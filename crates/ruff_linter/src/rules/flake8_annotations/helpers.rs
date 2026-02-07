@@ -48,7 +48,10 @@ pub(crate) fn is_overload_impl(
 }
 
 /// Given a function, guess its return type.
-pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPythonType> {
+pub(crate) fn auto_return_type(
+    function: &ast::StmtFunctionDef,
+    semantic: &SemanticModel,
+) -> Option<AutoPythonType> {
     // Collect all the `return` statements.
     let returns = {
         let mut visitor = ReturnStatementVisitor::default();
@@ -63,9 +66,16 @@ pub(crate) fn auto_return_type(function: &ast::StmtFunctionDef) -> Option<AutoPy
     };
 
     // Determine the terminal behavior (i.e., implicit return, no return, etc.).
-    let terminal = Terminal::from_function(function);
+    let terminal = Terminal::from_function(function, semantic);
 
-    // If every control flow path raises an exception, return `NoReturn`.
+    // If every control flow path raises NotImplementedError, don't suggest NoReturn
+    // since these are abstract methods that should have the actual return type.
+    if terminal == Terminal::RaiseNotImplemented {
+        return None;
+    }
+
+    // If every control flow path raises an exception (other than NotImplementedError),
+    // suggest NoReturn.
     if terminal == Terminal::Raise {
         return Some(AutoPythonType::Never);
     }

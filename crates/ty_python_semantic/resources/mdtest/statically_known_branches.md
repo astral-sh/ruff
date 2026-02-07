@@ -1578,8 +1578,23 @@ def _(flag: bool):
     if True and ALWAYS_TRUE_IF_BOUND:
         x = 1
 
-    # error: [possibly-unresolved-reference] "Name `x` used when possibly not defined"
+    # no error, x is considered definitely bound
     x
+```
+
+```py
+def _(flag: bool):
+    if flag:
+        ALWAYS_TRUE_IF_BOUND = True
+
+    # error: [possibly-unresolved-reference] "Name `ALWAYS_TRUE_IF_BOUND` used when possibly not defined"
+    if True and ALWAYS_TRUE_IF_BOUND:
+        x = 1
+    else:
+        x = 2
+
+    # If `ALWAYS_TRUE_IF_BOUND` were not defined, an error would occur, and therefore the `x = 2` branch would never be executed.
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Unreachable code

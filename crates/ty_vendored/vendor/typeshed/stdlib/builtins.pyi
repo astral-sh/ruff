@@ -1403,11 +1403,11 @@ class str(Sequence[str]):
     def __eq__(self, value: object, /) -> bool: ...
     def __ge__(self, value: str, /) -> bool: ...
     @overload
-    def __getitem__(self: LiteralString, key: SupportsIndex | slice, /) -> LiteralString:
+    def __getitem__(self: LiteralString, key: SupportsIndex | slice[SupportsIndex | None], /) -> LiteralString:
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: SupportsIndex | slice, /) -> str: ...  # type: ignore[misc]
+    def __getitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> str: ...  # type: ignore[misc]
     def __gt__(self, value: str, /) -> bool: ...
     def __hash__(self) -> int: ...
     @overload
@@ -1874,7 +1874,7 @@ class bytes(Sequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> bytes: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytes: ...
     def __add__(self, value: ReadableBuffer, /) -> bytes:
         """Return self+value."""
 
@@ -2377,14 +2377,14 @@ class bytearray(MutableSequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> bytearray: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytearray: ...
     @overload
     def __setitem__(self, key: SupportsIndex, value: SupportsIndex, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[SupportsIndex] | bytes, /) -> None: ...
-    def __delitem__(self, key: SupportsIndex | slice, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[SupportsIndex] | bytes, /) -> None: ...
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
 
     def __add__(self, value: ReadableBuffer, /) -> bytearray:
@@ -2525,7 +2525,7 @@ class memoryview(Sequence[_I]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> memoryview[_I]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> memoryview[_I]: ...
     def __contains__(self, x: object, /) -> bool: ...
     def __iter__(self) -> Iterator[_I]:
         """Implement iter(self)."""
@@ -2536,7 +2536,7 @@ class memoryview(Sequence[_I]):
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     @overload
-    def __setitem__(self, key: slice, value: ReadableBuffer, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: ReadableBuffer, /) -> None:
         """Set self[key] to value."""
 
     @overload
@@ -2740,7 +2740,7 @@ class tuple(Sequence[_T_co]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> tuple[_T_co, ...]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> tuple[_T_co, ...]: ...
     def __iter__(self) -> Iterator[_T_co]:
         """Implement iter(self)."""
 
@@ -2901,14 +2901,14 @@ class list(MutableSequence[_T]):
         """Return self[index]."""
 
     @overload
-    def __getitem__(self, s: slice, /) -> list[_T]: ...
+    def __getitem__(self, s: slice[SupportsIndex | None], /) -> list[_T]: ...
     @overload
     def __setitem__(self, key: SupportsIndex, value: _T, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[_T], /) -> None: ...
-    def __delitem__(self, key: SupportsIndex | slice, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[_T], /) -> None: ...
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
     # Overloading looks unnecessary, but is needed to work around complex mypy problems
     @overload
@@ -3157,7 +3157,7 @@ class set(MutableSet[_T]):
     def __ior__(self, value: AbstractSet[_T], /) -> Self:  # type: ignore[override,misc]
         """Return self|=value."""
 
-    def __sub__(self, value: AbstractSet[_T | None], /) -> set[_T]:
+    def __sub__(self, value: AbstractSet[object], /) -> set[_T]:
         """Return self-value."""
 
     def __isub__(self, value: AbstractSet[object], /) -> Self:
@@ -3225,7 +3225,7 @@ class frozenset(AbstractSet[_T_co]):
     def __or__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
         """Return self|value."""
 
-    def __sub__(self, value: AbstractSet[_T_co], /) -> frozenset[_T_co]:
+    def __sub__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
         """Return self-value."""
 
     def __xor__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
@@ -3310,7 +3310,7 @@ class range(Sequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> range: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> range: ...
     def __reversed__(self) -> Iterator[int]:
         """Return a reverse iterator."""
 

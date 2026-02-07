@@ -11,12 +11,17 @@ use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_source_file::LineColumn;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+use ruff_db::parsed::parsed_module;
+use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::scope::{FileScopeId, ScopeKind};
+use crate::semantic_index::semantic_index;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -29,8 +34,37 @@ use crate::types::{
     BindingContext, BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType,
     KnownBoundMethodType, KnownClass, KnownInstanceType, MaterializationKind, Protocol,
     ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
 };
+
+/// A named item that can be either a class or a type alias.
+///
+/// This wrapper allows tracking both classes and type aliases together for
+/// disambiguation, since a class and type alias with the same name in different
+/// modules need to be distinguished in error messages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NamedItem<'db> {
+    Class(ClassLiteral<'db>),
+    TypeAlias(TypeAliasType<'db>),
+}
+
+impl<'db> NamedItem<'db> {
+    fn name(self, db: &'db dyn Db) -> &'db str {
+        match self {
+            NamedItem::Class(class) => class.name(db),
+            NamedItem::TypeAlias(type_alias) => type_alias.name(db),
+        }
+    }
+
+    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
+        match self {
+            NamedItem::Class(class) => class.qualified_name(db).components_excluding_self(),
+            NamedItem::TypeAlias(type_alias) => {
+                type_alias.qualified_name(db).components_excluding_self()
+            }
+        }
+    }
+}
 
 /// Settings for displaying types and signatures
 #[derive(Debug, Clone, Default)]
@@ -40,6 +74,9 @@ pub struct DisplaySettings<'db> {
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
     pub qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
+    /// Type alias names that should be displayed fully qualified
+    /// (e.g., `A.Alias` instead of just `Alias`)
+    pub qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Whether long unions and literals are displayed in full
     pub preserve_full_unions: bool,
     /// Disallow Signature printing to introduce a name
@@ -109,24 +146,19 @@ impl<'db> DisplaySettings<'db> {
         T: Into<Type<'db>>,
     {
         fn build_display_settings<'db>(
-            collector: &AmbiguousClassCollector<'db>,
+            collector: &AmbiguousNameCollector<'db>,
         ) -> DisplaySettings<'db> {
+            // Both classes and type aliases use the same qualification map since
+            // a class and type alias with the same name need to be disambiguated.
+            let qualification_map = Rc::new(collector.qualification_map());
             DisplaySettings {
-                qualified: Rc::new(
-                    collector
-                        .class_names
-                        .borrow()
-                        .iter()
-                        .filter_map(|(name, ambiguity)| {
-                            Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
-                        })
-                        .collect(),
-                ),
+                qualified: Rc::clone(&qualification_map),
+                qualified_type_aliases: qualification_map,
                 ..DisplaySettings::default()
             }
         }
 
-        let collector = AmbiguousClassCollector::default();
+        let collector = AmbiguousNameCollector::default();
 
         for ty in types {
             collector.visit_type(db, ty.into());
@@ -374,43 +406,45 @@ impl QualificationLevel {
 }
 
 #[derive(Debug, Default)]
-struct AmbiguousClassCollector<'db> {
+struct AmbiguousNameCollector<'db> {
     visited_types: RefCell<FxHashSet<Type<'db>>>,
-    class_names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
+    names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
 }
 
-impl<'db> AmbiguousClassCollector<'db> {
-    fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
-        match self.class_names.borrow_mut().entry(class.name(db)) {
+impl<'db> AmbiguousNameCollector<'db> {
+    /// Records an item for ambiguity tracking.
+    ///
+    /// This updates the ambiguity state for items with the same name:
+    /// - First occurrence: `Unambiguous`
+    /// - Different qualified paths: `RequiresFullyQualifiedName`
+    /// - Same qualified paths: `RequiresFileAndLineNumber`
+    fn record(&self, db: &'db dyn Db, item: NamedItem<'db>) {
+        match self.names.borrow_mut().entry(item.name(db)) {
             Entry::Vacant(entry) => {
-                entry.insert(AmbiguityState::Unambiguous(class));
+                entry.insert(AmbiguityState::Unambiguous(item));
             }
             Entry::Occupied(mut entry) => {
                 let value = entry.get_mut();
                 match value {
                     AmbiguityState::Unambiguous(existing) => {
-                        if *existing != class {
-                            let qualified_name_components =
-                                class.qualified_name(db).components_excluding_self();
-                            if existing.qualified_name(db).components_excluding_self()
-                                == qualified_name_components
-                            {
+                        if *existing != item {
+                            let qualified_name_components = item.qualified_name_components(db);
+                            if existing.qualified_name_components(db) == qualified_name_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
                             } else {
                                 *value = AmbiguityState::RequiresFullyQualifiedName {
-                                    class,
+                                    item,
                                     qualified_name_components,
                                 };
                             }
                         }
                     }
                     AmbiguityState::RequiresFullyQualifiedName {
-                        class: existing,
+                        item: existing,
                         qualified_name_components,
                     } => {
-                        if *existing != class {
-                            let new_components =
-                                class.qualified_name(db).components_excluding_self();
+                        if *existing != item {
+                            let new_components = item.qualified_name_components(db);
                             if *qualified_name_components == new_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
                             }
@@ -421,25 +455,47 @@ impl<'db> AmbiguousClassCollector<'db> {
             }
         }
     }
+
+    fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
+        self.record(db, NamedItem::Class(class));
+    }
+
+    fn record_type_alias(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+        self.record(db, NamedItem::TypeAlias(type_alias));
+    }
+
+    /// Returns the qualification level map for all names.
+    ///
+    /// When there's any ambiguity for a name (including conflicts between a class
+    /// and a type alias), the name is included so that items with that name get qualified.
+    fn qualification_map(&self) -> FxHashMap<&'db str, QualificationLevel> {
+        self.names
+            .borrow()
+            .iter()
+            .filter_map(|(name, ambiguity)| {
+                Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
+            })
+            .collect()
+    }
 }
 
-/// Whether or not a class can be unambiguously identified by its *unqualified* name
+/// Whether or not an item can be unambiguously identified by its *unqualified* name
 /// given the other types that are present in the same context.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum AmbiguityState<'db> {
-    /// The class can be displayed unambiguously using its unqualified name
-    Unambiguous(ClassLiteral<'db>),
-    /// The class must be displayed using its fully qualified name to avoid ambiguity.
+    /// The item can be displayed unambiguously using its unqualified name.
+    Unambiguous(NamedItem<'db>),
+    /// The item must be displayed using its fully qualified name to avoid ambiguity.
     RequiresFullyQualifiedName {
-        class: ClassLiteral<'db>,
+        item: NamedItem<'db>,
         qualified_name_components: Vec<String>,
     },
-    /// Even the class's fully qualified name is not sufficient;
+    /// Even the item's fully qualified name is not sufficient;
     /// we must also include the file and line number.
     RequiresFileAndLineNumber,
 }
 
-impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
+impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
     fn should_visit_lazy_type_attributes(&self) -> bool {
         false
     }
@@ -453,6 +509,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
             Type::GenericAlias(alias) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
+            Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -555,6 +612,77 @@ impl fmt::Debug for DisplayType<'_> {
     }
 }
 
+/// Format a file location suffix for disambiguation (e.g., " @ path:line:column")
+fn fmt_file_location<'db>(
+    db: &'db dyn Db,
+    file: ruff_db::files::File,
+    offset: TextSize,
+    f: &mut TypeWriter<'_, '_, 'db>,
+) -> fmt::Result {
+    let path = file.path(db);
+    let path = match path {
+        FilePath::System(path) => Cow::Owned(FilePath::System(
+            path.strip_prefix(db.system().current_directory())
+                .unwrap_or(path)
+                .to_path_buf(),
+        )),
+        FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
+    };
+    let line_index = line_index(db, file);
+    let LineColumn { line, column } = line_index.line_column(offset, &source_text(db, file));
+    f.set_invalid_type_annotation();
+    write!(f, " @ {path}:{line}:{column}")
+}
+
+/// Returns the qualified name components for a scope, excluding the item itself.
+///
+/// This is the shared logic used by both [`QualifiedClassName`](super::class::QualifiedClassName)
+/// and [`QualifiedTypeAliasName`](super::QualifiedTypeAliasName) to compute the path components
+/// (module, enclosing classes, functions) leading to an item.
+///
+/// # Returns
+/// A vector of path components in order (e.g., `["module", "OuterClass", "InnerClass"]`)
+pub(super) fn qualified_name_components_from_scope(
+    db: &dyn Db,
+    file: ruff_db::files::File,
+    file_scope_id: FileScopeId,
+    skip_count: usize,
+) -> Vec<String> {
+    let module_ast = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    let mut name_parts = vec![];
+
+    for (_, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(skip_count) {
+        let node = ancestor_scope.node();
+
+        match ancestor_scope.kind() {
+            ScopeKind::Class => {
+                if let Some(class_def) = node.as_class() {
+                    name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
+                }
+            }
+            ScopeKind::Function => {
+                if let Some(function_def) = node.as_function() {
+                    name_parts.push(format!(
+                        "<locals of function '{}'>",
+                        function_def.node(&module_ast).name.as_str()
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(module) = file_to_module(db, file) {
+        let module_name = module.name(db);
+        name_parts.push(module_name.as_str().to_string());
+    }
+
+    name_parts.reverse();
+    name_parts
+}
+
 impl<'db> ClassLiteral<'db> {
     fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> ClassDisplay<'db> {
         ClassDisplay {
@@ -585,27 +713,69 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
             let file = self.class.file(self.db);
-            let class_offset = self.class.header_range(self.db).start();
-            let path = file.path(self.db);
-            let path = match path {
-                FilePath::System(path) => Cow::Owned(FilePath::System(
-                    path.strip_prefix(self.db.system().current_directory())
-                        .unwrap_or(path)
-                        .to_path_buf(),
-                )),
-                FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
-            };
-            let line_index = line_index(self.db, file);
-            let LineColumn { line, column } =
-                line_index.line_column(class_offset, &source_text(self.db, file));
-            f.set_invalid_type_annotation();
-            write!(f, " @ {path}:{line}:{column}")?;
+            let offset = self.class.header_range(self.db).start();
+            fmt_file_location(self.db, file, offset, f)?;
         }
         Ok(())
     }
 }
 
 impl Display for ClassDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
+}
+
+impl<'db> TypeAliasType<'db> {
+    fn display_with(
+        self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> TypeAliasDisplay<'db> {
+        TypeAliasDisplay {
+            db,
+            type_alias: self,
+            settings,
+        }
+    }
+}
+
+struct TypeAliasDisplay<'db> {
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let qualification_level = self
+            .settings
+            .qualified_type_aliases
+            .get(self.type_alias.name(self.db));
+
+        let ty = Type::TypeAlias(self.type_alias);
+        if qualification_level.is_some() {
+            let qualified_name = self.type_alias.qualified_name(self.db);
+            write!(f.with_type(ty), "{qualified_name}")?;
+        } else {
+            write!(f.with_type(ty), "{}", self.type_alias.name(self.db))?;
+        }
+
+        if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
+            if let Some(definition) = self.type_alias.definition(self.db) {
+                let file = definition.file(self.db);
+                let offset = definition
+                    .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
+                    .range()
+                    .start();
+                fmt_file_location(self.db, file, offset, f)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Display for TypeAliasDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
@@ -1056,7 +1226,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_char('>')
             }
             Type::TypeAlias(alias) => {
-                f.write_str(alias.name(self.db))?;
+                alias
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
                 match alias.specialization(self.db) {
                     None => Ok(()),
                     Some(specialization) => specialization

@@ -408,11 +408,6 @@ impl Printer {
             }
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
-            let format = if preview {
-                self.format
-            } else {
-                OutputFormat::Concise
-            };
             let config = DisplayDiagnosticConfig::default()
                 .preview(preview)
                 .hide_severity(true)
@@ -420,7 +415,7 @@ impl Printer {
                 .with_show_fix_status(show_fix_status(self.fix_mode, fixables.as_ref()))
                 .with_fix_applicability(self.unsafe_fixes.required_applicability())
                 .show_fix_diff(preview);
-            render_diagnostics(writer, format, config, &context, &diagnostics.inner)?;
+            render_diagnostics(writer, self.format, config, &context, &diagnostics.inner)?;
         }
         writer.flush()?;
 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:14:1
    |
 12 | # Errors
@@ -21,7 +21,7 @@ help: Pass `maxsplit=1` into `str.split()`
 16 | "1,2,3".rsplit(",")[0]  # [missing-maxsplit-arg]
 17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:15:1
    |
 13 | ## Test split called directly on string literal
@@ -41,7 +41,7 @@ help: Use `str.rsplit()` and pass `maxsplit=1`
 17 | "1,2,3".rsplit(",")[-1]  # [missing-maxsplit-arg]
 18 | 
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:16:1
    |
 14 | "1,2,3".split(",")[0]  # [missing-maxsplit-arg]
@@ -60,7 +60,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 18 | 
 19 | ## Test split called on string variable
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:17:1
    |
 15 | "1,2,3".split(",")[-1]  # [missing-maxsplit-arg]
@@ -80,7 +80,7 @@ help: Pass `maxsplit=1` into `str.rsplit()`
 19 | ## Test split called on string variable
 20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:20:1
    |
 19 | ## Test split called on string variable
@@ -99,7 +99,7 @@ help: Pass `maxsplit=1` into `str.split()`
 22 | SEQ.rsplit(",")[0]  # [missing-maxsplit-arg]
 23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:21:1
    |
 19 | ## Test split called on string variable
@@ -119,7 +119,7 @@ help: Use `str.rsplit()` and pass `maxsplit=1`
 23 | SEQ.rsplit(",")[-1]  # [missing-maxsplit-arg]
 24 | 
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:22:1
    |
 20 | SEQ.split(",")[0]  # [missing-maxsplit-arg]
@@ -138,7 +138,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 24 | 
 25 | ## Test split called on class attribute
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:23:1
    |
 21 | SEQ.split(",")[-1]  # [missing-maxsplit-arg]
@@ -158,7 +158,7 @@ help: Pass `maxsplit=1` into `str.rsplit()`
 25 | ## Test split called on class attribute
 26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:26:1
    |
 25 | ## Test split called on class attribute
@@ -177,7 +177,7 @@ help: Pass `maxsplit=1` into `str.split()`
 28 | Foo.class_str.rsplit(",")[0]  # [missing-maxsplit-arg]
 29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:27:1
    |
 25 | ## Test split called on class attribute
@@ -197,7 +197,7 @@ help: Use `str.rsplit()` and pass `maxsplit=1`
 29 | Foo.class_str.rsplit(",")[-1]  # [missing-maxsplit-arg]
 30 | 
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:28:1
    |
 26 | Foo.class_str.split(",")[0]  # [missing-maxsplit-arg]
@@ -216,7 +216,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 30 | 
 31 | ## Test split called on sliced string
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:29:1
    |
 27 | Foo.class_str.split(",")[-1]  # [missing-maxsplit-arg]
@@ -236,7 +236,7 @@ help: Pass `maxsplit=1` into `str.rsplit()`
 31 | ## Test split called on sliced string
 32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:32:1
    |
 31 | ## Test split called on sliced string
@@ -255,7 +255,7 @@ help: Pass `maxsplit=1` into `str.split()`
 34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
 35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:33:1
    |
 31 | ## Test split called on sliced string
@@ -275,7 +275,7 @@ help: Pass `maxsplit=1` into `str.split()`
 35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
 36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:34:1
    |
 32 | "1,2,3"[::-1].split(",")[0]  # [missing-maxsplit-arg]
@@ -295,7 +295,7 @@ help: Pass `maxsplit=1` into `str.split()`
 36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
 37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:35:1
    |
 33 | "1,2,3"[::-1][::-1].split(",")[0]  # [missing-maxsplit-arg]
@@ -315,7 +315,7 @@ help: Use `str.rsplit()` and pass `maxsplit=1`
 37 | SEQ[:3].rsplit(",")[0]  # [missing-maxsplit-arg]
 38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:36:1
    |
 34 | SEQ[:3].split(",")[0]  # [missing-maxsplit-arg]
@@ -335,7 +335,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 38 | Foo.class_str[1:3].rsplit(",")[-1]  # [missing-maxsplit-arg]
 39 | 
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:37:1
    |
 35 | Foo.class_str[1:3].split(",")[-1]  # [missing-maxsplit-arg]
@@ -354,7 +354,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 39 | 
 40 | ## Test sep given as named argument
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:38:1
    |
 36 | "1,2,3"[::-1].rsplit(",")[0]  # [missing-maxsplit-arg]
@@ -374,7 +374,7 @@ help: Pass `maxsplit=1` into `str.rsplit()`
 40 | ## Test sep given as named argument
 41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:41:1
    |
 40 | ## Test sep given as named argument
@@ -393,7 +393,7 @@ help: Pass `maxsplit=1` into `str.split()`
 43 | "1,2,3".rsplit(sep=",")[0]  # [missing-maxsplit-arg]
 44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:42:1
    |
 40 | ## Test sep given as named argument
@@ -413,7 +413,7 @@ help: Use `str.rsplit()` and pass `maxsplit=1`
 44 | "1,2,3".rsplit(sep=",")[-1]  # [missing-maxsplit-arg]
 45 | 
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:43:1
    |
 41 | "1,2,3".split(sep=",")[0]  # [missing-maxsplit-arg]
@@ -432,7 +432,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 45 | 
 46 | ## Special cases
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:44:1
    |
 42 | "1,2,3".split(sep=",")[-1]  # [missing-maxsplit-arg]
@@ -452,7 +452,7 @@ help: Pass `maxsplit=1` into `str.rsplit()`
 46 | ## Special cases
 47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:47:1
    |
 46 | ## Special cases
@@ -471,7 +471,7 @@ help: Pass `maxsplit=1` into `str.split()`
 49 | "1,2,3".rsplit("rsplit")[0]  # [missing-maxsplit-arg]
 50 | 
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:48:1
    |
 46 | ## Special cases
@@ -490,7 +490,7 @@ help: Use `str.rsplit()` and pass `maxsplit=1`
 50 | 
 51 | ## Test class attribute named split
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:49:1
    |
 47 | "1,2,3".split("\n")[0]  # [missing-maxsplit-arg]
@@ -510,7 +510,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 51 | ## Test class attribute named split
 52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:52:1
    |
 51 | ## Test class attribute named split
@@ -529,7 +529,7 @@ help: Pass `maxsplit=1` into `str.split()`
 54 | Bar.split.rsplit(",")[0]  # [missing-maxsplit-arg]
 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:53:1
    |
 51 | ## Test class attribute named split
@@ -549,7 +549,7 @@ help: Use `str.rsplit()` and pass `maxsplit=1`
 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 56 | 
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:54:1
    |
 52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
@@ -568,7 +568,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 56 | 
 57 | ## Test unpacked dict literal kwargs 
 
-PLC0207 [*] Replace with `rsplit(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:55:1
    |
 53 | Bar.split.split(",")[-1]  # [missing-maxsplit-arg]
@@ -588,7 +588,7 @@ help: Pass `maxsplit=1` into `str.rsplit()`
 57 | ## Test unpacked dict literal kwargs 
 58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:58:1
    |
 57 | ## Test unpacked dict literal kwargs 
@@ -606,7 +606,7 @@ help: Pass `maxsplit=1` into `str.split()`
 61 | # OK
 note: This is an unsafe fix and may change runtime behavior
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
    --> missing_maxsplit_arg.py:179:1
     |
 177 | # Errors
@@ -627,7 +627,7 @@ help: Pass `maxsplit=1` into `str.split()`
 182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
 note: This is an unsafe fix and may change runtime behavior
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
    --> missing_maxsplit_arg.py:182:1
     |
 180 | # OK
@@ -648,7 +648,7 @@ help: Pass `maxsplit=1` into `str.split()`
 185 | 
 note: This is an unsafe fix and may change runtime behavior
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
    --> missing_maxsplit_arg.py:184:1
     |
 182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
@@ -667,7 +667,7 @@ help: Pass `maxsplit=1` into `str.split()`
 187 | ## Test unpacked list literal args (starred expressions)
 note: This is an unsafe fix and may change runtime behavior
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
    --> missing_maxsplit_arg.py:189:1
     |
 187 | ## Test unpacked list literal args (starred expressions)
@@ -688,7 +688,7 @@ help: Pass `maxsplit=1` into `str.split()`
 192 | # Errors
 note: This is an unsafe fix and may change runtime behavior
 
-PLC0207 [*] Replace with `split(..., maxsplit=1)`.
+PLC0207 [*] String is split more times than necessary
    --> missing_maxsplit_arg.py:194:1
     |
 192 | # Errors

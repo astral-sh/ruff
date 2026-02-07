@@ -662,6 +662,25 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
+            // Fast path for various types that we know `object` is never a subtype of
+            // (`object` can be a subtype of some protocols, or of itself, but those cases are
+            // handled above).
+            (
+                Type::NominalInstance(source),
+                Type::NominalInstance(_)
+                | Type::SubclassOf(_)
+                | Type::Callable(_)
+                | Type::ProtocolInstance(_),
+            ) if source.is_object() => ConstraintSet::from(false),
+
+            // Fast path: `object` is not a subtype of any non-inferable type variable, since the
+            // type variable could be specialized to a type smaller than `object`.
+            (Type::NominalInstance(source), Type::TypeVar(typevar))
+                if source.is_object() && !typevar.is_inferable(db, inferable) =>
+            {
+                ConstraintSet::from(false)
+            }
+
             // `Never` is the bottom type, the empty set.
             (_, Type::Never) => ConstraintSet::from(false),
 
@@ -808,16 +827,22 @@ impl<'db> Type<'db> {
                 }),
 
             (Type::Intersection(intersection), _) => {
-                intersection.positive(db).iter().when_any(db, |&elem_ty| {
-                    elem_ty.has_relation_to_impl(
-                        db,
-                        target,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
+                // An intersection type is a subtype of another type if at least one of its
+                // positive elements is a subtype of that type. If there are no positive elements,
+                // we treat `object` as the implicit positive element (e.g., `~str` is semantically
+                // `object & ~str`).
+                intersection
+                    .positive_elements_or_object(db)
+                    .when_any(db, |elem_ty| {
+                        elem_ty.has_relation_to_impl(
+                            db,
+                            target,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             }
 
             // Other than the special cases checked above, no other types are a subtype of a

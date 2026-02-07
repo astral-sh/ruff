@@ -153,6 +153,10 @@ Settings: Settings {
     },
     analysis: AnalysisSettings {
         respect_type_ignore_comments: true,
+        allowed_unresolved_imports: ModuleGlobSet {
+            regex_set: RegexSet([]),
+            globs: [],
+        },
     },
     overrides: [],
 }

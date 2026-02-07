@@ -369,7 +369,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.14.14
+  rev: v0.15.0
   hooks:
     # Run the linter.
     - id: ruff-check

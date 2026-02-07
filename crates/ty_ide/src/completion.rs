@@ -6,7 +6,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
@@ -402,7 +402,7 @@ impl<'db> CompletionBuilder<'db> {
             if let Some(exception_ty) = ctx.exception_ty {
                 self.is_context_specific |= ty.is_assignable_to(db, exception_ty);
             }
-            if ctx.is_in_class_def {
+            if ctx.is_in_class_def() {
                 self.is_context_specific |= ty.is_class_literal()
                     || matches!(
                         ty,
@@ -607,10 +607,14 @@ impl<'m> Context<'m> {
             ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
                 let exception_ty = self.cursor.exception_ty(db);
+                let existing_class_bases = self
+                    .cursor
+                    .enclosing_class_def()
+                    .map(extract_base_class_names);
                 CollectionContext {
                     exception_ty,
                     is_raising_exception: exception_ty.is_some(),
-                    is_in_class_def: self.cursor.is_in_class_def(),
+                    existing_class_bases,
                     valid_keywords: self.cursor.valid_keywords(),
                 }
             }
@@ -857,23 +861,24 @@ impl<'m> ContextCursor<'m> {
         None
     }
 
-    /// Returns true when the curser is within the
-    /// arguments node of a class definition.
+    /// Returns the class definition if the cursor is within its
+    /// arguments node.
     ///
     /// E.g. `class Foo(Bar<CURSOR>)`
-    fn is_in_class_def(&self) -> bool {
+    fn enclosing_class_def(&self) -> Option<&'m ast::StmtClassDef> {
         for node in self.covering_node.ancestors() {
             if let ast::AnyNodeRef::StmtClassDef(class_def) = node {
                 return class_def
                     .arguments
                     .as_ref()
-                    .is_some_and(|args| args.range.contains_range(self.range));
+                    .is_some_and(|args| args.range.contains_range(self.range))
+                    .then_some(class_def);
             }
             if node.is_statement() {
-                return false;
+                return None;
             }
         }
-        false
+        None
     }
 
     /// Returns a set of keywords that are valid at
@@ -1066,8 +1071,10 @@ struct CollectionContext<'db> {
     exception_ty: Option<Type<'db>>,
     /// Whether we're in an exception context (`raise` or `except`) or not.
     is_raising_exception: bool,
-    /// Whether we're in a class definition context or not.
-    is_in_class_def: bool,
+    /// Names of base classes that are already specified in the class definition.
+    /// Used to filter out duplicate base class suggestions.
+    /// This is only `Some` when we're in a class definition context.
+    existing_class_bases: Option<FxHashSet<Name>>,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -1081,6 +1088,11 @@ impl<'db> CollectionContext<'db> {
     /// the "none" context does no additional filtering.
     fn none() -> CollectionContext<'db> {
         CollectionContext::default()
+    }
+
+    /// Whether we're in a class definition context.
+    fn is_in_class_def(&self) -> bool {
+        self.existing_class_bases.is_some()
     }
 
     /// Whether the completion that would be built from the
@@ -1097,8 +1109,35 @@ impl<'db> CollectionContext<'db> {
         {
             return !valid_keywords.contains(builder.name.as_str());
         }
+        // Exclude classes that are already listed as base classes in the class definition.
+        if let Some(ref existing_class_bases) = self.existing_class_bases {
+            // For in-scope completions, check if the simple name matches.
+            if builder.import.is_none() && existing_class_bases.contains(&builder.name) {
+                return true;
+            }
+            // For auto-import completions, check if the qualified name matches.
+            // This handles cases like `class Foo(mod.Bar, ...)` where we want to
+            // filter out auto-import suggestions for `Bar` from module `mod`.
+            if let Some(ref qualified) = builder.qualified
+                && existing_class_bases.contains(qualified)
+            {
+                return true;
+            }
+        }
         false
     }
+}
+
+/// Extracts the names of base classes from a class definition.
+///
+/// For simple name references (e.g., `Foo`), returns the name as-is.
+/// For attribute accesses (e.g., `mod.Foo`), returns the full dotted path.
+fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<Name> {
+    class_def
+        .bases()
+        .iter()
+        .filter_map(|expr| UnqualifiedName::from_expr(expr).map(|name| Name::new(name.to_string())))
+        .collect()
 }
 
 /// Relevance information assigned to a single completion.
@@ -3504,6 +3543,175 @@ class Foo(metaclass=x, meta<CURSOR>",
             .skip_builtins()
             .build()
             .not_contains("metaclass");
+    }
+
+    #[test]
+    fn class_base_already_specified() {
+        let builder = completion_test_builder(
+            "\
+class Foo: ...
+class Bar: ...
+
+class Baz(Foo, <CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo")
+            .contains("Bar");
+    }
+
+    #[test]
+    fn class_multiple_bases_already_specified() {
+        let builder = completion_test_builder(
+            "\
+class A: ...
+class B: ...
+class C: ...
+
+class D(A, B, <CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("A")
+            .not_contains("B")
+            .contains("C");
+    }
+
+    #[test]
+    fn class_base_same_name_different_module() {
+        // Even though `Foo` is already a base class, the auto-import suggestion
+        // for `other.Foo` should still be shown since it's a different symbol.
+        // Note: We need to type some characters (e.g., "Fo") to trigger auto-import
+        // suggestions, as empty queries don't generate unimported completions.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+class Foo: ...
+
+class Bar(Foo, Fo<CURSOR>
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // The local Foo should be filtered out (no import required)
+        assert!(
+            !foo_completions.iter().any(|c| c.import.is_none()),
+            "Local `Foo` should be filtered out as it's already a base class"
+        );
+
+        // The auto-import Foo from `other` module should be present
+        assert!(
+            foo_completions.iter().any(|c| c.import.is_some()),
+            "Auto-import `Foo` from other module should still be suggested"
+        );
+    }
+
+    #[test]
+    fn class_base_qualified_already_specified() {
+        // When a qualified base class like `other.Foo` is already specified,
+        // the auto-import suggestion for `Foo` from `other` should be filtered.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+import other
+
+class Bar(other.Foo, Fo<CURSOR>
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // The auto-import Foo from `other` should be filtered since `other.Foo`
+        // is already a base class.
+        assert!(
+            foo_completions.is_empty(),
+            "Auto-import `Foo` from `other` should be filtered since `other.Foo` is already a base"
+        );
+    }
+
+    #[test]
+    fn class_base_qualified_attribute_not_filtered() {
+        // TODO: This test documents a known limitation. When completing attributes
+        // on an already-imported module (e.g., `other.F<CURSOR>`), we don't filter
+        // out classes that are already base classes. This is because attribute
+        // completions don't have `import` or `qualified` set, so we can't match
+        // them against the existing base classes.
+        //
+        // This is a false negative (showing a duplicate that should be hidden),
+        // not a false positive, so it's a minor UX issue rather than a bug.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+class Bar: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+import other
+
+class MyClass(other.Foo, other.F<CURSOR>): pass
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // Ideally this would be empty since `other.Foo` is already a base class,
+        // but we don't currently filter attribute completions on imported modules.
+        assert_eq!(
+            foo_completions.len(),
+            1,
+            "Foo is not filtered out (known limitation)"
+        );
     }
 
     #[test]

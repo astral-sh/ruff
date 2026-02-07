@@ -23,7 +23,7 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
 
 use crate::configuration::Configuration;
-use crate::pyproject::{TargetVersionStrategy, settings_toml};
+use crate::pyproject::settings_toml;
 use crate::settings::Settings;
 use crate::{FileResolverSettings, pyproject};
 
@@ -315,13 +315,13 @@ pub trait ConfigurationTransformer {
 // file at least twice (possibly more than twice, since we'll also parse it when
 // resolving the "default" configuration).
 pub fn resolve_configuration(
-    pyproject: &Path,
+    initial_config_path: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
 ) -> Result<Configuration> {
     let relativity = Relativity::from(origin);
     let mut configurations = indexmap::IndexMap::new();
-    let mut next = Some(fs::normalize_path(pyproject));
+    let mut next = Some(fs::normalize_path(initial_config_path));
     while let Some(path) = next {
         if configurations.contains_key(&path) {
             bail!(format!(
@@ -334,20 +334,7 @@ pub fn resolve_configuration(
             ));
         }
 
-        // Resolve the current path.
-        let version_strategy =
-            if configurations.is_empty() && matches!(origin, ConfigurationOrigin::Ancestor) {
-                // For configurations that are discovered by
-                // walking back from a file, we will attempt to
-                // infer the `target-version` if it is missing
-                TargetVersionStrategy::RequiresPythonFallback
-            } else {
-                // In all other cases (e.g. for configurations
-                // inherited via `extend`, or user-level settings)
-                // we do not attempt to infer a missing `target-version`
-                TargetVersionStrategy::UseDefault
-            };
-        let options = pyproject::load_options(&path, &version_strategy).with_context(|| {
+        let options = pyproject::load_options(&path).with_context(|| {
             if configurations.is_empty() {
                 format!(
                     "Failed to load configuration `{path}`",
@@ -389,6 +376,9 @@ pub fn resolve_configuration(
     for extend in configurations {
         configuration = configuration.combine(extend);
     }
+
+    let configuration = configuration.apply_fallbacks(origin, initial_config_path);
+
     Ok(transformer.transform(configuration))
 }
 
@@ -963,7 +953,10 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
-    use ruff_linter::settings::types::{FilePattern, GlobPath};
+    use ruff_linter::settings::{
+        TargetVersion,
+        types::{FilePattern, GlobPath, PythonVersion},
+    };
 
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
@@ -1149,5 +1142,48 @@ mod tests {
             file_basename,
             &make_exclusion(exclude),
         ));
+    }
+
+    #[test]
+    fn extend_respects_target_version() -> Result<()> {
+        let tmp_dir = TempDir::new()?;
+        let root = tmp_dir.path();
+
+        let ruff_toml = root.join("ruff.toml");
+        std::fs::write(&ruff_toml, "target-version = \"py310\"")?;
+
+        let dot_ruff_toml = root.join(".ruff.toml");
+        std::fs::write(&dot_ruff_toml, "extend = \"ruff.toml\"")?;
+
+        let pyproject_toml = root.join("pyproject.toml");
+        std::fs::write(
+            &pyproject_toml,
+            r#"[project]
+name = "repro-ruff"
+version = "0.1.0"
+requires-python = ">=3.13"
+"#,
+        )?;
+
+        let main_py = root.join("main.py");
+        std::fs::write(
+            &main_py,
+            r#"from typing import TypeAlias
+
+A: TypeAlias = str | int
+"#,
+        )?;
+
+        let settings = resolve_root_settings(
+            &dot_ruff_toml,
+            &NoOpTransformer,
+            ConfigurationOrigin::Ancestor,
+        )?;
+        assert_eq!(
+            settings.linter.unresolved_target_version,
+            TargetVersion(Some(PythonVersion::Py310.into()))
+        );
+
+        Ok(())
     }
 }

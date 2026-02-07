@@ -3,7 +3,7 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "rich",
-#     "watchfiles",
+#     "watchfiles>=1.1.0",
 # ]
 # ///
 

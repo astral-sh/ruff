@@ -68,7 +68,7 @@ class Bar(Protocol):
     def f(self) -> int: ...
 
 class Baz(Bar):
-    # error: [invalid-return-type]
+    # error: [empty-body]
     def f(self) -> int: ...
 
 T = TypeVar("T")
@@ -108,7 +108,7 @@ class Bar[T](ABC):
     @abstractmethod
     def g[T](self, x: T) -> T: ...
 
-# error: [invalid-return-type]
+# error: [empty-body]
 def f() -> int: ...
 @abstractmethod  # Semantically meaningless, accepted nevertheless
 def g() -> int: ...
@@ -188,12 +188,12 @@ elif TYPE_CHECKING:
     def j() -> str: ...
 
 else:
-    def j_() -> str: ...  # error: [invalid-return-type]
+    def j_() -> str: ...  # error: [empty-body]
 
 if False:
     ...
 elif not TYPE_CHECKING:
-    def k_() -> str: ...  # error: [invalid-return-type]
+    def k_() -> str: ...  # error: [empty-body]
 
 else:
     def k() -> str: ...
@@ -225,19 +225,19 @@ if typing.TYPE_CHECKING:
     def o() -> str: ...
 
 if not typing.TYPE_CHECKING:
-    def p() -> str: ...  # error: [invalid-return-type]
+    def p() -> str: ...  # error: [empty-body]
 
 if compat.sub.sub.TYPE_CHECKING:
     def q() -> str: ...
 
 if not compat.sub.sub.TYPE_CHECKING:
-    def r() -> str: ...  # error: [invalid-return-type]
+    def r() -> str: ...  # error: [empty-body]
 
 if t.TYPE_CHECKING:
     def s() -> str: ...
 
 if not t.TYPE_CHECKING:
-    def t() -> str: ...  # error: [invalid-return-type]
+    def t() -> str: ...  # error: [empty-body]
 ```
 
 ## Conditional return type
@@ -321,7 +321,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 
-# error: [invalid-return-type]
+# error: [empty-body]
 def m(x: T) -> T: ...
 
 class A[T]: ...
@@ -558,7 +558,7 @@ async def j() -> str:  # error: [invalid-return-type]
     yield 42
 ```
 
-## Diagnostics for `invalid-return-type` on non-protocol subclasses of protocol classes
+## Diagnostics for `empty-body` on non-protocol subclasses of protocol classes
 
 <!-- snapshot-diagnostics -->
 
@@ -571,7 +571,7 @@ class Abstract(Protocol):
     def method(self) -> str: ...
 
 class Concrete(Abstract):
-    def method(self) -> str: ...  # error: [invalid-return-type]
+    def method(self) -> str: ...  # error: [empty-body]
 ```
 
 ## Diagnostics for `invalid-return-type` on dynamic type

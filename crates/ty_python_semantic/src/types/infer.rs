@@ -53,8 +53,7 @@ use crate::types::function::FunctionType;
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, StaticClassLiteral, Truthiness, Type, TypeAndQualifiers,
-    declaration_type,
+    ClassLiteral, KnownClass, StaticClassLiteral, Type, TypeAndQualifiers, declaration_type,
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
@@ -426,30 +425,6 @@ impl<'db> TypeContext<'db> {
         self.annotation
             .is_some_and(|ty| ty.is_typealias_special_form())
     }
-}
-
-/// Returns the statically-known truthiness of a given expression.
-///
-/// Returns [`Truthiness::Ambiguous`] in case any non-definitely bound places
-/// were encountered while inferring the type of the expression.
-#[salsa::tracked(
-    cycle_initial=|_, _, _| Truthiness::Ambiguous,
-    heap_size=get_size2::GetSize::get_heap_size
-)]
-pub(crate) fn static_expression_truthiness<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-) -> Truthiness {
-    let inference = infer_expression_types_impl(db, InferExpression::Bare(expression));
-
-    if !inference.all_places_definitely_bound() {
-        return Truthiness::Ambiguous;
-    }
-
-    let file = expression.file(db);
-    let module = parsed_module(db, file).load(db);
-    let node = expression.node_ref(db, &module);
-    inference.expression_type(node).bool(db)
 }
 
 /// Infer the types for an [`Unpack`] operation.
@@ -904,13 +879,5 @@ impl<'db> ExpressionInference<'db> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
-    }
-
-    /// Returns true if all places in this expression are definitely bound.
-    pub(crate) fn all_places_definitely_bound(&self) -> bool {
-        self.extra
-            .as_ref()
-            .map(|e| e.all_definitely_bound)
-            .unwrap_or(true)
     }
 }

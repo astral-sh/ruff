@@ -279,21 +279,17 @@ class ChildOfGood(Good):
 class Bad:
     @overload
     @final
-    def f(self, x: str) -> str: ...
+    def f(self, x: str) -> str: ...  # error: [invalid-overload]
     @overload
     def f(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
     def f(self, x: int | str) -> int | str:
         return x
 
     @final
     @overload
-    def g(self, x: str) -> str: ...
+    def g(self, x: str) -> str: ...  # error: [invalid-overload]
     @overload
     def g(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
     def g(self, x: int | str) -> int | str:
         return x
 
@@ -301,9 +297,7 @@ class Bad:
     def h(self, x: str) -> str: ...
     @overload
     @final
-    def h(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
+    def h(self, x: int) -> int: ...  # error: [invalid-overload]
     def h(self, x: int | str) -> int | str:
         return x
 
@@ -311,9 +305,7 @@ class Bad:
     def i(self, x: str) -> str: ...
     @final
     @overload
-    def i(self, x: int) -> int: ...
-
-    # error: [invalid-overload]
+    def i(self, x: int) -> int: ...  # error: [invalid-overload]
     def i(self, x: int | str) -> int | str:
         return x
 
@@ -352,6 +344,39 @@ class B:
 
 class C(B):
     def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
+```
+
+## Overriding a `@final` method by assigning a function to a class variable
+
+When a subclass overrides a `@final` method by assigning a function to a class variable, we emit a
+diagnostic but do not provide an autofix (since the function may be defined in a different file).
+
+<!-- snapshot-diagnostics -->
+
+`base.py`:
+
+```py
+from typing import final
+
+class Base:
+    @final
+    def method(self) -> None: ...
+```
+
+`other.py`:
+
+```py
+def replacement_method() -> None: ...
+```
+
+`derived.py`:
+
+```py
+from base import Base
+from other import replacement_method
+
+class Derived(Base):
+    method = replacement_method  # error: [override-of-final-method]
 ```
 
 ## Constructor methods are also checked
@@ -678,6 +703,245 @@ class MyProtocol(Protocol):
 @final
 class Implementer(MyProtocol):  # error: [abstract-method-in-final-class]
     pass
+```
+
+### Protocol with implicitly abstract methods
+
+<!-- snapshot-diagnostics -->
+
+A method in a `Protocol` class can be "implicitly abstract" if one of the following conditions are
+met:
+
+1. The function body only consists of `...` and/or `pass` statements
+1. The function is an overloaded function without an implementation
+1. The function body only consists of `raise NotImplementedError` or `raise NotImplementedError()`
+
+In either case, we also allow the function to have a docstring and still be considered implicitly
+abstract.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Protocol, final, Never, overload
+
+class P(Protocol):
+    # There'd be no unsoundness here if a subclass of this
+    # class were to be instantiated without the method having been overridden:
+    # the function returns `None`, and `None` is assignable to the inferred return
+    # type of the function (`Unknown`). Nonetheless, we consider this method
+    # implicitly abstract anyway, since the distinction based on the return type
+    # would probably be subtle and surprising to many users. This also matches the
+    # behaviour of all other type checkers
+    def still_abstractmethod(self): ...
+
+@final
+class Q(P): ...  # error: [abstract-method-in-final-class]
+
+class R(Protocol):
+    # same here
+    def also_still_abstractmethod(self) -> None: ...
+
+@final
+class S(R): ...  # error: [abstract-method-in-final-class]
+
+class Raises(Protocol):
+    def even_this_is_abstract(self):
+        raise NotImplementedError
+
+@final
+class RaisesSub(Raises): ...  # error: [abstract-method-in-final-class]
+
+class AlsoRaises(Protocol):
+    def also_abstractmethod(self) -> Never:
+        raise NotImplementedError
+
+@final
+class AlsoRaisesSub(AlsoRaises): ...  # error: [abstract-method-in-final-class]
+
+type NotImplementedErrorAlias = NotImplementedError
+
+def _(x: NotImplementedErrorAlias):
+    class Strange(Protocol):
+        def weird_abstractmethod(self):
+            raise x
+
+    @final
+    class StrangeSub(Strange): ...  # error: [abstract-method-in-final-class]
+
+class HasOverloads(Protocol):
+    @overload
+    def foo(self) -> int: ...
+    @overload
+    def foo(self, x: int) -> str: ...
+
+@final
+class HasOverloadSub(HasOverloads): ...  # error: [abstract-method-in-final-class]
+
+class RaisesDifferentException(Protocol):
+    def not_abstractmethod(self) -> int:
+        raise TypeError
+
+@final
+class RaisesDifferentSub(RaisesDifferentException): ...
+
+class RaisesMultiple(Protocol):
+    def not_abstractmethod(self) -> int:
+        raise NotImplementedError
+        raise NotImplementedError
+
+@final
+class RaisesMultipleSub(RaisesMultiple): ...
+
+class HasAbstract(Protocol):
+    def a(self) -> int: ...
+
+class HasAbstract2(Protocol):
+    def a(self) -> int:
+        pass
+
+class HasAbstract3(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+
+class HasAbstract4(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        ...
+
+class HasAbstract5(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        pass
+
+class HasAbstract6(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        pass
+        ...
+        pass
+        ...
+        pass
+        pass
+        pass
+        ...
+
+class HasAbstract7(Protocol):
+    def a(self) -> int:
+        raise NotImplementedError
+
+class HasAbstract8(Protocol):
+    def a(self) -> int:
+        raise NotImplementedError()
+
+class HasAbstract9(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        raise NotImplementedError
+
+class HasAbstract10(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        raise NotImplementedError()
+
+@final
+class HasAbstractSub(HasAbstract): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract2Sub(HasAbstract2): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract3Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract4Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract5Sub(HasAbstract5): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract6Sub(HasAbstract6): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract7Sub(HasAbstract7): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract8Sub(HasAbstract8): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract9Sub(HasAbstract9): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract10Sub(HasAbstract10): ...  # error: [abstract-method-in-final-class]
+```
+
+### `Protocol` methods in stub files are never implicitly abstract
+
+Methods in stub files are generally allowed to have stub bodies, so methods on `Protocol` classes in
+stub files are only inferred as being abstract if they are explicitly decorated with
+`@abstractmethod`:
+
+`stub.pyi`:
+
+```pyi
+from abc import abstractmethod
+from typing import Protocol
+
+class Abstract(Protocol):
+    @abstractmethod
+    def a(self) -> int: ...
+
+class NotAbstract(Protocol):
+    def a(self) -> int: ...
+```
+
+`main.py`:
+
+```py
+from typing import final
+from stub import Abstract, NotAbstract
+
+@final
+class Bad(Abstract): ...  # error: [abstract-method-in-final-class]
+
+@final
+class Fine(NotAbstract): ...
+```
+
+### `@final` `Protocol` classes are excluded
+
+We allow `@final` `Protocol` classes to have unimplemented abstract methods. Unlike non-`Protocol`
+classes, it is possible to subtype a `Protocol` class without explicitly subclassing it, so an
+`@final` `Protocol` class with unimplemented abstract methods is not inherently broken in the same
+way as an `@final` non-`Protocol` class:
+
+```py
+from typing import final, Protocol
+from ty_extensions import static_assert, is_subtype_of
+
+class Base(Protocol):
+    def abstract(self) -> int: ...
+
+@final
+class Sub(Base, Protocol):  # No error
+    def also_abstract(self) -> int: ...
+
+# This is rejected:
+#
+# error: [subclass-of-final-class]
+class SubclassesSub(Sub): ...
+
+# But this is fine:
+class ImplementsSubWithoutSubclassing:
+    def abstract(self) -> int:
+        return 42
+
+    def also_abstract(self) -> int:
+        return 56
+
+static_assert(is_subtype_of(ImplementsSubWithoutSubclassing, Sub))
 ```
 
 ### Fully implemented final class is fine

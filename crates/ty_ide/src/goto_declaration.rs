@@ -1110,6 +1110,212 @@ def another_helper(path):
     }
 
     #[test]
+    fn goto_declaration_string_annotation_nested1() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class | int'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass | int'] | None"
+          |           ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass | int'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested2() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:17
+          |
+        2 | x: "list['int | MyClass'] | None"
+          |                 ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['int | MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested3() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | None'] | My<CURSOR>Class"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:26
+          |
+        2 | x: "list['int | None'] | MyClass"
+          |                          ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['int | None'] | MyClass"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested4() {
+        let test = cursor_test(
+            r#"
+        x: "list['int' | 'My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:19
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+          |                   ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested5() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class' | 'str'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+          |           ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_too_nested1() {
+        let test = cursor_test(
+            r#"
+        x: """'list["My<CURSOR>Class" | "str"]' | None"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_too_nested2() {
+        let test = cursor_test(
+            r#"
+        x: """'list["int" | "str"]' | My<CURSOR>Class"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:31
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+          |                               ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_declaration_nested_instance_attribute() {
         let test = cursor_test(
             "

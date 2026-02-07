@@ -289,9 +289,36 @@ from typing import TypeVar
 T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
+
+S = TypeVar("S", int, float)
+
+def chained_constrained_types(t1: S, t2: S, t3: S) -> S:
+    return (t1 + t2) * t3
+
+def typevar_times_literal(t: S) -> S:
+    return t * 2
+
+def literal_times_typevar(t: S) -> S:
+    return 2 * t
+
+def negate_typevar(t: S) -> S:
+    return -t
+
+def positive_typevar(t: S) -> S:
+    return +t
+```
+
+Unary operations that are not supported by all constraints should error:
+
+```py
+from typing import TypeVar
+
+U = TypeVar("U", int, float)
+
+def invert_typevar(t: U) -> int:
+    # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `U@invert_typevar`"
+    return ~t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two
@@ -780,4 +807,80 @@ reveal_type(result)  # revealed: Derived
 
 # Accessing an attribute that only exists on Derived should work
 print(result.attr)  # No error
+```
+
+## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
+
+A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
+the actual TypeVar is equivalent to at least one constraint of the formal TypeVar. This commonly
+arises when wrapping functions from external packages that define private TypeVars with the same
+constraints.
+
+See: <https://github.com/astral-sh/ty/issues/2728>
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+S = TypeVar("S", int, str)
+
+def callee(x: T) -> T:
+    return x
+
+def caller(x: S) -> S:
+    return callee(x)
+
+reveal_type(caller(1))  # revealed: int
+reveal_type(caller("hello"))  # revealed: str
+```
+
+A constrained TypeVar with a subset of constraints is also compatible:
+
+```py
+from typing import TypeVar
+
+Wide = TypeVar("Wide", int, str, bytes)
+Narrow = TypeVar("Narrow", int, str)
+
+def wide(x: Wide) -> Wide:
+    return x
+
+def narrow(x: Narrow) -> Narrow:
+    return wide(x)
+
+reveal_type(narrow(1))  # revealed: int
+reveal_type(narrow("hello"))  # revealed: str
+```
+
+But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+U = TypeVar("U", int, bytes)
+
+def target(x: T) -> T:
+    return x
+
+def source(x: U) -> U:
+    return target(x)  # error: [invalid-argument-type]
+```
+
+We require equivalence rather than mere assignability when matching constraints. Constrained
+TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a
+strict subtype would be unsound. For example, a function constrained to `(int, str)` may narrow `T`
+to `int` and return `int(x)`, which would violate a caller's `bool` constraint:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+S = TypeVar("S", bool, str)
+
+def f(x: T) -> T:
+    return x
+
+def g(x: S) -> S:
+    return f(x)  # error: [invalid-argument-type]
 ```

@@ -1052,7 +1052,7 @@ fn create_workspace_server_with_file(
 /// Sends a workspace diagnostic request to the server.
 ///
 /// Unlike [`TestServer::workspace_diagnostic_request`], this function does not wait for the response.
-fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
+pub(crate) fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
     server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
         identifier: None,
         previous_result_ids: Vec::new(),
@@ -1065,7 +1065,7 @@ fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::Req
     })
 }
 
-fn shutdown_and_await_workspace_diagnostic(
+pub(crate) fn shutdown_and_await_workspace_diagnostic(
     mut server: TestServer,
     request_id: &RequestId,
 ) -> WorkspaceDiagnosticReportResult {
@@ -1083,7 +1083,7 @@ fn shutdown_and_await_workspace_diagnostic(
 }
 
 #[track_caller]
-fn assert_workspace_diagnostics_suspends_for_long_polling(
+pub(crate) fn assert_workspace_diagnostics_suspends_for_long_polling(
     server: &mut TestServer,
     request_id: &lsp_server::RequestId,
 ) {

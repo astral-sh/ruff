@@ -6,10 +6,9 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 
 use crate::Db;
-use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::{PyIndex, PySlice};
 
-use super::call::{Bindings, CallArguments, CallDunderError, CallError, CallErrorKind};
+use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
@@ -23,7 +22,8 @@ use super::instance::SliceLiteral;
 use super::special_form::SpecialFormType;
 use super::tuple::TupleSpec;
 use super::{
-    DynamicType, KnownInstanceType, Type, TypeAliasType, UnionBuilder, UnionType, todo_type,
+    DynamicType, IntersectionBuilder, IntersectionType, KnownInstanceType, Type, TypeAliasType,
+    UnionBuilder, UnionType, todo_type,
 };
 
 /// The kind of subscriptable type that had an out-of-bounds index.
@@ -107,29 +107,18 @@ pub(crate) enum SubscriptErrorKind<'db> {
     SliceStepSizeZero,
     /// A non-generic PEP 695 type alias was subscripted.
     NonGenericTypeAlias { alias: TypeAliasType<'db> },
-    /// `__getitem__` exists but is possibly unbound.
+    /// `__getitem__` or `__class_getitem__` exists but is possibly unbound.
     DunderPossiblyUnbound {
         method: DunderMethod,
         value_ty: Type<'db>,
     },
-    /// `__getitem__` exists but can't be called with the given arguments.
+    /// `__getitem__` or `__class_getitem__` exists but can't be called with the given arguments.
     DunderCallError {
         method: DunderMethod,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
         kind: CallErrorKind,
         bindings: Box<Bindings<'db>>,
-    },
-    /// `__class_getitem__` exists but isn't callable.
-    CallNonCallable {
-        method: DunderMethod,
-        value_ty: Type<'db>,
-        bindings: Box<Bindings<'db>>,
-    },
-    /// `__class_getitem__` exists but may be missing at runtime.
-    PossiblyMissingImplicitCall {
-        method: DunderMethod,
-        value_ty: Type<'db>,
     },
     /// The type does not support subscripting via the expected dunder.
     NotSubscriptable {
@@ -146,6 +135,8 @@ pub(crate) enum SubscriptErrorKind<'db> {
         origin: LegacyGenericOrigin,
         typevar_name: &'db str,
     },
+    /// A `TypeVarTuple` was provided to `Generic` or `Protocol` without being unpacked.
+    TypeVarTupleNotUnpacked { origin: LegacyGenericOrigin },
 }
 
 impl<'db> SubscriptError<'db> {
@@ -166,6 +157,11 @@ impl<'db> SubscriptError<'db> {
 
     fn into_errors(self) -> Vec<SubscriptErrorKind<'db>> {
         self.errors
+    }
+
+    /// Returns `true` if any error indicates the subscript method was available.
+    fn any_method_available(&self) -> bool {
+        self.errors.iter().any(SubscriptErrorKind::method_available)
     }
 
     pub(crate) fn report_diagnostics(
@@ -280,29 +276,6 @@ impl<'db> SubscriptErrorKind<'db> {
                     }
                 }
             },
-            Self::CallNonCallable {
-                method,
-                value_ty,
-                bindings,
-            } => {
-                if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
-                    builder.into_diagnostic(format_args!(
-                        "Method `{method}` of type `{}` is not callable on object of type `{}`",
-                        bindings.callable_type().display(db),
-                        value_ty.display(db),
-                    ));
-                }
-            }
-            Self::PossiblyMissingImplicitCall { method, value_ty } => {
-                if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Method `{method}` of type `{}` may be missing",
-                        value_ty.display(db),
-                    ));
-                }
-            }
             Self::NotSubscriptable { value_ty, method } => {
                 report_not_subscriptable(context, subscript, *value_ty, method.as_str());
             }
@@ -328,7 +301,21 @@ impl<'db> SubscriptErrorKind<'db> {
                     ));
                 }
             }
+            Self::TypeVarTupleNotUnpacked { origin } => {
+                if let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, subscript) {
+                    builder.into_diagnostic(format_args!(
+                        "`TypeVarTuple` must be unpacked with `*` or `Unpack[]` when \
+                        used as an argument to `{origin}`",
+                    ));
+                }
+            }
         }
+    }
+
+    /// Returns `true` if this error indicates the subscript method was available
+    /// (even if the call failed). Returns `false` for `NotSubscriptable` errors.
+    fn method_available(&self) -> bool {
+        !matches!(self, Self::NotSubscriptable { .. })
     }
 }
 
@@ -364,6 +351,62 @@ where
     }
 }
 
+fn map_intersection_subscript<'db, F>(
+    db: &'db dyn Db,
+    intersection: IntersectionType<'db>,
+    mut map_fn: F,
+) -> Result<Type<'db>, SubscriptError<'db>>
+where
+    F: FnMut(Type<'db>) -> Result<Type<'db>, SubscriptError<'db>>,
+{
+    let mut results = Vec::new();
+    let mut errors = Vec::new();
+
+    // Use `positive_elements_or_object` to ensure we always have at least one element.
+    // An intersection with only negative elements (e.g., `~int & ~str`) is implicitly
+    // `object & ~int & ~str`, so we fall back to `object`.
+    for element in intersection.positive_elements_or_object(db) {
+        match map_fn(element) {
+            Ok(result) => results.push(result),
+            Err(error) => errors.push(error),
+        }
+    }
+
+    // If any element succeeded, return the intersection of successful results.
+    if !results.is_empty() {
+        let mut builder = IntersectionBuilder::new(db);
+        for result in results {
+            builder = builder.add_positive(result);
+        }
+        return Ok(builder.build());
+    }
+
+    // All elements failed. Check if any element has the method available
+    // (even if the call failed). If so, filter out `NotSubscriptable` errors
+    // for elements that lack the method.
+    let any_has_method = errors.iter().any(SubscriptError::any_method_available);
+
+    let mut builder = IntersectionBuilder::new(db);
+    let mut collected_errors = Vec::new();
+
+    for error in errors {
+        if !any_has_method || error.any_method_available() {
+            builder = builder.add_positive(error.result_type());
+            let error_iter = error.into_errors().into_iter();
+            if any_has_method {
+                collected_errors.extend(error_iter.filter(SubscriptErrorKind::method_available));
+            } else {
+                collected_errors.extend(error_iter);
+            }
+        }
+    }
+
+    Err(SubscriptError::with_errors(
+        builder.build(),
+        collected_errors,
+    ))
+}
+
 impl<'db> Type<'db> {
     pub(super) fn subscript(
         self,
@@ -392,8 +435,16 @@ impl<'db> Type<'db> {
                 value_ty.subscript(db, element, expr_context)
             })),
 
-            (Type::Intersection(_), _) | (_, Type::Intersection(_)) => {
-                Some(Ok(todo_type!("Subscript expressions with intersections")))
+            (Type::Intersection(intersection), _) => {
+                Some(map_intersection_subscript(db, intersection, |element| {
+                    element.subscript(db, slice_ty, expr_context)
+                }))
+            }
+
+            (_, Type::Intersection(intersection)) => {
+                Some(map_intersection_subscript(db, intersection, |element| {
+                    value_ty.subscript(db, element, expr_context)
+                }))
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
@@ -656,41 +707,39 @@ impl<'db> Type<'db> {
         // despite the fact that there will be no corresponding `__class_getitem__`
         // method in these `sys.version_info` branches.
         if value_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)) {
-            let dunder_class_getitem_method = value_ty.member(db, "__class_getitem__").place;
-
-            match dunder_class_getitem_method {
-                Place::Undefined => {}
-                Place::Defined(DefinedPlace {
-                    ty,
-                    definedness: boundness,
-                    ..
-                }) => {
-                    let mut errors = Vec::new();
-                    if boundness == Definedness::PossiblyUndefined {
-                        errors.push(SubscriptErrorKind::PossiblyMissingImplicitCall {
+            let call_arguments = CallArguments::positional([slice_ty]);
+            match value_ty.try_call_dunder_on_class(
+                db,
+                "__class_getitem__",
+                &call_arguments,
+                TypeContext::default(),
+            ) {
+                Ok(bindings) => {
+                    return Ok(bindings.return_type(db));
+                }
+                Err(CallDunderError::PossiblyUnbound(bindings)) => {
+                    return Err(SubscriptError::new(
+                        bindings.return_type(db),
+                        SubscriptErrorKind::DunderPossiblyUnbound {
                             method: DunderMethod::ClassGetItem,
                             value_ty,
-                        });
-                    }
-
-                    match ty.try_call(db, &CallArguments::positional([slice_ty])) {
-                        Ok(bindings) => {
-                            let result_ty = bindings.return_type(db);
-                            if errors.is_empty() {
-                                return Ok(result_ty);
-                            }
-                            return Err(SubscriptError::with_errors(result_ty, errors));
-                        }
-                        Err(CallError(_, bindings)) => {
-                            let result_ty = bindings.return_type(db);
-                            errors.push(SubscriptErrorKind::CallNonCallable {
-                                method: DunderMethod::ClassGetItem,
-                                value_ty,
-                                bindings,
-                            });
-                            return Err(SubscriptError::with_errors(result_ty, errors));
-                        }
-                    }
+                        },
+                    ));
+                }
+                Err(CallDunderError::CallError(call_error_kind, bindings)) => {
+                    return Err(SubscriptError::new(
+                        bindings.return_type(db),
+                        SubscriptErrorKind::DunderCallError {
+                            method: DunderMethod::ClassGetItem,
+                            value_ty,
+                            slice_ty,
+                            kind: call_error_kind,
+                            bindings,
+                        },
+                    ));
+                }
+                Err(CallDunderError::MethodNotAvailable) => {
+                    // Fall through to the logic below
                 }
             }
 

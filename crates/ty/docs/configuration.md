@@ -5,6 +5,7 @@
 
 Configures the enabled rules and their severity.
 
+The keys are either rule names or `all` to set a default severity for all rules.
 See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
 
 Valid severities are:
@@ -16,7 +17,7 @@ Valid severities are:
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
 **Example usage**:
 
@@ -39,6 +40,46 @@ Valid severities are:
 ---
 
 ## `analysis`
+
+### `allowed-unresolved-imports`
+
+A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+
+Details on supported glob patterns:
+- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
+  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`
+  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.
+- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
 
 ### `respect-type-ignore-comments`
 
@@ -237,14 +278,13 @@ The root paths of the project, used for finding first-party modules.
 
 Accepts a list of directory paths searched in priority order (first has highest priority).
 
-If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:
+If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.
+The project root (`.`) is always included. Additionally, the following directories are included
+if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
 
-* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-* otherwise, default to `.` (flat layout)
-
-Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
-it will also be included in the first party search path.
+* `./src`
+* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+* `./python`
 
 **Default value**: `null`
 
@@ -418,7 +458,7 @@ severity levels or disable them entirely.
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
 **Example usage**:
 
@@ -445,6 +485,46 @@ severity levels or disable them entirely.
 ---
 
 ## `overrides.analysis`
+
+#### `allowed-unresolved-imports`
+
+A list of module glob patterns for which `unresolved-import` diagnostics should be suppressed.
+
+Details on supported glob patterns:
+- `*` matches zero or more characters except `.`. For example, `foo.*` matches `foo.bar` but
+  not `foo.bar.baz`; `foo*` matches `foo` and `foobar` but not `foo.bar` or `barfoo`; and `*foo`
+  matches `foo` and `barfoo` but not `foo.bar` or `foobar`.
+- `**` matches any number of module components (e.g., `foo.**` matches `foo`, `foo.bar`, etc.)
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Suppress errors for all `test` modules except `test.foo`
+    allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
 
 #### `respect-type-ignore-comments`
 
@@ -650,14 +730,13 @@ Enabled by default.
 
 The root of the project, used for finding first-party modules.
 
-If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
+The project root (`.`) is always included. Additionally, the following directories are included
+if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
 
-* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-* otherwise, default to `.` (flat layout)
-
-Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
-it will also be included in the first party search path.
+* `./src`
+* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+* `./python`
 
 **Default value**: `null`
 

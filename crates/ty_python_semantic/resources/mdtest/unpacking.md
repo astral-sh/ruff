@@ -9,7 +9,7 @@ to be `Unknown`.
 ### Simple tuple
 
 ```py
-(a, b, c) = (1, 2, 3)
+a, b, c = (1, 2, 3)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
 reveal_type(c)  # revealed: Literal[3]
@@ -46,7 +46,7 @@ reveal_type(c)  # revealed: tuple[Literal[1], Literal[2]]
 ### Nested tuple with unpacking
 
 ```py
-(a, (b, c), d) = (1, (2, 3), 4)
+a, (b, c), d = (1, (2, 3), 4)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[2]
 reveal_type(c)  # revealed: Literal[3]
@@ -56,7 +56,7 @@ reveal_type(d)  # revealed: Literal[4]
 ### Nested tuple without unpacking
 
 ```py
-(a, b, c) = (1, (2, 3), 4)
+a, b, c = (1, (2, 3), 4)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: tuple[Literal[2], Literal[3]]
 reveal_type(c)  # revealed: Literal[4]
@@ -66,7 +66,7 @@ reveal_type(c)  # revealed: Literal[4]
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected 3"
-(a, b, c) = (1, 2)
+a, b, c = (1, 2)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
@@ -76,7 +76,7 @@ reveal_type(c)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Too many values to unpack: Expected 2"
-(a, b) = (1, 2, 3)
+a, b = (1, 2, 3)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 ```
@@ -85,7 +85,7 @@ reveal_type(b)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected 2"
-(a, (b, c), d) = (1, (2,), 3)
+a, (b, c), d = (1, (2,), 3)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
@@ -96,7 +96,7 @@ reveal_type(d)  # revealed: Literal[3]
 
 ```py
 # error: [invalid-assignment] "Too many values to unpack: Expected 2"
-(a, (b, c), d) = (1, (2, 3, 4), 5)
+a, (b, c), d = (1, (2, 3, 4), 5)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
@@ -155,7 +155,7 @@ reveal_type(c)  # revealed: list[Literal[3, 4]]
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected at least 5"
-(a, b, c, *d, e, f) = (1,)
+a, b, c, *d, e, f = (1,)
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: Unknown
@@ -184,7 +184,7 @@ class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
 
-(a, b) = Iterable()
+a, b = Iterable()
 reveal_type(a)  # revealed: int
 reveal_type(b)  # revealed: int
 ```
@@ -200,7 +200,7 @@ class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
 
-(a, (b, c), d) = (1, Iterable(), 2)
+a, (b, c), d = (1, Iterable(), 2)
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: int
 reveal_type(c)  # revealed: int
@@ -549,7 +549,7 @@ reveal_type(b)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
-(a, *b, c, d) = "ab"
+a, *b, c, d = "ab"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: Unknown
@@ -558,7 +558,7 @@ reveal_type(d)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
-(a, b, *c, d) = "a"
+a, b, *c, d = "a"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: list[Unknown]
@@ -568,7 +568,7 @@ reveal_type(d)  # revealed: Unknown
 ### Starred expression (2)
 
 ```py
-(a, *b, c) = "ab"
+a, *b, c = "ab"
 reveal_type(a)  # revealed: Literal["a"]
 reveal_type(b)  # revealed: list[Never]
 reveal_type(c)  # revealed: Literal["b"]
@@ -577,7 +577,7 @@ reveal_type(c)  # revealed: Literal["b"]
 ### Starred expression (3)
 
 ```py
-(a, *b, c) = "abc"
+a, *b, c = "abc"
 reveal_type(a)  # revealed: Literal["a"]
 reveal_type(b)  # revealed: list[Literal["b"]]
 reveal_type(c)  # revealed: Literal["c"]
@@ -586,7 +586,7 @@ reveal_type(c)  # revealed: Literal["c"]
 ### Starred expression (4)
 
 ```py
-(a, *b, c, d) = "abcdef"
+a, *b, c, d = "abcdef"
 reveal_type(a)  # revealed: Literal["a"]
 reveal_type(b)  # revealed: list[Literal["b", "c", "d"]]
 reveal_type(c)  # revealed: Literal["e"]
@@ -596,7 +596,7 @@ reveal_type(d)  # revealed: Literal["f"]
 ### Starred expression (5)
 
 ```py
-(a, b, *c) = "abcd"
+a, b, *c = "abcd"
 reveal_type(a)  # revealed: Literal["a"]
 reveal_type(b)  # revealed: Literal["b"]
 reveal_type(c)  # revealed: list[Literal["c", "d"]]
@@ -618,7 +618,7 @@ def _(s: LiteralString):
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected 2"
-(a, b) = "é"
+a, b = "é"
 
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
@@ -628,7 +628,7 @@ reveal_type(b)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected 2"
-(a, b) = "\u9e6c"
+a, b = "\u9e6c"
 
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
@@ -638,7 +638,7 @@ reveal_type(b)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected 2"
-(a, b) = "\U0010ffff"
+a, b = "\U0010ffff"
 
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
@@ -647,7 +647,7 @@ reveal_type(b)  # revealed: Unknown
 ### Surrogates
 
 ```py
-(a, b) = "\ud800\udfff"
+a, b = "\ud800\udfff"
 
 reveal_type(a)  # revealed: Literal["�"]
 reveal_type(b)  # revealed: Literal["�"]
@@ -696,7 +696,7 @@ reveal_type(b)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
-(a, *b, c, d) = b"ab"
+a, *b, c, d = b"ab"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: list[Unknown]
 reveal_type(c)  # revealed: Unknown
@@ -705,7 +705,7 @@ reveal_type(d)  # revealed: Unknown
 
 ```py
 # error: [invalid-assignment] "Not enough values to unpack: Expected at least 3"
-(a, b, *c, d) = b"a"
+a, b, *c, d = b"a"
 reveal_type(a)  # revealed: Unknown
 reveal_type(b)  # revealed: Unknown
 reveal_type(c)  # revealed: list[Unknown]
@@ -715,7 +715,7 @@ reveal_type(d)  # revealed: Unknown
 ### Starred expression (2)
 
 ```py
-(a, *b, c) = b"ab"
+a, *b, c = b"ab"
 reveal_type(a)  # revealed: Literal[97]
 reveal_type(b)  # revealed: list[Never]
 reveal_type(c)  # revealed: Literal[98]
@@ -724,7 +724,7 @@ reveal_type(c)  # revealed: Literal[98]
 ### Starred expression (3)
 
 ```py
-(a, *b, c) = b"abc"
+a, *b, c = b"abc"
 reveal_type(a)  # revealed: Literal[97]
 reveal_type(b)  # revealed: list[Literal[98]]
 reveal_type(c)  # revealed: Literal[99]
@@ -733,7 +733,7 @@ reveal_type(c)  # revealed: Literal[99]
 ### Starred expression (4)
 
 ```py
-(a, *b, c, d) = b"abcdef"
+a, *b, c, d = b"abcdef"
 reveal_type(a)  # revealed: Literal[97]
 reveal_type(b)  # revealed: list[Literal[98, 99, 100]]
 reveal_type(c)  # revealed: Literal[101]
@@ -743,7 +743,7 @@ reveal_type(d)  # revealed: Literal[102]
 ### Starred expression (5)
 
 ```py
-(a, b, *c) = b"abcd"
+a, b, *c = b"abcd"
 reveal_type(a)  # revealed: Literal[97]
 reveal_type(b)  # revealed: Literal[98]
 reveal_type(c)  # revealed: list[Literal[99, 100]]
@@ -767,7 +767,7 @@ Union of two tuples of equal length and each element is of the same type.
 
 ```py
 def _(arg: tuple[int, int] | tuple[int, int]):
-    (a, b) = arg
+    a, b = arg
     reveal_type(a)  # revealed: int
     reveal_type(b)  # revealed: int
 ```
@@ -905,7 +905,7 @@ class Iterable:
     def __iter__(self) -> Iterator:
         return Iterator()
 
-((a, b), c) = Iterable()
+(a, b), c = Iterable()
 reveal_type(a)  # revealed: int
 reveal_type(b)  # revealed: int | str
 reveal_type(c)  # revealed: tuple[int, int] | tuple[int, str]

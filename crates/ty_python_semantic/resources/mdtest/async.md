@@ -71,7 +71,7 @@ async def task(name: str) -> int:
     return len(name)
 
 async def main():
-    (a, b) = await asyncio.gather(
+    a, b = await asyncio.gather(
         task("A"),
         task("B"),
     )

@@ -978,7 +978,7 @@ class Point(NamedTuple):
 Point3D = type("Point3D", (Point,), {})
 reveal_type(Point3D)  # revealed: <class 'Point3D'>
 # fmt: off
-reveal_mro(Point3D)  # revealed: (<class 'Point3D'>, <class 'Point'>, <class 'tuple[int, int]'>, <class 'Sequence[int]'>, <class 'Reversible[int]'>, <class 'Collection[int]'>, <class 'Iterable[int]'>, <class 'Container[int]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(Point3D)  # revealed: (<class 'Point3D'>, <class 'Point'>, <class 'tuple[int, int]'>, <class 'Sequence[int]'>, <class 'Reversible[int]'>, <class 'Collection[int]'>, <class 'Iterable[int]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 # fmt: on
 ```
 

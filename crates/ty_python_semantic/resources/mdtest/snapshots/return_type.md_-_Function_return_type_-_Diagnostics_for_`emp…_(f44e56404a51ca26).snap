@@ -4,7 +4,7 @@ expression: snapshot
 ---
 
 ---
-mdtest name: return_type.md - Function return type - Diagnostics for `invalid-return-type` on non-protocol subclasses of protocol classes
+mdtest name: return_type.md - Function return type - Diagnostics for `empty-body` on non-protocol subclasses of protocol classes
 mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 ---
 
@@ -19,21 +19,25 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/function/return_type.md
 4 |     def method(self) -> str: ...
 5 | 
 6 | class Concrete(Abstract):
-7 |     def method(self) -> str: ...  # error: [invalid-return-type]
+7 |     def method(self) -> str: ...  # error: [empty-body]
 ```
 
 # Diagnostics
 
 ```
-error[invalid-return-type]: Function always implicitly returns `None`, which is not assignable to return type `str`
+error[empty-body]: Function always implicitly returns `None`, which is not assignable to return type `str`
  --> src/mdtest_snippet.py:7:25
   |
 6 | class Concrete(Abstract):
-7 |     def method(self) -> str: ...  # error: [invalid-return-type]
+7 |     def method(self) -> str: ...  # error: [empty-body]
   |                         ^^^
   |
 info: Consider changing the return annotation to `-> None` or adding a `return` statement
-info: Only functions in stub files, methods on protocol classes, or methods with `@abstractmethod` are permitted to have empty bodies
+info: Functions with empty bodies and non-`None` return types are only permitted:
+info:  - in stub files
+info:  - in `if TYPE_CHECKING` blocks
+info:  - as methods on protocol classes
+info:  - or as `@abstractmethod`-decorated methods on abstract classes
 info: Class `Concrete` has `typing.Protocol` in its MRO, but it is not a protocol class
 info: Only classes that directly inherit from `typing.Protocol` or `typing_extensions.Protocol` are considered protocol classes
  --> src/mdtest_snippet.py:6:7
@@ -42,9 +46,9 @@ info: Only classes that directly inherit from `typing.Protocol` or `typing_exten
 5 |
 6 | class Concrete(Abstract):
   |       ^^^^^^^^^^^^^^^^^^ `Protocol` not present in `Concrete`'s immediate bases
-7 |     def method(self) -> str: ...  # error: [invalid-return-type]
+7 |     def method(self) -> str: ...  # error: [empty-body]
   |
 info: See https://typing.python.org/en/latest/spec/protocol.html#
-info: rule `invalid-return-type` is enabled by default
+info: rule `empty-body` is enabled by default
 
 ```

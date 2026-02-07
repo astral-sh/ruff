@@ -10,8 +10,10 @@ mod tests {
 
     use crate::registry::Rule;
 
+    use crate::settings::LinterSettings;
+    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_0.py"))]
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_1.py"))]
@@ -27,6 +29,29 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::InvalidMockAccess, Path::new("PGH005_0.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pygrep_hooks").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            }
+        );
         Ok(())
     }
 }

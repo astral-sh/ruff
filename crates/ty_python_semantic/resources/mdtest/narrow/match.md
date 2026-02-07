@@ -118,32 +118,6 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
-## Class patterns where the class pattern does not resolve to a class
-
-In general this does not allow for narrowing, but we make an exception for `Any`. This is to support
-[real ecosystem code](https://github.com/jax-ml/jax/blob/d2ce04b6c3d03ae18b145965b8b8b92e09e8009c/jax/_src/pallas/mosaic_gpu/lowering.py#L3372-L3387)
-found in `jax`.
-
-```py
-from typing import Any
-
-X = Any
-
-def f(obj: object):
-    match obj:
-        case int():
-            reveal_type(obj)  # revealed: int
-        case X():
-            reveal_type(obj)  # revealed: Any & ~int
-
-def g(obj: object, Y: Any):
-    match obj:
-        case int():
-            reveal_type(obj)  # revealed: int
-        case Y():
-            reveal_type(obj)  # revealed: Any & ~int
-```
-
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
@@ -441,4 +415,23 @@ def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
         case _:
             # But we *can* narrow with inequality
             reveal_type(x)  # revealed: tuple[str, B]
+```
+
+and it is also restricted to `match` patterns that solely consist of value patterns:
+
+```py
+class Config:
+    MODE: str = "default"
+
+def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
+    match u[0]:
+        case Config.MODE | "foo":
+            # Config.mode has type `str` (not a literal), which could match
+            # any string value at runtime. We cannot narrow based on "foo" alone
+            # because the actual match might have been against Config.mode.
+            reveal_type(u)  # revealed: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]
+        case "bar":
+            # Since the previous case could match any string, this case can
+            # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
+            reveal_type(u)  # revealed: tuple[Literal["bar"], str]
 ```

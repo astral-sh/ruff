@@ -564,9 +564,10 @@ impl DocumentQuery {
     /// Generate a source kind used by the linter.
     pub(crate) fn make_source_kind(&self) -> ruff_linter::source_kind::SourceKind {
         match self {
-            Self::Text { document, .. } => {
-                ruff_linter::source_kind::SourceKind::Python(document.contents().to_string())
-            }
+            Self::Text { document, .. } => ruff_linter::source_kind::SourceKind::Python {
+                code: document.contents().to_string(),
+                is_stub: ruff_python_ast::PySourceType::from(self.virtual_file_path()).is_stub(),
+            },
             Self::Notebook { notebook, .. } => {
                 ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())
             }

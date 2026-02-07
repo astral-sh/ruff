@@ -960,5 +960,21 @@ def f(x: Not) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
 
+## Attribute access on pure negation types
+
+When an attribute has a pure negation type (an intersection with only negative contributions, like
+`~AlwaysFalsy`), accessing it should preserve the negation information rather than falling back to
+`object`.
+
+```py
+from ty_extensions import Not, AlwaysFalsy
+
+class C:
+    x: Not[AlwaysFalsy]
+
+def f(c: C):
+    reveal_type(c.x)  # revealed: ~AlwaysFalsy
+```
+
 [complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)
 [de morgan's laws]: https://en.wikipedia.org/wiki/De_Morgan%27s_laws

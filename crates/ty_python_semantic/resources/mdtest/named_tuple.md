@@ -25,7 +25,7 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
-# revealed: (<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Person)
 
 static_assert(is_subtype_of(Person, tuple[int, str, int | None]))
@@ -249,7 +249,7 @@ from ty_extensions import reveal_mro
 class A(NamedTuple("B", [("x", NamedTuple("C", [("x", "A" | None)]))])):
     pass
 
-# revealed: (<class 'A'>, <class 'B'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'A'>, <class 'B'>, <class 'tuple[Unknown]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 ```
 
@@ -292,7 +292,7 @@ container = Container([1, 2, 3], {"a": True})
 reveal_type(container.items)  # revealed: Any
 reveal_type(container.mapping)  # revealed: Any
 
-# revealed: (<class 'Url'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'Url'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Url)
 
 invalid_fields = (("x", 42),)  # 42 is not a valid type
@@ -360,7 +360,7 @@ NT = NamedTuple("NT", fields)
 
 # Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
 reveal_type(NT)  # revealed: <class 'NT'>
-# revealed: (<class 'NT'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'NT'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(NT)
 reveal_type(NT(1, "a").x)  # revealed: Any
 ```
@@ -379,7 +379,7 @@ NT = collections.namedtuple("NT", field_names)
 
 # Fields are unknown, so attribute access returns Any and MRO has Unknown tuple.
 reveal_type(NT)  # revealed: <class 'NT'>
-# revealed: (<class 'NT'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'NT'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(NT)
 reveal_type(NT(1, 2).x)  # revealed: Any
 ```
@@ -397,7 +397,7 @@ class Url(NamedTuple("Url", [("host", str), ("path", str)])):
     pass
 
 reveal_type(Url)  # revealed: <class 'Url'>
-# revealed: (<class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:7'>, <class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:11'>, <class 'tuple[str, str]'>, <class 'Sequence[str]'>, <class 'Reversible[str]'>, <class 'Collection[str]'>, <class 'Iterable[str]'>, <class 'Container[str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:7'>, <class 'mdtest_snippet.Url @ src/mdtest_snippet.py:4:11'>, <class 'tuple[str, str]'>, <class 'Sequence[str]'>, <class 'Reversible[str]'>, <class 'Collection[str]'>, <class 'Iterable[str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(Url)
 reveal_type(Url.__new__)  # revealed: [Self](cls: type[Self], host: str, path: str) -> Self
 
@@ -508,7 +508,7 @@ reveal_type(config)  # revealed: GroundTruth
 reveal_type(config.duration)  # revealed: Any
 
 # Namedtuples with unknown fields inherit from tuple[Unknown, ...] to avoid false positives.
-# revealed: (<class 'GroundTruth'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'GroundTruth'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(GroundTruth)
 
 # No index-out-of-bounds error since the tuple length is unknown.

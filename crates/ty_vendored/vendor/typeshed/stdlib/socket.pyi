@@ -566,9 +566,10 @@ if sys.platform != "win32":
 
         __all__ += ["SO_BINDTODEVICE"]
 
-if sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "darwin":
     from _socket import BDADDR_ANY as BDADDR_ANY, BDADDR_LOCAL as BDADDR_LOCAL, BTPROTO_RFCOMM as BTPROTO_RFCOMM
 
+if sys.platform != "darwin" and sys.platform != "linux":
     __all__ += ["BDADDR_ANY", "BDADDR_LOCAL", "BTPROTO_RFCOMM"]
 
 if sys.platform == "darwin" and sys.version_info >= (3, 10):
@@ -1016,9 +1017,10 @@ if sys.platform != "linux":
 if sys.platform != "darwin" and sys.platform != "linux":
     __all__ += ["AF_BLUETOOTH"]
 
-if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "win32" and sys.platform != "darwin":
     from _socket import BTPROTO_HCI as BTPROTO_HCI, BTPROTO_L2CAP as BTPROTO_L2CAP, BTPROTO_SCO as BTPROTO_SCO
 
+if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
     __all__ += ["BTPROTO_HCI", "BTPROTO_L2CAP", "BTPROTO_SCO"]
 
 if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
@@ -1180,7 +1182,7 @@ class AddressFamily(IntEnum):
         AF_QIPCRTR = 42
     if sys.platform != "linux":
         AF_LINK = 33
-    if sys.platform != "darwin" and sys.platform != "linux":
+    if sys.platform != "darwin":
         AF_BLUETOOTH = 32
     if sys.platform == "win32" and sys.version_info >= (3, 12):
         AF_HYPERV = 34
@@ -1235,7 +1237,7 @@ if sys.platform == "linux":
 
 if sys.platform != "linux":
     AF_LINK: Final = AddressFamily.AF_LINK
-if sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "darwin":
     AF_BLUETOOTH: Final = AddressFamily.AF_BLUETOOTH
 if sys.platform == "win32" and sys.version_info >= (3, 12):
     AF_HYPERV: Final = AddressFamily.AF_HYPERV
@@ -1537,7 +1539,7 @@ if sys.platform == "win32":
 
 else:
     def socketpair(
-        family: int | AddressFamily | None = None, type: SocketType | int = ..., proto: int = 0
+        family: int | AddressFamily | None = None, type: SocketKind | int = ..., proto: int = 0
     ) -> tuple[socket, socket]:
         """socketpair([family[, type[, proto]]]) -> (socket object, socket object)
         Create a pair of socket objects from the sockets returned by the platform

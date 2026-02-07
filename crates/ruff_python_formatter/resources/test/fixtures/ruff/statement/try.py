@@ -203,3 +203,16 @@ try:
     pass
 except* (BaseException, Exception, ValueError) as e:
     pass
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/23125
+# Parentheses cannot be removed if any of the tuple elements is starred
+try:
+    pass
+except (Exception, *exceptions):
+    pass
+
+try:
+    pass
+except (*exceptions, Exception):
+    pass

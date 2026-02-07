@@ -554,7 +554,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ) -> Type<'db> {
         match value_ty {
             Type::ClassLiteral(class_literal) => match class_literal.known(self.db()) {
-                Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(slice)),
+                Some(KnownClass::Tuple) => Type::tuple(self.infer_tuple_type_expression(subscript)),
                 Some(KnownClass::Type) => self.infer_subclass_of_type_expression(slice),
                 _ => self.infer_subscript_type_expression(subscript, value_ty),
             },
@@ -583,10 +583,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    /// Given the slice of a `tuple[]` annotation, return the type that the annotation represents
+    /// Return the type represented by a `tuple[]` expression in a type annotation.
+    ///
+    /// This method assumes that a type has already been inferred and stored for the `value`
+    /// of the subscript passed in.
     pub(super) fn infer_tuple_type_expression(
         &mut self,
-        tuple_slice: &ast::Expr,
+        tuple: &ast::ExprSubscript,
     ) -> Option<TupleType<'db>> {
         /// In most cases, if a subelement of the tuple is inferred as `Todo`,
         /// we should only infer `Todo` for that specific subelement.
@@ -609,13 +612,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     element_ty.exact_tuple_instance_spec(builder.db()).is_none()
                 }
                 ast::Expr::Subscript(ast::ExprSubscript { value, .. }) => {
-                    let value_ty = if builder.deferred_state.in_string_annotation() {
-                        // Using `.expression_type` does not work in string annotations, because
-                        // we do not store types for sub-expressions. Re-infer the type here.
-                        builder.infer_expression(value, TypeContext::default())
-                    } else {
-                        builder.expression_type(value)
-                    };
+                    let value_ty = builder.expression_type(value);
 
                     value_ty == Type::SpecialForm(SpecialFormType::Unpack)
                 }
@@ -623,14 +620,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        // TODO: PEP 646
-        match tuple_slice {
+        // TODO: TypeVarTuple
+        match &*tuple.slice {
             ast::Expr::Tuple(elements) => {
                 if let [element, ellipsis @ ast::Expr::EllipsisLiteral(_)] = &*elements.elts {
+                    if element.is_starred_expr()
+                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                    {
+                        let mut diagnostic =
+                            builder.into_diagnostic("Invalid `tuple` specialization");
+                        diagnostic
+                            .set_primary_message("`...` cannot be used after an unpacked element");
+                    }
                     self.infer_expression(ellipsis, TypeContext::default());
                     let result =
                         TupleType::homogeneous(self.db(), self.infer_type_expression(element));
-                    self.store_expression_type(tuple_slice, Type::tuple(Some(result)));
+                    self.store_expression_type(&tuple.slice, Type::tuple(Some(result)));
                     return Some(result);
                 }
 
@@ -640,14 +645,65 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // (see docstring for `element_could_alter_type_of_whole_tuple`)
                 let mut return_todo = false;
 
+                let mut first_unpacked_variadic_tuple = None;
+
                 for element in elements {
+                    if element.is_ellipsis_literal_expr()
+                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                    {
+                        let mut diagnostic =
+                            builder.into_diagnostic("Invalid `tuple` specialization");
+                        diagnostic.set_primary_message(
+                            "`...` can only be used as the second element \
+                            in a two-element `tuple` specialization",
+                        );
+                    }
                     let element_ty = self.infer_type_expression(element);
                     return_todo |=
                         element_could_alter_type_of_whole_tuple(element, element_ty, self);
 
-                    if let ast::Expr::Starred(_) = element {
+                    if let ast::Expr::Starred(ast::ExprStarred {
+                        value: starred_value,
+                        ..
+                    }) = element
+                    {
+                        let mut report_too_many_unpacked_tuples = || {
+                            if let Some(first_unpacked_variadic_tuple) =
+                                first_unpacked_variadic_tuple
+                            {
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                                {
+                                    let mut diagnostic = builder.into_diagnostic(
+                                        "Multiple unpacked variadic tuples \
+                                            are not allowed in a `tuple` specialization",
+                                    );
+                                    diagnostic.annotate(
+                                        self.context
+                                            .secondary(first_unpacked_variadic_tuple)
+                                            .message("First unpacked variadic tuple"),
+                                    );
+                                    diagnostic.annotate(
+                                        self.context
+                                            .secondary(element)
+                                            .message("Later unpacked variadic tuple"),
+                                    );
+                                }
+                            } else {
+                                first_unpacked_variadic_tuple = Some(element);
+                            }
+                        };
+
                         if let Some(inner_tuple) = element_ty.exact_tuple_instance_spec(self.db()) {
                             element_types = element_types.concat(self.db(), &inner_tuple);
+
+                            if inner_tuple.is_variadic() {
+                                report_too_many_unpacked_tuples();
+                            }
+                        } else if self.expression_type(starred_value)
+                            == Type::Dynamic(DynamicType::TodoTypeVarTuple)
+                        {
+                            report_too_many_unpacked_tuples();
                         } else {
                             // TODO: emit a diagnostic
                         }
@@ -657,7 +713,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
 
                 let ty = if return_todo {
-                    Some(TupleType::homogeneous(self.db(), todo_type!("PEP 646")))
+                    Some(TupleType::homogeneous(
+                        self.db(),
+                        Type::Dynamic(DynamicType::TodoTypeVarTuple),
+                    ))
                 } else {
                     TupleType::new(self.db(), &element_types.build())
                 };
@@ -665,15 +724,27 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Here, we store the type for the inner `int, str` tuple-expression,
                 // while the type for the outer `tuple[int, str]` slice-expression is
                 // stored in the surrounding `infer_type_expression` call:
-                self.store_expression_type(tuple_slice, Type::tuple(ty));
+                self.store_expression_type(&tuple.slice, Type::tuple(ty));
 
                 ty
             }
             single_element => {
+                if single_element.is_ellipsis_literal_expr()
+                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                {
+                    let mut diagnostic = builder.into_diagnostic("Invalid `tuple` specialization");
+                    diagnostic.set_primary_message(
+                        "`...` can only be used as the second element \
+                            in a two-element `tuple` specialization",
+                    );
+                }
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
                 {
-                    Some(TupleType::homogeneous(self.db(), todo_type!("PEP 646")))
+                    Some(TupleType::homogeneous(
+                        self.db(),
+                        Type::Dynamic(DynamicType::TodoTypeVarTuple),
+                    ))
                 } else {
                     TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
                 }
@@ -707,6 +778,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 Type::unknown()
             }
+            ast::Expr::NoneLiteral(_) => {
+                self.infer_expression(slice, TypeContext::default());
+                KnownClass::NoneType.to_subclass_of(self.db())
+            }
             ast::Expr::Subscript(
                 subscript @ ast::ExprSubscript {
                     value,
@@ -736,7 +811,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                         } else if class_literal.is_tuple(self.db()) {
                             let class_type = self
-                                .infer_tuple_type_expression(parameters)
+                                .infer_tuple_type_expression(subscript)
                                 .map(|tuple_type| tuple_type.to_class_type(self.db()))
                                 .unwrap_or_else(|| class_literal.default_specialization(self.db()));
                             SubclassOfType::from(self.db(), class_type)
@@ -1680,9 +1755,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 Type::unknown()
             }
             SpecialFormType::Type => self.infer_subclass_of_type_expression(arguments_slice),
-            SpecialFormType::Tuple => {
-                Type::tuple(self.infer_tuple_type_expression(arguments_slice))
-            }
+            SpecialFormType::Tuple => Type::tuple(self.infer_tuple_type_expression(subscript)),
             SpecialFormType::Generic | SpecialFormType::Protocol => {
                 self.infer_expression(arguments_slice, TypeContext::default());
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {

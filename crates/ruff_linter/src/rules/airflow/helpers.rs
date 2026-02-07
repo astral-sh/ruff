@@ -3,15 +3,20 @@ use crate::fix::edits::remove_unused_imports;
 use crate::importer::ImportRequest;
 use crate::rules::numpy::helpers::{AttributeSearcher, ImportSearcher};
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::name::QualifiedNameBuilder;
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{Expr, ExprAttribute, ExprName, StmtTry};
+use ruff_python_ast::{Expr, ExprAttribute, ExprName, StmtFunctionDef, StmtTry};
 use ruff_python_semantic::Exceptions;
+use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::class::any_qualified_base_class;
 use ruff_python_semantic::{MemberNameImport, NameImport};
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
+
+/// Warning message for internal modules that are not part of the public API.
+pub(crate) const INTERNAL_MODULE_WARNING: &str = "This is an internal module which is not suggested to be used and is subject to change without notice.";
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum Replacement {
@@ -33,6 +38,20 @@ pub(crate) enum Replacement {
         module: &'static str,
         name: String,
     },
+    // Symbols moved to Task SDK in Airflow 3. Used when we want to match multiple names.
+    // e.g., `airflow.io.get_fs | has_fs | Properties` to `airflow.sdk.io.get_fs | has_fs | Properties`
+    SourceModuleMovedToSDK {
+        module: &'static str,
+        name: String,
+        version: &'static str,
+    },
+    // Symbols updated in Airflow 3 with only module changed. Used when we want to include custom message and optionally report diagnostics.
+    SourceModuleMovedWithMessage {
+        module: &'static str,
+        name: String,
+        message: &'static str,
+        suggest_fix: bool,
+    },
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -49,6 +68,12 @@ pub(crate) enum ProviderReplacement {
         provider: &'static str,
         version: &'static str,
     },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum FunctionSignatureChange {
+    /// Carries a message describing the function signature change.
+    Message(&'static str),
 }
 
 pub(crate) fn is_guarded_by_try_except(
@@ -242,4 +267,26 @@ pub(crate) fn generate_remove_and_runtime_import_edit(
     );
 
     Some(Fix::unsafe_edits(remove_edit, [import_edit]))
+}
+
+/// This is a helper function to check if the given function definition is a method
+/// that inherits from a base class.
+pub(crate) fn is_method_in_subclass<F>(
+    function_def: &StmtFunctionDef,
+    semantic: &SemanticModel,
+    method_name: &str,
+    is_base_class: F,
+) -> bool
+where
+    F: Fn(QualifiedName) -> bool,
+{
+    if function_def.name.as_str() != method_name {
+        return false;
+    }
+
+    let ScopeKind::Class(class_def) = semantic.current_scope().kind else {
+        return false;
+    };
+
+    any_qualified_base_class(class_def, semantic, &is_base_class)
 }

@@ -11,13 +11,13 @@ use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
-/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without
-/// `maxsplit=1`
+/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without a
+/// `maxsplit=1` argument.
 ///
 /// ## Why is this bad?
 /// Calling `str.split()` or `str.rsplit()` without passing `maxsplit=1` splits on every delimiter in the
 /// string. When accessing only the first or last element of the result, it
-/// would be more efficient to only split once.
+/// would be more efficient to split only once.
 ///
 /// ## Example
 /// ```python
@@ -38,13 +38,14 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or `**kwargs` arguments, as
-/// adding a `maxsplit` argument to such a call may lead to duplicated arguments.
+/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or
+/// `**kwargs` arguments, as adding a `maxsplit` argument to such a call may lead to duplicate
+/// arguments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.11.12")]
-pub(crate) struct MissingMaxsplitArg {
-    actual_split_type: String,
-    suggested_split_type: String,
+#[violation_metadata(stable_since = "0.15.0")]
+pub(crate) struct MissingMaxsplitArg<'a> {
+    actual_split_type: &'a str,
+    suggested_split_type: &'a str,
 }
 
 /// Represents the index of the slice used for this rule (which can only be 0 or -1)
@@ -53,15 +54,10 @@ enum SliceBoundary {
     Last,
 }
 
-impl AlwaysFixableViolation for MissingMaxsplitArg {
+impl AlwaysFixableViolation for MissingMaxsplitArg<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingMaxsplitArg {
-            actual_split_type: _,
-            suggested_split_type,
-        } = self;
-
-        format!("Replace with `{suggested_split_type}(..., maxsplit=1)`.")
+        "String is split more times than necessary".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -189,8 +185,8 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
 
     let mut diagnostic = checker.report_diagnostic(
         MissingMaxsplitArg {
-            actual_split_type: actual_split_type.to_string(),
-            suggested_split_type: suggested_split_type.to_string(),
+            actual_split_type,
+            suggested_split_type,
         },
         expr.range(),
     );

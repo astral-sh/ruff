@@ -9,6 +9,7 @@ TC004 [*] Move import `pandas.DataFrame` out of type-checking block. Import is u
     |                            ^^^^^^^^^
 111 |
 112 |     x: TypeAlias = DataFrame | None
+    |                    --------- Used at runtime here
     |
 help: Move out of type-checking block
 1   + from pandas import DataFrame

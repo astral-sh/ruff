@@ -1495,13 +1495,38 @@ static_assert(is_subtype_of(CallableTypeOf[kwargs_float], CallableTypeOf[kwargs_
 static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[kwargs_float]))
 ```
 
-A variadic parameter can be omitted in the subtype:
+A variadic parameter can be added in a subtype, since callers can omit it:
 
 ```py
 def empty() -> None: ...
 
 static_assert(is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[empty]))
 static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[kwargs_int]))
+```
+
+A positional parameter with default can also be added to the subtype, since callers can omit it:
+
+```py
+def positional_with_default(x: int = 0) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_with_default]))
+
+def positional_with_default_and_kwargs(x: int = 0, **kwargs: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default_and_kwargs], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_with_default_and_kwargs]))
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default_and_kwargs], CallableTypeOf[kwargs_int]))
+static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[positional_with_default_and_kwargs]))
+
+def positional_only_with_default_and_kwargs(x: int = 0, /, **kwargs: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_only_with_default_and_kwargs], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_only_with_default_and_kwargs]))
+
+static_assert(is_subtype_of(CallableTypeOf[positional_only_with_default_and_kwargs], CallableTypeOf[kwargs_int]))
+static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[positional_only_with_default_and_kwargs]))
 ```
 
 #### Keyword-variadic with keyword-only

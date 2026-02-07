@@ -16,7 +16,7 @@ use itertools::{EitherOrBoth, Itertools};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, semantic_index};
+use super::{DynamicType, Type, TypeVarVariance, semantic_index};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
@@ -35,7 +35,7 @@ use ruff_python_ast::{self as ast, name::Name};
 
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
-/// This is very similar to [`definition_expression_type`], but knows that `TypeInferenceBuilder`
+/// This is very similar to `definition_expression_type`, but knows that `TypeInferenceBuilder`
 /// will always infer the parameters and return of a function in its PEP-695 typevar scope, if
 /// there is one; otherwise they will be inferred in the function definition scope, but will always
 /// be deferred. (This prevents spurious salsa cycles when we need the signature of the function
@@ -702,8 +702,18 @@ impl<'db> Signature<'db> {
             legacy_generic_context,
         );
 
+        // Look for any typevars bound by this function that are only mentioned in a Callable
+        // return type. (We do this after merging the legacy and PEP-695 contexts because we need
+        // to apply this heuristic to PEP-695 typevars as well.)
+        let (generic_context, return_ty) = GenericContext::remove_callable_only_typevars(
+            db,
+            full_generic_context,
+            &parameters,
+            return_ty,
+        );
+
         Self {
-            generic_context: full_generic_context,
+            generic_context,
             definition: Some(definition),
             parameters,
             return_ty,
@@ -1615,12 +1625,14 @@ impl<'db> Signature<'db> {
                 ParameterKind::KeywordVariadic { .. } => {
                     self_keyword_variadic = Some(self_parameter.annotated_type());
                 }
-                ParameterKind::PositionalOnly { .. } => {
+                ParameterKind::PositionalOnly { default_type, .. } => {
                     // These are the unmatched positional-only parameters in `self` from the
                     // previous loop. They cannot be matched against any parameter in `other` which
-                    // only contains keyword-only and keyword-variadic parameters so the subtype
-                    // relation is invalid.
-                    return ConstraintSet::from(false);
+                    // only contains keyword-only and keyword-variadic parameters. However, if the
+                    // parameter has a default, it's valid because callers don't need to provide it.
+                    if default_type.is_none() {
+                        return ConstraintSet::from(false);
+                    }
                 }
                 ParameterKind::Variadic { .. } => {}
             }
@@ -1998,7 +2010,12 @@ impl<'db> Parameters<'db> {
 
         let default_type = |param: &ast::ParameterWithDefault| {
             param.default().map(|default| {
-                definition_expression_type(db, definition, default).replace_parameter_defaults(db)
+                // Use the same approach as function_signature_expression_type to avoid cycles.
+                // Defaults are always deferred (see infer_function_definition), so we can go
+                // directly to infer_deferred_types without first checking infer_definition_types.
+                infer_deferred_types(db, definition)
+                    .expression_type(default)
+                    .replace_parameter_defaults(db)
             })
         };
 

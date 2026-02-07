@@ -39,11 +39,11 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -69,11 +69,11 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -112,11 +112,11 @@ jobs:
     if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-build') }}
     runs-on: macos-14
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: arm64
@@ -169,11 +169,11 @@ jobs:
           - target: aarch64-pc-windows-msvc
             arch: x64
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: ${{ matrix.platform.arch }}
@@ -223,11 +223,11 @@ jobs:
           - x86_64-unknown-linux-gnu
           - i686-unknown-linux-gnu
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -295,11 +295,6 @@ jobs:
             manylinux: 2_17
             # see https://github.com/astral-sh/ruff/issues/10073
             maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
-          - target: powerpc64-unknown-linux-gnu
-            arch: ppc64
-            manylinux: 2_17
-            # see https://github.com/astral-sh/ruff/issues/10073
-            maturin_docker_options: -e JEMALLOC_SYS_WITH_LG_PAGE=16
           - target: arm-unknown-linux-musleabihf
             # Use the cross container, but tag as `linux_armv6l`
             manylinux: auto
@@ -310,11 +305,11 @@ jobs:
             manylinux: 2_31
 
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"
@@ -328,7 +323,7 @@ jobs:
           docker-options: ${{ matrix.platform.maturin_docker_options }}
           args: --release --locked --out dist --compatibility pypi
       - uses: uraimo/run-on-arch-action@d94c13912ea685de38fccc1109385b83fd79427d # v3.0.1
-        if: ${{ matrix.platform.arch != 'ppc64' && matrix.platform.arch != 'ppc64le'}}
+        if: ${{ matrix.platform.arch != 'ppc64le'}}
         name: Test wheel
         with:
           arch: ${{ matrix.platform.arch == 'arm' && 'armv6' || matrix.platform.arch }}
@@ -376,11 +371,11 @@ jobs:
           - x86_64-unknown-linux-musl
           - i686-unknown-linux-musl
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           architecture: x64
@@ -443,11 +438,11 @@ jobs:
             arch: armv7
 
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: recursive
           persist-credentials: false
-      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
       - name: "Prep README.md"

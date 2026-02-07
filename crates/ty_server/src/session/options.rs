@@ -145,16 +145,16 @@ impl ClientOptions {
 #[serde(rename_all = "camelCase")]
 pub struct GlobalOptions {
     /// Diagnostic mode for the language server.
-    diagnostic_mode: Option<DiagnosticMode>,
+    pub diagnostic_mode: Option<DiagnosticMode>,
 
     /// Experimental features that the server provides on an opt-in basis.
-    pub(crate) experimental: Option<Experimental>,
+    pub experimental: Option<Experimental>,
 
     /// If `true` or [`None`], show syntax errors as diagnostics.
     ///
     /// This is useful when using ty with other language servers, allowing the user to refer
     /// to syntax errors from only one source.
-    pub(crate) show_syntax_errors: Option<bool>,
+    pub show_syntax_errors: Option<bool>,
 }
 
 impl GlobalOptions {
@@ -396,7 +396,7 @@ impl Combine for DiagnosticMode {
     clippy::empty_structs_with_brackets,
     reason = "The LSP fails to deserialize the options when this is a unit type"
 )]
-pub(crate) struct Experimental {}
+pub struct Experimental {}
 
 impl Experimental {
     #[expect(clippy::unused_self)]

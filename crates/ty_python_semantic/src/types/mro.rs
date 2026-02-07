@@ -550,6 +550,22 @@ impl<'db> Iterator for MroIterator<'db> {
 
 impl std::iter::FusedIterator for MroIterator<'_> {}
 
+impl DoubleEndedIterator for MroIterator<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.full_mro_except_first_element()
+            .next_back()
+            .copied()
+            .or_else(|| {
+                if self.first_element_yielded {
+                    None
+                } else {
+                    self.first_element_yielded = true;
+                    Some(self.first_element())
+                }
+            })
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct StaticMroError<'db> {
     kind: StaticMroErrorKind<'db>,

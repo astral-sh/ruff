@@ -35,7 +35,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.42.0
+    rev: v1.42.1
     hooks:
       - id: typos
         priority: 0
@@ -51,7 +51,7 @@ repos:
 
   # Prettier
   - repo: https://github.com/rbubley/mirrors-prettier
-    rev: v3.7.4
+    rev: v3.8.1
     hooks:
       - id: prettier
         types: [yaml]
@@ -60,7 +60,7 @@ repos:
   # zizmor detects security vulnerabilities in GitHub Actions workflows.
   # Additional configuration for the tool is found in `.github/zizmor.yml`
   - repo: https://github.com/zizmorcore/zizmor-pre-commit
-    rev: v1.20.0
+    rev: v1.22.0
     hooks:
       - id: zizmor
         priority: 0
@@ -93,7 +93,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.11
+    rev: v0.14.14
     hooks:
       - id: ruff-format
         priority: 0
@@ -128,7 +128,7 @@ repos:
             .*?invalid(_.+)*_syntax\.md
           )$
         additional_dependencies:
-          - black==25.12.0
+          - black==26.1.0
         priority: 2
 
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.

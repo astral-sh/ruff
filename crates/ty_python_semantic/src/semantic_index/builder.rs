@@ -13,6 +13,7 @@ use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    YieldOutsideFunctionKind,
 };
 use ruff_text_size::TextRange;
 use ty_module_resolver::{ModuleName, resolve_module};
@@ -24,11 +25,13 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
-    DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
@@ -48,6 +51,7 @@ use crate::semantic_index::use_def::{
 };
 use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
+use crate::types::PossiblyNarrowedPlaces;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -755,6 +759,59 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (definition, num_definitions)
     }
 
+    // Creates a definition for each key-value assignment in the dictionary.
+    //
+    // If there are multiple targets, a given key-value definition will be created multiple
+    // times for each target.
+    fn add_dict_key_assignment_definitions(
+        &mut self,
+        targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for target in targets {
+            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+                self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
+            }
+        }
+    }
+
+    fn add_dict_key_assignment_definitions_impl(
+        &mut self,
+        target: &MemberExprBuilder,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for item in &dict.items {
+            let Some(key) = item.key.as_ref() else {
+                continue;
+            };
+
+            let Some(member_expr) = MemberExprBuilder::visit_subscript_expr(target.clone(), key)
+            else {
+                continue;
+            };
+
+            // Recurse into nested dictionaries.
+            if let ast::Expr::Dict(dict_value) = &item.value {
+                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
+            }
+
+            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
+                let place_id = self.add_place(place_expr);
+
+                self.add_definition(
+                    place_id,
+                    DictKeyAssignmentNodeRef {
+                        key,
+                        assignment,
+                        value: &item.value,
+                    },
+                );
+            }
+        }
+    }
+
     fn record_expression_narrowing_constraint(
         &mut self,
         predicate_node: &ast::Expr,
@@ -801,7 +858,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
-    /// [`SemanticIndexBuilder::record_narrowing_constraint_id`].
+    /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
     fn add_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut().add_predicate(predicate)
     }
@@ -812,27 +869,70 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .add_predicate(predicate.negated())
     }
 
-    /// Records a previously added narrowing constraint by adding it to all live bindings.
-    fn record_narrowing_constraint_id(&mut self, predicate: ScopedPredicateId) {
+    /// Records a previously added narrowing constraint by adding it to the live bindings
+    /// of the specified places.
+    fn record_narrowing_constraint_id_for_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+        places: &PossiblyNarrowedPlaces,
+    ) {
         self.current_use_def_map_mut()
-            .record_narrowing_constraint(predicate);
+            .record_narrowing_constraint_for_places(predicate, places);
     }
 
-    /// Adds and records a narrowing constraint, i.e. adds it to all live bindings.
+    /// Adds and records a narrowing constraint for only the places that could possibly be narrowed.
     fn record_narrowing_constraint(&mut self, predicate: PredicateOrLiteral<'db>) {
+        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
         let use_def = self.current_use_def_map_mut();
         let predicate_id = use_def.add_predicate(predicate);
-        use_def.record_narrowing_constraint(predicate_id);
+        use_def.record_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
     }
 
-    /// Negates the given predicate and then adds it as a narrowing constraint to all live
-    /// bindings.
+    /// Computes the conservative set of places that could possibly be narrowed by a predicate.
+    ///
+    /// This uses the closure-based approach to avoid calling Salsa queries that depend on
+    /// the semantic index (which is still being built).
+    fn compute_possibly_narrowed_places(
+        &self,
+        predicate: &PredicateOrLiteral<'db>,
+    ) -> PossiblyNarrowedPlaces {
+        use crate::types::PossiblyNarrowedPlacesBuilder;
+
+        match predicate {
+            PredicateOrLiteral::Literal(_) => PossiblyNarrowedPlaces::default(),
+            PredicateOrLiteral::Predicate(pred) => {
+                let place_table = self.current_place_table();
+
+                match pred.node {
+                    PredicateNode::Expression(expression) => {
+                        let module = self.module;
+                        let expression_node = expression.node_ref(self.db, module);
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .expression(expression_node)
+                    }
+                    PredicateNode::Pattern(pattern) => {
+                        let module = self.module;
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .pattern(pattern, module)
+                    }
+                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                        // These predicates don't narrow any places
+                        PossiblyNarrowedPlaces::default()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Negates the given predicate and then adds it as a narrowing constraint to the places
+    /// that could possibly be narrowed.
     fn record_negated_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
     ) -> ScopedPredicateId {
+        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
         let id = self.add_negated_predicate(predicate);
-        self.record_narrowing_constraint_id(id);
+        self.record_narrowing_constraint_id_for_places(id, &possibly_narrowed);
         id
     }
 
@@ -2480,7 +2580,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_definition {
                         match self.current_assignment() {
                             Some(CurrentAssignment::Assign { node, unpack }) => {
-                                self.add_definition(
+                                let assignment = self.add_definition(
                                     place_id,
                                     AssignmentDefinitionNodeRef {
                                         unpack,
@@ -2488,10 +2588,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         target: expr,
                                     },
                                 );
+
+                                if let ast::Expr::Dict(dict) = &*node.value {
+                                    self.add_dict_key_assignment_definitions(
+                                        &node.targets,
+                                        dict,
+                                        assignment,
+                                    );
+                                }
                             }
                             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                                 self.add_standalone_type_expression(&ann_assign.annotation);
-                                self.add_definition(
+                                let assignment = self.add_definition(
                                     place_id,
                                     AnnotatedAssignmentDefinitionNodeRef {
                                         node: ann_assign,
@@ -2500,6 +2608,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         target: expr,
                                     },
                                 );
+
+                                if let Some(ast::Expr::Dict(dict)) = ann_assign.value.as_deref() {
+                                    self.add_dict_key_assignment_definitions(
+                                        [&*ann_assign.target],
+                                        dict,
+                                        assignment,
+                                    );
+                                }
                             }
                             Some(CurrentAssignment::AugAssign(aug_assign)) => {
                                 self.add_definition(place_id, aug_assign);
@@ -2695,6 +2811,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // anymore.
                     if index < values.len() - 1 {
                         let predicate = self.build_predicate(value);
+                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                         let predicate_id = match op {
                             ast::BoolOp::And => self.add_predicate(predicate),
                             ast::BoolOp::Or => self.add_negated_predicate(predicate),
@@ -2717,7 +2834,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
-                        self.record_narrowing_constraint_id(predicate_id);
+                        self.record_narrowing_constraint_id_for_places(
+                            predicate_id,
+                            &possibly_narrowed,
+                        );
                         reachability_constraints.push(reachability_constraint);
                     }
                 }
@@ -2916,6 +3036,17 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        // TODO(brent) The long-term fix for this is for `YieldOutsideFunction` not to apply to
+        // `await` at all and only to emit the more specific `AwaitOutsideAsyncFunction` instead.
+        // However, to preserve backwards compatibility with the corresponding Ruff rules, we
+        // temporarily filter out the diagnostic for ty instead.
+        if matches!(
+            error.kind,
+            SemanticSyntaxErrorKind::YieldOutsideFunction(YieldOutsideFunctionKind::Await)
+        ) {
+            return;
+        }
+
         if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }

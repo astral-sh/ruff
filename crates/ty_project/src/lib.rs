@@ -35,7 +35,7 @@ use ty_python_semantic::types::check_types;
 mod db;
 mod files;
 mod fixes;
-mod glob;
+pub mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;

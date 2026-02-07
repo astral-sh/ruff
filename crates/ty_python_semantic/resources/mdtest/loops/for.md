@@ -417,6 +417,45 @@ def _(x: Intersection[tuple[int, str], tuple[object, object]]):
         reveal_type(item)  # revealed: int | str
 ```
 
+## Intersection of variable-length and fixed-length tuple
+
+When iterating over an intersection of a variable-length tuple with a fixed-length tuple, we should
+preserve the fixed-length structure and intersect each element type with the variable-length tuple's
+element type.
+
+```py
+from ty_extensions import Intersection
+
+def _(x: Intersection[tuple[str, ...], tuple[object, object]]):
+    # `tuple[str, ...]` yields `str` when iterated.
+    # `tuple[object, object]` yields `object` when iterated.
+    # The intersection should yield `(str & object) | (str & object)` = `str`.
+    for item in x:
+        reveal_type(item)  # revealed: str
+```
+
+## Intersection of variable-length tuples
+
+When iterating over an intersection of two variable-length tuples, we should intersect the element
+types position-by-position.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from ty_extensions import Intersection
+
+def _(x: Intersection[tuple[int, *tuple[str, ...], bytes], tuple[object, *tuple[str, ...]]]):
+    # After resizing, the intersection becomes:
+    # tuple[int & object, *tuple[str & str, ...], bytes & str]
+    # = tuple[int, *tuple[str, ...], Never]
+    # Iterating yields: int | str | Never = int | str
+    for item in x:
+        reveal_type(item)  # revealed: int | str
+```
+
 ## Intersection of fixed-length tuple with homogeneous iterable
 
 When iterating over an intersection of a fixed-length tuple with a class that implements `__iter__`
@@ -950,4 +989,65 @@ static_assert(is_assignable_to(type[Bar], Iterable[Any]))  # error: [static-asse
 for x in Bar:
     # TODO: should reveal `Any`
     reveal_type(x)  # revealed: Unknown
+```
+
+## Iterating over an intersection with a TypeVar whose bound is a union
+
+When a TypeVar has a union bound and the TypeVar is intersected with an iterable type (e.g., via
+`isinstance`), we need to properly distribute the intersection over the union and simplify. This
+ensures that only the parts of the union compatible with the intersection are considered for
+iteration.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+### TypeVar bound with non-iterable elements
+
+When the union contains non-iterable types (like `int`), those parts are disjoint from the tuple and
+simplify to `Never`, leaving only the iterable parts.
+
+```py
+def f[T: tuple[int, ...] | int](x: T):
+    if isinstance(x, tuple):
+        reveal_type(x)  # revealed: T@f & tuple[object, ...]
+        for item in x:
+            # The intersection `(tuple[int, ...] | int) & tuple[object, ...]` distributes to:
+            # `(tuple[int, ...] & tuple[object, ...]) | (int & tuple[object, ...])`
+            # which simplifies to `tuple[int, ...] | Never` = `tuple[int, ...]`
+            # so iterating gives `int`.
+            reveal_type(item)  # revealed: int
+```
+
+### TypeVar bound with all iterable but disjoint elements
+
+When the union contains types that are all iterable but some are disjoint from the intersection
+constraint, those parts should also simplify to `Never`.
+
+```py
+def g[T: tuple[int, ...] | list[str]](x: T):
+    if isinstance(x, tuple):
+        reveal_type(x)  # revealed: T@g & tuple[object, ...]
+        for item in x:
+            # The intersection `(tuple[int, ...] | list[str]) & tuple[object, ...]` distributes to:
+            # `(tuple[int, ...] & tuple[object, ...]) | (list[str] & tuple[object, ...])`
+            # Since `list[str]` is disjoint from `tuple[object, ...]`, this simplifies to:
+            # `tuple[int, ...] | Never` = `tuple[int, ...]`
+            # so iterating gives `int`, NOT `int | str`.
+            reveal_type(item)  # revealed: int
+```
+
+## Iterating over a list with a negated type parameter
+
+When we have a list with a negated type parameter (e.g., `list[~str]`), we should still be able to
+iterate over it correctly. The negated type parameter represents all types except `str`, and
+`list[~str]` is still a valid list that can be iterated.
+
+```py
+from ty_extensions import Not
+
+def _(value: list[Not[str]]):
+    for x in value:
+        reveal_type(x)  # revealed: ~str
 ```

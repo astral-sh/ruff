@@ -46,6 +46,73 @@ class Outer:
         def foo(self: Self) -> Self:
             reveal_type(self)  # revealed: Self@foo
             return self
+
+class OuterWithMethod:
+    def method(self) -> None:
+        class Inner:
+            def get(self) -> Self:
+                reveal_type(self)  # revealed: Self@get
+                return self
+
+            def explicit(self: Self) -> Self:
+                reveal_type(self)  # revealed: Self@explicit
+                return self
+
+            @classmethod
+            def create(cls) -> Self:
+                reveal_type(cls)  # revealed: type[Self@create]
+                return cls()
+
+            def generic[T](self, x: T) -> Self:
+                reveal_type(self)  # revealed: Self@generic
+                return self
+
+            def with_nested_function(self) -> Self:
+                def helper() -> Self:
+                    reveal_type(self)  # revealed: Self@with_nested_function
+                    return self
+                return helper()
+
+        reveal_type(Inner().get())  # revealed: Inner
+        reveal_type(Inner.create())  # revealed: Inner
+
+class DoublyNested:
+    def outer_method(self) -> None:
+        class Middle:
+            def middle_method(self) -> None:
+                class Innermost:
+                    def get(self) -> Self:
+                        reveal_type(self)  # revealed: Self@get
+                        return self
+
+def free_function() -> None:
+    class Inner:
+        def get(self) -> Self:
+            reveal_type(self)  # revealed: Self@get
+            return self
+
+class OuterWithClassmethod:
+    @classmethod
+    def factory(cls) -> None:
+        class Inner:
+            def get(self) -> Self:
+                reveal_type(self)  # revealed: Self@get
+                return self
+
+            @classmethod
+            def create(cls) -> Self:
+                reveal_type(cls)  # revealed: type[Self@create]
+                return cls()
+
+        reveal_type(Inner().get())  # revealed: Inner
+        reveal_type(Inner.create())  # revealed: Inner
+
+class NestedClassExplicitSelf:
+    class Bar:
+        def method_a(self) -> None:
+            def first_param_is_explicit_self(this: Self) -> None:
+                reveal_type(this)  # revealed: Self@method_a
+                reveal_type(self)  # revealed: Self@method_a
 ```
 
 ## Type of (unannotated) `self` parameters

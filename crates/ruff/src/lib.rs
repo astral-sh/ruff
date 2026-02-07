@@ -17,7 +17,6 @@ use args::{GlobalConfigArgs, ServerCommand};
 use ruff_db::diagnostic::{Diagnostic, Severity};
 use ruff_linter::logging::{LogLevel, set_up_logging};
 use ruff_linter::settings::flags::FixMode;
-use ruff_linter::settings::types::OutputFormat;
 use ruff_linter::{fs, warn_user, warn_user_once};
 use ruff_workspace::Settings;
 
@@ -366,13 +365,6 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
     let preview = pyproject_config.settings.linter.preview.is_enabled();
 
     if cli.watch {
-        if output_format != OutputFormat::default() {
-            warn_user!(
-                "`--output-format {}` is always used in watch mode.",
-                OutputFormat::default()
-            );
-        }
-
         // Configure the file watcher.
         let (tx, rx) = channel();
         let mut watcher = recommended_watcher(tx)?;

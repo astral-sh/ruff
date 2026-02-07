@@ -165,7 +165,7 @@ class BaseCookie(dict[str, Morsel[_T]], Generic[_T]):
         Override this function to modify the behavior of cookies.
         """
 
-    def value_encode(self, val: _T) -> tuple[_T, str]:
+    def value_encode(self, val: _T) -> tuple[str, str]:
         """real_value, coded_value = value_encode(VALUE)
         Called prior to setting a cookie's value from the dictionary
         representation.  The VALUE is the value being assigned.

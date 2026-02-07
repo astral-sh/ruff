@@ -133,7 +133,7 @@ class TarFile:
     fileobject: type[ExFileObject]  # undocumented
     pax_headers: Mapping[str, str]
     debug: int | None
-    errorlevel: int | None
+    errorlevel: int
     offset: int  # undocumented
     extraction_filter: _FilterFunction | None
     if sys.version_info >= (3, 13):

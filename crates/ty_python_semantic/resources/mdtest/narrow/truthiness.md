@@ -404,3 +404,25 @@ def f(arg1: Empty | None, arg2: NonEmpty | None, arg3: HasNotRequired1 | None, a
     if arg5:
         reveal_type(arg5)  # revealed: AlsoNonEmpty
 ```
+
+When using a guard clause pattern (`if not p: raise`), the type should be narrowed in the
+continuation:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict, total=False):
+    name: str
+    age: int
+
+def get_person() -> Person | None:
+    return None
+
+def test() -> None:
+    p = get_person()
+    if not p:
+        raise ValueError("No person")
+    reveal_type(p)  # revealed: Person & ~AlwaysFalsy
+    # error: [invalid-key] "Unknown key "nonexistent" for TypedDict `Person`"
+    print(p["nonexistent"])
+```

@@ -60,8 +60,10 @@ Ruff is extremely actively developed and used in major open-source projects like
 Ruff is backed by [Astral](https://astral.sh), the creators of
 [uv](https://github.com/astral-sh/uv) and [ty](https://github.com/astral-sh/ty).
 
-Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff), or the
-original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
+Read the [launch
+post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff), or the
+original [project
+announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Testimonials
 
@@ -150,8 +152,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.14.14/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.14.14/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.15.0/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.15.0/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -184,7 +186,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.14.14
+  rev: v0.15.0
   hooks:
     # Run the linter.
     - id: ruff-check

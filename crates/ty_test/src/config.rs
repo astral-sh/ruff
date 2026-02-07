@@ -110,6 +110,8 @@ pub(crate) struct Environment {
 pub(crate) struct Analysis {
     /// Whether ty should support `type: ignore` comments.
     pub(crate) respect_type_ignore_comments: Option<bool>,
+
+    pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

@@ -150,25 +150,7 @@ pub(super) fn clear_diagnostics_if_needed(
     {
         return;
     }
-
-    clear_diagnostics(document.url(), session, client);
-}
-
-/// Clears the diagnostics for the document identified by `uri`.
-///
-/// This is done by notifying the client with an empty list of diagnostics for the document.
-/// For notebook cells, this clears diagnostics for the specific cell.
-/// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(uri: &lsp_types::Url, session: &Session, client: &Client) {
-    if session.global_settings().diagnostic_mode().is_off() {
-        return;
-    }
-
-    client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
-        uri: uri.clone(),
-        diagnostics: vec![],
-        version: None,
-    });
+    session.clear_diagnostics(client, document.url());
 }
 
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics

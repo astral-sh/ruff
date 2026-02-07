@@ -286,3 +286,87 @@ AIR303 `Asset` signature is changed in Airflow 3.0
 72 | Asset("asset1")
    |
 help: Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+  --> AIR303.py:81:9
+   |
+79 | # 3 positional args, 3rd NOT named 'ti_key'
+80 | class DeprecatedOperatorLink1(BaseOperatorLink):
+81 |     def get_link(self, operator, dttm):
+   |         ^^^^^^^^
+82 |         pass
+   |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:111:9
+    |
+109 | # not exactly 3 positional args
+110 | class InvalidOperatorLink1(BaseOperatorLink):
+111 |     def get_link(self, operator):
+    |         ^^^^^^^^
+112 |         pass
+    |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:115:9
+    |
+114 | class InvalidOperatorLink2(BaseOperatorLink):
+115 |     def get_link(self, operator, ti_key, extra):
+    |         ^^^^^^^^
+116 |         pass
+    |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:119:9
+    |
+118 | class InvalidOperatorLink3(BaseOperatorLink):
+119 |     def get_link(self, operator, *, something):
+    |         ^^^^^^^^
+120 |         pass
+    |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:136:9
+    |
+134 | # 3 positional args, 3rd NOT named 'ti_key'
+135 | class DeprecatedOperatorLink2(BaseOperatorLink):
+136 |     def get_link(self, operator, dttm):
+    |         ^^^^^^^^
+137 |         pass
+    |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:166:9
+    |
+164 | # not exactly 3 positional args
+165 | class InvalidOperatorLink4(BaseOperatorLink):
+166 |     def get_link(self, operator):
+    |         ^^^^^^^^
+167 |         pass
+    |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:170:9
+    |
+169 | class InvalidOperatorLink5(BaseOperatorLink):
+170 |     def get_link(self, operator, ti_key, extra):
+    |         ^^^^^^^^
+171 |         pass
+    |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.
+
+AIR303 `get_link` signature is changed in Airflow 3.0
+   --> AIR303.py:174:9
+    |
+173 | class InvalidOperatorLink6(BaseOperatorLink):
+174 |     def get_link(self, operator, *, something):
+    |         ^^^^^^^^
+175 |         pass
+    |
+help: Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.

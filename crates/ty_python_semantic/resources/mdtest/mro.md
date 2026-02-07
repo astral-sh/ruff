@@ -530,7 +530,7 @@ exception at runtime, not a sub-expression in the class's bases list.
 # error: [duplicate-base]
 class D(
     A,
-    # error: [unused-ignore-comment]
+    # error: [unused-type-ignore-comment]
     A,  # type: ignore[duplicate-base]
 ): ...
 
@@ -539,7 +539,7 @@ class E(
     A,
     A
 ):
-    # error: [unused-ignore-comment]
+    # error: [unused-type-ignore-comment]
     x: int  # type: ignore[duplicate-base]
 
 # fmt: on
