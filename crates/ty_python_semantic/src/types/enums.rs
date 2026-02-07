@@ -23,7 +23,7 @@ pub(crate) struct EnumMetadata<'db> {
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
 
-impl<'db> EnumMetadata<'db> {
+impl EnumMetadata<'_> {
     fn empty() -> Self {
         EnumMetadata {
             members: FxIndexMap::default(),
@@ -288,8 +288,7 @@ pub(crate) fn enum_metadata<'db>(
     }
 
     // _value_
-    let scope = class.body_scope(db);
-    let value_sunder_symbol = place_table(db, scope).symbol_id("_value_")?;
+    let value_sunder_symbol = place_table(db, scope_id).symbol_id("_value_")?;
     let value_sunder_declarations =
         use_def_map.end_of_scope_symbol_declarations(value_sunder_symbol);
 
@@ -298,7 +297,7 @@ pub(crate) fn enum_metadata<'db>(
         .ignore_possibly_undefined()?;
 
     let value_sunder_type =
-        extract_init_member_type(db, class, scope).unwrap_or(inferred_value_sunder_type);
+        extract_init_member_type(db, class, scope_id).unwrap_or(inferred_value_sunder_type);
 
     Some(EnumMetadata {
         members,
