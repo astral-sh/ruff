@@ -200,6 +200,60 @@ async def main():
         ...
 ```
 
+## `async with` statement suppresses exceptions if `__aexit__` returns a truthy value
+
+```py
+from typing import Literal
+
+def f() -> str:
+    raise NotImplementedError()
+
+class ExceptionSuppressor:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True]:
+        return True
+
+class ExceptionPropagator:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+        return
+
+# If the return type is unknown, exceptions are assumed to be unsuppressed (matching mypy and pyright behavior).
+class UnknownExceptionHandler:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback):
+        return f()
+
+async def g(x: int):
+    y: int | str = x
+    async with ExceptionSuppressor() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+async def h(x: int):
+    y: int | str = x
+    # Since exceptions are not suppressed, we can assume that this block will always be executed to the end.
+    async with ExceptionPropagator() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+async def i(x: int):
+    y: int | str = x
+    async with UnknownExceptionHandler() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+```
+
 ## `@asynccontextmanager`
 
 ```py

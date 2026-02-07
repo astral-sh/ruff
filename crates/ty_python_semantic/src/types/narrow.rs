@@ -77,6 +77,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         }
         PredicateNode::ReturnsNever(_) => return None,
         PredicateNode::StarImportPlaceholder(_) => return None,
+        PredicateNode::ContextManagerExit { .. } => return None,
     };
 
     constraints.and_then(|constraints| constraints.get(&place).cloned())
@@ -523,6 +524,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             PredicateNode::ReturnsNever(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
+            PredicateNode::ContextManagerExit { .. } => return None,
         };
 
         if let Some(ref mut constraints) = constraints {
@@ -616,6 +618,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 callable.scope(self.db)
             }
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
+            PredicateNode::ContextManagerExit { context_expr, .. } => context_expr.scope(self.db),
         }
     }
 

@@ -249,7 +249,7 @@ print((
     R,  # error: [possibly-unresolved-reference]
     S,  # error: [possibly-unresolved-reference]
     T,  # error: [possibly-unresolved-reference]
-    U,  # TODO: could emit [possibly-unresolved-reference here] (https://github.com/astral-sh/ruff/issues/16996)
+    U,  # error: [possibly-unresolved-reference]
     V,  # error: [possibly-unresolved-reference]
     W,  # error: [possibly-unresolved-reference]
     typing,
