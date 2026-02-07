@@ -36,7 +36,6 @@ pub mod ast_node_ref;
 mod db;
 mod dunder_all;
 pub mod lint;
-pub(crate) mod list;
 mod node_key;
 pub(crate) mod place;
 mod program;
