@@ -594,6 +594,19 @@ class Y(C, B): ...
 Conflict = type("Conflict", (X, Y), {})
 ```
 
+## MRO errors with fix
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Generic, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class Foo(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+```
+
 ## MRO error highlighting (snapshot)
 
 <!-- snapshot-diagnostics -->
