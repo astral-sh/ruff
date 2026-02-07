@@ -142,6 +142,7 @@ fn format_pycon_block(
 ) -> Option<String> {
     static FIRST_LINE: &str = ">>> ";
     static CONTINUATION: &str = "... ";
+    static CONTINUATION_BLANK: &str = "...";
 
     let offset = FIRST_LINE.text_len();
     let mut changed = false;
@@ -161,6 +162,10 @@ fn format_pycon_block(
                     end = next_line.full_end();
                     unformatted.push_str(&source[TextRange::new(next_line.start() + offset, end)]);
                     lines.next();
+                } else if next_line.trim_end() == CONTINUATION_BLANK {
+                    end = next_line.full_end();
+                    unformatted.push_str(&source[TextRange::new(next_line.end(), end)]);
+                    lines.next();
                 } else {
                     break;
                 }
@@ -175,8 +180,14 @@ fn format_pycon_block(
             if formatted.len() != unformatted.len() || formatted != unformatted {
                 result.push_str(&source[TextRange::new(last_match, start)]);
                 for (idx, line) in formatted.universal_newlines().enumerate() {
-                    result.push_str(if idx == 0 { FIRST_LINE } else { CONTINUATION });
-                    result.push_str(&formatted[TextRange::new(line.start(), line.full_end())]);
+                    result.push_str(if idx == 0 {
+                        FIRST_LINE
+                    } else if line.is_empty() {
+                        CONTINUATION_BLANK
+                    } else {
+                        CONTINUATION
+                    });
+                    result.push_str(&formatted[line.full_range()]);
                 }
                 last_match = end;
                 changed = true;
@@ -501,7 +512,9 @@ hello there
 >>> def foo(): pass
 >>> def bar():
 ...   print( 'thing1', "thing2", )
+...
 ... bar()
+...
 thing1 thing2
 ```
         "#;
@@ -517,8 +530,8 @@ thing1 thing2
         ...         "thing1",
         ...         "thing2",
         ...     )
-        ... 
-        ... 
+        ...
+        ...
         ... bar()
         thing1 thing2
         ```
