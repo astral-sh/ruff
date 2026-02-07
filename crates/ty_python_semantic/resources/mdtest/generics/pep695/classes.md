@@ -825,6 +825,33 @@ reveal_type(generic_context(A.merge))  # revealed: ty_extensions.GenericContext[
 reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions.GenericContext[Self@foo]
 ```
 
+## Subscripting non-generic classes
+
+Subscripting a non-generic class in a type expression is an error:
+
+```py
+class NonGeneric: ...
+
+x: NonGeneric[int]  # error: [not-subscriptable] "Cannot subscript non-generic type"
+```
+
+Similarly, subscripting a non-generic class inside a `type[...]` annotation is an error:
+
+```py
+class NonGeneric: ...
+
+def f(x: type[NonGeneric[int]]) -> None: ...  # error: [not-subscriptable] "Cannot subscript non-generic type"
+```
+
+Non-generic classes that inherit from a concrete (non-generic) base also cannot be subscripted:
+
+```py
+class Base: ...
+class Child(Base): ...
+
+y: Child[int]  # error: [not-subscriptable] "Cannot subscript non-generic type"
+```
+
 ## Tuple as a PEP-695 generic class
 
 Our special handling for `tuple` does not break if `tuple` is defined as a PEP-695 generic class in

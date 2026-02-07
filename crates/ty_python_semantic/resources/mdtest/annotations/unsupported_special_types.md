@@ -34,11 +34,13 @@ Ts = TypeVarTuple("Ts")
 
 class Foo(Generic[Unpack[Ts]]): ...
 
-x: Foo[int, str, bytes]  # fine
+# TODO: false positive
+x: Foo[int, str, bytes]  # error: [not-subscriptable]
 
 class Bar(Generic[*Ts]): ...
 
-y: Bar[int, str, bytes]  # fine
+# TODO: false positive
+y: Bar[int, str, bytes]  # error: [not-subscriptable]
 
 class Baz[*Ts]: ...
 
