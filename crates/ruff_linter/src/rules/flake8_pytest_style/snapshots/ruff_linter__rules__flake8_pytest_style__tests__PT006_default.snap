@@ -2,494 +2,498 @@
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:9:26
-   |
- 9 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
-   |                          ^^^^^^^^^^^^^^^
-10 | def test_csv(param1, param2):
-11 |     ...
-   |
+ --> PT006.py:8:26
+  |
+8 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
+  |                          ^^^^^^^^^^^^^^^
+9 | def test_csv(param1, param2): ...
+  |
 help: Use a `tuple` for the first argument
-6  |     ...
+5  | def test_always_ok(param): ...
+6  | 
 7  | 
-8  | 
    - @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
-9  + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-10 | def test_csv(param1, param2):
-11 |     ...
-12 | 
+8  + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+9  | def test_csv(param1, param2): ...
+10 | 
+11 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:14:26
+  --> PT006.py:12:26
    |
-14 | @pytest.mark.parametrize("   param1,   ,    param2   , ", [(1, 2), (3, 4)])
+12 | @pytest.mark.parametrize("   param1,   ,    param2   , ", [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-15 | def test_csv_with_whitespace(param1, param2):
-16 |     ...
+13 | def test_csv_with_whitespace(param1, param2): ...
    |
 help: Use a `tuple` for the first argument
-11 |     ...
-12 | 
-13 | 
+9  | def test_csv(param1, param2): ...
+10 | 
+11 | 
    - @pytest.mark.parametrize("   param1,   ,    param2   , ", [(1, 2), (3, 4)])
-14 + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-15 | def test_csv_with_whitespace(param1, param2):
-16 |     ...
-17 | 
+12 + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+13 | def test_csv_with_whitespace(param1, param2): ...
+14 | 
+15 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:19:26
+  --> PT006.py:16:26
    |
-19 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
+16 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^
-20 | def test_csv_bad_quotes(param1, param2):
-21 |     ...
+17 | def test_csv_bad_quotes(param1, param2): ...
    |
 help: Use a `tuple` for the first argument
-16 |     ...
-17 | 
-18 | 
+13 | def test_csv_with_whitespace(param1, param2): ...
+14 | 
+15 | 
    - @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
-19 + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-20 | def test_csv_bad_quotes(param1, param2):
-21 |     ...
-22 | 
+16 + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+17 | def test_csv_bad_quotes(param1, param2): ...
+18 | 
+19 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-  --> PT006.py:29:26
+  --> PT006.py:24:26
    |
-29 | @pytest.mark.parametrize(("param1",), [1, 2, 3])
+24 | @pytest.mark.parametrize(("param1",), [1, 2, 3])
    |                          ^^^^^^^^^^^
-30 | def test_tuple_one_elem(param1, param2):
-31 |     ...
+25 | def test_tuple_one_elem(param1, param2): ...
    |
 help: Use a string for the first argument
-26 |     ...
-27 | 
-28 | 
+21 | def test_tuple(param1, param2): ...
+22 | 
+23 | 
    - @pytest.mark.parametrize(("param1",), [1, 2, 3])
-29 + @pytest.mark.parametrize("param1", [1, 2, 3])
-30 | def test_tuple_one_elem(param1, param2):
-31 |     ...
-32 | 
+24 + @pytest.mark.parametrize("param1", [1, 2, 3])
+25 | def test_tuple_one_elem(param1, param2): ...
+26 | 
+27 | 
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:34:26
+  --> PT006.py:28:26
    |
-34 | @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
+28 | @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^^^^^^
-35 | def test_list(param1, param2):
-36 |     ...
+29 | def test_list(param1, param2): ...
    |
 help: Use a `tuple` for the first argument
-31 |     ...
-32 | 
-33 | 
+25 | def test_tuple_one_elem(param1, param2): ...
+26 | 
+27 | 
    - @pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
-34 + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-35 | def test_list(param1, param2):
-36 |     ...
-37 | 
+28 + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+29 | def test_list(param1, param2): ...
+30 | 
+31 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-  --> PT006.py:39:26
+  --> PT006.py:32:26
    |
-39 | @pytest.mark.parametrize(["param1"], [1, 2, 3])
+32 | @pytest.mark.parametrize(["param1"], [1, 2, 3])
    |                          ^^^^^^^^^^
-40 | def test_list_one_elem(param1, param2):
-41 |     ...
+33 | def test_list_one_elem(param1, param2): ...
    |
 help: Use a string for the first argument
-36 |     ...
-37 | 
-38 | 
+29 | def test_list(param1, param2): ...
+30 | 
+31 | 
    - @pytest.mark.parametrize(["param1"], [1, 2, 3])
-39 + @pytest.mark.parametrize("param1", [1, 2, 3])
-40 | def test_list_one_elem(param1, param2):
-41 |     ...
+32 + @pytest.mark.parametrize("param1", [1, 2, 3])
+33 | def test_list_one_elem(param1, param2): ...
+34 | 
+35 | 
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
+  --> PT006.py:36:26
+   |
+36 | @pytest.mark.parametrize([some_expr, another_expr], [1, 2, 3])
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^
+37 | def test_list_expressions(param1, param2): ...
+   |
+help: Use a `tuple` for the first argument
+33 | def test_list_one_elem(param1, param2): ...
+34 | 
+35 | 
+   - @pytest.mark.parametrize([some_expr, another_expr], [1, 2, 3])
+36 + @pytest.mark.parametrize((some_expr, another_expr), [1, 2, 3])
+37 | def test_list_expressions(param1, param2): ...
+38 | 
+39 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
+  --> PT006.py:40:26
+   |
+40 | @pytest.mark.parametrize([some_expr, "param2"], [1, 2, 3])
+   |                          ^^^^^^^^^^^^^^^^^^^^^
+41 | def test_list_mixed_expr_literal(param1, param2): ...
+   |
+help: Use a `tuple` for the first argument
+37 | def test_list_expressions(param1, param2): ...
+38 | 
+39 | 
+   - @pytest.mark.parametrize([some_expr, "param2"], [1, 2, 3])
+40 + @pytest.mark.parametrize((some_expr, "param2"), [1, 2, 3])
+41 | def test_list_mixed_expr_literal(param1, param2): ...
 42 | 
+43 | 
+note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
   --> PT006.py:44:26
    |
-44 | @pytest.mark.parametrize([some_expr, another_expr], [1, 2, 3])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^
-45 | def test_list_expressions(param1, param2):
-46 |     ...
+44 | @pytest.mark.parametrize(("param1, param2, param3"), [(1, 2, 3), (4, 5, 6)])
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 | def test_implicit_str_concat_with_parens(param1, param2, param3): ...
    |
 help: Use a `tuple` for the first argument
-41 |     ...
+41 | def test_list_mixed_expr_literal(param1, param2): ...
 42 | 
 43 | 
-   - @pytest.mark.parametrize([some_expr, another_expr], [1, 2, 3])
-44 + @pytest.mark.parametrize((some_expr, another_expr), [1, 2, 3])
-45 | def test_list_expressions(param1, param2):
-46 |     ...
+   - @pytest.mark.parametrize(("param1, param2, param3"), [(1, 2, 3), (4, 5, 6)])
+44 + @pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
+45 | def test_implicit_str_concat_with_parens(param1, param2, param3): ...
+46 | 
 47 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:49:26
+  --> PT006.py:48:26
    |
-49 | @pytest.mark.parametrize([some_expr, "param2"], [1, 2, 3])
-   |                          ^^^^^^^^^^^^^^^^^^^^^
-50 | def test_list_mixed_expr_literal(param1, param2):
-51 |     ...
+48 | @pytest.mark.parametrize("param1, param2, param3", [(1, 2, 3), (4, 5, 6)])
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^
+49 | def test_implicit_str_concat_no_parens(param1, param2, param3): ...
    |
 help: Use a `tuple` for the first argument
-46 |     ...
+45 | def test_implicit_str_concat_with_parens(param1, param2, param3): ...
+46 | 
 47 | 
-48 | 
-   - @pytest.mark.parametrize([some_expr, "param2"], [1, 2, 3])
-49 + @pytest.mark.parametrize((some_expr, "param2"), [1, 2, 3])
-50 | def test_list_mixed_expr_literal(param1, param2):
-51 |     ...
-52 | 
+   - @pytest.mark.parametrize("param1, param2, param3", [(1, 2, 3), (4, 5, 6)])
+48 + @pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
+49 | def test_implicit_str_concat_no_parens(param1, param2, param3): ...
+50 | 
+51 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:54:26
+  --> PT006.py:52:26
    |
-54 | @pytest.mark.parametrize(("param1, " "param2, " "param3"), [(1, 2, 3), (4, 5, 6)])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-55 | def test_implicit_str_concat_with_parens(param1, param2, param3):
-56 |     ...
+52 | @pytest.mark.parametrize(("param1, param2, param3"), [(1, 2, 3), (4, 5, 6)])
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^
+53 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3): ...
    |
 help: Use a `tuple` for the first argument
-51 |     ...
-52 | 
-53 | 
-   - @pytest.mark.parametrize(("param1, " "param2, " "param3"), [(1, 2, 3), (4, 5, 6)])
-54 + @pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
-55 | def test_implicit_str_concat_with_parens(param1, param2, param3):
-56 |     ...
-57 | 
+49 | def test_implicit_str_concat_no_parens(param1, param2, param3): ...
+50 | 
+51 | 
+   - @pytest.mark.parametrize(("param1, param2, param3"), [(1, 2, 3), (4, 5, 6)])
+52 + @pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
+53 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3): ...
+54 | 
+55 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:59:26
+  --> PT006.py:56:26
    |
-59 | @pytest.mark.parametrize("param1, " "param2, " "param3", [(1, 2, 3), (4, 5, 6)])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-60 | def test_implicit_str_concat_no_parens(param1, param2, param3):
-61 |     ...
-   |
-help: Use a `tuple` for the first argument
-56 |     ...
-57 | 
-58 | 
-   - @pytest.mark.parametrize("param1, " "param2, " "param3", [(1, 2, 3), (4, 5, 6)])
-59 + @pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
-60 | def test_implicit_str_concat_no_parens(param1, param2, param3):
-61 |     ...
-62 | 
-note: This is an unsafe fix and may change runtime behavior
-
-PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:64:26
-   |
-64 | @pytest.mark.parametrize((("param1, " "param2, " "param3")), [(1, 2, 3), (4, 5, 6)])
-   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-65 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3):
-66 |     ...
-   |
-help: Use a `tuple` for the first argument
-61 |     ...
-62 | 
-63 | 
-   - @pytest.mark.parametrize((("param1, " "param2, " "param3")), [(1, 2, 3), (4, 5, 6)])
-64 + @pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
-65 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3):
-66 |     ...
-67 | 
-note: This is an unsafe fix and may change runtime behavior
-
-PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:69:26
-   |
-69 | @pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
+56 | @pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
    |                          ^^^^^^^^^^^^^^^^^
-70 | def test_csv_with_parens(param1, param2):
-71 |     ...
+57 | def test_csv_with_parens(param1, param2): ...
    |
 help: Use a `tuple` for the first argument
-66 |     ...
-67 | 
-68 | 
+53 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3): ...
+54 | 
+55 | 
    - @pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
-69 + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-70 | def test_csv_with_parens(param1, param2):
-71 |     ...
-72 | 
+56 + @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+57 | def test_csv_with_parens(param1, param2): ...
+58 | 
+59 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:74:39
+  --> PT006.py:60:39
    |
-74 | parametrize = pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
+60 | parametrize = pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
    |                                       ^^^^^^^^^^^^^^^^^
-75 |
-76 | @parametrize
    |
 help: Use a `tuple` for the first argument
-71 |     ...
-72 | 
-73 | 
+57 | def test_csv_with_parens(param1, param2): ...
+58 | 
+59 | 
    - parametrize = pytest.mark.parametrize(("param1,param2"), [(1, 2), (3, 4)])
-74 + parametrize = pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
-75 | 
-76 | @parametrize
-77 | def test_not_decorator(param1, param2):
+60 + parametrize = pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+61 | 
+62 | 
+63 | @parametrize
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `tuple`
-  --> PT006.py:81:35
+  --> PT006.py:67:35
    |
-81 | @pytest.mark.parametrize(argnames=("param1,param2"), argvalues=[(1, 2), (3, 4)])
+67 | @pytest.mark.parametrize(argnames=("param1,param2"), argvalues=[(1, 2), (3, 4)])
    |                                   ^^^^^^^^^^^^^^^^^
-82 | def test_keyword_arguments(param1, param2):
-83 |     ...
+68 | def test_keyword_arguments(param1, param2): ...
    |
 help: Use a `tuple` for the first argument
-78 |     ...
-79 | 
-80 | 
+64 | def test_not_decorator(param1, param2): ...
+65 | 
+66 | 
    - @pytest.mark.parametrize(argnames=("param1,param2"), argvalues=[(1, 2), (3, 4)])
-81 + @pytest.mark.parametrize(argnames=("param1", "param2"), argvalues=[(1, 2), (3, 4)])
-82 | def test_keyword_arguments(param1, param2):
-83 |     ...
-84 | 
+67 + @pytest.mark.parametrize(argnames=("param1", "param2"), argvalues=[(1, 2), (3, 4)])
+68 | def test_keyword_arguments(param1, param2): ...
+69 | 
+70 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-  --> PT006.py:86:26
+  --> PT006.py:71:26
    |
-86 | @pytest.mark.parametrize(("param",), [(1,), (2,)])
+71 | @pytest.mark.parametrize(("param",), [(1,), (2,)])
    |                          ^^^^^^^^^^
-87 | def test_single_element_tuple(param):
-88 |     ...
+72 | def test_single_element_tuple(param): ...
    |
 help: Use a string for the first argument
-83 |     ...
-84 | 
-85 | 
+68 | def test_keyword_arguments(param1, param2): ...
+69 | 
+70 | 
    - @pytest.mark.parametrize(("param",), [(1,), (2,)])
-86 + @pytest.mark.parametrize("param", [1, 2])
-87 | def test_single_element_tuple(param):
-88 |     ...
-89 | 
+71 + @pytest.mark.parametrize("param", [1, 2])
+72 | def test_single_element_tuple(param): ...
+73 | 
+74 | 
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-  --> PT006.py:91:26
+  --> PT006.py:75:26
    |
-91 | @pytest.mark.parametrize(("param",), [[1], [2]])
+75 | @pytest.mark.parametrize(("param",), [[1], [2]])
    |                          ^^^^^^^^^^
-92 | def test_single_element_list(param):
-93 |     ...
+76 | def test_single_element_list(param): ...
    |
 help: Use a string for the first argument
-88 |     ...
-89 | 
-90 | 
+72 | def test_single_element_tuple(param): ...
+73 | 
+74 | 
    - @pytest.mark.parametrize(("param",), [[1], [2]])
-91 + @pytest.mark.parametrize("param", [1, 2])
-92 | def test_single_element_list(param):
-93 |     ...
-94 | 
+75 + @pytest.mark.parametrize("param", [1, 2])
+76 | def test_single_element_list(param): ...
+77 | 
+78 | 
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-  --> PT006.py:96:26
+  --> PT006.py:79:26
    |
-96 | @pytest.mark.parametrize(("param",), [[1], [2]])
+79 | @pytest.mark.parametrize(("param",), [[1], [2]])
    |                          ^^^^^^^^^^
-97 | def test_single_element_list(param):
-98 |     ...
+80 | def test_single_element_list(param): ...
    |
 help: Use a string for the first argument
-93 |     ...
-94 | 
-95 | 
+76 | def test_single_element_list(param): ...
+77 | 
+78 | 
    - @pytest.mark.parametrize(("param",), [[1], [2]])
-96 + @pytest.mark.parametrize("param", [1, 2])
-97 | def test_single_element_list(param):
-98 |     ...
-99 | 
+79 + @pytest.mark.parametrize("param", [1, 2])
+80 | def test_single_element_list(param): ...
+81 | 
+82 | 
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-   --> PT006.py:103:5
-    |
-101 |   # Unsafe fix
-102 |   @pytest.mark.parametrize(
-103 | /     (
-104 | |         # comment
-105 | |         "param",
-106 | |     ),
-    | |_____^
-107 |       [[1], [2]],
-108 |   )
-    |
+  --> PT006.py:85:5
+   |
+83 |   # Unsafe fix
+84 |   @pytest.mark.parametrize(
+85 | /     (
+86 | |         # comment
+87 | |         "param",
+88 | |     ),
+   | |_____^
+89 |       [[1], [2]],
+90 |   )
+   |
 help: Use a string for the first argument
-100 | 
-101 | # Unsafe fix
-102 | @pytest.mark.parametrize(
-    -     (
-    -         # comment
-    -         "param",
-    -     ),
-    -     [[1], [2]],
-103 +     "param",
-104 +     [1, 2],
-105 | )
-106 | def test_comment_in_argnames(param):
-107 |     ...
+82 | 
+83 | # Unsafe fix
+84 | @pytest.mark.parametrize(
+   -     (
+   -         # comment
+   -         "param",
+   -     ),
+   -     [[1], [2]],
+85 +     "param",
+86 +     [1, 2],
+87 | )
+88 | def test_comment_in_argnames(param): ...
+89 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-   --> PT006.py:114:5
-    |
-112 | # Unsafe fix
-113 | @pytest.mark.parametrize(
-114 |     ("param",),
-    |     ^^^^^^^^^^
-115 |     [
-116 |         (
-    |
+  --> PT006.py:96:5
+   |
+94 | # Unsafe fix
+95 | @pytest.mark.parametrize(
+96 |     ("param",),
+   |     ^^^^^^^^^^
+97 |     [
+98 |         (
+   |
 help: Use a string for the first argument
-111 | 
-112 | # Unsafe fix
-113 | @pytest.mark.parametrize(
+93  | 
+94  | # Unsafe fix
+95  | @pytest.mark.parametrize(
     -     ("param",),
-114 +     "param",
-115 |     [
+96  +     "param",
+97  |     [
     -         (
     -             # comment
     -             1,
     -         ),
     -         (2,),
-116 +         1,
-117 +         2,
-118 |     ],
-119 | )
-120 | def test_comment_in_argvalues(param):
+98  +         1,
+99  +         2,
+100 |     ],
+101 | )
+102 | def test_comment_in_argvalues(param): ...
 note: This is an unsafe fix and may change runtime behavior
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-   --> PT006.py:129:5
+   --> PT006.py:110:5
     |
-127 | # Safe fix
-128 | @pytest.mark.parametrize(
-129 |     ("param",),
+108 | # Safe fix
+109 | @pytest.mark.parametrize(
+110 |     ("param",),
     |     ^^^^^^^^^^
-130 |     [
-131 |         (1,),
+111 |     [
+112 |         (1,),
     |
 help: Use a string for the first argument
-126 | 
-127 | # Safe fix
-128 | @pytest.mark.parametrize(
+107 | 
+108 | # Safe fix
+109 | @pytest.mark.parametrize(
     -     ("param",),
-129 +     "param",
-130 |     [
+110 +     "param",
+111 |     [
     -         (1,),
-131 +         1,
-132 |         # comment
+112 +         1,
+113 |         # comment
     -         (2,),
-133 +         2,
-134 |     ],
-135 | )
-136 | def test_comment_between_argvalues_items(param):
+114 +         2,
+115 |     ],
+116 | )
+117 | def test_comment_between_argvalues_items(param): ...
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-   --> PT006.py:142:5
+   --> PT006.py:122:5
     |
-140 | # A fix should be suggested for `argnames`, but not for `argvalues`.
-141 | @pytest.mark.parametrize(
-142 |     ("param",),
+120 | # A fix should be suggested for `argnames`, but not for `argvalues`.
+121 | @pytest.mark.parametrize(
+122 |     ("param",),
     |     ^^^^^^^^^^
-143 |     [
-144 |         (1,),
+123 |     [
+124 |         (1,),
     |
 help: Use a string for the first argument
-139 | 
-140 | # A fix should be suggested for `argnames`, but not for `argvalues`.
-141 | @pytest.mark.parametrize(
+119 | 
+120 | # A fix should be suggested for `argnames`, but not for `argvalues`.
+121 | @pytest.mark.parametrize(
     -     ("param",),
-142 +     "param",
-143 |     [
-144 |         (1,),
-145 |         (2, 3),
+122 +     "param",
+123 |     [
+124 |         (1,),
+125 |         (2, 3),
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:144:5
+    |
+142 | # See: https://github.com/astral-sh/ruff/issues/22441
+143 | @pytest.mark.parametrize(
+144 |     ["param"],
+    |     ^^^^^^^^^
+145 |     [
+146 |         ((),),
+    |
+help: Use a string for the first argument
+141 | # Regression tests for nested tuples that could cause syntax errors when unpacked.
+142 | # See: https://github.com/astral-sh/ruff/issues/22441
+143 | @pytest.mark.parametrize(
+    -     ["param"],
+144 +     "param",
+145 |     [
+    -         ((),),
+    -         ((1,),),
+146 +         (),
+147 +         (1,),
+148 |     ],
+149 | )
+150 | def test_single_element_nested_empty_tuple(param): ...
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:154:5
+    |
+153 | @pytest.mark.parametrize(
+154 |     ["param"],
+    |     ^^^^^^^^^
+155 |     [
+156 |         ((1, 2),),
+    |
+help: Use a string for the first argument
+151 | 
+152 | 
+153 | @pytest.mark.parametrize(
+    -     ["param"],
+154 +     "param",
+155 |     [
+    -         ((1, 2),),
+    -         ((3, 4),),
+156 +         (1, 2),
+157 +         (3, 4),
+158 |     ],
+159 | )
+160 | def test_single_element_nested_multi_tuple(param): ...
 
 PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
    --> PT006.py:164:5
     |
-162 | # See: https://github.com/astral-sh/ruff/issues/22441
 163 | @pytest.mark.parametrize(
 164 |     ["param"],
     |     ^^^^^^^^^
 165 |     [
-166 |         ((),),
+166 |         (((1,),),),
     |
 help: Use a string for the first argument
-161 | # Regression tests for nested tuples that could cause syntax errors when unpacked.
-162 | # See: https://github.com/astral-sh/ruff/issues/22441
+161 | 
+162 | 
 163 | @pytest.mark.parametrize(
     -     ["param"],
 164 +     "param",
 165 |     [
-    -         ((),),
-    -         ((1,),),
-166 +         (),
-167 +         (1,),
-168 |     ],
-169 | )
-170 | def test_single_element_nested_empty_tuple(param):
-
-PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-   --> PT006.py:175:5
-    |
-174 | @pytest.mark.parametrize(
-175 |     ["param"],
-    |     ^^^^^^^^^
-176 |     [
-177 |         ((1, 2),),
-    |
-help: Use a string for the first argument
-172 | 
-173 | 
-174 | @pytest.mark.parametrize(
-    -     ["param"],
-175 +     "param",
-176 |     [
-    -         ((1, 2),),
-    -         ((3, 4),),
-177 +         (1, 2),
-178 +         (3, 4),
-179 |     ],
-180 | )
-181 | def test_single_element_nested_multi_tuple(param):
-
-PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
-   --> PT006.py:186:5
-    |
-185 | @pytest.mark.parametrize(
-186 |     ["param"],
-    |     ^^^^^^^^^
-187 |     [
-188 |         (((1,),),),
-    |
-help: Use a string for the first argument
-183 | 
-184 | 
-185 | @pytest.mark.parametrize(
-    -     ["param"],
-186 +     "param",
-187 |     [
     -         (((1,),),),
-188 +         ((1,),),
-189 |     ],
-190 | )
-191 | def test_single_element_deeply_nested_tuple(param):
+166 +         ((1,),),
+167 |     ],
+168 | )
+169 | def test_single_element_deeply_nested_tuple(param): ...
+
+PT006 [*] Wrong type passed to first argument of `pytest.mark.parametrize`; expected `str`
+   --> PT006.py:173:5
+    |
+172 | @pytest.mark.parametrize(
+173 |     ["param"],
+    |     ^^^^^^^^^
+174 |     [
+175 |         (((1,)),),
+    |
+help: Use a string for the first argument
+170 | 
+171 | 
+172 | @pytest.mark.parametrize(
+    -     ["param"],
+173 +     "param",
+174 |     [
+    -         (((1,)),),
+175 +         (1,),
+176 |     ],
+177 | )
+178 | def test_single_element_grouped_tuple(param): ...
