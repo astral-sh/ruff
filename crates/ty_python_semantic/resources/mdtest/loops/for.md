@@ -1249,3 +1249,22 @@ for _ in range(1_000_000):
     if VAL - 1:
         x = 2
 ```
+
+### `Divergent` in narrowing conditions doesn't run afoul of "monotonic widening" in cycle recovery
+
+This test looks for a complicated inference failure case that came up during implementation. See the
+`while` variant of this case in `while_loop.md` for a detailed description.
+
+```py
+class Node:
+    def __init__(self, next: "Node | None" = None):
+        self.next: "Node | None" = next
+
+node = Node(Node(Node()))
+for _ in range(1_000_000):
+    if node.next is None:
+        break
+    node = node.next
+reveal_type(node)  # revealed: Node
+reveal_type(node.next)  # revealed: Node | None
+```
