@@ -282,3 +282,8 @@ pub(crate) const fn is_standalone_mock_non_existent_enabled(settings: &LinterSet
 pub(crate) const fn is_up024_precise_highlighting_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/22450
+pub(crate) const fn is_perf401_tuple_unpacking_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
