@@ -74,8 +74,8 @@ pub(crate) enum ProviderReplacement {
 pub(crate) enum FunctionSignatureChange {
     /// A message describing the function signature change.
     Message(&'static str),
-    /// The keyword argument name has been changed.
-    KeywordArg {
+    /// The argument name has been changed.
+    ArgName {
         old: &'static str,
         new: &'static str,
     },

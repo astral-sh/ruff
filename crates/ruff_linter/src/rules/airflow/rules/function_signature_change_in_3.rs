@@ -55,7 +55,7 @@ impl Violation for Airflow3IncompatibleFunctionSignature {
         let Airflow3IncompatibleFunctionSignature { change, .. } = self;
         match change {
             FunctionSignatureChange::Message(message) => Some((*message).to_string()),
-            FunctionSignatureChange::KeywordArg { old, new } => {
+            FunctionSignatureChange::ArgName { old, new } => {
                 Some(format!("Use `{new}` instead of `{old}`"))
             }
         }
@@ -185,7 +185,7 @@ fn check_method_arguments(
             (
                 Airflow3IncompatibleFunctionSignature {
                     function_name: "Variable.get".to_string(),
-                    change: FunctionSignatureChange::KeywordArg {
+                    change: FunctionSignatureChange::ArgName {
                         old: "default_var",
                         new: "default",
                     },
@@ -197,7 +197,7 @@ fn check_method_arguments(
     };
 
     let fix = match &violation.change {
-        FunctionSignatureChange::KeywordArg { new, .. } => Some(Fix::safe_edit(
+        FunctionSignatureChange::ArgName { new, .. } => Some(Fix::safe_edit(
             Edit::range_replacement((*new).to_string(), range),
         )),
         FunctionSignatureChange::Message(_) => None,
@@ -229,7 +229,7 @@ fn check_constructor_arguments(
                 Airflow3IncompatibleFunctionSignature {
                     function_name: qualified_name.segments().last().unwrap_or(&"").to_string(),
                     change: FunctionSignatureChange::Message(
-                        "`provide_context` is deprecated as of 2.0 and no longer required in 3.0",
+                        "`provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.",
                     ),
                 },
                 keyword.range(),

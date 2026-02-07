@@ -418,7 +418,7 @@ AIR303 `PythonOperator` signature is changed in Airflow 3.0
     |                                                              ^^^^^^^^^^^^^^^^^^^^
 205 | PythonVirtualenvOperator(task_id="task", python_callable=lambda: None, provide_context=True)
     |
-help: `provide_context` is deprecated as of 2.0 and no longer required in 3.0
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
 
 AIR303 `PythonVirtualenvOperator` signature is changed in Airflow 3.0
    --> AIR303.py:205:72
@@ -429,4 +429,4 @@ AIR303 `PythonVirtualenvOperator` signature is changed in Airflow 3.0
 206 |
 207 | PythonOperator(task_id="task", python_callable=lambda: None)
     |
-help: `provide_context` is deprecated as of 2.0 and no longer required in 3.0
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
