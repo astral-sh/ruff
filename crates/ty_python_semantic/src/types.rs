@@ -5815,6 +5815,9 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                // Unpack[TypedDict] is valid in annotation expressions but has special handling
+                // in **kwargs context. When used directly in a type expression, we return it as-is.
+                KnownInstanceType::UnpackedTypedDict(_) => Ok(*self),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -6227,6 +6230,11 @@ impl<'db> Type<'db> {
                     // TODO: For some of these, we may need to apply the type mapping to inner types.
                     self
                 },
+                KnownInstanceType::UnpackedTypedDict(typed_dict) => {
+                    Type::KnownInstance(KnownInstanceType::UnpackedTypedDict(
+                        typed_dict.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    ))
+                },
             }
 
             Type::FunctionLiteral(function) => {
@@ -6633,7 +6641,8 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
-                | KnownInstanceType::NewType(_) => {
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::UnpackedTypedDict(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
@@ -7278,6 +7287,10 @@ pub enum KnownInstanceType<'db> {
 
     /// The inferred spec for a functional `NamedTuple` class.
     NamedTupleSpec(NamedTupleSpec<'db>),
+
+    /// A single instance of `typing.Unpack[TypedDict]` (PEP 692).
+    /// This is used for more precise `**kwargs` typing.
+    UnpackedTypedDict(TypedDictType<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7329,6 +7342,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, field.ty);
             }
         }
+        KnownInstanceType::UnpackedTypedDict(typed_dict) => {
+            visitor.visit_type(db, Type::TypedDict(typed_dict));
+        }
     }
 }
 
@@ -7370,6 +7386,9 @@ impl<'db> KnownInstanceType<'db> {
                     .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
             ),
             Self::NamedTupleSpec(spec) => Self::NamedTupleSpec(spec.normalized_impl(db, visitor)),
+            Self::UnpackedTypedDict(typed_dict) => {
+                Self::UnpackedTypedDict(typed_dict.normalized_impl(db, visitor))
+            }
             Self::Deprecated(_)
             | Self::ConstraintSet(_)
             | Self::GenericContext(_)
@@ -7429,6 +7448,10 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(spec) => spec
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NamedTupleSpec),
+            Self::UnpackedTypedDict(typed_dict) => {
+                // TypedDict doesn't need recursive type normalization in this context
+                Some(Self::UnpackedTypedDict(typed_dict))
+            }
         }
     }
 
@@ -7456,6 +7479,8 @@ impl<'db> KnownInstanceType<'db> {
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
+            // Unpack[TypedDict] is represented as a _SpecialForm at runtime
+            Self::UnpackedTypedDict(_) => KnownClass::SpecialForm,
         }
     }
 
@@ -13292,7 +13317,7 @@ pub(super) fn determine_upper_bound<'db>(
 // Make sure that the `Type` enum does not grow unexpectedly.
 #[cfg(not(debug_assertions))]
 #[cfg(target_pointer_width = "64")]
-static_assertions::assert_eq_size!(Type, [u8; 16]);
+static_assertions::assert_eq_size!(Type, [u8; 24]);
 
 #[cfg(test)]
 pub(crate) mod tests {
