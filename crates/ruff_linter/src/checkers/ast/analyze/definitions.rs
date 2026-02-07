@@ -17,6 +17,33 @@ use crate::{docstrings, warn_user};
 /// it is expected that all [`Definition`] nodes have been visited by the time, and that this
 /// method will not recurse into any other nodes.
 pub(crate) fn definitions(checker: &mut Checker) {
+    // Compute visibility of all definitions.
+    let exports: Option<Vec<DunderAllName>> = {
+        checker
+            .semantic
+            .global_scope()
+            .get_all("__all__")
+            .map(|binding_id| &checker.semantic.bindings[binding_id])
+            .filter_map(|binding| match &binding.kind {
+                BindingKind::Export(Export { names }) => Some(names.iter().copied()),
+                _ => None,
+            })
+            .fold(None, |acc, names| {
+                Some(acc.into_iter().flatten().chain(names).collect())
+            })
+    };
+
+    let definitions = std::mem::take(&mut checker.semantic.definitions);
+    for ContextualizedDefinition {
+        definition,
+        visibility: _,
+    } in definitions.resolve(exports.as_deref()).iter()
+    {
+        if checker.is_rule_enabled(Rule::SwapWithTemporaryVariable) {
+            pylint::rules::swap_with_temporary_variable(checker, definition);
+        }
+    }
+
     let enforce_annotations = checker.any_rule_enabled(&[
         Rule::AnyType,
         Rule::MissingReturnTypeClassMethod,
@@ -100,24 +127,8 @@ pub(crate) fn definitions(checker: &mut Checker) {
         return;
     }
 
-    // Compute visibility of all definitions.
-    let exports: Option<Vec<DunderAllName>> = {
-        checker
-            .semantic
-            .global_scope()
-            .get_all("__all__")
-            .map(|binding_id| &checker.semantic.bindings[binding_id])
-            .filter_map(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => Some(names.iter().copied()),
-                _ => None,
-            })
-            .fold(None, |acc, names| {
-                Some(acc.into_iter().flatten().chain(names).collect())
-            })
-    };
-
-    let definitions = std::mem::take(&mut checker.semantic.definitions);
     let mut overloaded_name: Option<&str> = None;
+    let definitions = std::mem::take(&mut checker.semantic.definitions);
     for ContextualizedDefinition {
         definition,
         visibility,
