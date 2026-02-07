@@ -1,9 +1,8 @@
 use itertools::Itertools;
 use ruff_diagnostics::{Applicability, Edit, Fix};
+use ruff_python_ast::Stmt;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::traversal::EnclosingSuite;
-use ruff_python_ast::{Stmt, traversal};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::Definition;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -42,7 +41,7 @@ use crate::checkers::ast::Checker;
 /// exception case, applying the quick fix would remove comments between the
 /// assignment statements.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.11")]
+#[violation_metadata(preview_since = "0.15.1")]
 pub(crate) struct SwapWithTemporaryVariable<'a> {
     first_var: &'a Name,
     second_var: &'a Name,
@@ -79,13 +78,14 @@ impl Violation for SwapWithTemporaryVariable<'_> {
     }
 }
 
-pub(crate) fn swap_with_temporary_variable(checker: &Checker, assignment: &Stmt) {
-    let Some(consecutive_assignments) =
-        match_consecutive_assignments(assignment, checker.semantic())
-    else {
-        return;
-    };
-    for (stmt_a, stmt_b, stmt_c) in consecutive_assignments.tuple_windows() {
+pub(crate) fn swap_with_temporary_variable(checker: &Checker, definition: &Definition) {
+    let consecutive_assignments = match_consecutive_assignments(definition);
+
+    for stmt_sequence in consecutive_assignments.tuple_windows() {
+        let (Some(stmt_a), Some(stmt_b), Some(stmt_c)) = stmt_sequence else {
+            continue;
+        };
+
         // Detect patterns like:
         // temp = x
         // x = y
@@ -134,41 +134,14 @@ pub(crate) fn swap_with_temporary_variable(checker: &Checker, assignment: &Stmt)
 ///
 /// Also see the `repeated_append` rule for a similar use case.
 fn match_consecutive_assignments<'a>(
-    stmt: &'a Stmt,
-    semantic: &'a SemanticModel,
-) -> Option<impl Iterator<Item = VarToVarAssignment<'a>>> {
-    let root_assignment = VarToVarAssignment::from_stmt(stmt)?;
-
-    // In order to match consecutive statements, we need to go to the tree ancestor of the
-    // given statement, find its position there, and match all 'appends' from there.
-    let suite = if semantic.at_top_level() {
-        // If the statement is at the top level, we should go to the parent module.
-        // Module is available in the definitions list.
-        EnclosingSuite::new(semantic.definitions.python_ast()?, stmt.into())?
-    } else {
-        // Otherwise, go to the parent, and take its body as a sequence of siblings.
-        semantic
-            .current_statement_parent()
-            .and_then(|parent| traversal::suite(stmt, parent))?
+    definition: &'a Definition,
+) -> impl Iterator<Item = Option<VarToVarAssignment<'a>>> {
+    let suite = match definition {
+        Definition::Module(module) => module.python_ast,
+        Definition::Member(member) => member.body(),
     };
 
-    // We shouldn't repeat the same work for many 'assignments' that go in a row. Let's check
-    // that this statement is at the beginning of such a group.
-    if suite
-        .previous_sibling()
-        .is_some_and(|previous_stmt| VarToVarAssignment::from_stmt(previous_stmt).is_some())
-    {
-        return None;
-    }
-
-    Some(
-        std::iter::once(root_assignment).chain(
-            suite
-                .next_siblings()
-                .iter()
-                .map_while(VarToVarAssignment::from_stmt),
-        ),
-    )
+    suite.iter().map(VarToVarAssignment::from_stmt)
 }
 
 #[derive(Eq, PartialEq, Debug, Clone)]

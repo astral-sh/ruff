@@ -5,6 +5,14 @@ def foo(x: int, y: int):
     y = temp
 
 
+# safe fix inside an if condition
+def foo(x: int, y: int):
+    if x > 5:
+        temp: int = x
+        x = y
+        y = temp
+
+
 # unsafe fix because the swap statements contain a comment
 def bar(x: int, y: int):
     temp: int = x  # comment
