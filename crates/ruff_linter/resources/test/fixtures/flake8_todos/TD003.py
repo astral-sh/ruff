@@ -38,6 +38,12 @@ def foo(x):
 
 # TODO: #9627 A todo with a number on the same line
 
+# TODO: RFFU-6877 A todo with a Jira-style ID on the same line
+
+# TODO: ABC123 A todo with a Jira-style ID without hyphen
+
+# TODO: Move this part to the other place JIRA-123
+
 # TODO: A todo with a random number, 5431
 
 # TODO: here's a TODO on the last line with no link
