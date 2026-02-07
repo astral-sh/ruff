@@ -1256,7 +1256,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     for keyword in &args.keywords {
                         match keyword.arg.as_deref() {
                             Some(arg_name @ ("total" | "closed")) => {
-                                let passed_type = self.expression_type(&keyword.value);
+                                let passed_type = self.file_expression_type(&keyword.value);
                                 if !matches!(passed_type, Type::BooleanLiteral(_))
                                     && let Some(builder) =
                                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
@@ -1314,11 +1314,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // We mimic the runtime behaviour and discard the metaclass argument
                             Some(name) if name.id.as_str() == "metaclass" => None,
                             Some(name) => {
-                                let ty = self.expression_type(&keyword.value);
+                                let ty = self.file_expression_type(&keyword.value);
                                 Some((Argument::Keyword(name.id.as_str()), Some(ty)))
                             }
                             None => {
-                                let ty = self.expression_type(&keyword.value);
+                                let ty = self.file_expression_type(&keyword.value);
                                 Some((Argument::Keywords, Some(ty)))
                             }
                         })
