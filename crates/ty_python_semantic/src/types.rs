@@ -870,6 +870,35 @@ impl<'db> Type<'db> {
         )
     }
 
+    /// Bind `Self` type variables in this type to a concrete self type.
+    ///
+    /// Uses MRO-based matching: a `Self` typevar is only bound if its owner class
+    /// is in the MRO of the self type's class.
+    ///
+    /// Callable types whose `Self` binding is handled through the descriptor protocol /
+    /// signature binding path (e.g. `FunctionLiteral`, `BoundMethod`, function-like
+    /// `Callable`) are treated as opaque by the `BindSelf` type mapping — it will not
+    /// recurse into their signatures. This means `bind_self_typevars` can be called
+    /// uniformly on any attribute type: data attributes like `Manager[Self]` will have
+    /// `Self` bound eagerly, while functions/methods will defer `Self` binding to call
+    /// time (where `Self` is inferred from the explicit `self` argument).
+    pub(crate) fn bind_self_typevars(
+        self,
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        self_binding_context: Option<BindingContext<'db>>,
+    ) -> Self {
+        if !self.contains_self(db) {
+            return self;
+        }
+
+        self.apply_type_mapping(
+            db,
+            &TypeMapping::BindSelf(SelfBinding::new(db, self_type, self_binding_context)),
+            TypeContext::default(),
+        )
+    }
+
     /// Returns `true` if `self` is [`Type::Callable`].
     pub(crate) const fn is_callable_type(&self) -> bool {
         matches!(self, Type::Callable(..))
@@ -3391,7 +3420,12 @@ impl<'db> Type<'db> {
                     return Place::Undefined.into();
                 }
 
-                self.fallback_to_getattr(db, &name, result, policy)
+                let result = self.fallback_to_getattr(db, &name, result, policy);
+
+                // Resolve `Self` type variables in attribute types to the
+                // concrete instance type. Uses MRO-based matching so that
+                // inherited attributes with Self also resolve correctly.
+                result.map_type(|ty| ty.bind_self_typevars(db, self, None))
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -3418,6 +3452,18 @@ impl<'db> Type<'db> {
                 let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
+
+                // Resolve `Self` type variables in class-level attribute access
+                // BEFORE the descriptor protocol. The `BindSelf` type mapping treats
+                // function-like types as opaque (not recursing into their signatures),
+                // so only data attributes like `Manager[Self]` will have Self bound
+                // here. Functions/methods defer Self binding to call time.
+                //
+                // `to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`,
+                // and `SubclassOf`, so the `unwrap_or` is just a defensive fallback.
+                let self_instance = self.to_instance(db).unwrap_or(self);
+                let class_attr_plain =
+                    class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance, None));
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
                     db,
@@ -6153,7 +6199,7 @@ impl<'db> Type<'db> {
         // early. This is not just an optimization, it also prevents us from infinitely expanding
         // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
-            TypeMapping::BindSelf { self_type, .. } if self == *self_type => return self,
+            TypeMapping::BindSelf(binding) if self == binding.self_type() => return self,
             _ => {}
         }
 
@@ -6169,7 +6215,7 @@ impl<'db> Type<'db> {
                         TypeMapping::ApplySpecialization(_) |
                         TypeMapping::UniqueSpecialization { .. } |
                         TypeMapping::PromoteLiterals(_) |
-                        TypeMapping::BindSelf { .. } |
+                        TypeMapping::BindSelf(..) |
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
                         TypeMapping::ReplaceParameterDefaults |
@@ -6230,6 +6276,12 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
+                // `BindSelf` does not recurse into function literals: their `Self` binding
+                // is deferred to call time via `Signature::bind_self`.
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
+
                 let function = Type::FunctionLiteral(function.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
 
                 match type_mapping {
@@ -6238,11 +6290,19 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
-                db,
-                method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            )),
+            Type::BoundMethod(method) => {
+                // `BindSelf` does not recurse into bound methods: their `Self` binding
+                // is deferred to call time via `BoundMethodType::into_callable_type`.
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
+
+                Type::BoundMethod(BoundMethodType::new(
+                    db,
+                    method.function(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                ))
+            }
 
             Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::PromoteLiterals(PromoteLiteralsMode::On)) => {
                 match instance.known_class(db) {
@@ -6274,30 +6334,46 @@ impl<'db> Type<'db> {
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)) => {
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
                     function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)) => {
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(
                     function.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(
                     property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
             Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
+                if matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(
                     property.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                 ))
             }
 
             Type::Callable(callable) => {
+                // Function-like callables bind `Self` at call time, not at access time.
+                if callable.is_function_like(db) && matches!(type_mapping, TypeMapping::BindSelf(..)) {
+                    return self;
+                }
                 Type::Callable(callable.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
@@ -6392,7 +6468,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf { .. } |
+                TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
                 TypeMapping::ReplaceParameterDefaults |
@@ -6406,7 +6482,7 @@ impl<'db> Type<'db> {
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
-                TypeMapping::BindSelf { .. } |
+                TypeMapping::BindSelf(..) |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
                 TypeMapping::ReplaceParameterDefaults |
@@ -7069,6 +7145,102 @@ impl PromoteLiteralsMode {
     }
 }
 
+/// Returns the [`ClassLiteral`] that "owns" a `Self` typevar (i.e., the class from its upper bound).
+fn self_typevar_owner_class_literal<'db>(
+    db: &'db dyn Db,
+    bound_typevar: BoundTypeVarInstance<'db>,
+) -> Option<ClassLiteral<'db>> {
+    bound_typevar
+        .typevar(db)
+        .upper_bound(db)
+        .and_then(|ty| match ty {
+            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+            _ => None,
+        })
+}
+
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+fn class_mro_literals<'db>(
+    db: &'db dyn Db,
+    class_literal: ClassLiteral<'db>,
+) -> Vec<ClassLiteral<'db>> {
+    class_literal
+        .iter_mro(db)
+        .filter_map(ClassBase::into_class)
+        .map(|class| class.class_literal(db))
+        .collect()
+}
+
+/// Information needed to bind `Self` typevars to a concrete type.
+///
+/// Uses MRO-based matching: a `Self` typevar is bound only if its owner class
+/// is in the MRO of the self type's class.
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+pub struct SelfBinding<'db> {
+    ty: Type<'db>,
+    class_literal: Option<ClassLiteral<'db>>,
+    binding_context: Option<BindingContext<'db>>,
+}
+
+impl<'db> SelfBinding<'db> {
+    pub(crate) fn self_type(&self) -> Type<'db> {
+        self.ty
+    }
+
+    pub(crate) fn binding_context(&self) -> Option<BindingContext<'db>> {
+        self.binding_context
+    }
+}
+
+impl<'db> SelfBinding<'db> {
+    pub(crate) fn new(
+        db: &'db dyn Db,
+        self_type: Type<'db>,
+        binding_context: Option<BindingContext<'db>>,
+    ) -> Self {
+        let class_literal = match self_type {
+            Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+            Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
+                typevar.typevar(db).upper_bound(db).and_then(|ty| match ty {
+                    Type::NominalInstance(instance) => Some(instance.class_literal(db)),
+                    _ => None,
+                })
+            }
+            _ => None,
+        };
+
+        Self {
+            ty: self_type,
+            class_literal,
+            binding_context,
+        }
+    }
+
+    fn should_bind(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
+        if !bound_typevar.typevar(db).is_self(db) {
+            return false;
+        }
+
+        // Fast path for the common method-signature case where the bound `Self`
+        // carries the same binding context as this mapping.
+        if let Some(binding_context) = self.binding_context
+            && bound_typevar.binding_context(db) == binding_context
+        {
+            return true;
+        }
+
+        // When `class_literal` is `None` (e.g. the self type is `Never`, a dynamic type, or
+        // another non-nominal type), we can't perform MRO-based matching, so we
+        // optimistically bind. When `class_literal` is `Some`, we check that the Self
+        // typevar's owner class is in the MRO of the self type's class.
+        self.class_literal.is_none_or(|class_literal| {
+            let class_mro = class_mro_literals(db, class_literal);
+            self_typevar_owner_class_literal(db, bound_typevar)
+                .is_none_or(|owner_class| class_mro.contains(&owner_class))
+        })
+    }
+}
+
 /// A mapping that can be applied to a type, producing another type. This is applied inductively to
 /// the components of complex types.
 ///
@@ -7091,10 +7263,7 @@ pub enum TypeMapping<'a, 'db> {
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
     /// Binds any `typing.Self` typevar with a particular `self` class.
-    BindSelf {
-        self_type: Type<'db>,
-        binding_context: Option<BindingContext<'db>>,
-    },
+    BindSelf(SelfBinding<'db>),
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
@@ -7144,9 +7313,13 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
             | TypeMapping::RescopeReturnCallables(_) => context,
-            TypeMapping::BindSelf {
-                binding_context, ..
-            } => context.remove_self(db, *binding_context),
+            TypeMapping::BindSelf(binding) => {
+                if binding.binding_context().is_some() {
+                    context.remove_self(db, binding.binding_context())
+                } else {
+                    context
+                }
+            }
             TypeMapping::ReplaceSelf { new_upper_bound } => GenericContext::from_typevar_instances(
                 db,
                 context.variables(db).map(|typevar| {
@@ -7174,7 +7347,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
-            | TypeMapping::BindSelf { .. }
+            | TypeMapping::BindSelf(..)
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::EagerExpansion
@@ -8736,7 +8909,20 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
     /// differences in their bounds or constraints due to materialization.
+    ///
+    /// For `Self` typevars, two instances are considered the same if they share the same owner
+    /// class (derived from their upper bound), even if their binding contexts differ (e.g.,
+    /// `Self@LinkedList` from a class body vs `Self@next` from a method).
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
+        if self.typevar(db).is_self(db) && other.typevar(db).is_self(db) {
+            if let (Some(left), Some(right)) = (
+                self_typevar_owner_class_literal(db, self),
+                self_typevar_owner_class_literal(db, other),
+            ) {
+                return left == right && self.paramspec_attr(db) == other.paramspec_attr(db);
+            }
+        }
+
         self.identity(db) == other.identity(db)
     }
 
@@ -8852,14 +9038,9 @@ impl<'db> BoundTypeVarInstance<'db> {
                     })
                     .unwrap_or(Type::TypeVar(self))
             }
-            TypeMapping::BindSelf {
-                self_type,
-                binding_context,
-            } => {
-                if self.typevar(db).is_self(db)
-                    && binding_context.is_none_or(|context| self.binding_context(db) == context)
-                {
-                    *self_type
+            TypeMapping::BindSelf(binding) => {
+                if binding.should_bind(db, self) {
+                    binding.self_type()
                 } else {
                     Type::TypeVar(self)
                 }
