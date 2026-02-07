@@ -814,3 +814,30 @@ class Sub2(Base):
     # error: [invalid-overload]
     def method(self, x: str) -> str: ...
 ```
+
+### Invalid syntax regression case
+
+We used to panic on this snippet (see <https://github.com/astral-sh/ty/issues/1867>), because
+"iterating over the overloads" for `g` would incorrectly list the overloads for `f`:
+
+<!-- blacken-docs:off -->
+
+`module.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f() -> int: ...  # error: [invalid-overload]
+```
+
+`main.py`:
+
+```py
+import module
+g = module.f
+@staticmethod
+def g  # error: [invalid-syntax]
+```
+
+<!-- blacken-docs:on -->
