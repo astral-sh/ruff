@@ -23,6 +23,10 @@ dict.fromkeys(pierogi_fillings)
 dict.fromkeys(pierogi_fillings, ("blessed", "tuples", "don't", "mutate"))
 dict.fromkeys(pierogi_fillings, "neither do strings")
 
+dict.fromkeys(pierogi_fillings, (x for x in "cv"))
+dict.fromkeys(pierogi_fillings, (x := []))
+dict.fromkeys(pierogi_fillings, ([],))
+
 class MysteryBox: ...
 
 dict.fromkeys(pierogi_fillings, MysteryBox)

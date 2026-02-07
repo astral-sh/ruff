@@ -140,6 +140,12 @@ class P:
     class_variable = [*class_variable[0::1], *class_variable[2::3]]
 
 
+class T:
+    generator_default = (x for x in range(10))
+    walrus_default = (x := [])
+    tuple_with_mutable = ([],)
+
+
 import ctypes
 # Lint should trigger RUF012 only  for the `test` field and not the `_fields_`
 class S(ctypes.Structure):

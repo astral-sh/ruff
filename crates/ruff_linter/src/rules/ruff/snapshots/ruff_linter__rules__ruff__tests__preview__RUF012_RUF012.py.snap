@@ -119,6 +119,35 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
     |
 
 RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+   --> RUF012.py:144:25
+    |
+143 | class T:
+144 |     generator_default = (x for x in range(10))
+    |                         ^^^^^^^^^^^^^^^^^^^^^^
+145 |     walrus_default = (x := [])
+146 |     tuple_with_mutable = ([],)
+    |
+
+RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+   --> RUF012.py:145:23
+    |
+143 | class T:
+144 |     generator_default = (x for x in range(10))
+145 |     walrus_default = (x := [])
+    |                       ^^^^^^^
+146 |     tuple_with_mutable = ([],)
+    |
+
+RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+   --> RUF012.py:146:26
+    |
+144 |     generator_default = (x for x in range(10))
+145 |     walrus_default = (x := [])
+146 |     tuple_with_mutable = ([],)
+    |                          ^^^^^
+    |
+
+RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
    --> RUF012.py:152:12
     |
 150 | # Lint should trigger RUF012 only  for the `test` field and not the `_fields_`

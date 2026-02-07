@@ -36,9 +36,16 @@ class AWithQuotes:
     class_variable: 'typing.ClassVar[list[int]]'= []
 
 
-# Mutable defaults wrapped in field() calls
 @dataclass
 class C:
+    generator_default: list[int] = (x for x in range(10))
+    walrus_default: list[int] = (x := [])
+    tuple_with_mutable: list[int] = ([],)
+
+
+# Mutable defaults wrapped in field() calls
+@dataclass
+class D:
     mutable_default: list[int] = field(default=[])  # RUF008
     mutable_default2: dict[str, int] = field(default={})  # RUF008
     mutable_default3: set[int] = field(default=set())  # RUF008
