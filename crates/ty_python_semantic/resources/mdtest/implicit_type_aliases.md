@@ -30,6 +30,8 @@ g(None)
 
 ## Unions
 
+### Basics
+
 We also support unions in type aliases:
 
 ```py
@@ -81,14 +83,14 @@ reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 reveal_type(IntOrStrOrBytes1)  # revealed: <types.UnionType special-form 'int | str | bytes'>
 reveal_type(IntOrStrOrBytes2)  # revealed: <types.UnionType special-form 'int | str | bytes'>
 reveal_type(IntOrStrOrBytes3)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(IntOrStrOrBytes4)  # revealed: <types.UnionType special-form 'int | str | bytes'>
+reveal_type(IntOrStrOrBytes4)  # revealed: <types.UnionType special-form 'IntOrStr | bytes'>
 reveal_type(IntOrStrOrBytes5)  # revealed: <types.UnionType special-form 'int | str | bytes'>
 reveal_type(IntOrStrOrBytes6)  # revealed: <types.UnionType special-form 'int | str | bytes'>
-reveal_type(BytesOrIntOrStr)  # revealed: <types.UnionType special-form 'bytes | int | str'>
+reveal_type(BytesOrIntOrStr)  # revealed: <types.UnionType special-form 'bytes | IntOrStr'>
 reveal_type(IntOrNone)  # revealed: <types.UnionType special-form 'int | None'>
 reveal_type(NoneOrInt)  # revealed: <types.UnionType special-form 'None | int'>
-reveal_type(IntOrStrOrNone)  # revealed: <types.UnionType special-form 'int | str | None'>
-reveal_type(NoneOrIntOrStr)  # revealed: <types.UnionType special-form 'None | int | str'>
+reveal_type(IntOrStrOrNone)  # revealed: <types.UnionType special-form 'IntOrStr | None'>
+reveal_type(NoneOrIntOrStr)  # revealed: <types.UnionType special-form 'None | IntOrStr'>
 reveal_type(IntOrAny)  # revealed: <types.UnionType special-form 'int | Any'>
 reveal_type(AnyOrInt)  # revealed: <types.UnionType special-form 'Any | int'>
 reveal_type(NoneOrAny)  # revealed: <types.UnionType special-form 'None | Any'>
@@ -241,6 +243,138 @@ def f(SomeUnionType: UnionType):
     some_union: SomeUnionType
 
 f(int | str)
+```
+
+### Recursive unions
+
+Assigned `types.UnionType` instances are named and lazily evaluated, allowing for recursive type
+structures.
+
+```py
+from typing import Union
+
+JsonValue = Union[int, float, bool, str, None, dict[str, "JsonValue"], list["JsonValue"]]
+
+reveal_type(JsonValue)  # revealed: <types.UnionType special-form 'int | float | str | ... omitted 3 union elements'>
+
+j1: JsonValue = 42
+reveal_type(j1)  # revealed: Literal[42]
+# TODO: better type using bidirectional inference
+j2: JsonValue = {"key": 123}
+reveal_type(j2)  # revealed: dict[Unknown | str, Unknown | int]
+# TODO: better type using bidirectional inference
+j3: JsonValue = [1, [2, [3]]]
+reveal_type(j3)  # revealed: list[Unknown | int | list[Unknown | int | list[Unknown | int]]]
+# error: [invalid-assignment]
+j4: JsonValue = {1: "value"}
+# error: [invalid-assignment]
+j5: JsonValue = {"key": [{1: "value"}]}
+
+TreeNode = int | tuple["TreeNode", "TreeNode"]
+
+reveal_type(TreeNode)  # revealed: <types.UnionType special-form 'int | tuple[TreeNode, TreeNode]'>
+
+t1: TreeNode = 5
+t2: TreeNode = (1, 2)
+t3: TreeNode = ((1, 2), (3, 4))
+t4: TreeNode = (((1, 2), 3), (4, (5, 6)))
+# error: [invalid-assignment]
+t5: TreeNode = "not a tree"
+# error: [invalid-assignment]
+t6: TreeNode = [1, 2]
+
+class Node:
+    Child = int | list["Child"]
+
+    def __init__(self, value: Child):
+        self.value = value
+
+n1 = Node(42)
+reveal_type(n1.value)  # revealed: Unknown | int | list[Child]
+n2 = Node([1, [2, [3]]])
+reveal_type(n2.value)  # revealed: Unknown | int | list[Child]
+# error: [invalid-argument-type]
+n3 = Node(["a"])
+reveal_type(n3.value)  # revealed: Unknown | int | list[Child]
+```
+
+The type of the second parameter of `isinstance/issubclass` is defined using an implicit (PEP-613)
+recursive union type alias on typeshed. This test ensures that it works correctly.
+
+```py
+from typing import Literal
+
+# `typeshed/stdlib/builtins.pyi`:
+# if sys.version_info >= (3, 10):
+#     _ClassInfo: TypeAlias = type | types.UnionType | tuple[_ClassInfo, ...]
+# else:
+#     _ClassInfo: TypeAlias = type | tuple[_ClassInfo, ...]
+# def isinstance(obj: object, class_or_tuple: _ClassInfo, /) -> bool: ...
+# def issubclass(cls: type, class_or_tuple: _ClassInfo, /) -> bool: ...
+
+def f(x: object):
+    # error: [invalid-argument-type]
+    if isinstance(x, 42):
+        reveal_type(x)  # revealed: object
+
+    # error: [invalid-argument-type]
+    if isinstance(x, (int, 42)):
+        reveal_type(x)  # revealed: object
+
+    # error: [invalid-argument-type]
+    if isinstance(x, (int, (str, (bytes, 42)))):
+        reveal_type(x)  # revealed: object
+
+def g(cls: type):
+    # error: [invalid-argument-type]
+    if issubclass(cls, 42):
+        reveal_type(cls)  # revealed: type
+
+    # error: [invalid-argument-type]
+    if issubclass(cls, (int, 42)):
+        reveal_type(cls)  # revealed: type
+
+    # error: [invalid-argument-type]
+    if issubclass(cls, (int, (str, (bytes, 42)))):
+        reveal_type(cls)  # revealed: type
+```
+
+Mutually recursive unions are also supported:
+
+```py
+A = int | tuple["B", ...]
+B = str | tuple["A", ...]
+
+a1: A = 42
+reveal_type(a1)  # revealed: Literal[42]
+a2: A = ("hello", (1,))
+reveal_type(a2)  # revealed: tuple[Literal["hello"], tuple[Literal[1]]]
+# error: [invalid-assignment]
+a3: A = ("hello", ("world",))
+reveal_type(a3)  # revealed: int | tuple[B, ...]
+
+b1: B = "test"
+reveal_type(b1)  # revealed: Literal["test"]
+b2: B = (1, ("hello", (3,)))
+reveal_type(b2)  # revealed: tuple[Literal[1], tuple[Literal["hello"], tuple[Literal[3]]]]
+# error: [invalid-assignment]
+b3: B = (1, (2, (3,)))
+reveal_type(b3)  # revealed: str | tuple[A, ...]
+```
+
+Generic recursive unions are not yet supported:
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+NestedDict = dict[str, T | "NestedDict[T]"]
+
+d1: NestedDict[int] = {"a": 1, "b": {"c": 2}}
+# TODO: should be `dict[str, int | dict[str, int]]` or something
+reveal_type(d1)  # revealed: dict[str, Divergent]
+# TODO: should be an invalid-assignment error
+d2: NestedDict[int] = {"a": 1, "b": {"c": "wrong"}}
 ```
 
 ## `|` operator between class objects and non-class objects
@@ -1193,8 +1327,8 @@ UnionAlias2 = Union[C, D]
 SubclassOfUnionAlias1 = type[UnionAlias1]
 SubclassOfUnionAlias2 = type[UnionAlias2]
 
-reveal_type(SubclassOfUnionAlias1)  # revealed: <special-form 'type[C | D]'>
-reveal_type(SubclassOfUnionAlias2)  # revealed: <special-form 'type[C | D]'>
+reveal_type(SubclassOfUnionAlias1)  # revealed: <special-form 'type[UnionAlias1]'>
+reveal_type(SubclassOfUnionAlias2)  # revealed: <special-form 'type[UnionAlias2]'>
 
 def _(
     subclass_of_union_alias1: SubclassOfUnionAlias1,

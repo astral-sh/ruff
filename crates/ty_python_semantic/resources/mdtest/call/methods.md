@@ -788,9 +788,9 @@ from typing_extensions import Self
 
 reveal_type(object.__new__)  # revealed: def __new__[Self](cls) -> Self
 reveal_type(object().__new__)  # revealed: def __new__[Self](cls) -> Self
-# revealed: Overload[[Self](cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
+# revealed: Overload[[Self](cls, x: ConvertibleToInt = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
 reveal_type(int.__new__)
-# revealed: Overload[[Self](cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
+# revealed: Overload[[Self](cls, x: ConvertibleToInt = 0, /) -> Self, [Self](cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self]
 reveal_type((42).__new__)
 
 class X:
