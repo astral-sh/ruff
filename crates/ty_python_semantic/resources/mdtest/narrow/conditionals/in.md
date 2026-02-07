@@ -121,29 +121,48 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["a", "c"] | int
 ```
 
-## No narrowing for the right-hand side (currently)
+## Narrowing the right-hand side
 
-No narrowing is done for the right-hand side currently, even if the right-hand side is a valid
-"target" (name/attribute/subscript) that could potentially be narrowed. We may change this in the
-future:
+When the left-hand side is a string literal and the right-hand side is a union of string literals,
+we can narrow the right-hand side based on which strings contain the left-hand substring:
 
 ```py
 from typing import Literal
 
 def f(x: Literal["abc", "def"]):
     if "a" in x:
-        # `x` could also be validly narrowed to `Literal["abc"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
+        reveal_type(x)  # revealed: Literal["abc"]
     else:
-        # `x` could also be validly narrowed to `Literal["def"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
+        reveal_type(x)  # revealed: Literal["def"]
 
     if "a" not in x:
-        # `x` could also be validly narrowed to `Literal["def"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
+        reveal_type(x)  # revealed: Literal["def"]
     else:
-        # `x` could also be validly narrowed to `Literal["abc"]` here:
-        reveal_type(x)  # revealed: Literal["abc", "def"]
+        reveal_type(x)  # revealed: Literal["abc"]
+```
+
+Narrowing also works when multiple string literals contain the substring:
+
+```py
+from typing import Literal
+
+def g(x: Literal["abc", "abcd", "def"]):
+    if "a" in x:
+        reveal_type(x)  # revealed: Literal["abc", "abcd"]
+    else:
+        reveal_type(x)  # revealed: Literal["def"]
+```
+
+Narrowing works with single string literals too:
+
+```py
+from typing import Literal
+
+def h(x: Literal["hello"]):
+    if "ell" in x:
+        reveal_type(x)  # revealed: Literal["hello"]
+    else:
+        reveal_type(x)  # revealed: Never
 ```
 
 ## bool
