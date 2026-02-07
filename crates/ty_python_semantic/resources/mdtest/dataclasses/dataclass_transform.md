@@ -1451,5 +1451,70 @@ User(id=1, name="Test")
 User()
 ```
 
+## Converters
+
+When a field specifier uses a `converter` parameter, the synthesized `__init__` parameter type
+should be the converter's input type (i.e. the type of its first positional parameter), not the
+field's declared type. Attribute writes also accept the converter's input type.
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def field(*, converter: Any = ..., default: Any = ...) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def my_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+def str_to_int(x: str) -> int:
+    return int(x)
+```
+
+A function converter uses the converter's input type in `__init__`. A class converter (`float`) has
+a gradual signature, so accepts `Any` (no false positives). A converter combined with a `default`
+value makes the field optional.
+
+```py
+@my_model
+class ModelWithConverters:
+    x: int = field(converter=str_to_int)
+    y: float = field(converter=float)
+    z: int = field(converter=str_to_int, default="0")
+
+reveal_type(ModelWithConverters.__init__)  # revealed: (self: ModelWithConverters, x: str, y: Any, z: str = ...) -> None
+
+ModelWithConverters("1", "2")
+ModelWithConverters(x="1", y=3.14, z="99")
+ModelWithConverters(1, "2")  # error: [invalid-argument-type]
+```
+
+Reads return the declared type; writes accept the converter's input type:
+
+```py
+obj = ModelWithConverters("1", "2")
+reveal_type(obj.x)  # revealed: int
+reveal_type(obj.y)  # revealed: int | float
+obj.x = "2"
+obj.x = 3  # error: [invalid-assignment]
+obj.y = "1"
+obj.y = 1
+obj.y = 1.5
+```
+
+A variadic converter (`*args`) uses the variadic parameter's element type as the input type:
+
+```py
+def variadic_converter(*args: str) -> int:
+    return int(args[0])
+
+@my_model
+class WithVariadicConverter:
+    x: int = field(converter=variadic_converter)
+
+reveal_type(WithVariadicConverter.__init__)  # revealed: (self: WithVariadicConverter, x: str) -> None
+
+WithVariadicConverter("1")
+WithVariadicConverter(1)  # error: [invalid-argument-type]
+```
+
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
