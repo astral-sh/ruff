@@ -13,9 +13,9 @@ def _(x: int):
 ## Multiple negative contributions with simplification
 
 ```py
-def _(flag1: bool, flag2: bool):
-    x = 1 if flag1 else 2 if flag2 else 3
+from typing import Literal
 
+def _(x: Literal[1, 2, 3]):
     if x != 1:
         reveal_type(x)  # revealed: Literal[2, 3]
         if x != 2:
@@ -25,9 +25,9 @@ def _(flag1: bool, flag2: bool):
 ## elif-else blocks
 
 ```py
-def _(flag1: bool, flag2: bool):
-    x = 1 if flag1 else 2 if flag2 else 3
+from typing import Literal
 
+def _(x: Literal[1, 2, 3]):
     if x != 1:
         reveal_type(x)  # revealed: Literal[2, 3]
         if x == 2:

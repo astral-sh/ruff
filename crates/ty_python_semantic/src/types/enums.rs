@@ -16,7 +16,9 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct EnumMetadata<'db> {
+    /// A mapping from member names to the value of that member.
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
+    /// A mapping from alias names to the canonical member name.
     pub(crate) aliases: FxHashMap<Name, Name>,
 }
 

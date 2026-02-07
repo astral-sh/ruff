@@ -3,9 +3,9 @@
 ## `x != None`
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: Literal[1] | None):
     if x != None:
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -15,9 +15,9 @@ def _(flag: bool):
 ## `None != x` (reversed operands)
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: Literal[1] | None):
     if None != x:
         reveal_type(x)  # revealed: Literal[1]
     else:
@@ -27,9 +27,9 @@ def _(flag: bool):
 This also works for `==` with reversed operands:
 
 ```py
-def _(flag: bool):
-    x = None if flag else 1
+from typing import Literal
 
+def _(x: Literal[1] | None):
     if None == x:
         reveal_type(x)  # revealed: None
     else:
@@ -97,18 +97,18 @@ This narrowing behavior is only safe if the enum has no custom `__eq__`/`__ne__`
 ```py
 from enum import Enum
 
-class AmbiguousEnum(Enum):
+class AmbiguousEnum1(Enum):
     NO = 0
     YES = 1
 
     def __ne__(self, other) -> bool:
         return True
 
-def _(answer: AmbiguousEnum):
-    if answer != AmbiguousEnum.NO:
-        reveal_type(answer)  # revealed: AmbiguousEnum
+def _(answer: AmbiguousEnum1):
+    if answer != AmbiguousEnum1.NO:
+        reveal_type(answer)  # revealed: AmbiguousEnum1
     else:
-        reveal_type(answer)  # revealed: AmbiguousEnum
+        reveal_type(answer)  # revealed: AmbiguousEnum1
 ```
 
 Similar if that method is inherited from a base class:
@@ -120,23 +120,23 @@ class Mixin:
     def __eq__(self, other) -> bool:
         return True
 
-class AmbiguousEnum(Mixin, Enum):
+class AmbiguousEnum2(Mixin, Enum):
     NO = 0
     YES = 1
 
-def _(answer: AmbiguousEnum):
-    if answer == AmbiguousEnum.NO:
-        reveal_type(answer)  # revealed: AmbiguousEnum
+def _(answer: AmbiguousEnum2):
+    if answer == AmbiguousEnum2.NO:
+        reveal_type(answer)  # revealed: AmbiguousEnum2
     else:
-        reveal_type(answer)  # revealed: AmbiguousEnum
+        reveal_type(answer)  # revealed: AmbiguousEnum2
 ```
 
 ## `x != y` where `y` is of literal type
 
 ```py
-def _(flag: bool):
-    x = 1 if flag else 2
+from typing import Literal
 
+def _(x: Literal[1, 2]):
     if x != 1:
         reveal_type(x)  # revealed: Literal[2]
 ```
@@ -158,10 +158,9 @@ def _(flag: bool):
 ## `x != y` where `y` has multiple single-valued options
 
 ```py
-def _(flag1: bool, flag2: bool):
-    x = 1 if flag1 else 2
-    y = 2 if flag2 else 3
+from typing import Literal
 
+def _(x: Literal[1, 2], y: Literal[2, 3]):
     if x != y:
         reveal_type(x)  # revealed: Literal[1, 2]
     else:
@@ -173,9 +172,7 @@ def _(flag1: bool, flag2: bool):
 Only single-valued types should narrow the type:
 
 ```py
-def _(flag: bool, a: int, y: int):
-    x = a if flag else None
-
+def _(x: int | None, y: int):
     if x != y:
         reveal_type(x)  # revealed: int | None
 ```
@@ -277,8 +274,7 @@ def _(s: LiteralString | None, t: LiteralString | Any):
         reveal_type(s)  # revealed: Never
 
     if t == "foo":
-        # TODO could be `Literal["foo"] | Any`
-        reveal_type(t)  # revealed: LiteralString | Any
+        reveal_type(t)  # revealed: Literal["foo"] | Any
 ```
 
 ## Narrowing with tuple types
