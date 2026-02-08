@@ -202,6 +202,13 @@ async def main():
 
 ## `async with` statement suppresses exceptions if `__aexit__` returns a truthy value
 
+References:
+
+- <https://typing.python.org/en/latest/spec/exceptions.html#context-managers>
+
+If the return type of a context manager's `__aexit__` method is `Literal[True]` or `bool`, the
+context manager is treated as suppressing exceptions raised within the `async with` body.
+
 ```py
 from typing import Literal, Any
 
@@ -218,11 +225,6 @@ class ExceptionSuppressor2:
     async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
         return True
 
-class ExceptionSuppressor3:
-    async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
-        return True
-
 class ExceptionPropagator1:
     async def __aenter__(self) -> None: ...
     async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[False]:
@@ -235,7 +237,7 @@ class ExceptionPropagator2:
 
 class ExceptionPropagator3:
     async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[False] | None:
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool | None:
         return False
 
 class ExceptionPropagator4:
@@ -256,16 +258,6 @@ async def suppress1(x: int):
 async def suppress2(x: int):
     y: int | str = x
     async with ExceptionSuppressor2() as ex:
-        y = f()
-        z = f()
-    reveal_type(ex)  # revealed: None
-    reveal_type(y)  # revealed: int | str
-    # error: [possibly-unresolved-reference]
-    reveal_type(z)  # revealed: str
-
-async def suppress3(x: int):
-    y: int | str = x
-    async with ExceptionSuppressor3() as ex:
         y = f()
         z = f()
     reveal_type(ex)  # revealed: None

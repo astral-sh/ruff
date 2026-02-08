@@ -198,6 +198,13 @@ with Manager():
 
 ## `with` statement suppresses exceptions if `__exit__` returns a truthy value
 
+References:
+
+- <https://typing.python.org/en/latest/spec/exceptions.html#context-managers>
+
+If the return type of a context manager's `__exit__` method is `Literal[True]` or `bool`, the
+context manager is treated as suppressing exceptions raised within the `with` body.
+
 ```py
 from typing import Literal, Any
 
@@ -214,11 +221,6 @@ class ExceptionSuppressor2:
     def __exit__(self, exc_type, exc_value, traceback) -> bool:
         return True
 
-class ExceptionSuppressor3:
-    def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
-        return True
-
 class ExceptionPropagator1:
     def __enter__(self) -> None: ...
     def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
@@ -231,12 +233,12 @@ class ExceptionPropagator2:
 
 class ExceptionPropagator3:
     def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False] | None:
+    def __exit__(self, exc_type, exc_value, traceback) -> bool | None:
         return False
 
 class ExceptionPropagator4:
     def __enter__(self) -> None: ...
-    def __exit__(self, exc_type, exc_value, traceback):
+    def __exit__(self, exc_type, exc_value, traceback) -> Any:
         return f()
 
 def suppress1(x: int):
@@ -252,16 +254,6 @@ def suppress1(x: int):
 def suppress2(x: int):
     y: int | str = x
     with ExceptionSuppressor2() as ex:
-        y = f()
-        z = f()
-    reveal_type(ex)  # revealed: None
-    reveal_type(y)  # revealed: int | str
-    # error: [possibly-unresolved-reference]
-    reveal_type(z)  # revealed: str
-
-def suppress3(x: int):
-    y: int | str = x
-    with ExceptionSuppressor3() as ex:
         y = f()
         z = f()
     reveal_type(ex)  # revealed: None
