@@ -22,7 +22,7 @@ cd ..
 echo "Project selector: ${PRIMER_SELECTOR}"
 # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
 uvx \
-  --from="git+https://github.com/hauntsaninja/mypy_primer@d4e091e8937adea5b2722b49e17d3b252f2c8950" \
+  --from="git+https://github.com/hauntsaninja/mypy_primer@850d65d9da947ef9e02498b6f07598e7c8401641" \
   mypy_primer \
   --repo ruff \
   --type-checker ty \
