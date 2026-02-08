@@ -410,23 +410,165 @@ help: Use `default` instead of `default_var`
 194 | Variable.get(key="key", default="default")
 
 AIR303 `PythonOperator` signature is changed in Airflow 3.0
-   --> AIR303.py:205:62
+   --> AIR303.py:213:62
     |
-203 | )
-204 |
-205 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+211 | )
+212 |
+213 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
     |                                                              ^^^^^^^^^^^^^^^^^^^^
-206 | PythonVirtualenvOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+214 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+215 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `BranchPythonOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:214:68
+    |
+213 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+214 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                    ^^^^^^^^^^^^^^^^^^^^
+215 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+216 | PythonVirtualenvOperator(
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `ShortCircuitOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:215:68
+    |
+213 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+214 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+215 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                    ^^^^^^^^^^^^^^^^^^^^
+216 | PythonVirtualenvOperator(
+217 |     task_id="virtualenv_python",
     |
 help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
 
 AIR303 `PythonVirtualenvOperator` signature is changed in Airflow 3.0
-   --> AIR303.py:206:72
+   --> AIR303.py:221:5
     |
-205 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
-206 | PythonVirtualenvOperator(task_id="task", python_callable=lambda: None, provide_context=True)
-    |                                                                        ^^^^^^^^^^^^^^^^^^^^
-207 |
-208 | PythonOperator(task_id="task", python_callable=lambda: None)
+219 |     requirements=["colorama==0.4.0"],
+220 |     system_site_packages=False,
+221 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^^^^^^
+222 | )
+223 | BranchPythonVirtualenvOperator(
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `BranchPythonVirtualenvOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:229:5
+    |
+227 |     python_callable=virtualenv_callable,
+228 |     op_args=["some_args"],
+229 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^^^^^^
+230 | )
+231 | ExternalPythonOperator(
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `ExternalPythonOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:235:5
+    |
+233 |     python_callable=virtualenv_callable,
+234 |     python="some_path",
+235 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^^^^^^
+236 | )
+237 | BranchExternalPythonOperator(
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `BranchExternalPythonOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:242:5
+    |
+240 |     python_callable=virtualenv_callable,
+241 |     op_args=["some_args"],
+242 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^^^^^^
+243 | )
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `PythonOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:284:62
+    |
+282 | )
+283 |
+284 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                              ^^^^^^^^^^^^^^^^^^^^
+285 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+286 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `BranchPythonOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:285:68
+    |
+284 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+285 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                    ^^^^^^^^^^^^^^^^^^^^
+286 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+287 | PythonVirtualenvOperator(
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `ShortCircuitOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:286:68
+    |
+284 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+285 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+286 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                    ^^^^^^^^^^^^^^^^^^^^
+287 | PythonVirtualenvOperator(
+288 |     task_id="virtualenv_python",
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `PythonVirtualenvOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:292:5
+    |
+290 |     requirements=["colorama==0.4.0"],
+291 |     system_site_packages=False,
+292 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^^^^^^
+293 | )
+294 | BranchPythonVirtualenvOperator(
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `BranchPythonVirtualenvOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:300:5
+    |
+298 |     python_callable=virtualenv_callable,
+299 |     op_args=["some_args"],
+300 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^^^^^^
+301 | )
+302 | ExternalPythonOperator(
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `ExternalPythonOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:306:5
+    |
+304 |     python_callable=virtualenv_callable,
+305 |     python="some_path",
+306 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^^^^^^
+307 | )
+308 | BranchExternalPythonOperator(
+    |
+help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.
+
+AIR303 `BranchExternalPythonOperator` signature is changed in Airflow 3.0
+   --> AIR303.py:313:5
+    |
+311 |     python_callable=virtualenv_callable,
+312 |     op_args=["some_args"],
+313 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^^^^^^
+314 | )
     |
 help: `provide_context` is deprecated as of 2.0 and removed in 3.0, which is no longer required.

@@ -222,7 +222,25 @@ fn check_constructor_arguments(
             "standard",
             "operators",
             "python",
-            "PythonOperator" | "PythonVirtualenvOperator",
+            "PythonOperator"
+            | "BranchPythonOperator"
+            | "ShortCircuitOperator"
+            | "PythonVirtualenvOperator"
+            | "BranchPythonVirtualenvOperator"
+            | "ExternalPythonOperator"
+            | "BranchExternalPythonOperator",
+        ]
+        | [
+            "airflow",
+            "operators",
+            "python",
+            "PythonOperator"
+            | "BranchPythonOperator"
+            | "ShortCircuitOperator"
+            | "PythonVirtualenvOperator"
+            | "BranchPythonVirtualenvOperator"
+            | "ExternalPythonOperator"
+            | "BranchExternalPythonOperator",
         ] if arguments.find_keyword("provide_context").is_some() => {
             let keyword = arguments.find_keyword("provide_context").unwrap();
             (

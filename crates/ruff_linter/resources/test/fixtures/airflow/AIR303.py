@@ -197,13 +197,146 @@ Variable.get("key", deserialize_json=True)
 
 
 # airflow.providers.standard.operators.python (provide_context parameter removed)
+def virtualenv_callable():
+    pass
+
 from airflow.providers.standard.operators.python import (
     PythonOperator,
+    BranchPythonOperator,
+    ShortCircuitOperator,
     PythonVirtualenvOperator,
+    BranchPythonVirtualenvOperator,
+    ExternalPythonOperator,
+    BranchExternalPythonOperator,
 )
 
 PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
-PythonVirtualenvOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+PythonVirtualenvOperator(
+    task_id="virtualenv_python",
+    python_callable=virtualenv_callable,
+    requirements=["colorama==0.4.0"],
+    system_site_packages=False,
+    provide_context=True,
+)
+BranchPythonVirtualenvOperator(
+    task_id="branching_venv",
+    requirements=["numpy~=1.26.0"],
+    venv_cache_path="some_path",
+    python_callable=virtualenv_callable,
+    op_args=["some_args"],
+    provide_context=True,
+)
+ExternalPythonOperator(
+    task_id="external_python",
+    python_callable=virtualenv_callable,
+    python="some_path",
+    provide_context=True,
+)
+BranchExternalPythonOperator(
+    task_id="branching_ext_python",
+    python="some_path",
+    python_callable=virtualenv_callable,
+    op_args=["some_args"],
+    provide_context=True,
+)
 
 PythonOperator(task_id="task", python_callable=lambda: None)
-PythonVirtualenvOperator(task_id="task", python_callable=lambda: None)
+BranchPythonOperator(task_id="task", python_callable=lambda: None)
+ShortCircuitOperator(task_id="task", python_callable=lambda: None)
+PythonVirtualenvOperator(
+    task_id="virtualenv_python",
+    python_callable=virtualenv_callable,
+    requirements=["colorama==0.4.0"],
+    system_site_packages=False,
+)
+BranchPythonVirtualenvOperator(
+    task_id="branching_venv",
+    requirements=["numpy~=1.26.0"],
+    venv_cache_path="some_path",
+    python_callable=virtualenv_callable,
+    op_args=["some_args"],
+)
+ExternalPythonOperator(
+    task_id="external_python",
+    python_callable=virtualenv_callable,
+    python="some_path",
+)
+BranchExternalPythonOperator(
+    task_id="branching_ext_python",
+    python="some_path",
+    python_callable=virtualenv_callable,
+    op_args=["some_args"],
+)
+
+# airflow.operators.python (deprecated but valid paths, provide_context parameter removed)
+from airflow.operators.python import (
+    PythonOperator,
+    BranchPythonOperator,
+    ShortCircuitOperator,
+    PythonVirtualenvOperator,
+    BranchPythonVirtualenvOperator,
+    ExternalPythonOperator,
+    BranchExternalPythonOperator,
+)
+
+PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+PythonVirtualenvOperator(
+    task_id="virtualenv_python",
+    python_callable=virtualenv_callable,
+    requirements=["colorama==0.4.0"],
+    system_site_packages=False,
+    provide_context=True,
+)
+BranchPythonVirtualenvOperator(
+    task_id="branching_venv",
+    requirements=["numpy~=1.26.0"],
+    venv_cache_path="some_path",
+    python_callable=virtualenv_callable,
+    op_args=["some_args"],
+    provide_context=True,
+)
+ExternalPythonOperator(
+    task_id="external_python",
+    python_callable=virtualenv_callable,
+    python="some_path",
+    provide_context=True,
+)
+BranchExternalPythonOperator(
+    task_id="branching_ext_python",
+    python="some_path",
+    python_callable=virtualenv_callable,
+    op_args=["some_args"],
+    provide_context=True,
+)
+
+PythonOperator(task_id="task", python_callable=lambda: None)
+BranchPythonOperator(task_id="task", python_callable=lambda: None)
+ShortCircuitOperator(task_id="task", python_callable=lambda: None)
+PythonVirtualenvOperator(
+    task_id="virtualenv_python",
+    python_callable=virtualenv_callable,
+    requirements=["colorama==0.4.0"],
+    system_site_packages=False,
+)
+BranchPythonVirtualenvOperator(
+    task_id="branching_venv",
+    requirements=["numpy~=1.26.0"],
+    venv_cache_path="some_path",
+    python_callable=virtualenv_callable,
+    op_args=["some_args"],
+)
+ExternalPythonOperator(
+    task_id="external_python",
+    python_callable=virtualenv_callable,
+    python="some_path",
+)
+BranchExternalPythonOperator(
+    task_id="branching_ext_python",
+    python="some_path",
+    python_callable=virtualenv_callable,
+    op_args=["some_args"],
+)
