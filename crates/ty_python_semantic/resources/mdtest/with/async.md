@@ -203,30 +203,49 @@ async def main():
 ## `async with` statement suppresses exceptions if `__aexit__` returns a truthy value
 
 ```py
-from typing import Literal
+from typing import Literal, Any
 
 def f() -> str:
     raise NotImplementedError()
 
-class ExceptionSuppressor:
+class ExceptionSuppressor1:
     async def __aenter__(self) -> None: ...
     async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True]:
         return True
 
-class ExceptionPropagator:
+class ExceptionSuppressor2:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class ExceptionSuppressor3:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True
+
+class ExceptionPropagator1:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
+
+class ExceptionPropagator2:
     async def __aenter__(self) -> None: ...
     async def __aexit__(self, exc_type, exc_value, traceback) -> None:
         return
 
-# If the return type is unknown, exceptions are assumed to be unsuppressed (matching mypy and pyright behavior).
-class UnknownExceptionHandler:
+class ExceptionPropagator3:
     async def __aenter__(self) -> None: ...
-    async def __aexit__(self, exc_type, exc_value, traceback):
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[False] | None:
+        return False
+
+class ExceptionPropagator4:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Any:
         return f()
 
-async def g(x: int):
+async def suppress1(x: int):
     y: int | str = x
-    async with ExceptionSuppressor() as ex:
+    async with ExceptionSuppressor1() as ex:
         y = f()
         z = f()
     reveal_type(ex)  # revealed: None
@@ -234,19 +253,57 @@ async def g(x: int):
     # error: [possibly-unresolved-reference]
     reveal_type(z)  # revealed: str
 
-async def h(x: int):
+async def suppress2(x: int):
     y: int | str = x
-    # Since exceptions are not suppressed, we can assume that this block will always be executed to the end.
-    async with ExceptionPropagator() as ex:
+    async with ExceptionSuppressor2() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+async def suppress3(x: int):
+    y: int | str = x
+    async with ExceptionSuppressor3() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+async def propagate1(x: int):
+    y: int | str = x
+    # Since exceptions are not suppressed, we can assume that this block will always be executed to the end (or an exception is raised).
+    async with ExceptionPropagator1() as ex:
         y = f()
         z = f()
     reveal_type(ex)  # revealed: None
     reveal_type(y)  # revealed: str
     reveal_type(z)  # revealed: str
 
-async def i(x: int):
+async def propagate2(x: int):
     y: int | str = x
-    async with UnknownExceptionHandler() as ex:
+    async with ExceptionPropagator2() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+async def propagate3(x: int):
+    y: int | str = x
+    async with ExceptionPropagator3() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+async def propagate4(x: int):
+    y: int | str = x
+    async with ExceptionPropagator4() as ex:
         y = f()
         z = f()
     reveal_type(ex)  # revealed: None

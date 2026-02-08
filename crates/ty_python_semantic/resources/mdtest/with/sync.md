@@ -199,30 +199,49 @@ with Manager():
 ## `with` statement suppresses exceptions if `__exit__` returns a truthy value
 
 ```py
-from typing import Literal
+from typing import Literal, Any
 
 def f() -> str:
     raise NotImplementedError()
 
-class ExceptionSuppressor:
+class ExceptionSuppressor1:
     def __enter__(self) -> None: ...
     def __exit__(self, exc_type, exc_value, traceback) -> Literal[True]:
         return True
 
-class ExceptionPropagator:
+class ExceptionSuppressor2:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class ExceptionSuppressor3:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True] | None:
+        return True
+
+class ExceptionPropagator1:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
+
+class ExceptionPropagator2:
     def __enter__(self) -> None: ...
     def __exit__(self, exc_type, exc_value, traceback) -> None:
         return
 
-# If the return type is unknown, exceptions are assumed to be unsuppressed (matching mypy and pyright behavior).
-class UnknownExceptionHandler:
+class ExceptionPropagator3:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False] | None:
+        return False
+
+class ExceptionPropagator4:
     def __enter__(self) -> None: ...
     def __exit__(self, exc_type, exc_value, traceback):
         return f()
 
-def g(x: int):
+def suppress1(x: int):
     y: int | str = x
-    with ExceptionSuppressor() as ex:
+    with ExceptionSuppressor1() as ex:
         y = f()
         z = f()
     reveal_type(ex)  # revealed: None
@@ -230,19 +249,57 @@ def g(x: int):
     # error: [possibly-unresolved-reference]
     reveal_type(z)  # revealed: str
 
-def h(x: int):
+def suppress2(x: int):
+    y: int | str = x
+    with ExceptionSuppressor2() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+def suppress3(x: int):
+    y: int | str = x
+    with ExceptionSuppressor3() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+def propagate1(x: int):
     y: int | str = x
     # Since exceptions are not suppressed, we can assume that this block will always be executed to the end (or an exception is raised).
-    with ExceptionPropagator() as ex:
+    with ExceptionPropagator1() as ex:
         y = f()
         z = f()
     reveal_type(ex)  # revealed: None
     reveal_type(y)  # revealed: str
     reveal_type(z)  # revealed: str
 
-def i(x: int):
+def propagate2(x: int):
     y: int | str = x
-    with UnknownExceptionHandler() as ex:
+    with ExceptionPropagator2() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+def propagate3(x: int):
+    y: int | str = x
+    with ExceptionPropagator3() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+def propagate4(x: int):
+    y: int | str = x
+    with ExceptionPropagator4() as ex:
         y = f()
         z = f()
     reveal_type(ex)  # revealed: None

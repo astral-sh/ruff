@@ -877,8 +877,8 @@ impl ReachabilityConstraints {
                 // Therefore, if a truthy value will be returned, we must consider the possibility that
                 // handling within the with statement body will be interrupted and subsequent handling will continue.
                 // That is,
-                // * Truthy             => Exceptions are suppressed => The body may be interrupted => The reachability is ambiguous
-                // * Falsy (or unknown) => Exceptions are propagated => The body is fully executed  => The body is reachable
+                // * Truthy (<=> not always-falsy) => Exceptions are suppressed => The body may be interrupted => The reachability is ambiguous
+                // * Falsy                         => Exceptions are propagated => The body is fully executed  => The body is reachable
                 let context_manager_ty =
                     infer_expression_type(db, context_expr, TypeContext::default());
                 let exit_method = if is_async {
@@ -888,11 +888,10 @@ impl ReachabilityConstraints {
                 };
                 if let Place::Defined(exit) = exit_method.place
                     && let Some(__exit__) = exit.ty.as_function_literal()
-                    && __exit__
+                    && !__exit__
                         .last_definition_raw_signature(db)
                         .return_ty
-                        .try_bool(db)
-                        .is_ok_and(Truthiness::is_always_true)
+                        .is_assignable_to(db, Type::AlwaysFalsy)
                 {
                     Truthiness::Ambiguous
                 } else {
