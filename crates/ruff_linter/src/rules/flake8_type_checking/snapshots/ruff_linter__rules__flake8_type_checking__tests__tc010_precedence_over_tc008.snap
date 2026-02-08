@@ -18,10 +18,17 @@ help: Remove quotes
 6 + a: TypeAlias = int | None  # TC008
 7 | b: TypeAlias = 'int' | None  # TC010
 
-TC010 Invalid string member in `X | Y`-style union type
+TC010 [*] Invalid string member in `X | Y`-style union type
  --> <filename>:7:16
   |
 6 | a: TypeAlias = 'int | None'  # TC008
 7 | b: TypeAlias = 'int' | None  # TC010
-  |                ^^^^^
+  |                ^^^^^^^^^^^^
   |
+help: Remove quotes from string literals
+4 | from typing import TypeAlias
+5 | 
+6 | a: TypeAlias = 'int | None'  # TC008
+  - b: TypeAlias = 'int' | None  # TC010
+7 + b: TypeAlias = int | None  # TC010
+note: This is an unsafe fix and may change runtime behavior
