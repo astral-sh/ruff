@@ -4615,7 +4615,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     protocol_class,
                 );
             }
-        } else if !cls_ty.is_equivalent_to(self.db(), Type::Never) {
+        } else if !cls_ty.is_equivalent_to(self.db(), Type::Never)
+            && !matches!(cls_ty, Type::Dynamic(_))
+        {
             // This also raises a diagnostic for `Any()` calls, since that fails at runtime.
             report_called_match_pattern_must_be_a_type(&self.context, &*pattern.cls, cls_ty);
         }
