@@ -11656,14 +11656,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // that protocol -- and indeed, according to the spec, type checkers must disallow abstract
             // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
-            if !callable_type.is_subclass_of() {
-                if let Some(protocol) = class.into_protocol_class(self.db()) {
-                    report_attempted_protocol_instantiation(
-                        &self.context,
-                        call_expression,
-                        protocol,
-                    );
-                }
+            if !callable_type.is_subclass_of()
+                && let Some(protocol) = class.into_protocol_class(self.db())
+            {
+                report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
             }
 
             // For class literals we model the entire class instantiation logic, so it is handled
@@ -11752,26 +11748,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Validate `TypedDict` constructor calls after argument type inference.
-        // This needs to run for direct class literals (e.g. `MyTD(...)`), generic aliases
-        // (e.g. `MyGenTD[str](...)`), and `type[MyTD]`-style subclass targets.
-        let typed_dict = match callable_type {
-            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(self.db()) => {
-                Type::typed_dict(ClassType::NonGeneric(class_literal)).as_typed_dict()
-            }
-            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(self.db()) => {
-                Type::typed_dict(ClassType::Generic(generic_alias)).as_typed_dict()
-            }
-            Type::SubclassOf(subclass_of) if subclass_of.is_typed_dict(self.db()) => subclass_of
-                .subclass_of()
-                .into_class(self.db())
-                .and_then(|class| Type::typed_dict(class).as_typed_dict()),
-            _ => None,
-        };
-
-        if let Some(typed_dict) = typed_dict {
+        if let Some(class) = class
+            && class.class_literal(self.db()).is_typed_dict(self.db())
+        {
             validate_typed_dict_constructor(
                 &self.context,
-                typed_dict,
+                TypedDictType::new(class),
                 arguments,
                 func.as_ref().into(),
                 |expr| self.expression_type(expr),
