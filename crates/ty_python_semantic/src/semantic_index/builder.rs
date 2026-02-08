@@ -2076,7 +2076,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 is_async,
                 ..
             }) => {
-                let mut with_exit_reachability = self.current_use_def_map().reachability;
+                let mut with_exit_reachability = ScopedReachabilityConstraintId::ALWAYS_TRUE;
 
                 for item @ ast::WithItem {
                     range: _,
@@ -2108,18 +2108,68 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         is_positive: true,
                     });
                     let predicate_id = self.add_predicate(predicate);
-                    with_exit_reachability = self
+                    let reachability = self
                         .current_reachability_constraints_mut()
                         .add_atom(predicate_id);
+                    // A with statement with multiple context managers (`with A(), B(): ...`) is equivalent to nested with statements.
+                    // An exception escapes the whole statement only if all managers
+                    // choose propagation, so we combine per-manager escape conditions
+                    // with logical AND, starting from `ALWAYS_TRUE`.
+                    with_exit_reachability = self
+                        .current_reachability_constraints_mut()
+                        .add_and_constraint(with_exit_reachability, reachability);
                 }
 
-                let pre_with_state = self.flow_snapshot();
-                self.visit_body(body);
-                let post_with_state = self.flow_snapshot();
+                // To model the control flow of a with statement, we use the mechanism of a try statement.
+                // In fact, the with statement is equivalent to the following try/except/finally statements
+                // (https://peps.python.org/pep-0343/#specification-the-with-statement):
+                // ```python
+                // with EXPR as VAR:
+                //     BLOCK
+                // ```
+                // ↓
+                // ```python
+                // mgr = (EXPR)
+                // exit = type(mgr).__exit__  # Not calling it yet
+                // value = type(mgr).__enter__(mgr)
+                // exc = True
+                // try:
+                //     try:
+                //         VAR = value  # Only if "as VAR" is present
+                //         BLOCK
+                //     except:
+                //         # The exceptional case is handled here
+                //         exc = False
+                //         if not exit(mgr, *sys.exc_info()):
+                //             raise
+                //         # The exception is swallowed if exit() returns true
+                // finally:
+                //     # The normal and non-local-goto cases are handled here
+                //     if exc:
+                //         exit(mgr, None, None, None)
+                // ```
 
+                // Save the state before entering the with body = `BLOCK`.
+                let pre_with_state = self.flow_snapshot();
+                self.try_node_context_stack_manager.push_context();
+                self.visit_body(body);
+                let raised_states = self.try_node_context_stack_manager.pop_context();
+                let normal_post_with_state = self.flow_snapshot();
+
+                // Handle the exceptional path:
+                // start from the pre-with state, merge in all intermediate states that could raise,
+                // then keep only the branch where the exception is suppressed.
                 self.flow_restore(pre_with_state);
+                for raised_state in raised_states {
+                    self.flow_merge(raised_state);
+                }
                 self.record_negated_reachability_constraint(with_exit_reachability);
-                self.flow_merge(post_with_state);
+                let suppressed_state = self.flow_snapshot();
+
+                // Handle the normal path (`finally` with `exc` still true),
+                // then merge with the suppressed-exception path.
+                self.flow_restore(normal_post_with_state);
+                self.flow_merge(suppressed_state);
             }
 
             ast::Stmt::For(

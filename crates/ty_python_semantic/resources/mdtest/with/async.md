@@ -265,6 +265,12 @@ async def suppress2(x: int):
     # error: [possibly-unresolved-reference]
     reveal_type(z)  # revealed: str
 
+async def suppress3(x: int | str) -> None:
+    if isinstance(x, int):
+        async with ExceptionSuppressor1():
+            raise ValueError
+    reveal_type(x)  # revealed: int | str
+
 async def propagate1(x: int):
     y: int | str = x
     # Since exceptions are not suppressed, we can assume that this block will always be executed to the end (or an exception is raised).
@@ -301,6 +307,13 @@ async def propagate4(x: int):
     reveal_type(ex)  # revealed: None
     reveal_type(y)  # revealed: str
     reveal_type(z)  # revealed: str
+
+async def propagator5(x: int | str) -> None:
+    if isinstance(x, int):
+        async with ExceptionPropagator1():
+            raise ValueError
+    # TODO: should be `str`
+    reveal_type(x)  # revealed: int | str
 ```
 
 ## `@asynccontextmanager`
