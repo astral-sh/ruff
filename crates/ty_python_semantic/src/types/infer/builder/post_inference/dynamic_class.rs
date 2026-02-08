@@ -43,8 +43,15 @@ pub(crate) fn check_dynamic_class_definition<'db>(
         return;
     };
 
-    // A valid 3-argument type() call must have a `bases` argument.
-    let Some(bases) = call_expr.arguments.args.get(1) else {
+    // Find the bases argument: second positional, or `bases=` keyword.
+    let Some(bases) = call_expr.arguments.args.get(1).or_else(|| {
+        call_expr
+            .arguments
+            .keywords
+            .iter()
+            .find(|kw| kw.arg.as_deref() == Some("bases"))
+            .map(|kw| &kw.value)
+    }) else {
         return;
     };
 
