@@ -44,9 +44,9 @@ def BoolProperty() -> bool: ...
 ```py
 import bpy
 
-bpy.types.Scene.my_string = bpy.props.StringProperty()
-bpy.types.Scene.my_int = bpy.props.IntProperty()
-bpy.types.Object.my_float = bpy.props.FloatProperty()
+bpy.types.Scene.my_string = bpy.props.StringProperty()  # error: [invalid-attribute-access]
+bpy.types.Scene.my_int = bpy.props.IntProperty()  # error: [invalid-attribute-access]
+bpy.types.Object.my_float = bpy.props.FloatProperty()  # error: [invalid-attribute-access]
 ```
 
 `use_props.py`:
@@ -103,9 +103,9 @@ def BoolProperty() -> bool: ...
 ```py
 import bpy
 
-bpy.types.Scene.my_string = bpy.props.StringProperty()
-bpy.types.Scene.my_int = bpy.props.IntProperty()
-bpy.types.Object.my_float = bpy.props.FloatProperty()
+bpy.types.Scene.my_string = bpy.props.StringProperty()  # error: [invalid-attribute-access]
+bpy.types.Scene.my_int = bpy.props.IntProperty()  # error: [invalid-attribute-access]
+bpy.types.Object.my_float = bpy.props.FloatProperty()  # error: [invalid-attribute-access]
 ```
 
 `use_props.py`:
@@ -158,7 +158,7 @@ def BoolProperty() -> bool: ...
 ```py
 import bpy
 
-bpy.types.Scene.prop_a = bpy.props.StringProperty()
+bpy.types.Scene.prop_a = bpy.props.StringProperty()  # error: [invalid-attribute-access]
 ```
 
 `register_b.py`:
@@ -166,7 +166,7 @@ bpy.types.Scene.prop_a = bpy.props.StringProperty()
 ```py
 import bpy
 
-bpy.types.Scene.prop_b = bpy.props.BoolProperty()
+bpy.types.Scene.prop_b = bpy.props.BoolProperty()  # error: [invalid-attribute-access]
 ```
 
 `consumer.py`:

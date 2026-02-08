@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::FxIndexSet;
+use crate::blender_property::lookup_blender_dynamic_property_definition;
 use crate::place::builtins_module_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
@@ -397,6 +398,22 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                         break 'scopes;
                     }
                 }
+            }
+        }
+    }
+
+    // Fallback: check for dynamic Blender properties from project files
+    if resolved.is_empty() {
+        if let ClassLiteral::Static(static_class) = class_literal {
+            if let Some(definition) =
+                lookup_blender_dynamic_property_definition(db, *static_class, attribute_name)
+            {
+                resolved.extend(resolve_definition(
+                    db,
+                    definition,
+                    Some(attribute_name),
+                    ImportAliasResolution::ResolveAliases,
+                ));
             }
         }
     }

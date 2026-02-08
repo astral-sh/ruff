@@ -114,8 +114,24 @@ impl<'db> Definition<'db> {
         match kind {
             DefinitionKind::Assignment(assign_def) => {
                 let assign_node = assign_def.target(&module);
-                attribute_docstring(&module, assign_node)
-                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+                let existing_docstring = attribute_docstring(&module, assign_node)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned());
+
+                // If RHS is a Blender property call, prepend the formatted call expression
+                let value_expr = assign_def.value(&module);
+                if let Some(call) = as_blender_property(value_expr) {
+                    let mut call_expr_docstring = get_call_expression_docstring(call, db, file);
+                    match existing_docstring {
+                        Some(doc) => {
+                            call_expr_docstring.push_str("\n\n");
+                            call_expr_docstring.push_str(&doc);
+                            Some(call_expr_docstring)
+                        }
+                        None => Some(call_expr_docstring),
+                    }
+                } else {
+                    existing_docstring
+                }
             }
             DefinitionKind::AnnotatedAssignment(assign_def) => {
                 let assign_node = assign_def.target(&module);

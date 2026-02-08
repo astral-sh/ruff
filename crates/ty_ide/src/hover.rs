@@ -5047,7 +5047,7 @@ def use_scene(scene: bpy.types.Scene) -> None:
         str
         ---------------------------------------------
         ```python
-        StringProperty()
+        bpy.props.StringProperty()
         ```
 
         ---------------------------------------------
@@ -5056,7 +5056,7 @@ def use_scene(scene: bpy.types.Scene) -> None:
         ```
         ---
         ```python
-        StringProperty()
+        bpy.props.StringProperty()
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -5119,7 +5119,7 @@ def use_scene(scene: bpy.types.Scene) -> None:
         str
         ---------------------------------------------
         ```python
-        StringProperty()
+        bpy.props.StringProperty()
         ```
 
         ---------------------------------------------
@@ -5128,7 +5128,7 @@ def use_scene(scene: bpy.types.Scene) -> None:
         ```
         ---
         ```python
-        StringProperty()
+        bpy.props.StringProperty()
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

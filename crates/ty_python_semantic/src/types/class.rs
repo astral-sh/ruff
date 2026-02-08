@@ -9,6 +9,7 @@ use super::{
     function::FunctionType,
 };
 use super::{TypeVarVariance, display};
+use crate::blender_property::lookup_blender_dynamic_property;
 use crate::place::{DefinedPlace, TypeOrigin};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::{NodeWithScopeKind, Scope};
@@ -4611,6 +4612,18 @@ impl<'db> StaticClassLiteral<'db> {
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+        let result = self.own_instance_member_inner(db, name);
+
+        // Fallback: check for dynamic Blender properties registered in project files
+        if result.is_undefined() {
+            if let Some(dynamic_ty) = lookup_blender_dynamic_property(db, self, name) {
+                return Member::definitely_declared(dynamic_ty);
+            }
+        }
+        result
+    }
+
+    fn own_instance_member_inner(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         // TODO: There are many things that are not yet implemented here:
         // - `typing.Final`
         // - Proper diagnostics
