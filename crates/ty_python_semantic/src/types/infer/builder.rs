@@ -6774,6 +6774,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(definition),
                             namedtuple_kind,
                         )
+                    } else if let Some(function) = callable_type.as_function_literal()
+                        && function.is_known(self.db(), KnownFunction::NewClass)
+                    {
+                        self.infer_new_class_call(call_expr, Some(definition))
                     } else {
                         match callable_type
                             .as_class_literal()
@@ -8114,6 +8118,226 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     base2.display(db),
                 );
             }
+        }
+
+        Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
+    }
+
+    /// Infer a `types.new_class(name, bases, kwds, exec_body)` call.
+    ///
+    /// This method *does not* call `infer_expression` on the object being called;
+    /// it is assumed that the type for this AST node has already been inferred before this method is called.
+    fn infer_new_class_call(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        definition: Option<Definition<'db>>,
+    ) -> Type<'db> {
+        let db = self.db();
+
+        let ast::Arguments {
+            args,
+            keywords,
+            range: _,
+            node_index: _,
+        } = &call_expr.arguments;
+
+        // `new_class(name, bases=(), kwds=None, exec_body=None)`
+        // We need at least the `name` argument.
+        if args.is_empty() {
+            // Infer all keyword values for side effects.
+            for keyword in keywords {
+                self.infer_expression(&keyword.value, TypeContext::default());
+            }
+            // Check if `name` is provided as a keyword argument.
+            let name_keyword = keywords.iter().find(|kw| kw.arg.as_deref() == Some("name"));
+
+            if name_keyword.is_none() {
+                if let Some(builder) = self.context.report_lint(&NO_MATCHING_OVERLOAD, call_expr) {
+                    builder.into_diagnostic("No overload of `types.new_class` matches arguments");
+                }
+                return SubclassOfType::subclass_of_unknown();
+            }
+        }
+
+        // Extract name argument (first positional, or `name=` keyword).
+        let (name_node, name_type) = if let Some(first_arg) = args.first() {
+            let ty = self.infer_expression(first_arg, TypeContext::default());
+            (Some(first_arg), ty)
+        } else {
+            // Already inferred above in the keyword loop.
+            let found = keywords
+                .iter()
+                .find(|kw| kw.arg.as_deref() == Some("name"))
+                .map(|kw| (&kw.value, self.expression_type(&kw.value)));
+            match found {
+                Some((node, ty)) => (Some(node), ty),
+                None => (None, Type::unknown()),
+            }
+        };
+
+        let name = if let Type::StringLiteral(literal) = name_type {
+            ast::name::Name::new(literal.value(db))
+        } else {
+            if let Some(name_node) = name_node
+                && !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
+                && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, name_node)
+            {
+                let mut diagnostic = builder.into_diagnostic(
+                    "Invalid argument to parameter 1 (`name`) of `types.new_class()`",
+                );
+                diagnostic.set_primary_message(format_args!(
+                    "Expected `str`, found `{}`",
+                    name_type.display(db)
+                ));
+            }
+            ast::name::Name::new_static("<unknown>")
+        };
+
+        // Extract bases argument (second positional, or `bases=` keyword).
+        let (bases, mut disjoint_bases) = if let Some(second_arg) = args.get(1) {
+            let bases_type = self.infer_expression(second_arg, TypeContext::default());
+            // Infer remaining positional args and keywords.
+            for arg in args.iter().skip(2) {
+                self.infer_expression(arg, TypeContext::default());
+            }
+            if !args.is_empty() {
+                for keyword in keywords {
+                    self.infer_expression(&keyword.value, TypeContext::default());
+                }
+            }
+            self.extract_dynamic_type_bases(second_arg, bases_type, &name)
+        } else if let Some(bases_kw) = keywords
+            .iter()
+            .find(|kw| kw.arg.as_deref() == Some("bases"))
+        {
+            // If we haven't inferred keywords yet (args was non-empty), do it now.
+            if !args.is_empty() {
+                for keyword in keywords {
+                    if keyword.arg.as_deref() != Some("bases") {
+                        self.infer_expression(&keyword.value, TypeContext::default());
+                    }
+                }
+            }
+            let bases_type = if args.is_empty() {
+                // Already inferred in the keyword loop above.
+                self.expression_type(&bases_kw.value)
+            } else {
+                self.infer_expression(&bases_kw.value, TypeContext::default())
+            };
+            self.extract_dynamic_type_bases(&bases_kw.value, bases_type, &name)
+        } else {
+            // No bases argument provided, infer remaining args/keywords.
+            for arg in args.iter().skip(1) {
+                self.infer_expression(arg, TypeContext::default());
+            }
+            if !args.is_empty() {
+                for keyword in keywords {
+                    self.infer_expression(&keyword.value, TypeContext::default());
+                }
+            }
+            (
+                Box::new([]) as Box<[ClassBase<'db>]>,
+                IncompatibleBases::default(),
+            )
+        };
+
+        let scope = self.scope();
+
+        // Create the anchor for identifying this dynamic class.
+        let anchor = if let Some(def) = definition {
+            DynamicClassAnchor::Definition(def)
+        } else {
+            let call_node_index = call_expr.node_index().load();
+            let scope_anchor = scope.node(db).node_index().unwrap_or(NodeIndex::from(0));
+            let anchor_u32 = scope_anchor
+                .as_u32()
+                .expect("scope anchor should not be NodeIndex::NONE");
+            let call_u32 = call_node_index
+                .as_u32()
+                .expect("call node should not be NodeIndex::NONE");
+            DynamicClassAnchor::ScopeOffset {
+                scope,
+                offset: call_u32 - anchor_u32,
+            }
+        };
+
+        // `exec_body` populates the namespace dynamically, so we always
+        // treat this as having a dynamic namespace.
+        let members: Box<[(ast::name::Name, Type<'db>)]> = Box::new([]);
+        let dynamic_class = DynamicClassLiteral::new(db, name, bases, anchor, members, true, None);
+
+        // Check for MRO errors.
+        match dynamic_class.try_mro(db) {
+            Err(error) => match error.reason() {
+                DynamicMroErrorKind::DuplicateBases(duplicates) => {
+                    if let Some(builder) = self.context.report_lint(&DUPLICATE_BASE, call_expr) {
+                        builder.into_diagnostic(format_args!(
+                            "Duplicate base class{maybe_s} {dupes} in class `{class}`",
+                            maybe_s = if duplicates.len() == 1 { "" } else { "es" },
+                            dupes = duplicates
+                                .iter()
+                                .map(|base: &ClassBase<'_>| base.display(db))
+                                .join(", "),
+                            class = dynamic_class.name(db),
+                        ));
+                    }
+                }
+                DynamicMroErrorKind::UnresolvableMro => {
+                    if let Some(builder) = self.context.report_lint(&INCONSISTENT_MRO, call_expr) {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot create a consistent method resolution order (MRO) \
+                                for class `{}` with bases `[{}]`",
+                            dynamic_class.name(db),
+                            dynamic_class
+                                .bases(db)
+                                .iter()
+                                .map(|base| base.display(db))
+                                .join(", ")
+                        ));
+                    }
+                }
+            },
+            Ok(_) => {
+                // MRO succeeded, check for instance-layout-conflict.
+                disjoint_bases.remove_redundant_entries(db);
+                if disjoint_bases.len() > 1 {
+                    // For new_class, the bases arg may not be a tuple literal,
+                    // so we pass None for individual base expression ranges.
+                    report_instance_layout_conflict(
+                        &self.context,
+                        dynamic_class.header_range(db),
+                        args.get(1)
+                            .or_else(|| {
+                                keywords
+                                    .iter()
+                                    .find(|kw| kw.arg.as_deref() == Some("bases"))
+                                    .map(|kw| &kw.value)
+                            })
+                            .and_then(|e| e.as_tuple_expr())
+                            .map(|tuple| tuple.elts.as_slice()),
+                        &disjoint_bases,
+                    );
+                }
+            }
+        }
+
+        // Check for metaclass conflicts.
+        if let Err(DynamicMetaclassConflict {
+            metaclass1,
+            base1,
+            metaclass2,
+            base2,
+        }) = dynamic_class.try_metaclass(db)
+        {
+            report_conflicting_metaclass_from_bases(
+                &self.context,
+                call_expr.into(),
+                dynamic_class.name(db),
+                metaclass1,
+                base1.display(db),
+                metaclass2,
+                base2.display(db),
+            );
         }
 
         Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class))
@@ -12484,6 +12708,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             && class.is_known(self.db(), KnownClass::Type)
         {
             return self.infer_builtins_type_call(call_expression, None);
+        }
+
+        // Handle `types.new_class(name, bases, ...)`.
+        if let Some(function) = callable_type.as_function_literal()
+            && function.is_known(self.db(), KnownFunction::NewClass)
+        {
+            return self.infer_new_class_call(call_expression, None);
         }
 
         // Handle `typing.NamedTuple(typename, fields)` and `collections.namedtuple(typename, field_names)`.
