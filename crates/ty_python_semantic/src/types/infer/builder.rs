@@ -4615,13 +4615,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     protocol_class,
                 );
             }
-        } else {
-            if !cls_ty.is_equivalent_to(self.db(), Type::Never)
-                && !cls_ty.is_equivalent_to(self.db(), Type::Dynamic(DynamicType::Any))
-                && !cls_ty.is_equivalent_to(self.db(), Type::SpecialForm(SpecialFormType::Any))
-            {
-                report_called_match_pattern_must_be_a_type(&self.context, &*pattern.cls, cls_ty);
-            }
+        } else if !cls_ty.is_equivalent_to(self.db(), Type::Never) {
+            // This also raises a diagnostic for `Any()` calls, since that fails at runtime.
+            report_called_match_pattern_must_be_a_type(&self.context, &*pattern.cls, cls_ty);
         }
     }
 

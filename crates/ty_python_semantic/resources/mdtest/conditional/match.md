@@ -438,18 +438,39 @@ def _(answer: Answer | None):
 
 ## Invalid class patterns
 
+For a class pattern, the callable must be a class literal.
+
 ```py
-Foo = "foo"
+bar = 3
+
+class Foo: ...
+
+match bar:
+    case Foo():
+        ...
+```
+
+For objects which aren't class literals, we raise a diagnostic.
+
+```py
+bar = 3
+Baz = "baz"
+
+match bar:
+    case Baz():  # error: [called-match-pattern-must-be-a-type]
+        ...
+```
+
+We also raise the same diagnostic if `Any()` is used in the match pattern. This is because `Any()`
+does not support `isinstance` checks, and the code will raise a `TypeError` at runtime.
+
+```py
+from typing import Any
+
+X = Any
 bar = 3
 
 match bar:
-  case Foo():   # error: [called-match-pattern-must-be-a-type]
-    ...
-
-class Foo:
-    ...
-
-match bar:
-  case Foo():
-    ...
+    case X():  # error: [called-match-pattern-must-be-a-type]
+        ...
 ```
