@@ -2,7 +2,7 @@ use crate::Db;
 use crate::place::{ConsideredDefinitions, RequiresExplicitReExport, place_by_id};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::place::PlaceExpr;
-use crate::semantic_index::{global_scope, place_table, use_def_map};
+use crate::semantic_index::{place_table, semantic_index, use_def_map};
 use crate::types::StaticClassLiteral;
 use crate::types::Type;
 use ruff_db::files::File;
@@ -99,6 +99,63 @@ pub(crate) fn get_call_expression_docstring(
     return call_docstring;
 }
 
+/// Recursively collects all assignment statements from a statement list,
+/// including those nested inside function and class definitions.
+fn collect_all_assignments<'a>(stmts: &'a [ast::Stmt]) -> Vec<&'a ast::StmtAssign> {
+    let mut assignments = Vec::new();
+
+    for stmt in stmts {
+        match stmt {
+            ast::Stmt::Assign(assign) => {
+                assignments.push(assign);
+            }
+            ast::Stmt::FunctionDef(func_def) => {
+                // Recursively search function bodies
+                assignments.extend(collect_all_assignments(&func_def.body));
+            }
+            ast::Stmt::ClassDef(class_def) => {
+                // Recursively search class bodies
+                assignments.extend(collect_all_assignments(&class_def.body));
+            }
+            ast::Stmt::If(if_stmt) => {
+                // Search if/elif/else branches
+                assignments.extend(collect_all_assignments(&if_stmt.body));
+                for elif in &if_stmt.elif_else_clauses {
+                    assignments.extend(collect_all_assignments(&elif.body));
+                }
+            }
+            ast::Stmt::With(with_stmt) => {
+                assignments.extend(collect_all_assignments(&with_stmt.body));
+            }
+            ast::Stmt::Match(match_stmt) => {
+                for case in &match_stmt.cases {
+                    assignments.extend(collect_all_assignments(&case.body));
+                }
+            }
+            ast::Stmt::For(for_stmt) => {
+                assignments.extend(collect_all_assignments(&for_stmt.body));
+                assignments.extend(collect_all_assignments(&for_stmt.orelse));
+            }
+            ast::Stmt::While(while_stmt) => {
+                assignments.extend(collect_all_assignments(&while_stmt.body));
+                assignments.extend(collect_all_assignments(&while_stmt.orelse));
+            }
+            ast::Stmt::Try(try_stmt) => {
+                assignments.extend(collect_all_assignments(&try_stmt.body));
+                for handler in &try_stmt.handlers {
+                    let ast::ExceptHandler::ExceptHandler(handler_inner) = handler;
+                    assignments.extend(collect_all_assignments(&handler_inner.body));
+                }
+                assignments.extend(collect_all_assignments(&try_stmt.orelse));
+                assignments.extend(collect_all_assignments(&try_stmt.finalbody));
+            }
+            _ => {}
+        }
+    }
+
+    assignments
+}
+
 /// Checks if an assignment target expression matches the pattern
 /// `<root>.types.<ClassName>.<prop_name>` by traversing the AST attribute chain.
 /// For example, `bpy.types.Scene.my_string` returns `Some(("Scene", "my_string"))`.
@@ -152,10 +209,9 @@ pub(crate) fn lookup_blender_dynamic_property<'db>(
         };
 
         let parsed = parsed_module(db, file).load(db);
-        for stmt in parsed.suite() {
-            let ast::Stmt::Assign(assign) = stmt else {
-                continue;
-            };
+        let all_assignments = collect_all_assignments(parsed.suite());
+
+        for assign in all_assignments {
 
             // Only single-target assignments
             if assign.targets.len() != 1 {
@@ -180,25 +236,28 @@ pub(crate) fn lookup_blender_dynamic_property<'db>(
             }
 
             // Resolve the type via the semantic index
-            let scope = global_scope(db, file);
-            let table = place_table(db, scope);
-            let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
-                continue;
-            };
-            let Some(place_id) = table.place_id(&place_expr) else {
-                continue;
-            };
+            // Try all scopes in the file since the assignment could be in any scope
+            let index = semantic_index(db, file);
+            for scope_id in index.scope_ids() {
+                let table = place_table(db, scope_id);
+                let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
+                    continue;
+                };
+                let Some(place_id) = table.place_id(&place_expr) else {
+                    continue;
+                };
 
-            let result = place_by_id(
-                db,
-                scope,
-                place_id,
-                RequiresExplicitReExport::No,
-                ConsideredDefinitions::EndOfScope,
-            );
+                let result = place_by_id(
+                    db,
+                    scope_id,
+                    place_id,
+                    RequiresExplicitReExport::No,
+                    ConsideredDefinitions::EndOfScope,
+                );
 
-            if let Some(ty) = result.place.ignore_possibly_undefined() {
-                return Some(ty);
+                if let Some(ty) = result.place.ignore_possibly_undefined() {
+                    return Some(ty);
+                }
             }
         }
     }
@@ -230,10 +289,9 @@ pub(crate) fn lookup_blender_dynamic_property_definition<'db>(
         };
 
         let parsed = parsed_module(db, file).load(db);
-        for stmt in parsed.suite() {
-            let ast::Stmt::Assign(assign) = stmt else {
-                continue;
-            };
+        let all_assignments = collect_all_assignments(parsed.suite());
+
+        for assign in all_assignments {
 
             if assign.targets.len() != 1 {
                 continue;
@@ -255,19 +313,22 @@ pub(crate) fn lookup_blender_dynamic_property_definition<'db>(
             }
 
             // Get the Definition from the use-def map
-            let scope = global_scope(db, file);
-            let table = place_table(db, scope);
-            let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
-                continue;
-            };
-            let Some(place_id) = table.place_id(&place_expr) else {
-                continue;
-            };
+            // Try all scopes in the file since the assignment could be in any scope
+            let index = semantic_index(db, file);
+            for scope_id in index.scope_ids() {
+                let table = place_table(db, scope_id);
+                let Some(place_expr) = PlaceExpr::try_from_expr(target) else {
+                    continue;
+                };
+                let Some(place_id) = table.place_id(&place_expr) else {
+                    continue;
+                };
 
-            let use_def = use_def_map(db, scope);
-            for binding in use_def.end_of_scope_bindings(place_id) {
-                if let Some(def) = binding.binding.definition() {
-                    return Some(def);
+                let use_def = use_def_map(db, scope_id);
+                for binding in use_def.end_of_scope_bindings(place_id) {
+                    if let Some(def) = binding.binding.definition() {
+                        return Some(def);
+                    }
                 }
             }
         }
