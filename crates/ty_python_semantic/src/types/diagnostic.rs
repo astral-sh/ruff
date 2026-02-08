@@ -1651,7 +1651,7 @@ declare_lint! {
     /// ```
     pub(crate) static CALLED_MATCH_PATTERN_MUST_BE_A_TYPE = {
         summary: "detect invalid called match patterns",
-        status: LintStatus::stable("0.0.15"),
+        status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
     }
 }
