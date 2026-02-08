@@ -44,9 +44,9 @@ def BoolProperty() -> bool: ...
 ```py
 import bpy
 
-bpy.types.Scene.my_string = bpy.props.StringProperty()  # error: [invalid-attribute-access]
-bpy.types.Scene.my_int = bpy.props.IntProperty()  # error: [invalid-attribute-access]
-bpy.types.Object.my_float = bpy.props.FloatProperty()  # error: [invalid-attribute-access]
+bpy.types.Scene.my_string = bpy.props.StringProperty()
+bpy.types.Scene.my_int = bpy.props.IntProperty()
+bpy.types.Object.my_float = bpy.props.FloatProperty()
 ```
 
 `use_props.py`:
@@ -103,9 +103,9 @@ def BoolProperty() -> bool: ...
 ```py
 import bpy
 
-bpy.types.Scene.my_string = bpy.props.StringProperty()  # error: [invalid-attribute-access]
-bpy.types.Scene.my_int = bpy.props.IntProperty()  # error: [invalid-attribute-access]
-bpy.types.Object.my_float = bpy.props.FloatProperty()  # error: [invalid-attribute-access]
+bpy.types.Scene.my_string = bpy.props.StringProperty()
+bpy.types.Scene.my_int = bpy.props.IntProperty()
+bpy.types.Object.my_float = bpy.props.FloatProperty()
 ```
 
 `use_props.py`:
@@ -158,7 +158,7 @@ def BoolProperty() -> bool: ...
 ```py
 import bpy
 
-bpy.types.Scene.prop_a = bpy.props.StringProperty()  # error: [invalid-attribute-access]
+bpy.types.Scene.prop_a = bpy.props.StringProperty()
 ```
 
 `register_b.py`:
@@ -166,7 +166,7 @@ bpy.types.Scene.prop_a = bpy.props.StringProperty()  # error: [invalid-attribute
 ```py
 import bpy
 
-bpy.types.Scene.prop_b = bpy.props.BoolProperty()  # error: [invalid-attribute-access]
+bpy.types.Scene.prop_b = bpy.props.BoolProperty()
 ```
 
 `consumer.py`:
@@ -221,12 +221,12 @@ def BoolProperty() -> bool: ...
 import bpy
 
 def create_props():
-    bpy.types.Scene.my_int = bpy.props.IntProperty()  # error: [invalid-attribute-access]
-    bpy.types.Object.my_float = bpy.props.FloatProperty()  # error: [invalid-attribute-access]
+    bpy.types.Scene.my_int = bpy.props.IntProperty()
+    bpy.types.Object.my_float = bpy.props.FloatProperty()
 
 def destroy_props():
-    del bpy.types.Scene.my_int  # error: [unresolved-attribute]
-    del bpy.types.Object.my_float  # error: [unresolved-attribute]
+    del bpy.types.Scene.my_int
+    del bpy.types.Object.my_float
 ```
 
 `register_props.py`:
@@ -236,11 +236,11 @@ import bpy
 from register_props2 import create_props, destroy_props
 
 def register():
-    bpy.types.Scene.my_string = bpy.props.StringProperty()  # error: [invalid-attribute-access]
+    bpy.types.Scene.my_string = bpy.props.StringProperty()
     create_props()
 
 def unregister():
-    del bpy.types.Scene.my_string  # error: [unresolved-attribute]
+    del bpy.types.Scene.my_string
     destroy_props()
 ```
 

@@ -156,6 +156,20 @@ fn collect_all_assignments<'a>(stmts: &'a [ast::Stmt]) -> Vec<&'a ast::StmtAssig
     assignments
 }
 
+/// Checks if an `ExprAttribute` node matches the `<root>.types.<ClassName>.<prop_name>` pattern.
+/// This is used to suppress diagnostics on Blender dynamic property registration/unregistration.
+pub(crate) fn is_dynamic_blender_property_target_attr(target: &ast::ExprAttribute) -> bool {
+    // target is the outermost: ExprAttribute { value: ..., attr: <prop_name> }
+    // We need: value = ExprAttribute { value: ExprAttribute { value: ExprName, attr: "types" }, attr: <class_name> }
+    let Some(middle) = target.value.as_attribute_expr() else {
+        return false;
+    };
+    let Some(inner) = middle.value.as_attribute_expr() else {
+        return false;
+    };
+    inner.attr.as_str() == "types" && inner.value.is_name_expr()
+}
+
 /// Checks if an assignment target expression matches the pattern
 /// `<root>.types.<ClassName>.<prop_name>` by traversing the AST attribute chain.
 /// For example, `bpy.types.Scene.my_string` returns `Some(("Scene", "my_string"))`.

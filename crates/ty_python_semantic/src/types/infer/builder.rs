@@ -139,7 +139,7 @@ use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
-use crate::blender_property::as_blender_property;
+use crate::blender_property::{as_blender_property, is_dynamic_blender_property_target_attr};
 
 mod annotation_expression;
 mod type_expression;
@@ -6009,7 +6009,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 });
 
                             // Attribute is declared or bound on instance. Forbid access from the class object
-                            if emit_diagnostics {
+                            // unless this is a dynamic Blender property assignment pattern
+                            if emit_diagnostics
+                                && !is_dynamic_blender_property_target_attr(target)
+                            {
                                 if attribute_is_bound_on_instance {
                                     if let Some(builder) =
                                         self.context.report_lint(&INVALID_ATTRIBUTE_ACCESS, target)
@@ -12777,6 +12780,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                             }
                         }
+                        return fallback();
+                    }
+
+                    // Suppress diagnostics for dynamic Blender property patterns on class objects
+                    if bound_on_instance
+                        && is_dynamic_blender_property_target_attr(attribute)
+                    {
                         return fallback();
                     }
 
