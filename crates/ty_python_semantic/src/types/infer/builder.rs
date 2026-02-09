@@ -86,14 +86,15 @@ use crate::types::diagnostic::{
     UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
-    report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
-    report_conflicting_metaclass_from_bases, report_duplicate_bases, report_implicit_return_type,
-    report_instance_layout_conflict, report_invalid_arguments_to_annotated,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
+    report_call_to_abstract_method, report_cannot_delete_typed_dict_key,
+    report_cannot_pop_required_field_on_typed_dict, report_conflicting_metaclass_from_bases,
+    report_duplicate_bases, report_implicit_return_type, report_instance_layout_conflict,
+    report_invalid_arguments_to_annotated, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
+    report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
+    report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_named_tuple_field_with_leading_underscore,
@@ -11652,6 +11653,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     diagnostic.info("Use `@final` as a decorator on a class or method instead");
                 }
             }
+        }
+
+        // Check for unsound calls to abstract classmethods/staticmethods on class objects
+        match callable_type {
+            Type::BoundMethod(bound_method) => {
+                let function = bound_method.function(self.db());
+                if function.is_classmethod(self.db())
+                    && function.has_known_decorator(self.db(), FunctionDecorators::ABSTRACT_METHOD)
+                    && bound_method
+                        .self_instance(self.db())
+                        .to_class_type(self.db())
+                        .is_some()
+                    && function.has_trivial_body(self.db())
+                {
+                    report_call_to_abstract_method(
+                        &self.context,
+                        call_expression,
+                        function,
+                        "classmethod",
+                    );
+                }
+            }
+            Type::FunctionLiteral(function)
+                if function.is_staticmethod(self.db())
+                    && function
+                        .has_known_decorator(self.db(), FunctionDecorators::ABSTRACT_METHOD) =>
+            {
+                if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
+                    let value_type = self.expression_type(value);
+                    if value_type.to_class_type(self.db()).is_some()
+                        && function.has_trivial_body(self.db())
+                    {
+                        report_call_to_abstract_method(
+                            &self.context,
+                            call_expression,
+                            function,
+                            "staticmethod",
+                        );
+                    }
+                }
+            }
+            _ => {}
         }
 
         let class = match callable_type {
