@@ -1,10 +1,11 @@
 use ruff_python_ast::{self as ast, Arguments, Expr};
 
-use crate::{Edit, Fix, FixAvailability, Violation};
-use crate::{
-    checkers::ast::Checker, preview::is_fix_manual_list_comprehension_enabled,
-    rules::perflint::helpers::statement_deletion_range,
+use crate::checkers::ast::Checker;
+use crate::preview::{
+    is_fix_manual_list_comprehension_enabled, is_perf401_tuple_unpacking_enabled,
 };
+use crate::rules::perflint::helpers::statement_deletion_range;
+use crate::{Edit, Fix, FixAvailability, Violation};
 use anyhow::{Result, anyhow};
 
 use crate::rules::perflint::helpers::comment_strings_in_range;
@@ -95,12 +96,15 @@ impl Violation for ManualListComprehension {
 
 /// PERF401
 pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtFor) {
-    let Expr::Name(ast::ExprName {
-        id: for_stmt_target_id,
-        ..
-    }) = &*for_stmt.target
-    else {
-        return;
+    let targets = match &*for_stmt.target {
+        name @ Expr::Name(_) => std::slice::from_ref(name),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            if !is_perf401_tuple_unpacking_enabled(checker.settings()) {
+                return;
+            }
+            elts.as_slice()
+        }
+        _ => return,
     };
 
     let (stmt, if_test) = match &*for_stmt.body {
@@ -174,19 +178,6 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         return;
     };
 
-    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
-    // `manual-list-copy` doesn't cover.
-    if !for_stmt.is_async {
-        if if_test.is_none() {
-            if arg
-                .as_name_expr()
-                .is_some_and(|arg| arg.id == *for_stmt_target_id)
-            {
-                return;
-            }
-        }
-    }
-
     // Avoid, e.g., `for x in y: filtered.append(filtered[-1] * 2)`.
     if any_over_expr(arg, &|expr| {
         expr.as_name_expr()
@@ -244,25 +235,41 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // filtered = [x for x in y]
     // print(x)
     // ```
-    let target_binding = checker
-        .semantic()
-        .bindings
-        .iter()
-        .find(|binding| for_stmt.target.range() == binding.range)
-        .unwrap();
-    // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
-    // then it is intended to be used elsewhere outside the for loop.
-    if target_binding.is_global() || target_binding.is_nonlocal() {
-        return;
-    }
-    // If any references to the loop target variable are after the loop,
-    // then converting it into a comprehension would cause a NameError
-    if target_binding
-        .references()
-        .map(|reference| checker.semantic().reference(reference))
-        .any(|other_reference| for_stmt.end() < other_reference.start())
-    {
-        return;
+
+    // Ensure none of the loop targets (e.g., x, y in `for x, y in ...`)
+    // leak outside the loop.
+    for target in targets {
+        let ast::Expr::Name(ast::ExprName {
+            range: target_range,
+            ..
+        }) = target
+        else {
+            return;
+        };
+
+        let Some(target_binding) = checker
+            .semantic()
+            .bindings
+            .iter()
+            .find(|binding| binding.range == *target_range)
+        else {
+            return;
+        };
+
+        // If the target variable is global (e.g., `global INDEX`) or nonlocal (e.g., `nonlocal INDEX`),
+        // then it is intended to be used elsewhere outside the for loop.
+        if target_binding.is_global() || target_binding.is_nonlocal() {
+            return;
+        }
+        // If any references to the loop target variable are after the loop,
+        // then converting it into a comprehension would cause a NameError
+        if target_binding
+            .references()
+            .map(|reference| checker.semantic().reference(reference))
+            .any(|other_reference| for_stmt.end() < other_reference.start())
+        {
+            return;
+        }
     }
 
     let list_binding_stmt = list_binding.statement(checker.semantic());
@@ -341,6 +348,22 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         },
         *range,
     );
+
+    // Ignore direct list copies (e.g., `for x in y: filtered.append(x)`), unless it's async, which
+    // `manual-list-copy` (PERF402) doesn't cover.
+    if !for_stmt.is_async && if_test.is_none() {
+        if let Some(arg_name) = arg.as_name_expr() {
+            if targets.iter().any(|target| {
+                target
+                    .as_name_expr()
+                    .is_some_and(|name| name.id == arg_name.id)
+            }) {
+                if comprehension_type == ComprehensionType::ListComprehension {
+                    return;
+                }
+            }
+        }
+    }
 
     // TODO: once this fix is stabilized, change the rule to always fixable
     if is_fix_manual_list_comprehension_enabled(checker.settings()) {
