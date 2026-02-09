@@ -258,6 +258,8 @@ pub struct SymbolInfo<'a> {
     pub name: Cow<'a, str>,
     /// The kind of symbol (function, class, variable, etc.)
     pub kind: SymbolKind,
+    /// Whether this symbol has a `@deprecated` decorator.
+    pub deprecated: bool,
     /// Whether this symbol was imported from another module.
     ///
     /// And if so, this includes the name of that module.
@@ -273,6 +275,7 @@ impl SymbolInfo<'_> {
         SymbolInfo {
             name: Cow::Owned(self.name.to_string()),
             kind: self.kind,
+            deprecated: self.deprecated,
             imported_from: self.imported_from.clone(),
             name_range: self.name_range,
             full_range: self.full_range,
@@ -285,6 +288,7 @@ impl<'a> From<&'a SymbolTree> for SymbolInfo<'a> {
         SymbolInfo {
             name: Cow::Borrowed(&symbol.name),
             kind: symbol.kind,
+            deprecated: symbol.deprecated,
             // The clone here isn't great, but doing actual work here
             // probably isn't the super common case. Namely, most
             // imports aren't re-exports and get filtered out before
@@ -424,6 +428,7 @@ struct SymbolTree {
     parent: Option<SymbolId>,
     name: String,
     kind: SymbolKind,
+    deprecated: bool,
     name_range: TextRange,
     full_range: TextRange,
     imported_from: Option<ImportedFrom>,
@@ -838,6 +843,7 @@ impl<'db> SymbolVisitor<'db> {
             parent: None,
             name: name.id.to_string(),
             kind,
+            deprecated: false,
             name_range: name.range(),
             full_range: stmt.range(),
             imported_from: None,
@@ -872,6 +878,7 @@ impl<'db> SymbolVisitor<'db> {
             parent: None,
             name: name.id.to_string(),
             kind,
+            deprecated: false,
             name_range: name.range(),
             full_range,
             imported_from: Some(imported_from),
@@ -1125,6 +1132,17 @@ impl<'db> SymbolVisitor<'db> {
         name.chars().all(|c| c.is_ascii_uppercase() || c == '_')
     }
 
+    fn has_deprecated_decorator(decorator_list: &[ast::Decorator]) -> bool {
+        decorator_list.iter().any(|decorator| {
+            let expr = match &decorator.expression {
+                ast::Expr::Call(call) => &*call.func,
+                other => other,
+            };
+            UnqualifiedName::from_expr(expr)
+                .is_some_and(|name| name.segments().last() == Some(&"deprecated"))
+        })
+    }
+
     /// This routine determines whether the given symbol should be
     /// considered part of the public API of this module. The given
     /// symbol should defined or imported into this module.
@@ -1197,6 +1215,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     parent: None,
                     name: func_def.name.to_string(),
                     kind,
+                    deprecated: Self::has_deprecated_decorator(&func_def.decorator_list),
                     name_range: func_def.name.range(),
                     full_range: stmt.range(),
                     imported_from: None,
@@ -1226,6 +1245,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     parent: None,
                     name: class_def.name.to_string(),
                     kind: SymbolKind::Class,
+                    deprecated: Self::has_deprecated_decorator(&class_def.decorator_list),
                     name_range: class_def.name.range(),
                     full_range: stmt.range(),
                     imported_from: None,
