@@ -873,6 +873,23 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns the underlying class literal and specialization, if any.
+    ///
+    /// For a non-generic class, this returns the class literal directly.
+    /// For a generic alias, this returns the alias's origin.
+    pub(crate) fn class_literal_and_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> (ClassLiteral<'db>, Option<Specialization<'db>>) {
+        match self {
+            Self::NonGeneric(literal) => (literal, None),
+            Self::Generic(generic) => (
+                ClassLiteral::Static(generic.origin(db)),
+                Some(generic.specialization(db)),
+            ),
+        }
+    }
+
     /// Returns the statement-defined class literal and specialization for this class.
     /// For a non-generic class, this is the class itself. For a generic alias, this is the alias's origin.
     pub(crate) fn static_class_literal(
