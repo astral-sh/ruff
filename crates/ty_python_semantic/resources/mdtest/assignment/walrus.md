@@ -89,6 +89,34 @@ reveal_type(h)  # revealed: int
 reveal_type(x)  # revealed: int
 ```
 
+### Updates lazy snapshots in nested scopes
+
+```py
+def returns_str() -> str:
+    return "foo"
+
+def outer() -> None:
+    x = returns_str()
+
+    def inner() -> None:
+        reveal_type(x)  # revealed: str | int
+    [(x := y) for y in range(3)]
+    inner()
+```
+
+### Possibly defined in `except` handlers
+
+```py
+def could_raise() -> list[int]:
+    return [1]
+
+try:
+    [(y := n) for n in could_raise()]
+except:
+    # error: [possibly-unresolved-reference]
+    reveal_type(y)  # revealed: int
+```
+
 ### Honoring `global` declaration
 
 PEP 572: the walrus honors a `global` declaration in the enclosing scope.

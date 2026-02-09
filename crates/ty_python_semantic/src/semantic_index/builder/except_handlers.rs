@@ -1,7 +1,5 @@
 use crate::semantic_index::use_def::FlowSnapshot;
 
-use super::SemanticIndexBuilder;
-
 /// An abstraction over the fact that each scope should have its own [`TryNodeContextStack`]
 #[derive(Debug, Default)]
 pub(super) struct TryNodeContextStackManager(Vec<TryNodeContextStack>);
@@ -39,10 +37,15 @@ impl TryNodeContextStackManager {
         self.current_try_context_stack().pop_context()
     }
 
-    /// Retrieve the stack that is at the top of our stack of stacks.
-    /// For each `try` block on that stack, push the snapshot onto the `try` block
-    pub(super) fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
-        self.current_try_context_stack().record_definition(builder);
+    /// Record a definition in the try-node context at `scope_index`.
+    ///
+    /// For each active `try` block in that scope's context stack, a clone of `snapshot`
+    /// is pushed so that `except`/`finally` handlers can model which definitions may
+    /// have been reached before an exception.
+    pub(super) fn record_definition(&mut self, scope_index: usize, snapshot: &FlowSnapshot) {
+        if let Some(stack) = self.0.get_mut(scope_index) {
+            stack.record_definition(snapshot);
+        }
     }
 
     /// Retrieve the [`TryNodeContextStack`] that is relevant for the current scope.
@@ -77,9 +80,9 @@ impl TryNodeContextStack {
     }
 
     /// For each `try` block on the stack, push the snapshot onto the `try` block
-    fn record_definition(&mut self, builder: &SemanticIndexBuilder) {
+    fn record_definition(&mut self, snapshot: &FlowSnapshot) {
         for context in &mut self.0 {
-            context.record_definition(builder.flow_snapshot());
+            context.record_definition(snapshot.clone());
         }
     }
 }

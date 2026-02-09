@@ -257,15 +257,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///
     /// Returns `None` if the current scope is not a comprehension.
     ///
+    /// The returned `usize` is the index into `scope_stack` (and, correspondingly,
+    /// `try_node_context_stack_manager`) so callers can update the enclosing scope's
+    /// try-node context.
+    ///
     /// [PEP 572]: https://peps.python.org/pep-0572/#scope-of-the-target
-    fn enclosing_scope_for_walrus(&self) -> Option<FileScopeId> {
+    fn enclosing_scope_for_walrus(&self) -> Option<(FileScopeId, usize)> {
         if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
             return None;
         }
-        self.scope_stack.iter().rev().skip(1).find_map(|info| {
-            (self.scopes[info.file_scope_id].kind() != ScopeKind::Comprehension)
-                .then_some(info.file_scope_id)
-        })
+        self.scope_stack
+            .iter()
+            .enumerate()
+            .rev()
+            .skip(1)
+            .find_map(|(index, info)| {
+                (self.scopes[info.file_scope_id].kind() != ScopeKind::Comprehension)
+                    .then_some((info.file_scope_id, index))
+            })
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -486,10 +495,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     ///     inner()
     ///     inner2()
     /// ```
-    fn update_lazy_snapshots(&mut self, symbol: ScopedSymbolId) {
-        let current_scope = self.current_scope();
-        let current_place_table = &self.place_tables[current_scope];
-        let symbol = current_place_table.symbol(symbol);
+    fn update_lazy_snapshots(&mut self, scope: FileScopeId, symbol: ScopedSymbolId) {
+        let symbol = self.place_tables[scope].symbol(symbol);
         // Optimization: if this is the first binding of the symbol we've seen, there can't be any
         // lazy snapshots of it to update.
         if !symbol.is_reassigned() {
@@ -504,7 +511,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     for (ancestor, _) in
                         VisibleAncestorsIter::new(&self.scopes, key.enclosing_scope)
                     {
-                        if ancestor == current_scope {
+                        if ancestor == scope {
                             return true;
                         }
                         let ancestor_table = &self.place_tables[ancestor];
@@ -776,6 +783,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
     ) -> (Definition<'db>, usize) {
         let scope = self.current_scope();
+        let scope_index = self.scope_stack.len() - 1;
+        self.push_additional_definition_in_scope(scope, scope_index, place, definition_node)
+    }
+
+    /// Like [`Self::push_additional_definition`], but targets an explicit `scope`
+    /// (at `scope_index` in the scope stack) instead of the current scope.
+    ///
+    /// This is used for walrus operators in comprehensions, where PEP 572 requires
+    /// the definition to live in the first enclosing non-comprehension scope.
+    fn push_additional_definition_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        scope_index: usize,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize) {
         let (definition, num_definitions) =
             self.add_definition_in_scope(scope, place, definition_node);
 
@@ -785,13 +808,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         if category.is_binding() {
             if let Some(id) = place.as_symbol() {
-                self.update_lazy_snapshots(id);
+                self.update_lazy_snapshots(scope, id);
             }
         }
 
-        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
-        try_node_stack_manager.record_definition(self);
-        self.try_node_context_stack_manager = try_node_stack_manager;
+        let snapshot = self.use_def_maps[scope].snapshot();
+        self.try_node_context_stack_manager
+            .record_definition(scope_index, &snapshot);
 
         (definition, num_definitions)
     }
@@ -2669,7 +2692,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 );
                             }
                             Some(CurrentAssignment::Named(named)) => {
-                                if let Some(enclosing_scope) = self.enclosing_scope_for_walrus() {
+                                if let Some((enclosing_scope, scope_index)) =
+                                    self.enclosing_scope_for_walrus()
+                                {
                                     // PEP 572: walrus in comprehension binds in enclosing scope.
                                     let target_name = named
                                         .target
@@ -2683,8 +2708,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         self.use_def_maps[enclosing_scope]
                                             .add_place(symbol_id.into());
                                     }
-                                    self.add_definition_in_scope(
+                                    self.push_additional_definition_in_scope(
                                         enclosing_scope,
+                                        scope_index,
                                         symbol_id.into(),
                                         named,
                                     );
