@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::io::Write;
 
@@ -168,7 +169,7 @@ impl<'a> From<&'a Diagnostic> for RuleCode<'a> {
 struct SarifResult<'a> {
     rule_id: RuleCode<'a>,
     level: String,
-    message: SarifMessage,
+    message: SarifMessage<'a>,
     locations: Vec<SarifLocation>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     fixes: Vec<SarifFix>,
@@ -176,8 +177,8 @@ struct SarifResult<'a> {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SarifMessage {
-    text: String,
+struct SarifMessage<'a> {
+    text: Cow<'a, str>,
 }
 
 #[derive(Debug, Serialize)]
@@ -334,7 +335,7 @@ impl<'a> SarifResult<'a> {
             rule_id: RuleCode::from(diagnostic),
             level: "error".to_string(),
             message: SarifMessage {
-                text: diagnostic.concise_message().to_string(),
+                text: diagnostic.concise_message().to_str(),
             },
             fixes: Self::fix(diagnostic, &uri).into_iter().collect(),
             locations: vec![SarifLocation {
