@@ -9988,7 +9988,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
 
                     if let Some(declared_return_ty) = call_expression_tcx.annotation {
-                        let _ = builder.infer(overload.signature.return_ty, declared_return_ty);
+                        let _ = builder.infer_reverse(
+                            declared_return_ty,
+                            overload
+                                .constructor_instance_type
+                                .unwrap_or(overload.signature.return_ty),
+                        );
                     }
 
                     let specialization = builder
