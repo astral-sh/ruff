@@ -233,7 +233,7 @@ if isinstance(x, A):
         reveal_type(x)  # revealed: A & ~B
 
 if isinstance(x, (A, B)):
-    reveal_type(x)  # revealed: A | B
+    reveal_type(x)  # revealed: A | (B & ~A)
 elif isinstance(x, (A, C)):
     reveal_type(x)  # revealed: C & ~A & ~B
 else:

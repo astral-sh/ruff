@@ -326,29 +326,54 @@ impl Bindings {
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
         // the merged `live_bindings` vec remains sorted. If a definition is found in both `a` and
-        // `b`, we compose the constraints from the two paths in an appropriate way (intersection
-        // for narrowing constraints; ternary OR for reachability constraints). If a definition is
-        // found in only one path, it is used as-is.
+        // `b`, we usually merge constraints as before (intersection for narrowing, OR for
+        // reachability). For non-UNBOUND bindings with disjoint narrowing constraints, however, we
+        // keep both alternatives so type inference can drop unreachable alternatives before
+        // narrowing. If a definition is found in only one path, it is used as-is.
         let a = a.live_bindings.into_iter();
         let b = b.live_bindings.into_iter();
         for zipped in a.merge_join_by(b, |a, b| a.binding.cmp(&b.binding)) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {
-                    // If the same definition is visible through both paths, any constraint
-                    // that applies on only one path is irrelevant to the resulting type from
-                    // unioning the two paths, so we intersect the constraints.
-                    let narrowing_constraint = narrowing_constraints
-                        .intersect_constraints(a.narrowing_constraint, b.narrowing_constraint);
+                    // In the following, `a.binding == b.binding`, so we only need to use `a.binding`.
+                    if narrowing_constraints
+                        .constraints_equal(a.narrowing_constraint, b.narrowing_constraint)
+                    {
+                        // For semantically identical narrowing constraints, we can merge reachability.
+                        let reachability_constraint = reachability_constraints.add_or_constraint(
+                            a.reachability_constraint,
+                            b.reachability_constraint,
+                        );
 
-                    // For reachability constraints, we merge them using a ternary OR operation:
-                    let reachability_constraint = reachability_constraints
-                        .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
+                        self.live_bindings.push(LiveBinding {
+                            binding: a.binding,
+                            narrowing_constraint: a.narrowing_constraint,
+                            reachability_constraint,
+                        });
+                    } else {
+                        let narrowing_constraint = narrowing_constraints
+                            .intersect_constraints(a.narrowing_constraint, b.narrowing_constraint);
 
-                    self.live_bindings.push(LiveBinding {
-                        binding: a.binding,
-                        narrowing_constraint,
-                        reachability_constraint,
-                    });
+                        if !a.binding.is_unbound()
+                            && narrowing_constraint == ScopedNarrowingConstraint::empty()
+                        {
+                            // Keep branch-specific narrowing/reachability paired together.
+                            self.live_bindings.push(a);
+                            self.live_bindings.push(b);
+                        } else {
+                            let reachability_constraint = reachability_constraints
+                                .add_or_constraint(
+                                    a.reachability_constraint,
+                                    b.reachability_constraint,
+                                );
+
+                            self.live_bindings.push(LiveBinding {
+                                binding: a.binding,
+                                narrowing_constraint,
+                                reachability_constraint,
+                            });
+                        }
+                    }
                 }
 
                 EitherOrBoth::Left(binding) | EitherOrBoth::Right(binding) => {
@@ -581,7 +606,7 @@ mod tests {
         let mut sym1 = sym1a;
         assert_bindings(&narrowing_constraints, &sym1, &["1<0>"]);
 
-        // merging the same definition with differing constraints drops all constraints
+        // merging the same definition with differing constraints keeps both alternatives
         let mut sym2a = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym2a.record_binding(
             ScopedDefinitionId::from_u32(2),
@@ -608,7 +633,7 @@ mod tests {
             &mut reachability_constraints,
         );
         let sym2 = sym2a;
-        assert_bindings(&narrowing_constraints, &sym2, &["2<>"]);
+        assert_bindings(&narrowing_constraints, &sym2, &["2<1>", "2<2>"]);
 
         // merging a constrained definition with unbound keeps both
         let mut sym3a = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);

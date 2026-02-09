@@ -134,6 +134,25 @@ def return_in_both_nested_branches(cond1: bool, cond2: bool):
             reveal_type(x)  # revealed: Literal["terminal2"]
             return
     reveal_type(x)  # revealed: Literal["test"]
+
+class A:
+    pass
+
+class B:
+    pass
+
+class C:
+    pass
+
+def return_in_else_branch(x: A | B | C):
+    if isinstance(x, A):
+        pass
+    elif isinstance(x, B):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: A | (B & ~A)
 ```
 
 ## `continue`
@@ -618,9 +637,7 @@ def g(x: int | None):
     if x is None:
         sys.exit(1)
 
-    # TODO: should be just `int`, not `int | None`
-    # See https://github.com/astral-sh/ty/issues/685
-    reveal_type(x)  # revealed: int | None
+    reveal_type(x)  # revealed: int
 ```
 
 ### Possibly unresolved diagnostics

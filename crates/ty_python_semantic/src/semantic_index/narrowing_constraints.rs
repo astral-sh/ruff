@@ -111,6 +111,17 @@ impl NarrowingConstraintsBuilder {
     ) -> ScopedNarrowingConstraint {
         self.lists.intersect(a, b)
     }
+
+    /// Returns whether two narrowing constraints contain the same predicates.
+    pub(crate) fn constraints_equal(
+        &self,
+        a: ScopedNarrowingConstraint,
+        b: ScopedNarrowingConstraint,
+    ) -> bool {
+        self.lists
+            .iter_set_reverse(a)
+            .eq(self.lists.iter_set_reverse(b))
+    }
 }
 
 // Iteration
