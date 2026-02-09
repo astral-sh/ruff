@@ -40,7 +40,7 @@ impl Emitter for SarifEmitter {
             .filter_map(|result| result.rule_id.as_secondary_code())
             .collect();
         let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
-        rules.sort_by(|a, b| a.code.cmp(b.code));
+        rules.sort_by(|a, b| a.id.cmp(b.id));
 
         let output = json!({
             "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
@@ -62,14 +62,16 @@ impl Emitter for SarifEmitter {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
 struct SarifRule<'a> {
-    name: &'a str,
-    code: &'a SecondaryCode,
-    linter: &'a str,
-    summary: &'a str,
-    explanation: Option<&'a str>,
-    url: Option<String>,
+    id: &'a SecondaryCode,
+    short_description: SarifMessage<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    full_description: Option<SarifMessage<'a>>,
+    help: SarifMessage<'a>,
+    help_uri: Option<String>,
+    properties: SarifProperties<'a>,
 }
 
 impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
@@ -82,41 +84,24 @@ impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
             .find(|rule| rule.noqa_code().suffix() == suffix)
             .expect("Expected a valid noqa code corresponding to a rule");
         Self {
-            name: rule.into(),
-            code,
-            linter: linter.name(),
-            summary: rule.message_formats()[0],
-            explanation: rule.explanation(),
-            url: rule.url(),
+            id: code,
+            short_description: SarifMessage {
+                text: rule.message_formats()[0].into(),
+            },
+            full_description: rule
+                .explanation()
+                .map(|text| SarifMessage { text: text.into() }),
+            help: SarifMessage {
+                text: rule.message_formats()[0].into(),
+            },
+            help_uri: rule.url(),
+            properties: SarifProperties {
+                id: code,
+                kind: linter.name(),
+                name: rule.into(),
+                problem_severity: "error",
+            },
         }
-    }
-}
-
-impl Serialize for SarifRule<'_> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        json!({
-            "id": self.code,
-            "shortDescription": {
-                "text": self.summary,
-            },
-            "fullDescription": {
-                "text": self.explanation,
-            },
-            "help": {
-                "text": self.summary,
-            },
-            "helpUri": self.url,
-            "properties": {
-                "id": self.code,
-                "kind": self.linter,
-                "name": self.name,
-                "problem.severity": "error".to_string(),
-            },
-        })
-        .serialize(serializer)
     }
 }
 
@@ -175,7 +160,7 @@ struct SarifResult<'a> {
     fixes: Vec<SarifFix>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifMessage<'a> {
     text: Cow<'a, str>,
@@ -241,6 +226,15 @@ struct SarifRegion {
     start_column: OneIndexed,
     end_line: OneIndexed,
     end_column: OneIndexed,
+}
+
+#[derive(Debug, Clone, Serialize)]
+struct SarifProperties<'a> {
+    id: &'a SecondaryCode,
+    kind: &'a str,
+    name: &'a str,
+    #[serde(rename = "problem.severity")]
+    problem_severity: &'static str,
 }
 
 impl<'a> SarifResult<'a> {
