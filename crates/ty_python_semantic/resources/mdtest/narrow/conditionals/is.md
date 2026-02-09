@@ -161,9 +161,7 @@ from typing import Literal
 def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
     if a is b is c:
         reveal_type(b)  # revealed: Literal[1]
-        # TODO: `c` is narrowed based on `b`'s original type, not its narrowed type.
-        # This is a fixable limitation of chained comparison narrowing.
-        reveal_type(c)  # revealed: Literal[1, 2]
+        reveal_type(c)  # revealed: Literal[1]
 ```
 
 ## `is` where the other operand is a call expression
