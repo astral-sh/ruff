@@ -3301,6 +3301,8 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             })
                             .collect_vec();
 
+                        let any_variable_length =
+                            tuple_specs.iter().any(|spec| spec.len().is_variable());
                         let mut tuple_index = 0usize;
 
                         while self
@@ -3308,6 +3310,14 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             .get_positional(self.next_positional)
                             .is_some()
                         {
+                            if any_variable_length
+                                && self
+                                    .explicit_keyword_parameters
+                                    .contains(&self.next_positional)
+                            {
+                                break;
+                            }
+
                             let Ok(tuple_index_i32) = i32::try_from(tuple_index) else {
                                 break;
                             };
