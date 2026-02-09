@@ -70,7 +70,6 @@ typed-arena = { workspace = true }
 unicode-normalization = { workspace = true }
 unicode-width = { workspace = true }
 unicode_names2 = { workspace = true }
-url = { workspace = true }
 
 [dev-dependencies]
 # Disable colored output in tests
