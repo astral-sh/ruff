@@ -302,6 +302,8 @@ FINAL_LIST[0] = 4
 
 When a symbol is qualified with `Final` in a class, it cannot be overridden in subclasses.
 
+### Basic override detection
+
 ```py
 from typing import Final
 
@@ -311,12 +313,248 @@ class Base:
     FINAL_C: Final = 1
 
 class Derived(Base):
-    # TODO: This should be an error
+    # error: [override-of-final-variable] "Cannot override final variable `FINAL_A` from superclass `Base`"
     FINAL_A = 2
-    # TODO: This should be an error
+    # error: [override-of-final-variable] "Cannot override final variable `FINAL_B` from superclass `Base`"
     FINAL_B: Final[int] = 2
-    # TODO: This should be an error
+    # error: [override-of-final-variable] "Cannot override final variable `FINAL_C` from superclass `Base`"
     FINAL_C = 2
+```
+
+### Transitive override through MRO
+
+Overriding a `Final` variable is also detected transitively through the MRO:
+
+```py
+from typing import Final
+
+class GrandBase:
+    X: Final[int] = 1
+
+class Parent(GrandBase): ...
+
+class Child(Parent):
+    X = 2  # error: [override-of-final-variable] "Cannot override final variable `X` from superclass `GrandBase`"
+```
+
+### Non-`Final` variables are unaffected
+
+Non-`Final` class variables can still be overridden without issue:
+
+```py
+from typing import Final
+
+class Base:
+    FINAL: Final[int] = 1
+    NOT_FINAL: int = 2
+
+class Derived(Base):
+    FINAL = 3  # error: [override-of-final-variable] "Cannot override final variable `FINAL` from superclass `Base`"
+    NOT_FINAL = 4  # No error: not declared as Final
+```
+
+### Diamond inheritance
+
+When a `Final` variable is inherited through a diamond, only one error should be reported,
+attributing it to the first class in the MRO that defines the `Final` variable:
+
+```py
+from typing import Final
+
+class A:
+    X: Final[int] = 1
+
+class B(A): ...
+class C(A): ...
+
+class D(B, C):
+    X = 2  # error: [override-of-final-variable] "Cannot override final variable `X` from superclass `A`"
+```
+
+### Multiple `Final` variables from different bases
+
+```py
+from typing import Final
+
+class Base1:
+    X: Final[int] = 1
+    Y: int = 2
+
+class Base2:
+    Y: Final[str] = "hello"
+    Z: Final[float] = 3.0
+
+class Child(Base1, Base2):
+    # error: [override-of-final-variable]
+    X = 10
+    # error: [override-of-final-variable]
+    Y = 20
+    # error: [override-of-final-variable]
+    Z = 30.0
+```
+
+### Override with a method definition
+
+A method definition in a subclass that shadows a `Final` class variable should also be detected:
+
+```py
+from typing import Final
+
+class Base:
+    X: Final[int] = 1
+
+class Derived(Base):
+    # error: [override-of-final-variable]
+    def X(self) -> int:
+        return 2
+```
+
+### `@override` decorator on `Final` variable override
+
+When a subclass uses `@override` on a method that shadows a `Final` variable from a superclass, the
+`override-of-final-variable` diagnostic should still be emitted (because the superclass variable is
+`Final`), and no `invalid-explicit-override` error should be raised (because the member does exist
+in the superclass). Note that `@override` can only be applied to methods, not variable assignments:
+
+```py
+from typing import Final
+from typing_extensions import override
+
+class Base:
+    X: Final[int] = 1
+    Y: Final[int] = 2
+
+class Derived(Base):
+    @override
+    # error: [override-of-final-variable]
+    def X(self) -> int:
+        return 2
+    # error: [override-of-final-variable]
+    Y = 3
+```
+
+### Chain of overrides
+
+When multiple levels of subclasses override the same `Final` variable, each override should be
+reported individually. The error always attributes the violation to the *first* class in the MRO
+that declares the variable as `Final`:
+
+```py
+from typing import Final
+
+class A:
+    X: Final[int] = 1
+
+class B(A):
+    X = 2  # error: [override-of-final-variable] "Cannot override final variable `X` from superclass `A`"
+
+class C(B):
+    X = 3  # error: [override-of-final-variable] "Cannot override final variable `X` from superclass `A`"
+```
+
+### `ClassVar[Final[...]]` and `Annotated[Final[...]]`
+
+`Final` combined with `ClassVar` or `Annotated` should still prevent overrides:
+
+```py
+from typing import Final, ClassVar, Annotated
+
+class Base:
+    X: ClassVar[Final[int]] = 1
+    Y: Annotated[Final[int], "metadata"] = 2
+
+class Derived(Base):
+    # error: [override-of-final-variable]
+    X = 10
+    # error: [override-of-final-variable]
+    Y = 20
+```
+
+### Cross-module `Final` variable
+
+`base.py`:
+
+```py
+from typing import Final
+
+class Base:
+    CONST: Final[int] = 42
+```
+
+`derived.py`:
+
+```py
+from base import Base
+
+class Derived(Base):
+    CONST = 100  # error: [override-of-final-variable]
+```
+
+### Superclass with same name as subclass
+
+<!-- snapshot-diagnostics -->
+
+`module_a.py`:
+
+```py
+from typing import Final
+
+class Foo:
+    X: Final[int] = 1
+```
+
+`module_b.py`:
+
+```py
+from module_a import Foo as BaseFoo
+
+class Foo(BaseFoo):
+    X = 2  # error: [override-of-final-variable]
+```
+
+### `Final` declaration without a value
+
+A bare `Final` declaration without an assigned value should still prevent overrides:
+
+```py
+from typing import Final
+
+class Base:
+    X: Final[int]  # error: [final-without-value]
+
+class Derived(Base):
+    X = 1  # error: [override-of-final-variable]
+```
+
+### Instance `Final` declared in `__init__`
+
+Instance attributes declared as `Final` in `__init__` should also prevent overrides in subclasses:
+
+```py
+from typing import Final
+
+class Base:
+    def __init__(self):
+        self.x: Final[int] = 1
+
+class Derived(Base):
+    # TODO: This should be an error, but instance attribute override checking is not yet supported
+    def __init__(self):
+        self.x = 2
+```
+
+### Private (name-mangled) members are not checked
+
+Name-mangled private members use different underlying names per class, so overrides are allowed:
+
+```py
+from typing import Final
+
+class Base:
+    __X: Final[int] = 1
+
+class Derived(Base):
+    __X = 2  # No error: name mangling means these are different attributes
 ```
 
 ## Syntax and usage
