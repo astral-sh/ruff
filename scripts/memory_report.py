@@ -11,7 +11,7 @@ Examples:
     %(prog)s compare --old-dir old_reports/ --new-dir new_reports/
 
     # Full run: clone projects, build ty, run memory tests
-    %(prog)s run --old-ty ./ty-old --new-ty ./ty-new --projects-file projects.txt
+    %(prog)s run --old-ty ./ty-old --new-ty ./ty-new
 
     # Write output to a file
     %(prog)s compare --old-dir old_reports/ --new-dir new_reports/ --output memory_diff.md
@@ -27,10 +27,9 @@ import sys
 import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
 
-# Known projects with their Git URLs for memory testing
-# These are the projects listed in memory.txt
+# Known projects with their Git URLs for memory testing.
 KNOWN_PROJECTS: dict[str, str] = {
     "flake8": "https://github.com/PyCQA/flake8",
     "sphinx": "https://github.com/sphinx-doc/sphinx",
@@ -39,7 +38,7 @@ KNOWN_PROJECTS: dict[str, str] = {
 }
 
 
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class MemoryReport:
     """Memory report from a single ty run."""
 
@@ -66,28 +65,8 @@ class MemoryReport:
             queries=data.get("queries", []),
         )
 
-    @property
-    def total_mb(self) -> float:
-        return self.total_bytes / 1_000_000
 
-    @property
-    def struct_metadata_mb(self) -> float:
-        return self.struct_metadata_bytes / 1_000_000
-
-    @property
-    def struct_fields_mb(self) -> float:
-        return self.struct_fields_bytes / 1_000_000
-
-    @property
-    def memo_metadata_mb(self) -> float:
-        return self.memo_metadata_bytes / 1_000_000
-
-    @property
-    def memo_fields_mb(self) -> float:
-        return self.memo_fields_bytes / 1_000_000
-
-
-@dataclass(slots=True)
+@dataclass(slots=True, kw_only=True)
 class ProjectComparison:
     """Comparison of memory usage between old and new ty versions for a project."""
 
@@ -98,12 +77,6 @@ class ProjectComparison:
     @property
     def total_diff_bytes(self) -> int:
         return self.new.total_bytes - self.old.total_bytes
-
-    @property
-    def total_diff_percent(self) -> float:
-        if self.old.total_bytes == 0:
-            return 0.0
-        return (self.total_diff_bytes / self.old.total_bytes) * 100
 
 
 def bytes_to_mb(b: int) -> float:
@@ -151,13 +124,13 @@ def load_reports_from_directory(directory: Path) -> dict[str, MemoryReport]:
     return reports
 
 
-def item_total_bytes(item: dict) -> int:
+def item_total_bytes(item: dict[str, Any]) -> int:
     """Get total bytes (metadata + fields) for a struct or query item."""
     return item.get("metadata_bytes", 0) + item.get("fields_bytes", 0)
 
 
 def diff_items(
-    old_items: list[dict], new_items: list[dict]
+    old_items: list[dict[str, Any]], new_items: list[dict[str, Any]]
 ) -> list[tuple[str, int, int]]:
     """Diff two lists of struct/query items by name.
 
@@ -308,7 +281,7 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
     return "\n".join(lines)
 
 
-def clone_project(name: str, url: str, dest: Path) -> Path:
+def clone_project(*, name: str, url: str, dest: Path) -> Path:
     """Clone a project from Git. Returns the path to the cloned project."""
     project_path = dest / name
     if project_path.exists():
@@ -325,6 +298,7 @@ def clone_project(name: str, url: str, dest: Path) -> Path:
 
 
 def run_ty_memory_check(
+    *,
     ty_path: str,
     project_path: Path,
     output_path: Path,
@@ -346,9 +320,9 @@ def run_ty_memory_check(
 
 
 def run_memory_tests(
+    *,
     old_ty: str,
     new_ty: str,
-    projects: list[str],
     projects_dir: Path,
     old_reports_dir: Path,
     new_reports_dir: Path,
@@ -357,21 +331,20 @@ def run_memory_tests(
     old_reports_dir.mkdir(parents=True, exist_ok=True)
     new_reports_dir.mkdir(parents=True, exist_ok=True)
 
-    for project_name in projects:
-        if project_name not in KNOWN_PROJECTS:
-            print(f"Warning: Unknown project {project_name}, skipping", file=sys.stderr)
-            continue
-
-        url = KNOWN_PROJECTS[project_name]
-        project_path = clone_project(project_name, url, projects_dir)
+    for project_name, url in KNOWN_PROJECTS.items():
+        project_path = clone_project(name=project_name, url=url, dest=projects_dir)
 
         # Run old ty
         old_report_path = old_reports_dir / f"{project_name}.json"
-        run_ty_memory_check(old_ty, project_path, old_report_path)
+        run_ty_memory_check(
+            ty_path=old_ty, project_path=project_path, output_path=old_report_path
+        )
 
         # Run new ty
         new_report_path = new_reports_dir / f"{project_name}.json"
-        run_ty_memory_check(new_ty, project_path, new_report_path)
+        run_ty_memory_check(
+            ty_path=new_ty, project_path=project_path, output_path=new_report_path
+        )
 
 
 def cmd_compare(args: argparse.Namespace) -> None:
@@ -427,61 +400,40 @@ def cmd_compare(args: argparse.Namespace) -> None:
 
 def cmd_run(args: argparse.Namespace) -> None:
     """Handle the 'run' subcommand."""
-    # Read project list
-    if args.projects_file:
-        projects = [
-            line.strip()
-            for line in args.projects_file.read_text().splitlines()
-            if line.strip()
-        ]
-    else:
-        projects = list(KNOWN_PROJECTS.keys())
+    with tempfile.TemporaryDirectory() as tmpdir:
+        # Set up directories
+        projects_dir = args.projects_dir or Path(tmpdir) / "ty_memory_projects"
+        old_reports_dir = args.old_reports_dir or Path(tmpdir) / "ty_memory_old"
+        new_reports_dir = args.new_reports_dir or Path(tmpdir) / "ty_memory_new"
 
-    # Set up directories
-    if args.projects_dir:
-        projects_dir = args.projects_dir
-    else:
-        projects_dir = Path(tempfile.mkdtemp(prefix="ty_memory_projects_"))
+        print(f"Projects directory: {projects_dir}", file=sys.stderr)
+        print(f"Old reports directory: {old_reports_dir}", file=sys.stderr)
+        print(f"New reports directory: {new_reports_dir}", file=sys.stderr)
 
-    if args.old_reports_dir:
-        old_reports_dir = args.old_reports_dir
-    else:
-        old_reports_dir = Path(tempfile.mkdtemp(prefix="ty_memory_old_"))
-
-    if args.new_reports_dir:
-        new_reports_dir = args.new_reports_dir
-    else:
-        new_reports_dir = Path(tempfile.mkdtemp(prefix="ty_memory_new_"))
-
-    print(f"Projects directory: {projects_dir}", file=sys.stderr)
-    print(f"Old reports directory: {old_reports_dir}", file=sys.stderr)
-    print(f"New reports directory: {new_reports_dir}", file=sys.stderr)
-
-    # Run memory tests
-    run_memory_tests(
-        args.old_ty,
-        args.new_ty,
-        projects,
-        projects_dir,
-        old_reports_dir,
-        new_reports_dir,
-    )
-
-    # Load and compare reports
-    old_reports = load_reports_from_directory(old_reports_dir)
-    new_reports = load_reports_from_directory(new_reports_dir)
-
-    comparisons = []
-    for project in sorted(set(old_reports.keys()) & set(new_reports.keys())):
-        comparisons.append(
-            ProjectComparison(
-                name=project,
-                old=old_reports[project],
-                new=new_reports[project],
-            )
+        # Run memory tests
+        run_memory_tests(
+            old_ty=args.old_ty,
+            new_ty=args.new_ty,
+            projects_dir=projects_dir,
+            old_reports_dir=old_reports_dir,
+            new_reports_dir=new_reports_dir,
         )
 
-    rendered = render_summary(comparisons)
+        # Load and compare reports
+        old_reports = load_reports_from_directory(old_reports_dir)
+        new_reports = load_reports_from_directory(new_reports_dir)
+
+        comparisons = []
+        for project in sorted(old_reports.keys() & new_reports.keys()):
+            comparisons.append(
+                ProjectComparison(
+                    name=project,
+                    old=old_reports[project],
+                    new=new_reports[project],
+                )
+            )
+
+        rendered = render_summary(comparisons)
 
     if args.output:
         args.output.write_text(rendered, encoding="utf-8")
@@ -546,11 +498,6 @@ def parse_args() -> argparse.Namespace:
         help="Path to new ty executable",
     )
     run_parser.add_argument(
-        "--projects-file",
-        type=Path,
-        help="File containing list of project names (one per line)",
-    )
-    run_parser.add_argument(
         "--projects-dir",
         type=Path,
         help="Directory to clone projects into (default: temp directory)",
@@ -577,10 +524,15 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
 
-    if args.command == "compare":
-        cmd_compare(args)
-    elif args.command == "run":
-        cmd_run(args)
+    match args.command:
+        case "compare":
+            cmd_compare(args)
+        case "run":
+            cmd_run(args)
+        case _:
+            assert False, (
+                f"Unknown subcommand {args.command!r}; is the script out of date?"
+            )
 
 
 if __name__ == "__main__":

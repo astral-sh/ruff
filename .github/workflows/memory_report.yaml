@@ -29,7 +29,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  PYTHON_VERSION: 3.12
+  PYTHON_VERSION: 3.14
 
 jobs:
   memory_report:
@@ -58,6 +58,7 @@ jobs:
         shell: bash
         env:
           TY_MEMORY_REPORT: json
+          # Disabling multithreading improves the stability of memory usage numbers.
           TY_MAX_PARALLELISM: 1
         run: |
           # Build the executable for the old and new commit
@@ -85,7 +86,6 @@ jobs:
             python "./scripts/memory_report.py" run \
               --old-ty "./ty-old" \
               --new-ty "./ty-new" \
-              --projects-file "crates/ty_python_semantic/resources/primer/memory.txt" \
               --projects-dir "${GITHUB_WORKSPACE}/memory_projects" \
               --output ../memory_report_diff
           )
