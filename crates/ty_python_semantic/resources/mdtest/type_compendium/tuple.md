@@ -55,10 +55,10 @@ def f(x: Iterable[int], y: list[str], z: Never, aa: list[Never], bb: LiskovUncom
 
 reveal_type(tuple((1, 2)))  # revealed: tuple[Literal[1], Literal[2]]
 
-reveal_type(tuple([1]))  # revealed: tuple[Unknown | int, ...]
+reveal_type(tuple([1]))  # revealed: tuple[Literal[1], ...]
 
 x1: tuple[int, ...] = tuple([1])
-reveal_type(x1)  # revealed: tuple[int, ...]
+reveal_type(x1)  # revealed: tuple[Literal[1], ...]
 
 # error: [invalid-argument-type]
 reveal_type(tuple[int]([1]))  # revealed: tuple[int]

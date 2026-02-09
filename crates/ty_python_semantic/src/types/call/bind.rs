@@ -3175,8 +3175,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
         // For a given type variable, we keep track of the variance of any assignments to
-        // that type variable in the type context.
+        // that type variable in the argument types.
         let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
+            FxHashMap::default();
+
+        // We keep track of the variance of any assignments to type variables in the type context.
+        let mut tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
             FxHashMap::default();
 
         // Type variables for which we inferred a declared type based on a partially specialized
@@ -3195,6 +3199,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
                 builder
                     .infer_reverse_map(tcx, return_ty, |(identity, variance, inferred_ty)| {
+                        // Keep track of the variance of the element in the declared type.
+                        tcx_variance
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+
                         // Avoid unnecessarily widening the return type based on a covariant
                         // type parameter from the type context, as it can lead to argument
                         // assignability errors if the type variable is constrained by a narrower
@@ -3256,7 +3266,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any literal types assigned to the specialization.
-        let maybe_promote = |typevar, ty: Type<'db>| {
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, ty: Type<'db>| {
+            let identity = typevar.identity(self.db);
             let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
 
             let mut combined_tcx = TypeContext::default();
@@ -3283,16 +3294,20 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             return_ty.visit_specialization(self.db, self.call_expression_tcx, visit_return_ty);
 
-            // Promotion is only useful if the type variable is in invariant or contravariant
-            // position in the return type.
-            if variance_in_return.is_covariant() {
+            // Promotion is only useful if the type variable is in non-covariant position in the
+            // return type, as well as the declared type.
+            if variance_in_return.is_covariant()
+                || tcx_variance
+                    .get(&identity)
+                    .is_some_and(|variance| variance.is_covariant())
+            {
                 return ty;
             }
 
             // If the type variable is a non-covariant position in any argument, then we avoid
             // promotion, respecting any literals in the parameter type.
             if variance_in_arguments
-                .get(&typevar.identity(self.db))
+                .get(&identity)
                 .is_some_and(|variance| !variance.is_covariant())
             {
                 return ty;

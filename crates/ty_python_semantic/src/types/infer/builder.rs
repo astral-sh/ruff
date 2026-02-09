@@ -8654,12 +8654,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             is_async: _,
         } = for_statement;
 
-        self.infer_target(target, iter, &|builder, tcx| {
+        self.infer_target(target, iter, &|builder, _| {
+            // We pass `Iterable` as type context, allowing us to avoid literal promotion for
+            // collection literal in iterable position.
+            let iterable_tcx = KnownClass::Iterable
+                .to_specialized_instance(builder.db(), &[Type::unspecialized_type_var()]);
+
             // TODO: `infer_for_statement_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `for a.x in not_iterable: ...
             builder
-                .infer_standalone_expression(iter, tcx)
+                .infer_standalone_expression(iter, TypeContext::new(Some(iterable_tcx)))
                 .iterate(builder.db())
                 .homogeneous_element_type(builder.db())
         });
@@ -8686,8 +8691,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 unpacked.expression_type(target)
             }
             TargetKind::Single => {
-                let iterable_type =
-                    self.infer_standalone_expression(iterable, TypeContext::default());
+                // We pass `Iterable` as type context, allowing us to avoid literal promotion for
+                // collection literal in iterable position.
+                let iterable_tcx = KnownClass::Iterable
+                    .to_specialized_instance(self.db(), &[Type::unspecialized_type_var()]);
+
+                let iterable_type = self
+                    .infer_standalone_expression(iterable, TypeContext::new(Some(iterable_tcx)));
 
                 iterable_type
                     .try_iterate_with_mode(
@@ -10006,9 +10016,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // the specialization of one to influence the specialization of the other. It's
                         // not yet clear how we're going to do that. (We might have to start inferring
                         // constraint sets for each expression, instead of simple types?)
-                        .with_default(generic_context, |_| {
-                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
-                        })
+                        .with_default(generic_context, |_| Type::unspecialized_type_var())
                         .build(generic_context);
 
                     parameter_type = parameter_type.apply_specialization(db, specialization);
@@ -10800,6 +10808,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         tcx,
                         collection_instance,
                         |(typevar, variance, inferred_ty)| {
+                            // Keep track of the variance of the element in the declared type.
+                            elt_tcx_variance
+                                .entry(typevar)
+                                .and_modify(|current| *current = current.join(variance))
+                                .or_insert(variance);
+
                             // Avoid inferring a preferred type based on partially specialized type context
                             // from an outer generic call. If the type context is a union, we try to keep
                             // any concrete elements.
@@ -10809,11 +10823,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if inferred_ty.has_unspecialized_type_var(self.db()) {
                                 return None;
                             }
-
-                            elt_tcx_variance
-                                .entry(typevar)
-                                .and_modify(|current| *current = current.join(variance))
-                                .or_insert(variance);
 
                             Some(inferred_ty)
                         },
@@ -10837,10 +10846,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .get(&elt_ty_identity)
                 .copied();
 
-            // Avoid unnecessarily widening the return type based on a covariant
-            // type parameter from the type context.
+            // Avoid unnecessarily widening the return type based on a covariant type
+            // parameter from the type context.
             //
-            // Note that we also avoid unioning  the inferred type with `Unknown` in this
+            // Note that we also avoid unioning the inferred type with `Unknown` in this
             // case, which is only necessary for invariant collections.
             if elt_tcx_variance
                 .get(&elt_ty_identity)
@@ -10896,30 +10905,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let Some(elt) = elt else { continue };
 
                 // Note that unlike when preferring the declared type, we use covariant type
-                // assignments from the type context to potentially _narrow_ the inferred type,
-                // by avoiding literal promotion.
+                // assignments from the type context to potentially _narrow_ inferred element
+                // types, e.g., by avoiding literal promotion.
                 let elt_ty_identity = elt_ty.identity(self.db());
-
-                // If the element is a starred expression, we want to apply the type context to each element
-                // in the unpacked expression (which we will store as a tuple when inferring it). We
-                // therefore wrap the type context in an `tuple[T, ...]` specialization.
+                let elt_tcx_variance = elt_tcx_variance.get(&elt_ty_identity);
                 let elt_tcx = elt_tcx_constraints
                     .get(&elt_ty_identity)
                     .copied()
                     .map(|tcx| {
                         if elt.is_starred_expr() && collection_class != KnownClass::Dict {
+                            // If the element is a starred expression, we want to apply the type context to
+                            // each element in the unpacked expression (which we will store as a tuple when
+                            // inferring it). We therefore wrap the type context in an `tuple[T, ...]` specialization.
                             Type::homogeneous_tuple(self.db(), tcx)
                         } else {
                             tcx
                         }
                     });
 
-                let inferred_elt_ty =
+                let mut inferred_elt_ty =
                     infer_elt_expression(self, (i, elt, TypeContext::new(elt_tcx)));
 
-                // Simplify the inference based on a non-covariant declared type.
-                if let Some(elt_tcx) =
-                    elt_tcx.filter(|_| !elt_tcx_variance[&elt_ty_identity].is_covariant())
+                // Simplify the inference based on a non-covariant declared type, if any.
+                if let Some(elt_tcx) = elt_tcx
+                    && !elt_tcx_variance
+                        .expect("we track the variance of all preferred types")
+                        .is_covariant()
                     && inferred_elt_ty.is_assignable_to(self.db(), elt_tcx)
                 {
                     continue;
@@ -10927,8 +10938,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
-                let inferred_elt_ty =
-                    inferred_elt_ty.promote_literals(self.db(), TypeContext::new(elt_tcx));
+                //
+                // Note that this is only relevant for non-covariant collections with non-covariant
+                // declared types.
+                if elt_tcx_variance.is_none_or(|variance| !variance.is_covariant()) {
+                    inferred_elt_ty =
+                        inferred_elt_ty.promote_literals(self.db(), TypeContext::new(elt_tcx));
+                }
 
                 builder
                     .infer(
@@ -11213,7 +11229,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             is_async: _,
         } = comprehension;
 
-        self.infer_target(target, iter, &|builder, tcx| {
+        self.infer_target(target, iter, &|builder, _| {
+            // We pass `Iterable` as type context, allowing us to avoid literal promotion for
+            // collection literal in iterable position.
+            let iterable_tcx = KnownClass::Iterable
+                .to_specialized_instance(builder.db(), &[Type::unspecialized_type_var()]);
+
             // TODO: `infer_comprehension_definition` reports a diagnostic if `iter_ty` isn't iterable
             //  but only if the target is a name. We should report a diagnostic here if the target isn't a name:
             //  `[... for a.x in not_iterable]
@@ -11221,11 +11242,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 infer_same_file_expression_type(
                     builder.db(),
                     builder.index.expression(iter),
-                    tcx,
+                    TypeContext::new(Some(iterable_tcx)),
                     builder.module(),
                 )
             } else {
-                builder.infer_maybe_standalone_expression(iter, tcx)
+                builder
+                    .infer_maybe_standalone_expression(iter, TypeContext::new(Some(iterable_tcx)))
             }
             .iterate(builder.db())
             .homogeneous_element_type(builder.db())
@@ -11246,7 +11268,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut infer_iterable_type = || {
             let expression = self.index.expression(iterable);
-            let result = infer_expression_types(self.db(), expression, TypeContext::default());
+
+            // We pass `Iterable` as type context, allowing us to avoid literal promotion for
+            // collection literal in iterable position.
+            let iterable_tcx = KnownClass::Iterable
+                .to_specialized_instance(self.db(), &[Type::unspecialized_type_var()]);
+            let result =
+                infer_expression_types(self.db(), expression, TypeContext::new(Some(iterable_tcx)));
 
             // Two things are different if it's the first comprehension:
             // (1) We must lookup the `ScopedExpressionId` of the iterable expression in the outer scope,
