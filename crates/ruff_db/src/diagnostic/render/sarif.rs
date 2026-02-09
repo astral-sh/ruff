@@ -1,147 +1,108 @@
-use std::collections::HashSet;
-use std::io::Write;
+use std::collections::HashMap;
 
-use anyhow::Result;
-use log::warn;
 use serde::{Serialize, Serializer};
 use serde_json::json;
 
-use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
-use ruff_source_file::{OneIndexed, SourceFile};
-use ruff_text_size::{Ranged, TextRange};
+use super::FileResolver;
+use crate::diagnostic::{Diagnostic, Severity};
+use ruff_source_file::OneIndexed;
+use ruff_text_size::Ranged;
 
-use crate::VERSION;
-use crate::fs::normalize_path;
-use crate::message::{Emitter, EmitterContext};
-use crate::registry::{Linter, RuleNamespace};
-
-/// An emitter for producing SARIF 2.1.0-compliant JSON output.
-///
-/// Static Analysis Results Interchange Format (SARIF) is a standard format
-/// for static analysis results. For full specification, see:
-/// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
-pub struct SarifEmitter;
-
-impl Emitter for SarifEmitter {
-    fn emit(
-        &mut self,
-        writer: &mut dyn Write,
-        diagnostics: &[Diagnostic],
-        _context: &EmitterContext,
-    ) -> Result<()> {
-        let results = diagnostics
-            .iter()
-            .map(SarifResult::from_message)
-            .collect::<Result<Vec<_>>>()?;
-
-        let unique_rules: HashSet<_> = results
-            .iter()
-            .filter_map(|result| result.rule_id.as_secondary_code())
-            .collect();
-        let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
-        rules.sort_by(|a, b| a.code.cmp(b.code));
-
-        let output = json!({
-            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-            "version": "2.1.0",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": "ruff",
-                        "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": rules,
-                        "version": VERSION.to_string(),
-                    }
-                },
-                "results": results,
-            }],
-        });
-        serde_json::to_writer_pretty(writer, &output)?;
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone)]
-struct SarifRule<'a> {
-    name: &'a str,
-    code: &'a SecondaryCode,
-    linter: &'a str,
-    summary: &'a str,
-    explanation: Option<&'a str>,
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct SarifRule {
+    id: String,
+    name: Option<&'static str>,
+    linter: Option<&'static str>,
+    summary: String,
+    explanation: Option<String>,
     url: Option<String>,
 }
 
-impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
-    fn from(code: &'a SecondaryCode) -> Self {
-        // This is a manual re-implementation of Rule::from_code, but we also want the Linter. This
-        // avoids calling Linter::parse_code twice.
-        let (linter, suffix) = Linter::parse_code(code).unwrap();
-        let rule = linter
-            .all_rules()
-            .find(|rule| rule.noqa_code().suffix() == suffix)
-            .expect("Expected a valid noqa code corresponding to a rule");
+impl SarifRule {
+    fn from_metadata(metadata: RuleMetadata) -> Self {
         Self {
-            name: rule.into(),
-            code,
-            linter: linter.name(),
-            summary: rule.message_formats()[0],
-            explanation: rule.explanation(),
-            url: rule.url(),
+            id: metadata.code,
+            name: metadata.name,
+            linter: metadata.linter,
+            summary: metadata.summary.to_string(),
+            explanation: metadata.explanation.map(ToString::to_string),
+            url: metadata.url,
+        }
+    }
+
+    fn from_diagnostic(diagnostic: &Diagnostic) -> Self {
+        Self {
+            id: diagnostic.secondary_code_or_id().to_string(),
+            name: None,
+            linter: None,
+            summary: diagnostic.primary_message().to_string(),
+            explanation: None,
+            url: diagnostic.documentation_url().map(ToString::to_string),
         }
     }
 }
 
-impl Serialize for SarifRule<'_> {
+impl Serialize for SarifRule {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
-        json!({
-            "id": self.code,
+        let mut rule = json!({
+            "id": self.id,
             "shortDescription": {
                 "text": self.summary,
             },
-            "fullDescription": {
-                "text": self.explanation,
-            },
-            "help": {
-                "text": self.summary,
-            },
-            "helpUri": self.url,
             "properties": {
-                "id": self.code,
-                "kind": self.linter,
-                "name": self.name,
-                "problem.severity": "error".to_string(),
+                "id": self.id,
             },
-        })
-        .serialize(serializer)
+        });
+
+        if let Some(explanation) = &self.explanation {
+            rule["fullDescription"] = json!({
+                "text": explanation,
+            });
+        }
+
+        if let Some(summary) = &Some(&self.summary) {
+            rule["help"] = json!({
+                "text": summary,
+            });
+        }
+
+        if let Some(url) = &self.url {
+            rule["helpUri"] = json!(url);
+        }
+
+        if let Some(name) = &self.name {
+            rule["properties"]["name"] = json!(name);
+        }
+
+        if let Some(linter) = &self.linter {
+            rule["properties"]["kind"] = json!(linter);
+        }
+
+        rule["properties"]["problem.severity"] = json!("error");
+
+        rule.serialize(serializer)
     }
 }
 
 #[derive(Debug)]
-enum RuleCode<'a> {
-    SecondaryCode(&'a SecondaryCode),
-    LintId(&'a str),
+enum RuleCode {
+    SecondaryCode(String),
+    Other(String),
 }
 
-impl RuleCode<'_> {
-    fn as_secondary_code(&self) -> Option<&SecondaryCode> {
-        match self {
-            RuleCode::SecondaryCode(code) => Some(code),
-            RuleCode::LintId(_) => None,
-        }
-    }
-
+impl RuleCode {
     fn as_str(&self) -> &str {
         match self {
             RuleCode::SecondaryCode(code) => code.as_str(),
-            RuleCode::LintId(id) => id,
+            RuleCode::Other(s) => s.as_str(),
         }
     }
 }
 
-impl Serialize for RuleCode<'_> {
+impl Serialize for RuleCode {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
@@ -150,11 +111,11 @@ impl Serialize for RuleCode<'_> {
     }
 }
 
-impl<'a> From<&'a Diagnostic> for RuleCode<'a> {
-    fn from(code: &'a Diagnostic) -> Self {
-        match code.secondary_code() {
-            Some(diagnostic) => Self::SecondaryCode(diagnostic),
-            None => Self::LintId(code.id().as_str()),
+impl From<&Diagnostic> for RuleCode {
+    fn from(diagnostic: &Diagnostic) -> Self {
+        match diagnostic.secondary_code() {
+            Some(code) => Self::SecondaryCode(code.as_str().to_string()),
+            None => Self::Other(diagnostic.secondary_code_or_id().to_string()),
         }
     }
 }
@@ -165,8 +126,8 @@ impl<'a> From<&'a Diagnostic> for RuleCode<'a> {
 /// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SarifResult<'a> {
-    rule_id: RuleCode<'a>,
+struct SarifResult {
+    rule_id: RuleCode,
     level: String,
     message: SarifMessage,
     locations: Vec<SarifLocation>,
@@ -180,40 +141,40 @@ struct SarifMessage {
     text: String,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct SarifPhysicalLocation {
     artifact_location: SarifArtifactLocation,
     region: SarifRegion,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct SarifLocation {
     physical_location: SarifPhysicalLocation,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct SarifFix {
     description: RuleDescription,
     artifact_changes: Vec<SarifArtifactChange>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct RuleDescription {
     text: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct SarifArtifactChange {
     artifact_location: SarifArtifactLocation,
     replacements: Vec<SarifReplacement>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Default)]
 #[serde(rename_all = "camelCase")]
 struct SarifArtifactLocation {
     uri: String,
@@ -233,7 +194,7 @@ struct InsertedContent {
     text: String,
 }
 
-#[derive(Debug, Serialize, Clone, Copy)]
+#[derive(Debug, Serialize, Clone, Copy, Default)]
 #[serde(rename_all = "camelCase")]
 struct SarifRegion {
     start_line: OneIndexed,
@@ -242,36 +203,84 @@ struct SarifRegion {
     end_column: OneIndexed,
 }
 
-impl<'a> SarifResult<'a> {
-    fn range_to_sarif_region(source_file: &SourceFile, range: TextRange) -> SarifRegion {
-        let source_code = source_file.to_source_code();
-        let start_location = source_code.line_column(range.start());
-        let end_location = source_code.line_column(range.end());
+impl SarifResult {
+    fn from_diagnostic(diagnostic: &Diagnostic, resolver: &dyn FileResolver) -> Self {
+        let (location, uri) = diagnostic
+            .primary_span()
+            .map(|span| {
+                let file = span.file();
+                let uri = format!("file://{}", file.relative_path(resolver).display());
 
-        SarifRegion {
-            start_line: start_location.line,
-            start_column: start_location.column,
-            end_line: end_location.line,
-            end_column: end_location.column,
+                let region = if resolver.is_notebook(file) {
+                    SarifRegion::default()
+                } else {
+                    let diagnostic_source = file.diagnostic_source(resolver);
+                    let source_code = diagnostic_source.as_source_code();
+
+                    span.range()
+                        .map(|range| {
+                            let start = source_code.line_column(range.start());
+                            let end = source_code.line_column(range.end());
+                            SarifRegion {
+                                start_line: start.line,
+                                start_column: start.column,
+                                end_line: end.line,
+                                end_column: end.column,
+                            }
+                        })
+                        .unwrap_or_default()
+                };
+
+                let location = SarifLocation {
+                    physical_location: SarifPhysicalLocation {
+                        artifact_location: SarifArtifactLocation { uri: uri.clone() },
+                        region,
+                    },
+                };
+
+                (location, uri)
+            })
+            .unwrap_or_default();
+
+        let level = match diagnostic.severity() {
+            Severity::Info => "note",
+            Severity::Warning => "warning",
+            Severity::Error => "error",
+            Severity::Fatal => "error",
+        };
+
+        Self {
+            rule_id: RuleCode::from(diagnostic),
+            level: level.to_string(),
+            message: SarifMessage {
+                text: diagnostic.concise_message().to_string(),
+            },
+            locations: vec![location],
+            fixes: Self::extract_fixes(diagnostic, &uri, resolver),
         }
     }
 
-    fn fix(diagnostic: &'a Diagnostic, uri: &str) -> Option<SarifFix> {
-        let fix = diagnostic.fix()?;
-
-        let Some(source_file) = diagnostic.ruff_source_file() else {
-            debug_assert!(
-                false,
-                "Omitting the fix for diagnostic with id `{}` because the source file is missing. This is a bug in Ruff, please report an issue.",
-                diagnostic.id()
-            );
-
-            warn!(
-                "Omitting the fix for diagnostic with id `{}` because the source file is missing. This is a bug in Ruff, please report an issue.",
-                diagnostic.id()
-            );
-            return None;
+    fn extract_fixes(
+        diagnostic: &Diagnostic,
+        uri: &str,
+        resolver: &dyn FileResolver,
+    ) -> Vec<SarifFix> {
+        let Some(fix) = diagnostic.fix() else {
+            return vec![];
         };
+
+        let Some(span) = diagnostic.primary_span() else {
+            return vec![];
+        };
+
+        let file = span.file();
+
+        if resolver.is_notebook(file) {
+            return vec![];
+        }
+
+        let diagnostic_source = file.diagnostic_source(resolver);
+        let source_code = diagnostic_source.as_source_code();
 
         let fix_description = diagnostic
             .first_help_text()
@@ -282,9 +291,16 @@ impl<'a> SarifResult<'a> {
             .iter()
             .map(|edit| {
                 let range = edit.range();
-                let deleted_region = Self::range_to_sarif_region(source_file, range);
+                let start = source_code.line_column(range.start());
+                let end = source_code.line_column(range.end());
+
                 SarifReplacement {
-                    deleted_region,
+                    deleted_region: SarifRegion {
+                        start_line: start.line,
+                        start_column: start.column,
+                        end_line: end.line,
+                        end_column: end.column,
+                    },
                     inserted_content: edit.content().map(|content| InsertedContent {
                         text: content.to_string(),
                     }),
@@ -299,88 +315,121 @@ impl<'a> SarifResult<'a> {
             replacements,
         }];
 
-        Some(SarifFix {
+        vec![SarifFix {
             description: RuleDescription {
                 text: fix_description,
             },
             artifact_changes,
-        })
-    }
-
-    #[allow(clippy::unnecessary_wraps)]
-    fn uri(diagnostic: &Diagnostic) -> Result<String> {
-        let path = normalize_path(&*diagnostic.expect_ruff_filename());
-        #[cfg(not(target_arch = "wasm32"))]
-        return url::Url::from_file_path(&path)
-            .map_err(|()| anyhow::anyhow!("Failed to convert path to URL: {}", path.display()))
-            .map(|u| u.to_string());
-        #[cfg(target_arch = "wasm32")]
-        return Ok(format!("file://{}", path.display()));
-    }
-
-    fn from_message(diagnostic: &'a Diagnostic) -> Result<Self> {
-        let start_location = diagnostic.ruff_start_location().unwrap_or_default();
-        let end_location = diagnostic.ruff_end_location().unwrap_or_default();
-        let region = SarifRegion {
-            start_line: start_location.line,
-            start_column: start_location.column,
-            end_line: end_location.line,
-            end_column: end_location.column,
-        };
-
-        let uri = Self::uri(diagnostic)?;
-
-        Ok(Self {
-            rule_id: RuleCode::from(diagnostic),
-            level: "error".to_string(),
-            message: SarifMessage {
-                text: diagnostic.concise_message().to_string(),
-            },
-            fixes: Self::fix(diagnostic, &uri).into_iter().collect(),
-            locations: vec![SarifLocation {
-                physical_location: SarifPhysicalLocation {
-                    artifact_location: SarifArtifactLocation { uri },
-                    region,
-                },
-            }],
-        })
+        }]
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use crate::message::SarifEmitter;
-    use crate::message::tests::{
-        capture_emitter_output, create_diagnostics, create_syntax_error_diagnostics,
-    };
+pub struct RuleMetadata {
+    pub code: String,
+    pub name: Option<&'static str>,
+    pub linter: Option<&'static str>,
+    pub summary: &'static str,
+    pub explanation: Option<&'static str>,
+    pub url: Option<String>,
+}
 
-    fn get_output() -> String {
-        let mut emitter = SarifEmitter {};
-        capture_emitter_output(&mut emitter, &create_diagnostics())
+pub trait RuleMetadataProvider {
+    fn metadata(&self, diagnostic: &Diagnostic) -> Option<RuleMetadata>;
+}
+
+pub struct SarifToolInfo {
+    pub name: &'static str,
+    pub information_uri: &'static str,
+}
+
+pub struct SarifRenderer<'a> {
+    resolver: &'a dyn FileResolver,
+    tool: SarifToolInfo,
+    metadata_provider: Option<&'a dyn RuleMetadataProvider>,
+}
+
+impl<'a> SarifRenderer<'a> {
+    pub fn new(resolver: &'a dyn FileResolver, tool: SarifToolInfo) -> Self {
+        Self {
+            resolver,
+            tool,
+            metadata_provider: None,
+        }
     }
 
-    #[test]
-    fn valid_json() {
-        let content = get_output();
-        serde_json::from_str::<serde_json::Value>(&content).unwrap();
+    pub fn with_metadata_provider(mut self, provider: &'a dyn RuleMetadataProvider) -> Self {
+        self.metadata_provider = Some(provider);
+        self
     }
 
-    #[test]
-    fn valid_syntax_error_json() {
-        let mut emitter = SarifEmitter {};
-        let content = capture_emitter_output(&mut emitter, &create_syntax_error_diagnostics());
-        serde_json::from_str::<serde_json::Value>(&content).unwrap();
-    }
+    pub(super) fn render(
+        &self,
+        f: &mut std::fmt::Formatter,
+        diagnostics: &[Diagnostic],
+    ) -> std::fmt::Result {
+        let results = diagnostics
+            .iter()
+            .map(|diagnostic| SarifResult::from_diagnostic(diagnostic, self.resolver))
+            .collect::<Vec<_>>();
+        let unique_rules: HashMap<String, SarifRule> = diagnostics
+            .iter()
+            .filter_map(|d| {
+                let code = d.secondary_code()?;
+                let metadata = self
+                    .metadata_provider
+                    .and_then(|provider| provider.metadata(d));
 
-    #[test]
-    fn test_results() {
-        let content = get_output();
-        let value = serde_json::from_str::<serde_json::Value>(&content).unwrap();
+                let rule = metadata
+                    .map(SarifRule::from_metadata)
+                    .unwrap_or_else(|| SarifRule::from_diagnostic(d));
 
-        insta::assert_json_snapshot!(value, {
-            ".runs[0].tool.driver.version" => "[VERSION]",
-            ".runs[0].results[].locations[].physicalLocation.artifactLocation.uri" => "[URI]",
-            ".runs[0].results[].fixes[].artifactChanges[].artifactLocation.uri" => "[URI]",
+                Some((code.as_str().to_string(), rule))
+            })
+            .collect();
+
+        let mut rules: Vec<SarifRule> = unique_rules.into_values().collect();
+        rules.sort_by(|a, b| a.id.cmp(&b.id));
+
+        let output = serde_json::json!({
+            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
+            "version": "2.1.0",
+            "runs": [{
+                "tool": {
+                    "driver": {
+                        "name": self.tool.name,
+                        "informationUri": self.tool.information_uri,
+                        "rules": rules,
+                        "version": crate::program_version().unwrap_or("unknown"),
+                    }
+                },
+                "results": results,
+            }],
         });
+
+        write!(
+            f,
+            "{}",
+            serde_json::to_string_pretty(&output).map_err(|_| std::fmt::Error)?
+        )
+    }
+}
+
+pub struct DisplaySarifDiagnostics<'a> {
+    renderer: &'a SarifRenderer<'a>,
+    diagnostics: &'a [Diagnostic],
+}
+
+impl<'a> DisplaySarifDiagnostics<'a> {
+    pub fn new(renderer: &'a SarifRenderer<'a>, diagnostics: &'a [Diagnostic]) -> Self {
+        Self {
+            renderer,
+            diagnostics,
+        }
+    }
+}
+
+impl std::fmt::Display for DisplaySarifDiagnostics<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.renderer.render(f, self.diagnostics)
     }
 }

@@ -42,6 +42,8 @@ mod junit;
 mod pylint;
 #[cfg(feature = "serde")]
 mod rdjson;
+#[cfg(feature = "serde")]
+pub mod sarif;
 
 /// A type that implements `std::fmt::Display` for diagnostic rendering.
 ///

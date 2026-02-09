@@ -580,7 +580,7 @@ if __name__ == "__main__":
     let test = CliTest::with_settings(|_project_dir, mut settings| {
         // JSON double escapes backslashes
         settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
+        settings.add_filter(r" \([a-f0-9]+ \d{4}-\d{2}-\d{2}\)", "([COMMIT] [DATE])");
         settings
     })?;
     test.write_file("input.py", CONTENT)?;
@@ -618,21 +618,21 @@ fn output_format_notebook() -> Result<()> {
     1 | import numpy
       - maths = (numpy.arange(100)**2).sum()
       - stats= numpy.asarray([1,2,3,4]).median()
-    2 + 
+    2 +
     3 + maths = (numpy.arange(100) ** 2).sum()
     4 + stats = numpy.asarray([1, 2, 3, 4]).median()
      ::: cell 3
     1 | # A cell with IPython escape command
     2 | def some_function(foo, bar):
     3 |     pass
-    4 + 
-    5 + 
+    4 +
+    5 +
     6 | %matplotlib inline
       ::: cell 4
     1  | foo = %pwd
        - def some_function(foo,bar,):
-    2  + 
-    3  + 
+    2  +
+    3  +
     4  + def some_function(
     5  +     foo,
     6  +     bar,
@@ -985,7 +985,7 @@ if True:
       Cause: Failed to parse [TMP]/ruff.toml
       Cause: TOML parse error at line 1, column 1
       |
-    1 | 
+    1 |
       | ^
     unknown field `tab-size`
     ");
@@ -2452,22 +2452,22 @@ fn markdown_formatting_preview_enabled() -> Result<()> {
     unformatted: File would be reformatted
       --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
     1  | This is a markdown document with two fenced code blocks:
-    2  | 
+    2  |
     3  | ```py
        - print( "hello" )
        - def foo(): pass
     4  + print("hello")
-    5  + 
-    6  + 
+    5  +
+    6  +
     7  + def foo():
     8  +     pass
     9  | ```
-    10 | 
+    10 |
     11 | ```pyi
        - print( "hello" )
        - def foo(): pass
     12 + print("hello")
-    13 + 
+    13 +
     14 + def foo():
     15 +     pass
     16 | ```
