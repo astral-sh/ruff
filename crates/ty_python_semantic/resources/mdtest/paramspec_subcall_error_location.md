@@ -18,7 +18,6 @@ python-version = "3.12"
 from typing import Callable
 
 def foo[**P, T](fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
-
 def fn1(a: int, b: int, c: int) -> None: ...
 
 # error: [invalid-argument-type]
@@ -48,7 +47,8 @@ foo(fn4)
 
 ## Methods
 
-Methods require additional logic to offset the location given the additional synthetic `self` parameter.
+Methods require additional logic to offset the location given the additional synthetic `self`
+parameter.
 
 ```py
 from typing import Callable
