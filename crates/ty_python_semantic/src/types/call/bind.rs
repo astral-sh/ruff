@@ -4276,6 +4276,12 @@ impl BindingError<'_> {
         self
     }
 
+    /// Applies the given offset to the argument indices in this error, if any.
+    ///
+    /// This is mainly used to adjust error argument indices for errors that were generated in a
+    /// sub-call for a `ParamSpec`, where the argument indices are relative to the sub-call's
+    /// argument list rather than the original call's argument list. The `offset` should be the
+    /// number of arguments in the original call that were matched before the `ParamSpec` component.
     pub(crate) fn apply_argument_index_offset(&mut self, offset: usize) {
         match self {
             BindingError::InvalidArgumentType { argument_index, .. }
@@ -4284,9 +4290,8 @@ impl BindingError<'_> {
             | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
             | BindingError::ParameterAlreadyAssigned { argument_index, .. }
             | BindingError::SpecializationError { argument_index, .. } => {
-                if let Some(i) = argument_index {
-                    let new_index = *i + offset;
-                    *i = new_index;
+                if let Some(argument_index) = argument_index {
+                    *argument_index = *argument_index + offset;
                 }
             }
 
@@ -4294,9 +4299,8 @@ impl BindingError<'_> {
                 first_excess_argument_index,
                 ..
             } => {
-                if let Some(i) = first_excess_argument_index {
-                    let new_index = *i + offset;
-                    *i = new_index;
+                if let Some(first_excess_argument_index) = first_excess_argument_index {
+                    *first_excess_argument_index = *first_excess_argument_index + offset;
                 }
             }
 
