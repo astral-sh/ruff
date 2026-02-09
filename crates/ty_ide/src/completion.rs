@@ -303,6 +303,7 @@ impl<'db> Completion<'db> {
 
 /// A builder for construction a `Completion`.
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools)]
 struct CompletionBuilder<'db> {
     // See comments on `Completion` for the meaning of fields.
     name: Name,
@@ -317,6 +318,7 @@ struct CompletionBuilder<'db> {
     is_type_check_only: bool,
     documentation: Option<Docstring>,
     module_dependency_kind: Option<ModuleDependencyKind>,
+    deprecated: bool,
 }
 
 impl<'db> CompletionBuilder<'db> {
@@ -339,6 +341,7 @@ impl<'db> CompletionBuilder<'db> {
             is_type_check_only: false,
             documentation: None,
             module_dependency_kind: None,
+            deprecated: false,
         }
     }
 
@@ -412,6 +415,8 @@ impl<'db> CompletionBuilder<'db> {
                         )
                     );
             }
+
+            self.deprecated = ty.is_deprecated(db);
         }
         let kind = self
             .kind
@@ -1212,6 +1217,8 @@ struct Relevance {
     /// Sorts based on whether this symbol is only available during
     /// type checking and not at runtime.
     type_check_only: Sort,
+    /// Deprecated symbols appear lower in the completion result
+    deprecated: Sort,
 }
 
 impl Relevance {
@@ -1258,6 +1265,11 @@ impl Relevance {
             },
             module_dependency_kind: c.module_dependency_kind,
             type_check_only: if c.is_type_check_only {
+                Sort::Lower
+            } else {
+                Sort::Even
+            },
+            deprecated: if c.deprecated {
                 Sort::Lower
             } else {
                 Sort::Even
