@@ -73,10 +73,11 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@64ba99d672bd943c828529b80b6fe0692dfb5844"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@f196cedd062037608340986975b908e04c9fb0a1"
 
           ecosystem-analyzer \
             --repository ruff \
+            --max-flaky-runs 7 \
             diff \
             --profile=profiling \
             --projects-old ruff/projects_old.txt \
