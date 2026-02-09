@@ -9,8 +9,8 @@ I001 [*] Import block is un-sorted or un-formatted
 3 | | import sys
 4 | |
 5 | | # Also wrong heading
-6 | | import requests
-7 | | import pandas
+6 | | import pandas
+7 | | import requests
 8 | |
 9 | | from my_first_party import my_first_party_object
   | |________________________________________________^
@@ -22,11 +22,9 @@ help: Organize imports
 4  | import sys
 5  | 
 6  + # Third party imports
-7  + import pandas
-8  + 
-9  | # Also wrong heading
-10 | import requests
-   - import pandas
-11 | 
-12 + # First party imports
-13 | from my_first_party import my_first_party_object
+7  | # Also wrong heading
+8  | import pandas
+9  | import requests
+10 | 
+11 + # First party imports
+12 | from my_first_party import my_first_party_object
