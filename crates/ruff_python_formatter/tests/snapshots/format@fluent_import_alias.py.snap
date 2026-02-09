@@ -1,0 +1,81 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+---
+## Input
+```python
+import pandas as pd
+
+# Fixtures for fluent formatting of call chains
+# Note that `fluent.options.json` sets line width to 8
+
+
+x = pd.b()
+
+x = pd.b().c()
+
+x = pd.b().c().d
+
+x = pd.b.c.d().e()
+
+x = pd.b.c().d.e().f.g()
+
+```
+
+## Outputs
+### Output 1
+```
+indent-style               = space
+line-width                 = 8
+indent-width               = 4
+quote-style                = Double
+line-ending                = LineFeed
+magic-trailing-comma       = Respect
+docstring-code             = Disabled
+docstring-code-line-width  = "dynamic"
+preview                    = Disabled
+target_version             = 3.10
+source_type                = Python
+```
+
+```python
+import pandas as pd
+
+# Fixtures for fluent formatting of call chains
+# Note that `fluent.options.json` sets line width to 8
+
+
+x = pd.b()
+
+x = pd.b().c()
+
+x = (
+    pd.b()
+    .c()
+    .d
+)
+
+x = pd.b.c.d().e()
+
+x = (
+    pd.b.c()
+    .d.e()
+    .f.g()
+)
+```
+
+
+#### Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -17,7 +17,8 @@
+ x = pd.b.c.d().e()
+ 
+ x = (
+-    pd.b.c()
++    pd.b
++    .c()
+     .d.e()
+     .f.g()
+ )
+```
