@@ -37,6 +37,14 @@ impl TryNodeContextStackManager {
         self.current_try_context_stack().pop_context()
     }
 
+    /// Returns `true` if the scope at `scope_index` is currently inside at least
+    /// one `try` block and therefore needs definition snapshots recorded.
+    pub(super) fn has_active_try_context(&self, scope_index: usize) -> bool {
+        self.0
+            .get(scope_index)
+            .is_some_and(|stack| !stack.0.is_empty())
+    }
+
     /// Record a definition in the try-node context at `scope_index`.
     ///
     /// For each active `try` block in that scope's context stack, a clone of `snapshot`
