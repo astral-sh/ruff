@@ -1,5 +1,6 @@
 //! Rules from [isort](https://pypi.org/project/isort/).
 
+use std::fmt::Write;
 use std::path::PathBuf;
 
 use annotate::annotate_imports;
@@ -237,7 +238,7 @@ fn format_import_block(
 
         // Insert heading comment for this section, if configured.
         if let Some(heading) = settings.import_headings.get(import_section) {
-            output.push_str(&format!("# {heading}"));
+            write!(output, "# {heading}").unwrap();
             output.push_str(&stylist.line_ending());
         }
 
@@ -1234,7 +1235,7 @@ mod tests {
         Ok(())
     }
 
-    /// Helper to create a standard import_headings map for all sections.
+    /// Helper to create a standard `import_headings` map for all sections.
     fn all_section_headings() -> FxHashMap<ImportSection, String> {
         FxHashMap::from_iter([
             (
@@ -1443,7 +1444,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test heading with force_sort_within_sections.
+    /// Test heading with `force_sort_within_sections`.
     #[test_case(Path::new("import_heading_force_sort_within_sections.py"))]
     fn import_heading_force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!(
