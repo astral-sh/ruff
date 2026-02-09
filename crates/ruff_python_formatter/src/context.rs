@@ -6,7 +6,7 @@ use ruff_python_ast::Stmt;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
-use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::visitor::{Visitor, walk_stmt};
 use rustc_hash::FxHashSet;
 
 use crate::PyFormatOptions;
@@ -475,6 +475,14 @@ struct ImportAliasCollector<'a> {
 }
 
 impl<'a> Visitor<'a> for ImportAliasCollector<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        // We only want to collect names like
+        // `import pandas` and `import pandas as pd`
+        // not `from pandas import read_csv`.
+        if !matches!(stmt, Stmt::ImportFrom(_)) {
+            walk_stmt(self, stmt);
+        }
+    }
     fn visit_alias(&mut self, alias: &'a ruff_python_ast::Alias) {
         let ruff_python_ast::Alias { name, asname, .. } = alias;
 
