@@ -5,7 +5,7 @@ use crate::place::builtins_module_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
-use crate::types::call::{CallArguments, MatchedArgument};
+use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::signatures::{ParameterKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownUnion, Type,
@@ -564,10 +564,12 @@ pub fn call_signature_details<'db>(
         return Vec::new();
     };
 
+    let db = model.db();
+
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(model.db())
-        .map(|callables| callables.into_type(model.db()))
+        .try_upcast_to_callable(db)
+        .map(|callables| callables.into_type(db))
     {
         let call_arguments =
             CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
@@ -576,10 +578,8 @@ pub fn call_signature_details<'db>(
                     .unwrap_or(Type::unknown())
             });
         let bindings = callable_type
-            .bindings(model.db())
-            .match_parameters(model.db(), &call_arguments);
-
-        let db = model.db();
+            .bindings(db)
+            .match_parameters(db, &call_arguments);
 
         // Extract signature details from all callable bindings
         bindings
@@ -623,7 +623,7 @@ pub fn call_type_simplified_by_overloads(
     }
 
     // Hand the overload resolution system as much type info as we have
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
             .inferred_type(model)
             .unwrap_or(Type::unknown())
@@ -803,29 +803,25 @@ pub fn find_active_signature_from_details(
 ///
 /// Falls back to arity-based matching if type-based resolution fails.
 fn resolve_call_signature<'db>(
-    db: &'db dyn Db,
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<CallSignatureDetails<'db>> {
+    let db = model.db();
     let func_type = call_expr.func.inferred_type(model)?;
-    let callable_type = func_type
-        .try_upcast_to_callable(model.db())
-        .map(|callables| callables.into_type(model.db()))?;
+    let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
 
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
             .inferred_type(model)
             .unwrap_or(Type::unknown())
     });
 
-    let bindings = callable_type.bindings(db).match_parameters(db, &args);
-
     // Extract the `Bindings` regardless of whether type checking succeeded or failed.
-    let checked = bindings.check_types(db, &args, TypeContext::default(), &[]);
-    let bindings = match &checked {
-        Ok(bindings) => bindings,
-        Err(err) => &err.1,
-    };
+    let bindings = callable_type
+        .bindings(db)
+        .match_parameters(db, &args)
+        .check_types(db, &args, TypeContext::default(), &[])
+        .unwrap_or_else(|CallError(_, bindings)| *bindings);
 
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
@@ -867,7 +863,7 @@ pub fn inlay_hint_call_argument_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<InlayHintCallArgumentDetails> {
-    let resolved = resolve_call_signature(db, model, call_expr)?;
+    let resolved = resolve_call_signature(model, call_expr)?;
 
     let parameters = resolved.signature.parameters();
 
