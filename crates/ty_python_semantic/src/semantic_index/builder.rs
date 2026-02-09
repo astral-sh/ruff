@@ -812,14 +812,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
         }
 
-        if self
-            .try_node_context_stack_manager
-            .has_active_try_context(scope_index)
-        {
-            let snapshot = self.use_def_maps[scope].snapshot();
-            self.try_node_context_stack_manager
-                .record_definition(scope_index, &snapshot);
-        }
+        self.try_node_context_stack_manager
+            .record_definition(scope_index, &self.use_def_maps[scope]);
 
         (definition, num_definitions)
     }

@@ -1,4 +1,4 @@
-use crate::semantic_index::use_def::FlowSnapshot;
+use crate::semantic_index::use_def::{FlowSnapshot, UseDefMapBuilder};
 
 /// An abstraction over the fact that each scope should have its own [`TryNodeContextStack`]
 #[derive(Debug, Default)]
@@ -37,22 +37,17 @@ impl TryNodeContextStackManager {
         self.current_try_context_stack().pop_context()
     }
 
-    /// Returns `true` if the scope at `scope_index` is currently inside at least
-    /// one `try` block and therefore needs definition snapshots recorded.
-    pub(super) fn has_active_try_context(&self, scope_index: usize) -> bool {
-        self.0
-            .get(scope_index)
-            .is_some_and(|stack| !stack.0.is_empty())
-    }
-
     /// Record a definition in the try-node context at `scope_index`.
     ///
-    /// For each active `try` block in that scope's context stack, a clone of `snapshot`
-    /// is pushed so that `except`/`finally` handlers can model which definitions may
-    /// have been reached before an exception.
-    pub(super) fn record_definition(&mut self, scope_index: usize, snapshot: &FlowSnapshot) {
+    /// A snapshot is created from `use_def_map` only if the scope has at least
+    /// one active `try` block; otherwise this is a no-op.
+    pub(super) fn record_definition(
+        &mut self,
+        scope_index: usize,
+        use_def_map: &UseDefMapBuilder<'_>,
+    ) {
         if let Some(stack) = self.0.get_mut(scope_index) {
-            stack.record_definition(snapshot);
+            stack.record_definition(use_def_map);
         }
     }
 
@@ -87,10 +82,13 @@ impl TryNodeContextStack {
         try_suite_snapshots
     }
 
-    /// For each `try` block on the stack, push the snapshot onto the `try` block
-    fn record_definition(&mut self, snapshot: &FlowSnapshot) {
+    /// For each `try` block on the stack, create a snapshot and push it.
+    ///
+    /// The snapshot is created lazily per context, so this is a no-op when
+    /// no `try` block is active.
+    fn record_definition(&mut self, use_def_map: &UseDefMapBuilder<'_>) {
         for context in &mut self.0 {
-            context.record_definition(snapshot.clone());
+            context.record_definition(use_def_map.snapshot());
         }
     }
 }
