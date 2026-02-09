@@ -5201,8 +5201,16 @@ impl<'db> DynamicClassLiteral<'db> {
                 .as_call_expr()
                 .expect("Definition value should be a call expression");
 
-            // The `bases` argument is the second positional argument.
-            let Some(bases_arg) = call_expr.arguments.args.get(1) else {
+            // The `bases` argument is the second positional argument, or the `bases=` keyword.
+            let bases_arg = call_expr.arguments.args.get(1).or_else(|| {
+                call_expr
+                    .arguments
+                    .keywords
+                    .iter()
+                    .find(|kw| kw.arg.as_deref() == Some("bases"))
+                    .map(|kw| &kw.value)
+            });
+            let Some(bases_arg) = bases_arg else {
                 return Box::default();
             };
 
