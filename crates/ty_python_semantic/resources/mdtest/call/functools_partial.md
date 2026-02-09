@@ -378,8 +378,7 @@ reveal_type(p)  # revealed: partial[bool]
 
 ## Too many positional args
 
-Extra positional arguments are silently consumed. The constructor doesn't flag this because
-`partial.__init__` accepts `*args`.
+Extra positional arguments beyond the wrapped function's positional parameters are flagged.
 
 ```py
 from functools import partial
@@ -387,8 +386,7 @@ from functools import partial
 def f(a: int) -> bool:
     return True
 
-# TODO: should emit a diagnostic for excess positional args
-p = partial(f, 1, 2, 3)
+p = partial(f, 1, 2, 3)  # error: [too-many-positional-arguments]
 reveal_type(p)  # revealed: () -> bool
 ```
 

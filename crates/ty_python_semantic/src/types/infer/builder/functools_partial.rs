@@ -2,7 +2,7 @@ use ruff_python_ast as ast;
 
 use super::TypeInferenceBuilder;
 use crate::Db;
-use crate::types::diagnostic::INVALID_ARGUMENT_TYPE;
+use crate::types::diagnostic::{INVALID_ARGUMENT_TYPE, TOO_MANY_POSITIONAL_ARGUMENTS};
 use crate::types::generics::{ApplySpecialization, SpecializationBuilder};
 use crate::types::signatures::{Parameter, Signature};
 use crate::types::{
@@ -73,15 +73,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
         }
 
-        // Specialize each overload and remove bound params.
-        let new_overloads: Vec<_> = overloads
+        // Specialize each overload (inferring type variables from bound args).
+        let specialized: Vec<_> = overloads
             .iter()
-            .map(|sig| apply_partial_to_signature(db, sig, &bound_positional, &bound_keywords))
+            .map(|sig| {
+                specialize_signature_from_bound_args(db, sig, &bound_positional, &bound_keywords)
+            })
             .collect();
 
         // Type-check bound args against the wrapped function's parameter types.
         // For overloaded functions, only report if no overload matches.
-        self.check_partial_bound_args(arguments, overloads, &bound_positional, &bound_keywords);
+        self.check_partial_bound_args(arguments, &specialized, &bound_positional, &bound_keywords);
+
+        // Remove bound params from the specialized signatures.
+        let new_overloads: Vec<_> = specialized
+            .iter()
+            .map(|sig| remove_bound_params(db, sig, &bound_positional, &bound_keywords))
+            .collect();
 
         let new_callable_sig = CallableSignature::from_overloads(new_overloads);
         Some(Type::Callable(CallableType::new(
@@ -95,11 +103,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     /// function's parameter types, and emit diagnostics for mismatches.
     ///
     /// For overloaded functions, diagnostics are only emitted when no overload
-    /// accepts the bound arguments.
+    /// accepts the bound arguments. `specialized` should contain already-specialized
+    /// signatures (one per overload).
     fn check_partial_bound_args(
         &self,
         arguments: &ast::Arguments,
-        overloads: &[Signature<'db>],
+        specialized: &[Signature<'db>],
         bound_positional: &[Type<'db>],
         bound_keywords: &[(&str, Type<'db>)],
     ) {
@@ -107,13 +116,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         // Check if any overload accepts all bound arguments. If at least one
         // overload matches, we don't emit diagnostics.
-        let any_overload_matches = overloads.iter().any(|overload| {
-            let signature = specialize_signature_from_bound_args(
-                db,
-                overload,
-                bound_positional,
-                bound_keywords,
-            );
+        let any_overload_matches = specialized.iter().any(|signature| {
             let params = signature.parameters().as_slice();
             bound_args_match_params(db, params, bound_positional, bound_keywords)
         });
@@ -123,13 +126,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
 
         // No overload matched; emit diagnostics against the first overload.
-        let Some(overload) = overloads.first() else {
+        let Some(first) = specialized.first() else {
             return;
         };
 
-        let signature =
-            specialize_signature_from_bound_args(db, overload, bound_positional, bound_keywords);
-        let params = signature.parameters().as_slice();
+        let params = first.parameters().as_slice();
         let positional_arg_exprs = &arguments.args[1..];
 
         // Check bound positional args.
@@ -191,6 +192,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
         }
+
+        // Check for excess positional arguments (only if the function has no
+        // variadic `*args` parameter to absorb them).
+        let has_variadic = params.iter().any(Parameter::is_variadic);
+        let expected_positional_count = params.iter().filter(|p| p.is_positional()).count();
+        if !has_variadic && bound_positional.len() > expected_positional_count {
+            let first_excess_index = expected_positional_count;
+            if let Some(first_excess_expr) = positional_arg_exprs.get(first_excess_index)
+                && let Some(builder) = self
+                    .context
+                    .report_lint(&TOO_MANY_POSITIONAL_ARGUMENTS, first_excess_expr)
+            {
+                builder.into_diagnostic(format_args!(
+                    "Too many positional arguments to `partial()`: expected \
+                    {expected_positional_count}, got {}",
+                    bound_positional.len(),
+                ));
+            }
+        }
     }
 }
 
@@ -202,6 +222,13 @@ fn bound_args_match_params<'db>(
     bound_positional: &[Type<'db>],
     bound_keywords: &[(&str, Type<'db>)],
 ) -> bool {
+    let has_variadic = params.iter().any(Parameter::is_variadic);
+    let expected_positional_count = params.iter().filter(|p| p.is_positional()).count();
+
+    if !has_variadic && bound_positional.len() > expected_positional_count {
+        return false;
+    }
+
     let mut positional_consumed = 0usize;
     for param in params {
         if param.is_positional() && positional_consumed < bound_positional.len() {
@@ -284,20 +311,18 @@ fn specialize_signature_from_bound_args<'db>(
     )
 }
 
-/// Apply partial binding to a single signature, returning the remaining signature
-/// after removing bound parameters.
+/// Remove bound parameters from an already-specialized signature, returning
+/// the remaining signature.
 ///
-/// For generic signatures, type variables are inferred from the bound arguments
-/// and the signature is specialized before removing bound parameters.
-fn apply_partial_to_signature<'db>(
+/// Positionally-bound parameters are removed. Keyword-bound parameters are
+/// kept with a default value (since `partial` allows overriding keyword
+/// arguments at call time).
+fn remove_bound_params<'db>(
     db: &'db dyn Db,
     signature: &Signature<'db>,
     bound_positional: &[Type<'db>],
     bound_keywords: &[(&str, Type<'db>)],
 ) -> Signature<'db> {
-    let signature =
-        specialize_signature_from_bound_args(db, signature, bound_positional, bound_keywords);
-
     let params = signature.parameters().as_slice();
     let return_ty = signature.return_ty;
     let bound_positional_count = bound_positional.len();
