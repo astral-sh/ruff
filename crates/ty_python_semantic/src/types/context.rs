@@ -9,7 +9,7 @@ use ruff_db::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{TypeCheckDiagnostics, infer_definition_types};
+use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
@@ -194,15 +194,14 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
                 // if any is decorated with `@no_type_check`. We use the undecorated type
                 // rather than the binding type because other decorators (e.g. unknown ones)
                 // may transform the function type into a non-`FunctionLiteral`.
+                // `undecorated_type()` can be `None` during cycle recovery.
                 index
                     .ancestor_scopes(scope_id)
                     .filter_map(|(_, scope)| scope.node().as_function())
-                    .map(|node| {
+                    .filter_map(|node| {
                         infer_definition_types(self.db, index.expect_single_definition(node))
                             .undecorated_type()
-                            .expect("function should have undecorated type")
-                            .as_function_literal()
-                            .expect("undecorated function type should be a FunctionLiteral")
+                            .and_then(Type::as_function_literal)
                     })
                     .any(|function_ty| {
                         function_ty.has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
