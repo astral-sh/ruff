@@ -3,6 +3,9 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use ruff_python_ast::name::Name;
+use ty_module_resolver::{ModuleName, file_to_module};
+
 use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
@@ -247,6 +250,24 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
 }
 
 impl<'db> NominalInstanceType<'db> {
+    /// Returns the name of the class this is an instance of.
+    ///
+    /// For example, for an instance of `builtins.str`, this returns `"str"`.
+    pub fn class_name(&self, db: &'db dyn Db) -> &'db Name {
+        self.class(db).name(db)
+    }
+
+    /// Returns the fully qualified module name of the module in which the class
+    /// is defined, if it can be resolved.
+    ///
+    /// For example, for an instance of `pathlib.Path`, this returns
+    /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
+    /// to a known module (e.g. for classes defined in scripts or notebooks).
+    pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
+        let file = self.class(db).class_literal(db).file(db);
+        file_to_module(db, file).map(|module| module.name(db))
+    }
+
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),

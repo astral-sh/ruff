@@ -9972,20 +9972,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut parameter_type =
                     overload.signature.parameters()[*parameter_index].annotated_type();
 
-                // If this is a generic call, attempt to specialize the parameter type using the
-                // declared type context, if provided.
-                if let Some(generic_context) = overload.signature.generic_context
-                    && let Some(declared_return_ty) = call_expression_tcx.annotation
-                {
-                    let mut builder =
-                        SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
-
-                    let _ = builder.infer(overload.signature.return_ty, declared_return_ty);
-                    let specialization = builder.build(generic_context);
-
-                    parameter_type = parameter_type.apply_specialization(db, specialization);
-                }
-
                 // If the parameter is a single type variable with an upper bound, e.g., `typing.Self`,
                 // use the upper bound as type context.
                 if let Type::TypeVar(typevar) = parameter_type
@@ -9995,30 +9981,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Some(bound);
                 }
 
-                // TODO: For now, skip any parameter annotations that still mention any typevars. There
-                // are two issues:
-                //
-                // First, if we include those typevars in the type context that we use to infer the
-                // corresponding argument type, the typevars might end up appearing in the inferred
-                // argument type as well. As part of analyzing this call, we're going to (try to)
-                // infer a specialization of those typevars, and would need to substitute those
-                // typevars in the inferred argument type. We can't do that easily at the moment,
-                // since specialization inference occurs _after_ we've inferred argument types, and
-                // we can't _update_ an expression's inferred type after the fact.
-                //
-                // Second, certain kinds of arguments themselves have typevars that we need to
-                // infer specializations for. (For instance, passing the result of _another_  call
-                // to the argument of _this_ call, where both are calls to generic functions.) In
-                // that case, we want to "tie together" the typevars of the two calls so that we
-                // can infer their specializations at the same time — or at least, for the
-                // specialization of one to influence the specialization of the other. It's not yet
-                // clear how we're going to do that. (We might have to start inferring constraint
-                // sets for each expression, instead of simple types?)
-                //
-                // Regardless, for now, the expedient "solution" is to not perform bidi type
-                // checking for these kinds of parameters.
-                if parameter_type.has_typevar(db) {
-                    return None;
+                // If this is a generic call, attempt to specialize the parameter type using the
+                // declared type context, if provided.
+                if let Some(generic_context) = overload.signature.generic_context {
+                    let mut builder =
+                        SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
+
+                    if let Some(declared_return_ty) = call_expression_tcx.annotation {
+                        let _ = builder.infer_reverse(
+                            declared_return_ty,
+                            overload
+                                .constructor_instance_type
+                                .unwrap_or(overload.signature.return_ty),
+                        );
+                    }
+
+                    let specialization = builder
+                        // Default specialize any type variables to a marker type, which will be ignored
+                        // during argument inference, allowing the concrete subset of the parameter
+                        // type to still affect argument inference.
+                        //
+                        // TODO: Eventually, we want to "tie together" the typevars of the two calls
+                        // so that we can infer their specializations at the same time — or at least, for
+                        // the specialization of one to influence the specialization of the other. It's
+                        // not yet clear how we're going to do that. (We might have to start inferring
+                        // constraint sets for each expression, instead of simple types?)
+                        .with_default(generic_context, |_| {
+                            Type::Dynamic(DynamicType::UnspecializedTypeVar)
+                        })
+                        .build(generic_context);
+
+                    parameter_type = parameter_type.apply_specialization(db, specialization);
                 }
 
                 Some(parameter_type)
@@ -10807,6 +10800,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         tcx,
                         collection_instance,
                         |(typevar, variance, inferred_ty)| {
+                            // Avoid inferring a preferred type based on partially specialized type context
+                            // from an outer generic call. If the type context is a union, we try to keep
+                            // any concrete elements.
+                            let inferred_ty = inferred_ty.filter_union(self.db(), |ty| {
+                                !ty.has_unspecialized_type_var(self.db())
+                            });
+                            if inferred_ty.has_unspecialized_type_var(self.db()) {
+                                return None;
+                            }
+
                             elt_tcx_variance
                                 .entry(typevar)
                                 .and_modify(|current| *current = current.join(variance))
@@ -11658,14 +11661,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // that protocol -- and indeed, according to the spec, type checkers must disallow abstract
             // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
-            if !callable_type.is_subclass_of() {
-                if let Some(protocol) = class.into_protocol_class(self.db()) {
-                    report_attempted_protocol_instantiation(
-                        &self.context,
-                        call_expression,
-                        protocol,
-                    );
-                }
+            if !callable_type.is_subclass_of()
+                && let Some(protocol) = class.into_protocol_class(self.db())
+            {
+                report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
             }
 
             // For class literals we model the entire class instantiation logic, so it is handled
@@ -11754,26 +11753,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
 
         // Validate `TypedDict` constructor calls after argument type inference.
-        // This needs to run for direct class literals (e.g. `MyTD(...)`), generic aliases
-        // (e.g. `MyGenTD[str](...)`), and `type[MyTD]`-style subclass targets.
-        let typed_dict = match callable_type {
-            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(self.db()) => {
-                Type::typed_dict(ClassType::NonGeneric(class_literal)).as_typed_dict()
-            }
-            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(self.db()) => {
-                Type::typed_dict(ClassType::Generic(generic_alias)).as_typed_dict()
-            }
-            Type::SubclassOf(subclass_of) if subclass_of.is_typed_dict(self.db()) => subclass_of
-                .subclass_of()
-                .into_class(self.db())
-                .and_then(|class| Type::typed_dict(class).as_typed_dict()),
-            _ => None,
-        };
-
-        if let Some(typed_dict) = typed_dict {
+        if let Some(class) = class
+            && class.class_literal(self.db()).is_typed_dict(self.db())
+        {
             validate_typed_dict_constructor(
                 &self.context,
-                typed_dict,
+                TypedDictType::new(class),
                 arguments,
                 func.as_ref().into(),
                 |expr| self.expression_type(expr),
@@ -13407,6 +13392,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _, _)
             | (_, unknown @ Type::Dynamic(DynamicType::UnknownGeneric(_)), _) => Some(unknown),
+
+            (typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _, _)
+            | (_, typevar @ Type::Dynamic(DynamicType::UnspecializedTypeVar), _) => Some(typevar),
 
             (
                 todo @ Type::Dynamic(
