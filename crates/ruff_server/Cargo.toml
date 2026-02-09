@@ -17,6 +17,7 @@ ruff_db = { workspace = true }
 ruff_diagnostics = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_linter = { workspace = true }
+ruff_markdown = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_codegen = { workspace = true }

@@ -3509,6 +3509,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",
+ "ruff_markdown",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
