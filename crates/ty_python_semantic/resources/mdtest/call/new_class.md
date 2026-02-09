@@ -83,7 +83,7 @@ import types
 
 class Base: ...
 
-# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `type()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
+# error: [invalid-argument-type] "Invalid argument to parameter 2 (`bases`) of `types.new_class()`: Expected `tuple[type, ...]`, found `<class 'Base'>`"
 types.new_class("Foo", Base)
 ```
 
@@ -115,4 +115,82 @@ class Base: ...
 
 # error: [duplicate-base] "Duplicate base class <class 'Base'> in class `Dup`"
 types.new_class("Dup", (Base, Base))
+```
+
+## Special bases
+
+`types.new_class()` properly handles `__mro_entries__` and metaclasses, so it supports bases that
+`type()` does not.
+
+### Enum bases
+
+Unlike `type()`, `types.new_class()` properly handles metaclasses, so inheriting from `enum.Enum` or
+an empty enum subclass is valid:
+
+```py
+import types
+from enum import Enum
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+
+# Enums with members are still final and cannot be subclassed,
+# regardless of whether we use type() or types.new_class()
+# error: [subclass-of-final-class]
+ExtendedColor = types.new_class("ExtendedColor", (Color,))
+
+class EmptyEnum(Enum):
+    pass
+
+# Empty enum subclasses are fine with types.new_class() because it
+# properly resolves and uses the EnumMeta metaclass
+EmptyEnumSub = types.new_class("EmptyEnumSub", (EmptyEnum,))
+reveal_type(EmptyEnumSub)  # revealed: <class 'EmptyEnumSub'>
+
+# Directly inheriting from Enum is also fine
+MyEnum = types.new_class("MyEnum", (Enum,))
+reveal_type(MyEnum)  # revealed: <class 'MyEnum'>
+```
+
+### Generic and TypedDict bases
+
+`type()` doesn't support `__mro_entries__`, so `Generic[T]` and `TypedDict` fail as bases for
+`type()`. `types.new_class()` handles `__mro_entries__` properly, so these are valid:
+
+```py
+import types
+from typing import Generic, TypeVar
+from typing_extensions import TypedDict
+
+T = TypeVar("T")
+
+GenericClass = types.new_class("GenericClass", (Generic[T],))
+reveal_type(GenericClass)  # revealed: <class 'GenericClass'>
+
+TypedDictClass = types.new_class("TypedDictClass", (TypedDict,))
+reveal_type(TypedDictClass)  # revealed: <class 'TypedDictClass'>
+```
+
+### `type[X]` bases
+
+`type[X]` represents "some subclass of X". This is a valid base class, but ty cannot determine the
+exact class, so it cannot solve the MRO. `Unknown` is inserted and `unsupported-dynamic-base` is
+emitted:
+
+```py
+import types
+from ty_extensions import reveal_mro
+
+class Base:
+    base_attr: int = 1
+
+def f(x: type[Base]):
+    # error: [unsupported-dynamic-base] "Unsupported class base"
+    Child = types.new_class("Child", (x,))
+
+    reveal_type(Child)  # revealed: <class 'Child'>
+    reveal_mro(Child)  # revealed: (<class 'Child'>, Unknown, <class 'object'>)
+    child = Child()
+    reveal_type(child.base_attr)  # revealed: Unknown
 ```
