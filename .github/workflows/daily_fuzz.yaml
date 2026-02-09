@@ -36,7 +36,7 @@ jobs:
           persist-credentials: false
       - uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
         with:
-          version: "0.9.28"
+          version: "0.10.0"
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
