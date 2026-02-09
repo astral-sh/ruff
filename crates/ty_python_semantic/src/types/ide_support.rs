@@ -547,15 +547,23 @@ pub fn call_signature_details<'db>(
         .try_upcast_to_callable(model.db())
         .map(|callables| callables.into_type(model.db()))
     {
+        // Use from_arguments_typed so that check_types can infer TypeVar
+        // specializations from the actual argument types at this call site.
         let call_arguments =
-            CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
+            CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
                 splatted_value
                     .inferred_type(model)
                     .unwrap_or(Type::unknown())
             });
-        let bindings = callable_type
+        let mut bindings = callable_type
             .bindings(model.db())
             .match_parameters(model.db(), &call_arguments);
+
+        // Run type checking to resolve TypeVar bindings from argument types.
+        // For example, calling `dict[str, int].get("a")` resolves the `_KT`
+        // TypeVar to `str`. We ignore errors since we still want signature
+        // details even if the call has type errors.
+        let _ = bindings.check_types_impl(model.db(), &call_arguments, TypeContext::default(), &[]);
 
         // Extract signature details from all callable bindings
         bindings
@@ -563,6 +571,7 @@ pub fn call_signature_details<'db>(
             .flatten()
             .map(|binding| {
                 let argument_to_parameter_mapping = binding.argument_matches().to_vec();
+                let specialization = binding.specialization();
                 let signature = binding.signature;
                 let display_details = signature.display(model.db()).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
@@ -570,7 +579,19 @@ pub fn call_signature_details<'db>(
                 let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
                     .parameters()
                     .iter()
-                    .map(|param| (param.kind().clone(), param.annotated_type()))
+                    .map(|param| {
+                        // Apply the inferred specialization (if any) to resolve TypeVars
+                        // in the annotated type. For example, if `_KT` was inferred as
+                        // `str` from the call arguments, this turns `_KT` into `str`.
+                        let ty = if let Some(spec) = specialization {
+                            param
+                                .annotated_type()
+                                .apply_specialization(model.db(), spec)
+                        } else {
+                            param.annotated_type()
+                        };
+                        (param.kind().clone(), ty)
+                    })
                     .unzip();
 
                 CallSignatureDetails {
