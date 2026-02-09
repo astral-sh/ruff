@@ -73,14 +73,10 @@ pub(crate) fn f_string_in_gettext_func_call(checker: &Checker, func: &Expr, args
     }
 
     // Check second argument (plural) for ngettext calls
-    if is_ngettext_call(checker, func) {
-        if let Some(second) = args.get(1) {
-            if second.is_f_string_expr() {
-                checker.report_diagnostic(
-                    FStringInGetTextFuncCall { is_plural: true },
-                    second.range(),
-                );
-            }
-        }
+    if is_ngettext_call(checker, func)
+        && let Some(second) = args.get(1)
+        && second.is_f_string_expr()
+    {
+        checker.report_diagnostic(FStringInGetTextFuncCall { is_plural: true }, second.range());
     }
 }

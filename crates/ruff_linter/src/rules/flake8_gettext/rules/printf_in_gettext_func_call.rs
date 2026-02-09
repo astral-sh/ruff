@@ -66,35 +66,31 @@ impl Violation for PrintfInGetTextFuncCall {
 pub(crate) fn printf_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
     // Check first argument (singular)
     if let Some(first) = args.first() {
-        if let Expr::BinOp(ast::ExprBinOp {
-            op: Operator::Mod,
-            left,
-            ..
-        }) = &first
-        {
-            if left.is_string_literal_expr() {
-                checker
-                    .report_diagnostic(PrintfInGetTextFuncCall { is_plural: false }, first.range());
-            }
+        if is_printf_format(first) {
+            checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: false }, first.range());
         }
     }
 
     // Check second argument (plural) for ngettext calls
-    if is_ngettext_call(checker, func) {
-        if let Some(second) = args.get(1) {
-            if let Expr::BinOp(ast::ExprBinOp {
-                op: Operator::Mod,
-                left,
-                ..
-            }) = &second
-            {
-                if left.is_string_literal_expr() {
-                    checker.report_diagnostic(
-                        PrintfInGetTextFuncCall { is_plural: true },
-                        second.range(),
-                    );
-                }
-            }
-        }
+    if is_ngettext_call(checker, func)
+        && let Some(second) = args.get(1)
+        && is_printf_format(second)
+    {
+        checker.report_diagnostic(PrintfInGetTextFuncCall { is_plural: true }, second.range());
     }
+}
+
+/// Return `true` if `expr` is a printf-style formatting expression, such as
+/// `"%s" % 123`.
+fn is_printf_format(expr: &Expr) -> bool {
+    let Expr::BinOp(ast::ExprBinOp {
+        op: Operator::Mod,
+        left,
+        ..
+    }) = expr
+    else {
+        return false;
+    };
+
+    left.is_string_literal_expr()
 }

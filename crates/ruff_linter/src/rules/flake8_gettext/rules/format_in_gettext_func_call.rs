@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::Expr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -66,31 +66,26 @@ impl Violation for FormatInGetTextFuncCall {
 pub(crate) fn format_in_gettext_func_call(checker: &Checker, func: &Expr, args: &[Expr]) {
     // Check first argument (singular)
     if let Some(first) = args.first() {
-        if let Expr::Call(ast::ExprCall { func, .. }) = &first {
-            if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
-                if attr == "format" {
-                    checker.report_diagnostic(
-                        FormatInGetTextFuncCall { is_plural: false },
-                        first.range(),
-                    );
-                }
-            }
+        if is_format_call(first) {
+            checker.report_diagnostic(FormatInGetTextFuncCall { is_plural: false }, first.range());
         }
     }
 
     // Check second argument (plural) for ngettext calls
-    if is_ngettext_call(checker, func) {
-        if let Some(second) = args.get(1) {
-            if let Expr::Call(ast::ExprCall { func, .. }) = &second {
-                if let Expr::Attribute(ast::ExprAttribute { attr, .. }) = func.as_ref() {
-                    if attr == "format" {
-                        checker.report_diagnostic(
-                            FormatInGetTextFuncCall { is_plural: true },
-                            second.range(),
-                        );
-                    }
-                }
-            }
-        }
+    if is_ngettext_call(checker, func)
+        && let Some(second) = args.get(1)
+        && is_format_call(second)
+    {
+        checker.report_diagnostic(FormatInGetTextFuncCall { is_plural: true }, second.range());
     }
+}
+
+/// Return `true` if `expr` is a call to the `format` attribute, as in
+/// `s.format(...)`.
+fn is_format_call(expr: &Expr) -> bool {
+    expr.as_call_expr().is_some_and(|call| {
+        call.func
+            .as_attribute_expr()
+            .is_some_and(|attr| &attr.attr == "format")
+    })
 }
