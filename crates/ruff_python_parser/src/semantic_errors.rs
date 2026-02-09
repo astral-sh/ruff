@@ -1219,6 +1219,12 @@ impl Display for SemanticSyntaxError {
             SemanticSyntaxErrorKind::LateFutureImport => {
                 f.write_str("__future__ imports must be at the top of the file")
             }
+            SemanticSyntaxErrorKind::NamedExpressionInComprehensionIterable => f.write_str(
+                "assignment expression cannot be used in a comprehension iterable expression",
+            ),
+            SemanticSyntaxErrorKind::NamedExpressionInClassBodyComprehension => f.write_str(
+                "assignment expression within a comprehension cannot be used in a class body",
+            ),
             SemanticSyntaxErrorKind::ReboundComprehensionVariable => {
                 f.write_str("assignment expression cannot rebind comprehension variable")
             }
@@ -1396,6 +1402,27 @@ pub enum SemanticSyntaxErrorKind {
     ///
     /// [`late-future-import`]: https://docs.astral.sh/ruff/rules/late-future-import/
     LateFutureImport,
+
+    /// Represents the use of an assignment expression within a comprehension iterable clause.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// [x for x in (y := range(3))]
+    /// [x for x in [z for z in range(3) if (y := z)]]
+    /// ```
+    NamedExpressionInComprehensionIterable,
+
+    /// Represents the use of an assignment expression within a comprehension nested directly or
+    /// indirectly in a class body.
+    ///
+    /// ## Examples
+    ///
+    /// ```python
+    /// class C:
+    ///     [(x := y) for y in range(3)]
+    /// ```
+    NamedExpressionInClassBodyComprehension,
 
     /// Represents the rebinding of the iteration variable of a list, set, or dict comprehension or
     /// a generator expression.
