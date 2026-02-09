@@ -64,6 +64,7 @@ jobs:
           git checkout -b new_commit "$GITHUB_SHA"
           git rev-list --format=%s --max-count=1 new_commit
           cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
+          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
 
           echo "old commit (merge base)"
           MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
@@ -73,15 +74,16 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@f196cedd062037608340986975b908e04c9fb0a1"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@f26093838326d10b6d90f3a9d08125db7aa369d6"
 
           ecosystem-analyzer \
             --repository ruff \
-            --max-flaky-runs 7 \
+            --flaky-runs 10 \
             diff \
             --profile=profiling \
             --projects-old ruff/projects_old.txt \
             --projects-new ruff/projects_new.txt \
+            --projects-flaky ruff/projects_flaky.txt \
             --old old_commit \
             --new new_commit \
             --output-old diagnostics-old.json \
