@@ -25,12 +25,13 @@ help: Organize imports
 5  | import os
 6  | import sys
 7  | 
-   - import requests
 8  + # Third party imports
-9  | import pandas
+9  + import pandas
+10 | import requests
+   - import pandas
+11 | 
+12 + # First party imports
+13 | from my_first_party import my_first_party_object
    - 
-10 + import requests
-11 | from my_first_party import my_first_party_object
-12 | 
-13 + # Local folder imports
-14 | from . import my_local_folder_object
+14 + # Local folder imports
+15 | from . import my_local_folder_object

@@ -213,7 +213,14 @@ fn format_import_block(
         if !heading_comments.is_empty() {
             for import in &mut imports {
                 match import {
-                    Import((_, comments)) | ImportFrom((_, comments, _, _)) => {
+                    Import((_, comments)) => {
+                        comments.atop.retain(|comment| {
+                            !heading_comments
+                                .iter()
+                                .any(|heading| comment.as_ref() == heading.as_str())
+                        });
+                    }
+                    ImportFrom((_, comments, _, _)) => {
                         comments.atop.retain(|comment| {
                             !heading_comments
                                 .iter()
@@ -1266,6 +1273,13 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     import_headings: all_section_headings(),
+                    known_modules: KnownModules::new(
+                        vec![pattern("my_first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -1284,6 +1298,13 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     import_headings: all_section_headings(),
+                    known_modules: KnownModules::new(
+                        vec![pattern("my_first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -1302,6 +1323,13 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     import_headings: all_section_headings(),
+                    known_modules: KnownModules::new(
+                        vec![pattern("my_first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -1323,6 +1351,13 @@ mod tests {
             &LinterSettings {
                 isort: super::settings::Settings {
                     import_headings: all_section_headings(),
+                    known_modules: KnownModules::new(
+                        vec![pattern("my_first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
                     no_lines_before: FxHashSet::from_iter([ImportSection::Known(
                         ImportType::LocalFolder,
                     )]),
@@ -1384,6 +1419,13 @@ mod tests {
                             "First party imports".to_string(),
                         ),
                     ]),
+                    known_modules: KnownModules::new(
+                        vec![pattern("my_first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

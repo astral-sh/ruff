@@ -27,5 +27,6 @@ help: Organize imports
 9  | # Also wrong heading
 10 | import requests
    - import pandas
-   - 
-11 | from my_first_party import my_first_party_object
+11 | 
+12 + # First party imports
+13 | from my_first_party import my_first_party_object
