@@ -209,7 +209,19 @@ impl SarifResult {
             .primary_span()
             .map(|span| {
                 let file = span.file();
-                let uri = format!("file://{}", file.relative_path(resolver).display());
+                let uri = {
+                    let path = file.relative_path(resolver);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    {
+                        url::Url::from_file_path(path)
+                            .map(|u| u.to_string())
+                            .unwrap_or_else(|_| format!("file://{}", path.display()))
+                    }
+                    #[cfg(target_arch = "wasm32")]
+                    {
+                        format!("file://{}", path.display())
+                    }
+                };
 
                 let region = if resolver.is_notebook(file) {
                     SarifRegion::default()

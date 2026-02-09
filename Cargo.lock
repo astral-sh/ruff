@@ -3072,6 +3072,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "ty_static",
+ "url",
  "web-time",
  "zip",
 ]
