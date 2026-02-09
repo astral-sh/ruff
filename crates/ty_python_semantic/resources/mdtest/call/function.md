@@ -1532,13 +1532,17 @@ def _(arg: int):
     foo(*arg)
 ```
 
-## TODO regressions: false positives from variadic binding
+## Regression: union variadic unpacking with explicit keyword arguments
+
+When a union type containing variable-length elements (like `Unknown` or `str`) is unpacked as
+`*args`, the variadic expansion should not greedily consume optional positional parameters that are
+also provided as explicit keyword arguments.
 
 ```py
 from datetime import datetime, timezone
 from ty_extensions import Unknown
 
-# TODO: No `parameter-already-assigned` diagnostics should be emitted here.
+# Regression inspired by scipy: `self._dist.rvs(*self._shapes, size=size, random_state=random_state)`
 def _scipy_regression() -> None:
     class Dist:
         def rvs(self, mu=0, lmbda=1, a=1, b=1, size=None, random_state=None): ...
@@ -1549,11 +1553,9 @@ def _scipy_regression() -> None:
             self._shapes = (0, 1, 1, 1)
 
         def rvs(self, size=None, random_state=None):
-            # error: [parameter-already-assigned]
-            # error: [parameter-already-assigned]
             self._dist.rvs(*self._shapes, size=size, random_state=random_state)
 
-# TODO: No `parameter-already-assigned` diagnostic should be emitted here.
+# Regression inspired by cki-lib: `datetime(2010, 1, 2, *expected_next, tzinfo=timezone.utc)`
 def _cki_regression() -> None:
     cases = [
         ("*/5 * * * *", [(0, 5, 0), (0, 10, 0), (0, 15, 0)]),
@@ -1563,11 +1565,10 @@ def _cki_regression() -> None:
 
     for _schedule, times in cases:
         for expected_next in times:
-            # error: [parameter-already-assigned]
             datetime(2010, 1, 2, *expected_next, tzinfo=timezone.utc)
             expected_next = datetime(2010, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
 
-# TODO: No diagnostics should be emitted here.
+# Regression inspired by apprise: `validate_regex(bot_token, *x, fmt="{key}")`
 def _apprise_regression() -> None:
     def validate_regex(
         value: str,
@@ -1600,7 +1601,6 @@ def _apprise_regression() -> None:
                 bot_token,
                 # error: [not-iterable]
                 *self.template_tokens["bot_token"]["regex"],
-                # error: [parameter-already-assigned]
                 fmt="{key}",
             )
 ```
