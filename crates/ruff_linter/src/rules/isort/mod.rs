@@ -213,15 +213,12 @@ fn format_import_block(
         if !heading_comments.is_empty() {
             for import in &mut imports {
                 match import {
-                    Import((_, comments)) => {
-                        comments
-                            .atop
-                            .retain(|c| !heading_comments.iter().any(|h| c.as_ref() == h));
-                    }
-                    ImportFrom((_, comments, _, _)) => {
-                        comments
-                            .atop
-                            .retain(|c| !heading_comments.iter().any(|h| c.as_ref() == h));
+                    Import((_, comments)) | ImportFrom((_, comments, _, _)) => {
+                        comments.atop.retain(|comment| {
+                            !heading_comments
+                                .iter()
+                                .any(|heading| comment.as_ref() == heading.as_str())
+                        });
                     }
                 }
             }
