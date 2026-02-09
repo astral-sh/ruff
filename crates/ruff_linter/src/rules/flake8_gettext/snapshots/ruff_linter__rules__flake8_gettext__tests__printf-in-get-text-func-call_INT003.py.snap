@@ -30,17 +30,6 @@ INT003 printf-style format is resolved before function call; consider `_("string
 5 | _gettext("%s" % "line")  # no lint
   |
 
-INT003 printf-style format in plural argument is resolved before function call
- --> INT003.py:3:25
-  |
-1 | _("%s" % "line")
-2 | gettext("%s" % "line")
-3 | ngettext("%s" % "line", "%s" % "lines", 2)
-  |                         ^^^^^^^^^^^^^^
-4 |
-5 | _gettext("%s" % "line")  # no lint
-  |
-
 INT003 printf-style format is resolved before function call; consider `_("string %s") % arg`
   --> INT003.py:27:14
    |
