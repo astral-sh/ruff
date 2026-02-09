@@ -5,7 +5,7 @@ use crate::place::builtins_module_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
-use crate::types::call::{CallArguments, MatchedArgument};
+use crate::types::call::{CallArguments, CallError, MatchedArgument};
 use crate::types::signatures::{ParameterKind, Signature};
 use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownUnion, Type,
@@ -514,7 +514,29 @@ pub struct CallSignatureDetails<'db> {
     pub argument_to_parameter_mapping: Vec<MatchedArgument<'db>>,
 }
 
-impl CallSignatureDetails<'_> {
+impl<'db> CallSignatureDetails<'db> {
+    fn from_binding(db: &'db dyn Db, binding: &crate::types::call::Binding<'db>) -> Self {
+        let argument_to_parameter_mapping = binding.argument_matches().to_vec();
+        let signature = binding.signature.clone();
+        let display_details = signature.display(db).to_string_parts();
+        let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
+            .parameters()
+            .iter()
+            .map(|param| (param.kind().clone(), param.annotated_type()))
+            .unzip();
+
+        CallSignatureDetails {
+            definition: signature.definition(),
+            signature,
+            label: display_details.label,
+            parameter_label_offsets: display_details.parameter_ranges,
+            parameter_names: display_details.parameter_names,
+            parameter_kinds,
+            parameter_types,
+            argument_to_parameter_mapping,
+        }
+    }
+
     fn get_definition_parameter_range(&self, db: &dyn Db, name: &str) -> Option<FileRange> {
         let definition = self.signature.definition()?;
         let file = definition.file(db);
@@ -542,10 +564,12 @@ pub fn call_signature_details<'db>(
         return Vec::new();
     };
 
+    let db = model.db();
+
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type
-        .try_upcast_to_callable(model.db())
-        .map(|callables| callables.into_type(model.db()))
+        .try_upcast_to_callable(db)
+        .map(|callables| callables.into_type(db))
     {
         let call_arguments =
             CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
@@ -554,36 +578,14 @@ pub fn call_signature_details<'db>(
                     .unwrap_or(Type::unknown())
             });
         let bindings = callable_type
-            .bindings(model.db())
-            .match_parameters(model.db(), &call_arguments);
+            .bindings(db)
+            .match_parameters(db, &call_arguments);
 
         // Extract signature details from all callable bindings
         bindings
             .into_iter()
             .flatten()
-            .map(|binding| {
-                let argument_to_parameter_mapping = binding.argument_matches().to_vec();
-                let signature = binding.signature;
-                let display_details = signature.display(model.db()).to_string_parts();
-                let parameter_label_offsets = display_details.parameter_ranges;
-                let parameter_names = display_details.parameter_names;
-                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
-                    .parameters()
-                    .iter()
-                    .map(|param| (param.kind().clone(), param.annotated_type()))
-                    .unzip();
-
-                CallSignatureDetails {
-                    definition: signature.definition(),
-                    signature,
-                    label: display_details.label,
-                    parameter_label_offsets,
-                    parameter_names,
-                    parameter_kinds,
-                    parameter_types,
-                    argument_to_parameter_mapping,
-                }
-            })
+            .map(|binding| CallSignatureDetails::from_binding(db, &binding))
             .collect()
     } else {
         // Type is not callable, return empty signatures
@@ -621,7 +623,7 @@ pub fn call_type_simplified_by_overloads(
     }
 
     // Hand the overload resolution system as much type info as we have
-    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
         splatted_value
             .inferred_type(model)
             .unwrap_or(Type::unknown())
@@ -796,6 +798,60 @@ pub fn find_active_signature_from_details(
     Some(best_index)
 }
 
+/// Resolve a call expression to its matching overload's signature details,
+/// using full type checking (not just arity matching) for overload resolution.
+///
+/// Falls back to arity-based matching if type-based resolution fails.
+fn resolve_call_signature<'db>(
+    model: &SemanticModel<'db>,
+    call_expr: &ast::ExprCall,
+) -> Option<CallSignatureDetails<'db>> {
+    let db = model.db();
+    let func_type = call_expr.func.inferred_type(model)?;
+    let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
+
+    let args = CallArguments::from_arguments_typed(&call_expr.arguments, |splatted_value| {
+        splatted_value
+            .inferred_type(model)
+            .unwrap_or(Type::unknown())
+    });
+
+    // Extract the `Bindings` regardless of whether type checking succeeded or failed.
+    let bindings = callable_type
+        .bindings(db)
+        .match_parameters(db, &args)
+        .check_types(db, &args, TypeContext::default(), &[])
+        .unwrap_or_else(|CallError(_, bindings)| *bindings);
+
+    // First, try to find the matching overload after full type checking.
+    let type_checked_details: Vec<_> = bindings
+        .iter()
+        .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
+        .map(|binding| CallSignatureDetails::from_binding(db, binding))
+        .collect();
+
+    if !type_checked_details.is_empty() {
+        let active = find_active_signature_from_details(&type_checked_details)?;
+        return type_checked_details.into_iter().nth(active);
+    }
+
+    // If all overloads have type-checking errors (e.g., `InvalidArgumentType`),
+    // `matching_overloads()` returns empty. Fall back to arity-based matching
+    // across all overloads to pick the best candidate for showing hints.
+    let all_details: Vec<_> = bindings
+        .iter()
+        .flatten()
+        .map(|binding| CallSignatureDetails::from_binding(db, binding))
+        .collect();
+
+    if all_details.is_empty() {
+        return None;
+    }
+
+    let active = find_active_signature_from_details(&all_details)?;
+    all_details.into_iter().nth(active)
+}
+
 #[derive(Default)]
 pub struct InlayHintCallArgumentDetails {
     /// The position of the arguments mapped to their name and the range of the argument definition in the signature.
@@ -807,25 +863,14 @@ pub fn inlay_hint_call_argument_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Option<InlayHintCallArgumentDetails> {
-    let signature_details = call_signature_details(model, call_expr);
+    let resolved = resolve_call_signature(model, call_expr)?;
 
-    if signature_details.is_empty() {
-        return None;
-    }
-
-    let active_signature_index = find_active_signature_from_details(&signature_details)?;
-
-    let call_signature_details = signature_details.get(active_signature_index)?;
-
-    let parameters = call_signature_details.signature.parameters();
+    let parameters = resolved.signature.parameters();
 
     let mut argument_names = HashMap::new();
 
     for arg_index in 0..call_expr.arguments.args.len() {
-        let Some(arg_mapping) = call_signature_details
-            .argument_to_parameter_mapping
-            .get(arg_index)
-        else {
+        let Some(arg_mapping) = resolved.argument_to_parameter_mapping.get(arg_index) else {
             continue;
         };
 
@@ -847,8 +892,7 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         };
 
-        let parameter_label_offset =
-            call_signature_details.get_definition_parameter_range(db, param.name()?);
+        let parameter_label_offset = resolved.get_definition_parameter_range(db, param.name()?);
 
         // Only add hints for parameters that can be specified by name
         if !param.is_positional_only() && !param.is_variadic() && !param.is_keyword_variadic() {
