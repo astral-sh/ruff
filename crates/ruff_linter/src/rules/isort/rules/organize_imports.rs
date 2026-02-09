@@ -8,7 +8,7 @@ use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlines};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
@@ -110,8 +110,34 @@ pub(crate) fn organize_imports(
     }
 
     // Extract comments. Take care to grab any inline comments from the last line.
+    // Also extend the start backward to include any import heading comments above
+    // the first import, so they're collected and can be stripped/re-added correctly.
+    let import_headings = &settings.isort.import_headings;
+    let comment_range_start = if import_headings.is_empty() {
+        locator.line_start(range.start())
+    } else {
+        let heading_comments: Vec<String> =
+            import_headings.values().map(|h| format!("# {h}")).collect();
+
+        // start at the first import's line, walk backward while we see heading comments
+        let mut earliest = locator.line_start(range.start());
+        while earliest > TextSize::from(0) {
+            let prev_line_start = locator.line_start(earliest - TextSize::from(1));
+            let prev_line = locator
+                .slice(TextRange::new(prev_line_start, earliest))
+                .trim();
+
+            if heading_comments.iter().any(|h| prev_line == h) {
+                earliest = prev_line_start;
+            } else {
+                break;
+            }
+        }
+        earliest
+    };
+
     let comments = comments::collect_comments(
-        TextRange::new(range.start(), locator.full_line_end(range.end())),
+        TextRange::new(comment_range_start, locator.full_line_end(range.end())),
         locator,
         indexer.comment_ranges(),
     );
@@ -139,7 +165,7 @@ pub(crate) fn organize_imports(
     );
 
     // Expand the span the entire range, including leading and trailing space.
-    let fix_range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
+    let fix_range = TextRange::new(comment_range_start, trailing_line_end);
     let actual = locator.slice(fix_range);
     if matches_ignoring_indentation(actual, &expected) {
         return;
