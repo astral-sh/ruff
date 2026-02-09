@@ -5,7 +5,6 @@ use std::io::Write;
 use anyhow::Result;
 use log::warn;
 use serde::{Serialize, Serializer};
-use serde_json::json;
 
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_source_file::{OneIndexed, SourceFile};
@@ -42,24 +41,52 @@ impl Emitter for SarifEmitter {
         let mut rules: Vec<SarifRule> = unique_rules.into_iter().map(SarifRule::from).collect();
         rules.sort_by(|a, b| a.id.cmp(b.id));
 
-        let output = json!({
-            "$schema": "https://json.schemastore.org/sarif-2.1.0.json",
-            "version": "2.1.0",
-            "runs": [{
-                "tool": {
-                    "driver": {
-                        "name": "ruff",
-                        "informationUri": "https://github.com/astral-sh/ruff",
-                        "rules": rules,
-                        "version": VERSION.to_string(),
-                    }
+        let output = SarifOutput {
+            schema: "https://json.schemastore.org/sarif-2.1.0.json",
+            version: "2.1.0",
+            runs: [SarifRun {
+                tool: SarifTool {
+                    driver: SarifDriver {
+                        name: "ruff",
+                        information_uri: "https://github.com/astral-sh/ruff",
+                        rules,
+                        version: VERSION.to_string(),
+                    },
                 },
-                "results": results,
+                results: &results,
             }],
-        });
+        };
         serde_json::to_writer_pretty(writer, &output)?;
         Ok(())
     }
+}
+
+#[derive(Serialize)]
+struct SarifOutput<'a> {
+    #[serde(rename = "$schema")]
+    schema: &'static str,
+    version: &'static str,
+    runs: [SarifRun<'a>; 1],
+}
+
+#[derive(Serialize)]
+struct SarifRun<'a> {
+    tool: SarifTool<'a>,
+    results: &'a [SarifResult<'a>],
+}
+
+#[derive(Serialize)]
+struct SarifTool<'a> {
+    driver: SarifDriver<'a>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifDriver<'a> {
+    name: &'static str,
+    information_uri: &'static str,
+    rules: Vec<SarifRule<'a>>,
+    version: String,
 }
 
 #[derive(Debug, Clone, Serialize)]
