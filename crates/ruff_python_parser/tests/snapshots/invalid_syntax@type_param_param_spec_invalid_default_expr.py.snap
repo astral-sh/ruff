@@ -343,7 +343,7 @@ Module(
 2 | type X[**P = yield x] = int
 3 | type X[**P = yield from x] = int
 4 | type X[**P = x := int] = int
-  |                ^^ Syntax Error: Expected ',', found ':='
+  |                ^^ Syntax Error: Expected `,`, found `:=`
 5 | type X[**P = *int] = int
   |
 
@@ -373,5 +373,14 @@ Module(
 3 | type X[**P = yield from x] = int
   |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a ParamSpec default
 4 | type X[**P = x := int] = int
+5 | type X[**P = *int] = int
+  |
+
+
+  |
+2 | type X[**P = yield x] = int
+3 | type X[**P = yield from x] = int
+4 | type X[**P = x := int] = int
+  |                   ^^^ Syntax Error: non default type parameter `int` follows default type parameter
 5 | type X[**P = *int] = int
   |

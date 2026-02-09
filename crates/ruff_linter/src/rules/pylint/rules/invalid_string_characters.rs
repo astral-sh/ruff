@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_parser::{Token, TokenKind};
+use ruff_python_ast::token::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;

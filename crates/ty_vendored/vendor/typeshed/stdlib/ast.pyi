@@ -1444,6 +1444,8 @@ class Tuple(expr):
     elts: list[expr]
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
     dims: list[expr]
+    """Deprecated. Use elts instead."""
+
     if sys.version_info >= (3, 13):
         def __init__(self, elts: list[expr] = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> None: ...
     else:

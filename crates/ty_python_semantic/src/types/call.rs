@@ -1,8 +1,8 @@
 use super::context::InferContext;
 use super::{Signature, Type, TypeContext};
 use crate::Db;
-use crate::types::PropertyInstanceType;
 use crate::types::call::bind::BindingError;
+use crate::types::{MemberLookupPolicy, PropertyInstanceType};
 use ruff_python_ast as ast;
 
 mod arguments;
@@ -16,6 +16,16 @@ impl<'db> Type<'db> {
         left_ty: Type<'db>,
         op: ast::Operator,
         right_ty: Type<'db>,
+    ) -> Result<Bindings<'db>, CallBinOpError> {
+        Self::try_call_bin_op_with_policy(db, left_ty, op, right_ty, MemberLookupPolicy::default())
+    }
+
+    pub(crate) fn try_call_bin_op_with_policy(
+        db: &'db dyn Db,
+        left_ty: Type<'db>,
+        op: ast::Operator,
+        right_ty: Type<'db>,
+        policy: MemberLookupPolicy,
     ) -> Result<Bindings<'db>, CallBinOpError> {
         // We either want to call lhs.__op__ or rhs.__rop__. The full decision tree from
         // the Python spec [1] is:
@@ -43,39 +53,43 @@ impl<'db> Type<'db> {
                 && rhs_reflected != left_class.member(db, reflected_dunder).place
             {
                 return Ok(right_ty
-                    .try_call_dunder(
+                    .try_call_dunder_with_policy(
                         db,
                         reflected_dunder,
-                        CallArguments::positional([left_ty]),
+                        &mut CallArguments::positional([left_ty]),
                         TypeContext::default(),
+                        policy,
                     )
                     .or_else(|_| {
-                        left_ty.try_call_dunder(
+                        left_ty.try_call_dunder_with_policy(
                             db,
                             op.dunder(),
-                            CallArguments::positional([right_ty]),
+                            &mut CallArguments::positional([right_ty]),
                             TypeContext::default(),
+                            policy,
                         )
                     })?);
             }
         }
 
-        let call_on_left_instance = left_ty.try_call_dunder(
+        let call_on_left_instance = left_ty.try_call_dunder_with_policy(
             db,
             op.dunder(),
-            CallArguments::positional([right_ty]),
+            &mut CallArguments::positional([right_ty]),
             TypeContext::default(),
+            policy,
         );
 
         call_on_left_instance.or_else(|_| {
             if left_ty == right_ty {
                 Err(CallBinOpError::NotSupported)
             } else {
-                Ok(right_ty.try_call_dunder(
+                Ok(right_ty.try_call_dunder_with_policy(
                     db,
                     op.reflected_dunder(),
-                    CallArguments::positional([left_ty]),
+                    &mut CallArguments::positional([left_ty]),
                     TypeContext::default(),
+                    policy,
                 )?)
             }
         })

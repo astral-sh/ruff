@@ -43,7 +43,7 @@ def _(top_callable: Top[Callable[[Any], None]]):
     reveal_type(top_callable)  # revealed: (Never, /) -> None
 ```
 
-The invariant position is replaced with an unresolved type variable.
+The invariant position cannot simplify, and is represented with the `Top` special form.
 
 ```py
 def _(top_list: Top[list[Any]]):
@@ -70,8 +70,13 @@ def _(bottom_callable: Bottom[Callable[[Any, Unknown], None]]):
     reveal_type(bottom_callable)  # revealed: (object, object, /) -> None
 ```
 
-The invariant position is replaced in the same way as the top materialization, with an unresolved
-type variable.
+The invariant position is represented with the `Bottom` special form.
+
+There is an argument that `Bottom[list[Any]]` should simplify to `Never`, since it is the infinite
+intersection of all possible materializations of `list[Any]`, and (due to invariance) these
+materializations are disjoint types. But currently we do not make this simplification: there doesn't
+seem to be any compelling need for it, and allowing more gradual types to materialize to `Never` has
+undesirable implications for mutual assignability of seemingly-unrelated gradual types.
 
 ```py
 def _(bottom_list: Bottom[list[Any]]):
@@ -176,6 +181,100 @@ def _(top: Top[C3], bottom: Bottom[C3]) -> None:
 
     # revealed: (object, (Never, /) -> object, /) -> (object, int, /) -> Never
     reveal_type(bottom)
+```
+
+## Callable with gradual parameters
+
+For callables with gradual parameters (the `...` form), the top materialization preserves the
+gradual form since we cannot know what parameters are required. The bottom materialization
+simplifies to the bottom parameters `(*args: object, **kwargs: object)` since this is the most
+specific type that is a subtype of all possible parameter materializations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, Never, Protocol
+from ty_extensions import Bottom, Top, is_equivalent_to, is_subtype_of, static_assert
+
+type GradualCallable = Callable[..., Any]
+
+def _(top: Top[GradualCallable], bottom: Bottom[GradualCallable]) -> None:
+    # The top materialization keeps the gradual parameters wrapped
+    reveal_type(top)  # revealed: Top[(...) -> object]
+
+    # The bottom materialization simplifies to the fully static bottom callable
+    reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> Never
+
+# The bottom materialization of a gradual callable is a subtype of (and supertype of)
+# a protocol with `__call__(self, *args: object, **kwargs: object) -> Never`
+class EquivalentToBottom(Protocol):
+    def __call__(self, *args: object, **kwargs: object) -> Never: ...
+
+static_assert(is_subtype_of(EquivalentToBottom, Bottom[Callable[..., Never]]))
+static_assert(is_subtype_of(Bottom[Callable[..., Never]], EquivalentToBottom))
+
+# TODO: is_equivalent_to only considers types of the same kind equivalent (Callable vs ProtocolInstance),
+# so this fails even though mutual subtyping proves semantic equivalence.
+static_assert(is_equivalent_to(Bottom[Callable[..., Never]], EquivalentToBottom))  # error: [static-assert-error]
+
+# Top-materialized callables are not equivalent to non-top-materialized callables, even if their
+# signatures would otherwise be equivalent after materialization.
+static_assert(not is_equivalent_to(Top[Callable[..., object]], Callable[..., object]))
+```
+
+Gradual parameters can be top- and bottom-materialized even if the return type is not `Any`:
+
+```py
+type GradualParams = Callable[..., int]
+
+def _(top: Top[GradualParams], bottom: Bottom[GradualParams]) -> None:
+    reveal_type(top)  # revealed: Top[(...) -> int]
+
+    reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> int
+```
+
+Materializing an overloaded callable materializes each overload separately.
+
+```py
+from typing import overload
+from ty_extensions import CallableTypeOf
+
+@overload
+def f(x: int) -> Any: ...
+@overload
+def f(*args: Any, **kwargs: Any) -> str: ...
+def f(*args: object, **kwargs: object) -> object:
+    pass
+
+def _(top: Top[CallableTypeOf[f]], bottom: Bottom[CallableTypeOf[f]]):
+    reveal_type(top)  # revealed: Overload[(x: int) -> object, Top[(...) -> str]]
+    reveal_type(bottom)  # revealed: Overload[(x: int) -> Never, (*args: object, **kwargs: object) -> str]
+```
+
+The top callable can be represented in a `ParamSpec`:
+
+```py
+def takes_paramspec[**P](f: Callable[P, None]) -> Callable[P, None]:
+    return f
+
+def _(top: Top[Callable[..., None]]):
+    revealed = takes_paramspec(top)
+    reveal_type(revealed)  # revealed: Top[(...) -> None]
+```
+
+The top callable is not a subtype of `(*object, **object) -> object`:
+
+```py
+type TopCallable = Top[Callable[..., Any]]
+
+@staticmethod
+def takes_objects(*args: object, **kwargs: object) -> object:
+    pass
+
+static_assert(not is_subtype_of(TopCallable, CallableTypeOf[takes_objects]))
 ```
 
 ## Tuple

@@ -1,5 +1,3 @@
-#![expect(clippy::needless_doctest_main)]
-
 //! A library for formatting of text or programming code snippets.
 //!
 //! It's primary purpose is to build an ASCII-graphical representation of the snippet

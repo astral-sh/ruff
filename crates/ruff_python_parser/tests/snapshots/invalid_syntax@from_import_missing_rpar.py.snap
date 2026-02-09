@@ -152,7 +152,7 @@ Module(
 
   |
 1 | from x import (a, b
-  |                    ^ Syntax Error: Expected ')', found newline
+  |                    ^ Syntax Error: Expected `)`, found newline
 2 | 1 + 1
 3 | from x import (a, b,
 4 | 2 + 2
@@ -163,6 +163,6 @@ Module(
 1 | from x import (a, b
 2 | 1 + 1
 3 | from x import (a, b,
-  |                     ^ Syntax Error: Expected ')', found newline
+  |                     ^ Syntax Error: Expected `)`, found newline
 4 | 2 + 2
   |

@@ -123,7 +123,7 @@ def _(flag: bool, flag2: bool):
 class NotBoolable:
     __bool__: int = 3
 
-# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
+# error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 while NotBoolable():
     ...
 ```

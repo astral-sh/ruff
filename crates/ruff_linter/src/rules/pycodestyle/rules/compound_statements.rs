@@ -1,8 +1,8 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
 use ruff_python_ast::PySourceType;
+use ruff_python_ast::token::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenIterWithContext, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::Locator;

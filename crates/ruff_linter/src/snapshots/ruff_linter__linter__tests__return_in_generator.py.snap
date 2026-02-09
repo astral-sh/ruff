@@ -1,0 +1,55 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+ --> resources/test/fixtures/syntax_errors/return_in_generator.py:3:5
+  |
+1 | async def gen():
+2 |     yield 1
+3 |     return 42
+  |     ^^^^^^^^^
+4 |
+5 | def gen(): # B901 but not a syntax error - not an async generator
+  |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+ --> resources/test/fixtures/syntax_errors/return_in_generator.py:7:5
+  |
+5 | def gen(): # B901 but not a syntax error - not an async generator
+6 |     yield 1
+7 |     return 42
+  |     ^^^^^^^^^
+8 |
+9 | async def gen(): # ok - no value in return
+  |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+  --> resources/test/fixtures/syntax_errors/return_in_generator.py:15:5
+   |
+13 | async def gen():
+14 |     yield 1
+15 |     return foo()
+   |     ^^^^^^^^^^^^
+16 |
+17 | async def gen():
+   |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+  --> resources/test/fixtures/syntax_errors/return_in_generator.py:19:5
+   |
+17 | async def gen():
+18 |     yield 1
+19 |     return [1, 2, 3]
+   |     ^^^^^^^^^^^^^^^^
+20 |
+21 | async def gen():
+   |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+  --> resources/test/fixtures/syntax_errors/return_in_generator.py:24:5
+   |
+22 |     if True:
+23 |         yield 1
+24 |     return 10
+   |     ^^^^^^^^^
+   |

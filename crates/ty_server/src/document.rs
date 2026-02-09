@@ -5,14 +5,15 @@ mod notebook;
 mod range;
 mod text_document;
 
-pub(crate) use location::ToLink;
 use lsp_types::{PositionEncodingKind, Url};
+use ruff_db::system::{SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 
 use crate::system::AnySystemPath;
+pub(crate) use location::ToLink;
 pub use notebook::NotebookDocument;
 pub(crate) use range::{FileRangeExt, PositionExt, RangeExt, TextSizeExt, ToRangeExt};
-pub(crate) use text_document::DocumentVersion;
 pub use text_document::TextDocument;
+pub(crate) use text_document::{DocumentVersion, LanguageId};
 
 /// A convenient enumeration for supported text encodings. Can be converted to [`lsp_types::PositionEncodingKind`].
 // Please maintain the order from least to greatest priority for the derived `Ord` impl.
@@ -41,39 +42,75 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 
 /// A unique document ID, derived from a URL passed as part of an LSP request.
 /// This document ID can point to either be a standalone Python file, a full notebook, or a cell within a notebook.
-#[derive(Clone, Debug)]
-pub(crate) enum DocumentKey {
-    Notebook(AnySystemPath),
-    NotebookCell {
-        cell_url: Url,
-        notebook_path: AnySystemPath,
-    },
-    Text(AnySystemPath),
+///
+/// The `DocumentKey` is very similar to `AnySystemPath`. The important distinction is that
+/// ty doesn't know about individual notebook cells, instead, ty operates on full notebook documents.
+/// ty also doesn't support resolving settings per cell, instead, settings are resolved per file or notebook.
+///
+/// Thus, the motivation of `DocumentKey` is to prevent accidental use of Cell keys for operations
+/// that expect to work on a file path level. That's what [`DocumentHandle::to_file_path`]
+/// is for, it returns a file path for any document, taking into account that these methods should
+/// return the notebook for cell documents and notebooks.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub(super) enum DocumentKey {
+    /// A URI using the `file` schema and maps to a valid path.
+    File(SystemPathBuf),
+
+    /// Any other URI.
+    ///
+    /// Used for Notebook-cells, URI's with non-`file` schemes, or invalid `file` URI's.
+    Opaque(String),
 }
 
 impl DocumentKey {
-    /// Returns the file path associated with the key.
-    pub(crate) fn path(&self) -> &AnySystemPath {
-        match self {
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => path,
-            DocumentKey::NotebookCell { notebook_path, .. } => notebook_path,
+    /// Converts the given [`Url`] to an [`DocumentKey`].
+    ///
+    /// If the URL scheme is `file`, then the path is converted to a [`SystemPathBuf`] unless
+    /// the url isn't a valid file path.
+    ///
+    /// In all other cases, the URL is kept as an opaque identifier ([`Self::Opaque`]).
+    pub(crate) fn from_url(url: &Url) -> Self {
+        if url.scheme() == "file" {
+            if let Ok(path) = url.to_file_path() {
+                Self::File(SystemPathBuf::from_path_buf(path).expect("URL to be valid UTF-8"))
+            } else {
+                tracing::warn!(
+                    "Treating `file:` url `{url}` as opaque URL as it isn't a valid file path"
+                );
+                Self::Opaque(url.to_string())
+            }
+        } else {
+            Self::Opaque(url.to_string())
         }
     }
 
-    pub(crate) fn from_path(path: AnySystemPath) -> Self {
-        // For text documents, we assume it's a text document unless it's a notebook file.
-        match path.extension() {
-            Some("ipynb") => Self::Notebook(path),
-            _ => Self::Text(path),
+    /// Returns the corresponding [`AnySystemPath`] for this document key.
+    ///
+    /// Note, calling this method on a `DocumentKey::Opaque` representing a cell document
+    /// will return a `SystemVirtualPath` corresponding to the cell URI but not the notebook file path.
+    /// That's most likely not what you want.
+    pub(super) fn to_file_path(&self) -> AnySystemPath {
+        match self {
+            Self::File(path) => AnySystemPath::System(path.clone()),
+            Self::Opaque(uri) => {
+                AnySystemPath::SystemVirtual(SystemVirtualPath::new(uri).to_path_buf())
+            }
         }
     }
 
-    /// Returns the URL for this document key. For notebook cells, returns the cell URL.
-    /// For other document types, converts the path to a URL.
-    pub(crate) fn to_url(&self) -> Option<Url> {
+    pub(super) fn into_file_path(self) -> AnySystemPath {
         match self {
-            DocumentKey::NotebookCell { cell_url, .. } => Some(cell_url.clone()),
-            DocumentKey::Notebook(path) | DocumentKey::Text(path) => path.to_url(),
+            Self::File(path) => AnySystemPath::System(path),
+            Self::Opaque(uri) => AnySystemPath::SystemVirtual(SystemVirtualPathBuf::from(uri)),
+        }
+    }
+}
+
+impl From<AnySystemPath> for DocumentKey {
+    fn from(value: AnySystemPath) -> Self {
+        match value {
+            AnySystemPath::System(system_path) => Self::File(system_path),
+            AnySystemPath::SystemVirtual(virtual_path) => Self::Opaque(virtual_path.to_string()),
         }
     }
 }
@@ -81,11 +118,8 @@ impl DocumentKey {
 impl std::fmt::Display for DocumentKey {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::NotebookCell { cell_url, .. } => cell_url.fmt(f),
-            Self::Notebook(path) | Self::Text(path) => match path {
-                AnySystemPath::System(system_path) => system_path.fmt(f),
-                AnySystemPath::SystemVirtual(virtual_path) => virtual_path.fmt(f),
-            },
+            Self::File(path) => path.fmt(f),
+            Self::Opaque(uri) => uri.fmt(f),
         }
     }
 }

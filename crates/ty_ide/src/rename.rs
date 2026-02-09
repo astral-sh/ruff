@@ -3,15 +3,16 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::ImportAliasResolution;
+use ty_python_semantic::SemanticModel;
 
 /// Returns the range of the symbol if it can be renamed, None if not.
 pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text_size::TextRange> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the offset
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(&model, &module, offset)?;
 
     // Don't allow renaming of import module components
     if matches!(
@@ -23,26 +24,22 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 
     let current_file_in_project = is_file_in_project(db, file);
 
-    if let Some(definition_targets) = goto_target
-        .get_definition_targets(file, db, ImportAliasResolution::PreserveAliases)
-        .and_then(|definitions| definitions.declaration_targets(db))
-    {
-        for target in &definition_targets {
-            let target_file = target.file();
+    let definition_targets = goto_target
+        .get_definition_targets(&model, ReferencesMode::Rename.to_import_alias_resolution())?
+        .declaration_targets(db)?;
 
-            // If definition is outside the project, refuse rename
-            if !is_file_in_project(db, target_file) {
-                return None;
-            }
+    for target in &definition_targets {
+        let target_file = target.file();
 
-            // If current file is not in project and any definition is outside current file, refuse rename
-            if !current_file_in_project && target_file != file {
-                return None;
-            }
+        // If definition is outside the project, refuse rename
+        if !is_file_in_project(db, target_file) {
+            return None;
         }
-    } else {
-        // No definition targets found. This happens for keywords, so refuse rename
-        return None;
+
+        // If current file is not in project and any definition is outside current file, refuse rename
+        if !current_file_in_project && target_file != file {
+            return None;
+        }
     }
 
     Some(goto_target.range())
@@ -58,9 +55,10 @@ pub fn rename(
 ) -> Option<Vec<ReferenceTarget>> {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     // Get the definitions for the symbol at the offset
-    let goto_target = find_goto_target(&module, offset)?;
+    let goto_target = find_goto_target(&model, &module, offset)?;
 
     // Clients shouldn't call us with an empty new name, but just in case...
     if new_name.is_empty() {
@@ -86,7 +84,7 @@ pub fn rename(
 
 /// Helper function to check if a file is included in the project.
 fn is_file_in_project(db: &dyn Db, file: File) -> bool {
-    db.project().files(db).contains(&file)
+    file.path(db).is_system_virtual_path() || db.project().files(db).contains(&file)
 }
 
 #[cfg(test)]
@@ -100,7 +98,9 @@ mod tests {
 
     impl CursorTest {
         fn prepare_rename(&self) -> String {
-            let Some(range) = can_rename(&self.db, self.cursor.file, self.cursor.offset) else {
+            let Some(range) = salsa::attach(&self.db, || {
+                can_rename(&self.db, self.cursor.file, self.cursor.offset)
+            }) else {
                 return "Cannot rename".to_string();
             };
 
@@ -108,9 +108,13 @@ mod tests {
         }
 
         fn rename(&self, new_name: &str) -> String {
-            let Some(rename_results) =
+            let rename_results = salsa::attach(&self.db, || {
+                can_rename(&self.db, self.cursor.file, self.cursor.offset)?;
+
                 rename(&self.db, self.cursor.file, self.cursor.offset, new_name)
-            else {
+            });
+
+            let Some(rename_results) = rename_results else {
                 return "Cannot rename".to_string();
             };
 
@@ -161,7 +165,7 @@ mod tests {
     }
 
     #[test]
-    fn test_prepare_rename_parameter() {
+    fn prepare_rename_parameter() {
         let test = cursor_test(
             "
 def func(<CURSOR>value: int) -> int:
@@ -176,7 +180,7 @@ value = 0
     }
 
     #[test]
-    fn test_rename_parameter() {
+    fn rename_parameter() {
         let test = cursor_test(
             "
 def func(<CURSOR>value: int) -> int:
@@ -187,7 +191,7 @@ func(value=42)
 ",
         );
 
-        assert_snapshot!(test.rename("number"), @r"
+        assert_snapshot!(test.rename("number"), @"
         info[rename]: Rename symbol (found 4 locations)
          --> main.py:2:10
           |
@@ -205,7 +209,7 @@ func(value=42)
     }
 
     #[test]
-    fn test_rename_function() {
+    fn rename_function() {
         let test = cursor_test(
             "
 def fu<CURSOR>nc():
@@ -216,7 +220,7 @@ x = func
 ",
         );
 
-        assert_snapshot!(test.rename("calculate"), @r"
+        assert_snapshot!(test.rename("calculate"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:5
           |
@@ -233,7 +237,7 @@ x = func
     }
 
     #[test]
-    fn test_rename_class() {
+    fn rename_class() {
         let test = cursor_test(
             "
 class My<CURSOR>Class:
@@ -245,7 +249,7 @@ cls = MyClass
 ",
         );
 
-        assert_snapshot!(test.rename("MyNewClass"), @r"
+        assert_snapshot!(test.rename("MyNewClass"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:7
           |
@@ -263,7 +267,7 @@ cls = MyClass
     }
 
     #[test]
-    fn test_rename_invalid_name() {
+    fn rename_invalid_name() {
         let test = cursor_test(
             "
 def fu<CURSOR>nc():
@@ -272,7 +276,7 @@ def fu<CURSOR>nc():
         );
 
         assert_snapshot!(test.rename(""), @"Cannot rename");
-        assert_snapshot!(test.rename("valid_name"), @r"
+        assert_snapshot!(test.rename("valid_name"), @"
         info[rename]: Rename symbol (found 1 locations)
          --> main.py:2:5
           |
@@ -284,7 +288,7 @@ def fu<CURSOR>nc():
     }
 
     #[test]
-    fn test_multi_file_function_rename() {
+    fn multi_file_function_rename() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -310,14 +314,14 @@ from utils import helper_function
 class DataProcessor:
     def __init__(self):
         self.multiplier = helper_function
-    
+
     def process(self, value):
         return helper_function(value)
 ",
             )
             .build();
 
-        assert_snapshot!(test.rename("utility_function"), @r"
+        assert_snapshot!(test.rename("utility_function"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> utils.py:2:5
           |
@@ -338,7 +342,547 @@ class DataProcessor:
     }
 
     #[test]
-    fn test_cannot_rename_import_module_component() {
+    fn rename_string_annotation1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_string_annotation2() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyCl<CURSOR>ass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_string_annotation3() {
+        let test = cursor_test(
+            r#"
+        a: "None |<CURSOR> MyClass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_string_annotation4() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass<CURSOR>" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_string_annotation5() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass"<CURSOR> = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_string_annotation_dangling1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass |" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_string_annotation_dangling2() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass | No" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_string_annotation_dangling3() {
+        let test = cursor_test(
+            r#"
+        a: "MyClass | N<CURSOR>o" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.rename("MyNewClass"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_match_name_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      ^^
+        5 |             x = ab
+          |                 --
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_match_name_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      ^^
+        5 |             x = ab
+          |                 --
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_match_rest_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       ^^
+        5 |             x = ab
+          |                 --
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_match_rest_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       ^^
+        5 |             x = ab
+          |                 --
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_match_as_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     ^^
+        5 |             x = ab
+          |                 --
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_match_as_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     ^^
+        5 |             x = ab
+          |                 --
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_match_keyword_stmt() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=a<CURSOR>b):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"
+        info[rename]: Rename symbol (found 2 locations)
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              ^^
+        11 |             x = ab
+           |                 --
+           |
+        ");
+    }
+
+    #[test]
+    fn rename_match_keyword_binding() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=ab):
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"
+        info[rename]: Rename symbol (found 2 locations)
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              ^^
+        11 |             x = ab
+           |                 --
+           |
+        ");
+    }
+
+    #[test]
+    fn rename_match_class_name() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Cl<CURSOR>ick(x, button=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+          --> main.py:2:7
+           |
+         2 | class Click:
+           |       ^^^^^
+         3 |     __match_args__ = ("position", "button")
+         4 |     def __init__(self, pos, btn):
+           |
+          ::: main.py:8:20
+           |
+         6 |         self.button: str = btn
+         7 |
+         8 | def my_func(event: Click):
+           |                    -----
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |              -----
+        11 |             x = ab
+           |
+        "#);
+    }
+
+    #[test]
+    fn rename_match_class_field_name() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, but<CURSOR>ton=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_typevar_name_stmt() {
+        let test = cursor_test(
+            r#"
+            type Alias1[A<CURSOR>B: int = bool] = tuple[AB, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             ^^                      --       --
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_typevar_name_binding() {
+        let test = cursor_test(
+            r#"
+            type Alias1[AB: int = bool] = tuple[A<CURSOR>B, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             ^^                      --       --
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_typevar_spec_stmt() {
+        let test = cursor_test(
+            r#"
+            from typing import Callable
+            type Alias2[**A<CURSOR>B = [int, str]] = Callable[AB, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:3:15
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^^                          --        --
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_typevar_spec_binding() {
+        let test = cursor_test(
+            r#"
+            from typing import Callable
+            type Alias2[**AB = [int, str]] = Callable[A<CURSOR>B, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:3:15
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^^                          --        --
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_typevar_tuple_stmt() {
+        let test = cursor_test(
+            r#"
+            type Alias3[*A<CURSOR>B = ()] = tuple[tuple[*AB], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              ^^                      --          --
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_typevar_tuple_binding() {
+        let test = cursor_test(
+            r#"
+            type Alias3[*AB = ()] = tuple[tuple[*A<CURSOR>B], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.rename("XY"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              ^^                      --          --
+          |
+        ");
+    }
+
+    #[test]
+    fn cannot_rename_import_module_component() {
         // Test that we cannot rename parts of module names in import statements
         let test = cursor_test(
             "
@@ -351,7 +895,7 @@ x = os.path.join('a', 'b')
     }
 
     #[test]
-    fn test_cannot_rename_from_import_module_component() {
+    fn cannot_rename_from_import_module_component() {
         // Test that we cannot rename parts of module names in from import statements
         let test = cursor_test(
             "
@@ -364,7 +908,7 @@ result = join('a', 'b')
     }
 
     #[test]
-    fn test_cannot_rename_external_file() {
+    fn cannot_rename_external_file() {
         // This test verifies that we cannot rename a symbol when it's defined in a file
         // that's outside the project (like a standard library function)
         let test = cursor_test(
@@ -378,7 +922,7 @@ x = <CURSOR>os.path.join('a', 'b')
     }
 
     #[test]
-    fn test_rename_alias_at_import_statement() {
+    fn rename_alias_at_import_statement() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -389,26 +933,26 @@ def test(): pass
             .source(
                 "main.py",
                 "
-from utils import test as test_<CURSOR>alias
-result = test_alias()
+from utils import test as <CURSOR>alias
+result = alias()
 ",
             )
             .build();
 
-        assert_snapshot!(test.rename("new_alias"), @r"
+        assert_snapshot!(test.rename("new_alias"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
-        2 | from utils import test as test_alias
-          |                           ^^^^^^^^^^
-        3 | result = test_alias()
-          |          ----------
+        2 | from utils import test as alias
+          |                           ^^^^^
+        3 | result = alias()
+          |          -----
           |
         ");
     }
 
     #[test]
-    fn test_rename_alias_at_usage_site() {
+    fn rename_alias_at_usage_site() {
         // Test renaming an alias when the cursor is on the alias in the usage statement
         let test = CursorTest::builder()
             .source(
@@ -420,26 +964,26 @@ def test(): pass
             .source(
                 "main.py",
                 "
-from utils import test as test_alias
-result = test_<CURSOR>alias()
+from utils import test as alias
+result = <CURSOR>alias()
 ",
             )
             .build();
 
-        assert_snapshot!(test.rename("new_alias"), @r"
+        assert_snapshot!(test.rename("new_alias"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
-        2 | from utils import test as test_alias
-          |                           ^^^^^^^^^^
-        3 | result = test_alias()
-          |          ----------
+        2 | from utils import test as alias
+          |                           ^^^^^
+        3 | result = alias()
+          |          -----
           |
         ");
     }
 
     #[test]
-    fn test_rename_across_import_chain_with_mixed_aliases() {
+    fn rename_across_import_chain_with_mixed_aliases() {
         // Test renaming a symbol that's imported across multiple files with mixed alias patterns
         // File 1 (source.py): defines the original function
         // File 2 (middle.py): imports without alias from source.py
@@ -476,7 +1020,7 @@ value1 = func_alias()
             )
             .build();
 
-        assert_snapshot!(test.rename("renamed_function"), @r"
+        assert_snapshot!(test.rename("renamed_function"), @"
         info[rename]: Rename symbol (found 5 locations)
          --> source.py:2:5
           |
@@ -507,7 +1051,7 @@ value1 = func_alias()
     }
 
     #[test]
-    fn test_rename_alias_in_import_chain() {
+    fn rename_alias_in_import_chain() {
         let test = CursorTest::builder()
             .source(
                 "file1.py",
@@ -535,7 +1079,7 @@ class App:
             )
             .build();
 
-        assert_snapshot!(test.rename("new_util_name"), @r"
+        assert_snapshot!(test.rename("new_util_name"), @"
         info[rename]: Rename symbol (found 4 locations)
          --> file3.py:2:19
           |
@@ -559,7 +1103,7 @@ class App:
     }
 
     #[test]
-    fn test_cannot_rename_keyword() {
+    fn cannot_rename_keyword() {
         // Test that we cannot rename Python keywords like "None"
         let test = cursor_test(
             "
@@ -574,7 +1118,7 @@ def process_value(value):
     }
 
     #[test]
-    fn test_cannot_rename_builtin_type() {
+    fn cannot_rename_builtin_type() {
         // Test that we cannot rename Python builtin types like "int"
         let test = cursor_test(
             "
@@ -587,7 +1131,7 @@ def convert_to_number(value):
     }
 
     #[test]
-    fn test_rename_keyword_argument() {
+    fn rename_keyword_argument() {
         // Test renaming a keyword argument and its corresponding parameter
         let test = cursor_test(
             "
@@ -598,7 +1142,7 @@ result = func(10, <CURSOR>y=20)
 ",
         );
 
-        assert_snapshot!(test.rename("z"), @r"
+        assert_snapshot!(test.rename("z"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:13
           |
@@ -614,7 +1158,7 @@ result = func(10, <CURSOR>y=20)
     }
 
     #[test]
-    fn test_rename_parameter_with_keyword_argument() {
+    fn rename_parameter_with_keyword_argument() {
         // Test renaming a parameter and its corresponding keyword argument
         let test = cursor_test(
             "
@@ -625,7 +1169,7 @@ result = func(10, y=20)
 ",
         );
 
-        assert_snapshot!(test.rename("z"), @r"
+        assert_snapshot!(test.rename("z"), @"
         info[rename]: Rename symbol (found 3 locations)
          --> main.py:2:13
           |
@@ -638,5 +1182,1420 @@ result = func(10, y=20)
           |                   -
           |
         ");
+    }
+
+    #[test]
+    fn import_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import warnings
+                import warnings as <CURSOR>abc
+
+                x = abc
+                y = warnings
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |     ---
+        6 | y = warnings
+          |
+        ");
+    }
+
+    #[test]
+    fn import_alias_to_first_party_definition() {
+        let test = CursorTest::builder()
+            .source("lib.py", "def deprecated(): pass")
+            .source(
+                "main.py",
+                r#"
+                import lib as lib2<CURSOR>
+
+                x = lib2
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:2:15
+          |
+        2 | import lib as lib2
+          |               ^^^^
+        3 |
+        4 | x = lib2
+          |     ----
+          |
+        ");
+    }
+
+    #[test]
+    fn imported_first_party_definition() {
+        let test = CursorTest::builder()
+            .source("lib.py", "def deprecated(): pass")
+            .source(
+                "main.py",
+                r#"
+                from lib import deprecated<CURSOR>
+
+                x = deprecated
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:17
+          |
+        2 | from lib import deprecated
+          |                 ^^^^^^^^^^
+        3 |
+        4 | x = deprecated
+          |     ----------
+          |
+         ::: lib.py:1:5
+          |
+        1 | def deprecated(): pass
+          |     ----------
+          |
+        ");
+    }
+
+    #[test]
+    fn import_alias_use() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import warnings
+                import warnings as abc
+
+                x = abc<CURSOR>
+                y = warnings
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |     ---
+        6 | y = warnings
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): we should refuse to rename this (it's the name of a module)
+        assert_snapshot!(test.rename("mypkg"), @"
+        info[rename]: Rename symbol (found 1 locations)
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is correct
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good/fine here, it's an undefined reference
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good here, it's a module name
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good here, it's the name of a module
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Renaming the integer is correct
+        assert_snapshot!(test.rename("mypkg"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^^^^
+        3 |
+        4 | x = subpkg
+          |     ------
+          |
+         ::: mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this is incorrect, we should rename the `subpkg` int
+        // and the RHS of the import statement (but *not* rename the LHS).
+        //
+        // However us being cautious here *would* be good as the rename will actually
+        // result in a `subpkg` variable still existing in this code, as the import's LHS
+        // `DefinitionKind::ImportFromSubmodule` would stop being overwritten by the RHS!
+        assert_snapshot!(test.rename("mypkg"), @"
+        info[rename]: Rename symbol (found 1 locations)
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_overloaded_function() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                @overload
+                def test<CURSOR>() -> None: ...
+                @overload
+                def test(a: str) -> str: ...
+                @overload
+                def test(a: int) -> int: ...
+
+                def test(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import test
+
+                test("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> lib.py:5:5
+          |
+        4 | @overload
+        5 | def test() -> None: ...
+          |     ^^^^
+        6 | @overload
+        7 | def test(a: str) -> str: ...
+          |
+         ::: main.py:2:17
+          |
+        2 | from lib import test
+          |                 ----
+        3 |
+        4 | test("test")
+          | ----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_overloaded_method() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                class Test:
+                    @overload
+                    def test<CURSOR>() -> None: ...
+                    @overload
+                    def test(a: str) -> str: ...
+                    @overload
+                    def test(a: int) -> int: ...
+
+                    def test(a: Any) -> Any:
+                        return a
+
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Test
+
+                Test().test("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> lib.py:6:9
+          |
+        4 | class Test:
+        5 |     @overload
+        6 |     def test() -> None: ...
+          |         ^^^^
+        7 |     @overload
+        8 |     def test(a: str) -> str: ...
+          |
+         ::: main.py:4:8
+          |
+        2 | from lib import Test
+        3 |
+        4 | Test().test("test")
+          |        ----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_overloaded_function_usage() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                @overload
+                def test() -> None: ...
+                @overload
+                def test(a: str) -> str: ...
+                @overload
+                def test(a: int) -> int: ...
+
+                def test(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import test
+
+                test<CURSOR>("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:17
+          |
+        2 | from lib import test
+          |                 ^^^^
+        3 |
+        4 | test("test")
+          | ----
+          |
+         ::: lib.py:5:5
+          |
+        4 | @overload
+        5 | def test() -> None: ...
+          |     ----
+        6 | @overload
+        7 | def test(a: str) -> str: ...
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_property() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_property<CURSOR>(self) -> int:
+                        return 42
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Foo
+
+                print(Foo().my_property)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 2 locations)
+         --> lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_property(self) -> int:
+          |         ^^^^^^^^^^^
+        5 |         return 42
+          |
+         ::: main.py:4:13
+          |
+        2 | from lib import Foo
+        3 |
+        4 | print(Foo().my_property)
+          |             -----------
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_property_with_setter() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_property<CURSOR>(self) -> int:
+                        return 42
+
+                    @my_property.setter
+                    def my_property(self, value: int) -> None:
+                        pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Foo
+
+                print(Foo().my_property)
+                Foo().my_property = 56
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 5 locations)
+         --> lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_property(self) -> int:
+          |         ^^^^^^^^^^^
+        5 |         return 42
+        6 |
+        7 |     @my_property.setter
+          |      -----------
+        8 |     def my_property(self, value: int) -> None:
+          |         -----------
+        9 |         pass
+          |
+         ::: main.py:4:13
+          |
+        2 | from lib import Foo
+        3 |
+        4 | print(Foo().my_property)
+          |             -----------
+        5 | Foo().my_property = 56
+          |       -----------
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_property_with_deleter() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_property<CURSOR>(self) -> int:
+                        return 42
+
+                    @my_property.deleter
+                    def my_property(self) -> None:
+                        pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Foo
+
+                print(Foo().my_property)
+                del Foo().my_property
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 5 locations)
+         --> lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_property(self) -> int:
+          |         ^^^^^^^^^^^
+        5 |         return 42
+        6 |
+        7 |     @my_property.deleter
+          |      -----------
+        8 |     def my_property(self) -> None:
+          |         -----------
+        9 |         pass
+          |
+         ::: main.py:4:13
+          |
+        2 | from lib import Foo
+        3 |
+        4 | print(Foo().my_property)
+          |             -----------
+        5 | del Foo().my_property
+          |           -----------
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_property_with_setter_and_deleter() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_property<CURSOR>(self) -> int:
+                        return 42
+
+                    @my_property.setter
+                    def my_property(self, value: int) -> None:
+                        pass
+
+                    @my_property.deleter
+                    def my_property(self) -> None:
+                        pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Foo
+
+                print(Foo().my_property)
+                Foo().my_property = 56
+                del Foo().my_property
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 8 locations)
+          --> lib.py:4:9
+           |
+         2 | class Foo:
+         3 |     @property
+         4 |     def my_property(self) -> int:
+           |         ^^^^^^^^^^^
+         5 |         return 42
+         6 |
+         7 |     @my_property.setter
+           |      -----------
+         8 |     def my_property(self, value: int) -> None:
+           |         -----------
+         9 |         pass
+        10 |
+        11 |     @my_property.deleter
+           |      -----------
+        12 |     def my_property(self) -> None:
+           |         -----------
+        13 |         pass
+           |
+          ::: main.py:4:13
+           |
+         2 | from lib import Foo
+         3 |
+         4 | print(Foo().my_property)
+           |             -----------
+         5 | Foo().my_property = 56
+           |       -----------
+         6 | del Foo().my_property
+           |           -----------
+           |
+        ");
+    }
+
+    /// Renaming from the setter's function name should rename the getter,
+    /// the decorator reference, and the setter function name itself.
+    #[test]
+    fn rename_property_from_setter() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_property(self) -> int:
+                        return 42
+
+                    @my_property.setter
+                    def my_property<CURSOR>(self, value: int) -> None:
+                        pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Foo
+
+                print(Foo().my_property)
+                Foo().my_property = 56
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 5 locations)
+         --> lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_property(self) -> int:
+          |         ^^^^^^^^^^^
+        5 |         return 42
+        6 |
+        7 |     @my_property.setter
+          |      -----------
+        8 |     def my_property(self, value: int) -> None:
+          |         -----------
+        9 |         pass
+          |
+         ::: main.py:4:13
+          |
+        2 | from lib import Foo
+        3 |
+        4 | print(Foo().my_property)
+          |             -----------
+        5 | Foo().my_property = 56
+          |       -----------
+          |
+        ");
+    }
+
+    /// Renaming from the decorator reference (`@my_property.setter`)
+    /// should rename everything.
+    #[test]
+    fn rename_property_from_decorator() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_property(self) -> int:
+                        return 42
+
+                    @my_<CURSOR>property.setter
+                    def my_property(self, value: int) -> None:
+                        pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Foo
+
+                print(Foo().my_property)
+                Foo().my_property = 56
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 5 locations)
+         --> lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_property(self) -> int:
+          |         ^^^^^^^^^^^
+        5 |         return 42
+        6 |
+        7 |     @my_property.setter
+          |      -----------
+        8 |     def my_property(self, value: int) -> None:
+          |         -----------
+        9 |         pass
+          |
+         ::: main.py:4:13
+          |
+        2 | from lib import Foo
+        3 |
+        4 | print(Foo().my_property)
+          |             -----------
+        5 | Foo().my_property = 56
+          |       -----------
+          |
+        ");
+    }
+
+    /// Renaming from a usage site should rename the property getter,
+    /// setter, and decorator.
+    #[test]
+    fn rename_property_from_usage() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_property(self) -> int:
+                        return 42
+
+                    @my_property.setter
+                    def my_property(self, value: int) -> None:
+                        pass
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Foo
+
+                print(Foo().my_<CURSOR>property)
+                Foo().my_property = 56
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 5 locations)
+         --> main.py:4:13
+          |
+        2 | from lib import Foo
+        3 |
+        4 | print(Foo().my_property)
+          |             ^^^^^^^^^^^
+        5 | Foo().my_property = 56
+          |       -----------
+          |
+         ::: lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_property(self) -> int:
+          |         -----------
+        5 |         return 42
+        6 |
+        7 |     @my_property.setter
+          |      -----------
+        8 |     def my_property(self, value: int) -> None:
+          |         -----------
+        9 |         pass
+          |
+        ");
+    }
+
+    /// Two different properties in the same class: renaming one should
+    /// not affect the other.
+    #[test]
+    fn rename_property_no_cross_contamination() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def alpha<CURSOR>(self) -> int:
+                        return 1
+
+                    @alpha.setter
+                    def alpha(self, value: int) -> None:
+                        pass
+
+                    @property
+                    def beta(self) -> str:
+                        return "hello"
+
+                    @beta.setter
+                    def beta(self, value: str) -> None:
+                        pass
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("gamma"), @"
+        info[rename]: Rename symbol (found 3 locations)
+         --> lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def alpha(self) -> int:
+          |         ^^^^^
+        5 |         return 1
+        6 |
+        7 |     @alpha.setter
+          |      -----
+        8 |     def alpha(self, value: int) -> None:
+          |         -----
+        9 |         pass
+          |
+        ");
+    }
+
+    /// A non-property decorator that happens to have a `.setter` attribute
+    /// should not trigger property rename behavior.
+    #[test]
+    fn rename_non_property_setter_decorator() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Registry:
+                    def setter(self, func):
+                        return func
+
+                registry = Registry()
+
+                def my_func<CURSOR>():
+                    pass
+
+                @my_func.setter
+                def my_func():
+                    pass
+                "#,
+            )
+            .build();
+
+        // Only 2 locations should be found (the definition and the decorator reference),
+        // not the second `my_func` function definition, because `my_func` is not a property.
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+          --> lib.py:8:5
+           |
+         6 | registry = Registry()
+         7 |
+         8 | def my_func():
+           |     ^^^^^^^
+         9 |     pass
+        10 |
+        11 | @my_func.setter
+           |  -------
+        12 | def my_func():
+        13 |     pass
+           |
+        "#);
+    }
+
+    /// When renaming the decorated function (not the one referenced in the decorator),
+    /// we should only rename that function, not the one in the decorator.
+    #[test]
+    fn rename_non_property_setter_decorator_from_decorated() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Registry:
+                    def setter(self, func):
+                        return func
+
+                registry = Registry()
+
+                def my_func():
+                    pass
+
+                @my_func.setter
+                def my_func<CURSOR>():
+                    pass
+                "#,
+            )
+            .build();
+
+        // The second `my_func` definition should be renamed. The decorator reference
+        // is incorrectly included because `definitions_for_name` returns all bindings
+        // for a symbol rather than using position-aware lookup (`bindings_at_use`).
+        // Note: The first `def my_func` is correctly excluded since it has a distinct
+        // `Definition` from the second. The decorator should also be excluded since it
+        // semantically refers to the first definition, but fixing this requires using
+        // position-aware binding resolution in `definitions_for_name`.
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+          --> lib.py:11:2
+           |
+         9 |     pass
+        10 |
+        11 | @my_func.setter
+           |  -------
+        12 | def my_func():
+           |     ^^^^^^^
+        13 |     pass
+           |
+        "#);
+    }
+
+    /// A property with differently-named getter and setter should not link them
+    /// together during rename. This is an unusual pattern but valid Python.
+    #[test]
+    fn rename_property_with_different_setter_name() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                class Foo:
+                    @property
+                    def my_getter<CURSOR>(self) -> int:
+                        return 42
+
+                    @my_getter.setter
+                    def my_setter(self, value: int) -> None:
+                        pass
+                "#,
+            )
+            .build();
+
+        // Only the getter should be renamed, not the setter (they have different names).
+        assert_snapshot!(test.rename("new_name"), @r"
+        info[rename]: Rename symbol (found 2 locations)
+         --> lib.py:4:9
+          |
+        2 | class Foo:
+        3 |     @property
+        4 |     def my_getter(self) -> int:
+          |         ^^^^^^^^^
+        5 |         return 42
+        6 |
+        7 |     @my_getter.setter
+          |      ---------
+        8 |     def my_setter(self, value: int) -> None:
+        9 |         pass
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_single_dispatch_function() {
+        let test = CursorTest::builder()
+            .source(
+                "foo.py",
+                r#"
+                from functools import singledispatch
+
+                @singledispatch
+                def f<CURSOR>(x: object):
+                    raise NotImplementedError
+
+                @f.register
+                def _(x: int) -> str:
+                    return "int"
+
+                @f.register
+                def _(x: str) -> int:
+                    return int(x)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+          --> foo.py:5:5
+           |
+         4 | @singledispatch
+         5 | def f(x: object):
+           |     ^
+         6 |     raise NotImplementedError
+         7 |
+         8 | @f.register
+           |  -
+         9 | def _(x: int) -> str:
+        10 |     return "int"
+        11 |
+        12 | @f.register
+           |  -
+        13 | def _(x: str) -> int:
+        14 |     return int(x)
+           |
+        "#);
+    }
+
+    #[test]
+    fn rename_single_dispatch_function_stacked_register() {
+        let test = CursorTest::builder()
+            .source(
+                "foo.py",
+                r#"
+                from functools import singledispatch
+
+                @singledispatch
+                def f<CURSOR>(x):
+                    raise NotImplementedError
+
+                @f.register(int)
+                @f.register(float)
+                def _(x) -> float:
+                    return "int"
+
+                @f.register(str)
+                def _(x) -> int:
+                    return int(x)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 4 locations)
+          --> foo.py:5:5
+           |
+         4 | @singledispatch
+         5 | def f(x):
+           |     ^
+         6 |     raise NotImplementedError
+         7 |
+         8 | @f.register(int)
+           |  -
+         9 | @f.register(float)
+           |  -
+        10 | def _(x) -> float:
+        11 |     return "int"
+        12 |
+        13 | @f.register(str)
+           |  -
+        14 | def _(x) -> int:
+        15 |     return int(x)
+           |
+        "#);
+    }
+
+    #[test]
+    fn rename_single_dispatchmethod() {
+        let test = CursorTest::builder()
+            .source(
+                "foo.py",
+                r#"
+                from functools import singledispatchmethod
+
+                class Foo:
+                    @singledispatchmethod
+                    def f<CURSOR>(self, x: object):
+                        raise NotImplementedError
+
+                    @f.register
+                    def _(self, x: str) -> float:
+                        return "int"
+
+                    @f.register
+                    def _(self, x: str) -> int:
+                        return int(x)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+          --> foo.py:6:9
+           |
+         4 | class Foo:
+         5 |     @singledispatchmethod
+         6 |     def f(self, x: object):
+           |         ^
+         7 |         raise NotImplementedError
+         8 |
+         9 |     @f.register
+           |      -
+        10 |     def _(self, x: str) -> float:
+        11 |         return "int"
+        12 |
+        13 |     @f.register
+           |      -
+        14 |     def _(self, x: str) -> int:
+        15 |         return int(x)
+           |
+        "#);
+    }
+
+    #[test]
+    fn rename_single_dispatchmethod_staticmethod() {
+        let test = CursorTest::builder()
+            .source(
+                "foo.py",
+                r#"
+                from functools import singledispatchmethod
+
+                class Foo:
+                    @singledispatchmethod
+                    @staticmethod
+                    def f<CURSOR>(self, x):
+                        raise NotImplementedError
+
+                    @f.register(str)
+                    @staticmethod
+                    def _(x: int) -> str:
+                        return "int"
+
+                    @f.register
+                    @staticmethod
+                    def _(x: str) -> int:
+                        return int(x)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+          --> foo.py:7:9
+           |
+         5 |     @singledispatchmethod
+         6 |     @staticmethod
+         7 |     def f(self, x):
+           |         ^
+         8 |         raise NotImplementedError
+         9 |
+        10 |     @f.register(str)
+           |      -
+        11 |     @staticmethod
+        12 |     def _(x: int) -> str:
+        13 |         return "int"
+        14 |
+        15 |     @f.register
+           |      -
+        16 |     @staticmethod
+        17 |     def _(x: str) -> int:
+           |
+        "#);
+    }
+
+    #[test]
+    fn rename_single_dispatchmethod_classmethod() {
+        let test = CursorTest::builder()
+            .source(
+                "foo.py",
+                r#"
+                from functools import singledispatchmethod
+
+                class Foo:
+                    @singledispatchmethod
+                    @classmethod
+                    def f<CURSOR>(cls, x):
+                        raise NotImplementedError
+
+                    @f.register(str)
+                    @classmethod
+                    def _(cls, x) -> str:
+                        return "int"
+
+                    @f.register(int)
+                    @f.register(float)
+                    @staticmethod
+                    def _(cls, x) -> int:
+                        return int(x)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 4 locations)
+          --> foo.py:7:9
+           |
+         5 |     @singledispatchmethod
+         6 |     @classmethod
+         7 |     def f(cls, x):
+           |         ^
+         8 |         raise NotImplementedError
+         9 |
+        10 |     @f.register(str)
+           |      -
+        11 |     @classmethod
+        12 |     def _(cls, x) -> str:
+        13 |         return "int"
+        14 |
+        15 |     @f.register(int)
+           |      -
+        16 |     @f.register(float)
+           |      -
+        17 |     @staticmethod
+        18 |     def _(cls, x) -> int:
+           |
+        "#);
+    }
+
+    #[test]
+    fn rename_attribute() {
+        let test = CursorTest::builder()
+            .source(
+                "foo.py",
+                r#"
+                class Test:
+                    attribute<CURSOR>: str
+
+                    def __init__(self, value: str):
+                        self.attribute = value
+
+                class Child(Test):
+                    def test(self):
+                        return self.attribute
+
+
+                c = Child("test")
+
+                print(c.attribute)
+                c.attribute = "new_value"
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 5 locations)
+          --> foo.py:3:5
+           |
+         2 | class Test:
+         3 |     attribute: str
+           |     ^^^^^^^^^
+         4 |
+         5 |     def __init__(self, value: str):
+         6 |         self.attribute = value
+           |              ---------
+         7 |
+         8 | class Child(Test):
+         9 |     def test(self):
+        10 |         return self.attribute
+           |                     ---------
+           |
+          ::: foo.py:15:9
+           |
+        13 | c = Child("test")
+        14 |
+        15 | print(c.attribute)
+           |         ---------
+        16 | c.attribute = "new_value"
+           |   ---------
+           |
+        "#);
+    }
+
+    // TODO: This should rename all attribute usages
+    // Note: Pylance only renames the assignment in `__init__`.
+    #[test]
+    fn rename_implicit_attribute() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                class Test:
+                    def __init__(self, value: str):
+                        self.<CURSOR>attribute = value
+
+                class Child(Test):
+                    def __init__(self, value: str):
+                        super().__init__(value)
+                        self.attribute = value + "child"
+
+                    def test(self):
+                        return self.attribute
+
+
+                c = Child("test")
+
+                print(c.attribute)
+                c.attribute = "new_value"
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @"
+        info[rename]: Rename symbol (found 1 locations)
+         --> main.py:4:14
+          |
+        2 | class Test:
+        3 |     def __init__(self, value: str):
+        4 |         self.attribute = value
+          |              ^^^^^^^^^
+        5 |
+        6 | class Child(Test):
+          |
+        ");
+    }
+
+    // TODO: Should not rename the first declaration
+    #[test]
+    fn rename_redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | ^
+        3 |
+        4 | a: int = 10
+          | -
+        5 |
+        6 | print(a)
+          |       -
+          |
+        "#);
     }
 }

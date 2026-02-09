@@ -68,18 +68,38 @@ class profiler_entry(structseq[Any], tuple[CodeType | str, int, int, float, floa
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("code", "callcount", "reccallcount", "totaltime", "inlinetime", "calls")
     code: CodeType | str
+    """code object or built-in function name"""
+
     callcount: int
+    """how many times this was called"""
+
     reccallcount: int
+    """how many times called recursively"""
+
     totaltime: float
+    """total time in this entry"""
+
     inlinetime: float
+    """inline time in this entry (not in subcalls)"""
+
     calls: list[profiler_subentry]
+    """details of the calls"""
 
 @final
 class profiler_subentry(structseq[Any], tuple[CodeType | str, int, int, float, float]):
     if sys.version_info >= (3, 10):
         __match_args__: Final = ("code", "callcount", "reccallcount", "totaltime", "inlinetime")
     code: CodeType | str
+    """called code object or built-in function name"""
+
     callcount: int
+    """how many times this is called"""
+
     reccallcount: int
+    """how many times this is called recursively"""
+
     totaltime: float
+    """total time spent in this call"""
+
     inlinetime: float
+    """inline time (not in further subcalls)"""

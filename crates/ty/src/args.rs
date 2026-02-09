@@ -1,5 +1,7 @@
 use crate::logging::Verbosity;
 use crate::python_version::PythonVersion;
+use clap::builder::Styles;
+use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
 use ruff_db::system::SystemPathBuf;
@@ -7,10 +9,19 @@ use ty_combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
 use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
+use ty_static::EnvVars;
+
+// Configures Clap v3-style help menu colors
+const STYLES: Styles = Styles::styled()
+    .header(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .usage(AnsiColor::Green.on_default().effects(Effects::BOLD))
+    .literal(AnsiColor::Cyan.on_default().effects(Effects::BOLD))
+    .placeholder(AnsiColor::Cyan.on_default());
 
 #[derive(Debug, Parser)]
 #[command(author, name = "ty", about = "An extremely fast Python type checker.")]
 #[command(long_version = crate::version::version())]
+#[command(styles = STYLES)]
 pub struct Cli {
     #[command(subcommand)]
     pub(crate) command: Command,
@@ -42,6 +53,10 @@ pub(crate) struct CheckCommand {
         value_name = "PATH"
     )]
     pub paths: Vec<SystemPathBuf>,
+
+    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    #[arg(long)]
+    pub(crate) add_ignore: bool,
 
     /// Run the command within the given project directory.
     ///
@@ -111,11 +126,11 @@ pub(crate) struct CheckCommand {
     /// The path to a `ty.toml` file to use for configuration.
     ///
     /// While ty configuration can be included in a `pyproject.toml` file, it is not allowed in this context.
-    #[arg(long, env = "TY_CONFIG_FILE", value_name = "PATH")]
+    #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
     pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.
-    #[arg(long)]
+    #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
     pub(crate) output_format: Option<OutputFormat>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
@@ -131,7 +146,7 @@ pub(crate) struct CheckCommand {
     pub(crate) watch: bool,
 
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
-    /// Use `--no-respect-gitignore` to disable.
+    /// Use `--no-respect-ignore-files` to disable.
     #[arg(
         long,
         overrides_with("no_respect_ignore_files"),
@@ -142,6 +157,17 @@ pub(crate) struct CheckCommand {
     respect_ignore_files: Option<bool>,
     #[clap(long, overrides_with("respect_ignore_files"), hide = true)]
     no_respect_ignore_files: bool,
+
+    /// Enforce exclusions, even for paths passed to ty directly on the command-line.
+    /// Use `--no-force-exclude` to disable.
+    #[arg(
+        long,
+        overrides_with("no_force_exclude"),
+        help_heading = "File selection"
+    )]
+    force_exclude: bool,
+    #[clap(long, overrides_with("force_exclude"), hide = true)]
+    no_force_exclude: bool,
 
     /// Glob patterns for files to exclude from type checking.
     ///
@@ -167,6 +193,10 @@ pub(crate) struct CheckCommand {
 }
 
 impl CheckCommand {
+    pub(crate) fn force_exclude(&self) -> bool {
+        resolve_bool_arg(self.force_exclude, self.no_force_exclude).unwrap_or_default()
+    }
+
     pub(crate) fn into_options(self) -> Options {
         let rules = if self.rules.is_empty() {
             None
@@ -285,7 +315,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'error'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -293,7 +323,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -301,7 +331,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("Disables the rule. Can be specified multiple times.")
+                .help("Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -422,5 +452,14 @@ over all configuration files.",
 impl ConfigsArg {
     pub(crate) fn into_options(self) -> Option<Options> {
         self.0
+    }
+}
+
+fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
+    match (yes, no) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        (false, false) => None,
+        (..) => unreachable!("Clap should make this impossible"),
     }
 }

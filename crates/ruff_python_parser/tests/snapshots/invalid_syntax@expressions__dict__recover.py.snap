@@ -504,7 +504,7 @@ Module(
    |
  9 | # Missing comma
 10 | {1: 2 3: 4}
-   |       ^ Syntax Error: Expected ',', found int
+   |       ^ Syntax Error: Expected `,`, found int
 11 |
 12 | # No value
    |

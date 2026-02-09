@@ -2,9 +2,9 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_semantic::Binding;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -172,14 +172,10 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
-                    let start = parenthesized_range(
-                        target.into(),
-                        statement.into(),
-                        checker.comment_ranges(),
-                        checker.locator().contents(),
-                    )
-                    .unwrap_or(target.range())
-                    .start();
+                    let start =
+                        parenthesized_range(target.into(), statement.into(), checker.tokens())
+                            .unwrap_or(target.range())
+                            .start();
                     let end = match_token_after(checker.tokens(), target.end(), |token| {
                         token == TokenKind::Equal
                     })?

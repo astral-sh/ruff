@@ -11,7 +11,7 @@ use crate::registry::Rule;
 use crate::rules::flake8_type_checking::helpers::quote_type_expression;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 
 /// ## What it does
 /// Checks if [PEP 613] explicit type aliases contain references to
@@ -295,21 +295,20 @@ pub(crate) fn quoted_type_alias(
     let range = annotation_expr.range();
     let mut diagnostic = checker.report_diagnostic(QuotedTypeAlias, range);
     let fix_string = annotation_expr.value.to_string();
+
     let fix_string = if (fix_string.contains('\n') || fix_string.contains('\r'))
         && parenthesized_range(
-            // Check for parenthesis outside string ("""...""")
+            // Check for parentheses outside the string ("""...""")
             annotation_expr.into(),
             checker.semantic().current_statement().into(),
-            checker.comment_ranges(),
-            checker.locator().contents(),
+            checker.source_tokens(),
         )
         .is_none()
         && parenthesized_range(
-            // Check for parenthesis inside string """(...)"""
+            // Check for parentheses inside the string """(...)"""
             expr.into(),
             annotation_expr.into(),
-            checker.comment_ranges(),
-            checker.locator().contents(),
+            checker.tokens(),
         )
         .is_none()
     {

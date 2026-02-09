@@ -3,14 +3,13 @@
 use anyhow::{Context, Result};
 
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{self, Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
-    CommentRanges, PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content,
-    is_python_whitespace,
+    PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content, is_python_whitespace,
 };
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -209,7 +208,7 @@ pub(crate) fn remove_argument<T: Ranged>(
     arguments: &Arguments,
     parentheses: Parentheses,
     source: &str,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
@@ -224,7 +223,7 @@ pub(crate) fn remove_argument<T: Ranged>(
         .context("Unable to find argument")?;
 
     let parenthesized_range =
-        parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source)
+        token::parenthesized_range(arg.value().into(), arguments.into(), tokens)
             .unwrap_or(arg.range());
 
     if !after.is_empty() {
@@ -270,25 +269,14 @@ pub(crate) fn remove_argument<T: Ranged>(
 ///
 /// The new argument will be inserted before the first existing keyword argument in `arguments`, if
 /// there are any present. Otherwise, the new argument is added to the end of the argument list.
-pub(crate) fn add_argument(
-    argument: &str,
-    arguments: &Arguments,
-    comment_ranges: &CommentRanges,
-    source: &str,
-) -> Edit {
+pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Tokens) -> Edit {
     if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
-        let keyword = parenthesized_range(value.into(), arguments.into(), comment_ranges, source)
-            .unwrap_or(*range);
+        let keyword = parenthesized_range(value.into(), arguments.into(), tokens).unwrap_or(*range);
         Edit::insertion(format!("{argument}, "), keyword.start())
     } else if let Some(last) = arguments.arguments_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
-        let last = parenthesized_range(
-            last.value().into(),
-            arguments.into(),
-            comment_ranges,
-            source,
-        )
-        .unwrap_or(last.range());
+        let last = parenthesized_range(last.value().into(), arguments.into(), tokens)
+            .unwrap_or(last.range());
         Edit::insertion(format!(", {argument}"), last.end())
     } else {
         // Case 2: no arguments. Add argument, without any trailing comma.
@@ -296,14 +284,49 @@ pub(crate) fn add_argument(
     }
 }
 
+/// Remove the member at the given index from a sequence of expressions.
+pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> Result<Edit> {
+    if index < elts.len() - 1 {
+        // Case 1: the expression is _not_ the last node, so delete from the start of the
+        // expression to the end of the subsequent comma.
+        // Ex) Delete `"a"` in `{"a", "b", "c"}`.
+        let mut tokenizer = SimpleTokenizer::starts_at(elts[index].end(), source);
+
+        // Find the trailing comma.
+        tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+
+        // Find the next non-whitespace token.
+        let next = tokenizer
+            .find(|token| {
+                token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
+            })
+            .context("Unable to find next token")?;
+
+        Ok(Edit::deletion(elts[index].start(), next.start()))
+    } else if index > 0 {
+        // Case 2: the expression is the last node, but not the _only_ node, so delete from the
+        // start of the previous comma to the end of the expression.
+        // Ex) Delete `"c"` in `{"a", "b", "c"}`.
+        let mut tokenizer = SimpleTokenizer::starts_at(elts[index - 1].end(), source);
+
+        // Find the trailing comma.
+        let comma = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
+            .context("Unable to find trailing comma")?;
+
+        Ok(Edit::deletion(comma.start(), elts[index].end()))
+    } else {
+        // Case 3: expression is the only node, so delete it.
+        // Ex) Delete `"a"` in `{"a"}`.
+        Ok(Edit::range_deletion(elts[index].range()))
+    }
+}
+
 /// Generic function to add a (regular) parameter to a function definition.
 pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &str) -> Edit {
-    if let Some(last) = parameters
-        .args
-        .iter()
-        .filter(|arg| arg.default.is_none())
-        .next_back()
-    {
+    if let Some(last) = parameters.args.iter().rfind(|arg| arg.default.is_none()) {
         // Case 1: at least one regular parameter, so append after the last one.
         Edit::insertion(format!(", {parameter}"), last.end())
     } else if !parameters.args.is_empty() {

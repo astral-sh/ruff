@@ -357,3 +357,33 @@ help: Remove redundant '+' operator to implicitly concatenate
 203 | )
 204 | 
 205 | # nested examples with both t and f-strings
+
+ISC003 Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:216:5
+    |
+214 |   # reports diagnostic - no autofix.
+215 |   # See https://github.com/astral-sh/ruff/issues/19757
+216 |   _ = "abc" + (
+    |  _____^
+217 | |     "def"
+218 | |     "ghi"
+219 | | )
+    | |_^
+220 |
+221 |   _ = (
+    |
+help: Remove redundant '+' operator to implicitly concatenate
+
+ISC003 Explicitly concatenated string should be implicitly concatenated
+   --> ISC.py:221:5
+    |
+219 |   )
+220 |
+221 |   _ = (
+    |  _____^
+222 | |     "abc"
+223 | |     "def"
+224 | | ) + "ghi"
+    | |_________^
+    |
+help: Remove redundant '+' operator to implicitly concatenate

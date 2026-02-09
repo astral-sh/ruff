@@ -2,6 +2,7 @@ use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
     PythonVersion, Stmt, WithItem,
@@ -14,7 +15,7 @@ use crate::parser::progress::ParserProgress;
 use crate::parser::{
     FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
 };
-use crate::token::{TokenKind, TokenValue};
+use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
@@ -2781,13 +2782,20 @@ impl<'src> Parser<'src> {
         // def foo(): ...
         // @@
         // def foo(): ...
+        // @test
+        // @
+        // class Test
         while self.at(TokenKind::At) {
             progress.assert_progressing(self);
 
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
-            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
+            let parsed_expr = if self.at(TokenKind::Def) || self.at(TokenKind::Class) {
+                Expr::Name(self.parse_missing_name()).into()
+            } else {
+                self.parse_named_expression_or_higher(ExpressionContext::default())
+            };
 
             if self.options.target_version < PythonVersion::PY39 {
                 // test_ok decorator_expression_dotted_ident_py38
@@ -2913,21 +2921,27 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
-                // TODO(dhruvmanila): It seems that this recovery drops all the parsed
-                // decorators. Maybe we could convert them into statement expression
-                // with a flag indicating that this expression is part of a decorator.
-                // It's only possible to keep them if it's a function or class definition.
-                // We could possibly keep them if there's indentation error:
-                //
-                // ```python
-                // @decorator
-                //   @decorator
-                // def foo(): ...
-                // ```
-                //
-                // Or, parse it as a binary expression where the left side is missing.
-                // We would need to convert each decorator into a binary expression.
-                self.parse_statement()
+                let range = self.node_range(start);
+
+                ast::StmtFunctionDef {
+                    node_index: AtomicNodeIndex::default(),
+                    range,
+                    is_async: false,
+                    decorator_list: decorators,
+                    name: ast::Identifier {
+                        id: Name::empty(),
+                        range: self.missing_node_range(),
+                        node_index: AtomicNodeIndex::NONE,
+                    },
+                    type_params: None,
+                    parameters: Box::new(ast::Parameters {
+                        range: self.missing_node_range(),
+                        ..ast::Parameters::default()
+                    }),
+                    returns: None,
+                    body: vec![],
+                }
+                .into()
             }
         }
     }

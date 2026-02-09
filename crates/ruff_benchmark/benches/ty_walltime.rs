@@ -71,17 +71,22 @@ impl Display for Benchmark<'_> {
     }
 }
 
-fn check_project(db: &ProjectDatabase, max_diagnostics: usize) {
+#[track_caller]
+#[expect(clippy::cast_precision_loss)]
+fn check_project(db: &ProjectDatabase, project_name: &str, max_diagnostics: usize) {
     let result = db.check();
     let diagnostics = result.len();
 
     assert!(
         diagnostics > 1 && diagnostics <= max_diagnostics,
-        "Expected between {} and {} diagnostics but got {}",
-        1,
-        max_diagnostics,
-        diagnostics
+        "Expected between 1 and {max_diagnostics} diagnostics on project '{project_name}' but got {diagnostics}",
     );
+
+    if (max_diagnostics - diagnostics) as f64 / max_diagnostics as f64 > 0.10 {
+        tracing::warn!(
+            "The expected diagnostics for project `{project_name}` can be reduced: expected {max_diagnostics} but got {diagnostics}"
+        );
+    }
 }
 
 static ALTAIR: Benchmark = Benchmark::new(
@@ -104,7 +109,7 @@ static ALTAIR: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    1000,
+    860,
 );
 
 static COLOUR_SCIENCE: Benchmark = Benchmark::new(
@@ -123,7 +128,7 @@ static COLOUR_SCIENCE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY310,
     },
-    600,
+    350,
 );
 
 static FREQTRADE: Benchmark = Benchmark::new(
@@ -146,7 +151,7 @@ static FREQTRADE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    400,
+    600,
 );
 
 static PANDAS: Benchmark = Benchmark::new(
@@ -166,7 +171,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    3000,
+    4500,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -184,7 +189,7 @@ static PYDANTIC: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY39,
     },
-    1000,
+    3200,
 );
 
 static SYMPY: Benchmark = Benchmark::new(
@@ -197,7 +202,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    13000,
+    13400,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
@@ -210,7 +215,7 @@ static TANJUN: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    320,
+    120,
 );
 
 static STATIC_FRAME: Benchmark = Benchmark::new(
@@ -226,7 +231,7 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: "2025-08-09",
         python_version: PythonVersion::PY311,
     },
-    750,
+    1800,
 );
 
 #[track_caller]
@@ -234,34 +239,59 @@ fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
     bencher
         .with_inputs(|| benchmark.setup_iteration())
         .bench_local_refs(|db| {
-            check_project(db, benchmark.max_diagnostics);
+            check_project(db, benchmark.project.name, benchmark.max_diagnostics);
         });
 }
 
-#[bench(args=[&ALTAIR, &FREQTRADE, &PYDANTIC, &TANJUN], sample_size=2, sample_count=3)]
-fn small(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn altair(bencher: Bencher) {
+    run_single_threaded(bencher, &ALTAIR);
 }
 
-#[bench(args=[&COLOUR_SCIENCE, &PANDAS, &STATIC_FRAME], sample_size=1, sample_count=3)]
-fn medium(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn freqtrade(bencher: Bencher) {
+    run_single_threaded(bencher, &FREQTRADE);
 }
 
-#[bench(args=[&SYMPY], sample_size=1, sample_count=2)]
-fn large(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn tanjun(bencher: Bencher) {
+    run_single_threaded(bencher, &TANJUN);
 }
 
-#[bench(args=[&PYDANTIC], sample_size=3, sample_count=8)]
-fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+#[bench(sample_size = 2, sample_count = 3)]
+fn pydantic(bencher: Bencher) {
+    run_single_threaded(bencher, &PYDANTIC);
+}
+
+#[bench(sample_size = 1, sample_count = 3)]
+fn static_frame(bencher: Bencher) {
+    run_single_threaded(bencher, &STATIC_FRAME);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn colour_science(bencher: Bencher) {
+    run_single_threaded(bencher, &COLOUR_SCIENCE);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn pandas(bencher: Bencher) {
+    run_single_threaded(bencher, &PANDAS);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn sympy(bencher: Bencher) {
+    run_single_threaded(bencher, &SYMPY);
+}
+
+#[bench(sample_size = 3, sample_count = 8)]
+fn multithreaded(bencher: Bencher) {
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 
     bencher
-        .with_inputs(|| benchmark.setup_iteration())
+        .with_inputs(|| ALTAIR.setup_iteration())
         .bench_local_values(|db| {
             thread_pool.install(|| {
-                check_project(&db, benchmark.max_diagnostics);
+                check_project(&db, ALTAIR.project.name, ALTAIR.max_diagnostics);
                 db
             })
         });
@@ -285,7 +315,7 @@ fn main() {
     // branch when looking up the ingredient index.
     {
         let db = TANJUN.setup_iteration();
-        check_project(&db, TANJUN.max_diagnostics);
+        check_project(&db, TANJUN.project.name, TANJUN.max_diagnostics);
     }
 
     divan::main();

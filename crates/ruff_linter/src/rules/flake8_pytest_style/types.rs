@@ -6,19 +6,15 @@ use ruff_macros::CacheKey;
 
 #[derive(Clone, Copy, Debug, CacheKey, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum ParametrizeNameType {
     #[serde(rename = "csv")]
     Csv,
     #[serde(rename = "tuple")]
+    #[default]
     Tuple,
     #[serde(rename = "list")]
     List,
-}
-
-impl Default for ParametrizeNameType {
-    fn default() -> Self {
-        Self::Tuple
-    }
 }
 
 impl Display for ParametrizeNameType {
@@ -33,17 +29,13 @@ impl Display for ParametrizeNameType {
 
 #[derive(Clone, Copy, Debug, CacheKey, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum ParametrizeValuesType {
     #[serde(rename = "tuple")]
     Tuple,
     #[serde(rename = "list")]
+    #[default]
     List,
-}
-
-impl Default for ParametrizeValuesType {
-    fn default() -> Self {
-        Self::List
-    }
 }
 
 impl Display for ParametrizeValuesType {
@@ -57,17 +49,13 @@ impl Display for ParametrizeValuesType {
 
 #[derive(Clone, Copy, Debug, CacheKey, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum ParametrizeValuesRowType {
     #[serde(rename = "tuple")]
+    #[default]
     Tuple,
     #[serde(rename = "list")]
     List,
-}
-
-impl Default for ParametrizeValuesRowType {
-    fn default() -> Self {
-        Self::Tuple
-    }
 }
 
 impl Display for ParametrizeValuesRowType {

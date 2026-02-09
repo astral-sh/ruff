@@ -88,8 +88,6 @@ class C:
         self.FINAL_C: Final[int] = 1
         self.FINAL_D: Final = 1
         self.FINAL_E: Final
-        # TODO: Should not be an error
-        # error: [invalid-assignment] "Cannot assign to final attribute `FINAL_E` on type `Self@__init__`"
         self.FINAL_E = 1
 
 reveal_type(C.FINAL_A)  # revealed: int
@@ -167,6 +165,77 @@ FINAL_E = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINA
 FINAL_F = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `FINAL_F` is not allowed"
 ```
 
+### Reassignment after conditional assignment
+
+If a `Final` symbol is conditionally assigned, a subsequent unconditional assignment is still a
+reassignment error, because the symbol may have already been bound:
+
+```py
+from typing import Final
+
+def cond() -> bool:
+    return True
+
+ABC: Final[int]
+
+if cond():
+    ABC = 1
+
+ABC = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `ABC` is not allowed"
+```
+
+Assigning in both branches of an `if/else` is fine — each branch is a first assignment:
+
+```py
+from typing import Final
+
+def cond() -> bool:
+    return True
+
+X: Final[int]
+
+if cond():
+    X = 1
+else:
+    X = 2
+```
+
+But assigning in both branches and then again unconditionally is an error:
+
+```py
+from typing import Final
+
+def cond() -> bool:
+    return True
+
+Y: Final[int]
+
+if cond():
+    Y = 1
+else:
+    Y = 2
+
+Y = 3  # error: [invalid-assignment] "Reassignment of `Final` symbol `Y` is not allowed"
+```
+
+Multiple conditional blocks don't help — the second `if` body sees that the first may have already
+bound the symbol:
+
+```py
+from typing import Final
+
+def cond() -> bool:
+    return True
+
+Z: Final[int]
+
+if cond():
+    Z = 1
+
+if cond():
+    Z = 2  # error: [invalid-assignment] "Reassignment of `Final` symbol `Z` is not allowed"
+```
+
 ### Attributes
 
 Assignments to attributes qualified with `Final` are also not allowed:
@@ -186,7 +255,6 @@ class C(metaclass=Meta):
         self.INSTANCE_FINAL_A: Final[int] = 1
         self.INSTANCE_FINAL_B: Final = 1
         self.INSTANCE_FINAL_C: Final[int]
-        # error: [invalid-assignment] "Cannot assign to final attribute `INSTANCE_FINAL_C` on type `Self@__init__`"
         self.INSTANCE_FINAL_C = 1
 
 # error: [invalid-assignment] "Cannot assign to final attribute `META_FINAL_A` on type `<class 'C'>`"
@@ -265,6 +333,7 @@ python-version = "3.12"
 
 ```py
 from typing import Final, ClassVar, Annotated
+from ty_extensions import reveal_mro
 
 LEGAL_A: Final[int] = 1
 LEGAL_B: Final = 1
@@ -281,8 +350,6 @@ class C:
     def __init__(self):
         self.LEGAL_H: Final[int] = 1
         self.LEGAL_I: Final[int]
-        # TODO: Should not be an error
-        # error: [invalid-assignment]
         self.LEGAL_I = 1
 
 # error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
@@ -304,8 +371,8 @@ def f[T](x: T) -> Final[T]:
 class Foo(Final[tuple[int]]): ...
 
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `Final` and show the MRO as if `Final` was not there
-# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
-reveal_type(Foo.__mro__)
+# revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
+reveal_mro(Foo)
 ```
 
 ### Attribute assignment outside `__init__`
@@ -344,6 +411,22 @@ class C:
     x: Final[int, str] = 1
 ```
 
+### Trailing comma creates a tuple
+
+A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
+and emit a proper error rather than crashing (see
+[ty#1793](https://github.com/astral-sh/ty/issues/1793)).
+
+```py
+from typing import Final
+
+# error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
+x: Final[(),] = 42
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `x` is not allowed"
+x = 56
+```
+
 ### Illegal `Final` in type expression
 
 ```py
@@ -380,24 +463,277 @@ DECLARED_THEN_BOUND = 1
 ```py
 from typing import Final
 
-# TODO: This should be an error
-NO_ASSIGNMENT_A: Final
-# TODO: This should be an error
-NO_ASSIGNMENT_B: Final[int]
+NO_ASSIGNMENT_A: Final  # error: [final-without-value] "`Final` symbol `NO_ASSIGNMENT_A` is not assigned a value"
+NO_ASSIGNMENT_B: Final[int]  # error: [final-without-value] "`Final` symbol `NO_ASSIGNMENT_B` is not assigned a value"
 
 class C:
-    # TODO: This should be an error
-    NO_ASSIGNMENT_A: Final
-    # TODO: This should be an error
-    NO_ASSIGNMENT_B: Final[int]
+    NO_ASSIGNMENT_A: Final  # error: [final-without-value] "`Final` symbol `NO_ASSIGNMENT_A` is not assigned a value"
+    NO_ASSIGNMENT_B: Final[int]  # error: [final-without-value] "`Final` symbol `NO_ASSIGNMENT_B` is not assigned a value"
 
-    # This is okay. `DEFINED_IN_INIT` is defined in `__init__`.
     DEFINED_IN_INIT: Final[int]
 
     def __init__(self):
-        # TODO: should not be an error
-        # error: [invalid-assignment]
         self.DEFINED_IN_INIT = 1
+```
+
+### Function-local `Final` without value
+
+```py
+from typing import Final
+
+def f():
+    x: Final[int]  # error: [final-without-value] "`Final` symbol `x` is not assigned a value"
+```
+
+### `typing_extensions.Final` without value
+
+```py
+from typing_extensions import Final
+
+TEXF_NO_VALUE: Final[str]  # error: [final-without-value] "`Final` symbol `TEXF_NO_VALUE` is not assigned a value"
+```
+
+### `Annotated[Final[...], ...]` without value
+
+```py
+from typing import Annotated, Final
+
+ANNOTATED_FINAL: Annotated[  # error: [final-without-value] "`Final` symbol `ANNOTATED_FINAL` is not assigned a value"
+    Final[int], "metadata"
+]
+```
+
+### Imported `Final` symbol
+
+Importing a symbol that is declared `Final` in its source module should not trigger
+`final-without-value`, because the import itself provides the binding.
+
+`module.py`:
+
+```py
+from typing import Final
+
+MODULE_FINAL: Final[int] = 1
+```
+
+`test.py`:
+
+```py
+from module import MODULE_FINAL
+```
+
+Even if the imported symbol is later deleted (a common pattern to clean up module namespaces), it
+should not trigger the diagnostic.
+
+`test_del.py`:
+
+```py
+from module import MODULE_FINAL
+
+_ = MODULE_FINAL
+
+del MODULE_FINAL
+```
+
+### Stub file `Final` without value
+
+In stub files, `Final` declarations without a value are permitted, at both module and class scope.
+
+`stub.pyi`:
+
+```pyi
+from typing import Final
+
+STUB_FINAL: Final[int]
+
+class StubClass:
+    STUB_ATTR: Final[str]
+```
+
+### Conditional assignment in `__init__`
+
+A `Final` attribute declared in the class body and conditionally assigned in `__init__` should not
+trigger `final-without-value`, since at least one path provides a binding.
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int]
+
+    def __init__(self, flag: bool):
+        if flag:
+            self.x = 1
+        else:
+            self.x = 2
+
+class D:
+    y: Final[int]
+
+    def __init__(self, flag: bool):
+        if flag:
+            self.y = 1
+        # No else: y may be unbound at runtime, but there is still an assignment path
+```
+
+### Assignment in non-`__init__` method
+
+Per the typing spec, a `Final` attribute declared in a class body without a value must be
+initialized in `__init__`. Assignment in other methods does not satisfy the requirement.
+
+```py
+from typing import Final
+
+class E:
+    x: Final[int]  # error: [final-without-value] "`Final` symbol `x` is not assigned a value"
+
+    def setup(self):
+        # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+        self.x = 1  # Too late: not __init__
+```
+
+### Dataclass with `Final` field
+
+Dataclass-like classes do not report `final-without-value` because the `__init__` is synthesized by
+the framework.
+
+```py
+from dataclasses import dataclass
+from typing import Final
+
+@dataclass
+class D:
+    x: Final[int]  # No error: dataclass generates __init__
+```
+
+## Final attributes with Self annotation in `__init__`
+
+Issue #1409: Final instance attributes should be assignable in `__init__` even when using `Self`
+type annotation.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Final, Self
+
+class ClassA:
+    ID4: Final[int]  # OK because initialized in __init__
+
+    def __init__(self: Self):
+        self.ID4 = 1  # Should be OK
+
+    def other_method(self: Self):
+        # error: [invalid-assignment] "Cannot assign to final attribute `ID4` on type `Self@other_method`"
+        self.ID4 = 2  # Should still error outside __init__
+
+class ClassB:
+    ID5: Final[int]
+
+    def __init__(self):  # Without Self annotation
+        self.ID5 = 1  # Should also be OK
+
+reveal_type(ClassA().ID4)  # revealed: int
+reveal_type(ClassB().ID5)  # revealed: int
+```
+
+## Reassignment to Final in `__init__`
+
+Per PEP 591 and the typing conformance suite, Final attributes can be assigned in `__init__`.
+Multiple assignments within `__init__` are allowed (matching mypy and pyright behavior). However,
+assignment in `__init__` is not allowed if the attribute already has a value at class level.
+
+```py
+from typing import Final
+
+# Case 1: Declared in class, assigned once in __init__ - ALLOWED
+class DeclaredAssignedInInit:
+    attr1: Final[int]
+
+    def __init__(self):
+        self.attr1 = 1  # OK: First and only assignment
+
+# Case 2: Declared and assigned in class body - ALLOWED (no __init__ assignment)
+class DeclaredAndAssignedInClass:
+    attr2: Final[int] = 10
+
+# Case 3: Reassignment when already assigned in class body
+class ReassignmentFromClass:
+    attr3: Final[int] = 10
+
+    def __init__(self):
+        # error: [invalid-assignment]
+        self.attr3 = 20  # Error: already assigned in class body
+
+# Case 4: Multiple assignments within __init__ itself
+# Per conformance suite and PEP 591, all assignments in __init__ are allowed
+class MultipleAssignmentsInInit:
+    attr4: Final[int]
+
+    def __init__(self):
+        self.attr4 = 1  # OK: Assignment in __init__
+        self.attr4 = 2  # OK: Multiple assignments in __init__ are allowed
+
+class ConditionalAssignment:
+    X: Final[int]
+
+    def __init__(self, cond: bool):
+        if cond:
+            self.X = 42  # OK: Assignment in __init__
+        else:
+            self.X = 56  # OK: Multiple assignments in __init__ are allowed
+
+# Case 5: Declaration and assignment in __init__ - ALLOWED
+class DeclareAndAssignInInit:
+    def __init__(self):
+        self.attr5: Final[int] = 1  # OK: Declare and assign in __init__
+
+# Case 6: Assignment outside __init__ should still fail
+class AssignmentOutsideInit:
+    attr6: Final[int]  # error: [final-without-value] "`Final` symbol `attr6` is not assigned a value"
+
+    def other_method(self):
+        # error: [invalid-assignment] "Cannot assign to final attribute `attr6`"
+        self.attr6 = 1  # Error: Not in __init__
+```
+
+## Final assignment restrictions in `__init__`
+
+`__init__` can only assign Final attributes on the class it's defining, and only to the first
+parameter (`self`).
+
+```py
+from typing import Final
+
+class C:
+    x: Final[int] = 100
+
+# Assignment from standalone function (even named __init__)
+def _(c: C):
+    # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+    c.x = 1  # Error: Not in C.__init__
+
+def __init__(c: C):
+    # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+    c.x = 1  # Error: Not a method
+
+# Assignment from another class's __init__
+class A:
+    def __init__(self, c: C):
+        # error: [invalid-assignment] "Cannot assign to final attribute `x`"
+        c.x = 1  # Error: Not C's __init__
+
+# Assignment to non-self parameter in __init__
+class D:
+    y: Final[int]
+
+    def __init__(self, other: "D"):
+        self.y = 1  # OK: Assigning to self
+        # TODO: Should error - assigning to non-self parameter
+        # Requires tracking which parameter the base expression refers to
+        other.y = 2
 ```
 
 ## Full diagnostics
@@ -422,6 +758,14 @@ Imported `Final` symbol:
 from _stat import ST_INO
 
 ST_INO = 1  # error: [invalid-assignment]
+```
+
+`Final` declaration without value:
+
+```py
+from typing import Final
+
+UNINITIALIZED: Final[int]  # error: [final-without-value]
 ```
 
 [`typing.final`]: https://docs.python.org/3/library/typing.html#typing.Final

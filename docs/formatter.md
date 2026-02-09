@@ -147,7 +147,7 @@ assumed to be Python code examples and also formatted.
 * reStructuredText [literal blocks]. While literal blocks may contain things
 other than Python, this is meant to reflect a long-standing convention in the
 Python ecosystem where literal blocks often contain Python code.
-* reStructuredText [`code-block` and `sourcecode` directives]. As with
+* reStructuredText [`code-block` and `sourcecode` directives][directives]. As with
 Markdown, the language names recognized for Python are `python`, `py`,
 `python3`, or `py3`.
 
@@ -223,7 +223,116 @@ def f(x):
 [doctest]: https://docs.python.org/3/library/doctest.html
 [fenced code blocks]: https://spec.commonmark.org/0.30/#fenced-code-blocks
 [literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
-[`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+[directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+
+## Markdown code formatting
+
+*This feature is currently only available in [preview mode](preview.md#preview).*
+
+The Ruff formatter can also format Python code blocks in Markdown files.
+In these files, Ruff will format any CommonMark [fenced code blocks][]
+with the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`.
+Fenced code blocks without an info string are assumed to be Python code examples
+and will also be formatted.
+
+If a code example is recognized and treated as Python, the Ruff formatter will
+automatically skip it if the code does not parse as valid Python or if the
+reformatted code would produce an invalid Python program.
+
+Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
+the normal Python code formatting style, while any code blocks marked with
+`pyi` will be formatted like Python type stub files:
+
+````markdown
+```py
+print("hello")
+```
+
+```pyi
+def foo(): ...
+def bar(): ...
+```
+````
+
+Ruff also supports [Quarto](https://quarto.org/) style executable code blocks
+with curly braces surrounding the language name:
+
+````markdown
+```{python}
+print("hello")
+```
+````
+
+While [formatting suppression](#format-suppression) comments will be handled as
+usual within code blocks, the formatter will also skip formatting any code block
+surrounded by appropriate HTML comments, such as:
+
+````markdown
+<!-- fmt:off -->
+```py
+print( 'hello' )
+```
+<!-- fmt:on -->
+````
+
+Any number of code blocks may be contained within a matching pair of `off` and
+`on` HTML comments, and any `off`  comment *without* a matching `on` comment
+will implicitly cover the remaining portion of the document.
+
+The Ruff formatter will also recognize HTML comments from [blacken-docs][],
+`<!-- blacken-docs:off -->` and `<!-- blacken-docs:on -->`, which are equivalent
+to `<!-- fmt:off -->` and `<!-- fmt:on -->` respectively.
+
+[blacken-docs]: https://github.com/adamchainz/blacken-docs/
+
+Ruff will not automatically discover or format Markdown files in your project,
+but will format any Markdown files explicitly passed with a `.md` extension:
+
+```shell-session
+$ ruff format --preview --check docs/
+warning: No Python files found under the given path(s)
+
+$ ruff format --preview --check docs/*.md
+13 files already formatted
+```
+
+This is likely to change in a future release when the feature is stabilized.
+Including Markdown files without also enabling [preview mode](preview.md#preview)
+will result in an error message and non-zero [exit code](#exit-codes).
+
+To include Markdown files by default when running Ruff on your project, add them
+with [`extend-include`](settings.md#extend-include) in your project settings:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # Find and format code blocks in Markdown files
+    extend-include = ["*.md"]
+    # OR
+    extend-include = ["docs/*.md"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # Find and format code blocks in Markdown files
+    extend-include = ["*.md"]
+    # OR
+    extend-include = ["docs/*.md"]
+    ```
+
+If you run Ruff via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit), Markdown
+support needs to be explicitly included by adding it to `types_or`:
+
+```yaml title=".pre-commit-config.yaml"
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      - id: ruff-format
+        types_or: [python, pyi, jupyter, markdown]
+```
 
 ## Format suppression
 
@@ -265,26 +374,29 @@ Instead, apply the `# fmt: off` comment to the entire statement:
 Like Black, Ruff will _also_ recognize [YAPF](https://github.com/google/yapf)'s `# yapf: disable` and `# yapf: enable` pragma
 comments, which are treated equivalently to `# fmt: off` and `# fmt: on`, respectively.
 
-`# fmt: skip` comments suppress formatting for a preceding statement, case header, decorator,
-function definition, or class definition:
+`# fmt: skip` comments suppress formatting for a case header, decorator,
+function definition, class definition, or the preceding statements
+on the same logical line. The formatter leaves the following unchanged:
 
 ```python
 if True:
     pass
-elif False: # fmt: skip
+elif     False: # fmt: skip
     pass
 
 @Test
-@Test2 # fmt: skip
+@Test2(a,b) # fmt: skip
 def test(): ...
 
-a = [1, 2, 3, 4, 5] # fmt: skip
+a = [1,2,3,4,5] # fmt: skip
 
-def test(a, b, c, d, e, f) -> int: # fmt: skip
+def test(a,b,c,d,e,f) -> int: # fmt: skip
     pass
+
+x=1;x=2;x=3 # fmt: skip
 ```
 
-As such, adding an `# fmt: skip` comment at the end of an expression will have no effect. In
+Adding a `# fmt: skip` comment at the end of an expression will have no effect. In
 the following example, the list entry `'1'` will be formatted, despite the `# fmt: skip`:
 
 ```python
@@ -361,6 +473,7 @@ When an incompatible lint rule or setting is enabled, `ruff format` will emit a 
 `ruff format` exits with the following status codes:
 
 - `0` if Ruff terminates successfully, regardless of whether any files were formatted.
+- `1` if Ruff terminates successfully, one or more files were formatted, and `--exit-non-zero-on-format` was specified.
 - `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an
     internal error.
 
@@ -500,6 +613,48 @@ If you want Ruff to split an f-string across multiple lines, ensure there's a li
 
 [self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
 [configured quote style]: settings.md/#format_quote-style
+
+### Fluent layout for method chains
+
+At times, when developers write long chains of methods on an object, such as
+
+```python
+x = df.filter(cond).agg(func).merge(other)
+```
+
+the intent is to perform a sequence of transformations or operations
+on a fixed object of interest - in this example, the object `df`.
+Assuming the assigned expression exceeds the `line-length`, this preview
+style will format the above as:
+
+```python
+x = (
+    df
+    .filter(cond)
+    .agg(func)
+    .merge(other)
+)
+```
+
+This deviates from the stable formatting, and also from Black, both
+of which would produce:
+
+
+```python
+x = (
+    df.filter(cond)
+    .agg(func)
+    .merge(other)
+)
+```
+
+Both the stable and preview formatting are variants of something
+called a **fluent layout**.
+
+In general, this preview style differs from the stable style
+only at the first attribute that precedes
+a call or subscript. The preview formatting breaks _before_ this attribute,
+while the stable formatting breaks _after_ the call or subscript.
 
 ## Sorting imports
 

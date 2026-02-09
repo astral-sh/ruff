@@ -122,7 +122,9 @@ impl MemoryFileSystem {
             let entry = by_path.get(&normalized).ok_or_else(not_found)?;
 
             match entry {
-                Entry::File(file) => Ok(file.content.clone()),
+                Entry::File(file) => {
+                    String::from_utf8(file.content.to_vec()).map_err(|_| invalid_utf8())
+                }
                 Entry::Directory(_) => Err(is_a_directory()),
             }
         }
@@ -139,7 +141,7 @@ impl MemoryFileSystem {
             .get(&path.as_ref().to_path_buf())
             .ok_or_else(not_found)?;
 
-        Ok(file.content.clone())
+        String::from_utf8(file.content.to_vec()).map_err(|_| invalid_utf8())
     }
 
     pub fn exists(&self, path: &SystemPath) -> bool {
@@ -161,7 +163,7 @@ impl MemoryFileSystem {
         match by_path.entry(normalized) {
             btree_map::Entry::Vacant(entry) => {
                 entry.insert(Entry::File(File {
-                    content: String::new(),
+                    content: Box::default(),
                     last_modified: file_time_now(),
                 }));
 
@@ -177,13 +179,17 @@ impl MemoryFileSystem {
     /// Stores a new file in the file system.
     ///
     /// The operation overrides the content for an existing file with the same normalized `path`.
-    pub fn write_file(&self, path: impl AsRef<SystemPath>, content: impl ToString) -> Result<()> {
+    pub fn write_file(
+        &self,
+        path: impl AsRef<SystemPath>,
+        content: impl AsRef<[u8]>,
+    ) -> Result<()> {
         let mut by_path = self.inner.by_path.write().unwrap();
 
         let normalized = self.normalize_path(path.as_ref());
 
         let file = get_or_create_file(&mut by_path, &normalized)?;
-        file.content = content.to_string();
+        file.content = content.as_ref().to_vec().into_boxed_slice();
         file.last_modified = file_time_now();
 
         Ok(())
@@ -214,7 +220,7 @@ impl MemoryFileSystem {
     pub fn write_file_all(
         &self,
         path: impl AsRef<SystemPath>,
-        content: impl ToString,
+        content: impl AsRef<[u8]>,
     ) -> Result<()> {
         let path = path.as_ref();
 
@@ -228,19 +234,24 @@ impl MemoryFileSystem {
     /// Stores a new virtual file in the file system.
     ///
     /// The operation overrides the content for an existing virtual file with the same `path`.
-    pub fn write_virtual_file(&self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+    pub fn write_virtual_file(
+        &self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl AsRef<[u8]>,
+    ) {
         let path = path.as_ref();
         let mut virtual_files = self.inner.virtual_files.write().unwrap();
+        let content = content.as_ref().to_vec().into_boxed_slice();
 
         match virtual_files.entry(path.to_path_buf()) {
             std::collections::hash_map::Entry::Vacant(entry) => {
                 entry.insert(File {
-                    content: content.to_string(),
+                    content,
                     last_modified: file_time_now(),
                 });
             }
             std::collections::hash_map::Entry::Occupied(mut entry) => {
-                entry.get_mut().content = content.to_string();
+                entry.get_mut().content = content;
             }
         }
     }
@@ -468,7 +479,7 @@ impl Entry {
 
 #[derive(Debug)]
 struct File {
-    content: String,
+    content: Box<[u8]>,
     last_modified: FileTime,
 }
 
@@ -495,6 +506,13 @@ fn not_a_directory() -> std::io::Error {
 
 fn directory_not_empty() -> std::io::Error {
     std::io::Error::other("directory not empty")
+}
+
+fn invalid_utf8() -> std::io::Error {
+    std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        "stream did not contain valid UTF-8",
+    )
 }
 
 fn create_dir_all(
@@ -533,7 +551,7 @@ fn get_or_create_file<'a>(
 
     let entry = paths.entry(normalized.to_path_buf()).or_insert_with(|| {
         Entry::File(File {
-            content: String::new(),
+            content: Box::default(),
             last_modified: file_time_now(),
         })
     });
@@ -844,7 +862,7 @@ mod tests {
         let fs = with_files(["c.py"]);
 
         let error = fs
-            .write_file(SystemPath::new("a/b.py"), "content".to_string())
+            .write_file(SystemPath::new("a/b.py"), "content")
             .unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::NotFound);
@@ -855,7 +873,7 @@ mod tests {
         let fs = with_files(["a/b.py"]);
 
         let error = fs
-            .write_file_all(SystemPath::new("a/b.py/c"), "content".to_string())
+            .write_file_all(SystemPath::new("a/b.py/c"), "content")
             .unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::Other);
@@ -878,7 +896,7 @@ mod tests {
         let fs = MemoryFileSystem::new();
         let path = SystemPath::new("a.py");
 
-        fs.write_file_all(path, "Test content".to_string())?;
+        fs.write_file_all(path, "Test content")?;
 
         assert_eq!(fs.read_to_string(path)?, "Test content");
 
@@ -915,9 +933,7 @@ mod tests {
 
         fs.create_directory_all("a")?;
 
-        let error = fs
-            .write_file(SystemPath::new("a"), "content".to_string())
-            .unwrap_err();
+        let error = fs.write_file(SystemPath::new("a"), "content").unwrap_err();
 
         assert_eq!(error.kind(), ErrorKind::Other);
 

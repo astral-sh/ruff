@@ -1,3 +1,4 @@
+import sys
 from collections.abc import Callable, Iterable, Mapping
 from typing import Any
 
@@ -12,6 +13,10 @@ class BaseProcess:
 
     name: str
     daemon: bool
+    """
+    Return whether process is a daemon
+    """
+
     authkey: bytes
     _identity: tuple[int, ...]  # undocumented
     def __init__(
@@ -33,6 +38,11 @@ class BaseProcess:
         """
         Start child process
         """
+    if sys.version_info >= (3, 14):
+        def interrupt(self) -> None:
+            """
+            Terminate process; sends SIGINT signal
+            """
 
     def terminate(self) -> None:
         """

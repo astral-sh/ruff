@@ -204,3 +204,27 @@ x = 1
 print(f"{x=}" or "bar")  # SIM222
 (lambda: 1) or True  # SIM222
 (i for i in range(1)) or "bar"  # SIM222
+
+# https://github.com/astral-sh/ruff/issues/21136
+def get_items():
+    return tuple(item for item in Item.objects.all()) or None  # OK
+
+
+def get_items_list():
+    return tuple([item for item in items]) or None  # OK
+
+
+def get_items_set():
+    return tuple({item for item in items}) or None  # OK
+
+
+# https://github.com/astral-sh/ruff/issues/21473
+tuple("") or True  # SIM222
+tuple(t"") or True  # OK
+tuple(0) or True  # OK
+tuple(1) or True  # OK
+tuple(False) or True  # OK
+tuple(None) or True  # OK
+tuple(...) or True  # OK
+tuple(lambda x: x) or True  # OK
+tuple(x for x in range(0)) or True  # OK

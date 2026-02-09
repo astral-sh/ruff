@@ -1,11 +1,13 @@
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_path_samefile_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr,
 };
 use crate::{FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
 
 /// ## What it does
 /// Checks for uses of `os.path.samefile`.
@@ -79,5 +81,6 @@ pub(crate) fn os_path_samefile(checker: &Checker, call: &ExprCall, segments: &[&
         "f2",
         fix_enabled,
         OsPathSamefile,
+        Applicability::Safe,
     );
 }

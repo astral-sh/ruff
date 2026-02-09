@@ -13,7 +13,7 @@ reveal_type(3 | 4)  # revealed: Literal[7]
 reveal_type(5 & 6)  # revealed: Literal[4]
 reveal_type(7 ^ 2)  # revealed: Literal[5]
 
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `Literal[2]` and `Literal["f"]`"
+# error: [unsupported-operator] "Operator `+` is not supported between objects of type `Literal[2]` and `Literal["f"]`"
 reveal_type(2 + "f")  # revealed: Unknown
 
 def lhs(x: int):
@@ -54,10 +54,8 @@ reveal_type(2**largest_u32)  # revealed: int
 
 def variable(x: int):
     reveal_type(x**2)  # revealed: int
-    # TODO: should be `Any` (overload 5 on `__pow__`), requires correct overload matching
-    reveal_type(2**x)  # revealed: int
-    # TODO: should be `Any` (overload 5 on `__pow__`), requires correct overload matching
-    reveal_type(x**x)  # revealed: int
+    reveal_type(2**x)  # revealed: Any
+    reveal_type(x**x)  # revealed: Any
 ```
 
 If the second argument is \<0, a `float` is returned at runtime. If the first argument is \<0 but

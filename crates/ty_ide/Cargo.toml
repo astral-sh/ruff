@@ -19,14 +19,15 @@ ruff_memory_usage = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_codegen = { workspace = true }
 ruff_python_importer = { workspace = true }
-ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
-ty_python_semantic = { workspace = true }
+ty_module_resolver = { workspace = true }
 ty_project = { workspace = true, features = ["testing"] }
+ty_python_semantic = { workspace = true }
 ty_vendored = { workspace = true }
 
+compact_str = { workspace = true }
 get-size2 = { workspace = true }
 itertools = { workspace = true }
 rayon = { workspace = true }
@@ -37,6 +38,8 @@ smallvec = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+ruff_python_parser = { workspace = true }
+
 camino = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 

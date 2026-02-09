@@ -166,10 +166,10 @@ impl<'db> PatternPredicate<'db> {
     }
 }
 
-/// A "placeholder predicate" that is used to model the fact that the boundness of a
-/// (possible) definition or declaration caused by a `*` import cannot be fully determined
-/// until type-inference time. This is essentially the same as a standard reachability constraint,
-/// so we reuse the [`Predicate`] infrastructure to model it.
+/// A "placeholder predicate" that is used to model the fact that the boundness of a (possible)
+/// definition or declaration caused by a `*` import cannot be fully determined until type-
+/// inference time. This is essentially the same as a standard reachability constraint, so we reuse
+/// the [`Predicate`] infrastructure to model it.
 ///
 /// To illustrate, say we have a module `exporter.py` like so:
 ///
@@ -183,14 +183,14 @@ impl<'db> PatternPredicate<'db> {
 /// ```py
 /// A = 1
 ///
-/// from importer import *
+/// from exporter import *
 /// ```
 ///
-/// Since we cannot know whether or not <condition> is true at semantic-index time,
-/// we record a definition for `A` in `b.py` as a result of the `from a import *`
-/// statement, but place a predicate on it to record the fact that we don't yet
-/// know whether this definition will be visible from all control-flow paths or not.
-/// Essentially, we model `b.py` as something similar to this:
+/// Since we cannot know whether or not <condition> is true at semantic-index time, we record
+/// a definition for `A` in `importer.py` as a result of the `from exporter import *` statement,
+/// but place a predicate on it to record the fact that we don't yet know whether this definition
+/// will be visible from all control-flow paths or not. Essentially, we model `importer.py` as
+/// something similar to this:
 ///
 /// ```py
 /// A = 1
@@ -199,8 +199,8 @@ impl<'db> PatternPredicate<'db> {
 ///     from a import A
 /// ```
 ///
-/// At type-check time, the placeholder predicate for the `A` definition is evaluated by
-/// attempting to resolve the `A` symbol in `a.py`'s global namespace:
+/// At type-check time, the placeholder predicate for the `A` definition is evaluated by attempting
+/// to resolve the `A` symbol in `exporter.py`'s global namespace:
 /// - If it resolves to a definitely bound symbol, then the predicate resolves to [`Truthiness::AlwaysTrue`]
 /// - If it resolves to an unbound symbol, then the predicate resolves to [`Truthiness::AlwaysFalse`]
 /// - If it resolves to a possibly bound symbol, then the predicate resolves to [`Truthiness::Ambiguous`]

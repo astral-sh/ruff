@@ -49,9 +49,14 @@ impl<'a> FullRenderer<'a> {
             .help(stylesheet.help)
             .line_no(stylesheet.line_no)
             .emphasis(stylesheet.emphasis)
-            .none(stylesheet.none);
+            .none(stylesheet.none)
+            .hyperlink(stylesheet.hyperlink);
 
         for diag in diagnostics {
+            if self.config.is_canceled() {
+                return Ok(());
+            }
+
             let resolved = Resolved::new(self.resolver, diag, self.config);
             let renderable = resolved.to_renderable(self.config.context);
             for diag in renderable.diagnostics.iter() {
@@ -112,16 +117,16 @@ impl std::fmt::Display for Diff<'_> {
         // `None`, indicating a regular script file, all the lines will be in one "cell" under the
         // `None` key.
         let cells = if let Some(notebook_index) = &self.notebook_index {
-            let mut last_cell = OneIndexed::MIN;
+            let mut last_cell_index = OneIndexed::MIN;
             let mut cells: Vec<(Option<OneIndexed>, TextSize)> = Vec::new();
-            for (row, cell) in notebook_index.iter() {
-                if cell != last_cell {
-                    let offset = source_code.line_start(row);
-                    cells.push((Some(last_cell), offset));
-                    last_cell = cell;
+            for cell in notebook_index.iter() {
+                if cell.cell_index() != last_cell_index {
+                    let offset = source_code.line_start(cell.start_row());
+                    cells.push((Some(last_cell_index), offset));
+                    last_cell_index = cell.cell_index();
                 }
             }
-            cells.push((Some(last_cell), source_text.text_len()));
+            cells.push((Some(last_cell_index), source_text.text_len()));
             cells
         } else {
             vec![(None, source_text.text_len())]
@@ -703,52 +708,7 @@ print()
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
-        error[unused-import][*]: `os` imported but unused
-         --> notebook.ipynb:cell 1:2:8
-          |
-        1 | # cell 1
-        2 | import os
-          |        ^^
-          |
-        help: Remove unused import: `os`
-         ::: cell 1
-        1 | # cell 1
-          - import os
-
-        error[unused-import][*]: `math` imported but unused
-         --> notebook.ipynb:cell 2:2:8
-          |
-        1 | # cell 2
-        2 | import math
-          |        ^^^^
-        3 |
-        4 | print('hello world')
-          |
-        help: Remove unused import: `math`
-         ::: cell 2
-        1 | # cell 2
-          - import math
-        2 | 
-        3 | print('hello world')
-
-        error[unused-variable][*]: Local variable `x` is assigned to but never used
-         --> notebook.ipynb:cell 3:4:5
-          |
-        2 | def foo():
-        3 |     print()
-        4 |     x = 1
-          |     ^
-          |
-        help: Remove assignment to unused variable `x`
-         ::: cell 3
-        1 | # cell 3
-        2 | def foo():
-        3 |     print()
-          -     x = 1
-        4 | 
-        note: This is an unsafe fix and may change runtime behavior
-        ");
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
     }
 
     #[test]
@@ -768,31 +728,7 @@ print()
         }
         *fix = Fix::unsafe_edits(edits.remove(0), edits);
 
-        insta::assert_snapshot!(env.render(&diagnostic), @r"
-        error[unused-import][*]: `os` imported but unused
-         --> notebook.ipynb:cell 1:2:8
-          |
-        1 | # cell 1
-        2 | import os
-          |        ^^
-          |
-        help: Remove unused import: `os`
-         ::: cell 1
-        1 | # cell 1
-          - import os
-         ::: cell 2
-        1 | # cell 2
-          - import math
-        2 | 
-        3 | print('hello world')
-         ::: cell 3
-        1 | # cell 3
-        2 | def foo():
-        3 |     print()
-          -     x = 1
-        4 | 
-        note: This is an unsafe fix and may change runtime behavior
-        ");
+        insta::assert_snapshot!(env.render(&diagnostic));
     }
 
     /// Carriage return (`\r`) is a valid line-ending in Python, so we should normalize this to a

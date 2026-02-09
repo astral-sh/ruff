@@ -10,6 +10,10 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
+
 [lib]
 doctest = false
 
@@ -18,10 +22,10 @@ ruff_cache = { workspace = true }
 ruff_db = { workspace = true }
 ruff_formatter = { workspace = true }
 ruff_macros = { workspace = true }
-ruff_python_trivia = { workspace = true }
-ruff_source_file = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
+ruff_python_trivia = { workspace = true }
+ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 anyhow = { workspace = true }
@@ -32,8 +36,8 @@ memchr = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
-serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
@@ -43,21 +47,12 @@ tracing = { workspace = true }
 [dev-dependencies]
 ruff_formatter = { workspace = true }
 
-insta = { workspace = true, features = ["glob"] }
+datatest-stable = { workspace = true }
+insta = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 similar = { workspace = true }
-
-[package.metadata.cargo-shear]
-# Used via `CacheKey` macro expansion.
-ignored = ["ruff_cache"]
-
-[[test]]
-name = "ruff_python_formatter_fixtures"
-path = "tests/fixtures.rs"
-test = true
-required-features = ["serde"]
 
 [features]
 default = ["serde"]
@@ -68,6 +63,12 @@ serde = [
     "ruff_python_ast/serde",
 ]
 schemars = ["dep:schemars", "dep:serde_json", "ruff_formatter/schemars"]
+
+[[test]]
+name = "fixtures"
+harness = false
+test = true
+required-features = ["serde"]
 
 [lints]
 workspace = true

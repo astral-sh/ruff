@@ -172,16 +172,40 @@ class _ActionsContainer:
         add_argument(dest, ..., name=value, ...)
         add_argument(option_string, option_string, ..., name=value, ...)
         """
+    if sys.version_info >= (3, 14):
+        @overload
+        def add_argument_group(
+            self,
+            title: str | None = None,
+            description: str | None = None,
+            *,
+            # argument_default's type must be valid for the arguments in the group
+            argument_default: Any = ...,
+            conflict_handler: str = ...,
+        ) -> _ArgumentGroup: ...
+        @overload
+        @deprecated("The `prefix_chars` parameter deprecated since Python 3.14.")
+        def add_argument_group(
+            self,
+            title: str | None = None,
+            description: str | None = None,
+            *,
+            prefix_chars: str,
+            argument_default: Any = ...,
+            conflict_handler: str = ...,
+        ) -> _ArgumentGroup: ...
+    else:
+        def add_argument_group(
+            self,
+            title: str | None = None,
+            description: str | None = None,
+            *,
+            prefix_chars: str = ...,
+            # argument_default's type must be valid for the arguments in the group
+            argument_default: Any = ...,
+            conflict_handler: str = ...,
+        ) -> _ArgumentGroup: ...
 
-    def add_argument_group(
-        self,
-        title: str | None = None,
-        description: str | None = None,
-        *,
-        prefix_chars: str = ...,
-        argument_default: Any = ...,
-        conflict_handler: str = ...,
-    ) -> _ArgumentGroup: ...
     def add_mutually_exclusive_group(self, *, required: bool = False) -> _MutuallyExclusiveGroup: ...
     def _add_action(self, action: _ActionT) -> _ActionT: ...
     def _remove_action(self, action: Action) -> None: ...
@@ -364,7 +388,11 @@ class ArgumentParser(_AttributeHolder, _ActionsContainer):
     def _read_args_from_files(self, arg_strings: list[str]) -> list[str]: ...
     def _match_argument(self, action: Action, arg_strings_pattern: str) -> int: ...
     def _match_arguments_partial(self, actions: Sequence[Action], arg_strings_pattern: str) -> list[int]: ...
-    def _parse_optional(self, arg_string: str) -> tuple[Action | None, str, str | None] | None: ...
+    if sys.version_info >= (3, 12):
+        def _parse_optional(self, arg_string: str) -> list[tuple[Action | None, str, str | None, str | None]] | None: ...
+    else:
+        def _parse_optional(self, arg_string: str) -> tuple[Action | None, str, str | None] | None: ...
+
     def _get_option_tuples(self, option_string: str) -> list[tuple[Action, str, str | None]]: ...
     def _get_nargs_pattern(self, action: Action) -> str: ...
     def _get_values(self, action: Action, arg_strings: list[str]) -> Any: ...

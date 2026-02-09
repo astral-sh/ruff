@@ -3,10 +3,10 @@ use ruff_python_ast::StmtDelete;
 use ruff_text_size::Ranged;
 
 use crate::builders::{PyFormatterExtensions, parenthesize_if_expands};
-use crate::comments::{SourceComment, dangling_node_comments};
+use crate::comments::dangling_node_comments;
 use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
-use crate::{has_skip_comment, prelude::*};
+use crate::prelude::*;
 
 #[derive(Default)]
 pub struct FormatStmtDelete;
@@ -56,13 +56,5 @@ impl FormatNodeRule<StmtDelete> for FormatStmtDelete {
                 parenthesize_if_expands(&item).fmt(f)
             }
         }
-    }
-
-    fn is_suppressed(
-        &self,
-        trailing_comments: &[SourceComment],
-        context: &PyFormatContext,
-    ) -> bool {
-        has_skip_comment(trailing_comments, context.source())
     }
 }

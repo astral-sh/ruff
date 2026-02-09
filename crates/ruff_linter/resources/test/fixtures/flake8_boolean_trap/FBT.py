@@ -73,6 +73,9 @@ sa.func.coalesce(tbl.c.valid, False)
 setVisible(True)
 set_visible(True)
 
+from multiprocessing import Value as m_Value
+m_Value("b", True)
+
 
 class Registry:
     def __init__(self) -> None:

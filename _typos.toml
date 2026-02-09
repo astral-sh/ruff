@@ -4,6 +4,7 @@ extend-exclude = [
     "crates/ty_vendored/vendor/**/*",
     "**/resources/**/*",
     "**/snapshots/**/*",
+    "crates/ruff_linter/src/rules/flake8_implicit_str_concat/rules/collection_literal.rs",
     # Completion tests tend to have a lot of incomplete
     # words naturally. It's annoying to have to make all
     # of them actually words. So just ignore typos here.

@@ -22,6 +22,7 @@ DAG(dag_id="class_schedule_interval", schedule_interval="@hourly")
 
 DAG(dag_id="class_timetable", timetable=NullTimetable())
 
+DAG(dag_id="class_concurrency", concurrency=12)
 
 DAG(dag_id="class_fail_stop", fail_stop=True)
 

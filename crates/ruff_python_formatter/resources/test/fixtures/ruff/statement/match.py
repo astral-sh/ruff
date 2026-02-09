@@ -613,3 +613,58 @@ match guard_comments:
     ):
         pass
 
+
+# regression tests from https://github.com/astral-sh/ruff/issues/17796
+match class_pattern:
+    case Class(xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx) as capture:
+        pass
+    case Class(
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ) as capture:
+        pass
+    case Class(
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ) as capture:
+        pass
+    case Class(
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ) as really_really_really_really_really_really_really_really_really_really_really_really_long_capture:
+        pass
+
+match sequence_pattern_brackets:
+    case [xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx] as capture:
+        pass
+    case [
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ] as capture:
+        pass
+    case [
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+    ] as capture:
+        pass
+
+
+match class_pattern:
+    # 1
+    case Class(xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx) as capture:  # 2
+        # 3
+        pass # 4
+    # 5
+    case Class( # 6
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 7
+    ) as capture: # 8
+        pass
+    case Class( # 9
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 10
+    ) as capture: # 11
+        pass
+    case Class( # 12
+        xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 13
+    ) as really_really_really_really_really_really_really_really_really_really_really_really_long_capture: # 14
+        pass
+    case Class( # 0
+            # 1
+            xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx # 2
+            # 3
+    ) as capture:
+        pass

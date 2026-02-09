@@ -45,6 +45,10 @@ use crate::{FixAvailability, Violation};
 /// behaviors is required, there's no existing `pathlib` alternative. See CPython issue
 /// [#69200](https://github.com/python/cpython/issues/69200).
 ///
+/// Additionally, the fix is marked as unsafe because `os.path.abspath()` returns `str` or `bytes` (`AnyStr`),
+/// while `Path.resolve()` returns a `Path` object. This change in return type can break code that uses
+/// the return value.
+///
 /// ## References
 /// - [Python documentation: `Path.resolve`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.resolve)
 /// - [Python documentation: `os.path.abspath`](https://docs.python.org/3/library/os.path.html#os.path.abspath)
@@ -85,6 +89,6 @@ pub(crate) fn os_path_abspath(checker: &Checker, call: &ExprCall, segments: &[&s
         "path",
         is_fix_os_path_abspath_enabled(checker.settings()),
         OsPathAbspath,
-        Some(Applicability::Unsafe),
+        Applicability::Unsafe,
     );
 }

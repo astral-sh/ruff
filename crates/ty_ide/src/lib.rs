@@ -3,15 +3,15 @@
     reason = "Prefer System trait methods over std methods in ty crates"
 )]
 mod all_symbols;
+mod code_action;
 mod completion;
 mod doc_highlights;
 mod docstring;
 mod document_symbols;
-mod find_node;
+mod find_references;
 mod goto;
 mod goto_declaration;
 mod goto_definition;
-mod goto_references;
 mod goto_type_definition;
 mod hover;
 mod importer;
@@ -27,13 +27,16 @@ mod symbols;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
+pub use code_action::{QuickFix, code_actions};
 pub use completion::{Completion, CompletionKind, CompletionSettings, completion};
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
+pub use find_references::find_references;
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
-pub use goto_references::goto_references;
 pub use hover::hover;
-pub use inlay_hints::{InlayHintKind, InlayHintLabel, InlayHintSettings, inlay_hints};
+pub use inlay_hints::{
+    InlayHintKind, InlayHintLabel, InlayHintSettings, InlayHintTextEdit, inlay_hints,
+};
 pub use markup::MarkupKind;
 pub use references::ReferencesMode;
 pub use rename::{can_rename, rename};
@@ -132,6 +135,20 @@ impl NavigationTarget {
     pub fn full_range(&self) -> TextRange {
         self.full_range
     }
+
+    pub fn full_file_range(&self) -> FileRange {
+        FileRange::new(self.file, self.full_range)
+    }
+}
+
+impl From<FileRange> for NavigationTarget {
+    fn from(value: FileRange) -> Self {
+        Self {
+            file: value.file(),
+            focus_range: value.range(),
+            full_range: value.range(),
+        }
+    }
 }
 
 /// Specifies the kind of reference operation.
@@ -211,6 +228,11 @@ impl NavigationTargets {
     #[cfg(test)]
     fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -338,9 +360,6 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -417,18 +436,7 @@ mod tests {
                 SystemPathBuf::from("/"),
             ));
 
-            let search_paths = SearchPathSettings::new(vec![SystemPathBuf::from("/")])
-                .to_search_paths(db.system(), db.vendored())
-                .expect("Valid search path settings");
-
-            Program::from_settings(
-                &db,
-                ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
-                    python_platform: PythonPlatform::default(),
-                    search_paths,
-                },
-            );
+            db.init_program().unwrap();
 
             let mut cursor: Option<Cursor> = None;
             for &Source {

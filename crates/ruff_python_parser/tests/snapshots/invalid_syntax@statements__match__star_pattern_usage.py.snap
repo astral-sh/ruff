@@ -580,7 +580,7 @@ Module(
 15 |     case Foo(x=*_):
 16 |         pass
 17 |     case {*_}:
-   |             ^ Syntax Error: Expected ':', found '}'
+   |             ^ Syntax Error: Expected `:`, found `}`
 18 |         pass
 19 |     case {*_: 1}:
    |

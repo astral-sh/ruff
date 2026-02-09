@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: named_tuple.md - `NamedTuple` - `typing.NamedTuple` - Multiple Inheritance
 mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
@@ -29,6 +30,23 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
 15 | 
 16 | # error: [invalid-named-tuple]
 17 | class E(NamedTuple, Protocol): ...
+18 | from abc import ABC
+19 | from collections import namedtuple
+20 | from typing import NamedTuple
+21 | 
+22 | class Point(namedtuple("Point", ["x", "y"]), ABC):
+23 |     """No error - functional namedtuple inheritance allows multiple inheritance."""
+24 | 
+25 | class Url(NamedTuple("Url", [("host", str), ("port", int)]), ABC):
+26 |     """No error - typing.NamedTuple functional syntax also allows multiple inheritance."""
+27 | 
+28 | p = Point(1, 2)
+29 | reveal_type(p.x)  # revealed: Any
+30 | reveal_type(p.y)  # revealed: Any
+31 | 
+32 | u = Url("localhost", 8080)
+33 | reveal_type(u.host)  # revealed: str
+34 | reveal_type(u.port)  # revealed: int
 ```
 
 # Diagnostics
@@ -67,6 +85,8 @@ error[invalid-named-tuple]: NamedTuple class `E` cannot use multiple inheritance
 16 | # error: [invalid-named-tuple]
 17 | class E(NamedTuple, Protocol): ...
    |                     ^^^^^^^^
+18 | from abc import ABC
+19 | from collections import namedtuple
    |
 info: rule `invalid-named-tuple` is enabled by default
 

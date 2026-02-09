@@ -444,7 +444,7 @@ def _(
     reveal_type(i07)  # revealed: Never
     reveal_type(i08)  # revealed: Never
 
-# `bool` is final and can not be subclassed, so `type[bool]` is equivalent to `Literal[bool]`, which
+# `bool` is final and cannot be subclassed, so `type[bool]` is equivalent to `Literal[bool]`, which
 # is disjoint from `type[str]`:
 def example_type_bool_type_str(
     i: Intersection[type[bool], type[str]],
@@ -958,6 +958,22 @@ def f(x: Intersection) -> None:
 # error: [invalid-type-form] "`ty_extensions.Not` requires exactly one argument when used in a type expression"
 def f(x: Not) -> None:
     reveal_type(x)  # revealed: Unknown
+```
+
+## Attribute access on pure negation types
+
+When an attribute has a pure negation type (an intersection with only negative contributions, like
+`~AlwaysFalsy`), accessing it should preserve the negation information rather than falling back to
+`object`.
+
+```py
+from ty_extensions import Not, AlwaysFalsy
+
+class C:
+    x: Not[AlwaysFalsy]
+
+def f(c: C):
+    reveal_type(c.x)  # revealed: ~AlwaysFalsy
 ```
 
 [complement laws]: https://en.wikipedia.org/wiki/Complement_(set_theory)

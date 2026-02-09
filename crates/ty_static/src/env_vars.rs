@@ -10,7 +10,7 @@ impl EnvVars {
     ///
     /// For example:
     ///
-    /// - `TY_LOG=uv=debug` is the equivalent of `-vv` to the command line
+    /// - `TY_LOG=ty=debug` is the equivalent of `-vv` to the command line
     /// - `TY_LOG=trace` will enable all trace-level logging.
     ///
     /// See the [tracing documentation](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#example-syntax)
@@ -38,6 +38,21 @@ impl EnvVars {
     /// This isn't the same as a thread limit. ty may spawn additional threads
     /// when necessary, e.g. to watch for file system changes or a dedicated UI thread.
     pub const TY_MAX_PARALLELISM: &'static str = "TY_MAX_PARALLELISM";
+
+    /// Path to a `ty.toml` configuration file to use.
+    ///
+    /// When set, ty will use this file for configuration instead of
+    /// discovering configuration files automatically.
+    ///
+    /// Equivalent to the `--config-file` command-line argument.
+    pub const TY_CONFIG_FILE: &'static str = "TY_CONFIG_FILE";
+
+    /// The format to use for printing diagnostic messages.
+    ///
+    /// When set, ty will use this format for output instead of the default.
+    ///
+    /// Accepts the same values as the `--output-format` command-line argument.
+    pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
 
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";

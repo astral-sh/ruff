@@ -71,6 +71,10 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// This rule only applies to generic functions and does not include generic classes. See
 /// [`non-pep695-generic-class`][UP046] for the class version.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/

@@ -28,6 +28,7 @@ mod tests {
     use crate::settings::types::PreviewMode;
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
+    use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
     use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
 
@@ -263,7 +264,10 @@ mod tests {
     )]
     fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
+            &SourceKind::Python {
+                code: dedent(contents).to_string(),
+                is_stub: false,
+            },
             Path::new("f401_preview_first_party_submodule/__init__.py"),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
@@ -528,9 +532,44 @@ mod tests {
         import a",
         "f401_use_in_between_imports"
     )]
+    #[test_case(
+        r"
+        if cond:
+            import a
+            import a.b
+            a.foo()
+        ",
+        "f401_same_branch"
+    )]
+    #[test_case(
+        r"
+        try:
+            import a.b.c
+        except ImportError:
+            import argparse
+            import a
+            a.b = argparse.Namespace()
+        ",
+        "f401_different_branch"
+    )]
+    #[test_case(
+        r"
+        import mlflow.pyfunc.loaders.chat_agent
+        import mlflow.pyfunc.loaders.chat_model
+        import mlflow.pyfunc.loaders.code_model
+        from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
+
+        if IS_PYDANTIC_V2_OR_NEWER:
+            import mlflow.pyfunc.loaders.responses_agent
+        ",
+        "f401_type_checking"
+    )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
+            &SourceKind::Python {
+                code: dedent(contents).to_string(),
+                is_stub: false,
+            },
             Path::new("f401_preview_submodule.py"),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
@@ -906,7 +945,10 @@ mod tests {
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
-        let source_kind = SourceKind::Python(contents.to_string());
+        let source_kind = SourceKind::Python {
+            code: contents.to_string(),
+            is_stub: source_type.is_stub(),
+        };
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
         let target_version = settings.unresolved_target_version;
         let options =
@@ -923,6 +965,7 @@ mod tests {
             &locator,
             &indexer,
         );
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
         let mut messages = check_path(
             Path::new("<filename>"),
             None,
@@ -936,6 +979,7 @@ mod tests {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
         messages.sort_by(Diagnostic::ruff_start_ordering);
         let actual = messages

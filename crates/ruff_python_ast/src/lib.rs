@@ -12,6 +12,7 @@ pub use python_version::*;
 pub mod comparable;
 pub mod docstrings;
 mod expression;
+pub mod find_node;
 mod generated;
 pub mod helpers;
 pub mod identifier;
@@ -29,6 +30,7 @@ pub mod statement_visitor;
 pub mod stmt_if;
 pub mod str;
 pub mod str_prefix;
+pub mod token;
 pub mod traversal;
 pub mod types;
 pub mod visitor;
@@ -41,6 +43,8 @@ pub enum SourceType {
     Python(PySourceType),
     /// The file contains TOML.
     Toml(TomlSourceType),
+    /// The file contains Markdown.
+    Markdown,
 }
 
 impl Default for SourceType {
@@ -57,6 +61,7 @@ impl<P: AsRef<Path>> From<P> for SourceType {
             Some(filename) if filename == "poetry.lock" => Self::Toml(TomlSourceType::Poetry),
             _ => match path.as_ref().extension() {
                 Some(ext) if ext == "toml" => Self::Toml(TomlSourceType::Unrecognized),
+                Some(ext) if ext == "md" || ext == "qmd" => Self::Markdown,
                 _ => Self::Python(PySourceType::from(path)),
             },
         }

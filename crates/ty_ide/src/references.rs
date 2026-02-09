@@ -10,17 +10,17 @@
 //! all references to these externally-visible symbols therefore requires
 //! an expensive search of all source files in the workspace.
 
-use crate::find_node::CoveringNode;
 use crate::goto::GotoTarget;
-use crate::{Db, NavigationTarget, ReferenceKind, ReferenceTarget};
+use crate::{Db, NavigationTargets, ReferenceKind, ReferenceTarget};
 use ruff_db::files::File;
+use ruff_python_ast::find_node::CoveringNode;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
-use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_semantic::ImportAliasResolution;
+use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -37,6 +37,38 @@ pub enum ReferencesMode {
     DocumentHighlights,
 }
 
+impl ReferencesMode {
+    pub(super) fn to_import_alias_resolution(self) -> ImportAliasResolution {
+        match self {
+            // Resolve import aliases for find references:
+            // ```py
+            // from warnings import deprecated as my_deprecated
+            //
+            // @my_deprecated
+            // def foo
+            // ```
+            //
+            // When finding references on `my_deprecated`, we want to find all usages of `deprecated` across the entire
+            // project.
+            Self::References | Self::ReferencesSkipDeclaration => {
+                ImportAliasResolution::ResolveAliases
+            }
+            // For rename, don't resolve import aliases.
+            //
+            // ```py
+            // from warnings import deprecated as my_deprecated
+            //
+            // @my_deprecated
+            // def foo
+            // ```
+            // When renaming `my_deprecated`, only rename the alias, but not the original definition in `warnings`.
+            Self::Rename | Self::RenameMultiFile | Self::DocumentHighlights => {
+                ImportAliasResolution::PreserveAliases
+            }
+        }
+    }
+}
+
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
 pub(crate) fn references(
@@ -45,13 +77,10 @@ pub(crate) fn references(
     goto_target: &GotoTarget,
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
-    // Get the definitions for the symbol at the cursor position
-
-    // When finding references, do not resolve any local aliases.
-    let target_definitions_nav = goto_target
-        .get_definition_targets(file, db, ImportAliasResolution::PreserveAliases)?
-        .definition_targets(db)?;
-    let target_definitions: Vec<NavigationTarget> = target_definitions_nav.into_iter().collect();
+    let model = SemanticModel::new(db, file);
+    let target_definitions = goto_target
+        .get_definition_targets(&model, mode.to_import_alias_resolution())?
+        .declaration_targets(db)?;
 
     // Extract the target text from the goto target for fast comparison
     let target_text = goto_target.to_string()?;
@@ -114,17 +143,17 @@ pub(crate) fn references(
 fn references_for_file(
     db: &dyn Db,
     file: File,
-    target_definitions: &[NavigationTarget],
+    target_definitions: &NavigationTargets,
     target_text: &str,
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
 ) {
     let parsed = ruff_db::parsed::parsed_module(db, file);
     let module = parsed.load(db);
+    let model = SemanticModel::new(db, file);
 
     let mut finder = LocalReferencesFinder {
-        db,
-        file,
+        model: &model,
         target_definitions,
         references,
         mode,
@@ -156,10 +185,9 @@ fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
 
 /// AST visitor to find all references to a specific symbol by comparing semantic definitions
 struct LocalReferencesFinder<'a> {
-    db: &'a dyn Db,
-    file: File,
+    model: &'a SemanticModel<'a>,
     tokens: &'a Tokens,
-    target_definitions: &'a [NavigationTarget],
+    target_definitions: &'a NavigationTargets,
     references: &'a mut Vec<ReferenceTarget>,
     mode: ReferencesMode,
     target_text: &'a str,
@@ -219,11 +247,41 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                     self.check_identifier_reference(name);
                 }
             }
+            AnyNodeRef::PatternMatchStar(pattern_star) if self.should_include_declaration() => {
+                if let Some(name) = &pattern_star.name {
+                    self.check_identifier_reference(name);
+                }
+            }
             AnyNodeRef::PatternMatchMapping(pattern_mapping)
                 if self.should_include_declaration() =>
             {
                 if let Some(rest_name) = &pattern_mapping.rest {
                     self.check_identifier_reference(rest_name);
+                }
+            }
+            AnyNodeRef::TypeParamParamSpec(param_spec) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_spec.name);
+            }
+            AnyNodeRef::TypeParamTypeVarTuple(param_tuple) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_tuple.name);
+            }
+            AnyNodeRef::TypeParamTypeVar(param_var) if self.should_include_declaration() => {
+                self.check_identifier_reference(&param_var.name);
+            }
+            AnyNodeRef::ExprStringLiteral(string_expr) if self.should_include_declaration() => {
+                // Highlight the sub-AST of a string annotation
+                if let Some((sub_ast, sub_model)) = self.model.enter_string_annotation(string_expr)
+                {
+                    let mut sub_finder = LocalReferencesFinder {
+                        model: &sub_model,
+                        target_definitions: self.target_definitions,
+                        references: self.references,
+                        mode: self.mode,
+                        tokens: sub_ast.tokens(),
+                        target_text: self.target_text,
+                        ancestors: Vec::new(),
+                    };
+                    sub_finder.visit_expr(sub_ast.expr());
                 }
             }
             AnyNodeRef::Alias(alias) if self.should_include_declaration() => {
@@ -276,31 +334,25 @@ impl LocalReferencesFinder<'_> {
 
     /// Determines whether the given covering node is a reference to
     /// the symbol we are searching for
-    fn check_reference_from_covering_node(
-        &mut self,
-        covering_node: &crate::find_node::CoveringNode<'_>,
-    ) {
+    fn check_reference_from_covering_node(&mut self, covering_node: &CoveringNode<'_>) {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
         let offset = covering_node.node().start();
-
         if let Some(goto_target) =
-            GotoTarget::from_covering_node(covering_node, offset, self.tokens)
+            GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens)
         {
             // Get the definitions for this goto target
-            if let Some(current_definitions_nav) = goto_target
-                .get_definition_targets(self.file, self.db, ImportAliasResolution::PreserveAliases)
-                .and_then(|definitions| definitions.declaration_targets(self.db))
+            if let Some(current_definitions) = goto_target
+                .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
+                .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
-                let current_definitions: Vec<NavigationTarget> =
-                    current_definitions_nav.into_iter().collect();
                 // Check if any of the current definitions match our target definitions
                 if self.navigation_targets_match(&current_definitions) {
                     // Determine if this is a read or write reference
                     let kind = self.determine_reference_kind(covering_node);
                     let target =
-                        ReferenceTarget::new(self.file, covering_node.node().range(), kind);
+                        ReferenceTarget::new(self.model.file(), covering_node.node().range(), kind);
                     self.references.push(target);
                 }
             }
@@ -308,7 +360,7 @@ impl LocalReferencesFinder<'_> {
     }
 
     /// Check if `Vec<NavigationTarget>` match our target definitions
-    fn navigation_targets_match(&self, current_targets: &[NavigationTarget]) -> bool {
+    fn navigation_targets_match(&self, current_targets: &NavigationTargets) -> bool {
         // Since we're comparing the same symbol, all definitions should be equivalent
         // We only need to check against the first target definition
         if let Some(first_target) = self.target_definitions.iter().next() {

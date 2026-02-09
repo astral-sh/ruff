@@ -212,13 +212,46 @@ class Session: ...
 async def connect() -> AsyncGenerator[Session]:
     yield Session()
 
-# TODO: this should be `() -> _AsyncGeneratorContextManager[Session, None]`
-reveal_type(connect)  # revealed: (...) -> _AsyncGeneratorContextManager[Unknown, None]
+# revealed: () -> _AsyncGeneratorContextManager[Session, None]
+reveal_type(connect)
 
 async def main():
     async with connect() as session:
-        # TODO: should be `Session`
-        reveal_type(session)  # revealed: Unknown
+        reveal_type(session)  # revealed: Session
+```
+
+This also works with `AsyncIterator` return types:
+
+```py
+from typing import AsyncIterator
+
+@asynccontextmanager
+async def connect_iterator() -> AsyncIterator[Session]:
+    yield Session()
+
+# revealed: () -> _AsyncGeneratorContextManager[Session, None]
+reveal_type(connect_iterator)
+
+async def main_iterator():
+    async with connect_iterator() as session:
+        reveal_type(session)  # revealed: Session
+```
+
+And with `AsyncGeneratorType` return types:
+
+```py
+from types import AsyncGeneratorType
+
+@asynccontextmanager
+async def connect_async_generator() -> AsyncGeneratorType[Session]:
+    yield Session()
+
+# revealed: () -> _AsyncGeneratorContextManager[Session, None]
+reveal_type(connect_async_generator)
+
+async def main_async_generator():
+    async with connect_async_generator() as session:
+        reveal_type(session)  # revealed: Session
 ```
 
 ## `asyncio.timeout`

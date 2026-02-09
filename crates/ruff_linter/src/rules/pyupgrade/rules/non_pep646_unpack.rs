@@ -34,6 +34,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// different values when introspecting types at runtime. However, in most cases,
 /// the fix should be safe to apply.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// [PEP 646]: https://peps.python.org/pep-0646/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.10.0")]

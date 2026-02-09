@@ -9,10 +9,11 @@ use anyhow::Result;
 use libcst_native as cst;
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
-use ruff_python_parser::{Parsed, Tokens};
+use ruff_python_parser::Parsed;
 use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
 };
@@ -83,7 +84,7 @@ impl<'a> Importer<'a> {
                     .into_edit(&required_import)
             } else {
                 // Insert at the start of the file.
-                Insertion::start_of_file(self.python_ast, self.source, self.stylist)
+                Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
                     .into_edit(&required_import)
             }
         }
@@ -113,7 +114,7 @@ impl<'a> Importer<'a> {
             Insertion::end_of_statement(stmt, self.source, self.stylist)
         } else {
             // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
         };
         let add_import_edit = insertion.into_edit(&content);
 
@@ -498,7 +499,7 @@ impl<'a> Importer<'a> {
             Insertion::end_of_statement(stmt, self.source, self.stylist)
         } else {
             // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
         };
         if insertion.is_inline() {
             Err(anyhow::anyhow!(

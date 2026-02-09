@@ -53,7 +53,7 @@ pub(crate) fn format_stdin(
 
     let source_type = match path.and_then(|path| settings.extension.get(path)) {
         None => match path.map(SourceType::from).unwrap_or_default() {
-            SourceType::Python(source_type) => source_type,
+            source_type @ (SourceType::Python(_) | SourceType::Markdown) => source_type,
             SourceType::Toml(_) => {
                 if mode.is_write() {
                     parrot_stdin()?;
@@ -61,7 +61,7 @@ pub(crate) fn format_stdin(
                 return Ok(ExitStatus::Success);
             }
         },
-        Some(language) => PySourceType::from(language),
+        Some(language) => SourceType::Python(PySourceType::from(language)),
     };
 
     // Format the file.
@@ -88,7 +88,7 @@ fn format_source_code(
     path: Option<&Path>,
     range: Option<FormatRange>,
     settings: &FormatterSettings,
-    source_type: PySourceType,
+    source_type: SourceType,
     mode: FormatMode,
 ) -> Result<FormatResult, FormatCommandError> {
     // Read the source from stdin.
@@ -104,7 +104,7 @@ fn format_source_code(
     };
 
     // Format the source.
-    let formatted = format_source(&source_kind, source_type, path, settings, range)?;
+    let formatted = format_source(&source_kind, path, settings, range)?;
 
     match &formatted {
         FormattedSource::Formatted(formatted) => match mode {

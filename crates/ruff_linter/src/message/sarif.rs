@@ -18,7 +18,7 @@ use crate::registry::{Linter, RuleNamespace};
 /// An emitter for producing SARIF 2.1.0-compliant JSON output.
 ///
 /// Static Analysis Results Interchange Format (SARIF) is a standard format
-/// for static analysis results. For full specfification, see:
+/// for static analysis results. For full specification, see:
 /// [SARIF 2.1.0](https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html)
 pub struct SarifEmitter;
 
@@ -334,7 +334,7 @@ impl<'a> SarifResult<'a> {
             rule_id: RuleCode::from(diagnostic),
             level: "error".to_string(),
             message: SarifMessage {
-                text: diagnostic.body().to_string(),
+                text: diagnostic.concise_message().to_string(),
             },
             fixes: Self::fix(diagnostic, &uri).into_iter().collect(),
             locations: vec![SarifLocation {

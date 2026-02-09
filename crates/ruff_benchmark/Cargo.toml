@@ -16,75 +16,80 @@ bench = false
 test = false
 doctest = false
 
-[[bench]]
-name = "linter"
-harness = false
-required-features = ["instrumented"]
-
-[[bench]]
-name = "lexer"
-harness = false
-required-features = ["instrumented"]
-
-[[bench]]
-name = "parser"
-harness = false
-required-features = ["instrumented"]
-
-[[bench]]
-name = "formatter"
-harness = false
-required-features = ["instrumented"]
-
-[[bench]]
-name = "ty"
-harness = false
-required-features = ["instrumented"]
-
-[[bench]]
-name = "ty_walltime"
-harness = false
-required-features = ["walltime"]
-
 [dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
-ruff_python_ast = { workspace = true }
 ruff_linter = { workspace = true, optional = true }
+ruff_python_ast = { workspace = true }
 ruff_python_formatter = { workspace = true, optional = true }
 ruff_python_parser = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true, optional = true }
 ty_project = { workspace = true, optional = true }
 
-divan = { workspace = true, optional = true }
 anyhow = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
 criterion = { workspace = true, default-features = false, optional = true }
-rayon = { workspace = true }
-rustc-hash = { workspace = true }
+divan = { workspace = true, optional = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
 
-[lints]
-workspace = true
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
+tikv-jemallocator = { workspace = true, optional = true }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+mimalloc = { workspace = true, optional = true }
+
+[dev-dependencies]
+rayon = { workspace = true }
+rustc-hash = { workspace = true }
 
 [features]
-default = ["instrumented", "walltime"]
-# Enables the benchmark that should only run with codspeed's instrumented runner
-instrumented = [
+default = ["ty_instrumented", "ty_walltime", "ruff_instrumented"]
+# Enables the ruff instrumented benchmarks
+ruff_instrumented = [
     "criterion",
     "ruff_linter",
     "ruff_python_formatter",
     "ruff_python_parser",
     "ruff_python_trivia",
-    "ty_project",
+    "mimalloc",
+    "tikv-jemallocator",
 ]
+# Enables the ty instrumented benchmarks
+ty_instrumented = ["criterion", "ty_project", "ruff_python_trivia"]
 codspeed = ["codspeed-criterion-compat"]
-# Enables benchmark that should only run with codspeed's walltime runner.
-walltime = ["ruff_db/os", "ty_project", "divan"]
+# Enables the ty_walltime benchmarks
+ty_walltime = ["ruff_db/os", "ty_project", "divan"]
 
-[target.'cfg(target_os = "windows")'.dev-dependencies]
-mimalloc = { workspace = true }
+[[bench]]
+name = "linter"
+harness = false
+required-features = ["ruff_instrumented"]
 
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dev-dependencies]
-tikv-jemallocator = { workspace = true }
+[[bench]]
+name = "lexer"
+harness = false
+required-features = ["ruff_instrumented"]
+
+[[bench]]
+name = "parser"
+harness = false
+required-features = ["ruff_instrumented"]
+
+[[bench]]
+name = "formatter"
+harness = false
+required-features = ["ruff_instrumented"]
+
+[[bench]]
+name = "ty"
+harness = false
+required-features = ["ty_instrumented"]
+
+[[bench]]
+name = "ty_walltime"
+harness = false
+required-features = ["ty_walltime"]
+
+[lints]
+workspace = true

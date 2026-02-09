@@ -389,7 +389,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         }
     }
 
-    let in_init = checker.path().ends_with("__init__.py");
+    let in_init = checker.in_init_module();
     let fix_init = !checker.settings().ignore_init_module_imports;
     let preview_mode = is_dunder_init_fix_unused_import_enabled(checker.settings());
     let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());
@@ -898,6 +898,10 @@ fn best_match<'a, 'b>(
 
 #[inline]
 fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &SemanticModel) -> bool {
+    let Some(binding_node) = semantic.binding(id).source else {
+        return false;
+    };
+
     scope.shadowed_bindings(id).enumerate().all(|(i, shadow)| {
         let shadowed_binding = semantic.binding(shadow);
         // Bail if one of the shadowed bindings is
@@ -910,6 +914,34 @@ fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &Semanti
         // import a.b
         // ```
         if i > 0 && shadowed_binding.is_used() {
+            return false;
+        }
+        // We want to allow a situation like this:
+        //
+        // ```python
+        // import a.b
+        // if TYPE_CHECKING:
+        //     import a.b.c
+        // ```
+        // but bail in a situation like this:
+        //
+        // ```python
+        // try:
+        //     import a.b
+        // except ImportError:
+        //     import argparse
+        //     import a
+        //     a.b = argparse.Namespace()
+        // ```
+        //
+        // So we require that all the shadowed bindings dominate the
+        // last live binding for the import. That is: if the last live
+        // binding is executed it should imply that all the shadowed
+        // bindings were executed as well.
+        if shadowed_binding
+            .source
+            .is_none_or(|node_id| !semantic.dominates(node_id, binding_node))
+        {
             return false;
         }
         matches!(

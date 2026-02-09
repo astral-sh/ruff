@@ -6,7 +6,7 @@ use ruff_notebook::NotebookIndex;
 use ruff_source_file::{LineColumn, OneIndexed};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::{Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
+use crate::diagnostic::{ConciseMessage, Diagnostic, DiagnosticSource, DisplayDiagnosticConfig};
 
 use super::FileResolver;
 
@@ -100,8 +100,8 @@ pub(super) fn diagnostic_to_json<'a>(
     if config.preview {
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
-            url: diagnostic.to_ruff_url(),
-            message: diagnostic.body(),
+            url: diagnostic.documentation_url(),
+            message: diagnostic.concise_message(),
             fix,
             cell: notebook_cell_index,
             location: start_location.map(JsonLocation::from),
@@ -112,8 +112,8 @@ pub(super) fn diagnostic_to_json<'a>(
     } else {
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
-            url: diagnostic.to_ruff_url(),
-            message: diagnostic.body(),
+            url: diagnostic.documentation_url(),
+            message: diagnostic.concise_message(),
             fix,
             cell: notebook_cell_index,
             location: Some(start_location.unwrap_or_default().into()),
@@ -226,9 +226,9 @@ pub(crate) struct JsonDiagnostic<'a> {
     filename: Option<&'a str>,
     fix: Option<JsonFix<'a>>,
     location: Option<JsonLocation>,
-    message: &'a str,
+    message: ConciseMessage<'a>,
     noqa_row: Option<OneIndexed>,
-    url: Option<String>,
+    url: Option<&'a str>,
 }
 
 #[derive(Serialize)]
@@ -294,7 +294,10 @@ mod tests {
         env.format(DiagnosticFormat::Json);
         env.preview(false);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
+            .build();
 
         insta::assert_snapshot!(
             env.render(&diag),
@@ -328,7 +331,10 @@ mod tests {
         env.format(DiagnosticFormat::Json);
         env.preview(true);
 
-        let diag = env.err().build();
+        let diag = env
+            .err()
+            .documentation_url("https://docs.astral.sh/ruff/rules/test-diagnostic")
+            .build();
 
         insta::assert_snapshot!(
             env.render(&diag),

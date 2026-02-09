@@ -6,8 +6,8 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 use ruff_python_ast::{
-    self as ast, Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, Stmt, StmtAssign,
-    TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
+    self as ast, Arguments, Expr, ExprCall, ExprName, ExprSubscript, Identifier, PythonVersion,
+    Stmt, StmtAssign, TypeParam, TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple,
     name::Name,
     visitor::{self, Visitor},
 };
@@ -369,15 +369,19 @@ fn in_nested_context(checker: &Checker) -> bool {
 }
 
 /// Deduplicate `vars`, returning `None` if `vars` is empty or any duplicates are found.
-/// Also returns `None` if any `TypeVar` has a default value and preview mode is not enabled.
+/// Also returns `None` if any `TypeVar` has a default value and the target Python version
+/// is below 3.13 or preview mode is not enabled. Note that `typing_extensions` backports
+/// the default argument, but the rule should be skipped in that case.
 fn check_type_vars<'a>(vars: Vec<TypeVar<'a>>, checker: &Checker) -> Option<Vec<TypeVar<'a>>> {
     if vars.is_empty() {
         return None;
     }
 
-    // If any type variables have defaults and preview mode is not enabled, skip the rule
+    // If any type variables have defaults, skip the rule unless
+    // running with preview mode enabled and targeting Python 3.13+.
     if vars.iter().any(|tv| tv.default.is_some())
-        && !is_type_var_default_enabled(checker.settings())
+        && (checker.target_version() < PythonVersion::PY313
+            || !is_type_var_default_enabled(checker.settings()))
     {
         return None;
     }

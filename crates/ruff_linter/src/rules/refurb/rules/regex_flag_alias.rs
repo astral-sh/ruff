@@ -20,7 +20,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// import re
 ///
-/// if re.match("^hello", "hello world", re.I):
+/// if re.search("^hello", "hello world", re.I):
 ///     ...
 /// ```
 ///
@@ -28,7 +28,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```python
 /// import re
 ///
-/// if re.match("^hello", "hello world", re.IGNORECASE):
+/// if re.search("^hello", "hello world", re.IGNORECASE):
 ///     ...
 /// ```
 #[derive(ViolationMetadata)]

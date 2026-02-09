@@ -1,10 +1,10 @@
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Alias, StmtImportFrom, StmtRef};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::Tokens;
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -766,11 +766,12 @@ pub(crate) fn deprecated_import(checker: &Checker, import_from_stmt: &StmtImport
     }
 
     for operation in fixer.with_renames() {
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             DeprecatedImport {
                 deprecation: Deprecation::WithRename(operation),
             },
             import_from_stmt.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     }
 }

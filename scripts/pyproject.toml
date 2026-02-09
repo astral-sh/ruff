@@ -1,7 +1,7 @@
 [project]
 name = "scripts"
 version = "0.0.1"
-dependencies = ["stdlibs"]
+dependencies = ["stdlibs", "tqdm", "mdformat", "pyyaml"]
 requires-python = ">=3.12"
 
 [tool.black]
@@ -9,3 +9,12 @@ line-length = 88
 
 [tool.ruff]
 extend = "../pyproject.toml"
+
+[tool.ty.src]
+# `ty_benchmark` is a standalone project with its own pyproject.toml files, search paths, etc.
+exclude = ["./ty_benchmark"]
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+division-by-zero = "error"
+unused-ignore-comment = "error"

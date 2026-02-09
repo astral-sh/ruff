@@ -1,11 +1,11 @@
 use itertools::{EitherOrBoth, Itertools};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, PythonVersion, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::Tokens;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
