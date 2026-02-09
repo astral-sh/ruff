@@ -4291,7 +4291,7 @@ impl BindingError<'_> {
             | BindingError::ParameterAlreadyAssigned { argument_index, .. }
             | BindingError::SpecializationError { argument_index, .. } => {
                 if let Some(argument_index) = argument_index {
-                    *argument_index = *argument_index + offset;
+                    *argument_index += offset;
                 }
             }
 
@@ -4300,7 +4300,7 @@ impl BindingError<'_> {
                 ..
             } => {
                 if let Some(first_excess_argument_index) = first_excess_argument_index {
-                    *first_excess_argument_index = *first_excess_argument_index + offset;
+                    *first_excess_argument_index += offset;
                 }
             }
 
