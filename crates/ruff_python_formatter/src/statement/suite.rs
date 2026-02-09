@@ -989,6 +989,7 @@ mod tests {
 
     use crate::PyFormatOptions;
     use crate::comments::Comments;
+    use crate::context::collect_import_aliases;
     use crate::prelude::*;
     use crate::statement::suite::SuiteKind;
 
@@ -1016,12 +1017,14 @@ def trailing_func():
 
         let parsed = parse_module(source).unwrap();
         let comment_ranges = CommentRanges::from(parsed.tokens());
+        let import_aliases = collect_import_aliases(&parsed.syntax().body);
 
         let context = PyFormatContext::new(
             PyFormatOptions::default(),
             source,
             Comments::from_ranges(&comment_ranges),
             parsed.tokens(),
+            import_aliases,
         );
 
         let test_formatter =
