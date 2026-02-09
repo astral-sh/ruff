@@ -9767,15 +9767,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .any(|overload| overload.signature.generic_context.is_some());
 
         // If the type context is a union, attempt to narrow to a specific element.
-        let narrow_targets: &[_] = match call_expression_tcx.annotation {
+        let narrow_targets: Box<[_]> = match call_expression_tcx.annotation {
             // TODO: We could theoretically attempt to narrow to every element of
             // the power set of this union. However, this leads to an exponential
             // explosion of inference attempts, and is rarely needed in practice.
             //
             // We only need to attempt narrowing on generic calls, otherwise the type
             // context has no effect.
-            Some(Type::Union(union)) if has_generic_context => union.elements(db),
-            _ => &[],
+            Some(Type::Union(union)) if has_generic_context => union
+                .elements(self.db())
+                .iter()
+                // It is very unlikely that narrowing to `None` produces the intended inference,
+                // so we ignore it here. This is mostly a performance optimization.
+                .filter(|ty| !ty.is_none(self.db()))
+                .collect(),
+
+            _ => Box::new([]),
         };
 
         // We silence diagnostics until we successfully narrow to a specific type.
@@ -9850,7 +9857,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .filter(|ty| ty.class_specialization(db).is_some())
         {
-            if let Some(result) = try_narrow(*narrowed_ty) {
+            if let Some(result) = try_narrow(**narrowed_ty) {
                 return result;
             }
         }
@@ -9863,7 +9870,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .iter()
             .filter(|ty| ty.class_specialization(db).is_none())
         {
-            if let Some(result) = try_narrow(*narrowed_ty) {
+            if let Some(result) = try_narrow(**narrowed_ty) {
                 return result;
             }
         }
