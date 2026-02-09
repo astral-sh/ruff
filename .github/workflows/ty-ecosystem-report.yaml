@@ -56,11 +56,12 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@64ba99d672bd943c828529b80b6fe0692dfb5844"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@f26093838326d10b6d90f3a9d08125db7aa369d6"
 
           ecosystem-analyzer \
             --verbose \
             --repository ruff \
+            --flaky-runs 20 \
             analyze \
             --profile=profiling \
             --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
