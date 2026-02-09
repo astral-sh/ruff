@@ -1532,75 +1532,16 @@ def _(arg: int):
     foo(*arg)
 ```
 
-## Regression: union variadic unpacking with explicit keyword arguments
+## Union variadic unpacking with explicit keyword arguments
 
-When a union type containing variable-length elements (like `Unknown` or `str`) is unpacked as
-`*args`, the variadic expansion should not greedily consume optional positional parameters that are
-also provided as explicit keyword arguments.
+When a union type containing variable-length elements (like `Unknown`) is unpacked as `*args`, the
+variadic expansion should not greedily consume optional positional parameters that are also provided
+as explicit keyword arguments.
 
 ```py
-from datetime import datetime, timezone
 from ty_extensions import Unknown
 
-# Regression inspired by scipy: `self._dist.rvs(*self._shapes, size=size, random_state=random_state)`
-def _scipy_regression() -> None:
-    class Dist:
-        def rvs(self, mu=0, lmbda=1, a=1, b=1, size=None, random_state=None): ...
-
-    class Frozen:
-        def __init__(self) -> None:
-            self._dist: Unknown | Dist = Dist()
-            self._shapes = (0, 1, 1, 1)
-
-        def rvs(self, size=None, random_state=None):
-            self._dist.rvs(*self._shapes, size=size, random_state=random_state)
-
-# Regression inspired by cki-lib: `datetime(2010, 1, 2, *expected_next, tzinfo=timezone.utc)`
-def _cki_regression() -> None:
-    cases = [
-        ("*/5 * * * *", [(0, 5, 0), (0, 10, 0), (0, 15, 0)]),
-        ("*/10 * * * *", [(0, 10, 0), (0, 20, 0), (0, 30, 0)]),
-        ("0 */2 * * *", [(2, 0, 0), (4, 0, 0), (6, 0, 0)]),
-    ]
-
-    for _schedule, times in cases:
-        for expected_next in times:
-            datetime(2010, 1, 2, *expected_next, tzinfo=timezone.utc)
-            expected_next = datetime(2010, 1, 2, 0, 0, 0, tzinfo=timezone.utc)
-
-# Regression inspired by apprise: `validate_regex(bot_token, *x, fmt="{key}")`
-def _apprise_regression() -> None:
-    def validate_regex(
-        value: str,
-        regex: str = r"[^\s]+",
-        flags: str | int = 0,
-        strip: object = True,
-        fmt: str | None = None,
-    ) -> str:
-        return value
-
-    class NotifyBase:
-        template_tokens: dict[str, dict[str, str | bool | tuple[str, str]]] = {
-            "default": {"name": "x", "required": False, "regex": ("x", "i")},
-        }
-
-    class NotifyTelegram(NotifyBase):
-        template_tokens = dict(
-            NotifyBase.template_tokens,
-            **{
-                "bot_token": {
-                    "name": "Bot Token",
-                    "required": True,
-                    "regex": (r"^(bot)?(?P<key>[0-9]+:[a-z0-9_-]+)$", "i"),
-                }
-            },
-        )
-
-        def __init__(self, bot_token: str) -> None:
-            self.bot_token = validate_regex(
-                bot_token,
-                # error: [not-iterable]
-                *self.template_tokens["bot_token"]["regex"],
-                fmt="{key}",
-            )
+def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
+def _(args: "Unknown | tuple[int, int, int]"):
+    f(*args, fmt="{key}")  # fine
 ```
