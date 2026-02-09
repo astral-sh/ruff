@@ -1405,7 +1405,7 @@ fn check_apply_defaults_decorator(checker: &Checker, function_def: &StmtFunction
 
 /// Check if `trigger_rule` argument contains a deprecated value.
 ///
-/// Detects both string literal and TriggerRule enum usages:
+/// Check both string literal and `TriggerRule` enum usages:
 ///
 /// ```python
 /// from airflow.operators.empty import EmptyOperator
