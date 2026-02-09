@@ -92,6 +92,10 @@ impl<'a> PyFormatContext<'a> {
         self.docstring
     }
 
+    pub(crate) fn is_known_import_alias(&self, name: &Name) -> bool {
+        self.import_aliases.contains(&name)
+    }
+
     /// Return a new context suitable for formatting code snippets within a
     /// docstring.
     ///

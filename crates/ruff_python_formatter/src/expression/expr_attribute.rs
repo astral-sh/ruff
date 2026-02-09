@@ -1,5 +1,5 @@
 use ruff_formatter::{FormatRuleWithOptions, write};
-use ruff_python_ast::AnyNodeRef;
+use ruff_python_ast::{AnyNodeRef, ExprName};
 use ruff_python_ast::{Expr, ExprAttribute, ExprNumberLiteral, Number};
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, find_only_token_in_range};
 use ruff_text_size::{Ranged, TextRange};
@@ -134,7 +134,8 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     // Remember to update the doc-comment above when
                     // stabilizing this behavior.
                     || (is_fluent_layout_split_first_call_enabled(f.context())
-                        && call_chain_layout.is_first_call_like())
+                        && call_chain_layout.is_first_call_like() &&
+                !is_known_import_alias(value, f.context()))
                 {
                     soft_line_break().fmt(f)?;
                 }
@@ -185,6 +186,13 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             write!(f, [format_inner])
         }
     }
+}
+
+fn is_known_import_alias(value: &Expr, context: &PyFormatContext) -> bool {
+    let Some(ExprName { id, .. }) = value.as_name_expr() else {
+        return false;
+    };
+    context.is_known_import_alias(id)
 }
 
 impl NeedsParentheses for ExprAttribute {
