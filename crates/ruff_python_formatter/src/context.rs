@@ -463,7 +463,7 @@ where
     }
 }
 
-pub(crate) fn collect_import_aliases<'a>(body: &'a [Stmt]) -> FxHashSet<&'a Name> {
+pub(crate) fn collect_import_aliases(body: &[Stmt]) -> FxHashSet<&Name> {
     let mut visitor = ImportAliasCollector::default();
     visitor.visit_body(body);
     visitor.import_aliases
