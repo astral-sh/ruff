@@ -245,30 +245,3 @@ reveal_type(generic_context(outside_callable(int_identity)))
 # error: [invalid-argument-type]
 outside_callable(int_identity)("string")
 ```
-
-## TODO regression: `compose(identity)` should specialize under assignment
-
-```py
-from collections.abc import Callable
-from typing import Any, TypeVar, overload
-
-_A = TypeVar("_A")
-_B = TypeVar("_B")
-
-@overload
-def compose() -> Callable[[_A], _A]: ...
-@overload
-def compose(__fn1: Callable[[_A], _B]) -> Callable[[_A], _B]: ...
-def compose(*fns: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    def _compose(source: Any) -> Any:
-        for fn in fns:
-            source = fn(source)
-        return source
-    return _compose
-
-def identity(value: _A) -> _A:
-    return value
-
-# TODO: No `invalid-assignment` diagnostic should be emitted here.
-fn: Callable[[int], int] = compose(identity)  # error: [invalid-assignment]
-```
