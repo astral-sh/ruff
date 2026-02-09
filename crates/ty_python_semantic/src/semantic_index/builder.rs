@@ -251,6 +251,23 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         false
     }
 
+    /// Returns the enclosing non-comprehension scope for walrus operator targets,
+    /// per [PEP 572]. Named expressions in comprehensions bind in the first
+    /// enclosing scope that is *not* a comprehension.
+    ///
+    /// Returns `None` if the current scope is not a comprehension.
+    ///
+    /// [PEP 572]: https://peps.python.org/pep-0572/#scope-of-the-target
+    fn enclosing_scope_for_walrus(&self) -> Option<FileScopeId> {
+        if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
+            return None;
+        }
+        self.scope_stack.iter().rev().skip(1).find_map(|info| {
+            (self.scopes[info.file_scope_id].kind() != ScopeKind::Comprehension)
+                .then_some(info.file_scope_id)
+        })
+    }
+
     /// Push a new loop, returning the outer loop, if any.
     fn push_loop(&mut self) -> Option<Loop> {
         self.current_scope_info_mut()
@@ -668,8 +685,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         definition
     }
 
-    fn delete_associated_bindings(&mut self, place: ScopedPlaceId) {
-        let scope = self.current_scope();
+    fn delete_associated_bindings_in_scope(&mut self, scope: FileScopeId, place: ScopedPlaceId) {
         // Don't delete associated bindings if the scope is a class scope & place is a name (it's never visible to nested scopes)
         if self.scopes[scope].kind() == ScopeKind::Class && place.is_symbol() {
             return;
@@ -687,8 +703,64 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().delete_binding(place);
     }
 
+    /// Create a [`Definition`] for `definition_node` in the given `scope`, recording it in
+    /// that scope's place table and use-def map.
+    ///
+    /// Returns a 2-element tuple: the newly created [`Definition`] and the total number of
+    /// definitions now associated with the AST node.
+    ///
+    /// This is the low-level helper; callers that add definitions to the **current** scope
+    /// should normally use [`Self::push_additional_definition`] or [`Self::add_definition`],
+    /// which also update lazy snapshots and the try-node context stack.
+    fn add_definition_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize) {
+        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
+
+        let category = kind.category(self.source_type.is_stub(), self.module);
+        let is_reexported = kind.is_reexported();
+
+        let definition: Definition<'db> =
+            Definition::new(self.db, self.file, scope, place, kind, is_reexported);
+
+        let num_definitions = {
+            let definitions = self.add_entry_for_definition_key(definition_node.key());
+            definitions.push(definition);
+            definitions.len()
+        };
+
+        if category.is_binding() {
+            self.place_tables[scope].mark_bound(place);
+        }
+        if category.is_declaration() {
+            self.place_tables[scope].mark_declared(place);
+        }
+
+        match category {
+            DefinitionCategory::DeclarationAndBinding => {
+                self.use_def_maps[scope].record_declaration_and_binding(place, definition);
+                self.delete_associated_bindings_in_scope(scope, place);
+            }
+            DefinitionCategory::Declaration => {
+                self.use_def_maps[scope].record_declaration(place, definition);
+            }
+            DefinitionCategory::Binding => {
+                self.use_def_maps[scope].record_binding(place, definition);
+                self.delete_associated_bindings_in_scope(scope, place);
+            }
+        }
+
+        (definition, num_definitions)
+    }
+
     /// Push a new [`Definition`] onto the list of definitions
-    /// associated with the `definition_node` AST node.
+    /// associated with the `definition_node` AST node in the **current** scope.
     ///
     /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
     /// and the second element is the number of definitions that are now associated with
@@ -703,48 +775,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place: ScopedPlaceId,
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
     ) -> (Definition<'db>, usize) {
-        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+        let scope = self.current_scope();
+        let (definition, num_definitions) =
+            self.add_definition_in_scope(scope, place, definition_node);
 
-        // Note `definition_node` is guaranteed to be a child of `self.module`
-        let kind = definition_node.into_owned(self.module);
-
-        let category = kind.category(self.source_type.is_stub(), self.module);
-        let is_reexported = kind.is_reexported();
-
-        let definition: Definition<'db> = Definition::new(
-            self.db,
-            self.file,
-            self.current_scope(),
-            place,
-            kind,
-            is_reexported,
-        );
-
-        let num_definitions = {
-            let definitions = self.add_entry_for_definition_key(definition_node.key());
-            definitions.push(definition);
-            definitions.len()
-        };
-
-        if category.is_binding() {
-            self.mark_place_bound(place);
-        }
-        if category.is_declaration() {
-            self.mark_place_declared(place);
-        }
-
-        let use_def = self.current_use_def_map_mut();
-        match category {
-            DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(place, definition);
-                self.delete_associated_bindings(place);
-            }
-            DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
-            DefinitionCategory::Binding => {
-                use_def.record_binding(place, definition);
-                self.delete_associated_bindings(place);
-            }
-        }
+        let category = definition
+            .kind(self.db)
+            .category(self.source_type.is_stub(), self.module);
 
         if category.is_binding() {
             if let Some(id) = place.as_symbol() {
@@ -2632,10 +2669,28 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 );
                             }
                             Some(CurrentAssignment::Named(named)) => {
-                                // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                                // named expression is implicitly nonlocal. This is yet to be
-                                // implemented.
-                                self.add_definition(place_id, named);
+                                if let Some(enclosing_scope) = self.enclosing_scope_for_walrus() {
+                                    // PEP 572: walrus in comprehension binds in enclosing scope.
+                                    let target_name = named
+                                        .target
+                                        .as_name_expr()
+                                        .expect("target should be a Name expression")
+                                        .id
+                                        .clone();
+                                    let (symbol_id, added) = self.place_tables[enclosing_scope]
+                                        .add_symbol(Symbol::new(target_name));
+                                    if added {
+                                        self.use_def_maps[enclosing_scope]
+                                            .add_place(symbol_id.into());
+                                    }
+                                    self.add_definition_in_scope(
+                                        enclosing_scope,
+                                        symbol_id.into(),
+                                        named,
+                                    );
+                                } else {
+                                    self.add_definition(place_id, named);
+                                }
                             }
                             Some(CurrentAssignment::Comprehension {
                                 unpack,
@@ -2690,11 +2745,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
-                // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
+                    // PEP 572: walrus in comprehension binds in the enclosing scope.
+                    // Make the value a standalone expression so inference can evaluate
+                    // it in the comprehension scope where the iteration variables are visible.
+                    if self.enclosing_scope_for_walrus().is_some() {
+                        self.add_standalone_expression(&node.value);
+                    }
                     self.push_assignment(node.into());
                     self.visit_expr(&node.target);
                     self.pop_assignment();
