@@ -918,6 +918,33 @@ def _(a: int | None):
     )
 ```
 
+### Optimization: Limit tuple element expansion size
+
+To prevent combinatorial explosion, ty limits the Cartesian product size when expanding tuple
+elements. A tuple like `tuple[A | B, A | B, ..., A | B]` with many union-typed elements would
+otherwise produce an exponential number of expanded types.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: tuple[int, ...]) -> int: ...
+@overload
+def f(x: tuple[str, ...]) -> str: ...
+```
+
+```py
+from overloaded import f
+
+def _(a: int | str) -> None:
+    # This tuple has too many expandable elements for the Cartesian product to be computed.
+    # ty skips the tuple expansion and falls through to the error case.
+    # error: [no-matching-overload]
+    f((a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a))
+```
+
 ### Retry from parameter matching
 
 As per the spec, the argument type expansion should retry evaluating the expanded argument list from
