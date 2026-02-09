@@ -3103,21 +3103,12 @@ struct ArgumentTypeChecker<'a, 'db> {
     inferable_typevars: InferableTypeVars<'db, 'db>,
     specialization: Option<Specialization<'db>>,
 
-    /// Argument indices for which the constraint-set solver produced a `NoSolution` error. We
-    /// silence diagnostics from `check_argument_type` for these arguments to avoid duplicates: the
-    /// constraint-set solver is the authority for these parameters, and the post-specialization
-    /// assignability check would re-detect the same incompatibility against a less-informative
-    /// fallback specialization.
+    /// Argument indices for which specialization inference has already produced a sufficiently
+    /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
+    /// avoid duplicate diagnostics.
     ///
-    /// This is only needed because we currently use a hybrid of two solvers. The old heuristic
-    /// solver (which unions type mappings) never produces `NoSolution` errors for assignability
-    /// failures — it relies on `check_argument_type` as the sole diagnostic authority. The new
-    /// constraint-set solver detects errors during inference, making the subsequent
-    /// `check_argument_type` redundant for those arguments.
-    ///
-    /// TODO: Once we fully migrate to constraint sets for all specialization inference, this field
-    /// can be removed: `infer_specialization` will be the sole authority for generic parameters,
-    /// and `check_argument_type` will only be needed for non-generic parameters.
+    /// TODO: Once specialization inference fully owns generic argument validation, this field can
+    /// be removed.
     constraint_set_errors: Vec<bool>,
 }
 
@@ -3372,14 +3363,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 );
 
                 if let Err(error) = specialization_result {
-                    // Record if the specialization error comes from the new constraint set solver.
-                    // If so, we will silence any diagnostics from check_argument_types for this
-                    // argument. The constraint-set solver is the authority for these parameters,
-                    // and the post-specialization assignability check would re-detect the same
-                    // incompatibility against a less-informative fallback specialization.
-                    if error.comes_from_new_solver() {
-                        self.constraint_set_errors[argument_index] = true;
-                    }
                     specialization_errors.push(BindingError::SpecializationError {
                         error,
                         argument_index: adjusted_argument_index,
@@ -4849,13 +4832,6 @@ impl<'db> BindingError<'db> {
                 ));
 
                 match error {
-                    SpecializationError::NoSolution { parameter, .. } => {
-                        diag.set_primary_message(format_args!(
-                            "Argument type `{argument_ty_display}` does not \
-                                satisfy generic parameter annotation `{}",
-                            parameter.display(context.db()),
-                        ));
-                    }
                     SpecializationError::MismatchedBound { bound_typevar, .. } => {
                         let typevar = bound_typevar.typevar(context.db());
                         let typevar_name = typevar.name(context.db());
@@ -4890,9 +4866,11 @@ impl<'db> BindingError<'db> {
                     }
                 }
 
-                if let Some(typevar_definition) = error.bound_typevar().and_then(|bound_typevar| {
-                    bound_typevar.typevar(context.db()).definition(context.db())
-                }) {
+                if let Some(typevar_definition) = error
+                    .bound_typevar()
+                    .typevar(context.db())
+                    .definition(context.db())
+                {
                     let module = parsed_module(context.db(), typevar_definition.file(context.db()))
                         .load(context.db());
                     let typevar_range = typevar_definition.full_range(context.db(), &module);

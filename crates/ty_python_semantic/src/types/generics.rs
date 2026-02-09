@@ -2305,16 +2305,13 @@ impl<'db> SpecializationBuilder<'db> {
                             formal,
                             self.inferable,
                         );
-                        let result =
-                            self.add_type_mappings_from_constraint_set(formal, when, &mut f);
-                        if result.is_err()
-                            && (formal.has_typevar(self.db) || actual.has_typevar(self.db))
-                        {
-                            return Err(SpecializationError::NoSolution {
-                                parameter: formal,
-                                argument: actual,
-                            });
-                        }
+                        // For protocol inference via constraint sets, we currently treat
+                        // unsatisfiable results as "no inference" instead of an immediate
+                        // specialization error. This matches the previous behavior (where
+                        // unsatisfied comparisons simply produced no type mappings), and avoids
+                        // false positives for callable-wrapper patterns while this path is still
+                        // a hybrid of old and new solver logic.
+                        let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                         return Ok(());
                     }
 
@@ -2361,21 +2358,21 @@ impl<'db> SpecializationBuilder<'db> {
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     return Ok(());
                 };
+
                 // The `__call__` method is bound to `self`, so we need to bind it to get the
                 // callable signature that the actual type needs to match.
                 let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
-                let result = self.infer_from_callable_signature(
+
+                // For callable-signature inference, keep unsatisfiable constraint-set
+                // comparisons non-fatal for now. The hybrid inference/checking pipeline still
+                // depends on post-specialization assignability checks for some callable wrapper
+                // patterns (e.g. `functools.wraps`, callback adapters).
+                let _ = self.infer_from_callable_signature(
                     formal,
                     formal_signature,
                     &actual_callables,
                     f,
                 );
-                if result.is_err() && (formal.has_typevar(self.db) || actual.has_typevar(self.db)) {
-                    return Err(SpecializationError::NoSolution {
-                        parameter: formal,
-                        argument: actual,
-                    });
-                }
             }
 
             (Type::Callable(formal_callable), _) => {
@@ -2383,18 +2380,17 @@ impl<'db> SpecializationBuilder<'db> {
                     return Ok(());
                 };
                 let formal_signature = formal_callable.signatures(self.db);
-                let result = self.infer_from_callable_signature(
+
+                // For callable-signature inference, keep unsatisfiable constraint-set
+                // comparisons non-fatal for now. The hybrid inference/checking pipeline still
+                // depends on post-specialization assignability checks for some callable wrapper
+                // patterns (e.g. `functools.wraps`, callback adapters).
+                let _ = self.infer_from_callable_signature(
                     formal,
                     formal_signature,
                     &actual_callables,
                     f,
                 );
-                if result.is_err() && (formal.has_typevar(self.db) || actual.has_typevar(self.db)) {
-                    return Err(SpecializationError::NoSolution {
-                        parameter: formal,
-                        argument: actual,
-                    });
-                }
             }
 
             // Expand type aliases in the actual type.
@@ -2511,10 +2507,6 @@ impl<'db> SpecializationBuilder<'db> {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum SpecializationError<'db> {
-    NoSolution {
-        parameter: Type<'db>,
-        argument: Type<'db>,
-    },
     MismatchedBound {
         bound_typevar: BoundTypeVarInstance<'db>,
         argument: Type<'db>,
@@ -2526,21 +2518,15 @@ pub(crate) enum SpecializationError<'db> {
 }
 
 impl<'db> SpecializationError<'db> {
-    pub(crate) fn comes_from_new_solver(&self) -> bool {
-        matches!(self, SpecializationError::NoSolution { .. })
-    }
-
-    pub(crate) fn bound_typevar(&self) -> Option<BoundTypeVarInstance<'db>> {
+    pub(crate) fn bound_typevar(&self) -> BoundTypeVarInstance<'db> {
         match self {
-            Self::NoSolution { .. } => None,
-            Self::MismatchedBound { bound_typevar, .. } => Some(*bound_typevar),
-            Self::MismatchedConstraint { bound_typevar, .. } => Some(*bound_typevar),
+            Self::MismatchedBound { bound_typevar, .. } => *bound_typevar,
+            Self::MismatchedConstraint { bound_typevar, .. } => *bound_typevar,
         }
     }
 
     pub(crate) fn argument_type(&self) -> Type<'db> {
         match self {
-            Self::NoSolution { argument, .. } => *argument,
             Self::MismatchedBound { argument, .. } => *argument,
             Self::MismatchedConstraint { argument, .. } => *argument,
         }
