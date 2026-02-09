@@ -1,5 +1,6 @@
 //! Access to the Ruff linting API for the LSP
 
+use ruff_python_ast::SourceType;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -95,7 +96,9 @@ pub(crate) fn check(
         None
     };
 
-    let source_type = query.source_type();
+    let SourceType::Python(source_type) = query.source_type() else {
+        return DiagnosticsMap::default();
+    };
 
     let target_version = settings.linter.resolve_target_version(&document_path);
 

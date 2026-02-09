@@ -1220,7 +1220,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
             let rhs_ty = inference.expression_type(right);
-            last_rhs_ty = Some(rhs_ty);
 
             // Narrowing for:
             // - `if type(x) is Y`
@@ -1271,6 +1270,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                                 .negate_if(self.db, !is_positive),
                         ),
                     );
+                    last_rhs_ty = Some(rhs_ty);
                     continue;
                 }
             }
@@ -1316,6 +1316,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         *existing = existing.merge_constraint_and(constraint.clone(), self.db);
                     })
                     .or_insert(constraint);
+
+                // Use the narrowed type for subsequent comparisons in a chain.
+                last_rhs_ty = Some(IntersectionType::from_elements(self.db, [rhs_ty, ty]));
+            } else {
+                last_rhs_ty = Some(rhs_ty);
             }
         }
         Some(constraints)

@@ -38,6 +38,14 @@ For example, how many files should be checked in parallel.
 This isn't the same as a thread limit. ty may spawn additional threads
 when necessary, e.g. to watch for file system changes or a dedicated UI thread.
 
+### `TY_OUTPUT_FORMAT`
+
+The format to use for printing diagnostic messages.
+
+When set, ty will use this format for output instead of the default.
+
+Accepts the same values as the `--output-format` command-line argument.
+
 ## Externally-defined variables
 
 ty also reads the following externally defined environment variables:

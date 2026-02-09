@@ -13,8 +13,10 @@ use ty_module_resolver::{
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::place_table;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::Symbol;
 use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{
@@ -261,6 +263,17 @@ impl<'db> SemanticModel<'db> {
         completions.dedup_by(|c1, c2| c1.name == c2.name);
 
         completions
+    }
+
+    /// Returns `true` if the given class definition's name was previously
+    /// bound in the same scope (i.e., the class definition is a re-assignment).
+    pub fn is_class_name_reassigned(&self, class_def: &ast::StmtClassDef) -> bool {
+        let index = semantic_index(self.db, self.file);
+        let definition = index.expect_single_definition(class_def);
+        let scope = definition.scope(self.db);
+        let table = place_table(self.db, scope);
+        let place = table.place(definition.place(self.db));
+        place.as_symbol().is_some_and(Symbol::is_reassigned)
     }
 
     /// Returns the scope in which `node` is defined (handles string annotations).

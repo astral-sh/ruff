@@ -47,6 +47,13 @@ impl EnvVars {
     /// Equivalent to the `--config-file` command-line argument.
     pub const TY_CONFIG_FILE: &'static str = "TY_CONFIG_FILE";
 
+    /// The format to use for printing diagnostic messages.
+    ///
+    /// When set, ty will use this format for output instead of the default.
+    ///
+    /// Accepts the same values as the `--output-format` command-line argument.
+    pub const TY_OUTPUT_FORMAT: &'static str = "TY_OUTPUT_FORMAT";
+
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
 

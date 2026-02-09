@@ -6191,13 +6191,14 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:5:9
+         --> main.py:7:9
           |
-        4 | @overload
         5 | def foo(x: int) -> str: ...
-          |         ^
         6 | @overload
         7 | def foo(x: str) -> int: ...
+          |         ^
+        8 | def foo(x):
+        9 |     return x
           |
         info: Source
           --> main2.py:12:6
@@ -6205,6 +6206,146 @@ mod tests {
         11 | foo([x=]42)
         12 | foo([x=]'hello')
            |      ^
+           |
+        ");
+    }
+
+    #[test]
+    fn test_overloaded_function_calls_different_params() {
+        let mut test = inlay_hint_test(
+            "
+            from typing import overload, Optional, Sequence
+
+            @overload
+            def S(name: str, is_symmetric: Optional[bool] = None) -> str: ...
+            @overload
+            def S(*names: str, is_symmetric: Optional[bool] = None) -> Sequence[str]: ...
+            def S():
+                pass
+
+            b = S('x', 'y')",
+        );
+
+        // The call S('x', 'y') should match the second overload (*names: str),
+        // and since *names is variadic, no parameter name hints should be shown.
+        // Before the fix, this incorrectly showed `name=` and `is_symmetric=` hints
+        // from the first overload.
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from typing import overload, Optional, Sequence
+
+        @overload
+        def S(name: str, is_symmetric: Optional[bool] = None) -> str: ...
+        @overload
+        def S(*names: str, is_symmetric: Optional[bool] = None) -> Sequence[str]: ...
+        def S():
+            pass
+
+        b[: Sequence[str]] = S('x', 'y')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/typing.pyi:1565:7
+             |
+        1563 |     def __len__(self) -> int: ...
+        1564 |
+        1565 | class Sequence(Reversible[_T_co], Collection[_T_co]):
+             |       ^^^^^^^^
+        1566 |     \"\"\"All the operations on a read-only sequence.
+             |
+        info: Source
+          --> main2.py:11:5
+           |
+         9 |     pass
+        10 |
+        11 | b[: Sequence[str]] = S('x', 'y')
+           |     ^^^^^^^^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     \"\"\"str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+          --> main2.py:11:14
+           |
+         9 |     pass
+        10 |
+        11 | b[: Sequence[str]] = S('x', 'y')
+           |              ^^^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import overload, Optional, Sequence
+
+        @overload
+        def S(name: str, is_symmetric: Optional[bool] = None) -> str: ...
+        @overload
+        def S(*names: str, is_symmetric: Optional[bool] = None) -> Sequence[str]: ...
+        def S():
+            pass
+
+        b: Sequence[str] = S('x', 'y')
+        ");
+    }
+
+    #[test]
+    fn test_overloaded_function_calls_no_matching_overload() {
+        let mut test = inlay_hint_test(
+            "
+            from typing import overload
+
+            @overload
+            def f(x: int) -> str: ...
+            @overload
+            def f(x: str, y: str) -> int: ...
+            def f(x):
+                return x
+
+            f([])
+            ",
+        );
+
+        // Neither overload matches via type checking (list[Unknown] is neither int nor str),
+        // so `matching_overloads()` returns empty. The arity-based fallback picks the first
+        // overload (1 matched arg out of 1 required), and we should see the `x=` hint.
+        assert_snapshot!(test.inlay_hints(), @r"
+
+        from typing import overload
+
+        @overload
+        def f(x: int) -> str: ...
+        @overload
+        def f(x: str, y: str) -> int: ...
+        def f(x):
+            return x
+
+        f([x=][])
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:5:7
+          |
+        4 | @overload
+        5 | def f(x: int) -> str: ...
+          |       ^
+        6 | @overload
+        7 | def f(x: str, y: str) -> int: ...
+          |
+        info: Source
+          --> main2.py:11:4
+           |
+         9 |     return x
+        10 |
+        11 | f([x=][])
+           |    ^
            |
         ");
     }
