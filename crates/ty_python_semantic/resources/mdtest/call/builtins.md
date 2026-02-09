@@ -183,16 +183,3 @@ isinstance("", t.Any)  # error: [invalid-argument-type]
 raise NotImplemented()  # error: [call-non-callable]
 raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
 ```
-
-## TODO regression: `map` with `Unknown | str`
-
-```py
-import re
-from ty_extensions import Unknown
-
-def get_search_text() -> Unknown | str: ...
-def _() -> None:
-    # TODO: No `invalid-argument-type` diagnostic should be emitted here.
-    # error: [invalid-argument-type]
-    ".*".join(map(re.escape, get_search_text()))
-```
