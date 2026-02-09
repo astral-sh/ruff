@@ -240,6 +240,19 @@ pub(super) struct LiveBinding {
 
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
+struct BindingsCounts {
+    counts: SmallVec<[(ScopedDefinitionId, usize); 2]>,
+}
+
+impl BindingsCounts {
+    fn get(&self, binding: ScopedDefinitionId) -> usize {
+        self.counts
+            .binary_search_by_key(&binding, |(binding, _count)| *binding)
+            .ok()
+            .map_or(0, |index| self.counts[index].1)
+    }
+}
+
 impl Bindings {
     pub(super) fn unbound(reachability_constraint: ScopedReachabilityConstraintId) -> Self {
         let initial_binding = LiveBinding {
@@ -308,6 +321,20 @@ impl Bindings {
         self.live_bindings.iter()
     }
 
+    fn count_bindings(&self) -> BindingsCounts {
+        let mut counts = SmallVec::new();
+        for live_binding in &self.live_bindings {
+            if let Some((last_binding, count)) = counts.last_mut()
+                && *last_binding == live_binding.binding
+            {
+                *count += 1;
+                continue;
+            }
+            counts.push((live_binding.binding, 1));
+        }
+        BindingsCounts { counts }
+    }
+
     pub(super) fn merge(
         &mut self,
         b: Self,
@@ -323,6 +350,9 @@ impl Bindings {
             self.unbound_narrowing_constraint =
                 Some(narrowing_constraints.intersect_constraints(a, b));
         }
+
+        let a_counts = a.count_bindings();
+        let b_counts = b.count_bindings();
 
         // Invariant: merge_join_by consumes the two iterators in sorted order, which ensures that
         // the merged `live_bindings` vec remains sorted. If a definition is found in both `a` and
@@ -353,9 +383,13 @@ impl Bindings {
                     } else {
                         let narrowing_constraint = narrowing_constraints
                             .intersect_constraints(a.narrowing_constraint, b.narrowing_constraint);
+                        // State number explosion guard
+                        let appears_once_in_each_path =
+                            a_counts.get(a.binding) == 1 && b_counts.get(b.binding) == 1;
 
                         if !a.binding.is_unbound()
                             && narrowing_constraint == ScopedNarrowingConstraint::empty()
+                            && appears_once_in_each_path
                         {
                             // Keep branch-specific narrowing/reachability paired together.
                             self.live_bindings.push(a);
