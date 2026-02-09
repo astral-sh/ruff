@@ -38,47 +38,45 @@ pub fn completion<'db>(
     let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
         return vec![];
     };
+    let model = SemanticModel::new(db, file);
     let query = UserQuery::fuzzy(context.cursor.typed);
-    let mut completions = Completions::new(db, context.collection_context(db), query);
+    let mut completions = Completions::new(db, context.collection_context(db, &model), query);
     match context.kind {
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
         }
-        ContextKind::NonImport(ref non_import) => {
-            let model = SemanticModel::new(db, file);
-            match non_import.target {
-                CompletionTargetAst::ObjectDot { expr } => {
-                    completions.extend(model.attribute_completions(expr));
+        ContextKind::NonImport(ref non_import) => match non_import.target {
+            CompletionTargetAst::ObjectDot { expr } => {
+                completions.extend(model.attribute_completions(expr));
+            }
+            CompletionTargetAst::Scoped(scoped) => {
+                for semantic_completion in model.scoped_completions(scoped.node) {
+                    let module_dependency_kind = if semantic_completion.builtin {
+                        ModuleDependencyKind::Builtin
+                    } else {
+                        ModuleDependencyKind::Current
+                    };
+                    completions.add(
+                        CompletionBuilder::from_semantic_completion(db, semantic_completion)
+                            .module_dependency_kind(module_dependency_kind),
+                    );
                 }
-                CompletionTargetAst::Scoped(scoped) => {
-                    for semantic_completion in model.scoped_completions(scoped.node) {
-                        let module_dependency_kind = if semantic_completion.builtin {
-                            ModuleDependencyKind::Builtin
-                        } else {
-                            ModuleDependencyKind::Current
-                        };
-                        completions.add(
-                            CompletionBuilder::from_semantic_completion(db, semantic_completion)
-                                .module_dependency_kind(module_dependency_kind),
-                        );
-                    }
-                    add_keyword_completions(db, &mut completions);
-                    add_argument_completions(db, &model, &context.cursor, &mut completions);
-                    if settings.auto_import {
-                        add_unimported_completions(
-                            db,
-                            file,
-                            &parsed,
-                            scoped,
-                            |module_name: &ModuleName, symbol: &str| {
-                                ImportRequest::import_from(module_name.as_str(), symbol)
-                            },
-                            &mut completions,
-                        );
-                    }
+                add_keyword_completions(db, &mut completions);
+                add_argument_completions(db, &model, &context.cursor, &mut completions);
+                if settings.auto_import {
+                    add_unimported_completions(
+                        db,
+                        file,
+                        &parsed,
+                        scoped,
+                        |module_name: &ModuleName, symbol: &str| {
+                            ImportRequest::import_from(module_name.as_str(), symbol)
+                        },
+                        &mut completions,
+                    );
                 }
             }
-        }
+        },
     }
 
     completions.into_completions()
@@ -602,15 +600,26 @@ impl<'m> Context<'m> {
     }
 
     /// Returns a filtering context for use with a completion collector.
-    fn collection_context<'db>(&self, db: &'db dyn Db) -> CollectionContext<'db> {
+    fn collection_context<'db>(
+        &self,
+        db: &'db dyn Db,
+        model: &SemanticModel<'db>,
+    ) -> CollectionContext<'db> {
         match self.kind {
             ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
                 let exception_ty = self.cursor.exception_ty(db);
-                let existing_class_bases = self
-                    .cursor
-                    .enclosing_class_def()
-                    .map(extract_base_class_names);
+                let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
+                    let mut bases = extract_base_class_names(class_def);
+                    // Exclude the class being defined from its own base class
+                    // completions, unless the name was previously bound in the
+                    // same scope (in which case the bases refer to the prior
+                    // definition).
+                    if !model.is_class_name_reassigned(class_def) {
+                        bases.insert(class_def.name.id.clone());
+                    }
+                    bases
+                });
                 CollectionContext {
                     exception_ty,
                     is_raising_exception: exception_ty.is_some(),
@@ -1071,8 +1080,9 @@ struct CollectionContext<'db> {
     exception_ty: Option<Type<'db>>,
     /// Whether we're in an exception context (`raise` or `except`) or not.
     is_raising_exception: bool,
-    /// Names of base classes that are already specified in the class definition.
-    /// Used to filter out duplicate base class suggestions.
+    /// Names of base classes that are already specified in the class definition,
+    /// including the class being defined (unless its name was previously bound).
+    /// Used to filter out duplicate and self-referential base class suggestions.
     /// This is only `Some` when we're in a class definition context.
     existing_class_bases: Option<FxHashSet<Name>>,
     /// When set, the context dictates that only *these* keywords
@@ -3460,7 +3470,6 @@ class Foo(<CURSOR>):
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
-        Foo
         metaclass=
         ");
     }
@@ -3478,7 +3487,6 @@ class Bar: ...
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
-        Foo
         metaclass=
         ");
     }
@@ -3496,7 +3504,6 @@ class Bar: ...
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
-        Foo
         metaclass=
         ");
     }
@@ -3512,7 +3519,6 @@ class Foo(<CURSOR>",
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
-        Foo
         metaclass=
         ");
     }
@@ -3543,6 +3549,56 @@ class Foo(metaclass=x, meta<CURSOR>",
             .skip_builtins()
             .build()
             .not_contains("metaclass");
+    }
+
+    #[test]
+    fn class_base_excludes_class_being_defined() {
+        let builder = completion_test_builder(
+            "\
+class Foo(<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo");
+    }
+
+    #[test]
+    fn class_base_excludes_class_being_defined_with_typed_text() {
+        let builder = completion_test_builder(
+            "\
+class Foo(Fo<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo");
+    }
+
+    #[test]
+    fn class_base_includes_prior_definition_with_same_name() {
+        // When a class with the same name was previously defined,
+        // the bases refer to the prior definition, so it should
+        // still be offered as a completion.
+        let builder = completion_test_builder(
+            "\
+class Foo: ...
+
+class Foo(<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("Foo");
     }
 
     #[test]
