@@ -65,14 +65,14 @@ impl Emitter for SarifEmitter {
 struct SarifOutput<'a> {
     #[serde(rename = "$schema")]
     schema: &'static str,
-    version: &'static str,
     runs: [SarifRun<'a>; 1],
+    version: &'static str,
 }
 
 #[derive(Serialize)]
 struct SarifRun<'a> {
-    tool: SarifTool<'a>,
     results: &'a [SarifResult<'a>],
+    tool: SarifTool<'a>,
 }
 
 #[derive(Serialize)]
@@ -83,8 +83,8 @@ struct SarifTool<'a> {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifDriver<'a> {
-    name: &'static str,
     information_uri: &'static str,
+    name: &'static str,
     rules: Vec<SarifRule<'a>>,
     version: String,
 }
@@ -92,13 +92,13 @@ struct SarifDriver<'a> {
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifRule<'a> {
-    id: &'a SecondaryCode,
-    short_description: SarifMessage<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     full_description: Option<SarifMessage<'a>>,
     help: SarifMessage<'a>,
     help_uri: Option<String>,
+    id: &'a SecondaryCode,
     properties: SarifProperties<'a>,
+    short_description: SarifMessage<'a>,
 }
 
 impl<'a> From<&'a SecondaryCode> for SarifRule<'a> {
@@ -179,12 +179,12 @@ impl<'a> From<&'a Diagnostic> for RuleCode<'a> {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifResult<'a> {
-    rule_id: RuleCode<'a>,
-    level: String,
-    message: SarifMessage<'a>,
-    locations: Vec<SarifLocation>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     fixes: Vec<SarifFix>,
+    level: String,
+    locations: Vec<SarifLocation>,
+    message: SarifMessage<'a>,
+    rule_id: RuleCode<'a>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -209,8 +209,8 @@ struct SarifLocation {
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SarifFix {
-    description: RuleDescription,
     artifact_changes: Vec<SarifArtifactChange>,
+    description: RuleDescription,
 }
 
 #[derive(Debug, Serialize)]
@@ -249,10 +249,10 @@ struct InsertedContent {
 #[derive(Debug, Serialize, Clone, Copy)]
 #[serde(rename_all = "camelCase")]
 struct SarifRegion {
-    start_line: OneIndexed,
-    start_column: OneIndexed,
-    end_line: OneIndexed,
     end_column: OneIndexed,
+    end_line: OneIndexed,
+    start_column: OneIndexed,
+    start_line: OneIndexed,
 }
 
 #[derive(Debug, Clone, Serialize)]
