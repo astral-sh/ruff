@@ -128,18 +128,24 @@ reveal_type(Aliases.not_forward)  # revealed: str
 ```py
 a: "int" = 1
 b: "'int'" = 1
-c: "Foo"
+# error: [invalid-syntax-in-forward-annotation] "too many levels of nested string annotations; remove the redundant nested quotes"
+c: """'"int"'""" = 1
+d: "Foo"
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Foo`"
-d: "Foo" = 1
+e: "Foo" = 1
+# error: [invalid-syntax-in-forward-annotation] "nested string annotation is too long; remove the redundant nested quotes"
+f: "'str | int | bool | Foo | Bar'" = 1
 
 class Foo: ...
 
-c = Foo()
+d = Foo()
 
 reveal_type(a)  # revealed: Literal[1]
 reveal_type(b)  # revealed: Literal[1]
-reveal_type(c)  # revealed: Foo
+reveal_type(c)  # revealed: Literal[1]
 reveal_type(d)  # revealed: Foo
+reveal_type(e)  # revealed: Foo
+reveal_type(f)  # revealed: Literal[1]
 ```
 
 ## Parameter
@@ -166,29 +172,48 @@ stringified_fstring_with_dict_comprehension: "f'{ {i: i for i in range(5)} }'"
 # error: [fstring-type-annotation]
 stringified_fstring_with_set_comprehension: "f'{ {i for i in range(5)} }'"
 
+# error: [invalid-type-form]
 a: "1 or 2"
+# error: [invalid-type-form]
 b: "(x := 1)"
 # error: [invalid-type-form]
 c: "1 + 2"
 # Regression test for https://github.com/astral-sh/ty/issues/1847
 # error: [invalid-type-form]
 c2: "a*(i for i in [])"
+# error: [invalid-type-form]
 d: "lambda x: x"
+# error: [invalid-type-form]
 e: "x if True else y"
+# error: [invalid-type-form]
 f: "{'a': 1, 'b': 2}"
+# error: [invalid-type-form]
 g: "{1, 2}"
+# error: [invalid-type-form]
 h: "[i for i in range(5)]"
+# error: [invalid-type-form]
 i: "{i for i in range(5)}"
+# error: [invalid-type-form]
 j: "{i: i for i in range(5)}"
+# error: [invalid-type-form]
 k: "(i for i in range(5))"
+# error: [invalid-type-form]
 l: "await 1"
 # error: [invalid-syntax-in-forward-annotation]
 m: "yield 1"
 # error: [invalid-syntax-in-forward-annotation]
 n: "yield from 1"
+# error: [invalid-type-form]
 o: "1 < 2"
+# error: [invalid-type-form]
 p: "call()"
+# error: [invalid-type-form] "List literals are not allowed"
+# error: [invalid-type-form] "Int literals are not allowed"
+# error: [invalid-type-form] "Int literals are not allowed"
 r: "[1, 2]"
+# error: [invalid-type-form] "Tuple literals are not allowed"
+# error: [invalid-type-form] "Int literals are not allowed"
+# error: [invalid-type-form] "Int literals are not allowed"
 s: "(1, 2)"
 ```
 

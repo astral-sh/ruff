@@ -1321,6 +1321,10 @@ impl<T> Tuple<T> {
         }
     }
 
+    pub(crate) const fn is_variadic(&self) -> bool {
+        matches!(self, Tuple::Variable(_))
+    }
+
     pub(crate) const fn homogeneous(element: T) -> Self {
         Self::Variable(VariableLengthTuple::homogeneous(element))
     }

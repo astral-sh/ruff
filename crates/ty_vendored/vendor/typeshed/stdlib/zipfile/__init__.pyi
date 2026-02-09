@@ -636,8 +636,8 @@ else:
             encoding: str | None = None,
             errors: str | None = None,
             newline: str | None = None,
-            line_buffering: bool = ...,
-            write_through: bool = ...,
+            line_buffering: bool = False,
+            write_through: bool = False,
             *,
             pwd: bytes | None = None,
         ) -> TextIOWrapper:
@@ -660,11 +660,11 @@ else:
         def exists(self) -> bool: ...
         def read_text(
             self,
-            encoding: str | None = ...,
-            errors: str | None = ...,
-            newline: str | None = ...,
-            line_buffering: bool = ...,
-            write_through: bool = ...,
+            encoding: str | None = None,
+            errors: str | None = None,
+            newline: str | None = None,
+            line_buffering: bool = False,
+            write_through: bool = False,
         ) -> str: ...
         def read_bytes(self) -> bytes: ...
         if sys.version_info >= (3, 10):

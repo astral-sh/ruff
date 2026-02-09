@@ -44,9 +44,10 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors when
 /// alongside libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10. It may also lead to runtime errors
-/// in unusual and likely incorrect type annotations where the type does not
-/// support the `|` operator.
+/// on Python versions prior to Python 3.10, or as it may remove comments if they
+/// are present within the type annotation being rewritten. It may also lead to
+/// runtime errors in unusual and likely incorrect type annotations where the type
+/// does not  support the `|` operator.
 ///
 /// ## Options
 /// - `target-version`
@@ -101,8 +102,9 @@ impl Violation for NonPEP604AnnotationUnion {
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors
 /// using libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10. It may also lead to runtime errors
-/// in unusual and likely incorrect type annotations where the type does not
+/// on Python versions prior to Python 3.10, or as it may remove comments if they
+/// are present within the type annotation being rewritten. It may also lead to runtime
+/// errors in unusual and likely incorrect type annotations where the type does not
 /// support the `|` operator.
 ///
 /// ## Options
@@ -152,7 +154,9 @@ pub(crate) fn non_pep604_annotation(
         && is_allowed_value(slice)
         && !is_optional_none(operator, slice);
 
-    let applicability = if checker.target_version() >= PythonVersion::PY310 {
+    let has_comments = checker.comment_ranges().intersects(expr.range());
+
+    let applicability = if checker.target_version() >= PythonVersion::PY310 && !has_comments {
         Applicability::Safe
     } else {
         Applicability::Unsafe

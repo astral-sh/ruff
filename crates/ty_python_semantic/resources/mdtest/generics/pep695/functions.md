@@ -258,9 +258,30 @@ methods that are compatible with the return type, so the `return` expression is 
 
 ```py
 def same_constrained_types[T: (int, str)](t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
+
+def chained_constrained_types[T: (int, float)](t1: T, t2: T, t3: T) -> T:
+    return (t1 + t2) * t3
+
+def typevar_times_literal[T: (int, float)](t: T) -> T:
+    return t * 2
+
+def literal_times_typevar[T: (int, float)](t: T) -> T:
+    return 2 * t
+
+def negate_typevar[T: (int, float)](t: T) -> T:
+    return -t
+
+def positive_typevar[T: (int, float)](t: T) -> T:
+    return +t
+```
+
+Unary operations that are not supported by all constraints should error:
+
+```py
+def invert_typevar[T: (int, float)](t: T) -> int:
+    # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `T@invert_typevar`"
+    return ~t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two
@@ -870,7 +891,7 @@ class ClassWithOverloadedInit[T]:
 # revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(into_callable(ClassWithOverloadedInit))
 # TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
-# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], (x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
+# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], [T](x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
 reveal_type(accepts_callable(ClassWithOverloadedInit))
 # TODO: revealed: ClassWithOverloadedInit[int]
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
@@ -886,25 +907,35 @@ class GenericClass[T]:
         raise NotImplementedError
 
 def _(x: list[str]):
-    # TODO: This fails because we are not propagating GenericClass's generic context into the
-    # Callable that we create for it.
     # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(into_callable(GenericClass))
     # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(into_callable(GenericClass)))
 
-    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    # revealed: [T](x: list[T], y: list[T]) -> GenericClass[T]
     reveal_type(accepts_callable(GenericClass))
-    # TODO: revealed: ty_extensions.GenericContext[T@GenericClass]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@GenericClass]
     reveal_type(generic_context(accepts_callable(GenericClass)))
 
-    # TODO: revealed: GenericClass[str]
-    # TODO: no errors
-    # revealed: GenericClass[T@GenericClass]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
+    # revealed: GenericClass[str]
     reveal_type(accepts_callable(GenericClass)(x, x))
+```
+
+### `Callable`s that return union types
+
+```py
+from typing import Callable
+
+class Box[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def my_iter[T](f: Callable[[], T | None]) -> Box[T]:
+    return Box()
+
+def get_int() -> int | None: ...
+
+reveal_type(my_iter(get_int))  # revealed: Box[int]
 ```
 
 ### Don't include identical lower/upper bounds in type mapping multiple times
@@ -971,6 +1002,62 @@ def _(keys: list[str]):
     # TODO: revealed: int
     # revealed: Unknown | Literal[0]
     reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+```
+
+## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
+
+A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
+the actual TypeVar is equivalent to at least one constraint of the formal TypeVar. This commonly
+arises when wrapping functions from external packages that define private TypeVars with the same
+constraints.
+
+See: <https://github.com/astral-sh/ty/issues/2728>
+
+```py
+def callee[T: (int, str)](x: T) -> T:
+    return x
+
+def caller[S: (int, str)](x: S) -> S:
+    return callee(x)
+
+reveal_type(caller(1))  # revealed: int
+reveal_type(caller("hello"))  # revealed: str
+```
+
+A constrained TypeVar with a subset of constraints is also compatible:
+
+```py
+def wide[T: (int, str, bytes)](x: T) -> T:
+    return x
+
+def narrow[S: (int, str)](x: S) -> S:
+    return wide(x)
+
+reveal_type(narrow(1))  # revealed: int
+reveal_type(narrow("hello"))  # revealed: str
+```
+
+But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
+
+```py
+def target[T: (int, str)](x: T) -> T:
+    return x
+
+def source[U: (int, bytes)](x: U) -> U:
+    return target(x)  # error: [invalid-argument-type]
+```
+
+We require equivalence rather than mere assignability when matching constraints. Constrained
+TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a
+strict subtype would be unsound. For example, a function constrained to `(int, str)` may narrow `T`
+to `int` and return `int(x)`, which would violate a caller's `bool` constraint:
+
+```py
+def f[T: (int, str)](x: T) -> T:
+    return x
+
+def g[S: (bool, str)](x: S) -> S:
+    return f(x)  # error: [invalid-argument-type]
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

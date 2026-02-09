@@ -24,14 +24,13 @@ use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
-use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
-use options::GlobalOptions;
 use ty_python_semantic::MisconfigurationMode;
 
 pub(crate) use self::options::InitializationOptions;
-pub use self::options::{ClientOptions, DiagnosticMode, WorkspaceOptions};
+pub use self::options::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
@@ -345,6 +344,9 @@ impl Session {
         match path {
             AnySystemPath::System(system_path) => {
                 self.project_state_for_path(system_path).unwrap_or_else(|| {
+                    // TODO: While ty supports multiple workspace folders, we still
+                    // need to figure out which project should this virtual path
+                    // belong to: https://github.com/astral-sh/ty/issues/794
                     self.projects
                         .values()
                         .next()
@@ -352,9 +354,9 @@ impl Session {
                 })
             }
             AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: Currently, ty only supports single workspace but we need to figure out
-                // which project should this virtual path belong to when there are multiple
-                // projects: https://github.com/astral-sh/ty/issues/794
+                // TODO: While ty supports multiple workspace folders, we still
+                // need to figure out which project should this virtual path
+                // belong to: https://github.com/astral-sh/ty/issues/794
                 self.projects
                     .iter()
                     .next()
@@ -383,15 +385,17 @@ impl Session {
                     return self.projects.range_mut(range).next_back().unwrap().1;
                 }
 
-                // TODO: Currently, ty only supports single workspaces but we need to figure out
-                // which project to use when we support multiple projects (e.g. look for the first project
-                // with an overlapping search path?)
+                // TODO: While ty supports multiple workspace folders, we still
+                // need to figure out which project should this virtual path
+                // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
+                // look for the first project with an overlapping search path?)
                 self.projects.values_mut().next().unwrap()
             }
             AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: Currently, ty only supports single workspace but we need to figure out
-                // which project should this virtual path belong to when there are multiple
-                // projects: https://github.com/astral-sh/ty/issues/794
+                // TODO: While ty supports multiple workspace folders, we still
+                // need to figure out which project should this virtual path
+                // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
+                // look for the first project with an overlapping search path?)
                 self.projects
                     .iter_mut()
                     .next()
@@ -442,154 +446,444 @@ impl Session {
         self.projects.values_mut()
     }
 
-    pub(crate) fn initialize_workspaces(
+    /// Initializes a sequence of workspace folders identified by URL
+    /// along with its corresponding options.
+    ///
+    /// This is meant to be called when a response from a
+    /// `workspace/configuration` request is received. (This is where
+    /// the `ClientOptions` comes from.)
+    ///
+    /// It is legal to call this on URLs corresponding to workspace
+    /// folders that are already initialized. When that occurs,
+    /// they are skipped by this routine. That is, they are not
+    /// re-initialized.
+    ///
+    /// The client provided is used to show error messages, publish
+    /// diagnostics related to configuration and register capabilities.
+    ///
+    /// This is typically called when a response to a
+    /// `workspace/configuration` request is received.
+    pub(crate) fn initialize_workspace_folders(
         &mut self,
-        workspace_settings: Vec<(Url, ClientOptions)>,
         client: &Client,
+        workspace_folders: Vec<(Url, ClientOptions)>,
     ) {
-        assert!(!self.workspaces.all_initialized());
+        // Every workspace folder can come with its own
+        // global options. In theory, these can have different
+        // values. At time of writing (2026-01-28), AG has been
+        // unable to make VS Code cause this. This is because
+        // the ty VS Code extension scopes its settings to the
+        // "window":
+        // https://github.com/astral-sh/ty-vscode/blob/e68f26549a920926d8a6bced942dfaf32313f851/package.json#L107
+        //
+        // So at least in theory, there is a semantic mismatch
+        // between the LSP protocol and ty's LSP's understanding
+        // of what settings are global and which aren't.
+        //
+        // We used to try and combine these global options across
+        // multiple workspace folders. But when we did that, we
+        // didn't actually support multiple workspace folders. We
+        // always took the first workspace folder and ignored the
+        // rest.
+        //
+        // In a world where we support multiple workspace folders,
+        // we also need to support possibly _adding_ (or removing)
+        // new workspace folders dynamically (that's the
+        // `workspace/didChangeWorkspaceFolders` notification).
+        // This in turn means that global options can change based
+        // on new workspace folders being added.
+        //
+        // Should we try to merge the existing global options with
+        // the new ones? What if a workspace folder is removed? Should
+        // we try to update our global options based on that?
+        //
+        // It should be clear that there are many different
+        // permutations of possibilities here. Perhaps the best
+        // choice is to find a way to get rid of global options
+        // entirely and make all settings specific to workspace
+        // folders.
+        //
+        // In any case, our current strategy for now is to just use the
+        // most recent global options received (after being combined
+        // with the global options received at initialization time).
+        // Doing anything more complicated seems unwarranted unless
+        // real users are having problems as a result of this.
+        //
+        // Note that this is a divergence from previous behavior:
+        // https://github.com/astral-sh/ruff/pull/19614
+        let mut global_options: Option<GlobalOptions> = None;
 
-        // These are the options combined from all the global options received by the server for
-        // each workspace via the workspace configuration request.
-        let mut combined_global_options: Option<GlobalOptions> = None;
-
-        for (url, options) in workspace_settings {
-            // Combine the global options specified during initialization with the
-            // workspace-specific options to create the final workspace options.
-            let ClientOptions {
-                global, workspace, ..
-            } = self
-                .initialization_options
-                .options
-                .clone()
-                .combine(options.clone());
-
-            tracing::debug!("Initializing workspace `{url}`: {workspace:#?}");
-
-            let unknown_options = &options.unknown;
-            if !unknown_options.is_empty() {
-                warn_about_unknown_options(client, Some(&url), unknown_options);
+        for (url, options) in workspace_folders {
+            // Last setting wins.
+            global_options = Some(
+                self.initialization_options
+                    .options
+                    .global
+                    .clone()
+                    .combine(options.global),
+            );
+            if !options.unknown.is_empty() {
+                warn_about_unknown_options(client, Some(&url), &options.unknown);
             }
-
-            combined_global_options.combine_with(Some(global));
-
-            let Ok(root) = url.to_file_path() else {
-                tracing::debug!("Ignoring workspace with non-path root: {url}");
-                continue;
-            };
-
-            // Realistically I don't think this can fail because we got the path from a Url
-            let root = match SystemPathBuf::from_path_buf(root) {
-                Ok(root) => root,
-                Err(root) => {
-                    tracing::debug!(
-                        "Ignoring workspace with non-UTF8 root: {root}",
-                        root = root.display()
-                    );
-                    continue;
-                }
-            };
-
-            let workspace_settings = workspace.into_settings(&root, client);
-            let Some(workspace) = self.workspaces.initialize(&root, workspace_settings) else {
-                continue;
-            };
-
-            // For now, create one project database per workspace.
-            // In the future, index the workspace directories to find all projects
-            // and create a project database for each.
-            let system = LSPSystem::new(
-                self.index.as_ref().unwrap().clone(),
-                self.native_system.clone(),
-            );
-
-            let configuration_file = workspace
-                .settings
-                .project_options_overrides()
-                .and_then(|settings| settings.config_file_override.as_ref());
-
-            let metadata = if let Some(configuration_file) = configuration_file {
-                ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
-            } else {
-                ProjectMetadata::discover(&root, &system)
-            };
-
-            let project = metadata
-                .context("Failed to discover project configuration")
-                .and_then(|mut metadata| {
-                    metadata
-                        .apply_configuration_files(&system)
-                        .context("Failed to apply configuration files")?;
-
-                    if let Some(overrides) = workspace.settings.project_options_overrides() {
-                        metadata.apply_overrides(overrides);
-                    }
-
-                    ProjectDatabase::new(metadata, system.clone())
-                });
-
-            let (root, db) = match project {
-                Ok(db) => (root, db),
-                Err(err) => {
-                    tracing::error!(
-                        "Failed to create project for workspace `{url}`: {err:#}. \
-                        Falling back to default settings"
-                    );
-
-                    client.show_error_message(format!(
-                        "Failed to load project for workspace {url}. {}",
-                        self.client_name.log_guidance(),
-                    ));
-
-                    let db_with_default_settings = ProjectMetadata::from_options(
-                        Options::default(),
-                        root,
-                        None,
-                        MisconfigurationMode::UseDefault,
-                    )
-                    .context("Failed to convert default options to metadata")
-                    .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                    .expect("Default configuration to be valid");
-                    let default_root = db_with_default_settings
-                        .project()
-                        .root(&db_with_default_settings)
-                        .to_path_buf();
-
-                    (default_root, db_with_default_settings)
-                }
-            };
-
-            // Carry forward diagnostic state if any exists
-            let previous = self.projects.remove(&root);
-            let untracked = previous
-                .map(|state| state.untracked_files_with_pushed_diagnostics)
-                .unwrap_or_default();
-            self.projects.insert(
-                root.clone(),
-                ProjectState {
-                    db,
-                    untracked_files_with_pushed_diagnostics: untracked,
-                },
-            );
-
-            publish_settings_diagnostics(self, client, root);
+            self.initialize_workspace_folder(client, &url, options.workspace);
         }
 
-        if let Some(global_options) = combined_global_options {
+        if let Some(global_options) = global_options {
             let global_settings = global_options.into_settings();
-            if global_settings.diagnostic_mode().is_workspace() {
-                for project in self.projects.values_mut() {
-                    project.db.set_check_mode(CheckMode::AllFiles);
-                }
-            }
             self.global_settings = Arc::new(global_settings);
+        }
+        if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
+            for project in self.projects.values_mut() {
+                project.db.set_check_mode(check_mode);
+            }
         }
 
         self.register_capabilities(client);
+    }
 
-        assert!(
-            self.workspaces.all_initialized(),
-            "All workspaces should be initialized after calling `initialize_workspaces`"
+    /// Initializes a single workspace folder with the given URL
+    /// and options.
+    ///
+    /// If this workspace folder has already been initialized, then
+    /// this is a no-op.
+    ///
+    /// The client provided is used to show error messages and publish
+    /// diagnostics related to configuration.
+    pub(crate) fn initialize_workspace_folder(
+        &mut self,
+        client: &Client,
+        url: &Url,
+        options: WorkspaceOptions,
+    ) {
+        let options = self
+            .initialization_options
+            .options
+            .workspace
+            .clone()
+            .combine(options);
+
+        tracing::debug!("Initializing workspace `{url}`: {options:#?}");
+
+        let Ok(root) = url.to_file_path() else {
+            tracing::debug!("Ignoring workspace with non-path root: {url}");
+            return;
+        };
+
+        // Realistically I don't think this can fail because we got the path from a Url
+        let root = match SystemPathBuf::from_path_buf(root) {
+            Ok(root) => root,
+            Err(root) => {
+                tracing::debug!(
+                    "Ignoring workspace with non-UTF8 root: {root}",
+                    root = root.display()
+                );
+                return;
+            }
+        };
+
+        let settings = options.into_settings(&root, client);
+        let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
+            tracing::debug!("Ignoring workspace `{url}` since it was not registered");
+            return;
+        };
+        if workspace.is_initialized() {
+            tracing::debug!(
+                "Ignoring workspace initialization for `{url}` \
+                 since it has already been initialized"
+            );
+            return;
+        }
+        workspace.initialize(settings);
+
+        // For now, create one project database per workspace.
+        // In the future, index the workspace directories to find all projects
+        // and create a project database for each.
+        let system = LSPSystem::new(
+            self.index.as_ref().unwrap().clone(),
+            self.native_system.clone(),
+        );
+
+        let configuration_file = workspace
+            .settings
+            .project_options_overrides()
+            .and_then(|settings| settings.config_file_override.as_ref());
+
+        let metadata = if let Some(configuration_file) = configuration_file {
+            ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
+        } else {
+            ProjectMetadata::discover(&root, &system)
+        };
+
+        let project = metadata
+            .context("Failed to discover project configuration")
+            .and_then(|mut metadata| {
+                metadata
+                    .apply_configuration_files(&system)
+                    .context("Failed to apply configuration files")?;
+
+                if let Some(overrides) = workspace.settings.project_options_overrides() {
+                    metadata.apply_overrides(overrides);
+                }
+
+                ProjectDatabase::new(metadata, system.clone())
+            });
+
+        let (root, db) = match project {
+            Ok(db) => (root, db),
+            Err(err) => {
+                tracing::error!(
+                    "Failed to create project for workspace `{url}`: {err:#}. \
+                        Falling back to default settings"
+                );
+
+                client.show_error_message(format!(
+                    "Failed to load project for workspace {url}. {}",
+                    self.client_name.log_guidance(),
+                ));
+
+                let db_with_default_settings = ProjectMetadata::from_options(
+                    Options::default(),
+                    root,
+                    None,
+                    MisconfigurationMode::UseDefault,
+                )
+                .context("Failed to convert default options to metadata")
+                .and_then(|metadata| ProjectDatabase::new(metadata, system))
+                .expect("Default configuration to be valid");
+                let default_root = db_with_default_settings
+                    .project()
+                    .root(&db_with_default_settings)
+                    .to_path_buf();
+
+                (default_root, db_with_default_settings)
+            }
+        };
+
+        // Carry forward diagnostic state if any exists
+        let previous = self.projects.remove(&root);
+        let untracked = previous
+            .map(|state| state.untracked_files_with_pushed_diagnostics)
+            .unwrap_or_default();
+        self.projects.insert(
+            root.clone(),
+            ProjectState {
+                db,
+                untracked_files_with_pushed_diagnostics: untracked,
+            },
+        );
+
+        publish_settings_diagnostics(self, client, root);
+    }
+
+    /// Adds an uninitialized workspace to this session.
+    ///
+    /// This returns `true` when this workspace is added and `false`
+    /// when it has already been added.
+    ///
+    /// If there was a problem adding the workspace folder (e.g., the
+    /// path derived from the given URL is not valid UTF-8), then an
+    /// error is returned and no workspace folder is registered.
+    ///
+    /// To initialize the workspace folder, callers must initiate
+    /// a request for workspace folder configuration via
+    /// `Session::request_uninitialized_workspace_folder_configuration`.
+    pub(crate) fn register_workspace_folder(&mut self, url: Url) -> anyhow::Result<bool> {
+        self.workspaces.register(url)
+    }
+
+    /// Requests configuration for each registered but uninitialized
+    /// workspace folder in this session.
+    ///
+    /// When all workspace folders in this session are initialized, then
+    /// this is a no-op.
+    ///
+    /// Each uninitialized workspace folder will be fully initialized
+    /// once the configuration response is received (asynchronously).
+    /// When the client doesn't support requesting workspace
+    /// configuration, the workspace folder is initialized immediately
+    /// using the options this session was initialized with.
+    ///
+    /// Adding an uninitialized workspace to this session can be done
+    /// with `Session::register_workspace_folder`.
+    pub(crate) fn request_uninitialized_workspace_folder_configurations(
+        &mut self,
+        client: &Client,
+    ) {
+        // When all workspaces are already initialized, then
+        // there's nothing to do.
+        if self.workspaces().all_initialized() {
+            return;
+        }
+
+        let uninit_workspace_urls: Vec<Url> = self
+            .workspaces()
+            .into_iter()
+            .filter_map(|(_, workspace)| {
+                if workspace.is_initialized() {
+                    None
+                } else {
+                    Some(workspace.url().clone())
+                }
+            })
+            .collect();
+
+        if !self
+            .client_capabilities()
+            .supports_workspace_configuration()
+        {
+            tracing::info!(
+                "Client does not support workspace configuration, initializing workspaces \
+                 using the initialization options"
+            );
+            self.initialize_workspace_folders(
+                client,
+                uninit_workspace_urls
+                    .into_iter()
+                    .map(|url| (url, self.initialization_options().options.clone()))
+                    .collect::<Vec<_>>(),
+            );
+            return;
+        }
+
+        let items: Vec<lsp_types::ConfigurationItem> = uninit_workspace_urls
+            .iter()
+            .map(|url| lsp_types::ConfigurationItem {
+                scope_uri: Some(url.clone()),
+                section: Some("ty".to_string()),
+            })
+            .collect();
+
+        tracing::debug!("Requesting workspace configuration for workspaces");
+        client.send_request::<lsp_types::request::WorkspaceConfiguration>(
+            self,
+            lsp_types::ConfigurationParams { items },
+            move |client, result: Vec<serde_json::Value>| {
+                tracing::debug!("Received workspace configurations, initializing workspaces");
+
+                // This shouldn't fail because, as per the spec, the client needs to provide a
+                // `null` value even if it cannot provide a configuration for a workspace.
+                assert_eq!(
+                    result.len(),
+                    uninit_workspace_urls.len(),
+                    "Mismatch in number of workspace URLs ({}) and configuration results ({})",
+                    uninit_workspace_urls.len(),
+                    result.len()
+                );
+
+                let workspaces_with_options: Vec<_> = uninit_workspace_urls
+                    .into_iter()
+                    .zip(result)
+                    .map(|(url, value)| {
+                        if value.is_null() {
+                            tracing::debug!(
+                                "No workspace options provided for {url}, using default options"
+                            );
+                            return (url, ClientOptions::default());
+                        }
+                        let options: ClientOptions =
+                            serde_json::from_value(value).unwrap_or_else(|err| {
+                                tracing::error!(
+                                    "Failed to deserialize workspace options for {url}: {err}. \
+                                        Using default options"
+                                );
+                                ClientOptions::default()
+                            });
+                        (url, options)
+                    })
+                    .collect();
+
+                client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
+            },
+        );
+    }
+
+    /// Removes a workspace folder at the given URL.
+    ///
+    /// This removes the workspace folder and its associated project database,
+    /// and clears diagnostics for any documents that were in the workspace.
+    ///
+    /// # Errors
+    ///
+    /// This returns an error if the workspace folder has already been removed
+    /// or otherwise could not be found.
+    pub(crate) fn remove_workspace_folder(
+        &mut self,
+        client: &Client,
+        url: &Url,
+    ) -> anyhow::Result<()> {
+        tracing::info!("Removing workspace folder: {url}");
+
+        let path = url
+            .to_file_path()
+            .map_err(|()| anyhow!("Workspace URL is not a file path: {url}"))?;
+        let workspace_path = SystemPathBuf::from_path_buf(path)
+            .map_err(|path| anyhow!("Workspace path is not valid UTF-8: {}", path.display()))?;
+
+        anyhow::ensure!(
+            self.workspaces.unregister(&workspace_path),
+            "Workspace not found: {url}",
+        );
+
+        // Note that it is somewhat unclear whether we actually need to
+        // clear diagnostics here. It seems that, at least in the case
+        // of VS Code, it will auto-clear any diagnostics not found in
+        // the workspace diagnostic response. Moreover, VS Code will
+        // re-request workspace diagnostics after removing a workspace
+        // folder.
+        //
+        // For now, we keep unconditionally clearing diagnostics on
+        // opened text documents for reasons of good sense, but it's
+        // possible that we don't even need to do that (when workspace
+        // diagnostics are enabled).
+        //
+        // See: https://github.com/astral-sh/ruff/pull/22953#discussion_r2745255350
+
+        // Remove the associated project database.
+        if let Some(project_state) = self.projects.remove(&workspace_path) {
+            // Clear diagnostics for any files that had pushed diagnostics in this project.
+            for file_url in project_state.untracked_files_with_pushed_diagnostics {
+                self.clear_diagnostics(client, &file_url);
+            }
+        }
+
+        // Collect all of the documents to clear upfront to
+        // work around borrowck.
+        let documents_to_clear: Vec<DocumentHandle> = self
+            .text_document_handles()
+            .filter_map(|doc| {
+                if let AnySystemPath::System(ref path) = *doc.notebook_or_file_path()
+                    && path.starts_with(&workspace_path)
+                {
+                    Some(doc)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        for doc in documents_to_clear {
+            self.clear_diagnostics(client, doc.url());
+        }
+
+        self.bump_revision();
+
+        Ok(())
+    }
+
+    /// Clears the diagnostics for the document identified by `uri`.
+    ///
+    /// This is done by notifying the client with an empty list of diagnostics for the document.
+    /// For notebook cells, this clears diagnostics for the specific cell.
+    /// For other document types, this clears diagnostics for the main document.
+    pub(crate) fn clear_diagnostics(&self, client: &Client, uri: &Url) {
+        if self.global_settings().diagnostic_mode().is_off() {
+            return;
+        }
+        client.send_notification::<lsp_types::notification::PublishDiagnostics>(
+            lsp_types::PublishDiagnosticsParams {
+                uri: uri.clone(),
+                diagnostics: vec![],
+                version: None,
+            },
         );
     }
 
@@ -1180,20 +1474,22 @@ impl ClientName {
 #[derive(Debug, Default)]
 pub(crate) struct Workspaces {
     workspaces: BTreeMap<SystemPathBuf, Workspace>,
-    uninitialized: usize,
 }
 
 impl Workspaces {
     /// Registers a new workspace with the given URL and default settings for the workspace.
     ///
-    /// It's the caller's responsibility to later call [`initialize`] with the resolved settings
-    /// for this workspace. Registering and initializing a workspace is a two-step process because
-    /// the workspace are announced to the server during the `initialize` request, but the
-    /// resolved settings are only available after the client has responded to the `workspace/configuration`
-    /// request.
+    /// This returns `true` when this workspace is added and `false`
+    /// when it has already been added.
     ///
-    /// [`initialize`]: Workspaces::initialize
-    pub(crate) fn register(&mut self, url: Url) -> anyhow::Result<()> {
+    /// It's the caller's responsibility to later call
+    /// [`Session::request_uninitialized_workspace_folder_configurations`] with
+    /// the resolved settings for this workspace. Registering and initializing
+    /// a workspace is a two-step process because the workspace are announced
+    /// to the server during the `initialize` request, but the resolved
+    /// settings are only available after the client has responded to the
+    /// `workspace/configuration` request.
+    fn register(&mut self, url: Url) -> anyhow::Result<bool> {
         let path = url
             .to_file_path()
             .map_err(|()| anyhow!("Workspace URL is not a file or directory: {url:?}"))?;
@@ -1202,41 +1498,31 @@ impl Workspaces {
         let system_path = SystemPathBuf::from_path_buf(path)
             .map_err(|_| anyhow!("Workspace URL is not valid UTF8"))?;
 
+        if self.workspaces.contains_key(&system_path) {
+            return Ok(false);
+        }
+
         self.workspaces.insert(
             system_path,
             Workspace {
                 url,
                 settings: Arc::new(WorkspaceSettings::default()),
+                initialized: false,
             },
         );
-
-        self.uninitialized += 1;
-
-        Ok(())
+        Ok(true)
     }
 
-    /// Initializes the workspace with the resolved client settings for the workspace.
+    /// Unregisters a workspace folder at the given path.
     ///
-    /// ## Returns
-    ///
-    /// `None` if URL doesn't map to a valid path or if the workspace is not registered.
-    pub(crate) fn initialize(
-        &mut self,
-        path: &SystemPath,
-        settings: WorkspaceSettings,
-    ) -> Option<&mut Workspace> {
-        if let Some(workspace) = self.workspaces.get_mut(path) {
-            workspace.settings = Arc::new(settings);
-            self.uninitialized -= 1;
-            Some(workspace)
-        } else {
-            None
-        }
+    /// Returns `true` if the workspace was removed, `false` if it wasn't found.
+    fn unregister(&mut self, path: &SystemPath) -> bool {
+        self.workspaces.remove(path).is_some()
     }
 
     /// Returns a reference to the workspace for the given path, [`None`] if there's no workspace
     /// registered for the path.
-    pub(crate) fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
+    fn for_path(&self, path: impl AsRef<SystemPath>) -> Option<&Workspace> {
         self.workspaces
             .range(..=path.as_ref().to_path_buf())
             .next_back()
@@ -1245,22 +1531,15 @@ impl Workspaces {
 
     /// Returns the client settings for the workspace at the given path, [`None`] if there's no
     /// workspace registered for the path.
-    pub(crate) fn settings_for_path(
-        &self,
-        path: impl AsRef<SystemPath>,
-    ) -> Option<Arc<WorkspaceSettings>> {
+    fn settings_for_path(&self, path: impl AsRef<SystemPath>) -> Option<Arc<WorkspaceSettings>> {
         self.for_path(path).map(Workspace::settings_arc)
-    }
-
-    pub(crate) fn urls(&self) -> impl Iterator<Item = &Url> + '_ {
-        self.workspaces.values().map(Workspace::url)
     }
 
     /// Returns `true` if all workspaces have been [initialized].
     ///
     /// [initialized]: Workspaces::initialize
-    pub(crate) fn all_initialized(&self) -> bool {
-        self.uninitialized == 0
+    fn all_initialized(&self) -> bool {
+        self.workspaces.values().all(Workspace::is_initialized)
     }
 }
 
@@ -1277,7 +1556,19 @@ impl<'a> IntoIterator for &'a Workspaces {
 pub(crate) struct Workspace {
     /// The workspace root URL as sent by the client during initialization.
     url: Url,
+    /// The settings for this workspace.
+    ///
+    /// The settings here have already been "combined" with the initialization
+    /// settings for the LSP.
     settings: Arc<WorkspaceSettings>,
+    /// Whether this workspace has been initialized or not.
+    ///
+    /// If a workspace hasn't been initialized, then it is still
+    /// generally usable. It just means that its settings may not
+    /// be correct. That is, a workspace is considered initialized
+    /// when the configuration from a `workspace/configuration`
+    /// request has been received and set on this workspace.
+    initialized: bool,
 }
 
 impl Workspace {
@@ -1291,6 +1582,15 @@ impl Workspace {
 
     pub(crate) fn settings_arc(&self) -> Arc<WorkspaceSettings> {
         self.settings.clone()
+    }
+
+    pub(crate) fn is_initialized(&self) -> bool {
+        self.initialized
+    }
+
+    pub(crate) fn initialize(&mut self, settings: WorkspaceSettings) {
+        self.settings = Arc::new(settings);
+        self.initialized = true;
     }
 }
 
@@ -1544,6 +1844,11 @@ impl DocumentHandle {
     /// Calling this multiple times for the same document is a logic error.
     ///
     /// Returns `true` if the client needs to clear the diagnostics for this document.
+    ///
+    /// # Errors
+    ///
+    /// This can return an error when the document does not exist in the
+    /// session index.
     pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
         let is_cell = self.is_cell();
         let path = self.notebook_or_file_path();

@@ -266,7 +266,9 @@ use crate::semantic_index::use_def::place_state::{
     LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
-use crate::types::{NarrowingConstraint, Truthiness, Type, infer_narrowing_constraint};
+use crate::types::{
+    NarrowingConstraint, PossiblyNarrowedPlaces, Truthiness, Type, infer_narrowing_constraint,
+};
 
 mod place_state;
 
@@ -769,7 +771,7 @@ impl<'db> ConstraintsIterator<'_, 'db> {
                 constraint.merge_constraint_and(acc, db)
             })
             .map_or(base_ty, |constraint| {
-                NarrowingConstraint::regular(base_ty)
+                NarrowingConstraint::intersection(base_ty)
                     .merge_constraint_and(constraint, db)
                     .evaluate_constraint_type(db)
             })
@@ -1002,7 +1004,12 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn record_narrowing_constraint(&mut self, predicate: ScopedPredicateId) {
+    /// Records a narrowing constraint for only the specified places.
+    pub(super) fn record_narrowing_constraint_for_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+        places: &PossiblyNarrowedPlaces,
+    ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
         {
@@ -1011,14 +1018,25 @@ impl<'db> UseDefMapBuilder<'db> {
         }
 
         let narrowing_constraint = predicate.into();
-        for state in &mut self.symbol_states {
-            state
-                .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
-        }
-
-        for state in &mut self.member_states {
-            state
-                .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
+        for place in places {
+            match place {
+                ScopedPlaceId::Symbol(symbol_id) => {
+                    if let Some(state) = self.symbol_states.get_mut(*symbol_id) {
+                        state.record_narrowing_constraint(
+                            &mut self.narrowing_constraints,
+                            narrowing_constraint,
+                        );
+                    }
+                }
+                ScopedPlaceId::Member(member_id) => {
+                    if let Some(state) = self.member_states.get_mut(*member_id) {
+                        state.record_narrowing_constraint(
+                            &mut self.narrowing_constraints,
+                            narrowing_constraint,
+                        );
+                    }
+                }
+            }
         }
     }
 

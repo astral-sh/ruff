@@ -19,6 +19,7 @@ mod tests {
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
+    use crate::rules::pydocstyle::settings::Settings as PydocstyleSettings;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
@@ -116,6 +117,7 @@ mod tests {
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_0.py"))]
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
     #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
+    #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -229,6 +231,24 @@ mod tests {
             &LinterSettings {
                 unresolved_target_version: PythonVersion::PY314.into(),
                 ..LinterSettings::for_rule(Rule::AccessAnnotationsFromClassDict)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn property_without_return_custom_decorator() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF066_custom_property_decorator.py"),
+            &LinterSettings {
+                pydocstyle: PydocstyleSettings {
+                    property_decorators: ["my_library.custom_property".to_string()]
+                        .into_iter()
+                        .collect(),
+                    ..PydocstyleSettings::default()
+                },
+                ..LinterSettings::for_rule(Rule::PropertyWithoutReturn)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -591,6 +611,8 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
@@ -599,6 +621,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_3.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
+    #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

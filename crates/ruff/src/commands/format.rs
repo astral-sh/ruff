@@ -16,6 +16,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_linter::message::{EmitterContext, create_panic_diagnostic, render_diagnostics};
 use ruff_linter::settings::types::OutputFormat;
+use ruff_markdown::{MarkdownResult, format_code_blocks};
 use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -123,15 +124,13 @@ pub(crate) fn format(
                     let settings = resolver.resolve(path);
 
                     let source_type = match settings.formatter.extension.get(path) {
-                        None => match SourceType::from(path) {
-                            SourceType::Python(source_type) => source_type,
-                            SourceType::Toml(_) => {
-                                // Ignore any non-Python files.
-                                return None;
-                            }
-                        },
-                        Some(language) => PySourceType::from(language),
+                        None => SourceType::from(path),
+                        Some(language) => SourceType::Python(PySourceType::from(language)),
                     };
+                    if source_type.is_toml() {
+                        // Ignore TOML files.
+                        return None;
+                    }
 
                     // Ignore files that are excluded from formatting
                     if (settings.file_resolver.force_exclude || !resolved_file.is_root())
@@ -206,17 +205,19 @@ pub(crate) fn format(
     }
 
     let results = FormatResults::new(results.as_slice(), mode);
-    match mode {
-        FormatMode::Write => {}
-        FormatMode::Check => {
-            if preview.is_enabled() {
-                results.write_changed_preview(&mut stdout().lock(), output_format, &errors)?;
-            } else {
-                results.write_changed(&mut stdout().lock())?;
+    if config_arguments.log_level > LogLevel::Silent {
+        match mode {
+            FormatMode::Write => {}
+            FormatMode::Check => {
+                if preview.is_enabled() {
+                    results.write_changed_preview(&mut stdout().lock(), output_format, &errors)?;
+                } else {
+                    results.write_changed(&mut stdout().lock())?;
+                }
             }
-        }
-        FormatMode::Diff => {
-            results.write_diff(&mut stdout().lock())?;
+            FormatMode::Diff => {
+                results.write_diff(&mut stdout().lock())?;
+            }
         }
     }
 
@@ -261,7 +262,7 @@ pub(crate) fn format(
 pub(crate) fn format_path(
     path: &Path,
     settings: &FormatterSettings,
-    source_type: PySourceType,
+    source_type: SourceType,
     mode: FormatMode,
     range: Option<FormatRange>,
     cache: Option<&Cache>,
@@ -292,8 +293,7 @@ pub(crate) fn format_path(
     let cache = cache.filter(|_| range.is_none());
 
     // Format the source.
-    let format_result = match format_source(&unformatted, source_type, Some(path), settings, range)?
-    {
+    let format_result = match format_source(&unformatted, Some(path), settings, range)? {
         FormattedSource::Formatted(formatted) => match mode {
             FormatMode::Write => {
                 let mut writer = File::create(path).map_err(|err| {
@@ -357,14 +357,17 @@ impl From<FormattedSource> for FormatResult {
 /// unchanged.
 pub(crate) fn format_source(
     source_kind: &SourceKind,
-    source_type: PySourceType,
     path: Option<&Path>,
     settings: &FormatterSettings,
     range: Option<FormatRange>,
 ) -> Result<FormattedSource, FormatCommandError> {
     match &source_kind {
-        SourceKind::Python(unformatted) => {
-            let options = settings.to_format_options(source_type, unformatted, path);
+        SourceKind::Python {
+            code: unformatted,
+            is_stub,
+        } => {
+            let py_source_type = source_kind.py_source_type();
+            let options = settings.to_format_options(py_source_type, unformatted, path);
 
             let formatted = if let Some(range) = range {
                 let line_index = LineIndex::from_source_text(unformatted);
@@ -400,7 +403,10 @@ pub(crate) fn format_source(
             if formatted.len() == unformatted.len() && formatted == *unformatted {
                 Ok(FormattedSource::Unchanged)
             } else {
-                Ok(FormattedSource::Formatted(SourceKind::Python(formatted)))
+                Ok(FormattedSource::Formatted(SourceKind::Python {
+                    code: formatted,
+                    is_stub: *is_stub,
+                }))
             }
         }
         SourceKind::IpyNotebook(notebook) => {
@@ -409,12 +415,13 @@ pub(crate) fn format_source(
             }
 
             if range.is_some() {
-                return Err(FormatCommandError::RangeFormatNotebook(
+                return Err(FormatCommandError::RangeFormatNotSupported(
                     path.map(Path::to_path_buf),
                 ));
             }
 
-            let options = settings.to_format_options(source_type, notebook.source_code(), path);
+            let options =
+                settings.to_format_options(PySourceType::Ipynb, notebook.source_code(), path);
 
             let mut output: Option<String> = None;
             let mut last: Option<TextSize> = None;
@@ -488,6 +495,26 @@ pub(crate) fn format_source(
             Ok(FormattedSource::Formatted(SourceKind::IpyNotebook(
                 formatted,
             )))
+        }
+        SourceKind::Markdown(unformatted_document) => {
+            if !settings.preview.is_enabled() {
+                return Err(FormatCommandError::MarkdownExperimental(
+                    path.map(Path::to_path_buf),
+                ));
+            }
+
+            if range.is_some() {
+                return Err(FormatCommandError::RangeFormatNotSupported(
+                    path.map(Path::to_path_buf),
+                ));
+            }
+
+            match format_code_blocks(unformatted_document, path, settings) {
+                MarkdownResult::Formatted(formatted) => {
+                    Ok(FormattedSource::Formatted(SourceKind::Markdown(formatted)))
+                }
+                MarkdownResult::Unchanged => Ok(FormattedSource::Unchanged),
+            }
         }
     }
 }
@@ -830,7 +857,8 @@ pub(crate) enum FormatCommandError {
     Read(Option<PathBuf>, SourceError),
     Format(Option<PathBuf>, FormatModuleError),
     Write(Option<PathBuf>, SourceError),
-    RangeFormatNotebook(Option<PathBuf>),
+    RangeFormatNotSupported(Option<PathBuf>),
+    MarkdownExperimental(Option<PathBuf>),
 }
 
 impl FormatCommandError {
@@ -848,7 +876,8 @@ impl FormatCommandError {
             | Self::Read(path, _)
             | Self::Format(path, _)
             | Self::Write(path, _)
-            | Self::RangeFormatNotebook(path) => path.as_deref(),
+            | Self::RangeFormatNotSupported(path)
+            | Self::MarkdownExperimental(path) => path.as_deref(),
         }
     }
 }
@@ -880,10 +909,15 @@ impl From<&FormatCommandError> for Diagnostic {
                 Diagnostic::new(DiagnosticId::Io, Severity::Error, source_error)
             }
             FormatCommandError::Format(_, format_module_error) => format_module_error.into(),
-            FormatCommandError::RangeFormatNotebook(_) => Diagnostic::new(
+            FormatCommandError::RangeFormatNotSupported(_) => Diagnostic::new(
                 DiagnosticId::InvalidCliOption,
                 Severity::Error,
-                "Range formatting isn't supported for notebooks.",
+                "Range formatting is only supported for Python files.",
+            ),
+            FormatCommandError::MarkdownExperimental(_) => Diagnostic::new(
+                DiagnosticId::PreviewFeature,
+                Severity::Warning,
+                "Markdown formatting is experimental, enable preview mode.",
             ),
         };
 
@@ -962,11 +996,11 @@ impl Display for FormatCommandError {
                     write!(f, "{header} {err}", header = "Failed to format:".bold())
                 }
             }
-            Self::RangeFormatNotebook(path) => {
+            Self::RangeFormatNotSupported(path) => {
                 if let Some(path) = path {
                     write!(
                         f,
-                        "{header}{path}{colon} Range formatting isn't supported for notebooks.",
+                        "{header}{path}{colon} Range formatting is only supported for Python files.",
                         header = "Failed to format ".bold(),
                         path = fs::relativize_path(path).bold(),
                         colon = ":".bold()
@@ -974,7 +1008,24 @@ impl Display for FormatCommandError {
                 } else {
                     write!(
                         f,
-                        "{header} Range formatting isn't supported for notebooks",
+                        "{header} Range formatting is only supported for Python files",
+                        header = "Failed to format:".bold()
+                    )
+                }
+            }
+            Self::MarkdownExperimental(path) => {
+                if let Some(path) = path {
+                    write!(
+                        f,
+                        "{header}{path}{colon} Markdown formatting is experimental, enable preview mode.",
+                        header = "Failed to format ".bold(),
+                        path = fs::relativize_path(path).bold(),
+                        colon = ":".bold()
+                    )
+                } else {
+                    write!(
+                        f,
+                        "{header} Markdown formatting is experimental, enable preview mode",
                         header = "Failed to format:".bold()
                     )
                 }
@@ -1248,7 +1299,10 @@ mod tests {
     #[test]
     fn error_diagnostics() -> anyhow::Result<()> {
         let path = PathBuf::from("test.py");
-        let source_kind = SourceKind::Python("1".to_string());
+        let source_kind = SourceKind::Python {
+            code: "1".to_string(),
+            is_stub: false,
+        };
 
         let panic_error = catch_unwind(|| {
             panic!("Test panic for FormatCommandError");
@@ -1290,7 +1344,7 @@ mod tests {
                     "Cannot write to file",
                 )),
             ),
-            FormatCommandError::RangeFormatNotebook(Some(path)),
+            FormatCommandError::RangeFormatNotSupported(Some(path)),
         ];
 
         let results = FormatResults::new(&[], FormatMode::Check);
@@ -1305,7 +1359,7 @@ mod tests {
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         let _s = settings.bind_to_scope();
 
-        assert_snapshot!(str::from_utf8(&buf)?, @"
+        assert_snapshot!(str::from_utf8(&buf)?, @r"
         io: test.py: Permission denied
         --> test.py:1:1
 
@@ -1321,7 +1375,7 @@ mod tests {
         io: Cannot write to file
         --> test.py:1:1
 
-        invalid-cli-option: Range formatting isn't supported for notebooks.
+        invalid-cli-option: Range formatting is only supported for Python files.
         --> test.py:1:1
 
         panic: Panicked at <location> when checking `test.py`: `Test panic for FormatCommandError`
@@ -1347,8 +1401,14 @@ mod tests {
         expect_formatted: Range<u32>,
     ) {
         let mr = ModifiedRange::new(
-            &SourceKind::Python(unformatted.to_string()),
-            &SourceKind::Python(formatted.to_string()),
+            &SourceKind::Python {
+                code: unformatted.to_string(),
+                is_stub: false,
+            },
+            &SourceKind::Python {
+                code: formatted.to_string(),
+                is_stub: false,
+            },
         );
         assert_eq!(
             mr.unformatted,

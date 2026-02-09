@@ -7,10 +7,7 @@ use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::{
-    is_future_required_preview_generics_enabled, is_optional_as_none_in_union_enabled,
-    is_unnecessary_default_type_args_stubs_enabled,
-};
+use crate::preview::is_future_required_preview_generics_enabled;
 use crate::registry::Rule;
 use crate::rules::{
     airflow, flake8_2020, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
@@ -54,7 +51,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             || checker.target_version() >= PythonVersion::PY310
                             || (checker.target_version() >= PythonVersion::PY37
                                 && checker.semantic.future_annotations_or_stub()
-                                && checker.semantic.in_annotation()
+                                && (checker.semantic.in_annotation()
+                                    || checker.semantic.in_string_type_definition())
                                 && !checker.settings().pyupgrade.keep_runtime_typing)
                         {
                             pyupgrade::rules::non_pep604_annotation(checker, expr, slice, operator);
@@ -100,10 +98,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     }
                     if checker.is_rule_enabled(Rule::DuplicateUnionMember)
                         // Avoid duplicate checks inside `Optional`
-                        && !(
-                            is_optional_as_none_in_union_enabled(checker.settings())
-                            && checker.semantic.inside_optional()
-                        )
+                        && !checker.semantic.inside_optional()
                     {
                         flake8_pyi::rules::duplicate_union_member(checker, expr);
                     }
@@ -148,8 +143,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
 
             if checker.is_rule_enabled(Rule::UnnecessaryDefaultTypeArgs) {
                 if checker.target_version() >= PythonVersion::PY313
-                    || is_unnecessary_default_type_args_stubs_enabled(checker.settings())
-                        && checker.semantic().in_stub_file()
+                    || checker.semantic().in_stub_file()
                 {
                     pyupgrade::rules::unnecessary_default_type_args(checker, expr);
                 }
@@ -260,6 +254,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     }
                     if checker.is_rule_enabled(Rule::Airflow3Removal) {
                         airflow::rules::airflow_3_removal_expr(checker, expr);
+                    }
+                    if checker.is_rule_enabled(Rule::Airflow31Moved) {
+                        airflow::rules::airflow_3_1_moved_expr(checker, expr);
                     }
                     if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
                         airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
@@ -485,6 +482,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_expr(checker, expr);
+            }
+            if checker.is_rule_enabled(Rule::Airflow31Moved) {
+                airflow::rules::airflow_3_1_moved_expr(checker, expr);
             }
             if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
                 airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
@@ -1245,6 +1245,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_extend_call(checker, call);
             }
+            if checker.is_rule_enabled(Rule::DuplicateEntryInDunderAll) {
+                ruff::rules::duplicate_entry_in_dunder_all_extend_call(checker, call);
+            }
             if checker.is_rule_enabled(Rule::DefaultFactoryKwarg) {
                 ruff::rules::default_factory_kwarg(checker, call);
             }
@@ -1538,10 +1541,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 if checker.is_rule_enabled(Rule::DuplicateUnionMember)
                     && checker.semantic.in_type_definition()
                     // Avoid duplicate checks inside `Optional`
-                    && !(
-                        is_optional_as_none_in_union_enabled(checker.settings())
-                        && checker.semantic.inside_optional()
-                    )
+                    && !checker.semantic.inside_optional()
                 {
                     flake8_pyi::rules::duplicate_union_member(checker, expr);
                 }
@@ -1648,6 +1648,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
             if checker.is_rule_enabled(Rule::YodaConditions) {
                 flake8_simplify::rules::yoda_conditions(checker, expr, left, ops, comparators);
+            }
+            if checker.is_rule_enabled(Rule::FloatEqualityComparison) {
+                ruff::rules::float_equality_comparison(checker, compare);
             }
             if checker.is_rule_enabled(Rule::PandasNuniqueConstantSeriesCheck) {
                 pandas_vet::rules::nunique_constant_series_check(

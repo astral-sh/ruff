@@ -208,8 +208,11 @@ fn discard_todo_metadata(ty: &str) -> Cow<'_, str> {
     {
         /// `@Todo` variants that are hardcoded and always display their message,
         /// even in release mode.
-        const PRESERVED_TODO_VARIANTS: &[&str] =
-            &["@Todo(StarredExpression)", "@Todo(typing.Unpack)"];
+        const PRESERVED_TODO_VARIANTS: &[&str] = &[
+            "@Todo(StarredExpression)",
+            "@Todo(typing.Unpack)",
+            "@Todo(TypeVarTuple)",
+        ];
 
         static TODO_METADATA_REGEX: LazyLock<regex::Regex> =
             LazyLock::new(|| regex::Regex::new(r"@Todo\([^)]*\)").unwrap());
@@ -1390,6 +1393,30 @@ mod tests {
                 0,
                 &[
                     "invalid assertion: expected '\"' to be the final character in an assertion with an error message",
+                    r#"unexpected error: 1 [some-rule] "some message""#,
+                ],
+            )],
+        );
+    }
+
+    #[test]
+    fn trailing_quote_without_message_not_allowed() {
+        let source = "x  # error: [some-rule]\"";
+        let result = get_result(
+            source,
+            vec![ExpectedDiagnostic::new(
+                DiagnosticId::lint("some-rule"),
+                "some message",
+                0,
+            )],
+        );
+
+        assert_fail(
+            result,
+            &[(
+                0,
+                &[
+                    "invalid assertion: expected message text and closing '\"' after opening '\"'",
                     r#"unexpected error: 1 [some-rule] "some message""#,
                 ],
             )],

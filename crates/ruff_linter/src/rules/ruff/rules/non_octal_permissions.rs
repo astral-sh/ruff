@@ -31,7 +31,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// There are two categories of fix, the first of which is where it looks like
+/// There are two categories of unsafe fixes, the first of which is where it looks like
 /// the author intended to use an octal literal but the `0o` prefix is missing:
 ///
 /// ```python
@@ -72,7 +72,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// A fix is only available if the integer literal matches a set of common modes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.12.1")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct NonOctalPermissions;
 
 impl Violation for NonOctalPermissions {
@@ -111,8 +111,17 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
+    let mut diagnostic = checker.report_custom_diagnostic(NonOctalPermissions, mode_arg.range());
 
+    let Some(mode) = int.as_u16() else {
+        return;
+    };
+
+    diagnostic.info(format_args!(
+        "Current value of {mode_literal} ({:#05o}) sets permissions: {}",
+        mode & 0o7777,
+        get_permissions(mode)
+    ));
     // Don't suggest a fix for 0x or 0b literals.
     if mode_literal.starts_with("0x") || mode_literal.starts_with("0b") {
         return;
@@ -128,7 +137,10 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
     let Some(suggested) = int.as_u16().and_then(suggest_fix) else {
         return;
     };
-
+    let suggested_permissions = get_permissions(suggested);
+    diagnostic.info(format_args!(
+        "Suggested value of {suggested:#05o} sets permissions: {suggested_permissions}"
+    ));
     let edit = Edit::range_replacement(format!("{suggested:#o}"), mode_arg.range());
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 }
@@ -229,4 +241,21 @@ fn suggest_fix(mode: u16) -> Option<u16> {
         777 | 511 => Some(0o777), // r-x--x--x, seems unlikely
         _ => None,
     }
+}
+
+fn get_permissions(mode: u16) -> String {
+    let perm = mode & 0o777;
+    let mut out = String::with_capacity(9);
+    let append_permission = |out: &mut String, bits: u16| {
+        out.push(if bits & 0o4 != 0 { 'r' } else { '-' });
+        out.push(if bits & 0o2 != 0 { 'w' } else { '-' });
+        out.push(if bits & 0o1 != 0 { 'x' } else { '-' });
+    };
+    out.push_str("u=");
+    append_permission(&mut out, (perm >> 6) & 0o7);
+    out.push_str(", g=");
+    append_permission(&mut out, (perm >> 3) & 0o7);
+    out.push_str(", o=");
+    append_permission(&mut out, perm & 0o7);
+    out
 }

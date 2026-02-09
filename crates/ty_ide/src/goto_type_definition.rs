@@ -764,7 +764,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -796,13 +814,13 @@ mod tests {
             |       -------
           5 |     """some docs"""
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -818,7 +836,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -850,13 +886,13 @@ mod tests {
             |       -------
           5 |     """some docs"""
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -904,7 +940,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "MyClass | No" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -918,7 +972,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:15
+          |
+        2 | a: "MyClass | No" = 1
+          |               ^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | -------
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
+        "#);
     }
 
     #[test]
@@ -972,6 +1044,230 @@ mod tests {
         15 | AlwaysTruthy = object()
         16 | AlwaysFalsy = object()
            |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested1() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class | int'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass | int'] | None"
+          |           ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass | int'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested2() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:17
+          |
+        2 | x: "list['int | MyClass'] | None"
+          |                 ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['int | MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested3() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | None'] | My<CURSOR>Class"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:26
+          |
+        2 | x: "list['int | None'] | MyClass"
+          |                          ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['int | None'] | MyClass"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested4() {
+        let test = cursor_test(
+            r#"
+        x: "list['int' | 'My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:19
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+          |                   ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested5() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class' | 'str'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+          |           ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_too_nested1() {
+        let test = cursor_test(
+            r#"
+        x: """'list["My<CURSOR>Class" | "str"]' | None"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:13
+          |
+        2 | x: """'list["MyClass" | "str"]' | None"""
+          |             ^^^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | -------
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_too_nested2() {
+        let test = cursor_test(
+            r#"
+        x: """'list["int" | "str"]' | My<CURSOR>Class"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:31
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+          |                               ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
         "#);
     }
 
@@ -1609,13 +1905,13 @@ def function():
         916 |     """str(object='') -> str
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
-           ::: stdlib/types.pyi:974:11
+           ::: stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }

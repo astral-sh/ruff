@@ -11,7 +11,6 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-ruff_annotate_snippets = { workspace = true }
 ruff_db = { workspace = true }
 ruff_diagnostics = { workspace = true }
 ruff_index = { workspace = true, features = ["salsa"] }
@@ -26,13 +25,11 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ty_combine = { workspace = true }
 ty_module_resolver = { workspace = true }
-ty_static = { workspace = true }
+ty_site_packages = { workspace = true }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
 bitvec = { workspace = true }
-camino = { workspace = true }
-colored = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
 get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
@@ -63,6 +60,7 @@ ty_test = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
+camino = { workspace = true }
 datatest-stable = { workspace = true }
 glob = { workspace = true }
 indoc = { workspace = true }

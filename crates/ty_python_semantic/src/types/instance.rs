@@ -3,6 +3,9 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use ruff_python_ast::name::Name;
+use ty_module_resolver::{ModuleName, file_to_module};
+
 use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
@@ -42,6 +45,9 @@ impl<'db> Type<'db> {
             ClassLiteral::Dynamic(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
+            ClassLiteral::DynamicNamedTuple(_) => {
+                Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
+            }
             ClassLiteral::Static(class_literal) => {
                 let specialization = class.into_generic_alias().map(|g| g.specialization(db));
                 match class_literal.known(db) {
@@ -78,7 +84,7 @@ impl<'db> Type<'db> {
         Type::tuple_instance(tuple)
     }
 
-    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+    pub fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
         Type::tuple_instance(TupleType::homogeneous(db, element))
     }
 
@@ -229,6 +235,24 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
 }
 
 impl<'db> NominalInstanceType<'db> {
+    /// Returns the name of the class this is an instance of.
+    ///
+    /// For example, for an instance of `builtins.str`, this returns `"str"`.
+    pub fn class_name(&self, db: &'db dyn Db) -> &'db Name {
+        self.class(db).name(db)
+    }
+
+    /// Returns the fully qualified module name of the module in which the class
+    /// is defined, if it can be resolved.
+    ///
+    /// For example, for an instance of `pathlib.Path`, this returns
+    /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
+    /// to a known module (e.g. for classes defined in scripts or notebooks).
+    pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
+        let file = self.class(db).class_literal(db).file(db);
+        file_to_module(db, file).map(|module| module.name(db))
+    }
+
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
@@ -701,7 +725,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _, ()| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
@@ -717,15 +741,6 @@ impl<'db> ProtocolInstanceType<'db> {
                     &IsDisjointVisitor::default(),
                 )
                 .is_always_satisfied(db)
-        }
-
-        fn initial<'db>(
-            _db: &'db dyn Db,
-            _id: salsa::Id,
-            _value: ProtocolInstanceType<'db>,
-            _: (),
-        ) -> bool {
-            true
         }
 
         is_equivalent_to_object_inner(db, self, ())

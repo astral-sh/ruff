@@ -6,7 +6,7 @@ use std::path::Path;
 use anyhow::Result;
 use insta_cmd::assert_cmd_snapshot;
 
-use super::{CliTest, tempdir_filter};
+use super::CliTest;
 
 #[test]
 fn default_options() -> Result<()> {
@@ -603,14 +603,8 @@ if __name__ == "__main__":
 
 #[test]
 fn output_format_notebook() -> Result<()> {
-    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let fixtures = crate_root.join("resources").join("test").join("fixtures");
-    let path = fixtures.join("unformatted.ipynb");
-
-    let test = CliTest::with_settings(|_, mut settings| {
-        settings.add_filter(&tempdir_filter(crate_root.to_str().unwrap()), "CRATE_ROOT/");
-        settings
-    })?;
+    let test = CliTest::new()?;
+    let path = test.fixture_path("unformatted.ipynb");
 
     assert_cmd_snapshot!(
         test.format_command().args(["--isolated", "--preview", "--check"]).arg(path),
@@ -723,6 +717,55 @@ if __name__ == "__main__":
     ----- stderr -----
     ");
 
+    Ok(())
+}
+
+#[test]
+fn check_silent_mode_no_output() -> Result<()> {
+    // Write code that requires formatting,
+    // but there should be no "reformat" output in silent mode
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--silent"]), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn check_quiet_mode_shows_diagnostics_only() -> Result<()> {
+    // should show diagnostics but not summary
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--check", "--quiet"]), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
+fn check_default_mode_shows_diagnostics_and_summary() -> Result<()> {
+    // default mode should show both diagnostics and summary
+    let test = CliTest::with_file("main.py", "def     foo():\n                pass\n")?;
+
+    assert_cmd_snapshot!(test.format_command().args(["--check"]), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    Would reformat: main.py
+    1 file would be reformatted
+
+    ----- stderr -----
+    ");
     Ok(())
 }
 
@@ -1232,16 +1275,11 @@ def say_hy(name: str):
 
 #[test]
 fn test_diff() -> Result<()> {
-    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let test = CliTest::with_settings(|_, mut settings| {
-        settings.add_filter(&tempdir_filter(crate_root.to_str().unwrap()), "CRATE_ROOT/");
-        settings
-    })?;
-    let fixtures = crate_root.join("resources").join("test").join("fixtures");
+    let test = CliTest::new()?;
     let paths = [
-        fixtures.join("unformatted.py"),
-        fixtures.join("formatted.py"),
-        fixtures.join("unformatted.ipynb"),
+        test.fixture_path("unformatted.py"),
+        test.fixture_path("formatted.py"),
+        test.fixture_path("unformatted.ipynb"),
     ];
 
     assert_cmd_snapshot!(
@@ -1301,14 +1339,8 @@ fn test_diff() -> Result<()> {
 
 #[test]
 fn test_diff_no_change() -> Result<()> {
-    let crate_root = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let test = CliTest::with_settings(|_, mut settings| {
-        settings.add_filter(&tempdir_filter(crate_root.to_str().unwrap()), "CRATE_ROOT/");
-        settings
-    })?;
-
-    let fixtures = crate_root.join("resources").join("test").join("fixtures");
-    let paths = [fixtures.join("unformatted.py")];
+    let test = CliTest::new()?;
+    let paths = [test.fixture_path("unformatted.py")];
     assert_cmd_snapshot!(
         test.format_command().args(["--isolated", "--diff"]).args(paths),
         @"
@@ -2274,13 +2306,13 @@ fn range_formatting_notebook() -> Result<()> {
  "nbformat": 4,
  "nbformat_minor": 5
 }
-"#), @"
+"#), @r"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    error: Failed to format main.ipynb: Range formatting isn't supported for notebooks.
+    error: Failed to format main.ipynb: Range formatting is only supported for Python files.
     ");
     Ok(())
 }
@@ -2383,5 +2415,100 @@ fn stable_output_format_warning() -> Result<()> {
     warning: The --output-format flag for the formatter is unstable and requires preview mode to use.
     ",
     );
+    Ok(())
+}
+
+#[test]
+fn markdown_formatting_preview_disabled() -> Result<()> {
+    let test = CliTest::new()?;
+    let unformatted = test.fixture_path("unformatted.md");
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--no-preview", "--diff"])
+        .arg(unformatted),
+        @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: Failed to format CRATE_ROOT/resources/test/fixtures/unformatted.md: Markdown formatting is experimental, enable preview mode.
+    ");
+    Ok(())
+}
+
+#[test]
+fn markdown_formatting_preview_enabled() -> Result<()> {
+    let test = CliTest::new()?;
+    let unformatted = test.fixture_path("unformatted.md");
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--preview", "--check"])
+        .arg(unformatted),
+        @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    unformatted: File would be reformatted
+      --> CRATE_ROOT/resources/test/fixtures/unformatted.md:1:1
+    1  | This is a markdown document with two fenced code blocks:
+    2  | 
+    3  | ```py
+       - print( "hello" )
+       - def foo(): pass
+    4  + print("hello")
+    5  + 
+    6  + 
+    7  + def foo():
+    8  +     pass
+    9  | ```
+    10 | 
+    11 | ```pyi
+       - print( "hello" )
+       - def foo(): pass
+    12 + print("hello")
+    13 + 
+    14 + def foo():
+    15 +     pass
+    16 | ```
+
+    1 file would be reformatted
+
+    ----- stderr -----
+    "#);
+    Ok(())
+}
+
+#[test]
+fn markdown_formatting_stdin() -> Result<()> {
+    let test = CliTest::new()?;
+    let unformatted = fs::read(test.fixture_path("unformatted.md")).unwrap();
+
+    assert_cmd_snapshot!(test.format_command()
+        .args(["--isolated", "--preview", "--stdin-filename", "unformatted.md"])
+        .arg("-")
+        .pass_stdin(unformatted), @r#"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    This is a markdown document with two fenced code blocks:
+
+    ```py
+    print("hello")
+
+
+    def foo():
+        pass
+    ```
+
+    ```pyi
+    print("hello")
+
+    def foo():
+        pass
+    ```
+
+    ----- stderr -----
+    "#);
     Ok(())
 }

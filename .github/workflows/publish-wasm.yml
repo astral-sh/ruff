@@ -26,15 +26,15 @@ jobs:
         with:
           name: artifacts-wasm-${{ matrix.target }}
           path: pkg
-      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+      - uses: actions/setup-node@6044e13b5dc448c55e2357c09f80417699197238 # v6.2.0
         with:
           node-version: 24
           registry-url: "https://registry.npmjs.org"
       - name: "Publish (dry-run)"
         if: ${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}
-        run: npm publish --dry-run pkg
+        run: npm publish --dry-run pkg/
       - name: "Publish"
         if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
-        run: npm publish --provenance --access public pkg
+        run: npm publish --provenance --access public pkg/
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

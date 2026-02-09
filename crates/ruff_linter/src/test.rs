@@ -16,7 +16,7 @@ use ruff_db::diagnostic::{
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions};
@@ -127,7 +127,7 @@ pub(crate) fn test_path(
     settings: &LinterSettings,
 ) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
-    let source_type = PySourceType::from(&path);
+    let source_type = SourceType::Python(PySourceType::from(&path));
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
     Ok(test_contents(&source_kind, &path, settings).0)
 }
@@ -197,7 +197,15 @@ pub(crate) fn assert_notebook_path(
 pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
-    test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
+    test_contents(
+        &SourceKind::Python {
+            code: contents.into_owned(),
+            is_stub: false,
+        },
+        path,
+        settings,
+    )
+    .0
 }
 
 thread_local! {
@@ -235,7 +243,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
-    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
     let messages = check_path(
         path,
         path.parent()
@@ -303,7 +311,7 @@ pub(crate) fn test_contents<'a>(
             );
 
             let suppressions =
-                Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+                Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
             let fixed_messages = check_path(
                 path,
                 None,

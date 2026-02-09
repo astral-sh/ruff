@@ -285,6 +285,10 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
+        if is_ignored_variable_assignment_target(expr) {
+            return;
+        }
+
         if let Some(inlay_hint) = InlayHint::variable_type(expr, rhs, ty, self.db, allow_edits) {
             self.hints.push(inlay_hint);
         }
@@ -496,6 +500,17 @@ fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bo
     true
 }
 
+fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
+    let Expr::Name(name) = expr else {
+        return false;
+    };
+
+    let name = name.id.as_str();
+    let is_dunder = name.starts_with("__") && name.ends_with("__") && name.len() > 4;
+
+    name.starts_with('_') && !is_dunder
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -580,10 +595,7 @@ mod tests {
         ///
         /// [`inlay_hints_with_settings`]: Self::inlay_hints_with_settings
         fn inlay_hints(&mut self) -> String {
-            self.inlay_hints_with_settings(&InlayHintSettings {
-                variable_types: true,
-                call_argument_names: true,
-            })
+            self.inlay_hints_with_settings(&InlayHintSettings::default())
         }
 
         fn with_extra_file(&mut self, file_name: &str, content: &str) {
@@ -1031,6 +1043,141 @@ mod tests {
         10 | x4[: int], y4[: str] = (x3, y3)
            |                 ^^^
            |
+        "#);
+    }
+
+    #[test]
+    fn test_leading_underscore_variable_assignment_has_no_type_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+
+            _ = i(1)
+            _ignored = i(1)
+            __ignored = i(1)
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def i(x: int, /) -> int:
+            return x
+
+        _ = i(1)
+        _ignored = i(1)
+        __ignored = i(1)
+        "#);
+    }
+
+    #[test]
+    fn test_leading_underscore_variable_in_tuple_assignment_has_no_type_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+            def s(x: str, /) -> str:
+                return x
+
+            x, _ignored = (i(1), s('abc'))
+            __ignored, y = (i(1), s('abc'))
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def i(x: int, /) -> int:
+            return x
+        def s(x: str, /) -> str:
+            return x
+
+        x[: int], _ignored = (i(1), s('abc'))
+        __ignored, y[: str] = (i(1), s('abc'))
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:7:5
+          |
+        5 |     return x
+        6 |
+        7 | x[: int], _ignored = (i(1), s('abc'))
+          |     ^^^
+        8 | __ignored, y[: str] = (i(1), s('abc'))
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:8:16
+          |
+        7 | x[: int], _ignored = (i(1), s('abc'))
+        8 | __ignored, y[: str] = (i(1), s('abc'))
+          |                ^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_dunder_variable_assignment_has_type_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+            def i(x: int, /) -> int:
+                return x
+
+            __special__ = i(1)
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def i(x: int, /) -> int:
+            return x
+
+        __special__[: int] = i(1)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:5:15
+          |
+        3 |     return x
+        4 |
+        5 | __special__[: int] = i(1)
+          |               ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def i(x: int, /) -> int:
+            return x
+
+        __special__: int = i(1)
         "#);
     }
 
@@ -2466,13 +2613,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:974:11
+           --> stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           ^^^^^^^^
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         info: Source
          --> main2.py:5:20
@@ -5675,13 +5822,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:974:11
+           --> stdlib/types.pyi:969:11
             |
-        972 | if sys.version_info >= (3, 10):
-        973 |     @final
-        974 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           ^^^^^^^^
-        975 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         info: Source
           --> main2.py:13:37
@@ -6504,13 +6651,13 @@ mod tests {
         a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:690:7
+           --> stdlib/types.pyi:685:7
             |
-        689 | @final
-        690 | class WrapperDescriptorType:
+        684 | @final
+        685 | class WrapperDescriptorType:
             |       ^^^^^^^^^^^^^^^^^^^^^
-        691 |     @property
-        692 |     def __name__(self) -> str: ...
+        686 |     @property
+        687 |     def __name__(self) -> str: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6557,13 +6704,13 @@ mod tests {
         a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:704:7
+           --> stdlib/types.pyi:699:7
             |
-        703 | @final
-        704 | class MethodWrapperType:
+        698 | @final
+        699 | class MethodWrapperType:
             |       ^^^^^^^^^^^^^^^^^
-        705 |     @property
-        706 |     def __self__(self) -> object: ...
+        700 |     @property
+        701 |     def __self__(self) -> object: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6930,19 +7077,18 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
-
         from typing_extensions import TypeAliasType
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2546:26
+            --> stdlib/typing.pyi:2549:26
              |
-        2544 |         """
-        2545 |
-        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2547 |         """
+        2548 |
+        2549 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                          ^^^^
-        2547 |         @property
-        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2550 |         @property
+        2551 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:20
@@ -6953,14 +7099,14 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2546:37
+            --> stdlib/typing.pyi:2549:37
              |
-        2544 |         """
-        2545 |
-        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2547 |         """
+        2548 |
+        2549 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                                     ^^^^^
-        2547 |         @property
-        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2550 |         @property
+        2551 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:32

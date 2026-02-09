@@ -282,6 +282,9 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (DynamicType::UnknownGeneric(_), _) => Ordering::Less,
         (_, DynamicType::UnknownGeneric(_)) => Ordering::Greater,
 
+        (DynamicType::UnspecializedTypeVar, _) => Ordering::Less,
+        (_, DynamicType::UnspecializedTypeVar) => Ordering::Greater,
+
         #[cfg(debug_assertions)]
         (DynamicType::Todo(TodoType(left)), DynamicType::Todo(TodoType(right))) => left.cmp(right),
 
@@ -293,6 +296,9 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
 
         (DynamicType::TodoStarredExpression, _) => Ordering::Less,
         (_, DynamicType::TodoStarredExpression) => Ordering::Greater,
+
+        (DynamicType::TodoTypeVarTuple, _) => Ordering::Less,
+        (_, DynamicType::TodoTypeVarTuple) => Ordering::Greater,
 
         (DynamicType::Divergent(left), DynamicType::Divergent(right)) => left.cmp(&right),
         (DynamicType::Divergent(_), _) => Ordering::Less,

@@ -1,0 +1,85 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - A `@final` class must implement all abstract methods - Multiple abstract methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from abc import ABC, abstractmethod
+ 2 | from typing import final
+ 3 | 
+ 4 | class Base(ABC):
+ 5 |     @abstractmethod
+ 6 |     def foo(self) -> int: ...
+ 7 |     @abstractmethod
+ 8 |     def bar(self) -> str: ...
+ 9 |     @abstractmethod
+10 |     def baz(self) -> None: ...
+11 | 
+12 | @final
+13 | class MissingAll(Base):  # error: [abstract-method-in-final-class]
+14 |     pass
+15 | 
+16 | @final
+17 | class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
+18 |     def foo(self) -> int:
+19 |         return 42
+20 | 
+21 |     def bar(self) -> str:
+22 |         return "hello"
+```
+
+# Diagnostics
+
+```
+error[abstract-method-in-final-class]: Final class `MissingAll` does not implement abstract methods `foo`, `bar` and `baz`
+  --> src/mdtest_snippet.py:13:7
+   |
+12 | @final
+13 | class MissingAll(Base):  # error: [abstract-method-in-final-class]
+   |       ^^^^^^^^^^
+14 |     pass
+   |
+  ::: src/mdtest_snippet.py:6:9
+   |
+ 4 | class Base(ABC):
+ 5 |     @abstractmethod
+ 6 |     def foo(self) -> int: ...
+   |         --- `foo` defined as abstract on superclass `Base`
+ 7 |     @abstractmethod
+ 8 |     def bar(self) -> str: ...
+   |
+info: rule `abstract-method-in-final-class` is enabled by default
+
+```
+
+```
+error[abstract-method-in-final-class]: Final class `PartiallyImplemented` does not implement abstract method `baz`
+  --> src/mdtest_snippet.py:17:7
+   |
+16 | @final
+17 | class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
+   |       ^^^^^^^^^^^^^^^^^^^^
+18 |     def foo(self) -> int:
+19 |         return 42
+   |
+  ::: src/mdtest_snippet.py:10:9
+   |
+ 8 |     def bar(self) -> str: ...
+ 9 |     @abstractmethod
+10 |     def baz(self) -> None: ...
+   |         --- `baz` defined as abstract on superclass `Base`
+11 |
+12 | @final
+   |
+info: rule `abstract-method-in-final-class` is enabled by default
+
+```

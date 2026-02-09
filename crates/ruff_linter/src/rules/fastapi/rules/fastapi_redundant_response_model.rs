@@ -58,6 +58,11 @@ use crate::{AlwaysFixableViolation, Fix};
 /// async def create_item(item: Item) -> Item:
 ///     return item
 /// ```
+///
+/// ## Fix safety
+/// This fix is always unsafe, as removing the `response_model` argument can change
+/// runtime behavior and API documentation generation. Additionally, comments inside
+/// the decorator might be removed when the argument is deleted.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct FastApiRedundantResponseModel;

@@ -1539,22 +1539,6 @@ import sys
         .args(["--config", "ruff.toml"])
         .arg("noqa.py"),
         @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    noqa.py:5:8: F401 [*] `sys` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
-
-    ----- stderr -----
-    ");
-
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .args(["--config", "ruff.toml"])
-        .arg("noqa.py")
-        .args(["--preview"]),
-        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1563,12 +1547,12 @@ import sys
     ----- stderr -----
     ");
 
-    // with --ignore-noqa --preview
+    // with --ignore-noqa
     assert_cmd_snapshot!(fixture
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
-        .args(["--ignore-noqa", "--preview"]),
+        .args(["--ignore-noqa"]),
         @"
     success: false
     exit_code: 1

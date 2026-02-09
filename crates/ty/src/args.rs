@@ -130,7 +130,7 @@ pub(crate) struct CheckCommand {
     pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.
-    #[arg(long)]
+    #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
     pub(crate) output_format: Option<OutputFormat>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
@@ -315,7 +315,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'error'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -323,7 +323,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -331,7 +331,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("Disables the rule. Can be specified multiple times.")
+                .help("Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )

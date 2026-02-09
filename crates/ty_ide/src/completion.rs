@@ -1,11 +1,12 @@
 use std::cmp::Ordering;
+use std::collections::{BinaryHeap, binary_heap};
 
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
@@ -13,7 +14,7 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, Module, ModuleName};
 use ty_python_semantic::HasType;
-use ty_python_semantic::types::UnionType;
+use ty_python_semantic::types::{SpecialFormType, UnionType};
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
     types::{CycleDetector, KnownClass, Type},
@@ -37,47 +38,45 @@ pub fn completion<'db>(
     let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
         return vec![];
     };
+    let model = SemanticModel::new(db, file);
     let query = UserQuery::fuzzy(context.cursor.typed);
-    let mut completions = Completions::new(db, context.collection_context(db), query);
+    let mut completions = Completions::new(db, context.collection_context(db, &model), query);
     match context.kind {
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
         }
-        ContextKind::NonImport(ref non_import) => {
-            let model = SemanticModel::new(db, file);
-            match non_import.target {
-                CompletionTargetAst::ObjectDot { expr } => {
-                    completions.extend(model.attribute_completions(expr));
+        ContextKind::NonImport(ref non_import) => match non_import.target {
+            CompletionTargetAst::ObjectDot { expr } => {
+                completions.extend(model.attribute_completions(expr));
+            }
+            CompletionTargetAst::Scoped(scoped) => {
+                for semantic_completion in model.scoped_completions(scoped.node) {
+                    let module_dependency_kind = if semantic_completion.builtin {
+                        ModuleDependencyKind::Builtin
+                    } else {
+                        ModuleDependencyKind::Current
+                    };
+                    completions.add(
+                        CompletionBuilder::from_semantic_completion(db, semantic_completion)
+                            .module_dependency_kind(module_dependency_kind),
+                    );
                 }
-                CompletionTargetAst::Scoped(scoped) => {
-                    for semantic_completion in model.scoped_completions(scoped.node) {
-                        let module_dependency_kind = if semantic_completion.builtin {
-                            ModuleDependencyKind::Builtin
-                        } else {
-                            ModuleDependencyKind::Current
-                        };
-                        completions.add(
-                            CompletionBuilder::from_semantic_completion(db, semantic_completion)
-                                .module_dependency_kind(module_dependency_kind),
-                        );
-                    }
-                    add_keyword_completions(db, &mut completions);
-                    add_argument_completions(db, &model, &context.cursor, &mut completions);
-                    if settings.auto_import {
-                        add_unimported_completions(
-                            db,
-                            file,
-                            &parsed,
-                            scoped,
-                            |module_name: &ModuleName, symbol: &str| {
-                                ImportRequest::import_from(module_name.as_str(), symbol)
-                            },
-                            &mut completions,
-                        );
-                    }
+                add_keyword_completions(db, &mut completions);
+                add_argument_completions(db, &model, &context.cursor, &mut completions);
+                if settings.auto_import {
+                    add_unimported_completions(
+                        db,
+                        file,
+                        &parsed,
+                        scoped,
+                        |module_name: &ModuleName, symbol: &str| {
+                            ImportRequest::import_from(module_name.as_str(), symbol)
+                        },
+                        &mut completions,
+                    );
                 }
             }
-        }
+        },
     }
 
     completions.into_completions()
@@ -87,7 +86,7 @@ pub fn completion<'db>(
 struct Completions<'db> {
     db: &'db dyn Db,
     context: CollectionContext<'db>,
-    items: Vec<Completion<'db>>,
+    items: BinaryHeap<CompletionRanker<'db>>,
     /// The query used to match against candidate completions.
     ///
     /// If a completion's name doesn't match this query, then
@@ -96,6 +95,13 @@ struct Completions<'db> {
 }
 
 impl<'db> Completions<'db> {
+    /// A limit on the total number of completions we'll return.
+    ///
+    /// A user should refine its completion request if the searched symbol
+    /// doesn't appear in the first 1k results. Serializing/deserializing 1k
+    /// completions can be expensive and result in noticeable lag.
+    const LIMIT: usize = 1_000;
+
     /// Create a new empty collection of completions.
     ///
     /// The given typed text should correspond to what we believe
@@ -106,30 +112,27 @@ impl<'db> Completions<'db> {
         Completions {
             db,
             context,
-            items: vec![],
+            items: BinaryHeap::new(),
             query,
         }
     }
 
     /// Convert this collection into a simple
     /// sequence of completions.
-    fn into_completions(mut self) -> Vec<Completion<'db>> {
-        self.items.sort_by(rank);
+    fn into_completions(self) -> Vec<Completion<'db>> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        // A user should refine its completion request if the searched symbol doesn't appear in the first 1k results.
-        // Serializing/deserializing 1k completions can be expensive and result in noticeable lag.
-        self.items.truncate(1000);
-        self.items
+            .into_sorted_vec()
+            .into_iter()
+            .map(|CompletionRanker(c)| c)
+            .collect()
     }
 
     // Convert this collection into a list of "import..." fixes
-    fn into_imports(mut self) -> Vec<ImportEdit> {
-        self.items.sort_by(rank);
+    fn into_imports(self) -> Vec<ImportEdit> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        self.items
+            .into_sorted_vec()
             .into_iter()
+            .map(|CompletionRanker(c)| c)
             .filter_map(|item| {
                 Some(ImportEdit {
                     label: format!("import {}", item.qualified?),
@@ -140,12 +143,11 @@ impl<'db> Completions<'db> {
     }
 
     // Convert this collection into a list of "qualify..." fixes
-    fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
-        self.items.sort_by(rank);
+    fn into_qualifications(self, range: TextRange) -> Vec<ImportEdit> {
         self.items
-            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
-        self.items
+            .into_sorted_vec()
             .into_iter()
+            .map(|CompletionRanker(c)| c)
             .filter_map(|item| {
                 // If we would have to actually import something, don't suggest the qualification
                 // (we could, maybe we should, but for now, we don't)
@@ -198,8 +200,16 @@ impl<'db> Completions<'db> {
         if self.context.exclude(self.db, &builder) {
             return false;
         }
-        self.items
-            .push(builder.build(self.db, &self.context, &self.query));
+        let completion = CompletionRanker(builder.build(self.db, &self.context, &self.query));
+        if self.items.len() >= Completions::LIMIT {
+            // OK because `self.items` is guaranteed to be non-empty here.
+            let worst = self.items.peek_mut().unwrap();
+            if *worst <= completion {
+                return false;
+            }
+            binary_heap::PeekMut::pop(worst);
+        }
+        self.items.push(completion);
         true
     }
 }
@@ -378,20 +388,30 @@ impl<'db> CompletionBuilder<'db> {
         ctx: &CollectionContext<'db>,
         query: &UserQuery,
     ) -> Completion<'db> {
-        // Tags completions with context-specific if they are
-        // known to be usable in a `raise` context and we have
-        // determined a raisable type `raisable_ty`.
-        //
-        // It's possible that some completions are usable in a `raise`
-        // but aren't marked here. That is, false negatives are
-        // possible but false positives are not.
-        if let Some(raisable_ty) = ctx.raisable_ty {
-            if let Some(ty) = self.ty {
-                self.is_context_specific |= ty.is_assignable_to(db, raisable_ty);
-            }
-        }
         if let Some(ty) = self.ty {
             self.is_type_check_only = ty.is_type_check_only(db);
+            // Tags completions with context-specific if they are
+            // known to be usable in an exception context and we have
+            // determined an `exception_ty`.
+            //
+            // It's possible that some completions are usable in an exception
+            // but aren't marked here. That is, false negatives are
+            // possible but false positives are not.
+            if let Some(exception_ty) = ctx.exception_ty {
+                self.is_context_specific |= ty.is_assignable_to(db, exception_ty);
+            }
+            if ctx.is_in_class_def() {
+                self.is_context_specific |= ty.is_class_literal()
+                    || matches!(
+                        ty,
+                        Type::SpecialForm(
+                            SpecialFormType::Protocol
+                                | SpecialFormType::Generic
+                                | SpecialFormType::TypedDict
+                                | SpecialFormType::NamedTuple
+                        )
+                    );
+            }
         }
         let kind = self
             .kind
@@ -580,22 +600,30 @@ impl<'m> Context<'m> {
     }
 
     /// Returns a filtering context for use with a completion collector.
-    fn collection_context<'db>(&self, db: &'db dyn Db) -> CollectionContext<'db> {
+    fn collection_context<'db>(
+        &self,
+        db: &'db dyn Db,
+        model: &SemanticModel<'db>,
+    ) -> CollectionContext<'db> {
         match self.kind {
             ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
-                let is_raising_exception = self.cursor.is_raising_exception();
+                let exception_ty = self.cursor.exception_ty(db);
+                let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
+                    let mut bases = extract_base_class_names(class_def);
+                    // Exclude the class being defined from its own base class
+                    // completions, unless the name was previously bound in the
+                    // same scope (in which case the bases refer to the prior
+                    // definition).
+                    if !model.is_class_name_reassigned(class_def) {
+                        bases.insert(class_def.name.id.clone());
+                    }
+                    bases
+                });
                 CollectionContext {
-                    raisable_ty: is_raising_exception.then(|| {
-                        UnionType::from_elements(
-                            db,
-                            [
-                                KnownClass::BaseException.to_subclass_of(db),
-                                KnownClass::BaseException.to_instance(db),
-                            ],
-                        )
-                    }),
-                    is_raising_exception,
+                    exception_ty,
+                    is_raising_exception: exception_ty.is_some(),
+                    existing_class_bases,
                     valid_keywords: self.cursor.valid_keywords(),
                 }
             }
@@ -628,6 +656,8 @@ struct ContextCursor<'m> {
     range: TextRange,
     /// The tokens that appear before the cursor.
     tokens_before: &'m [Token],
+    /// The covering node based on `parsed` and `range`.
+    covering_node: CoveringNode<'m>,
 }
 
 impl<'m> ContextCursor<'m> {
@@ -639,13 +669,16 @@ impl<'m> ContextCursor<'m> {
     ) -> ContextCursor<'m> {
         let tokens_before = tokens_start_before(parsed.tokens(), offset);
         let Some(range) = ContextCursor::find_typed_text_range(tokens_before, offset) else {
+            let range = TextRange::empty(offset);
+            let covering_node = covering_node(parsed.syntax().into(), range);
             return ContextCursor {
                 parsed,
                 source,
                 typed: None,
                 offset,
-                range: TextRange::empty(offset),
+                range,
                 tokens_before,
+                covering_node,
             };
         };
 
@@ -654,6 +687,8 @@ impl<'m> ContextCursor<'m> {
             !text.is_empty(),
             "expected typed text, when found, to be non-empty"
         );
+
+        let covering_node = covering_node(parsed.syntax().into(), range);
         ContextCursor {
             parsed,
             source,
@@ -661,6 +696,7 @@ impl<'m> ContextCursor<'m> {
             offset,
             range,
             tokens_before,
+            covering_node,
         }
     }
 
@@ -761,8 +797,7 @@ impl<'m> ContextCursor<'m> {
     /// Returns true when the cursor sits on a binding statement.
     /// E.g. naming a parameter, type parameter, or `for` <name>).
     fn is_in_variable_binding(&self) -> bool {
-        let covering = self.covering_node(self.range);
-        covering.ancestors().any(|node| match node {
+        self.covering_node.ancestors().any(|node| match node {
             ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(self.range),
             ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
                 type_param.name.range.contains_range(self.range)
@@ -792,28 +827,67 @@ impl<'m> ContextCursor<'m> {
         })
     }
 
-    /// Returns true when the cursor is after a `raise` keyword.
-    fn is_raising_exception(&self) -> bool {
-        /// The maximum number of tokens we're willing to
-        /// look-behind to find a `raise` keyword.
-        const LIMIT: usize = 10;
+    /// Returns the expected type when the cursor sits inside
+    /// a `raise` or `except` expression.
+    ///
+    /// The return value is always `None` if the cursor is not
+    /// inside a `raise` or `except` context.
+    fn exception_ty<'db>(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let base_exception_ty = KnownClass::BaseException.to_subclass_of(db);
+        let base_exception_instance = KnownClass::BaseException.to_instance(db);
+        let raise_ty = UnionType::from_elements(db, [base_exception_ty, base_exception_instance]);
+        let cause_ty = UnionType::from_elements(db, [raise_ty, Type::none(db)]);
+        let except_ty = UnionType::from_elements(
+            db,
+            [
+                base_exception_ty,
+                Type::homogeneous_tuple(db, base_exception_ty),
+            ],
+        );
 
-        // This only looks for things like `raise foo.bar.baz.qu<CURSOR>`.
-        // Technically, any kind of expression is allowed after `raise`.
-        // But we may not always want to treat it specially. So we're
-        // rather conservative about what we consider "raising an
-        // exception" to be for the purposes of completions. The failure
-        // mode here is that we may wind up suggesting things that
-        // shouldn't be raised. The benefit is that when this heuristic
-        // does work, we won't suggest things that shouldn't be raised.
-        for token in self.tokens_before.iter().rev().take(LIMIT) {
-            match token.kind() {
-                TokenKind::Name | TokenKind::Dot => continue,
-                TokenKind::Raise => return true,
-                _ => return false,
+        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
+
+        for node in self.covering_node.ancestors() {
+            match node {
+                ast::AnyNodeRef::StmtRaise(stmt) => {
+                    if stmt.exc.as_deref().is_some_and(contains) {
+                        return Some(raise_ty);
+                    } else if stmt.cause.as_deref().is_some_and(contains) {
+                        return Some(cause_ty);
+                    }
+                }
+                ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
+                    if handler.type_.as_deref().is_some_and(contains) {
+                        return Some(except_ty);
+                    }
+                }
+                _ => {}
+            }
+            if node.is_statement() {
+                return None;
             }
         }
-        false
+        None
+    }
+
+    /// Returns the class definition if the cursor is within its
+    /// arguments node.
+    ///
+    /// E.g. `class Foo(Bar<CURSOR>)`
+    fn enclosing_class_def(&self) -> Option<&'m ast::StmtClassDef> {
+        for node in self.covering_node.ancestors() {
+            if let ast::AnyNodeRef::StmtClassDef(class_def) = node {
+                return class_def
+                    .arguments
+                    .as_ref()
+                    .is_some_and(|args| args.range.contains_range(self.range))
+                    .then_some(class_def);
+            }
+            if node.is_statement() {
+                return None;
+            }
+        }
+        None
     }
 
     /// Returns a set of keywords that are valid at
@@ -822,11 +896,10 @@ impl<'m> ContextCursor<'m> {
     /// Returns None if no context-based exclusions can
     /// be identified. Meaning that all keywords are valid.
     fn valid_keywords(&self) -> Option<FxHashSet<&'static str>> {
-        let covering_node = self.covering_node(self.range);
-
         // Check if the cursor is within the naming
         // part of a decorator node.
-        if covering_node
+        if self
+            .covering_node
             .ancestors()
             // We bail if we're specifying arguments as we don't
             // want to suppress suggestions there.
@@ -837,7 +910,7 @@ impl<'m> ContextCursor<'m> {
         {
             return Some(FxHashSet::from_iter(["lambda"]));
         }
-        covering_node.ancestors().find_map(|node| {
+        self.covering_node.ancestors().find_map(|node| {
             self.is_in_for_statement_iterable(node)
                 .then(|| FxHashSet::from_iter(["yield", "lambda", "await"]))
                 .or_else(|| {
@@ -1001,13 +1074,17 @@ impl UserQuery {
 #[derive(Clone, Debug, Default)]
 struct CollectionContext<'db> {
     /// A pre-computed type corresponding to what is
-    /// expected for the type of valuables that are
-    /// raisable.
+    /// expected in an exception expression.
     ///
     /// This is only `Some` when `is_raising_exception` is `true`.
-    raisable_ty: Option<Type<'db>>,
-    /// Whether we're in a `raise <EXPR>` context or not.
+    exception_ty: Option<Type<'db>>,
+    /// Whether we're in an exception context (`raise` or `except`) or not.
     is_raising_exception: bool,
+    /// Names of base classes that are already specified in the class definition,
+    /// including the class being defined (unless its name was previously bound).
+    /// Used to filter out duplicate and self-referential base class suggestions.
+    /// This is only `Some` when we're in a class definition context.
+    existing_class_bases: Option<FxHashSet<Name>>,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -1021,6 +1098,11 @@ impl<'db> CollectionContext<'db> {
     /// the "none" context does no additional filtering.
     fn none() -> CollectionContext<'db> {
         CollectionContext::default()
+    }
+
+    /// Whether we're in a class definition context.
+    fn is_in_class_def(&self) -> bool {
+        self.existing_class_bases.is_some()
     }
 
     /// Whether the completion that would be built from the
@@ -1037,8 +1119,35 @@ impl<'db> CollectionContext<'db> {
         {
             return !valid_keywords.contains(builder.name.as_str());
         }
+        // Exclude classes that are already listed as base classes in the class definition.
+        if let Some(ref existing_class_bases) = self.existing_class_bases {
+            // For in-scope completions, check if the simple name matches.
+            if builder.import.is_none() && existing_class_bases.contains(&builder.name) {
+                return true;
+            }
+            // For auto-import completions, check if the qualified name matches.
+            // This handles cases like `class Foo(mod.Bar, ...)` where we want to
+            // filter out auto-import suggestions for `Bar` from module `mod`.
+            if let Some(ref qualified) = builder.qualified
+                && existing_class_bases.contains(qualified)
+            {
+                return true;
+            }
+        }
         false
     }
+}
+
+/// Extracts the names of base classes from a class definition.
+///
+/// For simple name references (e.g., `Foo`), returns the name as-is.
+/// For attribute accesses (e.g., `mod.Foo`), returns the full dotted path.
+fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<Name> {
+    class_def
+        .bases()
+        .iter()
+        .filter_map(|expr| UnqualifiedName::from_expr(expr).map(|name| Name::new(name.to_string())))
+        .collect()
 }
 
 /// Relevance information assigned to a single completion.
@@ -1271,7 +1380,7 @@ fn add_argument_completions<'db>(
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
-    for node in cursor.covering_node(cursor.range).ancestors() {
+    for node in cursor.covering_node.ancestors() {
         match node {
             ast::AnyNodeRef::ExprCall(call) => {
                 if call.arguments.range().contains_range(cursor.range) {
@@ -1347,7 +1456,7 @@ fn add_function_arg_completions<'db>(
 ) {
     debug_assert!(
         cursor
-            .covering_node(cursor.range)
+            .covering_node
             .ancestors()
             .take_while(|node| !node.is_statement())
             .any(|node| node.is_arguments()),
@@ -1358,11 +1467,11 @@ fn add_function_arg_completions<'db>(
     let Some(sig_help) = signature_help(db, file, cursor.offset) else {
         return;
     };
-    let set_function_args = detect_set_function_args(cursor);
+    let mut set_function_args = detect_set_function_args(cursor);
 
     for sig in &sig_help.signatures {
         for p in &sig.parameters {
-            if p.is_positional_only || set_function_args.contains(&p.name.as_str()) {
+            if p.is_positional_only || !set_function_args.insert(p.name.as_str()) {
                 continue;
             }
             let mut builder = CompletionBuilder::argument(&p.name).ty(p.ty);
@@ -1394,9 +1503,8 @@ fn add_function_arg_completions<'db>(
 /// If the parent node is not an arguments node, the return value
 /// is an empty Vec.
 fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str> {
-    let range = TextRange::empty(cursor.offset);
     cursor
-        .covering_node(range)
+        .covering_node
         .parent()
         .and_then(|node| match node {
             ast::AnyNodeRef::Arguments(args) => Some(args),
@@ -1526,23 +1634,19 @@ fn add_unimported_completions<'db>(
         }
 
         let module_name = symbol.module().name(db);
-        let (name, qualified, request) = symbol
+        let (name, request) = symbol
             .name_in_file()
-            .map(|name| {
-                let qualified = format!("{module_name}.{name}");
-                (name, qualified, create_import_request(module_name, name))
-            })
+            .map(|name| (name, create_import_request(module_name, name)))
             .unwrap_or_else(|| {
                 let name = module_name.as_str();
-                let qualified = name.to_string();
-                (name, qualified, ImportRequest::module(name))
+                (name, ImportRequest::module(name))
             });
         let import_action = importer.import(request, &members);
         // N.B. We use `add_skip_query` here because `all_symbols`
         // already takes our query into account.
         completions.add_skip_query(
             Completion::builder(name)
-                .qualified(qualified)
+                .qualified(symbol.qualified())
                 .insert(import_action.symbol_text())
                 .kind(symbol.kind().to_completion_kind())
                 .module_name(module_name)
@@ -1679,13 +1783,9 @@ impl<'t> CompletionTargetTokens<'t> {
                 let node = cursor.covering_node(token.range()).node();
                 Some(CompletionTargetAst::Scoped(ScopedTarget { node }))
             }
-            CompletionTargetTokens::Unknown => {
-                let range = TextRange::empty(cursor.offset);
-                let covering_node = cursor.covering_node(range);
-                Some(CompletionTargetAst::Scoped(ScopedTarget {
-                    node: covering_node.node(),
-                }))
-            }
+            CompletionTargetTokens::Unknown => Some(CompletionTargetAst::Scoped(ScopedTarget {
+                node: cursor.covering_node.node(),
+            })),
         }
     }
 }
@@ -2386,19 +2486,44 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
     imp(db, ty, &CompletionKindVisitor::default())
 }
 
-/// Return an ordering relating the two completions.
+/// Defines an ordering relating the two completions for ranking purposes.
 ///
-/// A `Ordering::Less` is returned when `c1` should be ranked above
-/// `c2`. A `Ordering::Greater` is returned when `c1` should be ranked
-/// below `c2`. In other words, a standard ascending sort used with
-/// this comparison routine will yields the "best ranked" completions
-/// first.
+/// A `Ordering::Less` is returned when `c1` should be ranked above `c2`. A
+/// `Ordering::Greater` is returned when `c1` should be ranked below `c2`.
+/// In other words, an ascending sort used with this comparison routine will
+/// yields the "best ranked" completions first. This scheme was chosen so that
+/// this type works with a max-heap (such as `std::collections::BinaryHeap`).
 ///
-/// Note that this could have been implemented via `Eq` and `Ord`
-/// impls on `Completion`, but is instead a separate function to avoid
-/// conflating relevance ranking with identity.
-fn rank(c1: &Completion<'_>, c2: &Completion<'_>) -> Ordering {
-    (&c1.relevance, &c1.name).cmp(&(&c2.relevance, &c2.name))
+/// Note that this could have been implemented via `Eq` and `Ord` impls on
+/// `Completion` directly, but is instead a separate type to avoid conflating
+/// relevance ranking with identity.
+#[derive(Debug)]
+struct CompletionRanker<'db>(Completion<'db>);
+
+impl Eq for CompletionRanker<'_> {}
+
+impl PartialEq for CompletionRanker<'_> {
+    fn eq(&self, rhs: &CompletionRanker<'_>) -> bool {
+        self.0.relevance == rhs.0.relevance
+            && self.0.name == rhs.0.name
+            && self.0.module_name == rhs.0.module_name
+    }
+}
+
+impl Ord for CompletionRanker<'_> {
+    fn cmp(&self, rhs: &CompletionRanker<'_>) -> Ordering {
+        (&self.0.relevance, &self.0.name, &self.0.module_name).cmp(&(
+            &rhs.0.relevance,
+            &rhs.0.name,
+            &rhs.0.module_name,
+        ))
+    }
+}
+
+impl PartialOrd for CompletionRanker<'_> {
+    fn partial_cmp(&self, rhs: &CompletionRanker<'_>) -> Option<Ordering> {
+        Some(self.cmp(rhs))
+    }
 }
 
 #[cfg(test)]
@@ -3344,9 +3469,8 @@ class Foo(<CURSOR>):
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
-        Foo
+        metaclass=
         ");
     }
 
@@ -3362,9 +3486,8 @@ class Bar: ...
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
-        Foo
+        metaclass=
         ");
     }
 
@@ -3380,9 +3503,8 @@ class Bar: ...
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
-        Foo
+        metaclass=
         ");
     }
 
@@ -3396,9 +3518,8 @@ class Foo(<CURSOR>",
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
-        metaclass=
         Bar
-        Foo
+        metaclass=
         ");
     }
 
@@ -3428,6 +3549,225 @@ class Foo(metaclass=x, meta<CURSOR>",
             .skip_builtins()
             .build()
             .not_contains("metaclass");
+    }
+
+    #[test]
+    fn class_base_excludes_class_being_defined() {
+        let builder = completion_test_builder(
+            "\
+class Foo(<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo");
+    }
+
+    #[test]
+    fn class_base_excludes_class_being_defined_with_typed_text() {
+        let builder = completion_test_builder(
+            "\
+class Foo(Fo<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo");
+    }
+
+    #[test]
+    fn class_base_includes_prior_definition_with_same_name() {
+        // When a class with the same name was previously defined,
+        // the bases refer to the prior definition, so it should
+        // still be offered as a completion.
+        let builder = completion_test_builder(
+            "\
+class Foo: ...
+
+class Foo(<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("Foo");
+    }
+
+    #[test]
+    fn class_base_already_specified() {
+        let builder = completion_test_builder(
+            "\
+class Foo: ...
+class Bar: ...
+
+class Baz(Foo, <CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo")
+            .contains("Bar");
+    }
+
+    #[test]
+    fn class_multiple_bases_already_specified() {
+        let builder = completion_test_builder(
+            "\
+class A: ...
+class B: ...
+class C: ...
+
+class D(A, B, <CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("A")
+            .not_contains("B")
+            .contains("C");
+    }
+
+    #[test]
+    fn class_base_same_name_different_module() {
+        // Even though `Foo` is already a base class, the auto-import suggestion
+        // for `other.Foo` should still be shown since it's a different symbol.
+        // Note: We need to type some characters (e.g., "Fo") to trigger auto-import
+        // suggestions, as empty queries don't generate unimported completions.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+class Foo: ...
+
+class Bar(Foo, Fo<CURSOR>
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // The local Foo should be filtered out (no import required)
+        assert!(
+            !foo_completions.iter().any(|c| c.import.is_none()),
+            "Local `Foo` should be filtered out as it's already a base class"
+        );
+
+        // The auto-import Foo from `other` module should be present
+        assert!(
+            foo_completions.iter().any(|c| c.import.is_some()),
+            "Auto-import `Foo` from other module should still be suggested"
+        );
+    }
+
+    #[test]
+    fn class_base_qualified_already_specified() {
+        // When a qualified base class like `other.Foo` is already specified,
+        // the auto-import suggestion for `Foo` from `other` should be filtered.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+import other
+
+class Bar(other.Foo, Fo<CURSOR>
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // The auto-import Foo from `other` should be filtered since `other.Foo`
+        // is already a base class.
+        assert!(
+            foo_completions.is_empty(),
+            "Auto-import `Foo` from `other` should be filtered since `other.Foo` is already a base"
+        );
+    }
+
+    #[test]
+    fn class_base_qualified_attribute_not_filtered() {
+        // TODO: This test documents a known limitation. When completing attributes
+        // on an already-imported module (e.g., `other.F<CURSOR>`), we don't filter
+        // out classes that are already base classes. This is because attribute
+        // completions don't have `import` or `qualified` set, so we can't match
+        // them against the existing base classes.
+        //
+        // This is a false negative (showing a duplicate that should be hidden),
+        // not a false positive, so it's a minor UX issue rather than a bug.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+class Bar: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+import other
+
+class MyClass(other.Foo, other.F<CURSOR>): pass
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // Ideally this would be empty since `other.Foo` is already a base class,
+        // but we don't currently filter attribute completions on imported modules.
+        assert_eq!(
+            foo_completions.len(),
+            1,
+            "Foo is not filtered out (known limitation)"
+        );
     }
 
     #[test]
@@ -4025,7 +4365,7 @@ quux.<CURSOR>
         __module__ :: str
         __mul__ :: bound method Quux.__mul__(value: SupportsIndex, /) -> tuple[int | str, ...]
         __ne__ :: bound method Quux.__ne__(value: object, /) -> bool
-        __new__ :: (x: int, y: str) -> None
+        __new__ :: (x: int, y: str) -> Quux
         __orig_bases__ :: tuple[Any, ...]
         __reduce__ :: bound method Quux.__reduce__() -> str | tuple[Any, ...]
         __reduce_ex__ :: bound method Quux.__reduce_ex__(protocol: SupportsIndex, /) -> str | tuple[Any, ...]
@@ -8067,6 +8407,109 @@ def f(x: Intersection[int, Any] | str):
         assert_snapshot!(
             builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
             @"__file__ :: str",
+        );
+    }
+
+    #[test]
+    fn dunder_file_attribute_completion_non_namespace_package() {
+        let builder = CursorTest::builder()
+            .source("module.py", "")
+            .source("main.py", "import module; module.__file<CURSOR>")
+            .completion_test_builder();
+
+        // __file__ should be `str` when accessed as an attribute on a non-namespace-package module,
+        // not `str | None`
+        assert_snapshot!(
+            builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
+            @"__file__ :: str",
+        );
+    }
+
+    #[test]
+    fn dunder_file_attribute_completion_namespace_package() {
+        let builder = CursorTest::builder()
+            .source("namespace_package/foo.py", "")
+            .source(
+                "main.py",
+                "import namespace_package; namespace_package.__file<CURSOR>",
+            )
+            .completion_test_builder();
+
+        // __file__ should be `None` when accessed as an attribute on a namespace-package module,
+        // not `str | None`
+        assert_snapshot!(
+            builder.skip_keywords().skip_auto_import().type_signatures().build().snapshot(),
+            @"__file__ :: None",
+        );
+    }
+
+    #[test]
+    fn no_duplicate_keyword_arg() {
+        let builder = completion_test_builder(
+            r#"
+import re
+re.match('', '', fla<CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().skip_builtins().build().snapshot(),
+            @"flags=",
+        );
+    }
+
+    // Ideally, we should favour completions that are definitely raisable
+    // here. However, doing so would require `exception_ty` to fall back to
+    // token matching when AST-matching fails, making the function signficantly
+    // more complex. At the time of writing, this trade-off was not
+    // considered worthwhile.
+    //
+    // Note that this only applies to bare raise/raise-from statements with no
+    // characters typed after it. It does not apply to `raise A<CURSOR>`.
+    #[test]
+    fn empty_raise_statement() {
+        let builder = completion_test_builder(
+            r#"
+raise <CURSOR>
+"#,
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().skip_builtins().build().snapshot(),
+            @r"
+            and
+            as
+            assert
+            async
+            await
+            break
+            case
+            class
+            continue
+            def
+            del
+            elif
+            else
+            except
+            finally
+            for
+            from
+            global
+            if
+            import
+            in
+            is
+            lambda
+            match
+            nonlocal
+            not
+            or
+            pass
+            raise
+            return
+            try
+            while
+            with
+            yield
+            ",
         );
     }
 

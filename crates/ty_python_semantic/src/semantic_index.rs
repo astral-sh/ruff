@@ -469,6 +469,11 @@ impl<'db> SemanticIndex<'db> {
     ///
     /// If the number of definitions associated with the key is not exactly 1 and
     /// the `debug_assertions` feature is enabled, this method will panic.
+    ///
+    /// It is generally safe to use this method for any AST node that does not
+    /// correspond to a `*` (wildcard) import, since `*` imports are the only
+    /// situations that can result in multiple definitions being associated with a
+    /// single AST node.
     #[track_caller]
     pub(crate) fn expect_single_definition(
         &self,
@@ -524,6 +529,15 @@ impl<'db> SemanticIndex<'db> {
     /// Returns the id of the scope that `node` creates, if it exists.
     pub(crate) fn try_node_scope(&self, node: NodeWithScopeRef) -> Option<FileScopeId> {
         self.scopes_by_node.get(&node.node_key()).copied()
+    }
+
+    /// Returns the id of the scope that the node identified by `key` creates.
+    ///
+    /// This is useful when you have a [`NodeWithScopeKey`] constructed from an
+    /// [`AstNodeRef`](crate::ast_node_ref::AstNodeRef) and want to avoid loading
+    /// the parsed module just to look up the scope.
+    pub(crate) fn node_scope_by_key(&self, key: NodeWithScopeKey) -> FileScopeId {
+        self.scopes_by_node[&key]
     }
 
     /// Checks if there is an import of `__future__.annotations` in the global scope, which affects
