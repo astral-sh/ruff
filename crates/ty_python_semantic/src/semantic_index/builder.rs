@@ -262,6 +262,28 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         false
     }
 
+    /// Returns the enclosing non-comprehension scope for walrus operator targets,
+    /// per [PEP 572]. Named expressions in comprehensions bind in the first
+    /// enclosing scope that is *not* a comprehension.
+    ///
+    /// Returns `None` if the current scope is not a comprehension.
+    ///
+    /// [PEP 572]: https://peps.python.org/pep-0572/#scope-of-the-target
+    fn enclosing_scope_for_walrus(&self) -> Option<(FileScopeId, usize)> {
+        if self.scopes[self.current_scope()].kind() != ScopeKind::Comprehension {
+            return None;
+        }
+        self.scope_stack
+            .iter()
+            .enumerate()
+            .rev()
+            .skip(1)
+            .find_map(|(index, info)| {
+                (self.scopes[info.file_scope_id].kind() != ScopeKind::Comprehension)
+                    .then_some((info.file_scope_id, index))
+            })
+    }
+
     /// Push a new loop, returning the outer loop, if any.
     fn push_loop(&mut self) -> Option<Loop> {
         self.current_scope_info_mut()
@@ -2891,10 +2913,31 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 );
                             }
                             Some(CurrentAssignment::Named(named)) => {
-                                // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                                // named expression is implicitly nonlocal. This is yet to be
-                                // implemented.
-                                self.add_definition(place_id, named);
+                                if let Some((enclosing_scope, scope_index)) =
+                                    self.enclosing_scope_for_walrus()
+                                {
+                                    // PEP 572: walrus in comprehension binds in enclosing scope.
+                                    let target_name = named
+                                        .target
+                                        .as_name_expr()
+                                        .expect("target should be a Name expression")
+                                        .id
+                                        .clone();
+                                    let (symbol_id, added) = self.place_tables[enclosing_scope]
+                                        .add_symbol(Symbol::new(target_name));
+                                    if added {
+                                        self.use_def_maps[enclosing_scope]
+                                            .add_place(symbol_id.into());
+                                    }
+                                    self.push_additional_definition_in_scope(
+                                        enclosing_scope,
+                                        scope_index,
+                                        symbol_id.into(),
+                                        named,
+                                    );
+                                } else {
+                                    self.add_definition(place_id, named);
+                                }
                             }
                             Some(CurrentAssignment::Comprehension {
                                 unpack,
@@ -2949,11 +2992,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 walk_expr(self, expr);
             }
             ast::Expr::Named(node) => {
-                // TODO walrus in comprehensions is implicitly nonlocal
                 self.visit_expr(&node.value);
 
                 // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
                 if node.target.is_name_expr() {
+                    // PEP 572: walrus in comprehension binds in the enclosing scope.
+                    // Make the value a standalone expression so inference can evaluate
+                    // it in the comprehension scope where the iteration variables are visible.
+                    if self.enclosing_scope_for_walrus().is_some() {
+                        self.add_standalone_expression(&node.value);
+                    }
                     self.push_assignment(node.into());
                     self.visit_expr(&node.target);
                     self.pop_assignment();
