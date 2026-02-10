@@ -4712,14 +4712,19 @@ impl<'db> Type<'db> {
             .into()
         };
 
-        // This helper is called from multiple `Type` variants (not just the `ClassLiteral` arm in
-        // `Type::bindings`), so manual-constructor exemptions must live here too.
+        // Checking TypedDict construction happens in `infer_call_expression_impl`, so here we just
+        // return a permissive fallback binding. TODO maybe we should just synthesize bindings for
+        // a TypedDict constructor? That would handle unions/intersections correctly.
         if class_literal.is_typed_dict(db)
             || class::CodeGeneratorKind::TypedDict.matches(db, class_literal, class_specialization)
         {
             return fallback_bindings();
         }
 
+        // These cases are checked in `Type::known_class_literal_bindings`, but currently we only
+        // call that for `ClassLiteral` types, so we need a permissive fallback here. TODO Ideally
+        // that would be called from `constructor_bindings` for better consistency, but that causes
+        // some test failures deserving separate investigation.
         let known = class.known(db);
         if matches!(
             known,
@@ -4734,12 +4739,6 @@ impl<'db> Type<'db> {
                     | KnownClass::Deprecated
             )
         ) {
-            // Manual signatures for known constructors.
-            return fallback_bindings();
-        }
-
-        if matches!(known, Some(KnownClass::Tuple)) && !class.is_generic() {
-            // Non-generic tuple constructors are defined via overloads.
             return fallback_bindings();
         }
 
