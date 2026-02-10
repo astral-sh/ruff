@@ -622,6 +622,8 @@ mod tests {
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
+    #[test_case(Rule::MutableClassDefault, Path::new("RUF012.py"))]
+    #[test_case(Rule::MutableFromkeysValue, Path::new("RUF024.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

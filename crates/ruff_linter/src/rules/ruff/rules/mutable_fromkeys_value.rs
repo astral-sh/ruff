@@ -1,13 +1,14 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::analyze::typing::is_mutable_expr;
+use ruff_python_semantic::analyze::typing::{is_mutable_expr, is_mutable_expr_extended};
 
 use ruff_python_codegen::Generator;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_extended_mutable_expr_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -84,7 +85,12 @@ pub(crate) fn mutable_fromkeys_value(checker: &Checker, call: &ast::ExprCall) {
     let [keys, value] = &*call.arguments.args else {
         return;
     };
-    if !is_mutable_expr(value, semantic) {
+    let is_mutable = if is_extended_mutable_expr_enabled(checker.settings()) {
+        is_mutable_expr_extended(value, semantic)
+    } else {
+        is_mutable_expr(value, semantic)
+    };
+    if !is_mutable {
         return;
     }
 

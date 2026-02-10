@@ -415,6 +415,20 @@ pub fn is_mutable_expr(expr: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
+/// Return `true` if `expr` is an expression that resolves to a mutable value,
+/// including additional patterns like generators, tuples containing mutable elements,
+/// and walrus (`:=`) expressions.
+pub fn is_mutable_expr_extended(expr: &Expr, semantic: &SemanticModel) -> bool {
+    match expr {
+        Expr::Generator(_) => true,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            elts.iter().any(|e| is_mutable_expr_extended(e, semantic))
+        }
+        Expr::Named(ast::ExprNamed { value, .. }) => is_mutable_expr_extended(value, semantic),
+        _ => is_mutable_expr(expr, semantic),
+    }
+}
+
 /// Return `true` if [`ast::StmtIf`] is a guard for a type-checking block.
 pub fn is_type_checking_block(stmt: &ast::StmtIf, semantic: &SemanticModel) -> bool {
     let ast::StmtIf { test, .. } = stmt;

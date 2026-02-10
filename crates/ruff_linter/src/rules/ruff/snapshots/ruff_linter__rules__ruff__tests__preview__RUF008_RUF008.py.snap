@@ -55,45 +55,75 @@ RUF008 Do not use mutable default values for dataclass attributes
    |
 
 RUF008 Do not use mutable default values for dataclass attributes
-  --> RUF008.py:42:48
+  --> RUF008.py:41:36
    |
-40 | @dataclass
-41 | class C:
-42 |     mutable_default: list[int] = field(default=[])  # RUF008
+39 | @dataclass
+40 | class C:
+41 |     generator_default: list[int] = (x for x in range(10))
+   |                                    ^^^^^^^^^^^^^^^^^^^^^^
+42 |     walrus_default: list[int] = (x := [])
+43 |     tuple_with_mutable: list[int] = ([],)
+   |
+
+RUF008 Do not use mutable default values for dataclass attributes
+  --> RUF008.py:42:34
+   |
+40 | class C:
+41 |     generator_default: list[int] = (x for x in range(10))
+42 |     walrus_default: list[int] = (x := [])
+   |                                  ^^^^^^^
+43 |     tuple_with_mutable: list[int] = ([],)
+   |
+
+RUF008 Do not use mutable default values for dataclass attributes
+  --> RUF008.py:43:37
+   |
+41 |     generator_default: list[int] = (x for x in range(10))
+42 |     walrus_default: list[int] = (x := [])
+43 |     tuple_with_mutable: list[int] = ([],)
+   |                                     ^^^^^
+   |
+
+RUF008 Do not use mutable default values for dataclass attributes
+  --> RUF008.py:49:48
+   |
+47 | @dataclass
+48 | class D:
+49 |     mutable_default: list[int] = field(default=[])  # RUF008
    |                                                ^^
-43 |     mutable_default2: dict[str, int] = field(default={})  # RUF008
-44 |     mutable_default3: set[int] = field(default=set())  # RUF008
+50 |     mutable_default2: dict[str, int] = field(default={})  # RUF008
+51 |     mutable_default3: set[int] = field(default=set())  # RUF008
    |
 
 RUF008 Do not use mutable default values for dataclass attributes
-  --> RUF008.py:43:54
+  --> RUF008.py:50:54
    |
-41 | class C:
-42 |     mutable_default: list[int] = field(default=[])  # RUF008
-43 |     mutable_default2: dict[str, int] = field(default={})  # RUF008
+48 | class D:
+49 |     mutable_default: list[int] = field(default=[])  # RUF008
+50 |     mutable_default2: dict[str, int] = field(default={})  # RUF008
    |                                                      ^^
-44 |     mutable_default3: set[int] = field(default=set())  # RUF008
-45 |     mutable_default4: dict[str, int] = field(default=dict())  # RUF008
+51 |     mutable_default3: set[int] = field(default=set())  # RUF008
+52 |     mutable_default4: dict[str, int] = field(default=dict())  # RUF008
    |
 
 RUF008 Do not use mutable default values for dataclass attributes
-  --> RUF008.py:44:48
+  --> RUF008.py:51:48
    |
-42 |     mutable_default: list[int] = field(default=[])  # RUF008
-43 |     mutable_default2: dict[str, int] = field(default={})  # RUF008
-44 |     mutable_default3: set[int] = field(default=set())  # RUF008
+49 |     mutable_default: list[int] = field(default=[])  # RUF008
+50 |     mutable_default2: dict[str, int] = field(default={})  # RUF008
+51 |     mutable_default3: set[int] = field(default=set())  # RUF008
    |                                                ^^^^^
-45 |     mutable_default4: dict[str, int] = field(default=dict())  # RUF008
-46 |     correct_factory: list[int] = field(default_factory=list)  # okay
+52 |     mutable_default4: dict[str, int] = field(default=dict())  # RUF008
+53 |     correct_factory: list[int] = field(default_factory=list)  # okay
    |
 
 RUF008 Do not use mutable default values for dataclass attributes
-  --> RUF008.py:45:54
+  --> RUF008.py:52:54
    |
-43 |     mutable_default2: dict[str, int] = field(default={})  # RUF008
-44 |     mutable_default3: set[int] = field(default=set())  # RUF008
-45 |     mutable_default4: dict[str, int] = field(default=dict())  # RUF008
+50 |     mutable_default2: dict[str, int] = field(default={})  # RUF008
+51 |     mutable_default3: set[int] = field(default=set())  # RUF008
+52 |     mutable_default4: dict[str, int] = field(default=dict())  # RUF008
    |                                                      ^^^^^^
-46 |     correct_factory: list[int] = field(default_factory=list)  # okay
-47 |     immutable_default: tuple[int, ...] = field(default=())  # okay
+53 |     correct_factory: list[int] = field(default_factory=list)  # okay
+54 |     immutable_default: tuple[int, ...] = field(default=())  # okay
    |

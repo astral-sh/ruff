@@ -2,11 +2,14 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
+use ruff_python_semantic::analyze::typing::{
+    is_immutable_annotation, is_mutable_expr, is_mutable_expr_extended,
+};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_extended_mutable_expr_enabled;
 use crate::rules::ruff::helpers::{
     dataclass_kind, has_default_copy_semantics, is_class_var_annotation,
     is_ctypes_structure_fields, is_final_annotation, is_special_attribute,
@@ -114,8 +117,13 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                     }
                 }
 
+                let is_mutable = if is_extended_mutable_expr_enabled(checker.settings()) {
+                    is_mutable_expr_extended(value, checker.semantic())
+                } else {
+                    is_mutable_expr(value, checker.semantic())
+                };
                 if !is_special_attribute(target)
-                    && is_mutable_expr(value, checker.semantic())
+                    && is_mutable
                     && !is_class_var_annotation(annotation, checker.semantic())
                     && !is_final_annotation(annotation, checker.semantic())
                     && !is_immutable_annotation(annotation, checker.semantic(), &[])
@@ -133,12 +141,17 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
+                let is_mutable = if is_extended_mutable_expr_enabled(checker.settings()) {
+                    is_mutable_expr_extended(value, checker.semantic())
+                } else {
+                    is_mutable_expr(value, checker.semantic())
+                };
                 if !targets.iter().all(|target| {
                     is_special_attribute(target)
                         || target
                             .as_name_expr()
                             .is_some_and(|name| class_var_targets.contains(&name.id))
-                }) && is_mutable_expr(value, checker.semantic())
+                }) && is_mutable
                 {
                     // The `_fields_` property of a `ctypes.Structure` base class has its
                     // immutability enforced  by the base class itself which will throw an error if
