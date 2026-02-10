@@ -62,6 +62,15 @@ Run ty:
 cargo run --bin ty -- check path/to/file.py
 ```
 
+## Reproducing ty ecosystem changes
+
+If asked to reproduce changes in the ty ecosystem, use this script to clone the project to some
+directory and install its dependencies into `.venv`:
+
+```sh
+uv run scripts/setup_primer_project.py <project-name> <some-temp-dir>
+```
+
 ## Pull Requests
 
 When working on ty, PR titles should start with `[ty]` and be tagged with the `ty` GitHub label.
