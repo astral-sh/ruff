@@ -959,7 +959,7 @@ impl<'db> Type<'db> {
 
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::LiteralValue(this), Type::LiteralValue(target))
-                if this.is_string(db) && target.is_literal_string(db) =>
+                if this.is_string() && target.is_literal_string() =>
             {
                 ConstraintSet::from(true)
             }
@@ -967,11 +967,11 @@ impl<'db> Type<'db> {
             // For union simplification, we want to preserve the unpromotable form of a literal value,
             // and so redundancy is not symmetric.
             (Type::LiteralValue(this), Type::LiteralValue(target)) if relation.is_redundancy() => {
-                ConstraintSet::from(this.kind(db) == target.kind(db) && this.is_promotable(db))
+                ConstraintSet::from(this.kind() == target.kind() && this.is_promotable())
             }
 
             (Type::LiteralValue(this), Type::LiteralValue(target)) => {
-                ConstraintSet::from(this.kind(db) == target.kind(db))
+                ConstraintSet::from(this.kind() == target.kind())
             }
 
             // No literal type is a subtype of any other literal type, unless they are the same
@@ -1091,9 +1091,9 @@ impl<'db> Type<'db> {
             // However, as an optimisation (to avoid interning many single-character string-literal types),
             // we only recognise this as being true for assignability.
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
-                if literal.is_string(db) =>
+                if literal.is_string() =>
             {
-                let value = literal.as_string(db).unwrap();
+                let value = literal.as_string().unwrap();
                 let other_class = instance.class(db);
 
                 if other_class.is_known(db, KnownClass::Str) {
@@ -1141,12 +1141,12 @@ impl<'db> Type<'db> {
                     })
             }
 
-            (Type::LiteralValue(literal), _) if literal.is_string(db) => ConstraintSet::from(false),
+            (Type::LiteralValue(literal), _) if literal.is_string() => ConstraintSet::from(false),
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
-            (Type::NominalInstance(_), Type::LiteralValue(literal)) if literal.is_enum(db) => {
-                let target_enum_literal = literal.as_enum(db).unwrap();
+            (Type::NominalInstance(_), Type::LiteralValue(literal)) if literal.is_enum() => {
+                let target_enum_literal = literal.as_enum().unwrap();
                 if target_enum_literal.enum_class_instance(db) != self {
                     return ConstraintSet::from(false);
                 }
@@ -1607,7 +1607,7 @@ impl<'db> Type<'db> {
             }
 
             (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                ConstraintSet::from(left.kind(db) == right.kind(db))
+                ConstraintSet::from(left.kind() == right.kind())
             }
 
             (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
@@ -1621,9 +1621,9 @@ impl<'db> Type<'db> {
             // if that enum has only has one member.
             (Type::NominalInstance(instance), Type::LiteralValue(literal))
             | (Type::LiteralValue(literal), Type::NominalInstance(instance))
-                if literal.is_enum(db) =>
+                if literal.is_enum() =>
             {
-                let literal = literal.as_enum(db).unwrap();
+                let literal = literal.as_enum().unwrap();
                 if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
                     return ConstraintSet::from(false);
                 }
@@ -1920,15 +1920,15 @@ impl<'db> Type<'db> {
             }
 
             (Type::LiteralValue(this), Type::LiteralValue(target))
-                if this.is_literal_string(db) && target.is_literal_string(db)
-                    || (this.is_string(db) && target.is_literal_string(db))
-                    || (this.is_literal_string(db) && target.is_string(db)) =>
+                if this.is_literal_string() && target.is_literal_string()
+                    || (this.is_string() && target.is_literal_string())
+                    || (this.is_literal_string() && target.is_string()) =>
             {
                 ConstraintSet::from(false)
             }
 
             (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                ConstraintSet::from(left.kind(db) != right.kind(db))
+                ConstraintSet::from(left.kind() != right.kind())
             }
 
             // any single-valued type is disjoint from another single-valued type
@@ -2202,7 +2202,7 @@ impl<'db> Type<'db> {
 
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
             | (Type::NominalInstance(instance), Type::LiteralValue(literal)) => {
-                match literal.kind(db) {
+                match literal.kind() {
                     LiteralValueTypeKind::Int(_) => KnownClass::Int
                         .when_subclass_of(db, instance.class(db))
                         .negate(db),

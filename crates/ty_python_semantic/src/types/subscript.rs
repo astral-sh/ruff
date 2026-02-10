@@ -448,8 +448,8 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
-            (Type::NominalInstance(nominal), Type::LiteralValue(literal)) if literal.is_int(db) => {
-                let i64_int = literal.as_int(db).unwrap();
+            (Type::NominalInstance(nominal), Type::LiteralValue(literal)) if literal.is_int() => {
+                let i64_int = literal.as_int().unwrap();
                 nominal
                     .tuple_spec(db)
                     .and_then(|tuple| Some((tuple, i32::try_from(i64_int).ok()?)))
@@ -491,9 +491,9 @@ impl<'db> Type<'db> {
                 }),
 
             // Ex) Given `"value"[1]`, return `"a"`
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_string(db) && rhs_literal.is_int(db) => {
-                let literal_ty = lhs_literal.as_string(db).unwrap();
-                let i64_int = rhs_literal.as_int(db).unwrap();
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_string() && rhs_literal.is_int() => {
+                let literal_ty = lhs_literal.as_string().unwrap();
+                let i64_int = rhs_literal.as_int().unwrap();
                 i32::try_from(i64_int).ok().map(|i32_int| {
                     let literal_value = literal_ty.value(db);
                     match (&mut literal_value.chars()).py_index(db, i32_int) {
@@ -512,8 +512,8 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `"value"[1:3]`, return `"al"`
-            (Type::LiteralValue(literal), Type::NominalInstance(nominal)) if literal.is_string(db) => {
-                let literal_ty = literal.as_string(db).unwrap();
+            (Type::LiteralValue(literal), Type::NominalInstance(nominal)) if literal.is_string() => {
+                let literal_ty = literal.as_string().unwrap();
                 nominal
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
@@ -533,24 +533,24 @@ impl<'db> Type<'db> {
                 })
             },
 
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_literal_string(db) && (rhs_literal.is_int(db) || rhs_literal.is_bool(db)) => {
-                Some(Ok(Type::literal_string(db)))
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_literal_string() && (rhs_literal.is_int() || rhs_literal.is_bool()) => {
+                Some(Ok(Type::literal_string()))
             }
 
             (Type::LiteralValue(literal), Type::NominalInstance(nominal))
-                if literal.is_literal_string(db) && nominal.slice_literal(db).is_some() =>
+                if literal.is_literal_string() && nominal.slice_literal(db).is_some() =>
             {
-                Some(Ok(Type::literal_string(db)))
+                Some(Ok(Type::literal_string()))
             }
 
             // Ex) Given `b"value"[1]`, return `97` (i.e., `ord(b"a")`)
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_bytes(db) && rhs_literal.is_int(db) => {
-                let literal_ty = lhs_literal.as_bytes(db).unwrap();
-                let i64_int = rhs_literal.as_int(db).unwrap();
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if lhs_literal.is_bytes() && rhs_literal.is_int() => {
+                let literal_ty = lhs_literal.as_bytes().unwrap();
+                let i64_int = rhs_literal.as_int().unwrap();
                 i32::try_from(i64_int).ok().map(|i32_int| {
                     let literal_value = literal_ty.value(db);
                     match literal_value.py_index(db, i32_int) {
-                        Ok(byte) => Ok(Type::int_literal(db, (*byte).into())),
+                        Ok(byte) => Ok(Type::int_literal((*byte).into())),
                         Err(_) => Err(SubscriptError::new(
                             Type::unknown(),
                             SubscriptErrorKind::IndexOutOfBounds {
@@ -565,9 +565,9 @@ impl<'db> Type<'db> {
             }
 
             // Ex) Given `b"value"[1:3]`, return `b"al"`
-            (Type::LiteralValue(literal), Type::NominalInstance(nominal)) if literal.is_bytes(db) =>
+            (Type::LiteralValue(literal), Type::NominalInstance(nominal)) if literal.is_bytes() =>
             {
-                let literal_ty = literal.as_bytes(db).unwrap();
+                let literal_ty = literal.as_bytes().unwrap();
                 nominal
                 .slice_literal(db)
                 .map(|SliceLiteral { start, stop, step }| {
@@ -587,16 +587,16 @@ impl<'db> Type<'db> {
             },
 
             // Ex) Given `"value"[True]`, return `"a"`
-            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if (lhs_literal.is_string(db) || lhs_literal.is_bytes(db)) && rhs_literal.is_bool(db) => {
-                let bool = rhs_literal.as_bool(db).unwrap();
-                Some(value_ty.subscript(db, Type::int_literal(db, i64::from(bool)), expr_context))
+            (Type::LiteralValue(lhs_literal), Type::LiteralValue(rhs_literal)) if (lhs_literal.is_string() || lhs_literal.is_bytes()) && rhs_literal.is_bool() => {
+                let bool = rhs_literal.as_bool().unwrap();
+                Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
             }
 
             (Type::NominalInstance(nominal), Type::LiteralValue(literal))
-                if literal.is_bool(db) && nominal.tuple_spec(db).is_some() =>
+                if literal.is_bool() && nominal.tuple_spec(db).is_some() =>
             {
-                let bool = literal.as_bool(db).unwrap();
-                Some(value_ty.subscript(db, Type::int_literal(db, i64::from(bool)), expr_context))
+                let bool = literal.as_bool().unwrap();
+                Some(value_ty.subscript(db, Type::int_literal(i64::from(bool)), expr_context))
             }
 
             (Type::KnownInstance(KnownInstanceType::SubscriptedProtocol(_)), _) => {

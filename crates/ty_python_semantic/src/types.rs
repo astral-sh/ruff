@@ -970,7 +970,7 @@ impl<'db> Type<'db> {
                 bindings
                     .return_type(db)
                     .as_literal_value()
-                    .and_then(|literal| literal.as_bool(db))
+                    .and_then(literal::LiteralValueType::as_bool)
                     == Some(allowed_return_value)
             }) || call_result.is_err_and(|err| matches!(err, CallDunderError::MethodNotAvailable))
         };
@@ -1029,7 +1029,7 @@ impl<'db> Type<'db> {
                 matches!(dynamic, DynamicType::UnknownGeneric(_))
             }
             // Due to inheritance rules, enums cannot be generic.
-            Type::LiteralValue(literal) if literal.is_enum(db) => false,
+            Type::LiteralValue(literal) if literal.is_enum() => false,
             // Once generic NewType is officially specified, handle it.
             _ => false,
         }
@@ -1296,12 +1296,9 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn as_literal_value_kind(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<LiteralValueTypeKind<'db>> {
+    pub(crate) fn as_literal_value_kind(self) -> Option<LiteralValueTypeKind<'db>> {
         match self {
-            Type::LiteralValue(literal) => Some(literal.kind(db)),
+            Type::LiteralValue(literal) => Some(literal.kind()),
             _ => None,
         }
     }
@@ -1395,44 +1392,44 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
-    pub(crate) fn as_string_literal(self, db: &'db dyn Db) -> Option<StringLiteralType<'db>> {
+    pub(crate) fn as_string_literal(self) -> Option<StringLiteralType<'db>> {
         match self {
-            Type::LiteralValue(literal) => literal.as_string(db),
+            Type::LiteralValue(literal) => literal.as_string(),
             _ => None,
         }
     }
 
-    pub(crate) fn as_int_literal(self, db: &'db dyn Db) -> Option<i64> {
+    pub(crate) fn as_int_literal(self) -> Option<i64> {
         match self {
-            Type::LiteralValue(literal) => literal.as_int(db),
+            Type::LiteralValue(literal) => literal.as_int(),
             _ => None,
         }
     }
 
-    pub(crate) fn as_enum_literal(self, db: &'db dyn Db) -> Option<EnumLiteralType<'db>> {
+    pub(crate) fn as_enum_literal(self) -> Option<EnumLiteralType<'db>> {
         match self {
-            Type::LiteralValue(literal) => literal.as_enum(db),
+            Type::LiteralValue(literal) => literal.as_enum(),
             _ => None,
         }
     }
 
     #[cfg(test)]
     #[track_caller]
-    pub(crate) fn expect_enum_literal(self, db: &'db dyn Db) -> EnumLiteralType<'db> {
-        match self.as_literal_value_kind(db) {
+    pub(crate) fn expect_enum_literal(self) -> EnumLiteralType<'db> {
+        match self.as_literal_value_kind() {
             Some(LiteralValueTypeKind::Enum(e)) => e,
             _ => panic!("Expected a `LiteralValueTypeKind::Enum` variant"),
         }
     }
 
-    pub(crate) fn is_literal_string(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_literal_string(&self) -> bool {
         self.as_literal_value()
-            .is_some_and(|literal| literal.is_literal_string(db))
+            .is_some_and(literal::LiteralValueType::is_literal_string)
     }
 
-    pub(crate) fn is_string_literal(&self, db: &'db dyn Db) -> bool {
+    pub(crate) fn is_string_literal(&self) -> bool {
         self.as_literal_value()
-            .is_some_and(|literal| literal.is_string(db))
+            .is_some_and(literal::LiteralValueType::is_string)
     }
 
     /// Detects types which are valid to appear inside a `Literal[…]` type annotation.
@@ -1442,7 +1439,7 @@ impl<'db> Type<'db> {
                 .elements(db)
                 .iter()
                 .all(|ty| ty.is_literal_or_union_of_literals(db)),
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::String(_)
                 | LiteralValueTypeKind::Bytes(_)
                 | LiteralValueTypeKind::Int(_)
@@ -1460,11 +1457,11 @@ impl<'db> Type<'db> {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string(db)
+                    || ty.is_literal_string()
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || self.is_bool(db)
-            || self.is_literal_string(db)
+            || self.is_literal_string()
             || (self.is_enum(db) && !self.overrides_equality(db))
     }
 
@@ -1473,58 +1470,55 @@ impl<'db> Type<'db> {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
-                    || ty.is_literal_string(db)
+                    || ty.is_literal_string()
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
         }) || self.is_bool(db)
-            || self.is_literal_string(db)
+            || self.is_literal_string()
             || (self.is_enum(db) && !self.overrides_equality(db))
     }
 
     /// Create a promotable string literal.
     pub(crate) fn string_literal(db: &'db dyn Db, string: &str) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(
-            db,
-            StringLiteralType::new(db, string),
-        ))
+        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
+            db, string,
+        )))
     }
 
     /// Create a promotable enum literal.
-    pub(crate) fn enum_literal(db: &'db dyn Db, value: EnumLiteralType<'db>) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(db, value))
+    pub(crate) fn enum_literal(value: EnumLiteralType<'db>) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(value))
     }
 
     /// Create a promotable integer literal.
-    pub(crate) fn int_literal(db: &'db dyn Db, int: i64) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(db, int))
+    pub(crate) fn int_literal(int: i64) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(int))
     }
 
     /// Create a promotable single-character string literal.
     pub(crate) fn single_char_string_literal(db: &'db dyn Db, c: char) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(
+        Self::LiteralValue(LiteralValueType::promotable(StringLiteralType::new(
             db,
-            StringLiteralType::new(db, c.to_compact_string()),
-        ))
+            c.to_compact_string(),
+        )))
     }
 
     /// Create a promotable bytes literal.
     pub(crate) fn bytes_literal(db: &'db dyn Db, bytes: &[u8]) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(
-            db,
-            BytesLiteralType::new(db, bytes),
-        ))
+        Self::LiteralValue(LiteralValueType::promotable(BytesLiteralType::new(
+            db, bytes,
+        )))
     }
 
     /// Create a promotable boolean literal.
-    pub fn bool_literal(db: &'db dyn Db, value: bool) -> Self {
-        Self::LiteralValue(LiteralValueType::promotable(db, value))
+    pub fn bool_literal(value: bool) -> Self {
+        Self::LiteralValue(LiteralValueType::promotable(value))
     }
 
     /// Create a `LiteralString`.
-    pub(crate) fn literal_string(db: &'db dyn Db) -> Self {
+    pub(crate) fn literal_string() -> Self {
         // Note that `LiteralString`s are never implicitly inferred, and so are always unpromotable.
         Self::LiteralValue(LiteralValueType::unpromotable(
-            db,
             LiteralValueTypeKind::LiteralString,
         ))
     }
@@ -1695,9 +1689,7 @@ impl<'db> Type<'db> {
     /// Like [`Type::promote_literals`], but does not recurse into nested types.
     fn promote_literals_impl(self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::LiteralValue(literal) if literal.is_promotable(db) => {
-                literal.fallback_instance(db)
-            }
+            Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
             Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
             _ => self,
@@ -1772,12 +1764,12 @@ impl<'db> Type<'db> {
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
             Type::LiteralValue(literal)
-                if literal.as_enum(db).is_some_and(|enum_literal| {
+                if literal.as_enum().is_some_and(|enum_literal| {
                     is_single_member_enum(db, enum_literal.enum_class(db))
                 }) =>
             {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
-                literal.as_enum(db).unwrap().enum_class_instance(db)
+                literal.as_enum().unwrap().enum_class_instance(db)
             }
             Type::TypedDict(typed_dict) => visitor.visit(self, || {
                 Type::TypedDict(typed_dict.normalized_impl(db, visitor))
@@ -2030,7 +2022,7 @@ impl<'db> Type<'db> {
                 Some(CallableTypes(callables))
             }
 
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => enum_literal
                     .enum_class_instance(db)
                     .try_upcast_to_callable(db),
@@ -2178,7 +2170,7 @@ impl<'db> Type<'db> {
         match self {
             Type::Dynamic(_) | Type::Never => false,
 
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(..)
                 | LiteralValueTypeKind::String(..)
                 | LiteralValueTypeKind::Bytes(..)
@@ -2309,7 +2301,7 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(..)
             | Type::KnownInstance(..) => true,
 
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(..) => !self.overrides_equality(db),
 
                 LiteralValueTypeKind::Int(..)
@@ -3146,8 +3138,8 @@ impl<'db> Type<'db> {
             )
             .into(),
 
-            Type::LiteralValue(literal) if literal.is_string(db) && name == "startswith" => {
-                let string_literal = literal.as_string(db).unwrap();
+            Type::LiteralValue(literal) if literal.is_string() && name == "startswith" => {
+                let string_literal = literal.as_string().unwrap();
                 Place::bound(Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(
                     string_literal,
                 )))
@@ -3283,7 +3275,7 @@ impl<'db> Type<'db> {
                 } else {
                     python_version.minor
                 };
-                Place::bound(Type::int_literal(db, segment.into())).into()
+                Place::bound(Type::int_literal(segment.into())).into()
             }
 
             Type::PropertyInstance(property) if name == "fget" => {
@@ -3294,16 +3286,16 @@ impl<'db> Type<'db> {
             }
 
             Type::LiteralValue(literal)
-                if literal.is_int(db) && matches!(name_str, "real" | "numerator") =>
+                if literal.is_int() && matches!(name_str, "real" | "numerator") =>
             {
                 Place::bound(self).into()
             }
 
             Type::LiteralValue(literal)
-                if literal.is_bool(db) && matches!(name_str, "real" | "numerator") =>
+                if literal.is_bool() && matches!(name_str, "real" | "numerator") =>
             {
-                let bool_value = literal.as_bool(db).unwrap();
-                Place::bound(Type::int_literal(db, i64::from(bool_value))).into()
+                let bool_value = literal.as_bool().unwrap();
+                Place::bound(Type::int_literal(i64::from(bool_value))).into()
             }
 
             Type::ModuleLiteral(module) => module.static_member(db, name_str),
@@ -3351,24 +3343,24 @@ impl<'db> Type<'db> {
                 .member_lookup_with_policy(db, name, policy),
 
             Type::LiteralValue(literal)
-                if literal.as_enum(db).is_some_and(|enum_literal| {
+                if literal.as_enum().is_some_and(|enum_literal| {
                     matches!(name_str, "name" | "_name_")
                         && Type::ClassLiteral(enum_literal.enum_class(db))
                             .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
                 }) =>
             {
-                let enum_literal = literal.as_enum(db).unwrap();
+                let enum_literal = literal.as_enum().unwrap();
                 Place::bound(Type::string_literal(db, enum_literal.name(db))).into()
             }
 
             Type::LiteralValue(literal)
-                if literal.as_enum(db).is_some_and(|enum_literal| {
+                if literal.as_enum().is_some_and(|enum_literal| {
                     matches!(name_str, "value" | "_value_")
                         && Type::ClassLiteral(enum_literal.enum_class(db))
                             .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
                 }) =>
             {
-                let enum_literal = literal.as_enum(db).unwrap();
+                let enum_literal = literal.as_enum().unwrap();
                 enum_metadata(db, enum_literal.enum_class(db))
                     .and_then(|metadata| metadata.members.get(enum_literal.name(db)))
                     .map_or_else(|| Place::Undefined, Place::bound)
@@ -3447,10 +3439,11 @@ impl<'db> Type<'db> {
                     && let Some(metadata) = enum_metadata(db, enum_class)
                     && let Some(resolved_name) = metadata.resolve_member(&name)
                 {
-                    return Place::bound(Type::enum_literal(
+                    return Place::bound(Type::enum_literal(EnumLiteralType::new(
                         db,
-                        EnumLiteralType::new(db, enum_class, resolved_name),
-                    ))
+                        enum_class,
+                        resolved_name,
+                    )))
                     .into();
                 }
 
@@ -3537,7 +3530,7 @@ impl<'db> Type<'db> {
         visitor: &TryBoolVisitor<'db>,
     ) -> Result<Truthiness, BoolError<'db>> {
         let type_to_truthiness = |ty: Type<'db>| {
-            match ty.as_literal_value_kind(db) {
+            match ty.as_literal_value_kind() {
                 Some(LiteralValueTypeKind::Bool(bool_val)) => Truthiness::from(bool_val),
                 Some(LiteralValueTypeKind::Int(int_val)) => Truthiness::from(int_val.as_i64() != 0),
                 // anything else is handled lower down
@@ -3774,7 +3767,7 @@ impl<'db> Type<'db> {
                 Truthiness::Ambiguous
             }
 
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::LiteralString => Truthiness::Ambiguous,
                 LiteralValueTypeKind::Enum(enum_type) => enum_type
                     .enum_class_instance(db)
@@ -3810,11 +3803,9 @@ impl<'db> Type<'db> {
         fn non_negative_int_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
             match ty {
                 // TODO: Emit diagnostic for non-integers and negative integers
-                Type::LiteralValue(literal) => match literal.kind(db) {
+                Type::LiteralValue(literal) => match literal.kind() {
                     LiteralValueTypeKind::Int(value) => (value.as_i64() >= 0).then_some(ty),
-                    LiteralValueTypeKind::Bool(value) => {
-                        Some(Type::int_literal(db, i64::from(value)))
-                    }
+                    LiteralValueTypeKind::Bool(value) => Some(Type::int_literal(i64::from(value))),
                     _ => None,
                 },
                 Type::Union(union) => {
@@ -3824,14 +3815,14 @@ impl<'db> Type<'db> {
             }
         }
 
-        let usize_len = match self.as_literal_value_kind(db) {
+        let usize_len = match self.as_literal_value_kind() {
             Some(LiteralValueTypeKind::Bytes(bytes)) => Some(bytes.python_len(db)),
             Some(LiteralValueTypeKind::String(string)) => Some(string.python_len(db)),
             _ => None,
         };
 
         if let Some(usize_len) = usize_len {
-            return usize_len.try_into().ok().map(|i| Type::int_literal(db, i));
+            return usize_len.try_into().ok().map(Type::int_literal);
         }
 
         let return_ty = match self.try_call_dunder(
@@ -4134,34 +4125,34 @@ impl<'db> Type<'db> {
                                     [
                                         Parameter::keyword_only(Name::new_static("init"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, true)),
+                                            .with_default_type(Type::bool_literal(true)),
                                         Parameter::keyword_only(Name::new_static("repr"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, true)),
+                                            .with_default_type(Type::bool_literal(true)),
                                         Parameter::keyword_only(Name::new_static("eq"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, true)),
+                                            .with_default_type(Type::bool_literal(true)),
                                         Parameter::keyword_only(Name::new_static("order"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("unsafe_hash"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("frozen"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("match_args"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, true)),
+                                            .with_default_type(Type::bool_literal(true)),
                                         Parameter::keyword_only(Name::new_static("kw_only"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("slots"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                         Parameter::keyword_only(Name::new_static("weakref_slot"))
                                             .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                            .with_default_type(Type::bool_literal(db, false)),
+                                            .with_default_type(Type::bool_literal(false)),
                                     ],
                                 ),
                                 Type::unknown(),
@@ -4226,7 +4217,7 @@ impl<'db> Type<'db> {
                                     .with_default_type(Type::any()),
                                 Parameter::keyword_only(Name::new_static("total"))
                                     .with_annotated_type(KnownClass::Bool.to_instance(db))
-                                    .with_default_type(Type::bool_literal(db, true)),
+                                    .with_default_type(Type::bool_literal(true)),
                                 // Future compatibility, in case new keyword arguments will be added:
                                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                                     .with_annotated_type(Type::any()),
@@ -4308,7 +4299,7 @@ impl<'db> Type<'db> {
             // TODO: some `SpecialForm`s are callable (e.g. TypedDicts)
             Type::SpecialForm(_) => CallableBinding::not_callable(self).into(),
 
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => {
                     enum_literal.enum_class_instance(db).bindings(db)
                 }
@@ -4366,7 +4357,7 @@ impl<'db> Type<'db> {
                                 db,
                                 [Parameter::positional_only(Some(Name::new_static("o")))
                                     .with_annotated_type(Type::any())
-                                    .with_default_type(Type::bool_literal(db, false))],
+                                    .with_default_type(Type::bool_literal(false))],
                             ),
                             KnownClass::Bool.to_instance(db),
                         ),
@@ -4509,7 +4500,7 @@ impl<'db> Type<'db> {
                                 db,
                                 [
                                     Parameter::positional_only(Some(Name::new_static("message")))
-                                        .with_annotated_type(Type::literal_string(db)),
+                                        .with_annotated_type(Type::literal_string()),
                                     Parameter::keyword_only(Name::new_static("category"))
                                         .with_annotated_type(UnionType::from_elements(
                                             db,
@@ -4523,7 +4514,7 @@ impl<'db> Type<'db> {
                                         .with_default_type(Type::any()),
                                     Parameter::keyword_only(Name::new_static("stacklevel"))
                                         .with_annotated_type(KnownClass::Int.to_instance(db))
-                                        .with_default_type(Type::int_literal(db, 1)),
+                                        .with_default_type(Type::int_literal(1)),
                                 ],
                             ),
                             KnownClass::Deprecated.to_instance(db),
@@ -5226,14 +5217,14 @@ impl<'db> Type<'db> {
                         "*tuple[] annotations"
                     ))))
                 }
-                Type::LiteralValue(literal) => match literal.kind(db) {
+                Type::LiteralValue(literal) => match literal.kind() {
                     LiteralValueTypeKind::Bytes(bytes) => {
                         let bytes_literal = bytes.value(db);
                         let spec = if bytes_literal.len() < MAX_TUPLE_LENGTH {
                             TupleSpec::heterogeneous(
                                 bytes_literal
                                     .iter()
-                                    .map(|b| Type::int_literal(db, i64::from(*b))),
+                                    .map(|b| Type::int_literal( i64::from(*b))),
                             )
                         } else {
                             TupleSpec::homogeneous(KnownClass::Int.to_instance(db))
@@ -5249,7 +5240,7 @@ impl<'db> Type<'db> {
                                     .map(|c| Type::string_literal(db, &c.to_string())),
                             )
                         } else {
-                            TupleSpec::homogeneous(Type::literal_string(db))
+                            TupleSpec::homogeneous(Type::literal_string())
                         };
                         Some(Cow::Owned(spec))
                     }
@@ -5847,7 +5838,7 @@ impl<'db> Type<'db> {
 
             Type::SpecialForm(special_form) => match special_form {
                 SpecialFormType::Never | SpecialFormType::NoReturn => Ok(Type::Never),
-                SpecialFormType::LiteralString => Ok(Type::literal_string(db)),
+                SpecialFormType::LiteralString => Ok(Type::literal_string()),
                 SpecialFormType::Any => Ok(Type::any()),
                 SpecialFormType::Unknown => Ok(Type::unknown()),
                 SpecialFormType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
@@ -6052,7 +6043,7 @@ impl<'db> Type<'db> {
             Type::PropertyInstance(_) => KnownClass::Property.to_class_literal(db),
             Type::Union(union) => union.map(db, |ty| ty.to_meta_type(db)),
             Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_class_literal(db),
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Bool(_) => KnownClass::Bool.to_class_literal(db),
                 LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_class_literal(db),
                 LiteralValueTypeKind::Int(_) => KnownClass::Int.to_class_literal(db),
@@ -6779,7 +6770,7 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn str(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(_) | LiteralValueTypeKind::Bool(_) => self.repr(db),
                 LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => *self,
                 LiteralValueTypeKind::Enum(enum_literal) => Type::string_literal(
@@ -6806,14 +6797,14 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn repr(&self, db: &'db dyn Db) -> Type<'db> {
         match self {
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(number) => Type::string_literal(db, &number.to_string()),
                 LiteralValueTypeKind::Bool(true) => Type::string_literal(db, "True"),
                 LiteralValueTypeKind::Bool(false) => Type::string_literal(db, "False"),
                 LiteralValueTypeKind::String(literal) => {
                     Type::string_literal(db, &format!("'{}'", literal.value(db).escape_default()))
                 }
-                LiteralValueTypeKind::LiteralString => Type::literal_string(db),
+                LiteralValueTypeKind::LiteralString => Type::literal_string(),
                 _ => KnownClass::Str.to_instance(db),
             },
             Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
@@ -10380,8 +10371,8 @@ impl Truthiness {
 
     fn into_type(self, db: &dyn Db) -> Type<'_> {
         match self {
-            Self::AlwaysTrue => Type::bool_literal(db, true),
-            Self::AlwaysFalse => Type::bool_literal(db, false),
+            Self::AlwaysTrue => Type::bool_literal(true),
+            Self::AlwaysFalse => Type::bool_literal(false),
             Self::Ambiguous => KnownClass::Bool.to_instance(db),
         }
     }
@@ -10930,8 +10921,7 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         KnownBoundMethodType::StrStartswith(string_literal) => {
             visitor.visit_type(
                 db,
-                LiteralValueType::promotable(db, LiteralValueTypeKind::String(string_literal))
-                    .into(),
+                LiteralValueType::promotable(LiteralValueTypeKind::String(string_literal)).into(),
             );
         }
         KnownBoundMethodType::ConstraintSetRange

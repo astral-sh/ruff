@@ -4468,7 +4468,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
-        match key_ty.as_string_literal(db) {
+        match key_ty.as_string_literal() {
             Some(key) => {
                 let key = key.value(db);
                 let typed_dict_name = typed_dict_ty.display(db);

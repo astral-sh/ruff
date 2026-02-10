@@ -374,7 +374,7 @@ impl<'db> NominalInstanceType<'db> {
         };
 
         let to_u32 = |ty: &Type<'db>| match ty {
-            Type::LiteralValue(literal) => match literal.kind(db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Int(n) => i32::try_from(n.as_i64()).map(Some).ok(),
                 LiteralValueTypeKind::Bool(b) => Some(Some(i32::from(b))),
                 _ => None,

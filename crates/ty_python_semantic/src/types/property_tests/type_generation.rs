@@ -137,22 +137,19 @@ impl Ty {
             Ty::Unknown => Type::unknown(),
             Ty::None => Type::none(db),
             Ty::Any => Type::any(),
-            Ty::IntLiteral(n) => Type::int_literal(db, n),
+            Ty::IntLiteral(n) => Type::int_literal(n),
             Ty::StringLiteral(s) => Type::string_literal(db, s),
-            Ty::BooleanLiteral(b) => Type::bool_literal(db, b),
-            Ty::LiteralString => Type::literal_string(db),
+            Ty::BooleanLiteral(b) => Type::bool_literal(b),
+            Ty::LiteralString => Type::literal_string(),
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::EnumLiteral(name) => Type::enum_literal(
+            Ty::EnumLiteral(name) => Type::enum_literal(EnumLiteralType::new(
                 db,
-                EnumLiteralType::new(
-                    db,
-                    known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
-                        .place
-                        .expect_type()
-                        .expect_class_literal(),
-                    Name::new(name),
-                ),
-            ),
+                known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
+                    .place
+                    .expect_type()
+                    .expect_class_literal(),
+                Name::new(name),
+            )),
             Ty::SingleMemberEnumLiteral => {
                 let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
                     .place

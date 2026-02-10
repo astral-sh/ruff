@@ -70,7 +70,7 @@ impl<'db> Type<'db> {
             //     Y = 1
             // ```
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => true,
-            (Type::LiteralValue(literal), _) => match (literal.kind(db), kind) {
+            (Type::LiteralValue(literal), _) => match (literal.kind(), kind) {
                 (LiteralValueTypeKind::String(_), LiteralKind::String) => true,
                 (LiteralValueTypeKind::Bytes(_), LiteralKind::Bytes) => true,
                 (LiteralValueTypeKind::Int(_), LiteralKind::Int) => true,
@@ -158,36 +158,36 @@ impl<'db> UnionElement<'db> {
             UnionElement::IntLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::Int) {
                     literals.retain(|literal, promotable| {
-                        should_retain_type(LiteralValueType::new(db, *literal, *promotable).into())
+                        should_retain_type(LiteralValueType::new(*literal, *promotable).into())
                     });
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(db, *literal, *promotable))
+                    !Type::from(LiteralValueType::new(*literal, *promotable))
                         .is_redundant_with(db, other_type)
                 }
             }
             UnionElement::StringLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::String) {
                     literals.retain(|literal, promotable| {
-                        should_retain_type(LiteralValueType::new(db, *literal, *promotable).into())
+                        should_retain_type(LiteralValueType::new(*literal, *promotable).into())
                     });
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(db, *literal, *promotable))
+                    !Type::from(LiteralValueType::new(*literal, *promotable))
                         .is_redundant_with(db, other_type)
                 }
             }
             UnionElement::BytesLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::Bytes) {
                     literals.retain(|literal, promotable| {
-                        should_retain_type(LiteralValueType::new(db, *literal, *promotable).into())
+                        should_retain_type(LiteralValueType::new(*literal, *promotable).into())
                     });
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(db, *literal, *promotable))
+                    !Type::from(LiteralValueType::new(*literal, *promotable))
                         .is_redundant_with(db, other_type)
                 }
             }
@@ -200,12 +200,12 @@ impl<'db> UnionElement<'db> {
                 };
                 if other_type.splits_literals(db, enum_class) {
                     literals.retain(|literal, promotable| {
-                        should_retain_type(LiteralValueType::new(db, *literal, *promotable).into())
+                        should_retain_type(LiteralValueType::new(*literal, *promotable).into())
                     });
                     !literals.is_empty()
                 } else {
                     let (literal, promotable) = literals.first().unwrap();
-                    !Type::from(LiteralValueType::new(db, *literal, *promotable))
+                    !Type::from(LiteralValueType::new(*literal, *promotable))
                         .is_redundant_with(db, other_type)
                 }
             }
@@ -407,7 +407,7 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             Type::LiteralValue(literal) => {
-                match literal.kind(self.db) {
+                match literal.kind() {
                     // If adding a string literal, look for an existing `UnionElement::StringLiterals` to
                     // add it to, or an existing element that is a super-type of string literals, which
                     // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
@@ -447,14 +447,11 @@ impl<'db> UnionBuilder<'db> {
                             }
                         }
                         if let Some(found) = found {
-                            let is_promotable = literal.is_promotable(self.db);
+                            let is_promotable = literal.is_promotable();
                             *found.entry(string_literal).or_insert(is_promotable) &= is_promotable;
                         } else {
                             self.elements.push(UnionElement::StringLiterals(
-                                FxOrderMap::from_iter([(
-                                    string_literal,
-                                    literal.is_promotable(self.db),
-                                )]),
+                                FxOrderMap::from_iter([(string_literal, literal.is_promotable())]),
                             ));
                         }
                         if let Some(index) = to_remove {
@@ -497,13 +494,13 @@ impl<'db> UnionBuilder<'db> {
                             }
                         }
                         if let Some(found) = found {
-                            let is_promotable = literal.is_promotable(self.db);
+                            let is_promotable = literal.is_promotable();
                             *found.entry(bytes_literal).or_insert(is_promotable) &= is_promotable;
                         } else {
                             self.elements
                                 .push(UnionElement::BytesLiterals(FxOrderMap::from_iter([(
                                     bytes_literal,
-                                    literal.is_promotable(self.db),
+                                    literal.is_promotable(),
                                 )])));
                         }
                         if let Some(index) = to_remove {
@@ -546,14 +543,14 @@ impl<'db> UnionBuilder<'db> {
                             }
                         }
                         if let Some(found) = found {
-                            let is_promotable = literal.is_promotable(self.db);
+                            let is_promotable = literal.is_promotable();
                             *found.entry(int_literal.as_i64()).or_insert(is_promotable) &=
                                 is_promotable;
                         } else {
                             self.elements
                                 .push(UnionElement::IntLiterals(FxOrderMap::from_iter([(
                                     int_literal.as_i64(),
-                                    literal.is_promotable(self.db),
+                                    literal.is_promotable(),
                                 )])));
                         }
                         if let Some(index) = to_remove {
@@ -624,7 +621,7 @@ impl<'db> UnionBuilder<'db> {
                         if let Some(found) = found {
                             match found.entry(enum_member_to_add) {
                                 ordermap::map::Entry::Vacant(entry) => {
-                                    entry.insert(literal.is_promotable(self.db));
+                                    entry.insert(literal.is_promotable());
 
                                     if found.len() == metadata.members.len() {
                                         self.add_in_place_impl(
@@ -635,7 +632,7 @@ impl<'db> UnionBuilder<'db> {
                                     }
                                 }
                                 ordermap::map::Entry::Occupied(mut entry) => {
-                                    *entry.get_mut() &= literal.is_promotable(self.db);
+                                    *entry.get_mut() &= literal.is_promotable();
                                 }
                             }
                         } else {
@@ -643,7 +640,7 @@ impl<'db> UnionBuilder<'db> {
                                 enum_class,
                                 literals: FxOrderMap::from_iter([(
                                     enum_member_to_add,
-                                    literal.is_promotable(self.db),
+                                    literal.is_promotable(),
                                 )]),
                             });
                         }
@@ -661,12 +658,11 @@ impl<'db> UnionBuilder<'db> {
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        let bool_pair =
-            if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind(self.db) {
-                Some(LiteralValueTypeKind::Bool(!b))
-            } else {
-                None
-            };
+        let bool_pair = if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
+            Some(LiteralValueTypeKind::Bool(!b))
+        } else {
+            None
+        };
 
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
@@ -699,7 +695,7 @@ impl<'db> UnionBuilder<'db> {
             }
 
             if element_type
-                .as_literal_value_kind(self.db)
+                .as_literal_value_kind()
                 .zip(bool_pair)
                 .is_some_and(|(element, pair)| element == pair)
             {
@@ -764,22 +760,22 @@ impl<'db> UnionBuilder<'db> {
             match element {
                 UnionElement::IntLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(self.db, literal, promotable))
+                        Type::from(LiteralValueType::new(literal, promotable))
                     }));
                 }
                 UnionElement::StringLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(self.db, literal, promotable))
+                        Type::from(LiteralValueType::new(literal, promotable))
                     }));
                 }
                 UnionElement::BytesLiterals(literals) => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(self.db, literal, promotable))
+                        Type::from(LiteralValueType::new(literal, promotable))
                     }));
                 }
                 UnionElement::EnumLiterals { literals, .. } => {
                     types.extend(literals.into_iter().map(|(literal, promotable)| {
-                        Type::from(LiteralValueType::new(self.db, literal, promotable))
+                        Type::from(LiteralValueType::new(literal, promotable))
                     }));
                 }
                 UnionElement::Type(ty) => types.push(ty),
@@ -887,7 +883,7 @@ impl<'db> IntersectionBuilder<'db> {
                 for intersection in &self.intersections {
                     if intersection.negative.iter().any(|negative| {
                         negative
-                            .as_enum_literal(self.db)
+                            .as_enum_literal()
                             .is_some_and(|lit| lit.enum_class_instance(self.db) == ty)
                     }) {
                         contains_enum_literal_as_negative_element = true;
@@ -994,7 +990,7 @@ impl<'db> IntersectionBuilder<'db> {
                     },
                 )
             }
-            Type::LiteralValue(literal) => match literal.kind(self.db) {
+            Type::LiteralValue(literal) => match literal.kind() {
                 LiteralValueTypeKind::Enum(enum_literal) => {
                     let enum_instance = enum_literal.enum_class_instance(self.db);
 
@@ -1107,41 +1103,39 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) {
         match new_positive {
             // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
-            Type::AlwaysTruthy if self.positive.contains(&Type::literal_string(db)) => {
+            Type::AlwaysTruthy if self.positive.contains(&Type::literal_string()) => {
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             // `LiteralString & AlwaysFalsy` -> `Literal[""]`
-            Type::AlwaysFalsy if self.positive.swap_remove(&Type::literal_string(db)) => {
+            Type::AlwaysFalsy if self.positive.swap_remove(&Type::literal_string()) => {
                 self.add_positive(db, Type::string_literal(db, ""));
             }
             // `AlwaysTruthy & LiteralString` -> `LiteralString & ~Literal[""]`
             Type::LiteralValue(literal)
-                if literal.is_literal_string(db)
+                if literal.is_literal_string()
                     && self.positive.swap_remove(&Type::AlwaysTruthy) =>
             {
-                self.add_positive(db, Type::literal_string(db));
+                self.add_positive(db, Type::literal_string());
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             // `AlwaysFalsy & LiteralString` -> `Literal[""]`
             Type::LiteralValue(literal)
-                if literal.is_literal_string(db)
-                    && self.positive.swap_remove(&Type::AlwaysFalsy) =>
+                if literal.is_literal_string() && self.positive.swap_remove(&Type::AlwaysFalsy) =>
             {
                 self.add_positive(db, Type::string_literal(db, ""));
             }
             // `LiteralString & ~AlwaysTruthy` -> `LiteralString & AlwaysFalsy` -> `Literal[""]`
             Type::LiteralValue(literal)
-                if literal.is_literal_string(db)
+                if literal.is_literal_string()
                     && self.negative.swap_remove(&Type::AlwaysTruthy) =>
             {
                 self.add_positive(db, Type::string_literal(db, ""));
             }
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
             Type::LiteralValue(literal)
-                if literal.is_literal_string(db)
-                    && self.negative.swap_remove(&Type::AlwaysFalsy) =>
+                if literal.is_literal_string() && self.negative.swap_remove(&Type::AlwaysFalsy) =>
             {
-                self.add_positive(db, Type::literal_string(db));
+                self.add_positive(db, Type::literal_string());
                 self.add_negative(db, Type::string_literal(db, ""));
             }
 
@@ -1162,11 +1156,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     match existing_positive {
                         // `AlwaysTruthy & bool` -> `Literal[True]`
                         Type::AlwaysTruthy if addition_is_bool_instance => {
-                            new_positive = Type::bool_literal(db, true);
+                            new_positive = Type::bool_literal(true);
                         }
                         // `AlwaysFalsy & bool` -> `Literal[False]`
                         Type::AlwaysFalsy if addition_is_bool_instance => {
-                            new_positive = Type::bool_literal(db, false);
+                            new_positive = Type::bool_literal(false);
                         }
                         Type::NominalInstance(instance)
                             if instance.has_known_class(db, KnownClass::Bool) =>
@@ -1174,11 +1168,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             match new_positive {
                                 // `bool & AlwaysTruthy` -> `Literal[True]`
                                 Type::AlwaysTruthy => {
-                                    new_positive = Type::bool_literal(db, true);
+                                    new_positive = Type::bool_literal(true);
                                 }
                                 // `bool & AlwaysFalsy` -> `Literal[False]`
                                 Type::AlwaysFalsy => {
-                                    new_positive = Type::bool_literal(db, false);
+                                    new_positive = Type::bool_literal(false);
                                 }
                                 _ => continue,
                             }
@@ -1194,19 +1188,19 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         match existing_negative {
                             // `bool & ~Literal[False]` -> `Literal[True]`
                             // `bool & ~Literal[True]` -> `Literal[False]`
-                            Type::LiteralValue(literal) => match literal.kind(db) {
+                            Type::LiteralValue(literal) => match literal.kind() {
                                 LiteralValueTypeKind::Bool(bool_value) => {
-                                    new_positive = Type::bool_literal(db, !bool_value);
+                                    new_positive = Type::bool_literal(!bool_value);
                                 }
                                 _ => continue,
                             },
                             // `bool & ~AlwaysTruthy` -> `Literal[False]`
                             Type::AlwaysTruthy => {
-                                new_positive = Type::bool_literal(db, false);
+                                new_positive = Type::bool_literal(false);
                             }
                             // `bool & ~AlwaysFalsy` -> `Literal[True]`
                             Type::AlwaysFalsy => {
-                                new_positive = Type::bool_literal(db, true);
+                                new_positive = Type::bool_literal(true);
                             }
                             _ => continue,
                         }
@@ -1293,28 +1287,26 @@ impl<'db> InnerIntersectionBuilder<'db> {
             }
             // `bool & ~AlwaysTruthy` -> `bool & Literal[False]`
             Type::AlwaysTruthy if contains_bool() => {
-                self.add_positive(db, Type::bool_literal(db, false));
+                self.add_positive(db, Type::bool_literal(false));
             }
             // `bool & ~Literal[True]` -> `bool & Literal[False]`
-            Type::LiteralValue(literal) if literal.as_bool(db) == Some(true) && contains_bool() => {
-                self.add_positive(db, Type::bool_literal(db, false));
+            Type::LiteralValue(literal) if literal.as_bool() == Some(true) && contains_bool() => {
+                self.add_positive(db, Type::bool_literal(false));
             }
             // `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
-            Type::AlwaysTruthy if self.positive.contains(&Type::literal_string(db)) => {
+            Type::AlwaysTruthy if self.positive.contains(&Type::literal_string()) => {
                 self.add_positive(db, Type::string_literal(db, ""));
             }
             // `bool & ~AlwaysFalsy` -> `bool & Literal[True]`
             Type::AlwaysFalsy if contains_bool() => {
-                self.add_positive(db, Type::bool_literal(db, true));
+                self.add_positive(db, Type::bool_literal(true));
             }
             // `bool & ~Literal[False]` -> `bool & Literal[True]`
-            Type::LiteralValue(literal)
-                if literal.as_bool(db) == Some(false) && contains_bool() =>
-            {
-                self.add_positive(db, Type::bool_literal(db, true));
+            Type::LiteralValue(literal) if literal.as_bool() == Some(false) && contains_bool() => {
+                self.add_positive(db, Type::bool_literal(true));
             }
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
-            Type::AlwaysFalsy if self.positive.contains(&Type::literal_string(db)) => {
+            Type::AlwaysFalsy if self.positive.contains(&Type::literal_string()) => {
                 self.add_negative(db, Type::string_literal(db, ""));
             }
             _ => {
@@ -1524,7 +1516,7 @@ mod tests {
     fn build_union_single_element() {
         let db = setup_db();
 
-        let t0 = Type::int_literal(&db, 0);
+        let t0 = Type::int_literal(0);
         let union = UnionType::from_elements(&db, [t0]);
         assert_eq!(union, t0);
     }
@@ -1533,8 +1525,8 @@ mod tests {
     fn build_union_two_elements() {
         let db = setup_db();
 
-        let t0 = Type::int_literal(&db, 0);
-        let t1 = Type::int_literal(&db, 1);
+        let t0 = Type::int_literal(0);
+        let t1 = Type::int_literal(1);
         let union = UnionType::from_elements(&db, [t0, t1]).expect_union();
 
         assert_eq!(union.elements(&db), &[t0, t1]);
@@ -1552,8 +1544,8 @@ mod tests {
     fn build_intersection_simplify_split_bool() {
         let db = setup_db();
 
-        build_intersection_simplify_split_bool_impl(&db, Type::bool_literal(&db, true));
-        build_intersection_simplify_split_bool_impl(&db, Type::bool_literal(&db, false));
+        build_intersection_simplify_split_bool_impl(&db, Type::bool_literal(true));
+        build_intersection_simplify_split_bool_impl(&db, Type::bool_literal(false));
         build_intersection_simplify_split_bool_impl(&db, Type::AlwaysTruthy);
         build_intersection_simplify_split_bool_impl(&db, Type::AlwaysFalsy);
     }
@@ -1572,28 +1564,28 @@ mod tests {
             .add_positive(t_bool)
             .add_negative(t_splitter)
             .build();
-        assert_eq!(ty, Type::bool_literal(db, !bool_value));
+        assert_eq!(ty, Type::bool_literal(!bool_value));
 
         let ty = IntersectionBuilder::new(db)
             .add_positive(t_bool)
             .add_positive(t_object)
             .add_negative(t_splitter)
             .build();
-        assert_eq!(ty, Type::bool_literal(db, !bool_value));
+        assert_eq!(ty, Type::bool_literal(!bool_value));
 
         let ty = IntersectionBuilder::new(db)
             .add_positive(t_object)
             .add_negative(t_splitter)
             .add_positive(t_bool)
             .build();
-        assert_eq!(ty, Type::bool_literal(db, !bool_value));
+        assert_eq!(ty, Type::bool_literal(!bool_value));
 
         let ty = IntersectionBuilder::new(db)
             .add_negative(t_splitter)
             .add_positive(t_object)
             .add_positive(t_bool)
             .build();
-        assert_eq!(ty, Type::bool_literal(db, !bool_value));
+        assert_eq!(ty, Type::bool_literal(!bool_value));
     }
 
     #[test]
@@ -1612,16 +1604,16 @@ mod tests {
 
         // SafeUUID.safe
         let l_safe = literals[0];
-        assert_eq!(l_safe.expect_enum_literal(&db).name(&db), "safe");
+        assert_eq!(l_safe.expect_enum_literal().name(&db), "safe");
         // SafeUUID.unsafe
         let l_unsafe = literals[1];
-        assert_eq!(l_unsafe.expect_enum_literal(&db).name(&db), "unsafe");
+        assert_eq!(l_unsafe.expect_enum_literal().name(&db), "unsafe");
         // SafeUUID.unknown
         let l_unknown = literals[2];
-        assert_eq!(l_unknown.expect_enum_literal(&db).name(&db), "unknown");
+        assert_eq!(l_unknown.expect_enum_literal().name(&db), "unknown");
 
         // The enum itself: SafeUUID
-        let safe_uuid = l_safe.expect_enum_literal(&db).enum_class_instance(&db);
+        let safe_uuid = l_safe.expect_enum_literal().enum_class_instance(&db);
 
         {
             let actual = IntersectionBuilder::new(&db)

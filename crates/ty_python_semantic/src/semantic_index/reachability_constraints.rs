@@ -316,8 +316,8 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
     let ty = match singleton {
         ruff_python_ast::Singleton::None => Type::none(db),
-        ruff_python_ast::Singleton::True => Type::bool_literal(db, true),
-        ruff_python_ast::Singleton::False => Type::bool_literal(db, false),
+        ruff_python_ast::Singleton::True => Type::bool_literal(true),
+        ruff_python_ast::Singleton::False => Type::bool_literal(false),
     };
     debug_assert!(ty.is_singleton(db));
     ty

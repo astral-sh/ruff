@@ -1723,12 +1723,11 @@ impl KnownFunction {
                 let [Some(ty), Some(Type::LiteralValue(literal))] = parameter_types else {
                     return;
                 };
-                let Some(member) = literal.as_string(db) else {
+                let Some(member) = literal.as_string() else {
                     return;
                 };
                 let ty_members = all_members(db, *ty);
                 overload.set_return_type(Type::bool_literal(
-                    db,
                     ty_members.iter().any(|m| m.name == member.value(db)),
                 ));
             }
@@ -1840,11 +1839,11 @@ impl KnownFunction {
                         return;
                     }
                     let mut diagnostic = if let Some(message) = message
-                        .and_then(|ty| ty.as_string_literal(db))
+                        .and_then(super::Type::as_string_literal)
                         .map(|s| s.value(db))
                     {
                         builder.into_diagnostic(format_args!("Static assertion error: {message}"))
-                    } else if *parameter_ty == Type::bool_literal(db, false) {
+                    } else if *parameter_ty == Type::bool_literal(false) {
                         builder.into_diagnostic(
                             "Static assertion error: argument evaluates to `False`",
                         )
@@ -2172,7 +2171,7 @@ impl KnownFunction {
                 let [Some(first), rest @ ..] = parameter_types else {
                     return;
                 };
-                let Some(full_module_name) = first.as_string_literal(db) else {
+                let Some(full_module_name) = first.as_string_literal() else {
                     return;
                 };
 

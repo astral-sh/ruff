@@ -88,7 +88,7 @@ pub(crate) fn enum_metadata<'db>(
 
         match ignore_place {
             Place::Defined(DefinedPlace { ty, .. }) => ty
-                .as_string_literal(db)
+                .as_string_literal()
                 .map(|ignored_names| ignored_names.value(db).split_ascii_whitespace().collect()),
 
             // TODO: support the list-variant of `_ignore_`.
@@ -180,7 +180,7 @@ pub(crate) fn enum_metadata<'db>(
                                             custom_mixins.as_slice(),
                                             [] | [Some(KnownClass::Int)]
                                         ) {
-                                            Type::int_literal(db, auto_counter)
+                                            Type::int_literal(auto_counter)
                                         } else {
                                             Type::any()
                                         }
@@ -225,7 +225,7 @@ pub(crate) fn enum_metadata<'db>(
             // performed if we can infer a precise literal type for the enum member. If we only get `int`,
             // we don't know if it's a duplicate or not.
             if matches!(
-                value_ty.as_literal_value_kind(db),
+                value_ty.as_literal_value_kind(),
                 Some(
                     LiteralValueTypeKind::Bool(_)
                         | LiteralValueTypeKind::Int(_)
@@ -300,7 +300,7 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
             .members
             .keys()
             .filter(move |name| Some(*name) != exclude_member)
-            .map(move |name| Type::enum_literal(db, EnumLiteralType::new(db, class, name.clone())))
+            .map(move |name| Type::enum_literal(EnumLiteralType::new(db, class, name.clone())))
     })
 }
 

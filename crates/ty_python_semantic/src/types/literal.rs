@@ -30,19 +30,10 @@ enum LiteralValueTypeRepr<'db> {
     UnpromotableLiteralString,
 }
 
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
-pub struct UnpromotableLiteralValueType<'db> {
-    kind: LiteralValueTypeKind<'db>,
-}
-
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for UnpromotableLiteralValueType<'_> {}
-
 #[derive(
     PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
 )]
-pub enum LiteralValueTypeKind<'db> {
+pub(crate) enum LiteralValueTypeKind<'db> {
     /// An integer literal
     Int(IntLiteralType),
     /// A boolean literal, either `True` or `False`.
@@ -60,22 +51,18 @@ pub enum LiteralValueTypeKind<'db> {
 
 impl<'db> LiteralValueType<'db> {
     pub(crate) fn new(
-        db: &'db dyn Db,
         kind: impl Into<LiteralValueTypeKind<'db>>,
         is_promotable: bool,
     ) -> LiteralValueType<'db> {
         if is_promotable {
-            Self::promotable(db, kind.into())
+            Self::promotable(kind.into())
         } else {
-            Self::unpromotable(db, kind.into())
+            Self::unpromotable(kind.into())
         }
     }
 
     /// Creates a literal value that may be promoted during literal promotion.
-    pub(crate) fn promotable(
-        _db: &'db dyn Db,
-        kind: impl Into<LiteralValueTypeKind<'db>>,
-    ) -> LiteralValueType<'db> {
+    pub(crate) fn promotable(kind: impl Into<LiteralValueTypeKind<'db>>) -> LiteralValueType<'db> {
         let repr = match kind.into() {
             LiteralValueTypeKind::Int(int) => LiteralValueTypeRepr::PromotableInt(int),
             LiteralValueTypeKind::Bool(bool) => LiteralValueTypeRepr::PromotableBool(bool),
@@ -90,7 +77,6 @@ impl<'db> LiteralValueType<'db> {
 
     /// Creates a literal value that should not be promoted during literal promotion.
     pub(crate) fn unpromotable(
-        _db: &'db dyn Db,
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {
         let repr = match kind.into() {
@@ -109,7 +95,7 @@ impl<'db> LiteralValueType<'db> {
 
     /// Returns the promotable form of this literal value.
     #[must_use]
-    pub(crate) fn to_promotable(self, _db: &'db dyn Db) -> Self {
+    pub(crate) fn to_promotable(self) -> Self {
         let repr = match self.0 {
             LiteralValueTypeRepr::UnpromotableInt(int) => LiteralValueTypeRepr::PromotableInt(int),
             LiteralValueTypeRepr::UnpromotableBool(bool) => {
@@ -138,7 +124,7 @@ impl<'db> LiteralValueType<'db> {
 
     /// Returns the unpromotable form of this literal value.
     #[must_use]
-    pub(crate) fn to_unpromotable(self, _db: &'db dyn Db) -> Self {
+    pub(crate) fn to_unpromotable(self) -> Self {
         let repr = match self.0 {
             LiteralValueTypeRepr::PromotableInt(int) => LiteralValueTypeRepr::UnpromotableInt(int),
             LiteralValueTypeRepr::PromotableBool(bool) => {
@@ -166,7 +152,7 @@ impl<'db> LiteralValueType<'db> {
     }
 
     /// Returns `true` if this literal value should be eagerly promoted to its instance type.
-    pub(crate) fn is_promotable(self, _db: &'db dyn Db) -> bool {
+    pub(crate) fn is_promotable(self) -> bool {
         match self.0 {
             LiteralValueTypeRepr::PromotableInt(_)
             | LiteralValueTypeRepr::PromotableBool(_)
@@ -184,7 +170,7 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
-    pub(crate) fn kind(self, _db: &'db dyn Db) -> LiteralValueTypeKind<'db> {
+    pub(crate) fn kind(self) -> LiteralValueTypeKind<'db> {
         match self.0 {
             LiteralValueTypeRepr::UnpromotableInt(int)
             | LiteralValueTypeRepr::PromotableInt(int) => LiteralValueTypeKind::Int(int),
@@ -204,72 +190,72 @@ impl<'db> LiteralValueType<'db> {
         }
     }
 
-    pub(crate) fn as_bytes(self, db: &'db dyn Db) -> Option<BytesLiteralType<'db>> {
-        if let LiteralValueTypeKind::Bytes(v) = self.kind(db) {
+    pub(crate) fn as_bytes(self) -> Option<BytesLiteralType<'db>> {
+        if let LiteralValueTypeKind::Bytes(v) = self.kind() {
             Some(v)
         } else {
             None
         }
     }
 
-    pub(crate) fn as_enum(self, db: &'db dyn Db) -> Option<EnumLiteralType<'db>> {
-        if let LiteralValueTypeKind::Enum(v) = self.kind(db) {
+    pub(crate) fn as_enum(self) -> Option<EnumLiteralType<'db>> {
+        if let LiteralValueTypeKind::Enum(v) = self.kind() {
             Some(v)
         } else {
             None
         }
     }
 
-    pub(crate) fn as_string(self, db: &'db dyn Db) -> Option<StringLiteralType<'db>> {
-        if let LiteralValueTypeKind::String(v) = self.kind(db) {
+    pub(crate) fn as_string(self) -> Option<StringLiteralType<'db>> {
+        if let LiteralValueTypeKind::String(v) = self.kind() {
             Some(v)
         } else {
             None
         }
     }
 
-    pub(crate) fn as_bool(self, db: &'db dyn Db) -> Option<bool> {
-        if let LiteralValueTypeKind::Bool(v) = self.kind(db) {
+    pub(crate) fn as_bool(self) -> Option<bool> {
+        if let LiteralValueTypeKind::Bool(v) = self.kind() {
             Some(v)
         } else {
             None
         }
     }
 
-    pub(crate) fn as_int(self, db: &'db dyn Db) -> Option<i64> {
-        if let LiteralValueTypeKind::Int(v) = self.kind(db) {
+    pub(crate) fn as_int(self) -> Option<i64> {
+        if let LiteralValueTypeKind::Int(v) = self.kind() {
             Some(v.as_i64())
         } else {
             None
         }
     }
 
-    pub(crate) fn is_int(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), LiteralValueTypeKind::Int(..))
+    pub(crate) fn is_int(self) -> bool {
+        matches!(self.kind(), LiteralValueTypeKind::Int(..))
     }
 
-    pub(crate) fn is_bool(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), LiteralValueTypeKind::Bool(..))
+    pub(crate) fn is_bool(self) -> bool {
+        matches!(self.kind(), LiteralValueTypeKind::Bool(..))
     }
 
-    pub(crate) fn is_literal_string(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), LiteralValueTypeKind::LiteralString)
+    pub(crate) fn is_literal_string(self) -> bool {
+        matches!(self.kind(), LiteralValueTypeKind::LiteralString)
     }
 
-    pub(crate) fn is_string(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), LiteralValueTypeKind::String(..))
+    pub(crate) fn is_string(self) -> bool {
+        matches!(self.kind(), LiteralValueTypeKind::String(..))
     }
 
-    pub fn is_enum(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), LiteralValueTypeKind::Enum(..))
+    pub fn is_enum(self) -> bool {
+        matches!(self.kind(), LiteralValueTypeKind::Enum(..))
     }
 
-    pub(crate) fn is_bytes(self, db: &'db dyn Db) -> bool {
-        matches!(self.kind(db), LiteralValueTypeKind::Bytes(..))
+    pub(crate) fn is_bytes(self) -> bool {
+        matches!(self.kind(), LiteralValueTypeKind::Bytes(..))
     }
 
     pub(crate) fn fallback_instance(self, db: &'db dyn Db) -> Type<'db> {
-        match self.kind(db) {
+        match self.kind() {
             LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString => {
                 KnownClass::Str.to_instance(db)
             }
@@ -282,10 +268,10 @@ impl<'db> LiteralValueType<'db> {
 
     pub(crate) fn normalized_impl(
         self,
-        db: &'db dyn Db,
+        _db: &'db dyn Db,
         _visitor: &NormalizedVisitor<'db>,
     ) -> Self {
-        self.to_promotable(db)
+        self.to_promotable()
     }
 }
 
@@ -328,7 +314,7 @@ impl<'db> From<LiteralValueType<'db>> for Type<'db> {
 // This type has the same alignment as `salsa::Id`, allowing `LiteralValueType` to use a smaller
 // discriminant.
 #[derive(PartialOrd, Ord, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub struct IntLiteralType {
+pub(crate) struct IntLiteralType {
     high: u32,
     low: u32,
 }

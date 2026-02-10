@@ -51,7 +51,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (_, Type::Never) => Ordering::Greater,
 
         (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-            match (left.kind(db), right.kind(db)) {
+            match (left.kind(), right.kind()) {
                 (LiteralValueTypeKind::LiteralString, _) => Ordering::Less,
                 (_, LiteralValueTypeKind::LiteralString) => Ordering::Greater,
 

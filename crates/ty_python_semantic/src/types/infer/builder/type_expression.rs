@@ -1180,7 +1180,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::GenericAlias(_) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::LiteralValue(literal) if literal.is_string(self.db()) => {
+            Type::LiteralValue(literal) if literal.is_string() => {
                 self.infer_type_expression(slice);
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
@@ -1723,7 +1723,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     let probably_meant_literal = argument_elements.all(|ty| match ty {
                         Type::LiteralValue(literal)
                             if matches!(
-                                literal.kind(db),
+                                literal.kind(),
                                 LiteralValueTypeKind::String(_)
                                     | LiteralValueTypeKind::Bytes(_)
                                     | LiteralValueTypeKind::Enum(_)
@@ -1846,7 +1846,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         return Ok(ty.inner(self.db()));
                     }
                     // `Literal[SomeEnum.Member]`
-                    Type::LiteralValue(literal) if literal.is_enum(self.db()) => {
+                    Type::LiteralValue(literal) if literal.is_enum() => {
                         return Ok(subscript_ty);
                     }
                     // `Literal[SingletonEnum.Member]`, where `SingletonEnum.Member` simplifies to
@@ -1870,7 +1870,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         Ok(if let Type::LiteralValue(literal) = ty {
             // Avoid promoting values originating from an explicitly annotated literal type.
-            Type::LiteralValue(literal.to_unpromotable(self.db()))
+            Type::LiteralValue(literal.to_unpromotable())
         } else {
             ty
         })

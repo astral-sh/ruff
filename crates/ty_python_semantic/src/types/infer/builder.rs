@@ -1286,7 +1286,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 let passed_type = self.file_expression_type(&keyword.value);
                                 if passed_type
                                     .as_literal_value()
-                                    .is_none_or(|literal| !literal.is_bool(self.db()))
+                                    .is_none_or(|literal| !literal.is_bool())
                                     && let Some(builder) =
                                         self.context.report_lint(&INVALID_ARGUMENT_TYPE, keyword)
                                 {
@@ -2372,7 +2372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match left {
             Type::LiteralValue(literal)
                 if matches!(
-                    literal.kind(self.db()),
+                    literal.kind(),
                     LiteralValueTypeKind::Bool(_) | LiteralValueTypeKind::Int(_)
                 ) => {}
             Type::NominalInstance(instance)
@@ -5168,7 +5168,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             db: &'db dyn Db,
             slice_ty: Type<'db>,
         ) -> Option<impl Iterator<Item = &'db str> + 'db> {
-            if let Some(literal) = slice_ty.as_string_literal(db) {
+            if let Some(literal) = slice_ty.as_string_literal() {
                 Some(Either::Left(std::iter::once(literal.value(db))))
             } else {
                 slice_ty.as_union().map(|union| {
@@ -5176,7 +5176,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         union
                             .elements(db)
                             .iter()
-                            .filter_map(|ty| ty.as_string_literal(db).map(|lit| lit.value(db))),
+                            .filter_map(|ty| ty.as_string_literal().map(|lit| lit.value(db))),
                     )
                 })
             }
@@ -5277,8 +5277,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let assigned_d = rhs_value_ty.display(db);
                     let value_d = object_ty.display(db);
 
-                    if slice_ty.is_assignable_to(db, Type::literal_string(db))
-                        && !slice_ty.is_equivalent_to(db, Type::literal_string(db))
+                    if slice_ty.is_assignable_to(db, Type::literal_string())
+                        && !slice_ty.is_equivalent_to(db, Type::literal_string())
                     {
                         if let Some(builder) = self
                             .context
@@ -5391,7 +5391,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                             CallErrorKind::BindingError => {
                                 if let Some(typed_dict) = object_ty.as_typed_dict() {
-                                    if let Some(key) = slice_ty.as_string_literal(db) {
+                                    if let Some(key) = slice_ty.as_string_literal() {
                                         let key = key.value(db);
                                         validate_typed_dict_key_assignment(
                                             &self.context,
@@ -5615,8 +5615,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     // For deletions of string literal keys on `TypedDict`, provide
                                     // a more detailed diagnostic.
                                     if let Some(typed_dict) = object_ty.as_typed_dict() {
-                                        if let Some(string_literal) = slice_ty.as_string_literal(db)
-                                        {
+                                        if let Some(string_literal) = slice_ty.as_string_literal() {
                                             let key = string_literal.value(db);
                                             let items = typed_dict.items(db);
 
@@ -6636,7 +6635,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) {
                         report_invalid_type_checking_constant(&self.context, target.into());
                     }
-                    Type::bool_literal(self.db(), true)
+                    Type::bool_literal(true)
                 } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                     Type::unknown()
                 } else {
@@ -6769,10 +6768,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty
-            .as_string_literal(db)
-            .map(|name| name.value(db))
-        else {
+        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
                 &self.context,
                 "The first argument to `ParamSpec` must be a string literal",
@@ -6989,10 +6985,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         };
 
-        let Some(name_param) = name_param_ty
-            .as_string_literal(db)
-            .map(|name| name.value(db))
-        else {
+        let Some(name_param) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
                 &self.context,
                 "The first argument to `TypeVar` must be a string literal.",
@@ -7110,10 +7103,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
 
-        let Some(name) = name_param_ty
-            .as_string_literal(db)
-            .map(|name| name.value(db))
-        else {
+        let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
             return error(
                 &self.context,
                 "The first argument to `NewType` must be a string literal",
@@ -7426,7 +7416,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let all_keys_are_string_literals = dict.items.iter().all(|item| {
                     item.key
                         .as_ref()
-                        .is_some_and(|k| self.expression_type(k).is_string_literal(db))
+                        .is_some_and(|k| self.expression_type(k).is_string_literal())
                 });
                 let members = dict
                     .items
@@ -7434,7 +7424,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .filter_map(|item| {
                         // Only extract items with string literal keys.
                         let key_expr = item.key.as_ref()?;
-                        let key_name = self.expression_type(key_expr).as_string_literal(db)?;
+                        let key_name = self.expression_type(key_expr).as_string_literal()?;
                         let key_name = ast::name::Name::new(key_name.value(db));
                         // Get the already-inferred type from when we inferred the dict above.
                         let value_ty = self.expression_type(&item.value);
@@ -7476,7 +7466,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Extract name and base classes.
-        let name = if let Some(literal) = name_type.as_string_literal(db) {
+        let name = if let Some(literal) = name_type.as_string_literal() {
             ast::name::Name::new(literal.value(db))
         } else {
             if !name_type.is_assignable_to(db, KnownClass::Str.to_instance(db))
@@ -7906,7 +7896,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Extract name.
-        let name = if let Some(literal) = name_type.as_string_literal(db) {
+        let name = if let Some(literal) = name_type.as_string_literal() {
             Name::new(literal.value(db))
         } else {
             // Name is not a string literal; use <unknown> like we do for type() calls.
@@ -7996,7 +7986,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Extract field names, first from the inferred type, then from the AST.
         let maybe_field_names: Option<Box<[Name]>> =
-            if let Some(string_literal) = fields_type.as_string_literal(db) {
+            if let Some(string_literal) = fields_type.as_string_literal() {
                 // Handle space/comma-separated string.
                 Some(
                     string_literal
@@ -8013,7 +8003,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 fixed_tuple
                     .all_elements()
                     .iter()
-                    .map(|elt| elt.as_string_literal(db).map(|s| Name::new(s.value(db))))
+                    .map(|elt| elt.as_string_literal().map(|s| Name::new(s.value(db))))
                     .collect()
             } else {
                 // Get the elements from the list or tuple literal.
@@ -8028,7 +8018,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(|elt| {
                             // Each element should be a string literal.
                             let field_ty = self.expression_type(elt);
-                            let field_lit = field_ty.as_string_literal(db)?;
+                            let field_lit = field_ty.as_string_literal()?;
                             Some(Name::new(field_lit.value(db)))
                         })
                         .collect::<Option<_>>()
@@ -8224,7 +8214,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             self.store_expression_type(element, element_type);
 
-            let Some(name) = name_type.as_string_literal(db) else {
+            let Some(name) = name_type.as_string_literal() else {
                 for element in &elements[(i + 1)..] {
                     self.infer_expression(element, TypeContext::default());
                 }
@@ -8743,7 +8733,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // otherwise, assigning something other than `False` is an error
                 report_invalid_type_checking_constant(&self.context, target.into());
             }
-            declared.inner = Type::bool_literal(self.db(), true);
+            declared.inner = Type::bool_literal(true);
         }
 
         // Handle various singletons.
@@ -8789,7 +8779,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_name_expr()
                 .is_some_and(|name| &name.id == "TYPE_CHECKING")
             {
-                Type::bool_literal(self.db(), true)
+                Type::bool_literal(true)
             } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                 declared.inner_type()
             } else {
@@ -10581,7 +10571,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .filter_union(self.db(), |ty| ty.as_literal_value().is_some())
             && ty.is_assignable_to(self.db(), tcx)
         {
-            ty = Type::LiteralValue(literal.to_unpromotable(self.db()));
+            ty = Type::LiteralValue(literal.to_unpromotable());
         }
 
         self.store_expression_type_impl(expression, ty, tcx);
@@ -10649,13 +10639,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match value {
             ast::Number::Int(n) => n
                 .as_i64()
-                .map(|n| Type::int_literal(db, n))
+                .map(Type::int_literal)
                 .unwrap_or_else(|| KnownClass::Int.to_instance(db)),
             ast::Number::Float(_) => KnownClass::Float.to_instance(db),
             ast::Number::Complex { .. } => KnownClass::Complex.to_instance(db),
         }
     }
 
+    #[expect(clippy::unused_self)]
     fn infer_boolean_literal_expression(&mut self, literal: &ast::ExprBooleanLiteral) -> Type<'db> {
         let ast::ExprBooleanLiteral {
             range: _,
@@ -10663,7 +10654,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = literal;
 
-        Type::bool_literal(self.db(), *value)
+        Type::bool_literal(*value)
     }
 
     fn infer_string_literal_expression(
@@ -10681,7 +10672,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if literal.value.len() <= Self::MAX_STRING_LITERAL_SIZE {
             Type::string_literal(self.db(), literal.value.to_str())
         } else {
-            Type::literal_string(self.db())
+            Type::literal_string()
         }
     }
 
@@ -10739,9 +10730,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 {
                                     collector.add_expression();
                                 } else {
-                                    if let Some(literal) =
-                                        ty.str(self.db()).as_string_literal(self.db())
-                                    {
+                                    if let Some(literal) = ty.str(self.db()).as_string_literal() {
                                         collector.push_str(literal.value(self.db()));
                                     } else {
                                         collector.add_expression();
@@ -11075,7 +11064,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let value_ty = if let Some(key_ty) = key_ty
-                && let Some(key) = key_ty.as_string_literal(self.db())
+                && let Some(key) = key_ty.as_string_literal()
                 && let Some(field) = typed_dict_items.get(key.value(self.db()))
             {
                 self.infer_expression(&item.value, TypeContext::new(Some(field.declared_ty)))
@@ -13346,25 +13335,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_unary_expression_type(op, alias.value_type(self.db()), unary)
             }
 
-            (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
-                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), value.as_i64()),
-                LiteralValueTypeKind::Bool(value) => Type::int_literal(self.db(), i64::from(value)),
+            (ast::UnaryOp::UAdd, Type::LiteralValue(literal)) => match literal.kind() {
+                LiteralValueTypeKind::Int(value) => Type::int_literal(value.as_i64()),
+                LiteralValueTypeKind::Bool(value) => Type::int_literal(i64::from(value)),
                 _ => fallback_unary_expression_type(),
             },
 
-            (ast::UnaryOp::USub, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
-                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), -value.as_i64()),
-                LiteralValueTypeKind::Bool(value) => {
-                    Type::int_literal(self.db(), -i64::from(value))
-                }
+            (ast::UnaryOp::USub, Type::LiteralValue(literal)) => match literal.kind() {
+                LiteralValueTypeKind::Int(value) => Type::int_literal(-value.as_i64()),
+                LiteralValueTypeKind::Bool(value) => Type::int_literal(-i64::from(value)),
                 _ => fallback_unary_expression_type(),
             },
 
-            (ast::UnaryOp::Invert, Type::LiteralValue(literal)) => match literal.kind(self.db()) {
-                LiteralValueTypeKind::Int(value) => Type::int_literal(self.db(), !value.as_i64()),
-                LiteralValueTypeKind::Bool(value) => {
-                    Type::int_literal(self.db(), !i64::from(value))
-                }
+            (ast::UnaryOp::Invert, Type::LiteralValue(literal)) => match literal.kind() {
+                LiteralValueTypeKind::Int(value) => Type::int_literal(!value.as_i64()),
+                LiteralValueTypeKind::Bool(value) => Type::int_literal(!i64::from(value)),
                 _ => fallback_unary_expression_type(),
             },
 
@@ -13615,7 +13600,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::Operator::Div | ast::Operator::FloorDiv | ast::Operator::Mod
             )
             && right_ty.as_literal_value().is_some_and(|literal| {
-                literal.as_bool(self.db()) == Some(false) || literal.as_int(self.db()) == Some(0)
+                literal.as_bool() == Some(false) || literal.as_int() == Some(0)
             })
         {
             emitted_division_by_zero_diagnostic = self.check_division_by_zero(node, op, left_ty);
@@ -13840,7 +13825,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::Never, _, _) | (_, Type::Never, _) => Some(Type::Never),
 
             (Type::LiteralValue(left), Type::LiteralValue(right), _) => {
-                match (left.kind(self.db()), right.kind(self.db()), op) {
+                match (left.kind(), right.kind(), op) {
                     (
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
@@ -13848,7 +13833,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) => Some(
                         n.as_i64()
                             .checked_add(m.as_i64())
-                            .map(|i| Type::int_literal(self.db(), i))
+                            .map(Type::int_literal)
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
                     ),
 
@@ -13859,7 +13844,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) => Some(
                         n.as_i64()
                             .checked_sub(m.as_i64())
-                            .map(|i| Type::int_literal(self.db(), i))
+                            .map(Type::int_literal)
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
                     ),
 
@@ -13870,7 +13855,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) => Some(
                         n.as_i64()
                             .checked_mul(m.as_i64())
-                            .map(|i| Type::int_literal(self.db(), i))
+                            .map(Type::int_literal)
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
                     ),
 
@@ -13894,7 +13879,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             q = q.map(|q| q - 1);
                         }
-                        q.map(|i| Type::int_literal(self.db(), i))
+                        q.map(Type::int_literal)
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
                     }),
 
@@ -13912,7 +13897,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         {
                             r = r.map(|x| x + m.as_i64());
                         }
-                        r.map(|i| Type::int_literal(self.db(), i))
+                        r.map(Type::int_literal)
                             .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
                     }),
 
@@ -13927,7 +13912,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             u32::try_from(m.as_i64())
                                 .ok()
                                 .and_then(|m| n.as_i64().checked_pow(m))
-                                .map(|i| Type::int_literal(self.db(), i))
+                                .map(Type::int_literal)
                                 .unwrap_or_else(|| KnownClass::Int.to_instance(self.db()))
                         }
                     }),
@@ -13936,19 +13921,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::BitOr,
-                    ) => Some(Type::int_literal(self.db(), n.as_i64() | m.as_i64())),
+                    ) => Some(Type::int_literal(n.as_i64() | m.as_i64())),
 
                     (
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::BitAnd,
-                    ) => Some(Type::int_literal(self.db(), n.as_i64() & m.as_i64())),
+                    ) => Some(Type::int_literal(n.as_i64() & m.as_i64())),
 
                     (
                         LiteralValueTypeKind::Int(n),
                         LiteralValueTypeKind::Int(m),
                         ast::Operator::BitXor,
-                    ) => Some(Type::int_literal(self.db(), n.as_i64() ^ m.as_i64())),
+                    ) => Some(Type::int_literal(n.as_i64() ^ m.as_i64())),
 
                     (
                         LiteralValueTypeKind::Bytes(lhs),
@@ -13970,7 +13955,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if lhs_value.len() + rhs_value.len() <= Self::MAX_STRING_LITERAL_SIZE {
                                 Type::string_literal(self.db(), &(lhs_value + rhs_value))
                             } else {
-                                Type::literal_string(self.db())
+                                Type::literal_string()
                             };
                         Some(ty)
                     }
@@ -13979,7 +13964,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString,
                         LiteralValueTypeKind::String(_) | LiteralValueTypeKind::LiteralString,
                         ast::Operator::Add,
-                    ) => Some(Type::literal_string(self.db())),
+                    ) => Some(Type::literal_string()),
 
                     (
                         LiteralValueTypeKind::String(s),
@@ -14002,7 +13987,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let new_literal = s.value(self.db()).repeat(n);
                             Type::string_literal(self.db(), &new_literal)
                         } else {
-                            Type::literal_string(self.db())
+                            Type::literal_string()
                         };
                         Some(ty)
                     }
@@ -14020,7 +14005,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let ty = if n.as_i64() < 1 {
                             Type::string_literal(self.db(), "")
                         } else {
-                            Type::literal_string(self.db())
+                            Type::literal_string()
                         };
                         Some(ty)
                     }
@@ -14029,19 +14014,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         LiteralValueTypeKind::Bool(b1),
                         LiteralValueTypeKind::Bool(b2),
                         ast::Operator::BitOr,
-                    ) => Some(Type::bool_literal(self.db(), b1 | b2)),
+                    ) => Some(Type::bool_literal(b1 | b2)),
 
                     (
                         LiteralValueTypeKind::Bool(b1),
                         LiteralValueTypeKind::Bool(b2),
                         ast::Operator::BitAnd,
-                    ) => Some(Type::bool_literal(self.db(), b1 & b2)),
+                    ) => Some(Type::bool_literal(b1 & b2)),
 
                     (
                         LiteralValueTypeKind::Bool(b1),
                         LiteralValueTypeKind::Bool(b2),
                         ast::Operator::BitXor,
-                    ) => Some(Type::bool_literal(self.db(), b1 ^ b2)),
+                    ) => Some(Type::bool_literal(b1 ^ b2)),
 
                     (
                         LiteralValueTypeKind::Bool(b1),
@@ -14050,7 +14035,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ) => self.infer_binary_expression_type(
                         node,
                         emitted_division_by_zero_diagnostic,
-                        Type::int_literal(self.db(), i64::from(b1)),
+                        Type::int_literal(i64::from(b1)),
                         right_ty,
                         op,
                     ),
@@ -14059,7 +14044,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             node,
                             emitted_division_by_zero_diagnostic,
                             left_ty,
-                            Type::int_literal(self.db(), i64::from(b2)),
+                            Type::int_literal(i64::from(b2)),
                             op,
                         ),
 
@@ -14370,7 +14355,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         *op,
                         right_ty,
                         range,
-                        &BinaryComparisonVisitor::new(Ok(Type::bool_literal(builder.db(), true))),
+                        &BinaryComparisonVisitor::new(Ok(Type::bool_literal(true))),
                     )
                     .unwrap_or_else(|error| {
                         report_unsupported_comparison(
@@ -14434,7 +14419,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if result
                 .ok()
                 .and_then(Type::as_literal_value)
-                .is_some_and(|literal| literal.is_bool(self.db()))
+                .is_some_and(super::super::literal::LiteralValueType::is_bool)
             {
                 return result;
             }
@@ -14451,14 +14436,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .infer_binary_type_comparison(other, op, *neg, range, visitor)
                     .ok(),
             }
-            .and_then(|ty| ty.as_literal_value_kind(self.db()));
+            .and_then(super::super::Type::as_literal_value_kind);
 
             match (op, result) {
                 (ast::CmpOp::Is, Some(LiteralValueTypeKind::Bool(true))) => {
-                    return Ok(Type::bool_literal(self.db(), false));
+                    return Ok(Type::bool_literal(false));
                 }
                 (ast::CmpOp::IsNot, Some(LiteralValueTypeKind::Bool(false))) => {
-                    return Ok(Type::bool_literal(self.db(), true));
+                    return Ok(Type::bool_literal(true));
                 }
                 _ => {}
             }
@@ -14601,18 +14586,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 ast::CmpOp::Is => {
                     if left.is_disjoint_from(db, right) {
-                        Ok(Type::bool_literal(db, false))
+                        Ok(Type::bool_literal(false))
                     } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                        Ok(Type::bool_literal(db, true))
+                        Ok(Type::bool_literal(true))
                     } else {
                         Ok(KnownClass::Bool.to_instance(db))
                     }
                 }
                 ast::CmpOp::IsNot => {
                     if left.is_disjoint_from(db, right) {
-                        Ok(Type::bool_literal(db, true))
+                        Ok(Type::bool_literal(true))
                     } else if left.is_singleton(db) && left.is_equivalent_to(db, right) {
-                        Ok(Type::bool_literal(db, false))
+                        Ok(Type::bool_literal(false))
                     } else {
                         Ok(KnownClass::Bool.to_instance(db))
                     }
@@ -14792,28 +14777,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => match (left_literal.kind(self.db()), right_literal.kind(self.db())) {
+            (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => match (left_literal.kind(), right_literal.kind()) {
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => Some(match op {
-                    ast::CmpOp::Eq => Ok(Type::bool_literal(self.db(), n == m)),
-                    ast::CmpOp::NotEq => Ok(Type::bool_literal(self.db(), n != m)),
-                    ast::CmpOp::Lt => Ok(Type::bool_literal(self.db(), n < m)),
-                    ast::CmpOp::LtE => Ok(Type::bool_literal(self.db(), n <= m)),
-                    ast::CmpOp::Gt => Ok(Type::bool_literal(self.db(), n > m)),
-                    ast::CmpOp::GtE => Ok(Type::bool_literal(self.db(), n >= m)),
+                    ast::CmpOp::Eq => Ok(Type::bool_literal(n == m)),
+                    ast::CmpOp::NotEq => Ok(Type::bool_literal(n != m)),
+                    ast::CmpOp::Lt => Ok(Type::bool_literal(n < m)),
+                    ast::CmpOp::LtE => Ok(Type::bool_literal(n <= m)),
+                    ast::CmpOp::Gt => Ok(Type::bool_literal(n > m)),
+                    ast::CmpOp::GtE => Ok(Type::bool_literal(n >= m)),
                     // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
                     // Even if they are the same value, they may not be the same object.
                     ast::CmpOp::Is => {
                         if n == m {
                             Ok(KnownClass::Bool.to_instance(self.db()))
                         } else {
-                            Ok(Type::bool_literal(self.db(), false))
+                            Ok(Type::bool_literal(false))
                         }
                     }
                     ast::CmpOp::IsNot => {
                         if n == m {
                             Ok(KnownClass::Bool.to_instance(self.db()))
                         } else {
-                            Ok(Type::bool_literal(self.db(), true))
+                            Ok(Type::bool_literal(true))
                         }
                     }
                     // Undefined for (int, int)
@@ -14826,27 +14811,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Booleans are coded as integers (False = 0, True = 1)
                 (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Bool(b)) => {
                     Some(self.infer_binary_type_comparison(
-                        Type::int_literal(self.db(), n.as_i64()),
+                        Type::int_literal(n.as_i64()),
                         op,
-                        Type::int_literal(self.db(), i64::from(b)),
+                        Type::int_literal(i64::from(b)),
                         range,
                         visitor,
                     ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
                 }
                 (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(m)) => {
                     Some(self.infer_binary_type_comparison(
-                        Type::int_literal(self.db(), i64::from(b)),
+                        Type::int_literal(i64::from(b)),
                         op,
-                        Type::int_literal(self.db(), m.as_i64()),
+                        Type::int_literal(m.as_i64()),
                         range,
                         visitor,
                     ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
                 }
                 (LiteralValueTypeKind::Bool(a), LiteralValueTypeKind::Bool(b)) => {
                     Some(self.infer_binary_type_comparison(
-                        Type::int_literal(self.db(), i64::from(a)),
+                        Type::int_literal(i64::from(a)),
                         op,
-                        Type::int_literal(self.db(), i64::from(b)),
+                        Type::int_literal(i64::from(b)),
                         range,
                         visitor,
                     ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
@@ -14856,26 +14841,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let s1 = salsa_s1.value(self.db());
                     let s2 = salsa_s2.value(self.db());
                     let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(self.db(), s1 == s2),
-                        ast::CmpOp::NotEq => Type::bool_literal(self.db(), s1 != s2),
-                        ast::CmpOp::Lt => Type::bool_literal(self.db(), s1 < s2),
-                        ast::CmpOp::LtE => Type::bool_literal(self.db(), s1 <= s2),
-                        ast::CmpOp::Gt => Type::bool_literal(self.db(), s1 > s2),
-                        ast::CmpOp::GtE => Type::bool_literal(self.db(), s1 >= s2),
-                        ast::CmpOp::In => Type::bool_literal(self.db(), s2.contains(s1)),
-                        ast::CmpOp::NotIn => Type::bool_literal(self.db(), !s2.contains(s1)),
+                        ast::CmpOp::Eq => Type::bool_literal(s1 == s2),
+                        ast::CmpOp::NotEq => Type::bool_literal(s1 != s2),
+                        ast::CmpOp::Lt => Type::bool_literal(s1 < s2),
+                        ast::CmpOp::LtE => Type::bool_literal(s1 <= s2),
+                        ast::CmpOp::Gt => Type::bool_literal(s1 > s2),
+                        ast::CmpOp::GtE => Type::bool_literal(s1 >= s2),
+                        ast::CmpOp::In => Type::bool_literal(s2.contains(s1)),
+                        ast::CmpOp::NotIn => Type::bool_literal(!s2.contains(s1)),
                         ast::CmpOp::Is => {
                             if s1 == s2 {
                                 KnownClass::Bool.to_instance(self.db())
                             } else {
-                                Type::bool_literal(self.db(), false)
+                                Type::bool_literal(false)
                             }
                         }
                         ast::CmpOp::IsNot => {
                             if s1 == s2 {
                                 KnownClass::Bool.to_instance(self.db())
                             } else {
-                                Type::bool_literal(self.db(), true)
+                                Type::bool_literal(true)
                             }
                         }
                     };
@@ -14886,30 +14871,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let b1 = salsa_b1.value(self.db());
                     let b2 = salsa_b2.value(self.db());
                     let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(self.db(), b1 == b2),
-                        ast::CmpOp::NotEq => Type::bool_literal(self.db(), b1 != b2),
-                        ast::CmpOp::Lt => Type::bool_literal(self.db(), b1 < b2),
-                        ast::CmpOp::LtE => Type::bool_literal(self.db(), b1 <= b2),
-                        ast::CmpOp::Gt => Type::bool_literal(self.db(), b1 > b2),
-                        ast::CmpOp::GtE => Type::bool_literal(self.db(), b1 >= b2),
+                        ast::CmpOp::Eq => Type::bool_literal(b1 == b2),
+                        ast::CmpOp::NotEq => Type::bool_literal(b1 != b2),
+                        ast::CmpOp::Lt => Type::bool_literal(b1 < b2),
+                        ast::CmpOp::LtE => Type::bool_literal(b1 <= b2),
+                        ast::CmpOp::Gt => Type::bool_literal(b1 > b2),
+                        ast::CmpOp::GtE => Type::bool_literal(b1 >= b2),
                         ast::CmpOp::In => {
-                            Type::bool_literal(self.db(), memchr::memmem::find(b2, b1).is_some())
+                            Type::bool_literal(memchr::memmem::find(b2, b1).is_some())
                         }
                         ast::CmpOp::NotIn => {
-                            Type::bool_literal(self.db(), memchr::memmem::find(b2, b1).is_none())
+                            Type::bool_literal(memchr::memmem::find(b2, b1).is_none())
                         }
                         ast::CmpOp::Is => {
                             if b1 == b2 {
                                 KnownClass::Bool.to_instance(self.db())
                             } else {
-                                Type::bool_literal(self.db(), false)
+                                Type::bool_literal(false)
                             }
                         }
                         ast::CmpOp::IsNot => {
                             if b1 == b2 {
                                 KnownClass::Bool.to_instance(self.db())
                             } else {
-                                Type::bool_literal(self.db(), true)
+                                Type::bool_literal(true)
                             }
                         }
                     };
@@ -14921,7 +14906,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
                         Ok(ty) => ty,
-                        Err(_) => Type::bool_literal(self.db(), literal_1 == literal_2),
+                        Err(_) => Type::bool_literal(literal_1 == literal_2),
                     }))
                 }
                 (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
@@ -14929,7 +14914,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
                         Ok(ty) => ty,
-                        Err(_) => Type::bool_literal(self.db(), literal_1 != literal_2),
+                        Err(_) => Type::bool_literal(literal_1 != literal_2),
                     }))
                 }
 
@@ -14940,10 +14925,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
             ) => match op {
-                ast::CmpOp::Eq => Some(Ok(Type::bool_literal(self.db(),
+                ast::CmpOp::Eq => Some(Ok(Type::bool_literal(
                     left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
                 ))),
-                ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(self.db(),
+                ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(
                     !left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
                 ))),
                 _ => None,
@@ -14994,9 +14979,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
 
                             if any_eq {
-                                Ok(Type::bool_literal(self.db(), op.is_in()))
+                                Ok(Type::bool_literal(op.is_in()))
                             } else if !any_ambiguous {
-                                Ok(Type::bool_literal(self.db(), op.is_not_in()))
+                                Ok(Type::bool_literal(op.is_not_in()))
                             } else {
                                 Ok(KnownClass::Bool.to_instance(self.db()))
                             }
@@ -15014,7 +14999,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // for `is` and `is not` comparisons. This is an implementation detail
                                 // for how we determine the truthiness of a type.
                                 ty => match ty.bool(self.db()) {
-                                    Truthiness::AlwaysFalse => Type::bool_literal(self.db(), op.is_is_not()),
+                                    Truthiness::AlwaysFalse => Type::bool_literal(op.is_is_not()),
                                     _ => KnownClass::Bool.to_instance(self.db()),
                                 },
                             })
@@ -15201,8 +15186,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
                                 // NOTE: The CPython implementation does not account for non-boolean return types
                                 // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
-                                RichCompareOperator::Eq => Type::bool_literal(self.db(), false),
-                                RichCompareOperator::Ne => Type::bool_literal(self.db(), true),
+                                RichCompareOperator::Eq => Type::bool_literal(false),
+                                RichCompareOperator::Ne => Type::bool_literal(true),
                             };
 
                             builder = builder.add(pairwise_compare_result);
@@ -15219,17 +15204,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // if no more items to compare, we just compare sizes
                 let (left_len, right_len) = (left.len(), right.len());
 
-                builder = builder.add(Type::bool_literal(
-                    self.db(),
-                    match op {
-                        RichCompareOperator::Eq => left_len == right_len,
-                        RichCompareOperator::Ne => left_len != right_len,
-                        RichCompareOperator::Lt => left_len < right_len,
-                        RichCompareOperator::Le => left_len <= right_len,
-                        RichCompareOperator::Gt => left_len > right_len,
-                        RichCompareOperator::Ge => left_len >= right_len,
-                    },
-                ));
+                builder = builder.add(Type::bool_literal(match op {
+                    RichCompareOperator::Eq => left_len == right_len,
+                    RichCompareOperator::Ne => left_len != right_len,
+                    RichCompareOperator::Lt => left_len < right_len,
+                    RichCompareOperator::Le => left_len <= right_len,
+                    RichCompareOperator::Gt => left_len > right_len,
+                    RichCompareOperator::Ge => left_len >= right_len,
+                }));
 
                 Ok(builder.build())
             }
@@ -16273,9 +16255,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let ty_step = self.infer_optional_expression(step.as_deref(), TypeContext::default());
 
         let type_to_slice_argument = |ty: Option<Type<'db>>| match ty {
-            Some(ty @ Type::LiteralValue(literal))
-                if literal.is_int(self.db()) || literal.is_bool(self.db()) =>
-            {
+            Some(ty @ Type::LiteralValue(literal)) if literal.is_int() || literal.is_bool() => {
                 SliceArg::Arg(ty)
             }
             Some(ty @ Type::NominalInstance(instance))
@@ -16778,7 +16758,7 @@ impl StringPartsCollector {
         } else if let Some(concatenated) = self.concatenated {
             Type::string_literal(db, &concatenated)
         } else {
-            Type::literal_string(db)
+            Type::literal_string()
         }
     }
 }

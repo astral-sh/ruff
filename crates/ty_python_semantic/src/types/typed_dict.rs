@@ -1008,7 +1008,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     // Validate each key-value pair in the dictionary literal
     for item in &dict_expr.items {
         if let Some(key_expr) = &item.key
-            && let Some(key_str) = expression_type_fn(key_expr).as_string_literal(context.db())
+            && let Some(key_str) = expression_type_fn(key_expr).as_string_literal()
         {
             let key_str = key_str.value(context.db());
             provided_keys.insert(Name::new(key_str));

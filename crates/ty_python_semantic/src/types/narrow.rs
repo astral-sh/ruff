@@ -473,7 +473,7 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
             .iter()
             .any(|ty| could_compare_equal(db, left_ty, *ty)),
         (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-            match (left.kind(db), right.kind(db)) {
+            match (left.kind(), right.kind()) {
                 // Boolean literals and int literals are disjoint, and single valued, and yet
                 // `True == 1` and `False == 0`.
                 (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(i))
@@ -645,7 +645,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             Type::NominalInstance(instance) if instance.tuple_spec(db).is_some() => true,
             Type::LiteralValue(literal)
                 if matches!(
-                    literal.kind(db),
+                    literal.kind(),
                     LiteralValueTypeKind::String(_)
                         | LiteralValueTypeKind::LiteralString
                         | LiteralValueTypeKind::Bytes(_)
@@ -781,7 +781,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     // other string literal could compare equal to it), or it is not a string
                     // literal, in which case (given that it is single-valued), LiteralString
                     // cannot compare equal to it.
-                    Type::LiteralValue(literal) if literal.is_literal_string(db) => true,
+                    Type::LiteralValue(literal) if literal.is_literal_string() => true,
                     _ => !could_compare_equal(db, lhs_ty, rhs_ty),
                 }
             }
@@ -802,7 +802,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     {
                         UnionType::from_elements(
                             db,
-                            [Type::bool_literal(db, true), Type::bool_literal(db, false)]
+                            [Type::bool_literal(true), Type::bool_literal(false)]
                                 .into_iter()
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
@@ -839,24 +839,21 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        match (lhs_ty, rhs_ty.as_literal_value_kind(self.db)) {
+        match (lhs_ty, rhs_ty.as_literal_value_kind()) {
             (Type::NominalInstance(instance), Some(LiteralValueTypeKind::Int(i)))
                 if instance.has_known_class(self.db, KnownClass::Bool) =>
             {
                 if i.as_i64() == 0 {
-                    Some(Type::bool_literal(self.db, false).negate(self.db))
+                    Some(Type::bool_literal(false).negate(self.db))
                 } else if i.as_i64() == 1 {
-                    Some(Type::bool_literal(self.db, true).negate(self.db))
+                    Some(Type::bool_literal(true).negate(self.db))
                 } else {
                     None
                 }
             }
             (_, Some(LiteralValueTypeKind::Bool(b))) => Some(
-                UnionType::from_elements(
-                    self.db,
-                    [rhs_ty, Type::int_literal(self.db, i64::from(b))],
-                )
-                .negate(self.db),
+                UnionType::from_elements(self.db, [rhs_ty, Type::int_literal(i64::from(b))])
+                    .negate(self.db),
             ),
             _ if rhs_ty.is_single_valued(self.db) => Some(rhs_ty.negate(self.db)),
             _ => None,
@@ -889,7 +886,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         continue;
                     }
                     // Skip types that are handled specially (LiteralString, bool, enum).
-                    if element.is_literal_string(self.db)
+                    if element.is_literal_string()
                         || element.is_bool(self.db)
                         || (element.is_enum(self.db) && !element.overrides_equality(self.db))
                     {
@@ -930,7 +927,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
                     if element.is_single_valued(self.db)
-                        || element.is_literal_string(self.db)
+                        || element.is_literal_string()
                         || element.is_bool(self.db)
                         || (element.is_enum(self.db) && !element.overrides_equality(self.db))
                     {
@@ -1082,7 +1079,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && let Some(subscript_place_expr) = PlaceExpr::try_from_expr(&subscript.value)
             && let Some(index) = inference
                 .expression_type(&*subscript.slice)
-                .as_int_literal(self.db)
+                .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
             && rhs_ty.is_singleton(self.db)
@@ -1187,9 +1184,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //     if "foo" not in u:
         //         reveal_type(u)  # revealed: Bar
         if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
-            && let Some(key) = inference
-                .expression_type(&**left)
-                .as_string_literal(self.db)
+            && let Some(key) = inference.expression_type(&**left).as_string_literal()
             && let Some(rhs_place_expr) = PlaceExpr::try_from_expr(&comparators[0])
             && let rhs_type = inference.expression_type(&comparators[0])
             && is_or_contains_typeddict(self.db, rhs_type)
@@ -1416,7 +1411,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if function == KnownFunction::HasAttr {
                     let attr = inference
                         .expression_type(second_arg)
-                        .as_string_literal(self.db)?
+                        .as_string_literal()?
                         .value(self.db);
 
                     if !is_identifier(attr) {
@@ -1514,8 +1509,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let ty = match singleton {
             ast::Singleton::None => Type::none(self.db),
-            ast::Singleton::True => Type::bool_literal(self.db, true),
-            ast::Singleton::False => Type::bool_literal(self.db, false),
+            ast::Singleton::True => Type::bool_literal(true),
+            ast::Singleton::False => Type::bool_literal(false),
         };
         let ty = ty.negate_if(self.db, !is_positive);
         Some(NarrowingConstraints::from_iter([(
@@ -1721,8 +1716,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
-        let key_literal = subscript_key_type.as_string_literal(self.db)?;
-        if !is_supported_tag_literal(self.db, rhs_type) {
+        let key_literal = subscript_key_type.as_string_literal()?;
+        if !is_supported_tag_literal(rhs_type) {
             return None;
         }
 
@@ -1794,11 +1789,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         };
 
         // The subscript index must be an integer literal.
-        let index = subscript_index_type.as_int_literal(self.db)?;
+        let index = subscript_index_type.as_int_literal()?;
         let index = i32::try_from(index).ok()?;
 
         // The comparison value must be a supported literal type.
-        if !is_supported_tag_literal(self.db, rhs_type) {
+        if !is_supported_tag_literal(rhs_type) {
             return None;
         }
 
@@ -1896,9 +1891,9 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
-fn is_supported_tag_literal(db: &dyn Db, ty: Type) -> bool {
+fn is_supported_tag_literal(ty: Type) -> bool {
     matches!(
-        ty.as_literal_value_kind(db),
+        ty.as_literal_value_kind(),
         // TODO: We'd like to support `EnumLiteral` also, but we have to be careful with types like
         // `IntEnum` and `StrEnum` that have custom `__eq__` methods.
         Some(
@@ -1923,7 +1918,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         typeddict
             .items(db)
             .get(field_name)
-            .is_none_or(|field| is_supported_tag_literal(db, field.declared_ty))
+            .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
     };
 
     match ty {
@@ -2020,7 +2015,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
         elem.as_nominal_instance()
             .and_then(|inst| inst.tuple_spec(db))
             .and_then(|spec| spec.py_index(db, index).ok())
-            .is_none_or(|tag| is_supported_tag_literal(db, tag))
+            .is_none_or(is_supported_tag_literal)
     })
 }
 

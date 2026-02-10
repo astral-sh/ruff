@@ -1428,7 +1428,7 @@ impl<'db> ClassType<'db> {
                     .and_then(|spec| spec.tuple(db))
                     .and_then(|tuple| tuple.len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
-                    .map(|len| Type::int_literal(db, len))
+                    .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
                 let parameters = Parameters::new(
@@ -1564,9 +1564,7 @@ impl<'db> ClassType<'db> {
 
                                 let index_annotation = UnionType::from_elements(
                                     db,
-                                    indices
-                                        .into_iter()
-                                        .map(|index| Type::int_literal(db, index)),
+                                    indices.into_iter().map(Type::int_literal),
                                 );
 
                                 Some(synthesize_getitem_overload_signature(
@@ -5354,7 +5352,7 @@ impl<'db> DynamicClassLiteral<'db> {
                         spec.len().into_fixed_length().is_some_and(|len| len > 0)
                     }),
                     // __slots__ = "abc"  # Same as ("abc",)
-                    Type::LiteralValue(literal) if literal.is_string(db) => true,
+                    Type::LiteralValue(literal) if literal.is_string() => true,
                     // Other types are considered dynamic/unknown
                     _ => false,
                 };
@@ -8071,7 +8069,7 @@ impl KnownClass {
                 };
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
-                    DeprecatedInstance::new(db, message.as_string_literal(db)),
+                    DeprecatedInstance::new(db, message.as_string_literal()),
                 )));
             }
 
@@ -8091,7 +8089,7 @@ impl KnownClass {
                     return;
                 };
 
-                let Some(name) = name.as_string_literal(db) else {
+                let Some(name) = name.as_string_literal() else {
                     if let Some(builder) =
                         context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
                     {
@@ -8319,7 +8317,7 @@ impl SlotsKind {
             },
 
             // __slots__ = "abc"  # Same as `("abc",)`
-            Type::LiteralValue(literal) if literal.is_string(db) => Self::NotEmpty,
+            Type::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
 
             _ => Self::Dynamic,
         }
