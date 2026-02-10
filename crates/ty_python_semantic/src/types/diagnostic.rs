@@ -120,6 +120,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
+    registry.register_lint(&CALL_ABSTRACT_METHOD);
     registry.register_lint(&TYPE_ASSERTION_FAILURE);
     registry.register_lint(&ASSERT_TYPE_UNSPELLABLE_SUBTYPE);
     registry.register_lint(&TOO_MANY_POSITIONAL_ARGUMENTS);
@@ -2148,6 +2149,49 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for calls to abstract `@classmethod`s or `@staticmethod`s
+    /// with "trivial bodies" when accessed on the class object itself.
+    ///
+    /// "Trivial bodies" are bodies that solely consist of `...`, `pass`,
+    /// a docstring, and/or `raise NotImplementedError`.
+    ///
+    /// ## Why is this bad?
+    /// An abstract method with a trivial body has no concrete implementation
+    /// to execute, so calling such a method directly on the class will probably
+    /// not have the desired effect.
+    ///
+    /// It is also unsound to call these methods directly on the class. Unlike
+    /// other methods, ty permits abstract methods with trivial bodies to have
+    /// non-`None` return types even though they always return `None` at runtime.
+    /// This is because it is expected that these methods will always be
+    /// overridden rather than being called directly. As a result of this
+    /// exception to the normal rule, ty may infer an incorrect type if one of
+    /// these methods is called directly, which may then mean that type errors
+    /// elsewhere in your code go undetected by ty.
+    ///
+    /// Calling abstract classmethods or staticmethods via `type[X]` is allowed,
+    /// since the actual runtime type could be a concrete subclass with an implementation.
+    ///
+    /// ## Example
+    /// ```python
+    /// from abc import ABC, abstractmethod
+    ///
+    /// class Foo(ABC):
+    ///     @classmethod
+    ///     @abstractmethod
+    ///     def method(cls) -> int: ...
+    ///
+    /// Foo.method()  # Error: cannot call abstract classmethod
+    /// ```
+    pub(crate) static CALL_ABSTRACT_METHOD = {
+        summary: "detects calls to abstract methods with trivial bodies on class objects",
+        status: LintStatus::preview("0.0.16"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for methods that are decorated with `@override` but do not override any method in a superclass.
     ///
     /// ## Why is this bad?
@@ -4071,6 +4115,30 @@ pub(crate) fn report_attempted_protocol_instantiation(
             .message(format_args!("`{class_name}` declared as a protocol here")),
     );
     diagnostic.sub(class_def_diagnostic);
+}
+
+pub(crate) fn report_call_to_abstract_method(
+    context: &InferContext,
+    call: &ast::ExprCall,
+    function: FunctionType,
+    method_kind: &str,
+) {
+    let Some(builder) = context.report_lint(&CALL_ABSTRACT_METHOD, call) else {
+        return;
+    };
+    let db = context.db();
+    let name = function.name(db);
+    let mut diag = builder.into_diagnostic(format_args!("Cannot call `{name}` on class object"));
+    diag.set_primary_message(format_args!(
+        "`{name}` is an abstract {method_kind} with a trivial body"
+    ));
+    let spans = function.spans(db);
+    let mut sub = SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        format_args!("Method `{name}` defined here"),
+    );
+    sub.annotate(Annotation::primary(spans.name));
+    diag.sub(sub);
 }
 
 pub(crate) fn report_undeclared_protocol_member(
