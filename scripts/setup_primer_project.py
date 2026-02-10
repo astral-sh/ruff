@@ -1,4 +1,5 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+#
 # /// script
 # requires-python = ">=3.10"
 # dependencies = ["mypy-primer"]
@@ -6,6 +7,7 @@
 # [tool.uv.sources]
 # mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
 # ///
+
 """Clone a mypy-primer project and set up a virtualenv with its dependencies installed.
 
 Usage: uv run scripts/setup_primer_project.py <project-name> [directory]
