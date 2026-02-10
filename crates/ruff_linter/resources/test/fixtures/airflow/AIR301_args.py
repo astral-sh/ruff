@@ -309,3 +309,41 @@ PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None
 PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
 
 PythonOperator(task_id="valid_trigger_rule_task", python_callable=lambda: None, trigger_rule="all_success")
+
+from airflow.providers.common.sql.operators.sql import SQLExecuteQueryOperator
+
+execute_query = SQLExecuteQueryOperator(
+    task_id="execute_query",
+    sql="SELECT 1; SELECT * FROM AIRFLOW_DB_METADATA_TABLE LIMIT 1;",
+    split_statements=True,
+    return_last=False,
+    trigger_rule="none_failed_or_skipped",
+)
+
+execute_query = SQLExecuteQueryOperator(
+    task_id="execute_query",
+    sql="SELECT 1; SELECT * FROM AIRFLOW_DB_METADATA_TABLE LIMIT 1;",
+    split_statements=True,
+    return_last=False,
+    trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+)
+
+from airflow.providers.amazon.aws.operators.s3 import S3FileTransformOperator
+
+file_transform = S3FileTransformOperator(
+    task_id="file_transform",
+    source_s3_key="s3://bucket/key",
+    dest_s3_key="s3://bucket_2/key_2",
+    transform_script="cp",
+    replace=True,
+    trigger_rule="none_failed_or_skipped",
+)
+
+file_transform = S3FileTransformOperator(
+    task_id="file_transform",
+    source_s3_key="s3://bucket/key",
+    dest_s3_key="s3://bucket_2/key_2",
+    transform_script="cp",
+    replace=True,
+    trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+)

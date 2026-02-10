@@ -653,3 +653,78 @@ help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
 309 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
 310 | 
 311 | PythonOperator(task_id="valid_trigger_rule_task", python_callable=lambda: None, trigger_rule="all_success")
+312 | 
+
+AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
+   --> AIR301_args.py:320:18
+    |
+318 |     split_statements=True,
+319 |     return_last=False,
+320 |     trigger_rule="none_failed_or_skipped",
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^
+321 | )
+    |
+help: Use `none_failed_min_one_success` instead
+317 |     sql="SELECT 1; SELECT * FROM AIRFLOW_DB_METADATA_TABLE LIMIT 1;",
+318 |     split_statements=True,
+319 |     return_last=False,
+    -     trigger_rule="none_failed_or_skipped",
+320 +     trigger_rule="none_failed_min_one_success",
+321 | )
+322 | 
+323 | execute_query = SQLExecuteQueryOperator(
+
+AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   --> AIR301_args.py:328:18
+    |
+326 |     split_statements=True,
+327 |     return_last=False,
+328 |     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+329 | )
+    |
+help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
+325 |     sql="SELECT 1; SELECT * FROM AIRFLOW_DB_METADATA_TABLE LIMIT 1;",
+326 |     split_statements=True,
+327 |     return_last=False,
+    -     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+328 +     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
+329 | )
+330 | 
+331 | from airflow.providers.amazon.aws.operators.s3 import S3FileTransformOperator
+
+AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
+   --> AIR301_args.py:339:18
+    |
+337 |     transform_script="cp",
+338 |     replace=True,
+339 |     trigger_rule="none_failed_or_skipped",
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^
+340 | )
+    |
+help: Use `none_failed_min_one_success` instead
+336 |     dest_s3_key="s3://bucket_2/key_2",
+337 |     transform_script="cp",
+338 |     replace=True,
+    -     trigger_rule="none_failed_or_skipped",
+339 +     trigger_rule="none_failed_min_one_success",
+340 | )
+341 | 
+342 | file_transform = S3FileTransformOperator(
+
+AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   --> AIR301_args.py:348:18
+    |
+346 |     transform_script="cp",
+347 |     replace=True,
+348 |     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+349 | )
+    |
+help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
+345 |     dest_s3_key="s3://bucket_2/key_2",
+346 |     transform_script="cp",
+347 |     replace=True,
+    -     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+348 +     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
+349 | )
