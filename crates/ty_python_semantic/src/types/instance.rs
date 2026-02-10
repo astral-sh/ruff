@@ -786,12 +786,13 @@ impl<'db> ProtocolInstanceType<'db> {
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
-    /// TODO: consider the types of the members as well as their existence
+    /// Two protocol types are equivalent if their interfaces are mutually subtypes
+    /// of each other.
     pub(super) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
+        inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -801,7 +802,37 @@ impl<'db> ProtocolInstanceType<'db> {
         if self_normalized == Type::ProtocolInstance(other) {
             return ConstraintSet::from(true);
         }
-        ConstraintSet::from(self_normalized == other.normalized(db))
+        if self_normalized == other.normalized(db) {
+            return ConstraintSet::from(true);
+        }
+
+        // Fall back to checking mutual subtyping of the interfaces.
+        // This handles cases like Attribute(T) ≡ Property{get: T, set: T}.
+        let self_interface = self.interface(db);
+        let other_interface = other.interface(db);
+        let relation = TypeRelation::Subtyping;
+        let relation_visitor = HasRelationToVisitor::default();
+        let disjointness_visitor = IsDisjointVisitor::default();
+
+        self_interface
+            .has_relation_to_impl(
+                db,
+                other_interface,
+                inferable,
+                relation,
+                &relation_visitor,
+                &disjointness_visitor,
+            )
+            .and(db, || {
+                other_interface.has_relation_to_impl(
+                    db,
+                    self_interface,
+                    inferable,
+                    relation,
+                    &relation_visitor,
+                    &disjointness_visitor,
+                )
+            })
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
