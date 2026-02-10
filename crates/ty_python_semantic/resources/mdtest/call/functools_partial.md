@@ -617,3 +617,51 @@ takes_wrong_callable(p)  # error: [invalid-argument-type]
 def returns_partial() -> partial[bool]:
     return p  # OK -- partial[(b: str) -> bool] is assignable to partial[bool]
 ```
+
+## Accessing `__call__` directly
+
+`__call__` on a `partial` result should reflect the refined callable signature, not the broad
+`(*args: Any, **kwargs: Any) -> T` from the `partial` class stub.
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, 1)
+reveal_type(p.__call__)  # revealed: (b: str) -> bool
+
+reveal_type(p.__call__("hello"))  # revealed: bool
+```
+
+## Attribute access on partial results
+
+Standard `partial` attributes like `.func`, `.args`, and `.keywords` should be accessible:
+
+```py
+from functools import partial
+from typing import Callable
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, 1)
+reveal_type(p.func)  # revealed: (...) -> bool
+reveal_type(p.args)  # revealed: tuple[Any, ...]
+reveal_type(p.keywords)  # revealed: dict[str, Any]
+```
+
+## Attribute assignment on partial results
+
+Attribute assignment should go through the standard nominal instance path:
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, 1)
+p.func = f  # error: [invalid-assignment]
+```

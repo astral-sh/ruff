@@ -6051,19 +6051,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 false
             }
-            Type::PartialCallable(_) => {
-                infer_value_ty(self, TypeContext::default());
-
-                if emit_diagnostics
-                    && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Cannot assign to attribute `{attribute}` on type `{}`",
-                        object_ty.display(self.db()),
-                    ));
-                }
-                false
-            }
+            Type::PartialCallable(partial) => self.validate_attribute_assignment(
+                target,
+                Type::NominalInstance(partial.instance(db)),
+                attribute,
+                &mut infer_value_ty,
+                emit_diagnostics,
+            ),
 
             Type::Dynamic(..) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());

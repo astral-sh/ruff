@@ -3574,6 +3574,10 @@ impl<'db> Type<'db> {
                     .unwrap_or(owner_attr)
             }
 
+            Type::PartialCallable(partial) if name_str == "__call__" => {
+                Place::bound(Type::Callable(partial.callable(db))).into()
+            }
+
             Type::PartialCallable(partial) => Type::NominalInstance(partial.instance(db))
                 .member_lookup_with_policy(db, name, policy),
         }
