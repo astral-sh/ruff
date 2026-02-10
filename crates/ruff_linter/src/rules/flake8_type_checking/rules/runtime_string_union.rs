@@ -7,7 +7,6 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::{Edit, Fix, FixAvailability};
-use anyhow::Result;
 
 /// ## What it does
 /// Checks for the presence of string literals in `X | Y`-style union types.
@@ -107,11 +106,9 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     let fix = if has_bytes {
         None
     } else if checker.settings().flake8_type_checking.quote_annotations {
-        quote_union(checker, &strings, expr).ok().flatten()
+        quote_union(checker, &strings, expr)
     } else {
         unquote_and_add_future_import(checker, &strings)
-            .ok()
-            .flatten()
     };
 
     if !strings.is_empty() {
@@ -147,7 +144,7 @@ fn traverse_op<'a>(expr: &'a Expr, strings: &mut Vec<&'a Expr>, has_bytes: &mut 
     }
 }
 
-fn unquote_and_add_future_import(checker: &Checker, strings: &[&Expr]) -> Result<Option<Fix>> {
+fn unquote_and_add_future_import(checker: &Checker, strings: &[&Expr]) -> Option<Fix> {
     let mut edits = vec![];
     for string_expr in strings {
         if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = string_expr {
@@ -162,14 +159,14 @@ fn unquote_and_add_future_import(checker: &Checker, strings: &[&Expr]) -> Result
         edits.push(future_import);
     }
     if edits.is_empty() {
-        return Ok(None);
+        return None;
     }
     let mut edits_iter = edits.into_iter();
     let first = edits_iter.next().expect("Empty edits");
-    Ok(Some(Fix::unsafe_edits(first, edits_iter)))
+    Some(Fix::unsafe_edits(first, edits_iter))
 }
 
-fn quote_union(checker: &Checker, strings: &[&Expr], union_expr: &Expr) -> Result<Option<Fix>> {
+fn quote_union(checker: &Checker, strings: &[&Expr], union_expr: &Expr) -> Option<Fix> {
     let mut union_text = checker.locator().slice(union_expr.range()).to_string();
     let mut unquoted: Vec<_> = strings
         .iter()
@@ -189,10 +186,10 @@ fn quote_union(checker: &Checker, strings: &[&Expr], union_expr: &Expr) -> Resul
         union_text.replace_range(start..end, value);
     }
     let quoted_union = format!("\"{union_text}\"");
-    Ok(Some(Fix::safe_edit(Edit::range_replacement(
+    Some(Fix::safe_edit(Edit::range_replacement(
         quoted_union,
         union_expr.range(),
-    ))))
+    )))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
