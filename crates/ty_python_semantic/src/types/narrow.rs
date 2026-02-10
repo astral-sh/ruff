@@ -1117,29 +1117,28 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
             let constrain_with_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
 
-            // Check if left is a subscript.
-            if let ast::Expr::Subscript(subscript) = &**left {
-                if let Some((place, constraint)) = self.narrow_typeddict_subscript(
-                    inference.expression_type(&*subscript.value),
-                    &subscript.value,
-                    inference.expression_type(&*subscript.slice),
-                    inference.expression_type(&comparators[0]),
-                    constrain_with_equality,
-                ) {
-                    constraints
-                        .entry(place)
-                        .and_modify(|existing| {
-                            *existing = existing.merge_constraint_and(constraint.clone(), self.db);
-                        })
-                        .or_insert(constraint);
-                }
+            let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
+                let value_type = inference.expression_type(&*subscript.value);
+                let slice_type = inference.expression_type(&*subscript.slice);
 
-                // Narrow tagged unions of tuples with `Literal` elements.
-                if let Some((place, constraint)) = self.narrow_tuple_subscript(
-                    inference.expression_type(&*subscript.value),
+                if let Some((place, constraint)) = self.narrow_typeddict_subscript(
+                    value_type,
                     &subscript.value,
-                    inference.expression_type(&*subscript.slice),
-                    inference.expression_type(&comparators[0]),
+                    slice_type,
+                    other_type,
+                    constrain_with_equality,
+                ) {
+                    constraints
+                        .entry(place)
+                        .and_modify(|existing| {
+                            *existing = existing.merge_constraint_and(constraint.clone(), self.db);
+                        })
+                        .or_insert(constraint);
+                } else if let Some((place, constraint)) = self.narrow_tuple_subscript(
+                    value_type,
+                    &subscript.value,
+                    slice_type,
+                    other_type,
                     constrain_with_equality,
                 ) {
                     constraints
@@ -1149,40 +1148,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         })
                         .or_insert(constraint);
                 }
+            };
+
+            if let ast::Expr::Subscript(subscript) = &**left {
+                narrow_subscript(subscript, inference.expression_type(&comparators[0]));
             }
 
-            // Check if right (comparator) is a subscript.
             if let ast::Expr::Subscript(subscript) = &comparators[0] {
-                if let Some((place, constraint)) = self.narrow_typeddict_subscript(
-                    inference.expression_type(&*subscript.value),
-                    &subscript.value,
-                    inference.expression_type(&*subscript.slice),
-                    inference.expression_type(&**left),
-                    constrain_with_equality,
-                ) {
-                    constraints
-                        .entry(place)
-                        .and_modify(|existing| {
-                            *existing = existing.merge_constraint_and(constraint.clone(), self.db);
-                        })
-                        .or_insert(constraint);
-                }
-
-                // Narrow tagged unions of tuples with `Literal` elements.
-                if let Some((place, constraint)) = self.narrow_tuple_subscript(
-                    inference.expression_type(&*subscript.value),
-                    &subscript.value,
-                    inference.expression_type(&*subscript.slice),
-                    inference.expression_type(&**left),
-                    constrain_with_equality,
-                ) {
-                    constraints
-                        .entry(place)
-                        .and_modify(|existing| {
-                            *existing = existing.merge_constraint_and(constraint.clone(), self.db);
-                        })
-                        .or_insert(constraint);
-                }
+                narrow_subscript(subscript, inference.expression_type(&**left));
             }
         }
 
@@ -2120,12 +2093,11 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
         // For subscript expressions on either side, the subscript base can also be narrowed.
         // (TypedDict and tuple discriminated union narrowing.)
         for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
-            if let ast::Expr::Subscript(subscript) = expr {
-                if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
-                    if let Some(place) = self.places.place_id((&place_expr).into()) {
-                        places.insert(place);
-                    }
-                }
+            if let ast::Expr::Subscript(subscript) = expr
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
             }
         }
 
