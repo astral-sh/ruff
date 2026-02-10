@@ -600,10 +600,19 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     continue;
                 }
 
-                // Found the scope where the symbol is actually bound.
-                if enclosing_symbol.is_bound() {
-                    modifications.push((enclosing_scope_id, enclosing_symbol_id));
+                // A `global` declaration is a resolution barrier; stop walking.
+                if enclosing_symbol.is_global() {
+                    break;
                 }
+
+                // Skip scopes where the symbol is only a free variable (used but
+                // not bound or declared); the real target is further out.
+                if !enclosing_symbol.is_bound() && !enclosing_symbol.is_declared() {
+                    continue;
+                }
+
+                // Found the scope where the symbol is locally bound or declared.
+                modifications.push((enclosing_scope_id, enclosing_symbol_id));
                 break;
             }
         }

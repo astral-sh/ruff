@@ -394,6 +394,32 @@ async def main() -> None:
     reveal_type(count)  # revealed: Literal[0] | Unknown
 ```
 
+With an intermediate scope that only uses (but doesn't bind) the name:
+
+```py
+def f():
+    x = 1
+    def g():
+        # `g` only reads `x`; it's a free variable here, not a binding.
+        reveal_type(x)  # revealed: Literal[1]
+        def h():
+            nonlocal x
+            x += 1
+    reveal_type(x)  # revealed: Literal[1] | Unknown
+```
+
+With a declaration-only nonlocal target (annotation without binding), the `ExternallyModified`
+binding widens the type:
+
+```py
+def f():
+    x: int
+    def g():
+        nonlocal x
+        x = 1
+    x  # error: [possibly-unresolved-reference]
+```
+
 ## Annotating a `nonlocal` binding is a syntax error
 
 ```py
