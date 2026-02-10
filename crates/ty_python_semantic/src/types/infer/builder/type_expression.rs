@@ -61,16 +61,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation_ty
     }
 
-    /// Similar to [`infer_type_expression`], but accepts an optional expression.
-    ///
-    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression_with_state
-    pub(super) fn infer_optional_type_expression(
-        &mut self,
-        expression: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
-        expression.map(|expr| self.infer_type_expression(expr))
-    }
-
     fn report_invalid_type_expression(
         &self,
         expression: &ast::Expr,
