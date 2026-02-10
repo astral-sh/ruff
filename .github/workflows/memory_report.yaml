@@ -1,4 +1,4 @@
-name: Run typing conformance
+name: Run memory report
 
 permissions: {}
 
@@ -14,8 +14,8 @@ on:
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
-      - "scripts/conformance.py"
-      - ".github/workflows/typing_conformance.yaml"
+      - "scripts/memory_report.py"
+      - ".github/workflows/memory_report.yaml"
       - "Cargo.lock"
       - "!**.md"
 
@@ -29,26 +29,18 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: f98d75ebb241d6f49e1a985a4f259f46b2056626
-  PYTHON_VERSION: 3.12
+  PYTHON_VERSION: 3.14
 
 jobs:
-  typing_conformance:
-    name: Compute diagnostic diff
+  memory_report:
+    name: Compute memory usage diff
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
           fetch-depth: 0
-          persist-credentials: false
-
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          repository: python/typing
-          ref: ${{ env.CONFORMANCE_SUITE_COMMIT }}
-          path: typing
           persist-credentials: false
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
@@ -62,8 +54,12 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Compute diagnostic diff
+      - name: Compute memory usage diff
         shell: bash
+        env:
+          TY_MEMORY_REPORT: json
+          # Disabling multithreading improves the stability of memory usage numbers.
+          TY_MAX_PARALLELISM: 1
         run: |
           # Build the executable for the old and new commit
           (
@@ -71,28 +67,27 @@ jobs:
 
             echo "new commit"
             git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
-            cargo build --bin ty
-            mv target/debug/ty ty-new
+            cargo build --bin ty --profile profiling
+            mv target/profiling/ty ty-new
 
             MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
             git checkout -b old_commit "$MERGE_BASE"
             echo "old commit (merge base)"
             git rev-list --format=%s --max-count=1 old_commit
-            cargo build --bin ty
-            mv target/debug/ty ty-old
+            cargo build --bin ty --profile profiling
+            mv target/profiling/ty ty-old
           )
 
           (
-            echo "Creating comment with conformance comparison"
+            echo "Creating comment with memory comparison"
             cd ruff
             git switch - --detach
 
-            python "./scripts/conformance.py" \
-             --old-ty "./ty-old" \
-             --new-ty "./ty-new" \
-             --tests-path "${GITHUB_WORKSPACE}/typing/conformance/" \
-             --python-version "$PYTHON_VERSION" \
-             --output ../typing_conformance_diagnostics.diff
+            python "./scripts/memory_report.py" run \
+              --old-ty "./ty-old" \
+              --new-ty "./ty-new" \
+              --projects-dir "${GITHUB_WORKSPACE}/memory_projects" \
+              --output ../memory_report_diff.diff
           )
 
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
@@ -100,5 +95,5 @@ jobs:
       - name: Upload diff
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: typing_conformance_diagnostics_diff
-          path: typing_conformance_diagnostics.diff
+          name: memory_report_diff
+          path: memory_report_diff.diff
