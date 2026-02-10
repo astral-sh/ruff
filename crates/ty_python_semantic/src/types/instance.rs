@@ -142,7 +142,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -435,7 +435,7 @@ impl<'db> NominalInstanceType<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

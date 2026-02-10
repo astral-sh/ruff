@@ -131,7 +131,7 @@ impl<'db> TypedDictType<'db> {
         db: &'db dyn Db,
         target: TypedDictType<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

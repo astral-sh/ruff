@@ -18,7 +18,7 @@ use crate::{
 
 /// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
-pub(crate) enum TypeRelation<'db> {
+pub(crate) enum TypeRelation {
     /// The "subtyping" relation.
     ///
     /// A [fully static] type `B` is a subtype of a fully static type `A` if and only if
@@ -189,7 +189,7 @@ pub(crate) enum TypeRelation<'db> {
     ///   subtype check will be vacuously true, even if you're comparing two concrete types that
     ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
     ///   will return true!)
-    SubtypingAssuming(ConstraintSet<'db>),
+    SubtypingAssuming,
 
     /// A placeholder for the new assignability relation that uses constraint sets to encode
     /// relationships with a typevar. This will eventually replace `Assignability`, but allows us
@@ -197,7 +197,7 @@ pub(crate) enum TypeRelation<'db> {
     ConstraintSetAssignability,
 }
 
-impl TypeRelation<'_> {
+impl TypeRelation {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
     }
@@ -215,7 +215,7 @@ impl TypeRelation<'_> {
             TypeRelation::Assignability
             | TypeRelation::ConstraintSetAssignability
             | TypeRelation::Redundancy { .. } => true,
-            TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
+            TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
                 ty.subtyping_is_always_reflexive()
             }
         }
@@ -252,11 +252,13 @@ impl<'db> Type<'db> {
         assuming: ConstraintSet<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
-        self.has_relation_to(
+        self.has_relation_to_impl(
             db,
             target,
             inferable,
-            TypeRelation::SubtypingAssuming(assuming),
+            TypeRelation::SubtypingAssuming,
+            &HasRelationToVisitor::with_given(assuming),
+            &IsDisjointVisitor::default(),
         )
     }
 
@@ -333,7 +335,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
@@ -350,7 +352,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -365,10 +367,11 @@ impl<'db> Type<'db> {
 
         // Handle constraint implication first. If either `self` or `target` is a typevar, check
         // the constraint set to see if the corresponding constraint is satisfied.
-        if let TypeRelation::SubtypingAssuming(constraints) = relation
+        if relation == TypeRelation::SubtypingAssuming
             && (self.is_type_var() || target.is_type_var())
         {
-            return constraints.implies_subtype_of(db, self, target);
+            let given = relation_visitor.extra;
+            return given.implies_subtype_of(db, self, target);
         }
 
         // Handle the new constraint-set-based assignability relation next. Comparisons with a
@@ -471,7 +474,7 @@ impl<'db> Type<'db> {
                     "DynamicType::Divergent should have been handled in an earlier branch"
                 );
                 ConstraintSet::from(match relation {
-                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
+                    TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
                     TypeRelation::Redundancy { .. } => match target {
                         Type::Dynamic(_) => true,
@@ -481,7 +484,7 @@ impl<'db> Type<'db> {
                 })
             }
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
-                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
+                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => false,
                 TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
                 TypeRelation::Redundancy { .. } => match self {
                     Type::Dynamic(_) => true,
@@ -823,7 +826,7 @@ impl<'db> Type<'db> {
                     let self_ty = match relation {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy { .. }
-                        | TypeRelation::SubtypingAssuming(_) => self,
+                        | TypeRelation::SubtypingAssuming => self,
                         TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                             self.bottom_materialization(db)
                         }
@@ -832,7 +835,7 @@ impl<'db> Type<'db> {
                         let neg_ty = match relation {
                             TypeRelation::Subtyping
                             | TypeRelation::Redundancy { .. }
-                            | TypeRelation::SubtypingAssuming(_) => neg_ty,
+                            | TypeRelation::SubtypingAssuming => neg_ty,
                             TypeRelation::Assignability
                             | TypeRelation::ConstraintSetAssignability => {
                                 neg_ty.bottom_materialization(db)
@@ -2456,12 +2459,24 @@ impl<'db> Type<'db> {
 }
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db> =
-    CycleDetector<TypeRelation<'db>, (Type<'db>, Type<'db>, TypeRelation<'db>), ConstraintSet<'db>>;
+pub(crate) type HasRelationToVisitor<'db> = CycleDetector<
+    TypeRelation,
+    (Type<'db>, Type<'db>, TypeRelation),
+    ConstraintSet<'db>,
+    ConstraintSet<'db>,
+>;
 
 impl Default for HasRelationToVisitor<'_> {
     fn default() -> Self {
-        HasRelationToVisitor::new(ConstraintSet::from(true))
+        let given = ConstraintSet::from(false);
+        Self::with_given(given)
+    }
+}
+
+impl<'db> HasRelationToVisitor<'db> {
+    pub(crate) fn with_given(given: ConstraintSet<'db>) -> Self {
+        let fallback = ConstraintSet::from(true);
+        HasRelationToVisitor::with_extra(fallback, given)
     }
 }
 

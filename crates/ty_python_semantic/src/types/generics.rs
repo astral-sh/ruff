@@ -1074,7 +1074,7 @@ fn has_relation_in_invariant_position<'db>(
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
     inferable: InferableTypeVars<'_, 'db>,
-    relation: TypeRelation<'db>,
+    relation: TypeRelation,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
@@ -1128,7 +1128,7 @@ fn has_relation_in_invariant_position<'db>(
             Some(base_mat),
             TypeRelation::Subtyping
             | TypeRelation::Redundancy { .. }
-            | TypeRelation::SubtypingAssuming(_),
+            | TypeRelation::SubtypingAssuming,
         ) => is_subtype_in_invariant_position(
             db,
             derived_type,
@@ -1144,7 +1144,7 @@ fn has_relation_in_invariant_position<'db>(
             None,
             TypeRelation::Subtyping
             | TypeRelation::Redundancy { .. }
-            | TypeRelation::SubtypingAssuming(_),
+            | TypeRelation::SubtypingAssuming,
         ) => is_subtype_in_invariant_position(
             db,
             derived_type,
@@ -1467,7 +1467,7 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

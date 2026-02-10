@@ -292,7 +292,7 @@ impl<'db> ProtocolInterface<'db> {
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -710,7 +710,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
         db: &'db dyn Db,
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {

@@ -291,7 +291,7 @@ impl<'db> CallableSignature<'db> {
         db: &'db dyn Db,
         other: &Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -352,7 +352,7 @@ impl<'db> CallableSignature<'db> {
         self_signatures: &[Signature<'db>],
         other_signature: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
     ) -> Option<ConstraintSet<'db>> {
         let single_required_positional_parameter_type = |signature: &Signature<'db>| {
             if signature.parameters().len() != 1 {
@@ -444,7 +444,7 @@ impl<'db> CallableSignature<'db> {
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -1077,7 +1077,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -1120,7 +1120,7 @@ impl<'db> Signature<'db> {
         db: &'db dyn Db,
         other: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
+        relation: TypeRelation,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -1258,7 +1258,7 @@ impl<'db> Signature<'db> {
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
             return match relation {
-                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
+                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
                     ConstraintSet::from(false)
                 }
                 TypeRelation::Redundancy { .. } => result.intersect(
