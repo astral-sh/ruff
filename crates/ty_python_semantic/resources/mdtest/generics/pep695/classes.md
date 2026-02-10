@@ -118,6 +118,27 @@ reveal_mro(Baz)
 reveal_mro(Baz[int])
 ```
 
+## Class keyword arguments
+
+Class keyword arguments are evaluated inside the type-parameter scope, so they must be resolved
+cross-scope when validating against `__init_subclass__`:
+
+```py
+from typing import TypedDict
+
+class Base:
+    def __init_subclass__(cls, *, setting: int) -> None: ...
+
+class Valid[T](Base, setting=1): ...
+class InvalidType[T](Base, setting="x"): ...  # error: [invalid-argument-type]
+class Fine[T](TypedDict, total=True): ...
+class NotFine[T](TypedDict, total=None): ...  # error: [invalid-argument-type]
+
+def _(kwargs: dict[str, int], bad_kwargs: dict[str, str]):
+    class AlsoFine[T](Base, **kwargs): ...
+    class AlsoNotFine[T](Base, **bad_kwargs): ...  # error: [invalid-argument-type]
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
