@@ -17,6 +17,7 @@ use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
+    overload_co_definitions_for_function,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
@@ -445,6 +446,7 @@ impl GotoTarget<'_> {
                         .into_iter()
                         .flatten(),
                 );
+                defs.extend(overload_co_definitions_for_function(model, function));
                 Some(defs)
             }
 
