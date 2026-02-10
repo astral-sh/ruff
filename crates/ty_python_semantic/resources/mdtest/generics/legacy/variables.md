@@ -226,12 +226,11 @@ U = TypeVar("U", int, str, default=bool)
 V = TypeVar("V", int, str, default=Any)
 ```
 
-#### TypeVar default with a bounded outer
+#### Default TypeVar's bound must be assignable to the outer bound
 
 <!-- snapshot-diagnostics -->
 
-When the default is a TypeVar, the default TypeVar's upper bound must be assignable to the outer
-TypeVar's bound:
+When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
 
 ```py
 from typing import Generic, TypeVar
@@ -248,7 +247,7 @@ S = TypeVar("S", default=T1, bound=float)
 U = TypeVar("U", default=T3, bound=float)
 ```
 
-#### Unbounded TypeVar default with bounded outer
+#### An unbounded default TypeVar has an implicit `object` bound
 
 <!-- snapshot-diagnostics -->
 
@@ -264,11 +263,11 @@ T1 = TypeVar("T1")
 S = TypeVar("S", default=T1, bound=int)
 ```
 
-#### TypeVar default with bounded outer (constrained default)
+#### A constrained default TypeVar's constraints must all be assignable to the outer bound
 
 <!-- snapshot-diagnostics -->
 
-When the default TypeVar has constraints, all constraints must be assignable to the outer bound:
+When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
 
 ```py
 from typing import Generic, TypeVar
@@ -288,11 +287,12 @@ U = TypeVar("U", default=T1, bound=int)
 V = TypeVar("V", default=T2, bound=int)
 ```
 
-#### TypeVar default with constrained outer (constrained default)
+#### A constrained default TypeVar's constraints must be a subset of the outer constraints
 
 <!-- snapshot-diagnostics -->
 
-When the default has constraints, the outer's constraints must be a superset:
+When the default TypeVar has constraints, they must all appear in the outer TypeVar's constraint
+list:
 
 ```py
 from typing import Generic, TypeVar
@@ -308,12 +308,12 @@ S = TypeVar("S", int, str, bool, default=T1)
 U = TypeVar("U", bool, complex, default=T1)
 ```
 
-#### TypeVar default with constrained outer (non-constrained default)
+#### A non-constrained default TypeVar is incompatible with a constrained outer TypeVar
 
 <!-- snapshot-diagnostics -->
 
-A non-constrained TypeVar (bounded or unbounded) is incompatible as the default for a constrained
-TypeVar:
+A bounded or unbounded TypeVar (one without constraints) cannot be used as the default for a
+constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
 
 ```py
 from typing import Generic, TypeVar

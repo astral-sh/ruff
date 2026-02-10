@@ -94,10 +94,9 @@ def h[T: (int, str) = bool](): ...
 def i[T: (int, str) = Any](): ...
 ```
 
-#### TypeVar default with a bounded outer
+#### Default TypeVar's bound must be assignable to the outer bound
 
-When the default is a TypeVar, the default TypeVar's upper bound must be assignable to the outer
-TypeVar's bound:
+When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
 
 ```py
 from typing import TypeVar
@@ -105,13 +104,16 @@ from typing import TypeVar
 T1 = TypeVar("T1", bound=int)
 T3 = TypeVar("T3", bound=str)
 
+# OK: `float` in a type expression means `int | float`,
+# and the upper bound of `T1` (`int`) is assignable to `int | float`
 def f[S: float = T1](): ...
 
+# `T3` has bound `str`, which is not assignable to `int | float`
 # error: [invalid-type-variable-default] "Default type `T3` is not assignable to bound `int | float`"
 def g[U: float = T3](): ...
 ```
 
-#### Unbounded TypeVar default with bounded outer
+#### An unbounded default TypeVar has an implicit `object` bound
 
 An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
 restrictive bound:
@@ -125,9 +127,9 @@ T1 = TypeVar("T1")
 def f[S: int = T1](): ...
 ```
 
-#### TypeVar default with bounded outer (constrained default)
+#### A constrained default TypeVar's constraints must all be assignable to the outer bound
 
-When the default TypeVar has constraints, all constraints must be assignable to the outer bound:
+When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
 
 ```py
 from typing import TypeVar
@@ -135,10 +137,16 @@ from typing import TypeVar
 T1 = TypeVar("T1", int, str)
 T2 = TypeVar("T2", int, bool)
 
+# OK: `T1`'s constraints are `int` and `str`,
+# which are both assignable to `object`
 def f[S: object = T1](): ...
 
+# `T1` has constraint `str`, which is not assignable to bound `int`
 # error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
 def g[U: int = T1](): ...
+
+# OK: `T2`'s constraints are `int` and `bool`,
+# which are both assignable to `int`
 def h[V: int = T2](): ...
 ```
 
@@ -147,27 +155,36 @@ def h[V: int = T2](): ...
 PEP 695 type parameters from the same scope can be used as defaults:
 
 ```py
+# OK: `T` has bound `int`, which is assignable to `int`
 def f[T: int, U: int = T](): ...
 
+# `T` has bound `int`, which is not assignable to `str`
 # error: [invalid-type-variable-default] "Default type `T` is not assignable to bound `str`"
 def g[T: int, U: str = T](): ...
+
+# OK: `T`'s constraints ({int, str}) are a subset of `U`'s ({int, str, bool})
 def h[T: (int, str), U: (int, str, bool) = T](): ...
 
+# `T` has constraint `int` which is not one of `U`'s constraints ({bool, complex})
 # error: [invalid-type-variable-default]
 def i[T: (int, str), U: (bool, complex) = T](): ...
 ```
 
-#### TypeVar default with constrained outer (constrained default)
+#### A constrained default TypeVar's constraints must be a subset of the outer constraints
 
-When the default has constraints, the outer's constraints must be a superset:
+When the default TypeVar has constraints, they must all appear in the outer TypeVar's constraint
+list:
 
 ```py
 from typing import TypeVar
 
 T1 = TypeVar("T1", int, str)
 
+# OK: `T1`'s constraints ({int, str}) are a subset
+# of `S`'s constraints ({int, str, bool})
 def f[S: (int, str, bool) = T1](): ...
 
+# `T1` has constraint `int` which is not one of `U`'s constraints ({bool, complex})
 # error: [invalid-type-variable-default]
 def g[U: (bool, complex) = T1](): ...
 ```
@@ -182,10 +199,10 @@ When a TypeVar has fewer than two constraints (already invalid), we should not a
 def f[T: (int,) = str](): ...
 ```
 
-#### TypeVar default with constrained outer (non-constrained default)
+#### A non-constrained default TypeVar is incompatible with a constrained outer TypeVar
 
-A non-constrained TypeVar (bounded or unbounded) is incompatible as the default for a constrained
-TypeVar:
+A bounded or unbounded TypeVar (one without constraints) cannot be used as the default for a
+constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
 
 ```py
 from typing import TypeVar
@@ -193,9 +210,11 @@ from typing import TypeVar
 T1 = TypeVar("T1", bound=int)
 T2 = TypeVar("T2")
 
+# `T1` has a bound but no constraints
 # error: [invalid-type-variable-default]
 def f[S: (float, str) = T1](): ...
 
+# `T2` has no bound or constraints
 # error: [invalid-type-variable-default]
 def g[U: (str, bytes) = T2](): ...
 ```

@@ -4,7 +4,7 @@ expression: snapshot
 ---
 
 ---
-mdtest name: variables.md - Legacy type variables - Type variables - Invalid defaults - TypeVar default with a bounded outer
+mdtest name: variables.md - Legacy type variables - Type variables - Invalid defaults - Default TypeVar's bound must be assignable to the outer bound
 mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variables.md
 ---
 

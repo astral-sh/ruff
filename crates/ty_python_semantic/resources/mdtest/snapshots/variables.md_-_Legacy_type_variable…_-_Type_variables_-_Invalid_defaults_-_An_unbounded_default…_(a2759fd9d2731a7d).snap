@@ -4,7 +4,7 @@ expression: snapshot
 ---
 
 ---
-mdtest name: variables.md - Legacy type variables - Type variables - Invalid defaults - Unbounded TypeVar default with bounded outer
+mdtest name: variables.md - Legacy type variables - Type variables - Invalid defaults - An unbounded default TypeVar has an implicit `object` bound
 mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variables.md
 ---
 
