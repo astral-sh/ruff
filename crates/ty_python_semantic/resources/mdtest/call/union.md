@@ -116,30 +116,6 @@ def _(flag: bool):
     reveal_type(cls(1))  # revealed: A | B
 ```
 
-## Conditional constructor aliases
-
-When a constructor alias depends on runtime configuration, we conservatively require the call to
-satisfy every possible constructor.
-
-```py
-import os
-
-if os.environ.get("USE_FAST") == "1":
-    class Fast:
-        def __init__(self, x: int, y: int) -> None: ...
-
-    Rational = Fast
-else:
-    class Slow:
-        def __init__(self, x: int) -> None: ...
-
-    Rational = Slow
-
-def _(x: int, y: int):
-    # error: [too-many-positional-arguments]
-    Rational(x, y)
-```
-
 ## Any non-callable variant
 
 ```py

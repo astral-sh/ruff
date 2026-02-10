@@ -4693,8 +4693,7 @@ impl<'db> Type<'db> {
     }
 
     // Build bindings for constructor calls by combining `__new__`/`__init__` signatures.
-    // `self` is used only for original `callable_type` for error reporting; `class` (unpacked by
-    // the caller from e.g. a `ClassLiteral` or `GenericAlias`) is used for member lookups.
+    // `self` is the self type for the constructor call; `class`  is used for member lookups.
     // Returns fallback bindings for cases that intentionally keep bespoke call behavior.
     fn constructor_bindings(
         self,
