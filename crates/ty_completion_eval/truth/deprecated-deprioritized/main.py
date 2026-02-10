@@ -1,3 +1,4 @@
 from abc import abstract<CURSOR: abstractmethod>
 
-AbstractC<CURSOR: AbstractAsyncContextManager>
+AbstractC<CURSOR: contextlib.AbstractAsyncContextManager>
+zzz<CURSOR: lib.zzzd>
