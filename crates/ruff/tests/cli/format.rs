@@ -580,7 +580,7 @@ if __name__ == "__main__":
     let test = CliTest::with_settings(|_project_dir, mut settings| {
         // JSON double escapes backslashes
         settings.add_filter(r#""[^"]+\\?/?input.py"#, r#""[TMP]/input.py"#);
-
+        settings.add_filter(r" \([a-f0-9]+ \d{4}-\d{2}-\d{2}\)", "([COMMIT] [DATE])");
         settings
     })?;
     test.write_file("input.py", CONTENT)?;

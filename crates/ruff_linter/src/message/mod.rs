@@ -8,8 +8,10 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
-    DisplayDiagnostics, DisplayGithubDiagnostics, FileResolver, GithubRenderer, Input, LintName,
-    SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
+    DisplayDiagnostics, DisplayGithubDiagnostics, DisplaySarifDiagnostics, FileResolver,
+    GithubRenderer, Input, LintName, RuleMetadata, RuleMetadataProvider, SarifRenderer,
+    SarifToolInfo, SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
+    UnifiedFile,
 };
 use ruff_db::files::File;
 
@@ -17,14 +19,12 @@ pub use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
 use ruff_source_file::{SourceFile, SourceFileBuilder};
 use ruff_text_size::{TextRange, TextSize};
-pub use sarif::SarifEmitter;
 
 use crate::Fix;
-use crate::registry::Rule;
+use crate::registry::{Linter, Rule, RuleNamespace};
 use crate::settings::types::{OutputFormat, RuffOutputFormat};
 
 mod grouped;
-mod sarif;
 
 /// Create a `Diagnostic` from a panic.
 pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
@@ -195,6 +195,28 @@ impl<'a> EmitterContext<'a> {
     }
 }
 
+struct RuffMetadataProvider;
+
+impl RuleMetadataProvider for RuffMetadataProvider {
+    fn metadata(&self, diagnostic: &Diagnostic) -> Option<RuleMetadata> {
+        let code = diagnostic.secondary_code()?;
+        let code_str = code.as_str();
+        let (linter, suffix) = Linter::parse_code(code_str)?;
+        let rule = linter
+            .all_rules()
+            .find(|rule| rule.noqa_code().suffix() == suffix)?;
+
+        Some(RuleMetadata {
+            code: code_str.to_string(),
+            name: Some(rule.into()),
+            linter: Some(linter.name()),
+            summary: rule.message_formats()[0],
+            explanation: rule.explanation(),
+            url: rule.url(),
+        })
+    }
+}
+
 pub fn render_diagnostics(
     writer: &mut dyn Write,
     format: OutputFormat,
@@ -221,9 +243,16 @@ pub fn render_diagnostics(
                 .map_err(std::io::Error::other)?;
         }
         Err(RuffOutputFormat::Sarif) => {
-            SarifEmitter
-                .emit(writer, diagnostics, context)
-                .map_err(std::io::Error::other)?;
+            let renderer = SarifRenderer::new(
+                context,
+                SarifToolInfo {
+                    name: "ruff",
+                    information_uri: "https://github.com/astral-sh/ruff",
+                },
+            )
+            .with_metadata_provider(&RuffMetadataProvider);
+            let value = DisplaySarifDiagnostics::new(&renderer, diagnostics);
+            write!(writer, "{value}")?;
         }
     }
 

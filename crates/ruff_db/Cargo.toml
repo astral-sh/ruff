@@ -22,6 +22,7 @@ ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true, features = ["get-size"] }
 ruff_text_size = { workspace = true }
 ty_static = { workspace = true }
+url = {workspace = true}
 
 anstyle = { workspace = true }
 arc-swap = { workspace = true }
