@@ -4742,8 +4742,9 @@ impl<'db> Type<'db> {
             return fallback_bindings();
         }
 
-        // temporary special-casing for all subclasses of `enum.Enum`
-        // until we support the functional syntax for creating enum classes
+        // Temporary special-casing for all subclasses of `enum.Enum` until we support the
+        // functional syntax for creating enum classes. TODO we should ideally check e.g.
+        // `MyEnum(1)` to make sure `1` is a valid value for `MyEnum`.
         if KnownClass::Enum
             .to_class_literal(db)
             .to_class_type(db)
