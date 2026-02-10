@@ -115,6 +115,26 @@ Foo()  # error: [missing-argument]
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
+### Metaclass `__call__` returning the class instance type
+
+When the metaclass `__call__` returns the constructed class type (or a subclass), it's not
+overriding normal construction. Per the spec, `__new__`/`__init__` should still be evaluated.
+
+```py
+class Meta(type):
+    def __call__(cls, *args, **kwargs) -> "Foo":
+        return super().__call__(*args, **kwargs)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# The metaclass __call__ returns Foo, so we fall through to check __init__.
+Foo()  # error: [missing-argument]
+Foo("wrong")  # error: [invalid-argument-type]
+reveal_type(Foo(1))  # revealed: Foo
+```
+
 ### Metaclass `__call__` returning bare `type`
 
 When the metaclass `__call__` is annotated as returning `type`, we use that return type. This is

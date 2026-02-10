@@ -4839,8 +4839,10 @@ impl<'db> Type<'db> {
         };
 
         // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
-        // Only use it directly when the return type indicates a non-pass-through metaclass
-        // `__call__` (i.e., the return type is not dynamic and has no unresolved typevars).
+        // Per the spec: if the return type is not an instance of the class being constructed
+        // (or a subclass thereof), use the metaclass `__call__` directly and skip `__new__`/`__init__`.
+        // If the return type IS an instance, or is dynamic/contains typevars, fall through to
+        // evaluate `__new__` and `__init__` normally.
         let metaclass_dunder_call = self_type.member_lookup_with_policy(
             db,
             "__call__".into(),
@@ -4861,7 +4863,12 @@ impl<'db> Type<'db> {
                 .unwrap_or(Type::unknown());
 
             if !declared_return_type.is_dynamic() && !declared_return_type.has_typevar(db) {
-                return Type::BoundMethod(metaclass_call_method).bindings(db);
+                let is_instance_return = self
+                    .to_instance(db)
+                    .is_some_and(|instance_ty| declared_return_type.is_subtype_of(db, instance_ty));
+                if !is_instance_return {
+                    return Type::BoundMethod(metaclass_call_method).bindings(db);
+                }
             }
         }
 
@@ -4964,10 +4971,15 @@ impl<'db> Type<'db> {
                     return false;
                 }
                 // Per the spec: "an explicit return type of `Any` should be treated as
-                // a type that is not an instance of the class being constructed." We use
-                // `is_subtype_of` so that dynamic types like `Any` are correctly treated
-                // as non-instance returns.
-                !return_ty.is_subtype_of(db, constructor_instance_ty)
+                // a type that is not an instance of the class being constructed."
+                // Detect `Any` anywhere in the return type (including unions), then use
+                // assignability for the remaining cases to avoid deep subtype recursion.
+                any_over_type(
+                    db,
+                    return_ty,
+                    &|ty| matches!(ty, Type::Dynamic(DynamicType::Any)),
+                    true,
+                ) || !return_ty.is_assignable_to(db, constructor_instance_ty)
             });
 
             if returns_non_instance {
