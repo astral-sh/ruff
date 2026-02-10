@@ -963,28 +963,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .map(|base| base.display(self.db()))
                                     .join(", ")
                             ));
-                            if let Some(index) = generic_fix {
-                                if let Some(arguments) = class_node.arguments.as_ref() {
-                                    let bases = &arguments.args;
-                                    let source =
-                                        source_text(self.context.db(), self.context.file());
-                                    let mut reordered_bases: Vec<String> = bases
-                                        .iter()
-                                        .enumerate()
-                                        .filter(|(i, _)| *i != *index)
-                                        .map(|(_, base)| source[base.range()].to_string())
-                                        .collect();
-                                    reordered_bases.push(source[bases[*index].range()].to_string());
-                                    let reordered_bases_t = reordered_bases.join(", ");
-                                    if let (Some(first), Some(last)) = (bases.first(), bases.last())
-                                    {
-                                        let fix = Fix::unsafe_edit(Edit::range_replacement(
-                                            reordered_bases_t,
-                                            TextRange::new(first.start(), last.end()),
-                                        ));
-                                        diagnostic.set_fix(fix);
-                                    }
-                                }
+                            if let Some(index) = *generic_fix
+                                && let [first_base, .., last_base] = class_node.bases()
+                            {
+                                let source = source_text(self.context.db(), self.context.file());
+                                let generic_base = &source[class_node.bases()[index].range()];
+                                diagnostic.help(format_args!(
+                                    "Move `{generic_base}` to the end of the bases list"
+                                ));
+                                let reordered_bases = class_node
+                                    .bases()
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(i, _)| *i != index)
+                                    .map(|(_, base)| &source[base.range()])
+                                    .chain(std::iter::once(generic_base))
+                                    .join(", ");
+                                let fix = Fix::unsafe_edit(Edit::range_replacement(
+                                    reordered_bases,
+                                    TextRange::new(first_base.start(), last_base.end()),
+                                ));
+                                diagnostic.set_fix(fix);
                             }
                         }
                     }
