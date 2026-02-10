@@ -14,6 +14,7 @@ use ruff_python_semantic::Modules;
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
@@ -137,6 +138,7 @@ pub(crate) fn airflow_3_removal_function_def(checker: &Checker, function_def: &S
     }
 
     check_function_parameters(checker, function_def);
+    check_apply_defaults_decorator(checker, function_def);
 }
 
 const REMOVED_CONTEXT_KEYS: [&str; 12] = [
@@ -209,6 +211,12 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
             diagnostic_for_argument(checker, arguments, "default_view", None);
             diagnostic_for_argument(checker, arguments, "orientation", None);
         }
+        ["airflow", "sdk", .., "Variable", "get"] => {
+            diagnostic_for_argument(checker, arguments, "default_var", Some("default"));
+        }
+        ["airflow", "decorators" | "sdk", "task"] => {
+            check_trigger_rule_argument_value(checker, arguments);
+        }
         segments => {
             if is_airflow_auth_manager(segments) {
                 if !arguments.is_empty() {
@@ -231,6 +239,8 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
                 );
+                diagnostic_for_argument(checker, arguments, "provide_context", None);
+                check_trigger_rule_argument_value(checker, arguments);
                 match segments {
                     [
                         "airflow",
@@ -841,11 +851,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             // airflow.utils.db
             ["db", "create_session"] => Replacement::None,
 
-            // airflow.utils.decorators
-            ["decorators", "apply_defaults"] => Replacement::Message(
-                "`apply_defaults` is now unconditionally done and can be safely removed.",
-            ),
-
             // airflow.utils.dates
             ["dates", "date_range"] => Replacement::None,
             ["dates", "days_ago"] => {
@@ -886,11 +891,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             ["state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
 
             // airflow.utils.trigger_rule
-            [
-                "trigger_rule",
-                "TriggerRule",
-                "DUMMY" | "NONE_FAILED_OR_SKIPPED",
-            ] => Replacement::None,
+            ["trigger_rule", "TriggerRule", "DUMMY"] => Replacement::None,
             _ => return,
         },
 
@@ -1357,4 +1358,111 @@ fn is_removed_context_key_attribute(
     }
 
     is_value_from_context_key(checker, value, context_key)
+}
+
+/// Check for the use of the `@apply_defaults` decorator.
+///
+/// `apply_defaults` is now unconditionally done in Airflow 3.0 and can be safely removed.
+///
+/// For example:
+///
+/// ```python
+/// from airflow.models.baseoperator import BaseOperator
+/// from airflow.utils.decorators import apply_defaults
+///
+/// class ExampleOperator(BaseOperator):
+///     @apply_defaults
+///     def __init__(self, message, **kwargs):
+///         super().__init__(**kwargs)
+///         self.message = message
+/// ```
+fn check_apply_defaults_decorator(checker: &Checker, function_def: &StmtFunctionDef) {
+    for decorator in &function_def.decorator_list {
+        if checker
+            .semantic()
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["airflow", "utils", "decorators", "apply_defaults"]
+                )
+            })
+        {
+            let mut diagnostic = checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: "apply_defaults".to_string(),
+                    replacement: Replacement::Message(
+                        "`apply_defaults` is now unconditionally done and can be safely removed.",
+                    ),
+                },
+                decorator.range(),
+            );
+            let range = checker.locator().full_lines_range(decorator.range());
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+        }
+    }
+}
+
+/// Check if `trigger_rule` argument contains a deprecated value.
+///
+/// Check both string literal and `TriggerRule` enum usages:
+///
+/// ```python
+/// from airflow.operators.empty import EmptyOperator
+/// from airflow.utils.trigger_rule import TriggerRule
+///
+/// # String literal
+/// EmptyOperator(task_id="my_task", trigger_rule="none_failed_or_skipped")
+///
+/// # Enum value
+/// EmptyOperator(task_id="my_task", trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+/// ```
+fn check_trigger_rule_argument_value(checker: &Checker, arguments: &Arguments) {
+    let Some(keyword) = arguments.find_keyword("trigger_rule") else {
+        return;
+    };
+
+    // Check for string literal value
+    if let Some(value) = keyword.value.as_string_literal_expr() {
+        if value.value.to_str() == "none_failed_or_skipped" {
+            let mut diagnostic = checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: "none_failed_or_skipped".to_string(),
+                    replacement: Replacement::AttrName("none_failed_min_one_success"),
+                },
+                value.range(),
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "\"none_failed_min_one_success\"".to_string(),
+                value.range(),
+            )));
+        }
+        return;
+    }
+
+    // Check for TriggerRule enum value
+    if let Some(qualified_name) = checker.semantic().resolve_qualified_name(&keyword.value) {
+        if matches!(
+            qualified_name.segments(),
+            [
+                "airflow",
+                "utils",
+                "trigger_rule",
+                "TriggerRule",
+                "NONE_FAILED_OR_SKIPPED"
+            ]
+        ) {
+            let mut diagnostic = checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: qualified_name.to_string(),
+                    replacement: Replacement::AttrName("NONE_FAILED_MIN_ONE_SUCCESS"),
+                },
+                keyword.value.range(),
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS".to_string(),
+                keyword.value.range(),
+            )));
+        }
+    }
 }
