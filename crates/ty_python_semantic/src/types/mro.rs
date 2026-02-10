@@ -714,7 +714,8 @@ fn check_generic_reorder_fixes_mro<'db>(
     resolved_bases: &[ClassBase<'db>],
     original_bases: &[Type<'db>],
 ) -> Option<usize> {
-    let indices: Vec<usize> = original_bases
+    // Only attempt an autofix if `Generic[]` appears exactly once in the original bases list.
+    let single_index = original_bases
         .iter()
         .enumerate()
         .filter_map(|(i, base)| {
@@ -724,19 +725,18 @@ fn check_generic_reorder_fixes_mro<'db>(
             )
             .then_some(i)
         })
-        .collect();
-    if indices.len() != 1 {
+        .exactly_one()
+        .ok()?;
+
+    // This should always be true if the original bases list contains exactly one
+    // subscripted `Generic`, but return `None` here just to be safe.
+    if resolved_bases.get(single_index) != Some(&ClassBase::Generic) {
         return None;
     }
-    let resolved_index = resolved_bases
-        .iter()
-        .position(|base| matches!(base, ClassBase::Generic))?;
-    if resolved_index == resolved_bases.len() - 1 {
-        return None;
-    }
-    let mut reordered = resolved_bases.to_vec();
-    let generic = reordered.remove(resolved_index);
-    reordered.push(generic);
+
+    let mut reordered: VecDeque<ClassBase<'db>> = resolved_bases.iter().copied().collect();
+    let generic = reordered.remove(single_index)?;
+    reordered.push_back(generic);
     let mut seqs: Vec<VecDeque<ClassBase<'db>>> = Vec::with_capacity(reordered.len() + 1);
     for base in &reordered {
         if base.has_cyclic_mro(db) {
@@ -744,9 +744,9 @@ fn check_generic_reorder_fixes_mro<'db>(
         }
         seqs.push(base.mro(db, None).collect());
     }
-    seqs.push(reordered.iter().copied().collect());
+    seqs.push(reordered);
     c3_merge(seqs)?;
-    Some(indices[0])
+    Some(single_index)
 }
 
 /// Error for dynamic class MRO computation with fallback MRO.
