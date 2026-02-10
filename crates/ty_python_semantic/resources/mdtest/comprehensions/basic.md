@@ -128,8 +128,7 @@ The type of the expression being iterated over is immutable, and so should not b
 `Unknown` or through literal promotion:
 
 ```py
-# TODO: This should reveal `Literal["a", "b"]`
-# revealed: Unknown | str
+# revealed: Literal["a", "b"]
 x = [reveal_type(string) for string in ["a", "b"]]
 ```
 
@@ -149,7 +148,7 @@ reveal_type({x for x in range(10)})
 # revealed: dict[Unknown | int, Unknown | str]
 reveal_type({x: str(x) for x in range(10)})
 
-# revealed: list[Unknown | tuple[int, Unknown | str]]
+# revealed: list[Unknown | tuple[int, str]]
 reveal_type([(x, y) for x in range(5) for y in ["a", "b", "c"]])
 
 squares: list[int | None] = [x**2 for x in range(10)]
@@ -172,8 +171,7 @@ x1: list[int] = [x for x in [1, 2, 3]]
 reveal_type(x1)  # revealed: list[int]
 
 x2: Sequence[int] = [x for x in [1, 2, 3]]
-# TODO: This should reveal `list[int]`.
-reveal_type(x2)  # revealed: list[Unknown | int]
+reveal_type(x2)  # revealed: list[Literal[1, 2, 3]]
 
 x3: dict[int, str] = {x: str(x) for x in [1, 2, 3]}
 reveal_type(x3)  # revealed: dict[int, str]

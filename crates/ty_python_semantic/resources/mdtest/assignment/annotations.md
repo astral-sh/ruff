@@ -690,16 +690,16 @@ from collections import defaultdict
 from typing import Any, Iterable, Literal, MutableSequence, Sequence
 
 x1: Sequence[Any] = [1, 2, 3]
-reveal_type(x1)  # revealed: list[int]
+reveal_type(x1)  # revealed: list[Literal[1, 2, 3]]
 
 x2: MutableSequence[Any] = [1, 2, 3]
 reveal_type(x2)  # revealed: list[Any]
 
 x3: Iterable[Any] = [1, 2, 3]
-reveal_type(x3)  # revealed: list[int]
+reveal_type(x3)  # revealed: list[Literal[1, 2, 3]]
 
 x4: Iterable[Iterable[Any]] = [[1, 2, 3]]
-reveal_type(x4)  # revealed: list[list[int]]
+reveal_type(x4)  # revealed: list[list[Literal[1, 2, 3]]]
 
 x5: list[Iterable[Any]] = [[1, 2, 3]]
 reveal_type(x5)  # revealed: list[Iterable[Any]]
@@ -708,19 +708,16 @@ x6: Iterable[list[Any]] = [[1, 2, 3]]
 reveal_type(x6)  # revealed: list[list[Any]]
 
 x7: Sequence[Any] = [i for i in [1, 2, 3]]
-# TODO: This should infer `list[int]`.
-reveal_type(x7)  # revealed: list[Unknown | int]
+reveal_type(x7)  # revealed: list[Literal[1, 2, 3]]
 
 x8: MutableSequence[Any] = [i for i in [1, 2, 3]]
 reveal_type(x8)  # revealed: list[Any]
 
 x9: Iterable[Any] = [i for i in [1, 2, 3]]
-# TODO: This should infer `list[int]`.
-reveal_type(x9)  # revealed: list[Unknown | int]
+reveal_type(x9)  # revealed: list[Literal[1, 2, 3]]
 
 x10: Iterable[Iterable[Any]] = [[i] for i in [1, 2, 3]]
-# TODO: This should infer `list[list[int]]`.
-reveal_type(x10)  # revealed: list[list[Unknown | int]]
+reveal_type(x10)  # revealed: list[list[Literal[1, 2, 3]]]
 
 x11: list[Iterable[Any]] = [[i] for i in [1, 2, 3]]
 reveal_type(x11)  # revealed: list[Iterable[Any]]
@@ -754,7 +751,7 @@ def f[T](x: T) -> list[list[T]]:
     return [[x]]
 
 x17: Sequence[Sequence[Any]] = f(1)
-reveal_type(x17)  # revealed: list[list[int]]
+reveal_type(x17)  # revealed: list[list[Literal[1]]]
 
 x18: Sequence[list[Any]] = f(1)
 reveal_type(x18)  # revealed: list[list[Any]]
