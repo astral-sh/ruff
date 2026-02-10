@@ -61,9 +61,7 @@ reveal_type(NoAnnotation())  # revealed: NoAnnotation
 ### `__new__` returning `Any`
 
 Per the spec, "an explicit return type of `Any` should be treated as a type that is not an instance
-of the class being constructed." However, we use `is_assignable_to` (matching the `into_callable`
-path) so that `-> Any` does not skip `__init__` validation. This is important for libraries like
-pydantic and SQLModel that annotate `__new__` as `-> Any`.
+of the class being constructed." This means `__init__` is not called and the return type is `Any`.
 
 ```py
 from typing import Any
@@ -75,15 +73,14 @@ class ReturnsAny:
     def __init__(self, x: int) -> None:
         pass
 
-# __init__ is still checked because Any is assignable to the instance type
-# error: [missing-argument]
-reveal_type(ReturnsAny())  # revealed: ReturnsAny
+# __init__ is skipped because `-> Any` is treated as non-instance per spec
+reveal_type(ReturnsAny())  # revealed: Any
 ```
 
 ### `__new__` returning a union containing `Any`
 
-When `__new__` returns a union containing `Any`, `Any` is assignable to the instance type, so
-`__init__` is still checked.
+When `__new__` returns a union containing `Any`, `Any` is not a subtype of the instance type, so
+`__init__` is skipped.
 
 ```py
 from typing import Any
@@ -97,7 +94,7 @@ class MaybeAny:
     def __init__(self, value: int) -> None:
         pass
 
-reveal_type(MaybeAny(1))  # revealed: MaybeAny
+reveal_type(MaybeAny(1))  # revealed: MaybeAny | Any
 ```
 
 ## Deferred resolution of bases

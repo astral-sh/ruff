@@ -4963,11 +4963,11 @@ impl<'db> Type<'db> {
                 if return_ty.has_typevar(db) {
                     return false;
                 }
-                // Use `is_assignable_to` (matching `into_callable` in class.rs) so that
-                // `-> Any` is treated as assignable to the instance type. This ensures
-                // `__init__` is still checked for libraries like pydantic/SQLModel that
-                // annotate `__new__` as `-> Any`.
-                !return_ty.is_assignable_to(db, constructor_instance_ty)
+                // Per the spec: "an explicit return type of `Any` should be treated as
+                // a type that is not an instance of the class being constructed." We use
+                // `is_subtype_of` so that dynamic types like `Any` are correctly treated
+                // as non-instance returns.
+                !return_ty.is_subtype_of(db, constructor_instance_ty)
             });
 
             if returns_non_instance {
