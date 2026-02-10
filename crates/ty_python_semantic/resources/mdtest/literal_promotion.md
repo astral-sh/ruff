@@ -439,4 +439,28 @@ delta2 = convert(1_000_000, "us")
 reveal_type(delta0)  # revealed: Timedelta[Literal["us"]]
 reveal_type(delta1)  # revealed: Timedelta[Literal["us"]]
 reveal_type(delta2)  # revealed: Timedelta[Literal["us"]]
+
+# Upper-bounded TypeVars with a Literal bound should also avoid promotion
+# when the promoted type would violate the bound.
+TB = TypeVar("TB", bound=Literal["ms", "us"])
+
+def g(unit: TB) -> TB:
+    return unit
+
+reveal_type(g("us"))  # revealed: Literal["us"]
+
+# Upper-bounded TypeVars in invariant return position: promotion should
+# still be blocked when it would violate the bound.
+def g2(unit: TB) -> list[TB]:
+    return [unit]
+
+reveal_type(g2("us"))  # revealed: list[Literal["us"]]
+
+# But a non-Literal upper bound should still allow promotion.
+TI = TypeVar("TI", bound=int)
+
+def h(x: TI) -> list[TI]:
+    return [x]
+
+reveal_type(h(1))  # revealed: list[int]
 ```

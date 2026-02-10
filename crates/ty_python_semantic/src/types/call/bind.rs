@@ -3357,11 +3357,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Attempt to promote any literal types assigned to the specialization.
         let maybe_promote = |typevar: BoundTypeVarInstance<'db>, ty: Type<'db>| {
+            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+
             // For constrained TypeVars, the inferred type is already one of the
             // constraints. Promoting literals would produce a type that doesn't
             // match any constraint.
             if matches!(
-                typevar.typevar(self.db).bound_or_constraints(self.db),
+                bound_or_constraints,
                 Some(TypeVarBoundOrConstraints::Constraints(_))
             ) {
                 return ty;
@@ -3408,7 +3410,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            ty.promote_literals(self.db, combined_tcx)
+            let promoted = ty.promote_literals(self.db, combined_tcx);
+
+            // If the TypeVar has an upper bound, only use the promoted type if it
+            // still satisfies the bound.
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                if !promoted.is_assignable_to(self.db, bound) {
+                    return ty;
+                }
+            }
+
+            promoted
         };
 
         let specialization = builder
