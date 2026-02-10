@@ -4764,77 +4764,6 @@ impl<'db> Type<'db> {
                 binding
             })
         }
-        fn meta_type_is_subclass_of_constructor<'db>(
-            db: &'db dyn Db,
-            meta_ty: Type<'db>,
-            constructor_class: ClassType<'db>,
-        ) -> Option<bool> {
-            match meta_ty.resolve_type_alias(db) {
-                Type::Union(union) => {
-                    let mut saw_unknown = false;
-                    for element in union.elements(db) {
-                        match meta_type_is_subclass_of_constructor(db, *element, constructor_class)
-                        {
-                            Some(false) => return Some(false),
-                            Some(true) => {}
-                            None => saw_unknown = true,
-                        }
-                    }
-                    if saw_unknown { None } else { Some(true) }
-                }
-                Type::ClassLiteral(class_literal) => Some(
-                    class_literal
-                        .default_specialization(db)
-                        .is_subclass_of(db, constructor_class),
-                ),
-                Type::GenericAlias(alias) => {
-                    Some(ClassType::from(alias).is_subclass_of(db, constructor_class))
-                }
-                Type::SubclassOf(subclass_of_ty) => subclass_of_ty
-                    .subclass_of()
-                    .into_class(db)
-                    .map(|class| class.is_subclass_of(db, constructor_class)),
-                Type::Never => Some(true),
-                Type::Dynamic(_) => None,
-                _ => None,
-            }
-        }
-        fn return_type_is_constructor_instance<'db>(
-            db: &'db dyn Db,
-            return_ty: Type<'db>,
-            constructor_class: ClassType<'db>,
-        ) -> Option<bool> {
-            match return_ty.resolve_type_alias(db) {
-                Type::Union(union) => {
-                    let mut saw_unknown = false;
-                    for element in union.elements(db) {
-                        match return_type_is_constructor_instance(db, *element, constructor_class) {
-                            Some(false) => return Some(false),
-                            Some(true) => {}
-                            None => saw_unknown = true,
-                        }
-                    }
-                    if saw_unknown { None } else { Some(true) }
-                }
-                Type::Dynamic(DynamicType::Any) => Some(false),
-                Type::Dynamic(
-                    DynamicType::Unknown
-                    | DynamicType::UnknownGeneric(_)
-                    | DynamicType::UnspecializedTypeVar
-                    | DynamicType::Todo(_)
-                    | DynamicType::TodoStarredExpression
-                    | DynamicType::TodoUnpack
-                    | DynamicType::TodoTypeVarTuple
-                    | DynamicType::Divergent(_),
-                )
-                | Type::TypeVar(_) => None,
-                Type::Never => Some(true),
-                ty => {
-                    meta_type_is_subclass_of_constructor(db, ty.to_meta_type(db), constructor_class)
-                }
-            }
-        }
-
         let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
         let class_generic_context = class_literal.generic_context(db);
 
@@ -4925,19 +4854,20 @@ impl<'db> Type<'db> {
         }) = metaclass_dunder_call.place
         {
             let signature = metaclass_call_method.function(db).signature(db);
-            let declared_return_type = signature
-                .overloads
-                .first()
-                .map(|sig| sig.return_ty)
-                .unwrap_or(Type::unknown());
 
-            if !declared_return_type.is_dynamic()
-                && !declared_return_type.has_typevar(db)
-                && matches!(
-                    return_type_is_constructor_instance(db, declared_return_type, class),
-                    Some(false)
-                )
-            {
+            // All overloads must return a non-instance type for us to treat the metaclass
+            // `__call__` as fully overriding `type.__call__`. If any overload returns the
+            // class instance type (or is dynamic/contains typevars), fall through to
+            // evaluate `__new__`/`__init__`.
+            let all_overloads_return_non_instance = !signature.overloads.is_empty()
+                && signature.overloads.iter().all(|sig| {
+                    !sig.return_ty.is_dynamic()
+                        && !sig.return_ty.has_typevar(db)
+                        && ConstructorReturnDisposition::of(db, sig.return_ty, class)
+                            .is_not_instance()
+                });
+
+            if all_overloads_return_non_instance {
                 return Type::BoundMethod(metaclass_call_method).bindings(db);
             }
         }
@@ -4953,10 +4883,6 @@ impl<'db> Type<'db> {
         //    the way to `object` (single `self` argument call). This time it is correct to
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
-        //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
@@ -5037,10 +4963,8 @@ impl<'db> Type<'db> {
                         .find(|return_ty| {
                             !return_ty.is_unknown()
                                 && !return_ty.has_typevar(db)
-                                && matches!(
-                                    return_type_is_constructor_instance(db, *return_ty, class),
-                                    Some(false)
-                                )
+                                && ConstructorReturnDisposition::of(db, *return_ty, class)
+                                    .is_not_instance()
                         })
                 });
 
@@ -5847,6 +5771,7 @@ impl<'db> Type<'db> {
             _ => None,
         }
     }
+
     #[must_use]
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {
@@ -7269,6 +7194,94 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             ty = self.display(db),
         );
         v
+    }
+}
+
+/// Whether a return type from `__new__` or metaclass `__call__` is an instance
+/// of the class being constructed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConstructorReturnDisposition {
+    /// The return type is definitely an instance of the constructed class.
+    Instance,
+    /// The return type is definitely *not* an instance of the constructed class.
+    NotInstance,
+    /// Cannot be determined (e.g., contains type variables or `Unknown`).
+    Uncertain,
+}
+
+impl ConstructorReturnDisposition {
+    /// Determine whether `return_ty` is an instance of `constructor_class`.
+    fn of<'db>(db: &'db dyn Db, return_ty: Type<'db>, constructor_class: ClassType<'db>) -> Self {
+        match return_ty.resolve_type_alias(db) {
+            Type::Union(union) => {
+                let mut saw_uncertain = false;
+                for element in union.elements(db) {
+                    match Self::of(db, *element, constructor_class) {
+                        Self::NotInstance => return Self::NotInstance,
+                        Self::Instance => {}
+                        Self::Uncertain => saw_uncertain = true,
+                    }
+                }
+                if saw_uncertain {
+                    Self::Uncertain
+                } else {
+                    Self::Instance
+                }
+            }
+            Type::Dynamic(DynamicType::Any) => Self::NotInstance,
+            Type::Dynamic(_) | Type::TypeVar(_) => Self::Uncertain,
+            Type::Never => Self::Instance,
+            Type::NominalInstance(instance) => {
+                if instance.class(db).is_subclass_of(db, constructor_class) {
+                    Self::Instance
+                } else {
+                    Self::NotInstance
+                }
+            }
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
+                Some(class) if class.is_subclass_of(db, constructor_class) => Self::Instance,
+                Some(_) => Self::NotInstance,
+                None => Self::Uncertain,
+            },
+            ty => {
+                // Fall back to checking the meta type for remaining concrete
+                // types (e.g., `Callable`, `FunctionLiteral`, literals, etc.).
+                // If the return type's class is not a subclass of the
+                // constructor class, the return type can't be an instance.
+                let meta = ty.to_meta_type(db);
+                match meta {
+                    Type::ClassLiteral(class_literal) => {
+                        if class_literal
+                            .default_specialization(db)
+                            .is_subclass_of(db, constructor_class)
+                        {
+                            Self::Instance
+                        } else {
+                            Self::NotInstance
+                        }
+                    }
+                    Type::GenericAlias(alias) => {
+                        if ClassType::from(alias).is_subclass_of(db, constructor_class) {
+                            Self::Instance
+                        } else {
+                            Self::NotInstance
+                        }
+                    }
+                    Type::NominalInstance(instance) => {
+                        if instance.class(db).is_subclass_of(db, constructor_class) {
+                            Self::Instance
+                        } else {
+                            Self::NotInstance
+                        }
+                    }
+                    _ => Self::Uncertain,
+                }
+            }
+        }
+    }
+
+    const fn is_not_instance(self) -> bool {
+        matches!(self, Self::NotInstance)
     }
 }
 

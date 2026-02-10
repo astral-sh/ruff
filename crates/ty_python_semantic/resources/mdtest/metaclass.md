@@ -193,6 +193,83 @@ reveal_type(Foo())  # revealed: Foo
 reveal_type(Foo("wrong"))  # revealed: Foo
 ```
 
+### Overloaded metaclass `__call__` with mixed return types
+
+When a metaclass `__call__` is overloaded and some overloads return the class instance type while
+others return a different type, we should fall through to `__new__`/`__init__` since the metaclass
+isn't uniformly overriding normal construction.
+
+```py
+from typing import Any, overload
+
+class Meta(type):
+    @overload
+    def __call__(cls, x: int) -> int: ...
+    @overload
+    def __call__(cls, x: str) -> "Foo": ...
+    def __call__(cls, x: int | str) -> Any:
+        return super().__call__(x)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# Because one overload returns `Foo` (an instance), we fall through to check __init__.
+Foo("wrong")  # error: [invalid-argument-type]
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+```
+
+### Overloaded metaclass `__call__` returning only non-instance types
+
+When all overloads of a metaclass `__call__` return non-instance types, the metaclass fully
+overrides `type.__call__` and `__init__` is not checked.
+
+```py
+from typing import Any, overload
+
+class Meta(type):
+    @overload
+    def __call__(cls, x: int) -> int: ...
+    @overload
+    def __call__(cls, x: str) -> str: ...
+    def __call__(cls, x: int | str) -> Any:
+        return x
+
+class Bar(metaclass=Meta):
+    def __init__(self, x: int, y: int) -> None:
+        pass
+
+# The metaclass __call__ overloads control construction; __init__ is not checked.
+reveal_type(Bar(1))  # revealed: int
+reveal_type(Bar("hello"))  # revealed: str
+```
+
+### Overloaded metaclass `__call__` with non-class return forms
+
+When all overloads return non-instance types that aren't simple class instances (e.g., `Callable`),
+`__init__` should still be skipped.
+
+```py
+from typing import Any, Callable, overload
+
+class Meta(type):
+    @overload
+    def __call__(cls, x: int) -> Callable[[], int]: ...
+    @overload
+    def __call__(cls, x: str) -> Callable[[], str]: ...
+    def __call__(cls, x: int | str) -> Any:
+        return lambda: x
+
+class Baz(metaclass=Meta):
+    def __init__(self, x: int, y: int) -> None:
+        pass
+
+# The metaclass __call__ overloads control construction; __init__ is not checked.
+reveal_type(Baz(1))  # revealed: () -> int
+reveal_type(Baz("hello"))  # revealed: () -> str
+```
+
 ## Default
 
 ```py
