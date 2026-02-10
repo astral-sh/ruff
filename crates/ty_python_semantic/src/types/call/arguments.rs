@@ -7,7 +7,7 @@ use ruff_python_ast as ast;
 use crate::Db;
 use crate::types::KnownClass;
 use crate::types::enums::{enum_member_literals, enum_metadata};
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::Tuple;
 
 use super::Type;
 
@@ -16,7 +16,7 @@ use super::Type;
 ///
 /// See: [pyright's `maxSingleOverloadArgTypeExpansionCount`][pyright]
 ///
-/// [pyright]: https://github.com/microsoft/pyright/blob/7781cb072382eb1df498eb8fb0a8d6a32d25e5c7/packages/pyright-internal/src/common/consts.ts#L21
+/// [pyright]: https://github.com/microsoft/pyright/blob/5a325e4874e775436671eed65ad696787a1ef74b/packages/pyright-internal/src/analyzer/typeEvaluator.ts#L570
 const MAX_TUPLE_EXPANSION: usize = 64;
 
 /// Maximum total number of expanded argument type combinations across all arguments
@@ -24,7 +24,7 @@ const MAX_TUPLE_EXPANSION: usize = 64;
 ///
 /// See: [pyright's `maxTotalOverloadArgTypeExpansionCount`][pyright]
 ///
-/// [pyright]: https://github.com/microsoft/pyright/blob/7781cb072382eb1df498eb8fb0a8d6a32d25e5c7/packages/pyright-internal/src/common/consts.ts#L24
+/// [pyright]: https://github.com/microsoft/pyright/blob/5a325e4874e775436671eed65ad696787a1ef74b/packages/pyright-internal/src/analyzer/typeEvaluator.ts#L566
 const MAX_TOTAL_EXPANSION: usize = 256;
 
 #[derive(Clone, Copy, Debug)]
@@ -415,7 +415,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                             let expanded = per_element
                                 .into_iter()
                                 .multi_cartesian_product()
-                                .map(|types| Type::tuple(TupleType::heterogeneous(db, types)))
+                                .map(|types| Type::heterogeneous_tuple(db, types))
                                 .collect::<Vec<_>>();
                             Some(expanded)
                         }
