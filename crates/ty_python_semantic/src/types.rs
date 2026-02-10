@@ -4155,7 +4155,6 @@ impl<'db> Type<'db> {
                     self.constructor_bindings(
                         db,
                         ClassType::NonGeneric(class),
-                        false,
                         ConstructorFallback::Gradual {
                             use_generic_context: true,
                         },
@@ -4165,7 +4164,6 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => self.constructor_bindings(
                 db,
                 ClassType::Generic(alias),
-                false,
                 ConstructorFallback::Gradual {
                     use_generic_context: false,
                 },
@@ -4176,7 +4174,7 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
                 SubclassOfInner::Class(class) => {
-                    self.constructor_bindings(db, class, false, ConstructorFallback::ClassBindings)
+                    self.constructor_bindings(db, class, ConstructorFallback::ClassBindings)
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
                     let Some(class) = (match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -4199,7 +4197,6 @@ impl<'db> Type<'db> {
                     self.constructor_bindings(
                         db,
                         class,
-                        true,
                         ConstructorFallback::Gradual {
                             use_generic_context: false,
                         },
@@ -4693,13 +4690,11 @@ impl<'db> Type<'db> {
     }
 
     // Build bindings for constructor calls by combining `__new__`/`__init__` signatures.
-    // `self` is the self type for the constructor call; `class`  is used for member lookups.
     // Returns fallback bindings for cases that intentionally keep bespoke call behavior.
     fn constructor_bindings(
         self,
         db: &'db dyn Db,
         class: ClassType<'db>,
-        lookup_from_bound: bool,
         fallback: ConstructorFallback,
     ) -> Bindings<'db> {
         fn resolve_dunder_new_callable<'db>(
@@ -4821,14 +4816,6 @@ impl<'db> Type<'db> {
         // generic typevars to itself.
         let self_type = identity_specialize_if_generic(self);
 
-        // For `type[T]`, validate arguments against the bound/constraint class constructors,
-        // but keep the constructed type as `T`.
-        let lookup_type = if lookup_from_bound {
-            identity_specialize_if_generic(Type::from(class))
-        } else {
-            self_type
-        };
-
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
         // The logic is roughly as follows:
@@ -4854,7 +4841,7 @@ impl<'db> Type<'db> {
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must bind the `cls` argument when forming
         // constructor-call bindings.
-        let new_method = lookup_type.lookup_dunder_new(db);
+        let new_method = self_type.lookup_dunder_new(db);
 
         let Some(constructor_instance_ty) = self_type.to_instance(db) else {
             return fallback_bindings();
@@ -4863,7 +4850,7 @@ impl<'db> Type<'db> {
         // Construct an instance type to look up `__init__`. We use `self_type` (possibly identity-
         // specialized) so the instance retains inferable class typevars during constructor checking.
         // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let Some(lookup_init_ty) = lookup_type.to_instance(db) else {
+        let Some(lookup_init_ty) = self_type.to_instance(db) else {
             return fallback_bindings();
         };
 
@@ -4877,7 +4864,7 @@ impl<'db> Type<'db> {
 
         let mut missing_init_bindings = None;
         let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
-            Some(place) => match resolve_dunder_new_callable(db, lookup_type, place) {
+            Some(place) => match resolve_dunder_new_callable(db, self_type, place) {
                 Some((new_callable, definedness)) => {
                     let mut bindings =
                         bind_constructor_new(db, new_callable.bindings(db), self_type);
