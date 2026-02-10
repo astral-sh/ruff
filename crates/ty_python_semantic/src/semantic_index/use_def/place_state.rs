@@ -384,12 +384,8 @@ impl Bindings {
                             reachability_constraint,
                         });
                     } else {
-                        let narrowing_constraint = narrowing_constraints
-                            .intersect_constraints(a.narrowing_constraint, b.narrowing_constraint);
                         let total_count = a_counts.get(a.binding) + b_counts.get(b.binding);
-
                         if !a.binding.is_unbound()
-                            && narrowing_constraint == ScopedNarrowingConstraint::empty()
                             // State number explosion guard
                             && total_count <= MAX_STATES_PER_BINDING
                         {
@@ -397,6 +393,10 @@ impl Bindings {
                             self.live_bindings.push(a);
                             self.live_bindings.push(b);
                         } else {
+                            let narrowing_constraint = narrowing_constraints.intersect_constraints(
+                                a.narrowing_constraint,
+                                b.narrowing_constraint,
+                            );
                             let reachability_constraint = reachability_constraints
                                 .add_or_constraint(
                                     a.reachability_constraint,
