@@ -6622,6 +6622,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 self.typevar_binding_context = previous_typevar_binding_context;
 
+                // Convert eager union instances to lazy for assignments
+                // This enables lazy evaluation for recursive type aliases like `Foo = int | list["Foo"]`
+                let value_ty = if let Some(instance) = value_ty.as_union_type_instance()
+                    && let Some(eager) = instance.as_eager(self.db())
+                    && let Some(lazy) = eager.try_into_lazy(
+                        self.db(),
+                        target,
+                        definition,
+                        self.typevar_binding_context,
+                    ) {
+                    lazy
+                } else {
+                    value_ty
+                };
+
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
@@ -8781,6 +8796,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::BooleanLiteral(true)
             } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                 declared.inner_type()
+            } else {
+                inferred_ty
+            };
+
+            // Convert eager union instances to lazy for assignments
+            // This enables lazy evaluation for recursive type aliases like `Foo: TypeAlias = int | list["Foo"]`
+            let inferred_ty = if let Some(instance) = inferred_ty.as_union_type_instance()
+                && let Some(eager) = instance.as_eager(self.db())
+                && let Some(lazy) =
+                    eager.try_into_lazy(self.db(), target, definition, self.typevar_binding_context)
+            {
+                lazy
             } else {
                 inferred_ty
             };
@@ -15401,7 +15428,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         let is_empty = elements.peek().is_none();
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
-                            UnionTypeInstance::new(
+                            UnionTypeInstance::eager(
                                 db,
                                 None,
                                 Ok(UnionType::from_elements(db, elements)),
