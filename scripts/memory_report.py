@@ -25,12 +25,13 @@ import os
 import subprocess
 import sys
 import tempfile
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, Final, Self
 
 # Known projects with their Git URLs for memory testing.
-KNOWN_PROJECTS: dict[str, str] = {
+KNOWN_PROJECTS: Final[Mapping[str, str]] = {
     "flake8": "https://github.com/PyCQA/flake8",
     "sphinx": "https://github.com/sphinx-doc/sphinx",
     "prefect": "https://github.com/PrefectHQ/prefect",
@@ -114,7 +115,7 @@ def format_outcome(*, old_bytes: int, new_bytes: int) -> str:
     elif diff < 0:
         return "⬇️"
     else:
-        return "☑️"
+        return "✅"
 
 
 def load_reports_from_directory(directory: Path) -> dict[str, MemoryReport]:
@@ -155,7 +156,7 @@ def diff_items(
 
 
 # Maximum number of changed items to show per category in the detailed breakdown
-MAX_CHANGED_ITEMS = 15
+MAX_CHANGED_ITEMS: Final = 15
 
 
 def render_summary(projects: list[ProjectComparison]) -> str:
@@ -165,8 +166,9 @@ def render_summary(projects: list[ProjectComparison]) -> str:
 
     projects.sort(key=lambda p: p.total_diff_bytes, reverse=True)
 
-    any_increased = any(p.total_diff_bytes > 0 for p in projects)
-    any_decreased = any(p.total_diff_bytes < 0 for p in projects)
+    # Suppress the memory report if no project had any top-line changes >10KB
+    any_increased = any(p.total_diff_bytes > 10_000 for p in projects)
+    any_decreased = any(p.total_diff_bytes < -10_000 for p in projects)
     any_changed = any_increased or any_decreased
 
     lines = ["## Memory usage report", ""]
@@ -246,7 +248,7 @@ def render_summary(projects: list[ProjectComparison]) -> str:
             ]
         )
     else:
-        lines.append("Memory usage unchanged :white_check_mark:")
+        lines.append("Memory usage unchanged ✅")
 
     return "\n".join(lines)
 
