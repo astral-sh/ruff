@@ -46,6 +46,36 @@ except MyExc as e:
     reveal_type(e)  # revealed: Exception
 ```
 
+## Can be (partially) stringified
+
+```py
+from typing import TypeAlias, Optional, TypeVar, Generic
+
+class A: ...
+
+OptionalA1: TypeAlias = Optional[A]
+OptionalA2: TypeAlias = Optional["A"]
+OptionalA3: TypeAlias = "Optional[A]"
+
+def _(a: OptionalA1, b: OptionalA2, c: OptionalA3) -> None:
+    reveal_type(a)  # revealed: A | None
+    reveal_type(b)  # revealed: A | None
+    reveal_type(c)  # revealed: A | None
+
+T = TypeVar("T")
+
+class MyGenericClass(Generic[T]): ...
+
+MyGenericAlias1: TypeAlias = MyGenericClass[A]
+MyGenericAlias2: TypeAlias = MyGenericClass["A"]
+MyGenericAlias3: TypeAlias = "MyGenericClass[A]"
+
+def _(a: MyGenericAlias1, b: MyGenericAlias2, c: MyGenericAlias3) -> None:
+    reveal_type(a)  # revealed: MyGenericClass[A]
+    reveal_type(b)  # revealed: MyGenericClass[A]
+    reveal_type(c)  # revealed: MyGenericClass[A]
+```
+
 ## Can inherit from an alias
 
 ```py

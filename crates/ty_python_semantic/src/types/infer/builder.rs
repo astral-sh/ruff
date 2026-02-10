@@ -14953,6 +14953,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )));
             }
             Type::SpecialForm(SpecialFormType::Optional) => {
+                let db = self.db();
+
                 if matches!(**slice, ast::Expr::Tuple(_))
                     && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                 {
@@ -14961,19 +14963,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ));
                 }
 
-                let ty = self.infer_expression(slice, TypeContext::default());
+                let ty = self.infer_type_expression(slice);
 
                 // `Optional[None]` is equivalent to `None`:
-                if ty.is_none(self.db()) {
+                if ty.is_none(db) {
                     return ty;
                 }
 
-                return UnionTypeInstance::from_value_expression_types(
-                    self.db(),
-                    [ty, Type::none(self.db())],
-                    self.scope(),
-                    self.typevar_binding_context,
-                );
+                return Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+                    db,
+                    None,
+                    Ok(UnionType::from_elements(db, [ty, Type::none(db)])),
+                )));
             }
             Type::SpecialForm(SpecialFormType::Union) => {
                 let db = self.db();
