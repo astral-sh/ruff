@@ -562,9 +562,56 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_eager_snapshots(popped_scope_id);
         } else {
             self.record_lazy_snapshots(popped_scope_id);
+            self.record_nonlocal_modifications(popped_scope_id);
         }
 
         popped_scope_id
+    }
+
+    /// For each `nonlocal` symbol in the popped scope, add an `ExternallyModified` binding
+    /// in the enclosing scope where the symbol is actually bound. This ensures the enclosing
+    /// scope's type for that symbol is widened to include `Unknown`, reflecting that the
+    /// nested scope may modify it.
+    fn record_nonlocal_modifications(&mut self, popped_scope_id: FileScopeId) {
+        // Collect (symbol_name, enclosing_scope_id, enclosing_symbol_id) tuples first
+        // to avoid borrow conflicts.
+        let mut modifications: Vec<(FileScopeId, ScopedSymbolId)> = Vec::new();
+
+        for symbol in self.place_tables[popped_scope_id].symbols() {
+            if !symbol.is_nonlocal() {
+                continue;
+            }
+
+            let name = symbol.name();
+
+            // Walk up the scope stack to find the enclosing scope where this symbol
+            // is bound AND not itself nonlocal.
+            for scope_info in self.scope_stack.iter().rev() {
+                let enclosing_scope_id = scope_info.file_scope_id;
+                let enclosing_place_table = &self.place_tables[enclosing_scope_id];
+
+                let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(name) else {
+                    continue;
+                };
+                let enclosing_symbol = enclosing_place_table.symbol(enclosing_symbol_id);
+
+                // Skip scopes where the symbol is itself nonlocal (keep walking up).
+                if enclosing_symbol.is_nonlocal() {
+                    continue;
+                }
+
+                // Found the scope where the symbol is actually bound.
+                if enclosing_symbol.is_bound() {
+                    modifications.push((enclosing_scope_id, enclosing_symbol_id));
+                }
+                break;
+            }
+        }
+
+        for (enclosing_scope_id, enclosing_symbol_id) in modifications {
+            self.use_def_maps[enclosing_scope_id]
+                .record_externally_modified_binding(enclosing_symbol_id);
+        }
     }
 
     fn current_place_table(&self) -> &PlaceTableBuilder {

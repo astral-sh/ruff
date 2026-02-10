@@ -4418,7 +4418,12 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             for attribute_assignment in attribute_assignments {
-                if let DefinitionState::Undefined = attribute_assignment.binding {
+                if matches!(
+                    attribute_assignment.binding,
+                    DefinitionState::Undefined
+                        | DefinitionState::Deleted
+                        | DefinitionState::ExternallyModified
+                ) {
                     continue;
                 }
 

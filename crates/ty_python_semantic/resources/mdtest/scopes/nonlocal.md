@@ -344,7 +344,7 @@ def f1():
                     y = "string"  # allowed, because `f3`'s `y` is untyped
 ```
 
-## TODO: `nonlocal` affects the inferred type in the outer scope
+## `nonlocal` affects the inferred type in the outer scope
 
 Without `nonlocal`, `g` can't write to `x`, and the inferred type of `x` in `f`'s scope isn't
 affected by `g`:
@@ -368,8 +368,7 @@ def f():
         reveal_type(x)  # revealed: Literal[1]
         x += 1
         reveal_type(x)  # revealed: Literal[2]
-    # TODO: should be `Unknown | Literal[1]`
-    reveal_type(x)  # revealed: Literal[1]
+    reveal_type(x)  # revealed: Literal[1] | Unknown
 ```
 
 Without a write:
@@ -380,8 +379,19 @@ def f():
     def g():
         nonlocal x
         reveal_type(x)  # revealed: Literal[1]
-    # TODO: should be `Unknown | Literal[1]`
-    reveal_type(x)  # revealed: Literal[1]
+    reveal_type(x)  # revealed: Literal[1] | Unknown
+```
+
+With an async pattern (from the original issue):
+
+```py
+async def main() -> None:
+    count = 0
+    async def bump() -> None:
+        nonlocal count
+        count += 1
+    await bump()
+    reveal_type(count)  # revealed: Literal[0] | Unknown
 ```
 
 ## Annotating a `nonlocal` binding is a syntax error

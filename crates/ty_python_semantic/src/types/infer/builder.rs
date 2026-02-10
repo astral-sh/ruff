@@ -12364,7 +12364,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     binding.narrowing_constraint.narrow(db, binding_ty, place),
                                 );
                             }
-                            DefinitionState::Undefined | DefinitionState::Deleted => {
+                            DefinitionState::Undefined
+                            | DefinitionState::Deleted
+                            | DefinitionState::ExternallyModified => {
                                 union =
                                     union.add(binding.narrowing_constraint.narrow(db, ty, place));
                             }

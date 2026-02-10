@@ -1213,6 +1213,17 @@ fn place_from_bindings_impl<'db>(
                     );
                     return None;
                 }
+                DefinitionState::ExternallyModified => {
+                    let static_reachability =
+                        reachability_constraints.evaluate(db, predicates, reachability_constraint);
+                    if static_reachability.is_always_false() {
+                        if unbound_visibility().is_none_or(Truthiness::is_always_false) {
+                            return Some(Type::Never);
+                        }
+                        return None;
+                    }
+                    return Some(Type::unknown());
+                }
             };
 
             if is_non_exported(binding) {
