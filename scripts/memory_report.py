@@ -47,8 +47,8 @@ class MemoryReport:
     struct_fields_bytes: int
     memo_metadata_bytes: int
     memo_fields_bytes: int
-    structs: list[dict] = field(default_factory=list)
-    queries: list[dict] = field(default_factory=list)
+    structs: list[dict[str, Any]] = field(default_factory=list)
+    queries: list[dict[str, Any]] = field(default_factory=list)
 
     @classmethod
     def from_json(cls, path: Path) -> Self:
@@ -79,13 +79,16 @@ class ProjectComparison:
         return self.new.total_bytes - self.old.total_bytes
 
 
-def bytes_to_mb(b: int) -> float:
-    return b / 1_000_000
+def format_bytes(bytes: int) -> str:
+    """Format bytes as a human-readable size."""
+    bytes: float = float(bytes)
 
+    for unit in ("B", "kB", "MB"):
+        if abs(bytes) < 1024.0:
+            return f"{bytes:.2f}{unit}"
+        bytes /= 1024.0
 
-def format_bytes(b: int) -> str:
-    """Format bytes as a human-readable string with MB."""
-    return f"{bytes_to_mb(b):.2f}MB"
+    return f"{bytes:.2f}GB"
 
 
 def format_diff(*, old_bytes: int, new_bytes: int) -> str:
@@ -100,7 +103,7 @@ def format_diff(*, old_bytes: int, new_bytes: int) -> str:
     if old_bytes == 0:
         return f"{sign}{format_bytes(diff)} (new)"
 
-    return f"{sign}{diff / old_bytes:.1%} ({format_bytes(diff)})"
+    return f"{sign}{diff / old_bytes:.1%} ({format_bytes(abs(diff))})"
 
 
 def format_outcome(*, old_bytes: int, new_bytes: int) -> str:
@@ -145,7 +148,7 @@ def diff_items(
         old_bytes = item_total_bytes(old_by_name[name]) if name in old_by_name else 0
         new_bytes = item_total_bytes(new_by_name[name]) if name in new_by_name else 0
         if old_bytes != new_bytes:
-            diffs.append((name, old_bytes, new_bytes))
+            diffs.append((name.replace(" ", ""), old_bytes, new_bytes))
 
     diffs.sort(key=lambda x: abs(x[2] - x[1]), reverse=True)
     return diffs
@@ -155,13 +158,15 @@ def diff_items(
 MAX_CHANGED_ITEMS = 15
 
 
-def render_summary(comparisons: list[ProjectComparison]) -> str:
+def render_summary(projects: list[ProjectComparison]) -> str:
     """Render a summary of all project comparisons."""
-    if not comparisons:
+    if not projects:
         return "No memory reports to compare."
 
-    any_increased = any(c.total_diff_bytes > 0 for c in comparisons)
-    any_decreased = any(c.total_diff_bytes < 0 for c in comparisons)
+    projects.sort(key=lambda p: p.total_diff_bytes, reverse=True)
+
+    any_increased = any(p.total_diff_bytes > 0 for p in projects)
+    any_decreased = any(p.total_diff_bytes < 0 for p in projects)
     any_changed = any_increased or any_decreased
 
     lines = ["## Memory usage report", ""]
@@ -176,35 +181,20 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
             ]
         )
 
-        for comp in sorted(comparisons, key=lambda c: c.total_diff_bytes, reverse=True):
+        for proj in projects:
             outcome = format_outcome(
-                old_bytes=comp.old.total_bytes, new_bytes=comp.new.total_bytes
+                old_bytes=proj.old.total_bytes, new_bytes=proj.new.total_bytes
             )
+
             lines.append(
-                f"| {comp.name} | {format_bytes(comp.old.total_bytes)} | "
-                f"{format_bytes(comp.new.total_bytes)} | "
-                f"{format_diff(old_bytes=comp.old.total_bytes, new_bytes=comp.new.total_bytes)} | {outcome} |"
+                f"| {proj.name} | {format_bytes(proj.old.total_bytes)} | "
+                f"{format_bytes(proj.new.total_bytes)} | "
+                f"{format_diff(old_bytes=proj.old.total_bytes, new_bytes=proj.new.total_bytes)} | {outcome} |"
             )
 
-        lines.append("")
-    else:
-        lines.append("Memory usage unchanged :white_check_mark:")
-
-    # Compute per-project item diffs
-    project_diffs = []
-    for comp in comparisons:
-        struct_diffs = diff_items(
-            old_items=comp.old.structs, new_items=comp.new.structs
-        )
-        query_diffs = diff_items(old_items=comp.old.queries, new_items=comp.new.queries)
-        project_diffs.append((comp, struct_diffs + query_diffs))
-
-    # Add detailed breakdown only if there are actual per-item changes
-    any_item_changed = any(item_diffs for _, item_diffs in project_diffs)
-
-    if any_item_changed:
         lines.extend(
             [
+                "",
                 "### Significant changes",
                 "",
                 "<details>",
@@ -213,13 +203,18 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
             ]
         )
 
-        for comp, item_diffs in project_diffs:
+        for proj in projects:
+            item_diffs = diff_items(
+                old_items=proj.old.structs + proj.old.queries,
+                new_items=proj.new.structs + proj.new.queries,
+            )
+
             if not item_diffs:
                 continue
 
             lines.extend(
                 [
-                    f"### {comp.name}",
+                    f"### {proj.name}",
                     "",
                     "| Name | Old | New | Diff | Outcome |",
                     "|------|-----|-----|------|---------|",
@@ -228,8 +223,9 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
 
             for name, old_bytes, new_bytes in item_diffs[:MAX_CHANGED_ITEMS]:
                 outcome = format_outcome(
-                    old_bytes=comp.old.total_bytes, new_bytes=comp.new.total_bytes
+                    old_bytes=proj.old.total_bytes, new_bytes=proj.new.total_bytes
                 )
+
                 lines.append(
                     f"| `{name}` | {format_bytes(old_bytes)} | "
                     f"{format_bytes(new_bytes)} | "
@@ -249,6 +245,8 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
                 "",
             ]
         )
+    else:
+        lines.append("Memory usage unchanged :white_check_mark:")
 
     return "\n".join(lines)
 
