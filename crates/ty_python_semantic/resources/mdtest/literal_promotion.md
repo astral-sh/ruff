@@ -407,3 +407,36 @@ reveal_type(x11)  # revealed: Sub2[Literal[1], int]
 x12: Sup2B[Literal[1], Literal[2]] = sub2(1, 2)
 reveal_type(x12)  # revealed: Sub2[int, Literal[2]]
 ```
+
+## Constrained TypeVars with Literal constraints
+
+Literal promotion should not apply to constrained TypeVars, since the inferred type is already one
+of the constraints. Promoting it would produce a type that doesn't match any constraint.
+
+```py
+from typing import TypeVar, Literal, Generic
+
+TU = TypeVar("TU", Literal["ms"], Literal["us"])
+
+def f(unit: TU) -> TU:
+    return unit
+
+reveal_type(f("us"))  # revealed: Literal["us"]
+reveal_type(f("ms"))  # revealed: Literal["ms"]
+
+class Timedelta(Generic[TU]):
+    def __init__(self, epoch: int, time_unit: TU) -> None:
+        self._epoch = epoch
+        self._time_unit = time_unit
+
+def convert(nanoseconds: int, time_unit: TU) -> Timedelta[TU]:
+    return Timedelta[TU](nanoseconds // 1_000, time_unit)
+
+delta0 = Timedelta[Literal["us"]](1_000, "us")
+delta1 = Timedelta(1_000, "us")
+delta2 = convert(1_000_000, "us")
+
+reveal_type(delta0)  # revealed: Timedelta[Literal["us"]]
+reveal_type(delta1)  # revealed: Timedelta[Literal["us"]]
+reveal_type(delta2)  # revealed: Timedelta[Literal["us"]]
+```
