@@ -28,12 +28,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
 # Diagnostics
 
 ```
-error[invalid-type-variable-default]: A bounded TypeVar cannot be used as the default for a constrained TypeVar
- --> src/mdtest_snippet.py:7:38
+error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
+ --> src/mdtest_snippet.py:7:18
   |
 6 | # error: [invalid-type-variable-default]
 7 | S = TypeVar("S", float, str, default=T1)
-  |                                      ^^
+  |                  ----------          ^^ Bounded TypeVar cannot be used as the default for a constrained TypeVar
+  |                  |
+  |                  Constraints of `S`
 8 |
 9 | # error: [invalid-type-variable-default]
   |
@@ -51,12 +53,14 @@ info: rule `invalid-type-variable-default` is enabled by default
 ```
 
 ```
-error[invalid-type-variable-default]: An unbounded TypeVar cannot be used as the default for a constrained TypeVar
-  --> src/mdtest_snippet.py:10:38
+error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
+  --> src/mdtest_snippet.py:10:18
    |
  9 | # error: [invalid-type-variable-default]
 10 | U = TypeVar("U", str, bytes, default=T2)
-   |                                      ^^
+   |                  ----------          ^^ Unbounded TypeVar cannot be used as the default for a constrained TypeVar
+   |                  |
+   |                  Constraints of `U`
    |
   ::: src/mdtest_snippet.py:4:1
    |

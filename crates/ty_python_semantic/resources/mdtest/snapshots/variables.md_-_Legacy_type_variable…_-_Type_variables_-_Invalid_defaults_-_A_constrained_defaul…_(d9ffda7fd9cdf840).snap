@@ -22,7 +22,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
  7 | # which are both assignable to `object`
  8 | S = TypeVar("S", default=T1, bound=object)
  9 | 
-10 | # error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
+10 | # error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint `str` of `T1` is not assignable to `int`"
 11 | U = TypeVar("U", default=T1, bound=int)
 12 | 
 13 | # OK: `T2`'s constraints are `int` and `bool`,
@@ -33,12 +33,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
 # Diagnostics
 
 ```
-error[invalid-type-variable-default]: Default type `T1` is not assignable to bound `int`
+error[invalid-type-variable-default]: TypeVar default is not assignable to the TypeVar's upper bound
   --> src/mdtest_snippet.py:11:26
    |
-10 | # error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
+10 | # error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint…
 11 | U = TypeVar("U", default=T1, bound=int)
-   |                          ^^
+   |                          ^^        --- Upper bound of `U`
+   |                          |
+   |                          Constraint `str` of default `T1` is not assignable to upper bound of `U`
 12 |
 13 | # OK: `T2`'s constraints are `int` and `bool`,
    |
@@ -50,7 +52,6 @@ error[invalid-type-variable-default]: Default type `T1` is not assignable to bou
    | ---------------------------- `T1` defined here
  4 | T2 = TypeVar("T2", int, bool)
    |
-info: Constraint `str` of `T1` is not assignable to bound `int`
 info: rule `invalid-type-variable-default` is enabled by default
 
 ```

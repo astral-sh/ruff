@@ -23,19 +23,21 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
  8 | # and the upper bound of `T` (`int`) is assignable to `int | float`
  9 | S = TypeVar("S", default=T1, bound=float)
 10 | 
-11 | # error: [invalid-type-variable-default] "Default type `T3` is not assignable to bound `int | float`"
+11 | # error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
 12 | U = TypeVar("U", default=T3, bound=float)
 ```
 
 # Diagnostics
 
 ```
-error[invalid-type-variable-default]: Default type `T3` is not assignable to bound `int | float`
+error[invalid-type-variable-default]: TypeVar default is not assignable to the TypeVar's upper bound
   --> src/mdtest_snippet.py:12:26
    |
-11 | # error: [invalid-type-variable-default] "Default type `T3` is not assignable to bound `int | float`"
+11 | # error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because it…
 12 | U = TypeVar("U", default=T3, bound=float)
-   |                          ^^
+   |                          ^^        ----- Upper bound of `U`
+   |                          |
+   |                          Upper bound `str` of default `T3` is not assignable to upper bound of `U`
    |
   ::: src/mdtest_snippet.py:5:1
    |
@@ -46,7 +48,6 @@ error[invalid-type-variable-default]: Default type `T3` is not assignable to bou
  6 |
  7 | # OK: `float` in a type expression means `int | float`,
    |
-info: `T3` has bound `str` which is not assignable to `int | float`
 info: rule `invalid-type-variable-default` is enabled by default
 
 ```

@@ -198,7 +198,7 @@ The default must be assignable to the bound:
 ```py
 from typing import TypeVar
 
-# error: [invalid-type-variable-default] "Default type `int` is not assignable to bound `str`"
+# error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
 T = TypeVar("T", bound=str, default=int)
 
 S = TypeVar("S", bound=float, default=int)
@@ -213,13 +213,13 @@ The default must be one of the constrained types, even if it is a subtype of one
 ```py
 from typing import Any, TypeVar
 
-# error: [invalid-type-variable-default] "Default type `bytes` is not one of the constrained types"
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bytes` is not one of the constraints of `T`"
 T = TypeVar("T", int, str, default=bytes)
 
 S = TypeVar("S", int, str, default=int)
 
 # A subtype is not sufficient; the default must be exactly one of the constraints.
-# error: [invalid-type-variable-default] "Default type `bool` is not one of the constrained types"
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bool` is not one of the constraints of `U`"
 U = TypeVar("U", int, str, default=bool)
 
 # `Any` is always allowed as a default, even for constrained TypeVars.
@@ -243,7 +243,7 @@ T3 = TypeVar("T3", bound=str)
 # and the upper bound of `T` (`int`) is assignable to `int | float`
 S = TypeVar("S", default=T1, bound=float)
 
-# error: [invalid-type-variable-default] "Default type `T3` is not assignable to bound `int | float`"
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
 U = TypeVar("U", default=T3, bound=float)
 ```
 
@@ -259,7 +259,7 @@ from typing import Generic, TypeVar
 
 T1 = TypeVar("T1")
 
-# error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
 S = TypeVar("S", default=T1, bound=int)
 ```
 
@@ -279,7 +279,7 @@ T2 = TypeVar("T2", int, bool)
 # which are both assignable to `object`
 S = TypeVar("S", default=T1, bound=object)
 
-# error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint `str` of `T1` is not assignable to `int`"
 U = TypeVar("U", default=T1, bound=int)
 
 # OK: `T2`'s constraints are `int` and `bool`,

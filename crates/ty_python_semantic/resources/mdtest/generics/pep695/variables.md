@@ -70,7 +70,7 @@ A TypeVar default must be compatible with its bound or constraints.
 The default must be assignable to the bound:
 
 ```py
-# error: [invalid-type-variable-default] "Default type `int` is not assignable to bound `str`"
+# error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
 def f[T: str = int](): ...
 def g[T: float = int](): ...
 ```
@@ -82,12 +82,12 @@ The default must be one of the constrained types, even if it is a subtype of one
 ```py
 from typing import Any
 
-# error: [invalid-type-variable-default] "Default type `bytes` is not one of the constrained types"
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bytes` is not one of the constraints of `T`"
 def f[T: (int, str) = bytes](): ...
 def g[T: (int, str) = int](): ...
 
 # A subtype is not sufficient; the default must be exactly one of the constraints.
-# error: [invalid-type-variable-default] "Default type `bool` is not one of the constrained types"
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bool` is not one of the constraints of `T`"
 def h[T: (int, str) = bool](): ...
 
 # `Any` is always allowed as a default, even for constrained TypeVars.
@@ -109,7 +109,7 @@ T3 = TypeVar("T3", bound=str)
 def f[S: float = T1](): ...
 
 # `T3` has bound `str`, which is not assignable to `int | float`
-# error: [invalid-type-variable-default] "Default type `T3` is not assignable to bound `int | float`"
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
 def g[U: float = T3](): ...
 ```
 
@@ -123,7 +123,7 @@ from typing import TypeVar
 
 T1 = TypeVar("T1")
 
-# error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
 def f[S: int = T1](): ...
 ```
 
@@ -142,7 +142,7 @@ T2 = TypeVar("T2", int, bool)
 def f[S: object = T1](): ...
 
 # `T1` has constraint `str`, which is not assignable to bound `int`
-# error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint `str` of `T1` is not assignable to `int`"
 def g[U: int = T1](): ...
 
 # OK: `T2`'s constraints are `int` and `bool`,
@@ -159,7 +159,7 @@ PEP 695 type parameters from the same scope can be used as defaults:
 def f[T: int, U: int = T](): ...
 
 # `T` has bound `int`, which is not assignable to `str`
-# error: [invalid-type-variable-default] "Default type `T` is not assignable to bound `str`"
+# error: [invalid-type-variable-default] "Default `T` of TypeVar `U` is not assignable to upper bound `str` of `U` because its upper bound `int` is not assignable to `str`"
 def g[T: int, U: str = T](): ...
 
 # OK: `T`'s constraints ({int, str}) are a subset of `U`'s ({int, str, bool})

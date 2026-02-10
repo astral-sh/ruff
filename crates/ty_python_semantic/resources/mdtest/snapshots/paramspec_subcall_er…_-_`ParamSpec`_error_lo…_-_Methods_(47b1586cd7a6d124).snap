@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: paramspec_subcall_error_location.md - `ParamSpec` error locations - Methods
 mdtest path: crates/ty_python_semantic/resources/mdtest/paramspec_subcall_error_location.md

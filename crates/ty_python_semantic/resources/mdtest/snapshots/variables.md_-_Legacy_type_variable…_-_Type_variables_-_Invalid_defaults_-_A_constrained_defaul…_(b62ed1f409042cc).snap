@@ -29,12 +29,14 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variable
 # Diagnostics
 
 ```
-error[invalid-type-variable-default]: Default type `T1` has constraint `int` that is not one of the outer TypeVar's constraints
-  --> src/mdtest_snippet.py:11:41
+error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
+  --> src/mdtest_snippet.py:11:18
    |
 10 | # error: [invalid-type-variable-default]
 11 | U = TypeVar("U", bool, complex, default=T1)
-   |                                         ^^
+   |                  -------------          ^^ Constraint `int` of default `T1` is not one of the constraints of `U`
+   |                  |
+   |                  Constraints of `U`
    |
   ::: src/mdtest_snippet.py:3:1
    |
