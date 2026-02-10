@@ -1,2 +1,6 @@
 if __name__ == '__main__':
-    print('I should be executable.')
+    #EXE002 Checks for executable .py files that do not have a shebang.
+    executable = True
+    shebang = False
+    rule_should = "fail"
+    print(f'EXE002 should {rule_should}: Executable: {executable}, shebang present: {shebang}')
