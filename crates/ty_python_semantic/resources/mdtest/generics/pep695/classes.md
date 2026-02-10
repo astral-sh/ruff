@@ -712,6 +712,34 @@ class WithOverloadedMethod[T]:
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
+## `Callable` return annotations preserve enclosing generic context
+
+When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an
+enclosing generic class or protocol, those typevars must remain tied to the enclosing context.
+
+```py
+from typing import Callable, Protocol, cast
+
+class GenericClass[**P, T]:
+    def hint(self) -> Callable[P, T]:
+        return cast(Callable[P, T], lambda *args, **kwargs: None)
+
+class GenericProtocol[**P, T](Protocol):
+    def hint(self) -> Callable[P, T]: ...
+
+def class_case(x: GenericClass[[int], str]) -> None:
+    # revealed: bound method GenericClass[(int, /), str].hint() -> (int, /) -> str
+    reveal_type(x.hint)
+    # revealed: (int, /) -> str
+    reveal_type(x.hint())
+
+def protocol_case(x: GenericProtocol[[int], str]) -> None:
+    # revealed: bound method GenericProtocol[(int, /), str].hint() -> (int, /) -> str
+    reveal_type(x.hint)
+    # revealed: (int, /) -> str
+    reveal_type(x.hint())
+```
+
 ## Scoping of typevars
 
 ### No back-references

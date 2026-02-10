@@ -542,6 +542,7 @@ impl<'db> GenericContext<'db> {
         generic_context: Option<Self>,
         parameters: &Parameters<'db>,
         return_type: Type<'db>,
+        function_definition: Definition<'db>,
     ) -> (Option<Self>, Type<'db>) {
         #[derive(Default)]
         struct TypeVarLocations<'db> {
@@ -564,6 +565,7 @@ impl<'db> GenericContext<'db> {
             fn finalize(
                 self,
                 db: &'db dyn Db,
+                function_definition: Definition<'db>,
             ) -> (
                 FxHashSet<BoundTypeVarInstance<'db>>,
                 FxHashMap<CallableType<'db>, CallableType<'db>>,
@@ -573,9 +575,14 @@ impl<'db> GenericContext<'db> {
                     .found_inside_callable_return
                     .into_iter()
                     .filter_map(|(callable, mut bound_typevars)| {
-                        // Only keep the typevars that appear _only_ in this callable.
+                        // Only keep typevars that appear _only_ in this callable and are
+                        // actually bound by this function. If we renamed typevars bound by an
+                        // enclosing generic context (e.g., class typevars in a method), we'd
+                        // disconnect them from class specialization.
                         bound_typevars.retain(|bound_typevar| {
                             !self.found_outside_callable_return.contains(bound_typevar)
+                                && bound_typevar.binding_context(db).definition()
+                                    == Some(function_definition)
                         });
                         if bound_typevars.is_empty() {
                             return None;
@@ -706,8 +713,10 @@ impl<'db> GenericContext<'db> {
 
         // Then update those return type Callables to be generic, with their generic context
         // containing the typevars that don't appear outside any return type Callable.
-        let (found_only_inside_callable_return, replacements) =
-            find_typevar_locations.locations.into_inner().finalize(db);
+        let (found_only_inside_callable_return, replacements) = find_typevar_locations
+            .locations
+            .into_inner()
+            .finalize(db, function_definition);
         let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
         let return_type = return_type.apply_type_mapping(db, &type_mapping, TypeContext::default());
 

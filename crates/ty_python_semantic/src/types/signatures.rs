@@ -710,6 +710,7 @@ impl<'db> Signature<'db> {
             full_generic_context,
             &parameters,
             return_ty,
+            definition,
         );
 
         Self {
