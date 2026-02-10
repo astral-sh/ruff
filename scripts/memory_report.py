@@ -164,7 +164,7 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
     any_decreased = any(c.total_diff_bytes < 0 for c in comparisons)
     any_changed = any_increased or any_decreased
 
-    lines = [f"## Memory usage report", ""]
+    lines = ["## Memory usage report", ""]
 
     if any_changed:
         lines.extend(
