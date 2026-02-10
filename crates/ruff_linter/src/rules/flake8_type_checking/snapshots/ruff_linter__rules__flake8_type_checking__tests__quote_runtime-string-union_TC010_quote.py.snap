@@ -1,0 +1,74 @@
+---
+source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
+---
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> TC010_quote.py:4:18
+  |
+4 | a = TypeVar('a', int | 'str', str)
+  |                  ^^^^^^^^^^^
+5 |
+6 | b = TypeVar('b', 'int' | 'str', bool)
+  |
+help: Quote the entire union expression
+1 | from typing import TypeVar, NewType
+2 | 
+3 | 
+  - a = TypeVar('a', int | 'str', str)
+4 + a = TypeVar('a', "int | str", str)
+5 | 
+6 | b = TypeVar('b', 'int' | 'str', bool)
+7 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> TC010_quote.py:6:18
+  |
+4 | a = TypeVar('a', int | 'str', str)
+5 |
+6 | b = TypeVar('b', 'int' | 'str', bool)
+  |                  ^^^^^^^^^^^^^
+7 |
+8 | c = TypeVar('c', bound="int" | str)
+  |
+help: Quote the entire union expression
+3 | 
+4 | a = TypeVar('a', int | 'str', str)
+5 | 
+  - b = TypeVar('b', 'int' | 'str', bool)
+6 + b = TypeVar('b', "int | str", bool)
+7 | 
+8 | c = TypeVar('c', bound="int" | str)
+9 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:8:24
+   |
+ 6 | b = TypeVar('b', 'int' | 'str', bool)
+ 7 |
+ 8 | c = TypeVar('c', bound="int" | str)
+   |                        ^^^^^^^^^^^
+ 9 |
+10 | d = NewType('d', "int" | str)
+   |
+help: Quote the entire union expression
+5  | 
+6  | b = TypeVar('b', 'int' | 'str', bool)
+7  | 
+   - c = TypeVar('c', bound="int" | str)
+8  + c = TypeVar('c', bound="int | str")
+9  | 
+10 | d = NewType('d', "int" | str)
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:10:18
+   |
+ 8 | c = TypeVar('c', bound="int" | str)
+ 9 |
+10 | d = NewType('d', "int" | str)
+   |                  ^^^^^^^^^^^
+   |
+help: Quote the entire union expression
+7  | 
+8  | c = TypeVar('c', bound="int" | str)
+9  | 
+   - d = NewType('d', "int" | str)
+10 + d = NewType('d', "int | str")
