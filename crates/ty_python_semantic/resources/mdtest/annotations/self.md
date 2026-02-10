@@ -654,7 +654,35 @@ D[K]().h()
 
 ## Protocols
 
-TODO: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
+See also: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
+
+```py
+from typing import Self, Protocol
+
+class Copyable(Protocol):
+    def copy(self) -> Self: ...
+
+class Linkable(Protocol):
+    next_node: Self
+
+    def advance(self) -> Self:
+        return self.next_node
+
+class CopyableImpl:
+    def copy(self) -> Self:
+        return self
+
+class SubCopyable(CopyableImpl): ...
+
+def copy_it(x: Copyable) -> None:
+    reveal_type(x.copy())  # revealed: Copyable
+
+def copy_concrete(x: CopyableImpl) -> None:
+    reveal_type(x.copy())  # revealed: CopyableImpl
+
+def copy_sub(x: SubCopyable) -> None:
+    reveal_type(x.copy())  # revealed: SubCopyable
+```
 
 ## Annotations
 

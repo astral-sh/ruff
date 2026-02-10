@@ -7203,10 +7203,7 @@ impl<'db> SelfBinding<'db> {
         let class_literal = match self_type {
             Type::NominalInstance(instance) => Some(instance.class_literal(db)),
             Type::TypeVar(typevar) if typevar.typevar(db).is_self(db) => {
-                typevar.typevar(db).upper_bound(db).and_then(|ty| match ty {
-                    Type::NominalInstance(instance) => Some(instance.class_literal(db)),
-                    _ => None,
-                })
+                self_typevar_owner_class_literal(db, typevar)
             }
             _ => None,
         };
@@ -7218,6 +7215,7 @@ impl<'db> SelfBinding<'db> {
         }
     }
 
+    /// Returns whether `bound_typevar` should be replaced by this binding's concrete self type.
     fn should_bind(&self, db: &'db dyn Db, bound_typevar: BoundTypeVarInstance<'db>) -> bool {
         if !bound_typevar.typevar(db).is_self(db) {
             return false;
@@ -7225,9 +7223,7 @@ impl<'db> SelfBinding<'db> {
 
         // Fast path for the common method-signature case where the bound `Self`
         // carries the same binding context as this mapping.
-        if let Some(binding_context) = self.binding_context
-            && bound_typevar.binding_context(db) == binding_context
-        {
+        if self.binding_context == Some(bound_typevar.binding_context(db)) {
             return true;
         }
 
