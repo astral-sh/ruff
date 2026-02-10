@@ -950,3 +950,26 @@ def test() -> None:
     instance_result = instance.objects.get()
     reveal_type(instance_result)  # revealed: Confirmation
 ```
+
+## Self in class attributes with descriptors
+
+`Self` binding should also work when the attribute type involves a descriptor.
+
+```py
+from typing import Self, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance, owner) -> T:
+        raise NotImplementedError
+
+class Base:
+    attr: Descriptor[Self] = Descriptor()
+
+class Child(Base):
+    pass
+
+reveal_type(Child.attr)  # revealed: Child
+reveal_type(Child().attr)  # revealed: Child
+```

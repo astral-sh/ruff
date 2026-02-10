@@ -879,19 +879,14 @@ impl<'db> Type<'db> {
     /// uniformly on any attribute type: data attributes like `Manager[Self]` will have
     /// `Self` bound eagerly, while functions/methods will defer `Self` binding to call
     /// time (where `Self` is inferred from the explicit `self` argument).
-    pub(crate) fn bind_self_typevars(
-        self,
-        db: &'db dyn Db,
-        self_type: Type<'db>,
-        self_binding_context: Option<BindingContext<'db>>,
-    ) -> Self {
+    pub(crate) fn bind_self_typevars(self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
         if !self.contains_self(db) {
             return self;
         }
 
         self.apply_type_mapping(
             db,
-            &TypeMapping::BindSelf(SelfBinding::new(db, self_type, self_binding_context)),
+            &TypeMapping::BindSelf(SelfBinding::new(db, self_type, None)),
             TypeContext::default(),
         )
     }
@@ -3435,10 +3430,7 @@ impl<'db> Type<'db> {
 
                 let result = self.fallback_to_getattr(db, &name, result, policy);
 
-                // Resolve `Self` type variables in attribute types to the
-                // concrete instance type. Uses MRO-based matching so that
-                // inherited attributes with Self also resolve correctly.
-                result.map_type(|ty| ty.bind_self_typevars(db, self, None))
+                result.map_type(|ty| ty.bind_self_typevars(db, self))
             }
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
@@ -3466,17 +3458,11 @@ impl<'db> Type<'db> {
                     "Calling `find_name_in_mro` on class literals and subclass-of types should always return `Some`",
                 );
 
-                // Resolve `Self` type variables in class-level attribute access
-                // BEFORE the descriptor protocol. The `BindSelf` type mapping treats
-                // function-like types as opaque (not recursing into their signatures),
-                // so only data attributes like `Manager[Self]` will have Self bound
-                // here. Functions/methods defer Self binding to call time.
-                //
-                // `to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`,
-                // and `SubclassOf`, so the `unwrap_or` is just a defensive fallback.
-                let self_instance = self.to_instance(db).unwrap_or(self);
+                let self_instance = self
+                    .to_instance(db)
+                    .expect("`to_instance` always returns `Some` for `ClassLiteral`, `GenericAlias`, and `SubclassOf`");
                 let class_attr_plain =
-                    class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance, None));
+                    class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
                 let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
                     db,
@@ -7227,11 +7213,9 @@ impl<'db> SelfBinding<'db> {
             return true;
         }
 
-        // When `class_literal` is `None` (e.g. the self type is `Never`, a dynamic type, or
-        // another non-nominal type), we can't perform MRO-based matching, so we
-        // optimistically bind. When `class_literal` is `Some`, we check that the Self
-        // typevar's owner class is in the MRO of the self type's class.
-        self.class_literal.is_none_or(|class_literal| {
+        // Check that the Self typevar's owner class is in the MRO of the self type's class.
+        // If we can't determine either class, conservatively don't bind.
+        self.class_literal.is_some_and(|class_literal| {
             let class_mro = class_mro_literals(db, class_literal);
             self_typevar_owner_class_literal(db, bound_typevar)
                 .is_none_or(|owner_class| class_mro.contains(&owner_class))
