@@ -91,7 +91,11 @@ pub(crate) struct MutableClassDefault;
 impl Violation for MutableClassDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Mutable class attributes should be annotated with `typing.ClassVar`".to_string()
+        "Mutable default value for class attribute".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Consider initializing in `__init__` or annotating with `typing.ClassVar`".to_string())
     }
 }
 
