@@ -164,16 +164,7 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
     any_decreased = any(c.total_diff_bytes < 0 for c in comparisons)
     any_changed = any_increased or any_decreased
 
-    if any_increased and not any_decreased:
-        header = "Memory usage increased :arrow_up:"
-    elif any_decreased and not any_increased:
-        header = "Memory usage decreased :arrow_down:"
-    elif any_increased and any_decreased:
-        header = "Memory usage changed"
-    else:
-        header = "Memory usage unchanged :white_check_mark:"
-
-    lines = [f"## {header}", ""]
+    lines = [f"## Memory usage report", ""]
 
     if any_changed:
         lines.extend(
@@ -194,6 +185,8 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
             )
 
         lines.append("")
+    else:
+        lines.append("Memory usage unchanged :white_check_mark:")
 
     # Compute per-project item diffs
     project_diffs = []
