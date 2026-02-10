@@ -240,6 +240,9 @@ pub(super) struct LiveBinding {
 
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
+/// Maximum number of branch-specific states tracked for the same binding at a merge point.
+const MAX_STATES_PER_BINDING: usize = 4;
+
 struct BindingsCounts {
     counts: SmallVec<[(ScopedDefinitionId, usize); 2]>,
 }
@@ -383,13 +386,12 @@ impl Bindings {
                     } else {
                         let narrowing_constraint = narrowing_constraints
                             .intersect_constraints(a.narrowing_constraint, b.narrowing_constraint);
-                        // State number explosion guard
-                        let appears_once_in_each_path =
-                            a_counts.get(a.binding) == 1 && b_counts.get(b.binding) == 1;
+                        let total_count = a_counts.get(a.binding) + b_counts.get(b.binding);
 
                         if !a.binding.is_unbound()
                             && narrowing_constraint == ScopedNarrowingConstraint::empty()
-                            && appears_once_in_each_path
+                            // State number explosion guard
+                            && total_count <= MAX_STATES_PER_BINDING
                         {
                             // Keep branch-specific narrowing/reachability paired together.
                             self.live_bindings.push(a);

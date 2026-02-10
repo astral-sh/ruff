@@ -144,6 +144,15 @@ class B:
 class C:
     pass
 
+class D:
+    pass
+
+class E:
+    pass
+
+class F:
+    pass
+
 def return_in_else_branch(x: A | B | C):
     if isinstance(x, A):
         pass
@@ -153,6 +162,37 @@ def return_in_else_branch(x: A | B | C):
         return
 
     reveal_type(x)  # revealed: A | (B & ~A)
+
+def return_in_else_branch2(x: A | B | C | D | E):
+    if isinstance(x, A):
+        pass
+    elif isinstance(x, B):
+        pass
+    elif isinstance(x, C):
+        pass
+    elif isinstance(x, D):
+        pass
+    else:
+        return
+
+    reveal_type(x)  # revealed: A | (D & ~A & ~B & ~C) | (C & ~A & ~B) | (B & ~A)
+
+def complex_return_in_else_branch(x: A | B | C | D | E | F):
+    if isinstance(x, A):
+        pass
+    elif isinstance(x, B):
+        pass
+    elif isinstance(x, C):
+        pass
+    elif isinstance(x, D):
+        pass
+    elif isinstance(x, E):
+        pass
+    else:
+        return
+
+    # TODO: this should eliminate `F`
+    reveal_type(x)  # revealed: A | B | C | D | E | F
 ```
 
 ## `continue`
