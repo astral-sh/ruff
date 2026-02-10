@@ -28,6 +28,7 @@ reveal_type(user.name)  # revealed: Any
 
 reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str) -> None
 
-# error: [missing-argument]
+# No `missing-argument` error here: `SQLModel.__new__` returns `Any`, so per the spec
+# `__init__` is not evaluated and any arguments are accepted via `__new__`.
 User()
 ```

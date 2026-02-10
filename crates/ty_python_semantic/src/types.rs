@@ -4764,6 +4764,76 @@ impl<'db> Type<'db> {
                 binding
             })
         }
+        fn meta_type_is_subclass_of_constructor<'db>(
+            db: &'db dyn Db,
+            meta_ty: Type<'db>,
+            constructor_class: ClassType<'db>,
+        ) -> Option<bool> {
+            match meta_ty.resolve_type_alias(db) {
+                Type::Union(union) => {
+                    let mut saw_unknown = false;
+                    for element in union.elements(db) {
+                        match meta_type_is_subclass_of_constructor(db, *element, constructor_class)
+                        {
+                            Some(false) => return Some(false),
+                            Some(true) => {}
+                            None => saw_unknown = true,
+                        }
+                    }
+                    if saw_unknown { None } else { Some(true) }
+                }
+                Type::ClassLiteral(class_literal) => Some(
+                    class_literal
+                        .default_specialization(db)
+                        .is_subclass_of(db, constructor_class),
+                ),
+                Type::GenericAlias(alias) => {
+                    Some(ClassType::from(alias).is_subclass_of(db, constructor_class))
+                }
+                Type::SubclassOf(subclass_of_ty) => subclass_of_ty
+                    .subclass_of()
+                    .into_class(db)
+                    .map(|class| class.is_subclass_of(db, constructor_class)),
+                Type::Never => Some(true),
+                Type::Dynamic(_) => None,
+                _ => None,
+            }
+        }
+        fn return_type_is_constructor_instance<'db>(
+            db: &'db dyn Db,
+            return_ty: Type<'db>,
+            constructor_class: ClassType<'db>,
+        ) -> Option<bool> {
+            match return_ty.resolve_type_alias(db) {
+                Type::Union(union) => {
+                    let mut saw_unknown = false;
+                    for element in union.elements(db) {
+                        match return_type_is_constructor_instance(db, *element, constructor_class) {
+                            Some(false) => return Some(false),
+                            Some(true) => {}
+                            None => saw_unknown = true,
+                        }
+                    }
+                    if saw_unknown { None } else { Some(true) }
+                }
+                Type::Dynamic(DynamicType::Any) => Some(false),
+                Type::Dynamic(
+                    DynamicType::Unknown
+                    | DynamicType::UnknownGeneric(_)
+                    | DynamicType::UnspecializedTypeVar
+                    | DynamicType::Todo(_)
+                    | DynamicType::TodoStarredExpression
+                    | DynamicType::TodoUnpack
+                    | DynamicType::TodoTypeVarTuple
+                    | DynamicType::Divergent(_),
+                )
+                | Type::TypeVar(_) => None,
+                Type::Never => Some(true),
+                ty => {
+                    meta_type_is_subclass_of_constructor(db, ty.to_meta_type(db), constructor_class)
+                }
+            }
+        }
 
         let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
         let class_generic_context = class_literal.generic_context(db);
@@ -4841,8 +4911,7 @@ impl<'db> Type<'db> {
         // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
         // Per the spec: if the return type is not an instance of the class being constructed
         // (or a subclass thereof), use the metaclass `__call__` directly and skip `__new__`/`__init__`.
-        // If the return type IS an instance, or is dynamic/contains typevars, fall through to
-        // evaluate `__new__` and `__init__` normally.
+        // If the return type is dynamic/contains typevars, fall through to evaluate `__new__`/`__init__`.
         let metaclass_dunder_call = self_type.member_lookup_with_policy(
             db,
             "__call__".into(),
@@ -4862,13 +4931,14 @@ impl<'db> Type<'db> {
                 .map(|sig| sig.return_ty)
                 .unwrap_or(Type::unknown());
 
-            if !declared_return_type.is_dynamic() && !declared_return_type.has_typevar(db) {
-                let is_instance_return = self
-                    .to_instance(db)
-                    .is_some_and(|instance_ty| declared_return_type.is_subtype_of(db, instance_ty));
-                if !is_instance_return {
-                    return Type::BoundMethod(metaclass_call_method).bindings(db);
-                }
+            if !declared_return_type.is_dynamic()
+                && !declared_return_type.has_typevar(db)
+                && matches!(
+                    return_type_is_constructor_instance(db, declared_return_type, class),
+                    Some(false)
+                )
+            {
+                return Type::BoundMethod(metaclass_call_method).bindings(db);
             }
         }
 
@@ -4937,61 +5007,42 @@ impl<'db> Type<'db> {
         // constructed (or a subclass thereof), a type checker should assume that the `__init__`
         // method will not be called." Also: "an explicit return type of `Any` should be treated
         // as a type that is not an instance of the class being constructed."
-        let new_non_instance_return = new_bindings.as_ref().and_then(|(_, new_callable)| {
-            let func = match *new_callable {
-                Type::FunctionLiteral(func) => Some(func),
-                Type::BoundMethod(method) => Some(method.function(db)),
-                _ => None,
-            }?;
+        //
+        // Use a structural class-based check instead of full assignability/subtyping to avoid
+        // deep recursive relation checks on large codebases (for example static-frame).
+        let new_non_instance_return =
+            new_bindings
+                .as_ref()
+                .and_then(|(new_bindings, new_callable)| {
+                    let func = match *new_callable {
+                        Type::FunctionLiteral(func) => Some(func),
+                        Type::BoundMethod(method) => Some(method.function(db)),
+                        _ => None,
+                    }?;
+                    let enclosing_class = nearest_enclosing_class(
+                        db,
+                        semantic_index(db, func.file(db)),
+                        func.definition(db).scope(db),
+                    );
+                    if enclosing_class.is_some_and(|cls| {
+                        matches!(cls.known(db), Some(KnownClass::Type | KnownClass::Object))
+                    }) {
+                        return None;
+                    }
 
-            // Skip the return type check for `__new__` inherited from `type` or `object`.
-            // `type.__new__` has an overload returning `type` (for `type(obj)`) that would
-            // incorrectly trigger non-instance detection for metaclass subclasses.
-            let enclosing_class = nearest_enclosing_class(
-                db,
-                semantic_index(db, func.file(db)),
-                func.definition(db).scope(db),
-            );
-            if enclosing_class.is_some_and(|cls| {
-                matches!(cls.known(db), Some(KnownClass::Type | KnownClass::Object))
-            }) {
-                return None;
-            }
-
-            let signature = func.signature(db);
-
-            let returns_non_instance = signature.overloads.iter().any(|overload| {
-                let return_ty = overload.return_ty;
-                // Unannotated __new__ (returns Unknown) is treated as returning Self.
-                if return_ty.is_unknown() {
-                    return false;
-                }
-                // Types with typevars (like `Self`) represent the class instance.
-                if return_ty.has_typevar(db) {
-                    return false;
-                }
-                // Per the spec: "an explicit return type of `Any` should be treated as
-                // a type that is not an instance of the class being constructed."
-                // Detect `Any` anywhere in the return type (including unions), then use
-                // assignability for the remaining cases to avoid deep subtype recursion.
-                any_over_type(
-                    db,
-                    return_ty,
-                    &|ty| matches!(ty, Type::Dynamic(DynamicType::Any)),
-                    true,
-                ) || !return_ty.is_assignable_to(db, constructor_instance_ty)
-            });
-
-            if returns_non_instance {
-                signature
-                    .overloads
-                    .iter()
-                    .map(|o| o.return_ty)
-                    .find(|ty| !ty.is_unknown())
-            } else {
-                None
-            }
-        });
+                    new_bindings
+                        .iter()
+                        .flat_map(|callable_binding| callable_binding.overloads().iter())
+                        .map(|overload| overload.signature.return_ty)
+                        .find(|return_ty| {
+                            !return_ty.is_unknown()
+                                && !return_ty.has_typevar(db)
+                                && matches!(
+                                    return_type_is_constructor_instance(db, *return_ty, class),
+                                    Some(false)
+                                )
+                        })
+                });
 
         if let Some(new_return_ty) = new_non_instance_return {
             let (new_bindings, _) = new_bindings.unwrap();
