@@ -100,18 +100,18 @@ def format_diff(*, old_bytes: int, new_bytes: int) -> str:
     if old_bytes == 0:
         return f"{sign}{format_bytes(diff)} (new)"
 
-    return f"{sign}{format_bytes(diff)} ({sign}{diff / old_bytes:.1%})"
+    return f"{sign}{diff / old_bytes:.1%} ({format_bytes(diff)})"
 
 
 def format_outcome(*, old_bytes: int, new_bytes: int) -> str:
     """Format the outcome indicator."""
     diff = new_bytes - old_bytes
     if diff > 0:
-        return ":arrow_up:"
+        return "⏫"
     elif diff < 0:
-        return ":arrow_down:"
+        return "⬇️"
     else:
-        return ""
+        return "☑️"
 
 
 def load_reports_from_directory(directory: Path) -> dict[str, MemoryReport]:
@@ -169,6 +169,8 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
     if any_changed:
         lines.extend(
             [
+                "### Summary",
+                "",
                 "| Project | Old | New | Diff | Outcome |",
                 "|---------|-----|-----|------|---------|",
             ]
@@ -195,17 +197,15 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
             old_items=comp.old.structs, new_items=comp.new.structs
         )
         query_diffs = diff_items(old_items=comp.old.queries, new_items=comp.new.queries)
-        project_diffs.append((comp, struct_diffs, query_diffs))
+        project_diffs.append((comp, struct_diffs + query_diffs))
 
     # Add detailed breakdown only if there are actual per-item changes
-    any_item_changed = any(
-        struct_diffs or query_diffs for _, struct_diffs, query_diffs in project_diffs
-    )
+    any_item_changed = any(item_diffs for _, item_diffs in project_diffs)
 
     if any_item_changed:
         lines.extend(
             [
-                "### Most significant changes",
+                "### Significant changes",
                 "",
                 "<details>",
                 "<summary>Click to expand detailed breakdown</summary>",
@@ -213,59 +213,35 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
             ]
         )
 
-        for comp, struct_diffs, query_diffs in project_diffs:
-            if not struct_diffs and not query_diffs:
+        for comp, item_diffs in project_diffs:
+            if not item_diffs:
                 continue
 
-            if len(comparisons) > 1:
-                lines.append(f"#### {comp.name}")
-                lines.append("")
+            lines.extend(
+                [
+                    f"### {comp.name}",
+                    "",
+                    "| Name | Old | New | Diff | Outcome |",
+                    "|------|-----|-----|------|---------|",
+                ]
+            )
 
-            if struct_diffs:
-                lines.extend(
-                    [
-                        "**Structs**",
-                        "",
-                        "| Name | Old | New | Diff |",
-                        "|------|-----|-----|------|",
-                    ]
+            for name, old_bytes, new_bytes in item_diffs[:MAX_CHANGED_ITEMS]:
+                outcome = format_outcome(
+                    old_bytes=comp.old.total_bytes, new_bytes=comp.new.total_bytes
+                )
+                lines.append(
+                    f"| `{name}` | {format_bytes(old_bytes)} | "
+                    f"{format_bytes(new_bytes)} | "
+                    f"{format_diff(old_bytes=old_bytes, new_bytes=new_bytes)} |"
+                    f"{outcome} |"
                 )
 
-                for name, old_bytes, new_bytes in struct_diffs[:MAX_CHANGED_ITEMS]:
-                    lines.append(
-                        f"| `{name}` | {format_bytes(old_bytes)} | "
-                        f"{format_bytes(new_bytes)} | "
-                        f"{format_diff(old_bytes=old_bytes, new_bytes=new_bytes)} |"
-                    )
+            remaining = len(item_diffs) - MAX_CHANGED_ITEMS
+            if remaining > 0:
+                lines.append(f"| ... | | | *{remaining} more* |")
 
-                remaining = len(struct_diffs) - MAX_CHANGED_ITEMS
-                if remaining > 0:
-                    lines.append(f"| ... | | | *{remaining} more* |")
-
-                lines.append("")
-
-            if query_diffs:
-                lines.extend(
-                    [
-                        "**Queries**",
-                        "",
-                        "| Name | Old | New | Diff |",
-                        "|------|-----|-----|------|",
-                    ]
-                )
-
-                for name, old_bytes, new_bytes in query_diffs[:MAX_CHANGED_ITEMS]:
-                    lines.append(
-                        f"| `{name}` | {format_bytes(old_bytes)} | "
-                        f"{format_bytes(new_bytes)} | "
-                        f"{format_diff(old_bytes=old_bytes, new_bytes=new_bytes)} |"
-                    )
-
-                remaining = len(query_diffs) - MAX_CHANGED_ITEMS
-                if remaining > 0:
-                    lines.append(f"| ... | | | *{remaining} more* |")
-
-                lines.append("")
+            lines.append("")
 
         lines.extend(
             [
@@ -304,7 +280,7 @@ def run_ty_memory_check(
     env["TY_MEMORY_REPORT"] = "json"
     env["TY_MAX_PARALLELISM"] = "1"  # For deterministic memory numbers
 
-    print(f"Running ty on {project_path.name}...", file=sys.stderr)
+    print(f"Running {ty_path} on {project_path.name}...", file=sys.stderr)
     result = subprocess.run(
         [ty_path, "check", str(project_path), "--exit-zero"],
         capture_output=True,
