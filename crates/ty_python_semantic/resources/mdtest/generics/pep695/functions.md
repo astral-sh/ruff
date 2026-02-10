@@ -670,6 +670,20 @@ def _(x: list[int], y: dict[int, int]):
     reveal_type(h(y))  # revealed: int | None
 ```
 
+## Bounded typevar call context through a union
+
+Regression test for an `invalid-assignment` false positive: `list(items)` should be assignable to
+`list[str] | list[int]` when `items` has type `list[T]` and `T: int`.
+
+```py
+def test[T: int](items: list[T]) -> list[T]:
+    ok1: list[str] | list[int] = list(items)
+    ok2: list[int] | list[str] = list(items)
+
+    bad: list[str] | list[bytes] = list(items)  # error: [invalid-assignment]
+    return items
+```
+
 ## Nested functions see typevars bound in outer function
 
 ```py
