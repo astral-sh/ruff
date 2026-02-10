@@ -1633,6 +1633,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UselessExceptionStatement) {
                 pylint::rules::useless_exception_statement(checker, expr);
             }
+            if checker.is_rule_enabled(Rule::AsyncioGatherIgnoredExceptions) {
+                ruff::rules::check_for_ignored_asyncio_gather(checker, expr);
+            }
         }
         Stmt::Match(ast::StmtMatch {
             subject: _,
