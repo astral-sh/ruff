@@ -426,6 +426,22 @@ def outer():
     reveal_type(x)  # revealed: Literal[1] | Unknown
 ```
 
+When an intermediate scope declares the symbol `global`, it acts as a resolution barrier for the
+`nonlocal` upward walk. The outer function's type is not widened:
+
+```py
+x = 1
+
+def outer():
+    x = 2
+
+    def middle():
+        global x
+        def inner():
+            nonlocal x  # error: [invalid-syntax] "no binding for nonlocal `x` found"
+    reveal_type(x)  # revealed: Literal[2]
+```
+
 With a declaration-only nonlocal target (annotation without binding), the `ExternallyModified`
 binding widens the type:
 

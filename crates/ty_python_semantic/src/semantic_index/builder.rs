@@ -562,6 +562,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             self.record_eager_snapshots(popped_scope_id);
         } else {
             self.record_lazy_snapshots(popped_scope_id);
+            // Only lazily-evaluated scopes (functions, classes) can contain `nonlocal`.
+            // Eagerly-evaluated scopes (comprehensions, generator expressions) cannot
+            // have `nonlocal` declarations — Python disallows this syntactically.
             self.record_nonlocal_modifications(popped_scope_id);
         }
 
@@ -573,10 +576,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// scope's type for that symbol is widened to include `Unknown`, reflecting that the
     /// nested scope may modify it.
     fn record_nonlocal_modifications(&mut self, popped_scope_id: FileScopeId) {
-        // Collect (symbol_name, enclosing_scope_id, enclosing_symbol_id) tuples first
-        // to avoid borrow conflicts.
+        // Collect (enclosing_scope_id, enclosing_symbol_id) tuples first to avoid borrow conflicts.
         let mut modifications: Vec<(FileScopeId, ScopedSymbolId)> = Vec::new();
 
+        // Only symbols (simple names) need to be checked here; Python's `nonlocal` statement
+        // only applies to simple names, not attributes or subscripts.
         for symbol in self.place_tables[popped_scope_id].symbols() {
             if !symbol.is_nonlocal() {
                 continue;

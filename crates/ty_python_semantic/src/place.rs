@@ -1319,7 +1319,10 @@ fn place_from_bindings_impl<'db>(
                     // no prior bindings (e.g. declaration-only like `x: int`).
                     assert!(
                         has_externally_modified,
-                        "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
+                        "Unbound is definitely visible alongside bindings, \
+                         but no `ExternallyModified` binding was found. \
+                         This is only expected when an `ExternallyModified` binding \
+                         is merged into a symbol with no prior bindings."
                     );
                     Definedness::PossiblyUndefined
                 }
