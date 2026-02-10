@@ -594,7 +594,10 @@ class Y(C, B): ...
 Conflict = type("Conflict", (X, Y), {})
 ```
 
-## MRO errors with fix
+## `inconsistent-mro` errors with autofixes
+
+A common cause of "inconsistent MRO" errors is where a class inherits from `Generic[]`, but
+`Generic[]` is not the last base class. We provide an autofix for this common error:
 
 <!-- snapshot-diagnostics -->
 
