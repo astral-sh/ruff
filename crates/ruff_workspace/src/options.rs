@@ -2900,7 +2900,10 @@ impl IsortOptions {
             constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
             variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
             no_lines_before: FxHashSet::from_iter(no_lines_before),
-            import_headings: import_heading,
+            import_headings: import_heading
+                .into_iter()
+                .map(|(section, heading)| (section, format!("# {heading}")))
+                .collect(),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),

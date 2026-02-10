@@ -116,18 +116,17 @@ pub(crate) fn organize_imports(
     let comment_range_start = if import_headings.is_empty() {
         locator.line_start(range.start())
     } else {
-        let heading_comments: Vec<String> =
-            import_headings.values().map(|h| format!("# {h}")).collect();
+        // Heading comments are already formatted as "# {heading}" in settings
 
         // start at the first import's line, walk backward while we see heading comments
         let mut earliest = locator.line_start(range.start());
-        while earliest > TextSize::from(0) {
-            let prev_line_start = locator.line_start(earliest - TextSize::from(1));
+        while earliest > TextSize::ZERO {
+            let prev_line_start = locator.line_start(earliest - TextSize::ONE);
             let prev_line = locator
                 .slice(TextRange::new(prev_line_start, earliest))
                 .trim();
 
-            if heading_comments.iter().any(|h| prev_line == h) {
+            if import_headings.values().any(|h| prev_line == h) {
                 earliest = prev_line_start;
             } else {
                 break;

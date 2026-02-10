@@ -184,11 +184,11 @@ fn format_import_block(
 
     let mut output = String::new();
 
-    // Collect all configured heading values (as "# {heading}") for stripping.
-    let heading_comments: Vec<String> = settings
+    // Heading comments are already formatted as "# {heading}" in settings.
+    let heading_comments: Vec<&str> = settings
         .import_headings
         .values()
-        .map(|heading| format!("# {heading}"))
+        .map(String::as_str)
         .collect();
 
     // Generate replacement source code.
@@ -212,22 +212,15 @@ fn format_import_block(
         // sorting may have reordered them.
         if !heading_comments.is_empty() {
             for import in &mut imports {
-                match import {
-                    Import((_, comments)) => {
-                        comments.atop.retain(|comment| {
-                            !heading_comments
-                                .iter()
-                                .any(|heading| comment.as_ref() == heading.as_str())
-                        });
-                    }
-                    ImportFrom((_, comments, _, _)) => {
-                        comments.atop.retain(|comment| {
-                            !heading_comments
-                                .iter()
-                                .any(|heading| comment.as_ref() == heading.as_str())
-                        });
-                    }
-                }
+                let atop = match import {
+                    Import((_, comments)) => &mut comments.atop,
+                    ImportFrom((_, comments, _, _)) => &mut comments.atop,
+                };
+                atop.retain(|comment| {
+                    !heading_comments
+                        .iter()
+                        .any(|&heading| comment.as_ref() == heading)
+                });
             }
         }
 
@@ -242,7 +235,7 @@ fn format_import_block(
 
         // Insert heading comment for this section, if configured.
         if let Some(heading) = settings.import_headings.get(import_section) {
-            write!(output, "# {heading}").unwrap();
+            write!(output, "{heading}").unwrap();
             output.push_str(&stylist.line_ending());
         }
 
@@ -1244,25 +1237,41 @@ mod tests {
         FxHashMap::from_iter([
             (
                 ImportSection::Known(ImportType::Future),
-                "Future imports".to_string(),
+                "# Future imports".to_string(),
             ),
             (
                 ImportSection::Known(ImportType::StandardLibrary),
-                "Standard library imports".to_string(),
+                "# Standard library imports".to_string(),
             ),
             (
                 ImportSection::Known(ImportType::ThirdParty),
-                "Third party imports".to_string(),
+                "# Third party imports".to_string(),
             ),
             (
                 ImportSection::Known(ImportType::FirstParty),
-                "First party imports".to_string(),
+                "# First party imports".to_string(),
             ),
             (
                 ImportSection::Known(ImportType::LocalFolder),
-                "Local folder imports".to_string(),
+                "# Local folder imports".to_string(),
             ),
         ])
+    }
+
+    /// Helper to create a standard isort Settings with all section headings
+    /// and `known_modules` configured for `my_first_party`.
+    fn isort_settings_with_all_headings() -> super::settings::Settings {
+        super::settings::Settings {
+            import_headings: all_section_headings(),
+            known_modules: KnownModules::new(
+                vec![pattern("my_first_party")],
+                vec![],
+                vec![],
+                vec![],
+                FxHashMap::default(),
+            ),
+            ..super::settings::Settings::default()
+        }
     }
 
     #[test_case(Path::new("import_heading.py"))]
@@ -1271,17 +1280,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
-                isort: super::settings::Settings {
-                    import_headings: all_section_headings(),
-                    known_modules: KnownModules::new(
-                        vec![pattern("my_first_party")],
-                        vec![],
-                        vec![],
-                        vec![],
-                        FxHashMap::default(),
-                    ),
-                    ..super::settings::Settings::default()
-                },
+                isort: isort_settings_with_all_headings(),
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
@@ -1296,17 +1295,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
-                isort: super::settings::Settings {
-                    import_headings: all_section_headings(),
-                    known_modules: KnownModules::new(
-                        vec![pattern("my_first_party")],
-                        vec![],
-                        vec![],
-                        vec![],
-                        FxHashMap::default(),
-                    ),
-                    ..super::settings::Settings::default()
-                },
+                isort: isort_settings_with_all_headings(),
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
@@ -1321,17 +1310,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
-                isort: super::settings::Settings {
-                    import_headings: all_section_headings(),
-                    known_modules: KnownModules::new(
-                        vec![pattern("my_first_party")],
-                        vec![],
-                        vec![],
-                        vec![],
-                        FxHashMap::default(),
-                    ),
-                    ..super::settings::Settings::default()
-                },
+                isort: isort_settings_with_all_headings(),
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
@@ -1350,18 +1329,10 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    import_headings: all_section_headings(),
-                    known_modules: KnownModules::new(
-                        vec![pattern("my_first_party")],
-                        vec![],
-                        vec![],
-                        vec![],
-                        FxHashMap::default(),
-                    ),
                     no_lines_before: FxHashSet::from_iter([ImportSection::Known(
                         ImportType::LocalFolder,
                     )]),
-                    ..super::settings::Settings::default()
+                    ..isort_settings_with_all_headings()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
@@ -1381,11 +1352,11 @@ mod tests {
                     import_headings: FxHashMap::from_iter([
                         (
                             ImportSection::Known(ImportType::StandardLibrary),
-                            "Standard library imports".to_string(),
+                            "# Standard library imports".to_string(),
                         ),
                         (
                             ImportSection::Known(ImportType::ThirdParty),
-                            "Third party imports".to_string(),
+                            "# Third party imports".to_string(),
                         ),
                     ]),
                     ..super::settings::Settings::default()
@@ -1408,15 +1379,15 @@ mod tests {
                     import_headings: FxHashMap::from_iter([
                         (
                             ImportSection::Known(ImportType::StandardLibrary),
-                            "Standard library imports".to_string(),
+                            "# Standard library imports".to_string(),
                         ),
                         (
                             ImportSection::Known(ImportType::ThirdParty),
-                            "Third party imports".to_string(),
+                            "# Third party imports".to_string(),
                         ),
                         (
                             ImportSection::Known(ImportType::FirstParty),
-                            "First party imports".to_string(),
+                            "# First party imports".to_string(),
                         ),
                     ]),
                     known_modules: KnownModules::new(
@@ -1445,7 +1416,7 @@ mod tests {
                 isort: super::settings::Settings {
                     import_headings: FxHashMap::from_iter([(
                         ImportSection::Known(ImportType::ThirdParty),
-                        "Third party imports".to_string(),
+                        "# Third party imports".to_string(),
                     )]),
                     ..super::settings::Settings::default()
                 },
@@ -1464,17 +1435,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
-                isort: super::settings::Settings {
-                    import_headings: all_section_headings(),
-                    known_modules: KnownModules::new(
-                        vec![pattern("my_first_party")],
-                        vec![],
-                        vec![],
-                        vec![],
-                        FxHashMap::default(),
-                    ),
-                    ..super::settings::Settings::default()
-                },
+                isort: isort_settings_with_all_headings(),
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
@@ -1494,9 +1455,8 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
                 isort: super::settings::Settings {
-                    import_headings: all_section_headings(),
                     force_sort_within_sections: true,
-                    ..super::settings::Settings::default()
+                    ..isort_settings_with_all_headings()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
