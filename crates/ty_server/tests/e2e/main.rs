@@ -1188,7 +1188,11 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: vec![("VIRTUAL_ENV".to_string(), None)],
+            env_vars: vec![
+                ("HOME".into(), None),
+                ("PATH".into(), None),
+                ("VIRTUAL_ENV".into(), None),
+            ],
         })
     }
 

@@ -129,6 +129,10 @@ impl System for OsSystem {
         self.inner.case_sensitivity
     }
 
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        is_executable::is_executable(path.as_std_path())
+    }
+
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
     }
