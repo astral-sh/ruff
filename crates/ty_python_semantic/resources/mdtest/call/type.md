@@ -609,20 +609,29 @@ V = TypeVar("V")
 
 class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
 
+# fmt: off
 
-class Foo2(  # comment
-    Generic[K, V],  # comment 1
-    dict  # comment 2
-): ...  # error: [inconsistent-mro]
+class Foo2(  # error: [inconsistent-mro]
+    # comment1
+    Generic[K, V],  # comment2
+    # comment3
+    dict  # comment4
+    # comment5
+): ...
 
 class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
 
-class Foo4(
-    Generic[K, V],  # comment
-    dict,
-    metaclass=type
-): ...  # error: [inconsistent-mro]
+class Foo4(  # error: [inconsistent-mro]
+    # comment1
+    Generic[K, V],  # comment2
+    # comment3
+    dict,  # comment4
+    # comment5
+    metaclass=type  # comment6
+    # comment7
+): ...
 
+# fmt: on
 ```
 
 ## MRO error highlighting (snapshot)
