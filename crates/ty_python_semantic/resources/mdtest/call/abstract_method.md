@@ -2,6 +2,8 @@
 
 ## Abstract classmethod with trivial body on class literal
 
+<!-- snapshot-diagnostics -->
+
 Calling an abstract `@classmethod` with a trivial body directly on the class is unsound.
 
 ```py

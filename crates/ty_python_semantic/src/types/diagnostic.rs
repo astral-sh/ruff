@@ -2150,13 +2150,24 @@ declare_lint! {
 declare_lint! {
     /// ## What it does
     /// Checks for calls to abstract `@classmethod`s or `@staticmethod`s
-    /// with trivial bodies when accessed on the class object itself.
+    /// with "trivial bodies" when accessed on the class object itself.
+    ///
+    /// "Trivial bodies" are bodies that solely consist of `...`, `pass`,
+    /// a docstring, and/or `raise NotImplementedError`.
     ///
     /// ## Why is this bad?
-    /// An abstract method with a trivial body (containing only `...`, `pass`, or
-    /// `raise NotImplementedError`) has no meaningful implementation. Calling such
-    /// a method directly on the class is unsound because there is no concrete
-    /// implementation to execute.
+    /// An abstract method with a trivial body has no concrete implementation
+    /// to execute, so calling such a method directly on the class will probably
+    /// not have the desired effect.
+    ///
+    /// It is also unsound to call these methods directly on the class. Unlike
+    /// other methods, ty permits abstract methods with trivial bodies to have
+    /// non-`None` return types even though they always return `None` at runtime.
+    /// This is because it is expected that these methods will always be
+    /// overridden rather than being called directly. As a result of this
+    /// exception to the normal rule, ty may infer an incorrect type if one of
+    /// these methods is called directly, which may then mean that type errors
+    /// elsewhere in your code go undetected by ty.
     ///
     /// Calling abstract classmethods or staticmethods via `type[X]` is allowed,
     /// since the actual runtime type could be a concrete subclass with an implementation.
