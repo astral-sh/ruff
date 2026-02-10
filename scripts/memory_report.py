@@ -88,7 +88,7 @@ def format_bytes(b: int) -> str:
     return f"{bytes_to_mb(b):.2f}MB"
 
 
-def format_diff(old_bytes: int, new_bytes: int) -> str:
+def format_diff(*, old_bytes: int, new_bytes: int) -> str:
     """Format a difference with percentage and direction indicator."""
     diff = new_bytes - old_bytes
 
@@ -100,11 +100,10 @@ def format_diff(old_bytes: int, new_bytes: int) -> str:
     if old_bytes == 0:
         return f"{sign}{format_bytes(diff)} (new)"
 
-    percent = (diff / old_bytes) * 100
-    return f"{sign}{format_bytes(diff)} ({sign}{percent:.1f}%)"
+    return f"{sign}{format_bytes(diff)} ({sign}{diff / old_bytes:.1%})"
 
 
-def format_outcome(old_bytes: int, new_bytes: int) -> str:
+def format_outcome(*, old_bytes: int, new_bytes: int) -> str:
     """Format the outcome indicator."""
     diff = new_bytes - old_bytes
     if diff > 0:
@@ -130,7 +129,7 @@ def item_total_bytes(item: dict[str, Any]) -> int:
 
 
 def diff_items(
-    old_items: list[dict[str, Any]], new_items: list[dict[str, Any]]
+    *, old_items: list[dict[str, Any]], new_items: list[dict[str, Any]]
 ) -> list[tuple[str, int, int]]:
     """Diff two lists of struct/query items by name.
 
@@ -139,7 +138,7 @@ def diff_items(
     old_by_name = {item["name"]: item for item in old_items}
     new_by_name = {item["name"]: item for item in new_items}
 
-    all_names = set(old_by_name.keys()) | set(new_by_name.keys())
+    all_names = old_by_name.keys() | new_by_name.keys()
 
     diffs = []
     for name in all_names:
@@ -185,11 +184,13 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
         )
 
         for comp in sorted(comparisons, key=lambda c: c.total_diff_bytes, reverse=True):
-            outcome = format_outcome(comp.old.total_bytes, comp.new.total_bytes)
+            outcome = format_outcome(
+                old_bytes=comp.old.total_bytes, new_bytes=comp.new.total_bytes
+            )
             lines.append(
                 f"| {comp.name} | {format_bytes(comp.old.total_bytes)} | "
                 f"{format_bytes(comp.new.total_bytes)} | "
-                f"{format_diff(comp.old.total_bytes, comp.new.total_bytes)} | {outcome} |"
+                f"{format_diff(old_bytes=comp.old.total_bytes, new_bytes=comp.new.total_bytes)} | {outcome} |"
             )
 
         lines.append("")
@@ -197,8 +198,10 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
     # Compute per-project item diffs
     project_diffs = []
     for comp in comparisons:
-        struct_diffs = diff_items(comp.old.structs, comp.new.structs)
-        query_diffs = diff_items(comp.old.queries, comp.new.queries)
+        struct_diffs = diff_items(
+            old_items=comp.old.structs, new_items=comp.new.structs
+        )
+        query_diffs = diff_items(old_items=comp.old.queries, new_items=comp.new.queries)
         project_diffs.append((comp, struct_diffs, query_diffs))
 
     # Add detailed breakdown only if there are actual per-item changes
@@ -239,7 +242,7 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
                     lines.append(
                         f"| `{name}` | {format_bytes(old_bytes)} | "
                         f"{format_bytes(new_bytes)} | "
-                        f"{format_diff(old_bytes, new_bytes)} |"
+                        f"{format_diff(old_bytes=old_bytes, new_bytes=new_bytes)} |"
                     )
 
                 remaining = len(struct_diffs) - MAX_CHANGED_ITEMS
@@ -262,7 +265,7 @@ def render_summary(comparisons: list[ProjectComparison]) -> str:
                     lines.append(
                         f"| `{name}` | {format_bytes(old_bytes)} | "
                         f"{format_bytes(new_bytes)} | "
-                        f"{format_diff(old_bytes, new_bytes)} |"
+                        f"{format_diff(old_bytes=old_bytes, new_bytes=new_bytes)} |"
                     )
 
                 remaining = len(query_diffs) - MAX_CHANGED_ITEMS
