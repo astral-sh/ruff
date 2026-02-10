@@ -1112,35 +1112,50 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //
         // Importantly, `my_typeddict_union["tag"]` isn't the place we're going to constraint.
         // Instead, we're going to constrain `my_typeddict_union` itself.
-        if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq])
-            && let ast::Expr::Subscript(subscript) = &**left
-        {
+        if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq]) {
             // For `==`, we use equality semantics on the `if` branch (is_positive=true).
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
             let constrain_with_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
-            if let Some((place, constraint)) = self.narrow_typeddict_subscript(
-                inference.expression_type(&*subscript.value),
-                &subscript.value,
-                inference.expression_type(&*subscript.slice),
-                inference.expression_type(&comparators[0]),
-                constrain_with_equality,
-            ) {
-                constraints.insert(place, constraint);
+
+            let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
+                let value_type = inference.expression_type(&*subscript.value);
+                let slice_type = inference.expression_type(&*subscript.slice);
+
+                if let Some((place, constraint)) = self.narrow_typeddict_subscript(
+                    value_type,
+                    &subscript.value,
+                    slice_type,
+                    other_type,
+                    constrain_with_equality,
+                ) {
+                    constraints
+                        .entry(place)
+                        .and_modify(|existing| {
+                            *existing = existing.merge_constraint_and(constraint.clone(), self.db);
+                        })
+                        .or_insert(constraint);
+                } else if let Some((place, constraint)) = self.narrow_tuple_subscript(
+                    value_type,
+                    &subscript.value,
+                    slice_type,
+                    other_type,
+                    constrain_with_equality,
+                ) {
+                    constraints
+                        .entry(place)
+                        .and_modify(|existing| {
+                            *existing = existing.merge_constraint_and(constraint.clone(), self.db);
+                        })
+                        .or_insert(constraint);
+                }
+            };
+
+            if let ast::Expr::Subscript(subscript) = &**left {
+                narrow_subscript(subscript, inference.expression_type(&comparators[0]));
             }
 
-            // Narrow tagged unions of tuples with `Literal` elements, for example:
-            //
-            //     def _(t: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
-            //         if t[0] == "a":
-            //             reveal_type(t)  # tuple[Literal["a"], A]
-            if let Some((place, constraint)) = self.narrow_tuple_subscript(
-                inference.expression_type(&*subscript.value),
-                &subscript.value,
-                inference.expression_type(&*subscript.slice),
-                inference.expression_type(&comparators[0]),
-                constrain_with_equality,
-            ) {
-                constraints.insert(place, constraint);
+            if let ast::Expr::Subscript(subscript) = &comparators[0] {
+                narrow_subscript(subscript, inference.expression_type(&**left));
             }
         }
 
@@ -2075,13 +2090,14 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             self.add_narrowing_target(comparator, &mut places);
         }
 
-        // For subscript expressions on the left, the subscript base can also be narrowed
-        // (TypedDict and tuple discriminated union narrowing)
-        if let ast::Expr::Subscript(subscript) = &*expr_compare.left {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
-                    places.insert(place);
-                }
+        // For subscript expressions on either side, the subscript base can also be narrowed.
+        // (TypedDict and tuple discriminated union narrowing.)
+        for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
+            if let ast::Expr::Subscript(subscript) = expr
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
             }
         }
 
