@@ -1103,11 +1103,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
                     }
-                    StaticMroErrorKind::UnresolvableMro { bases_list } => {
+                    StaticMroErrorKind::UnresolvableMro {
+                        bases_list,
+                        generic_index,
+                    } => {
                         if let Some(builder) =
                             self.context.report_lint(&INCONSISTENT_MRO, class_node)
                         {
-                            builder.into_diagnostic(format_args!(
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Cannot create a consistent method resolution order (MRO) \
                                     for class `{}` with bases list `[{}]`",
                                 class.name(self.db()),
@@ -1116,6 +1119,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .map(|base| base.display(self.db()))
                                     .join(", ")
                             ));
+                            if let Some(index) = *generic_index
+                                && let [first_base, .., last_base] = class_node.bases()
+                            {
+                                let source = source_text(self.context.db(), self.context.file());
+                                let generic_base = &source[class_node.bases()[index].range()];
+                                diagnostic.help(format_args!(
+                                    "Move `{generic_base}` to the end of the bases list"
+                                ));
+                                let reordered_bases = class_node
+                                    .bases()
+                                    .iter()
+                                    .enumerate()
+                                    .filter(|(i, _)| *i != index)
+                                    .map(|(_, base)| &source[base.range()])
+                                    .chain(std::iter::once(generic_base))
+                                    .join(", ");
+                                let fix = Fix::unsafe_edit(Edit::range_replacement(
+                                    reordered_bases,
+                                    TextRange::new(first_base.start(), last_base.end()),
+                                ));
+                                diagnostic.set_fix(fix);
+                            }
                         }
                     }
                     StaticMroErrorKind::Pep695ClassWithGenericInheritance => {

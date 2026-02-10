@@ -12,6 +12,8 @@ use crate::types::{
     StaticClassLiteral, Type,
 };
 
+use itertools::Itertools;
+
 /// The inferred method resolution order of a given class.
 ///
 /// An MRO cannot contain non-specialized generic classes. (This is why [`ClassBase`] contains a
@@ -299,6 +301,11 @@ impl<'db> Mro<'db> {
                     } else {
                         Err(StaticMroErrorKind::UnresolvableMro {
                             bases_list: original_bases.iter().copied().collect(),
+                            generic_index: check_generic_reorder_fixes_mro(
+                                db,
+                                resolved_bases.as_slice(),
+                                original_bases,
+                            ),
                         }
                         .into_mro_error(db, class))
                     }
@@ -623,7 +630,14 @@ pub(super) enum StaticMroErrorKind<'db> {
     /// The MRO is otherwise unresolvable through the C3-merge algorithm.
     ///
     /// See [`c3_merge`] for more details.
-    UnresolvableMro { bases_list: Box<[Type<'db>]> },
+    UnresolvableMro {
+        bases_list: Box<[Type<'db>]>,
+        /// If the error can be resolved by moving a `Generic[]` base
+        /// to the end of the MRO, this field indicates the index of
+        /// the `Generic[]` base. This allows us to provide an
+        /// autofix when the diagnostic is emitted.
+        generic_index: Option<usize>,
+    },
 }
 
 impl<'db> StaticMroErrorKind<'db> {
@@ -690,6 +704,51 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
             }
         }
     }
+}
+
+/// Determine if an `inconsistent-mro` error could be resolved by moving
+/// a `Generic[]` base to the end of the bases list.
+///
+/// If so, this function will return `Some(i)`, where `i` is the index of
+/// the `Generic[]` base. If not, this function will return `None`.
+fn check_generic_reorder_fixes_mro<'db>(
+    db: &'db dyn Db,
+    resolved_bases: &[ClassBase<'db>],
+    original_bases: &[Type<'db>],
+) -> Option<usize> {
+    // Only attempt an autofix if `Generic[]` appears exactly once in the original bases list.
+    let single_index = original_bases
+        .iter()
+        .enumerate()
+        .filter_map(|(i, base)| {
+            matches!(
+                base,
+                Type::KnownInstance(KnownInstanceType::SubscriptedGeneric(_))
+            )
+            .then_some(i)
+        })
+        .exactly_one()
+        .ok()?;
+
+    // This should always be true if the original bases list contains exactly one
+    // subscripted `Generic`, but return `None` here just to be safe.
+    if resolved_bases.get(single_index) != Some(&ClassBase::Generic) {
+        return None;
+    }
+
+    let mut reordered: VecDeque<ClassBase<'db>> = resolved_bases.iter().copied().collect();
+    let generic = reordered.remove(single_index)?;
+    reordered.push_back(generic);
+    let mut seqs: Vec<VecDeque<ClassBase<'db>>> = Vec::with_capacity(reordered.len() + 1);
+    for base in &reordered {
+        if base.has_cyclic_mro(db) {
+            return None;
+        }
+        seqs.push(base.mro(db, None).collect());
+    }
+    seqs.push(reordered);
+    c3_merge(seqs)?;
+    Some(single_index)
 }
 
 /// Error for dynamic class MRO computation with fallback MRO.
