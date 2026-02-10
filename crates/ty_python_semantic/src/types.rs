@@ -4753,13 +4753,6 @@ impl<'db> Type<'db> {
             return fallback_bindings();
         }
 
-        let identity_specialize_if_generic = |ty: Type<'db>| match ty {
-            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
-                Type::from(class.identity_specialization(db))
-            }
-            _ => ty,
-        };
-
         // If we are trying to construct a non-specialized generic class, we should use the
         // constructor parameters to try to infer the class specialization. To do this, we need to
         // tweak our member lookup logic a bit. Normally, when looking up a class or instance
@@ -4768,7 +4761,12 @@ impl<'db> Type<'db> {
         // have the class's typevars still in the method signature when we attempt to call it. To
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
-        let self_type = identity_specialize_if_generic(self);
+        let self_type = match self {
+            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
+                Type::from(class.identity_specialization(db))
+            }
+            _ => self,
+        };
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
         // only deals with interplay between `__new__` and `__init__` methods.
