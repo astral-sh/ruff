@@ -95,6 +95,7 @@ struct SarifRule<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     full_description: Option<SarifMessage<'a>>,
     help: SarifMessage<'a>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     help_uri: Option<String>,
     id: &'a SecondaryCode,
     properties: SarifProperties<'a>,
