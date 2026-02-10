@@ -12,7 +12,7 @@ use std::time::Duration;
 use bitflags::bitflags;
 use call::{CallDunderError, CallError, CallErrorKind};
 use context::InferContext;
-use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE, POSSIBLY_MISSING_IMPLICIT_CALL};
+use diagnostic::{INVALID_CONTEXT_MANAGER, NOT_ITERABLE};
 use ruff_db::Instant;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::files::File;
@@ -4142,351 +4142,38 @@ impl<'db> Type<'db> {
                 .into(),
             },
 
-            Type::ClassLiteral(class) => match class.known(db) {
-                // TODO: Ideally we'd use `try_call_constructor` for all constructor calls.
-                // Currently we don't for a few special known types, either because their
-                // constructors are defined with overloads, or because we want to special case
-                // their return type beyond what typeshed provides (though this support could
-                // likely be moved into the `try_call_constructor` path). Once we support
-                // overloads, re-evaluate the need for these arms.
-                Some(KnownClass::Bool) => {
-                    // ```py
-                    // class bool(int):
-                    //     def __new__(cls, o: object = ..., /) -> Self: ...
-                    // ```
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new(
-                                db,
-                                [Parameter::positional_only(Some(Name::new_static("o")))
-                                    .with_annotated_type(Type::any())
-                                    .with_default_type(Type::BooleanLiteral(false))],
-                            ),
-                            KnownClass::Bool.to_instance(db),
-                        ),
-                    )
-                    .into()
-                }
+            Type::ClassLiteral(class) => self
+                // TODO this should be called from `constructor_bindings` for better consistency
+                .known_class_literal_bindings(db, class)
+                .unwrap_or_else(|| self.constructor_bindings(db, ClassType::NonGeneric(class))),
 
-                Some(KnownClass::Str) => {
-                    // ```py
-                    // class str(Sequence[str]):
-                    //     @overload
-                    //     def __new__(cls, object: object = ...) -> Self: ...
-                    //     @overload
-                    //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
-                    // ```
-                    CallableBinding::from_overloads(
-                        self,
-                        [
+            Type::GenericAlias(alias) => self.constructor_bindings(db, ClassType::Generic(alias)),
+
+            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
+                SubclassOfInner::Dynamic(dynamic_type) => {
+                    Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
+                }
+                SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    let Some(class) = (match bound_typevar.typevar(db).bound_or_constraints(db) {
+                        None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
+                            subclass_of_type.subclass_of().into_class(db)
+                        }
+                        // TODO: model calls to `type[T]` where `T` is constrained
+                        Some(TypeVarBoundOrConstraints::Constraints(_)) => None,
+                    }) else {
+                        return Binding::single(
+                            self,
                             Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_or_keyword(Name::new_static("object"))
-                                        .with_annotated_type(Type::object())
-                                        .with_default_type(Type::string_literal(db, ""))],
-                                ),
-                                KnownClass::Str.to_instance(db),
+                                Parameters::gradual_form(),
+                                self.to_instance(db).unwrap_or(Type::unknown()),
                             ),
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [
-                                        Parameter::positional_or_keyword(Name::new_static(
-                                            "object",
-                                        ))
-                                        // TODO: Should be `ReadableBuffer` instead of this union type:
-                                        .with_annotated_type(UnionType::from_elements(
-                                            db,
-                                            [
-                                                KnownClass::Bytes.to_instance(db),
-                                                KnownClass::Bytearray.to_instance(db),
-                                            ],
-                                        ))
-                                        .with_default_type(Type::bytes_literal(db, b"")),
-                                        Parameter::positional_or_keyword(Name::new_static(
-                                            "encoding",
-                                        ))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db))
-                                        .with_default_type(Type::string_literal(db, "utf-8")),
-                                        Parameter::positional_or_keyword(Name::new_static(
-                                            "errors",
-                                        ))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db))
-                                        .with_default_type(Type::string_literal(db, "strict")),
-                                    ],
-                                ),
-                                KnownClass::Str.to_instance(db),
-                            ),
-                        ],
-                    )
-                    .into()
+                        )
+                        .into();
+                    };
+
+                    self.constructor_bindings(db, class)
                 }
-
-                Some(KnownClass::Object) => {
-                    // ```py
-                    // class object:
-                    //    def __init__(self) -> None: ...
-                    //    def __new__(cls) -> Self: ...
-                    // ```
-                    Binding::single(self, Signature::new(Parameters::empty(), Type::object()))
-                        .into()
-                }
-
-                Some(KnownClass::Enum) => {
-                    Binding::single(self, Signature::todo("functional `Enum` syntax")).into()
-                }
-
-                Some(KnownClass::Super) => {
-                    // ```py
-                    // class super:
-                    //     @overload
-                    //     def __init__(self, t: Any, obj: Any, /) -> None: ...
-                    //     @overload
-                    //     def __init__(self, t: Any, /) -> None: ...
-                    //     @overload
-                    //     def __init__(self) -> None: ...
-                    // ```
-                    CallableBinding::from_overloads(
-                        self,
-                        [
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [
-                                        Parameter::positional_only(Some(Name::new_static("t")))
-                                            .with_annotated_type(Type::any()),
-                                        Parameter::positional_only(Some(Name::new_static("obj")))
-                                            .with_annotated_type(Type::any()),
-                                    ],
-                                ),
-                                KnownClass::Super.to_instance(db),
-                            ),
-                            Signature::new(
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_only(Some(Name::new_static("t")))
-                                        .with_annotated_type(Type::any())],
-                                ),
-                                KnownClass::Super.to_instance(db),
-                            ),
-                            Signature::new(Parameters::empty(), KnownClass::Super.to_instance(db)),
-                        ],
-                    )
-                    .into()
-                }
-
-                Some(KnownClass::Deprecated) => {
-                    // ```py
-                    // class deprecated:
-                    //     def __new__(
-                    //         cls,
-                    //         message: LiteralString,
-                    //         /,
-                    //         *,
-                    //         category: type[Warning] | None = ...,
-                    //         stacklevel: int = 1
-                    //     ) -> Self: ...
-                    // ```
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_only(Some(Name::new_static("message")))
-                                        .with_annotated_type(Type::LiteralString),
-                                    Parameter::keyword_only(Name::new_static("category"))
-                                        .with_annotated_type(UnionType::from_elements(
-                                            db,
-                                            [
-                                                // TODO: should be `type[Warning]`
-                                                Type::any(),
-                                                KnownClass::NoneType.to_instance(db),
-                                            ],
-                                        ))
-                                        // TODO: should be `type[Warning]`
-                                        .with_default_type(Type::any()),
-                                    Parameter::keyword_only(Name::new_static("stacklevel"))
-                                        .with_annotated_type(KnownClass::Int.to_instance(db))
-                                        .with_default_type(Type::IntLiteral(1)),
-                                ],
-                            ),
-                            KnownClass::Deprecated.to_instance(db),
-                        ),
-                    )
-                    .into()
-                }
-
-                Some(KnownClass::TypeAliasType) => {
-                    // ```py
-                    // def __new__(
-                    //     cls,
-                    //     name: str,
-                    //     value: Any,
-                    //     *,
-                    //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
-                    // ) -> Self: ...
-                    // ```
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_or_keyword(Name::new_static("name"))
-                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
-                                    Parameter::positional_or_keyword(Name::new_static("value"))
-                                        .with_annotated_type(Type::any())
-                                        .type_form(),
-                                    Parameter::keyword_only(Name::new_static("type_params"))
-                                        .with_annotated_type(Type::homogeneous_tuple(
-                                            db,
-                                            UnionType::from_elements(
-                                                db,
-                                                [
-                                                    KnownClass::TypeVar.to_instance(db),
-                                                    KnownClass::ParamSpec.to_instance(db),
-                                                    KnownClass::TypeVarTuple.to_instance(db),
-                                                ],
-                                            ),
-                                        ))
-                                        .with_default_type(Type::empty_tuple(db)),
-                                ],
-                            ),
-                            Type::unknown(),
-                        ),
-                    )
-                    .into()
-                }
-
-                Some(KnownClass::Property) => {
-                    let getter_signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_only(None).with_annotated_type(Type::any())],
-                        ),
-                        Type::any(),
-                    );
-                    let setter_signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [
-                                Parameter::positional_only(None).with_annotated_type(Type::any()),
-                                Parameter::positional_only(None).with_annotated_type(Type::any()),
-                            ],
-                        ),
-                        Type::none(db),
-                    );
-                    let deleter_signature = Signature::new(
-                        Parameters::new(
-                            db,
-                            [Parameter::positional_only(None).with_annotated_type(Type::any())],
-                        ),
-                        Type::any(),
-                    );
-
-                    Binding::single(
-                        self,
-                        Signature::new(
-                            Parameters::new(
-                                db,
-                                [
-                                    Parameter::positional_or_keyword(Name::new_static("fget"))
-                                        .with_annotated_type(UnionType::from_elements(
-                                            db,
-                                            [
-                                                Type::single_callable(db, getter_signature),
-                                                Type::none(db),
-                                            ],
-                                        ))
-                                        .with_default_type(Type::none(db)),
-                                    Parameter::positional_or_keyword(Name::new_static("fset"))
-                                        .with_annotated_type(UnionType::from_elements(
-                                            db,
-                                            [
-                                                Type::single_callable(db, setter_signature),
-                                                Type::none(db),
-                                            ],
-                                        ))
-                                        .with_default_type(Type::none(db)),
-                                    Parameter::positional_or_keyword(Name::new_static("fdel"))
-                                        .with_annotated_type(UnionType::from_elements(
-                                            db,
-                                            [
-                                                Type::single_callable(db, deleter_signature),
-                                                Type::none(db),
-                                            ],
-                                        ))
-                                        .with_default_type(Type::none(db)),
-                                    Parameter::positional_or_keyword(Name::new_static("doc"))
-                                        .with_annotated_type(UnionType::from_elements(
-                                            db,
-                                            [KnownClass::Str.to_instance(db), Type::none(db)],
-                                        ))
-                                        .with_default_type(Type::none(db)),
-                                ],
-                            ),
-                            Type::unknown(),
-                        ),
-                    )
-                    .into()
-                }
-
-                Some(KnownClass::Tuple) => {
-                    let element_ty = BoundTypeVarInstance::synthetic(
-                        db,
-                        Name::new_static("T"),
-                        TypeVarVariance::Covariant,
-                    );
-
-                    // ```py
-                    // class tuple(Sequence[_T_co]):
-                    //     @overload
-                    //     def __new__(cls) -> tuple[()]: ...
-                    //     @overload
-                    //     def __new__(cls, iterable: Iterable[_T_co]) -> tuple[_T_co, ...]: ...
-                    // ```
-                    CallableBinding::from_overloads(
-                        self,
-                        [
-                            Signature::new(Parameters::empty(), Type::empty_tuple(db)),
-                            Signature::new_generic(
-                                Some(GenericContext::from_typevar_instances(db, [element_ty])),
-                                Parameters::new(
-                                    db,
-                                    [Parameter::positional_only(Some(Name::new_static(
-                                        "iterable",
-                                    )))
-                                    .with_annotated_type(
-                                        KnownClass::Iterable.to_specialized_instance(
-                                            db,
-                                            &[Type::TypeVar(element_ty)],
-                                        ),
-                                    )],
-                                ),
-                                Type::homogeneous_tuple(db, Type::TypeVar(element_ty)),
-                            ),
-                        ],
-                    )
-                    .into()
-                }
-
-                // Most class literal constructor calls are handled by `try_call_constructor` and
-                // not via getting the signature here. This signature can still be used in some
-                // cases (e.g. evaluating callable subtyping). TODO improve this definition
-                // (intersection of `__new__` and `__init__` signatures? and respect metaclass
-                // `__call__`).
-                _ => Binding::single(
-                    self,
-                    Signature::new_generic(
-                        class.generic_context(db),
-                        Parameters::gradual_form(),
-                        self.to_instance(db).unwrap_or(Type::unknown()),
-                    ),
-                )
-                .into(),
             },
 
             Type::SpecialForm(SpecialFormType::TypedDict) => {
@@ -4514,40 +4201,6 @@ impl<'db> Type<'db> {
                 )
                 .into()
             }
-
-            Type::GenericAlias(_) => {
-                // TODO annotated return type on `__new__` or metaclass `__call__`
-                // TODO check call vs signatures of `__new__` and/or `__init__`
-                Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::gradual_form(),
-                        self.to_instance(db).unwrap_or(Type::unknown()),
-                    ),
-                )
-                .into()
-            }
-
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).bindings(db),
-
-                // Most type[] constructor calls are handled by `try_call_constructor` and not via
-                // getting the signature here. This signature can still be used in some cases (e.g.
-                // evaluating callable subtyping). TODO improve this definition (intersection of
-                // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
-                SubclassOfInner::Class(class) => Type::from(class).bindings(db),
-
-                // TODO annotated return type on `__new__` or metaclass `__call__`
-                // TODO check call vs signatures of `__new__` and/or `__init__`
-                SubclassOfInner::TypeVar(_) => Binding::single(
-                    self,
-                    Signature::new(
-                        Parameters::gradual_form(),
-                        self.to_instance(db).unwrap_or(Type::unknown()),
-                    ),
-                )
-                .into(),
-            },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
                 // Note that for objects that have a (possibly not callable!) `__call__` attribute,
@@ -4654,6 +4307,607 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
         }
+    }
+
+    fn known_class_literal_bindings(
+        self,
+        db: &'db dyn Db,
+        class: ClassLiteral<'db>,
+    ) -> Option<Bindings<'db>> {
+        // TODO: Some of these cases date back to when we didn't even support overloads yet; see if
+        // any can be removed: https://github.com/astral-sh/ty/issues/2715
+        match class.known(db)? {
+            KnownClass::Bool => {
+                // ```py
+                // class bool(int):
+                //     def __new__(cls, o: object = ..., /) -> Self: ...
+                // ```
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new(
+                                db,
+                                [Parameter::positional_only(Some(Name::new_static("o")))
+                                    .with_annotated_type(Type::any())
+                                    .with_default_type(Type::BooleanLiteral(false))],
+                            ),
+                            KnownClass::Bool.to_instance(db),
+                        ),
+                    )
+                    .into(),
+                )
+            }
+
+            KnownClass::Str => {
+                // ```py
+                // class str(Sequence[str]):
+                //     @overload
+                //     def __new__(cls, object: object = ...) -> Self: ...
+                //     @overload
+                //     def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
+                // ```
+                Some(
+                    CallableBinding::from_overloads(
+                        self,
+                        [
+                            Signature::new(
+                                Parameters::new(
+                                    db,
+                                    [Parameter::positional_or_keyword(Name::new_static("object"))
+                                        .with_annotated_type(Type::object())
+                                        .with_default_type(Type::string_literal(db, ""))],
+                                ),
+                                KnownClass::Str.to_instance(db),
+                            ),
+                            Signature::new(
+                                Parameters::new(
+                                    db,
+                                    [
+                                        Parameter::positional_or_keyword(Name::new_static(
+                                            "object",
+                                        ))
+                                        // TODO: Should be `ReadableBuffer` instead of this union type:
+                                        .with_annotated_type(UnionType::from_elements(
+                                            db,
+                                            [
+                                                KnownClass::Bytes.to_instance(db),
+                                                KnownClass::Bytearray.to_instance(db),
+                                            ],
+                                        ))
+                                        .with_default_type(Type::bytes_literal(db, b"")),
+                                        Parameter::positional_or_keyword(Name::new_static(
+                                            "encoding",
+                                        ))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db))
+                                        .with_default_type(Type::string_literal(db, "utf-8")),
+                                        Parameter::positional_or_keyword(Name::new_static(
+                                            "errors",
+                                        ))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db))
+                                        .with_default_type(Type::string_literal(db, "strict")),
+                                    ],
+                                ),
+                                KnownClass::Str.to_instance(db),
+                            ),
+                        ],
+                    )
+                    .into(),
+                )
+            }
+
+            KnownClass::Object => {
+                // ```py
+                // class object:
+                //    def __init__(self) -> None: ...
+                //    def __new__(cls) -> Self: ...
+                // ```
+                Some(
+                    Binding::single(self, Signature::new(Parameters::empty(), Type::object()))
+                        .into(),
+                )
+            }
+
+            KnownClass::Enum => {
+                Some(Binding::single(self, Signature::todo("functional `Enum` syntax")).into())
+            }
+
+            KnownClass::Super => {
+                // ```py
+                // class super:
+                //     @overload
+                //     def __init__(self, t: Any, obj: Any, /) -> None: ...
+                //     @overload
+                //     def __init__(self, t: Any, /) -> None: ...
+                //     @overload
+                //     def __init__(self) -> None: ...
+                // ```
+                Some(
+                    CallableBinding::from_overloads(
+                        self,
+                        [
+                            Signature::new(
+                                Parameters::new(
+                                    db,
+                                    [
+                                        Parameter::positional_only(Some(Name::new_static("t")))
+                                            .with_annotated_type(Type::any()),
+                                        Parameter::positional_only(Some(Name::new_static("obj")))
+                                            .with_annotated_type(Type::any()),
+                                    ],
+                                ),
+                                KnownClass::Super.to_instance(db),
+                            ),
+                            Signature::new(
+                                Parameters::new(
+                                    db,
+                                    [Parameter::positional_only(Some(Name::new_static("t")))
+                                        .with_annotated_type(Type::any())],
+                                ),
+                                KnownClass::Super.to_instance(db),
+                            ),
+                            Signature::new(Parameters::empty(), KnownClass::Super.to_instance(db)),
+                        ],
+                    )
+                    .into(),
+                )
+            }
+
+            KnownClass::Deprecated => {
+                // ```py
+                // class deprecated:
+                //     def __new__(
+                //         cls,
+                //         message: LiteralString,
+                //         /,
+                //         *,
+                //         category: type[Warning] | None = ...,
+                //         stacklevel: int = 1
+                //     ) -> Self: ...
+                // ```
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("message")))
+                                        .with_annotated_type(Type::LiteralString),
+                                    Parameter::keyword_only(Name::new_static("category"))
+                                        .with_annotated_type(UnionType::from_elements(
+                                            db,
+                                            [
+                                                // TODO: should be `type[Warning]`
+                                                Type::any(),
+                                                KnownClass::NoneType.to_instance(db),
+                                            ],
+                                        ))
+                                        // TODO: should be `type[Warning]`
+                                        .with_default_type(Type::any()),
+                                    Parameter::keyword_only(Name::new_static("stacklevel"))
+                                        .with_annotated_type(KnownClass::Int.to_instance(db))
+                                        .with_default_type(Type::IntLiteral(1)),
+                                ],
+                            ),
+                            KnownClass::Deprecated.to_instance(db),
+                        ),
+                    )
+                    .into(),
+                )
+            }
+
+            KnownClass::TypeAliasType => {
+                // ```py
+                // def __new__(
+                //     cls,
+                //     name: str,
+                //     value: Any,
+                //     *,
+                //     type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
+                // ) -> Self: ...
+                // ```
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_or_keyword(Name::new_static("name"))
+                                        .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                    Parameter::positional_or_keyword(Name::new_static("value"))
+                                        .with_annotated_type(Type::any())
+                                        .type_form(),
+                                    Parameter::keyword_only(Name::new_static("type_params"))
+                                        .with_annotated_type(Type::homogeneous_tuple(
+                                            db,
+                                            UnionType::from_elements(
+                                                db,
+                                                [
+                                                    KnownClass::TypeVar.to_instance(db),
+                                                    KnownClass::ParamSpec.to_instance(db),
+                                                    KnownClass::TypeVarTuple.to_instance(db),
+                                                ],
+                                            ),
+                                        ))
+                                        .with_default_type(Type::empty_tuple(db)),
+                                ],
+                            ),
+                            Type::unknown(),
+                        ),
+                    )
+                    .into(),
+                )
+            }
+
+            KnownClass::Property => {
+                let getter_signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_only(None).with_annotated_type(Type::any())],
+                    ),
+                    Type::any(),
+                );
+                let setter_signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_only(None).with_annotated_type(Type::any()),
+                            Parameter::positional_only(None).with_annotated_type(Type::any()),
+                        ],
+                    ),
+                    Type::none(db),
+                );
+                let deleter_signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [Parameter::positional_only(None).with_annotated_type(Type::any())],
+                    ),
+                    Type::any(),
+                );
+
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_or_keyword(Name::new_static("fget"))
+                                        .with_annotated_type(UnionType::from_elements(
+                                            db,
+                                            [
+                                                Type::single_callable(db, getter_signature),
+                                                Type::none(db),
+                                            ],
+                                        ))
+                                        .with_default_type(Type::none(db)),
+                                    Parameter::positional_or_keyword(Name::new_static("fset"))
+                                        .with_annotated_type(UnionType::from_elements(
+                                            db,
+                                            [
+                                                Type::single_callable(db, setter_signature),
+                                                Type::none(db),
+                                            ],
+                                        ))
+                                        .with_default_type(Type::none(db)),
+                                    Parameter::positional_or_keyword(Name::new_static("fdel"))
+                                        .with_annotated_type(UnionType::from_elements(
+                                            db,
+                                            [
+                                                Type::single_callable(db, deleter_signature),
+                                                Type::none(db),
+                                            ],
+                                        ))
+                                        .with_default_type(Type::none(db)),
+                                    Parameter::positional_or_keyword(Name::new_static("doc"))
+                                        .with_annotated_type(UnionType::from_elements(
+                                            db,
+                                            [KnownClass::Str.to_instance(db), Type::none(db)],
+                                        ))
+                                        .with_default_type(Type::none(db)),
+                                ],
+                            ),
+                            Type::unknown(),
+                        ),
+                    )
+                    .into(),
+                )
+            }
+
+            KnownClass::Tuple => {
+                let element_ty = BoundTypeVarInstance::synthetic(
+                    db,
+                    Name::new_static("T"),
+                    TypeVarVariance::Covariant,
+                );
+
+                // ```py
+                // class tuple(Sequence[_T_co]):
+                //     @overload
+                //     def __new__(cls) -> tuple[()]: ...
+                //     @overload
+                //     def __new__(cls, iterable: Iterable[_T_co]) -> tuple[_T_co, ...]: ...
+                // ```
+                Some(
+                    CallableBinding::from_overloads(
+                        self,
+                        [
+                            Signature::new(Parameters::empty(), Type::empty_tuple(db)),
+                            Signature::new_generic(
+                                Some(GenericContext::from_typevar_instances(db, [element_ty])),
+                                Parameters::new(
+                                    db,
+                                    [Parameter::positional_only(Some(Name::new_static(
+                                        "iterable",
+                                    )))
+                                    .with_annotated_type(
+                                        KnownClass::Iterable.to_specialized_instance(
+                                            db,
+                                            &[Type::TypeVar(element_ty)],
+                                        ),
+                                    )],
+                                ),
+                                Type::homogeneous_tuple(db, Type::TypeVar(element_ty)),
+                            ),
+                        ],
+                    )
+                    .into(),
+                )
+            }
+
+            _ => None,
+        }
+    }
+
+    // Build bindings for constructor calls by combining `__new__`/`__init__` signatures.
+    // Returns fallback bindings for cases that intentionally keep bespoke call behavior.
+    fn constructor_bindings(self, db: &'db dyn Db, class: ClassType<'db>) -> Bindings<'db> {
+        fn resolve_dunder_new_callable<'db>(
+            db: &'db dyn Db,
+            owner: Type<'db>,
+            place: Place<'db>,
+        ) -> Option<(Type<'db>, Definedness)> {
+            match place.try_call_dunder_get(db, owner) {
+                Place::Defined(DefinedPlace {
+                    ty: callable,
+                    definedness,
+                    ..
+                }) => Some((callable, definedness)),
+                Place::Undefined => None,
+            }
+        }
+        fn bind_constructor_new<'db>(
+            db: &'db dyn Db,
+            bindings: Bindings<'db>,
+            self_type: Type<'db>,
+        ) -> Bindings<'db> {
+            bindings.map(|binding| {
+                let mut binding = binding;
+                // If descriptor binding produced a bound callable, bake that into the signature
+                // first, then bind `cls` for constructor-call semantics (the call site omits `cls`).
+                // Note: This intentionally preserves `type.__call__` behavior for `@classmethod __new__`,
+                // which receives an extra implicit `cls` and errors at call sites.
+                binding.bake_bound_type_into_overloads(db);
+                binding.bound_type = Some(self_type);
+                binding
+            })
+        }
+
+        let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
+        let class_generic_context = class_literal.generic_context(db);
+
+        // Keep bespoke constructor behavior for cases that don't map cleanly to `__new__`/`__init__`.
+        let fallback_bindings = || {
+            let return_type = self.to_instance(db).unwrap_or(Type::unknown());
+            Binding::single(
+                self,
+                Signature::new_generic(
+                    class_generic_context,
+                    Parameters::gradual_form(),
+                    return_type,
+                ),
+            )
+            .into()
+        };
+
+        // Checking TypedDict construction happens in `infer_call_expression_impl`, so here we just
+        // return a permissive fallback binding. TODO maybe we should just synthesize bindings for
+        // a TypedDict constructor? That would handle unions/intersections correctly.
+        if class_literal.is_typed_dict(db)
+            || class::CodeGeneratorKind::TypedDict.matches(db, class_literal, class_specialization)
+        {
+            return fallback_bindings();
+        }
+
+        // These cases are checked in `Type::known_class_literal_bindings`, but currently we only
+        // call that for `ClassLiteral` types, so we need a permissive fallback here. TODO Ideally
+        // that would be called from `constructor_bindings` for better consistency, but that causes
+        // some test failures deserving separate investigation.
+        let known = class.known(db);
+        if matches!(
+            known,
+            Some(
+                KnownClass::Bool
+                    | KnownClass::Str
+                    | KnownClass::Type
+                    | KnownClass::Object
+                    | KnownClass::Property
+                    | KnownClass::Super
+                    | KnownClass::TypeAliasType
+                    | KnownClass::Deprecated
+            )
+        ) {
+            return fallback_bindings();
+        }
+
+        // Temporary special-casing for all subclasses of `enum.Enum` until we support the
+        // functional syntax for creating enum classes. TODO we should ideally check e.g.
+        // `MyEnum(1)` to make sure `1` is a valid value for `MyEnum`.
+        if KnownClass::Enum
+            .to_class_literal(db)
+            .to_class_type(db)
+            .is_some_and(|enum_class| class.is_subclass_of(db, enum_class))
+        {
+            return fallback_bindings();
+        }
+
+        // If we are trying to construct a non-specialized generic class, we should use the
+        // constructor parameters to try to infer the class specialization. To do this, we need to
+        // tweak our member lookup logic a bit. Normally, when looking up a class or instance
+        // member, we first apply the class's default specialization, and apply that specialization
+        // to the type of the member. To infer a specialization from the argument types, we need to
+        // have the class's typevars still in the method signature when we attempt to call it. To
+        // do this, we instead use the _identity_ specialization, which maps each of the class's
+        // generic typevars to itself.
+        let self_type = match self {
+            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
+                Type::from(class.identity_specialization(db))
+            }
+            _ => self,
+        };
+
+        // As of now we do not model custom `__call__` on meta-classes, so the code below
+        // only deals with interplay between `__new__` and `__init__` methods.
+        // The logic is roughly as follows:
+        // 1. If `__new__` is defined anywhere in the MRO (except for `object`, since it is always
+        //    present), we validate the constructor arguments against it. We then validate `__init__`,
+        //    but only if it is defined somewhere except `object`. This is because `object.__init__`
+        //    allows arbitrary arguments if and only if `__new__` is defined, but typeshed
+        //    defines `__init__` for `object` with no arguments.
+        // 2. If `__new__` is not found, we call `__init__`. Here, we allow it to fallback all
+        //    the way to `object` (single `self` argument call). This time it is correct to
+        //    fallback to `object.__init__`, since it will indeed check that no arguments are
+        //    passed.
+        //
+        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
+        // and most builtin classes use it as return type annotation. We always return the instance
+        // type.
+
+        // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
+        // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
+        // a class, metaclass attribute would take precedence. But by avoiding `__new__` on
+        // `object` we would inadvertently unhide `__new__` on `type`, which is not what we want.
+        // An alternative might be to not skip `object.__new__` but instead mark it such that it's
+        // easy to check if that's the one we found?
+        // Note that `__new__` is a static method, so we must bind the `cls` argument when forming
+        // constructor-call bindings.
+        let new_method = self_type.lookup_dunder_new(db);
+
+        let Some(constructor_instance_ty) = self_type.to_instance(db) else {
+            return fallback_bindings();
+        };
+
+        // Construct an instance type to look up `__init__`. We use `self_type` (possibly identity-
+        // specialized) so the instance retains inferable class typevars during constructor checking.
+        // TODO: we should use the actual return type of `__new__` to determine the instance type
+        let Some(lookup_init_ty) = self_type.to_instance(db) else {
+            return fallback_bindings();
+        };
+
+        // Lookup the `__init__` instance method in the MRO, excluding `object` initially; we only
+        // fall back to `object.__init__` in the `__new__`-absent case (see rules above).
+        let init_method_no_object = lookup_init_ty.member_lookup_with_policy(
+            db,
+            "__init__".into(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+        );
+
+        let mut missing_init_bindings = None;
+        let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
+            Some(place) => match resolve_dunder_new_callable(db, self_type, place) {
+                Some((new_callable, definedness)) => {
+                    let mut bindings =
+                        bind_constructor_new(db, new_callable.bindings(db), self_type);
+                    if definedness == Definedness::PossiblyUndefined {
+                        bindings.set_implicit_dunder_new_is_possibly_unbound();
+                    }
+                    (Some((bindings, new_callable)), true)
+                }
+                None => (None, false),
+            },
+            None => (None, false),
+        };
+
+        // Only fall back to `object.__init__` when `__new__` is absent.
+        let init_bindings = match (&init_method_no_object.place, has_any_new) {
+            (
+                Place::Defined(DefinedPlace {
+                    ty: init_method,
+                    definedness,
+                    ..
+                }),
+                _,
+            ) => {
+                let mut bindings = init_method.bindings(db);
+                if *definedness == Definedness::PossiblyUndefined {
+                    bindings.set_implicit_dunder_init_is_possibly_unbound();
+                }
+                Some((bindings, *init_method))
+            }
+            (Place::Undefined, false) => {
+                let init_method_with_object = lookup_init_ty.member_lookup_with_policy(
+                    db,
+                    "__init__".into(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                );
+                match init_method_with_object.place {
+                    Place::Defined(DefinedPlace {
+                        ty: init_method,
+                        definedness,
+                        ..
+                    }) => {
+                        let mut bindings = init_method.bindings(db);
+                        if definedness == Definedness::PossiblyUndefined {
+                            bindings.set_implicit_dunder_init_is_possibly_unbound();
+                        }
+                        Some((bindings, init_method))
+                    }
+                    Place::Undefined => {
+                        // If we are using vendored typeshed, it should be impossible to have missing
+                        // or unbound `__init__` method on a class, as all classes have `object` in MRO.
+                        // Thus the following may only trigger if a custom typeshed is used.
+                        // Custom/broken typeshed: no `__init__` available even after falling back
+                        // to `object`. Keep analysis going and surface the missing-implicit-call
+                        // lint via the builder.
+                        let mut bindings: Bindings<'db> = Binding::single(
+                            self_type,
+                            Signature::new(Parameters::gradual_form(), constructor_instance_ty),
+                        )
+                        .into();
+                        bindings.set_implicit_dunder_init_is_possibly_unbound();
+                        missing_init_bindings = Some(bindings);
+                        None
+                    }
+                }
+            }
+            (Place::Undefined, true) => None,
+        };
+
+        let bindings = if let Some(bindings) = missing_init_bindings {
+            bindings
+        } else {
+            match (new_bindings, init_bindings) {
+                (Some((new_bindings, new_callable)), Some((init_bindings, init_callable))) => {
+                    let callable_type = UnionBuilder::new(db)
+                        .add(new_callable)
+                        .add(init_callable)
+                        .build();
+                    // Use both `__new__` and `__init__` bindings so argument inference/checking
+                    // happens under the combined constructor-call type context.
+                    // In ty unions of callables are checked as "all must accept".
+                    Bindings::from_union(callable_type, [new_bindings, init_bindings])
+                }
+                (Some((new_bindings, _)), None) => new_bindings,
+                (None, Some((init_bindings, _))) => init_bindings,
+                (None, None) => return fallback_bindings(),
+            }
+        };
+
+        bindings
+            .with_generic_context(db, class_generic_context)
+            .with_constructor_instance_type(constructor_instance_ty)
     }
 
     /// Calls `self`. Returns a [`CallError`] if `self` is (always or possibly) not callable, or if
@@ -5370,276 +5624,6 @@ impl<'db> Type<'db> {
             Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
             ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
             _ => None,
-        }
-    }
-
-    /// Given a class literal or non-dynamic `SubclassOf` type, try calling it (creating an instance)
-    /// and return the resulting instance type.
-    ///
-    /// The `infer_argument_types` closure should be invoked with the signatures of `__new__` and
-    /// `__init__`, such that the argument types can be inferred with the correct type context.
-    ///
-    /// Models `type.__call__` behavior.
-    /// TODO: model metaclass `__call__`.
-    ///
-    /// E.g., for the following code, infer the type of `Foo()`:
-    /// ```python
-    /// class Foo:
-    ///     pass
-    ///
-    /// Foo()
-    /// ```
-    fn try_call_constructor<'ast>(
-        self,
-        db: &'db dyn Db,
-        infer_argument_types: impl FnOnce(Option<Bindings<'db>>) -> CallArguments<'ast, 'db>,
-        tcx: TypeContext<'db>,
-    ) -> Result<Type<'db>, ConstructorCallError<'db>> {
-        debug_assert!(matches!(
-            self,
-            Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_)
-        ));
-
-        // If we are trying to construct a non-specialized generic class, we should use the
-        // constructor parameters to try to infer the class specialization. To do this, we need to
-        // tweak our member lookup logic a bit. Normally, when looking up a class or instance
-        // member, we first apply the class's default specialization, and apply that specialization
-        // to the type of the member. To infer a specialization from the argument types, we need to
-        // have the class's typevars still in the method signature when we attempt to call it. To
-        // do this, we instead use the _identity_ specialization, which maps each of the class's
-        // generic typevars to itself.
-        let (generic_origin, generic_context, self_type) = match self {
-            Type::ClassLiteral(class) => match class.generic_context(db) {
-                Some(generic_context) => (
-                    Some(class),
-                    Some(generic_context),
-                    // It is important that identity_specialization specializes the class with
-                    // _inferable_ typevars, so that our specialization inference logic will
-                    // try to find a specialization for them.
-                    Type::from(class.identity_specialization(db)),
-                ),
-                _ => (None, None, self),
-            },
-            _ => (None, None, self),
-        };
-
-        // As of now we do not model custom `__call__` on meta-classes, so the code below
-        // only deals with interplay between `__new__` and `__init__` methods.
-        // The logic is roughly as follows:
-        // 1. If `__new__` is defined anywhere in the MRO (except for `object`, since it is always
-        //    present), we call it and analyze outcome. We then analyze `__init__` call, but only
-        //    if it is defined somewhere except object. This is because `object.__init__`
-        //    allows arbitrary arguments if and only if `__new__` is defined, but typeshed
-        //    defines `__init__` for `object` with no arguments.
-        // 2. If `__new__` is not found, we call `__init__`. Here, we allow it to fallback all
-        //    the way to `object` (single `self` argument call). This time it is correct to
-        //    fallback to `object.__init__`, since it will indeed check that no arguments are
-        //    passed.
-        //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
-
-        // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
-        // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
-        // a class, metaclass attribute would take precedence. But by avoiding `__new__` on
-        // `object` we would inadvertently unhide `__new__` on `type`, which is not what we want.
-        // An alternative might be to not skip `object.__new__` but instead mark it such that it's
-        // easy to check if that's the one we found?
-        // Note that `__new__` is a static method, so we must inject the `cls` argument.
-        let new_method = self_type.lookup_dunder_new(db);
-
-        // Construct an instance type that we can use to look up the `__init__` instance method.
-        // This performs the same logic as `Type::to_instance`, except for generic class literals.
-        // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let init_ty = self_type
-            .to_instance(db)
-            .expect("type should be convertible to instance type");
-
-        // Lookup the `__init__` instance method in the MRO.
-        let init_method = init_ty.member_lookup_with_policy(
-            db,
-            "__init__".into(),
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
-        );
-
-        // Infer the call argument types, using both `__new__` and `__init__` for type-context.
-        let bindings = match (
-            new_method.as_ref().map(|method| &method.place),
-            &init_method.place,
-        ) {
-            (Some(Place::Defined(DefinedPlace { ty: new_method, .. })), Place::Undefined) => Some(
-                new_method
-                    .bindings(db)
-                    .map(|binding| binding.with_bound_type(self_type))
-                    .with_constructor_instance_type(init_ty),
-            ),
-
-            (
-                Some(Place::Undefined) | None,
-                Place::Defined(DefinedPlace {
-                    ty: init_method, ..
-                }),
-            ) => Some(
-                init_method
-                    .bindings(db)
-                    .with_constructor_instance_type(init_ty),
-            ),
-
-            (
-                Some(Place::Defined(DefinedPlace { ty: new_method, .. })),
-                Place::Defined(DefinedPlace {
-                    ty: init_method, ..
-                }),
-            ) => {
-                let callable = UnionType::from_elements(db, [*new_method, *init_method]);
-
-                let new_method_bindings = new_method
-                    .bindings(db)
-                    .map(|binding| binding.with_bound_type(self_type));
-
-                Some(
-                    Bindings::from_union(callable, [new_method_bindings, init_method.bindings(db)])
-                        .with_constructor_instance_type(init_ty),
-                )
-            }
-
-            _ => None,
-        };
-
-        let argument_types = infer_argument_types(bindings);
-
-        let new_call_outcome = new_method.and_then(|new_method| {
-            match new_method.place.try_call_dunder_get(db, self_type) {
-                Place::Defined(DefinedPlace {
-                    ty: new_method,
-                    definedness: boundness,
-                    ..
-                }) => {
-                    let argument_types = argument_types.with_self(Some(self_type));
-                    let result = new_method
-                        .bindings(db)
-                        .with_constructor_instance_type(init_ty)
-                        .match_parameters(db, &argument_types)
-                        .check_types(db, &argument_types, tcx, &[]);
-
-                    if boundness == Definedness::PossiblyUndefined {
-                        Some(Err(DunderNewCallError::PossiblyUnbound(result.err())))
-                    } else {
-                        Some(result.map_err(DunderNewCallError::CallError))
-                    }
-                }
-                Place::Undefined => None,
-            }
-        });
-
-        let init_call_outcome = if new_call_outcome.is_none() || !init_method.is_undefined() {
-            let call_result = match init_ty
-                .member_lookup_with_policy(
-                    db,
-                    "__init__".into(),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
-                .place
-            {
-                Place::Undefined => Err(CallDunderError::MethodNotAvailable),
-                Place::Defined(DefinedPlace {
-                    ty: dunder_callable,
-                    definedness: boundness,
-                    ..
-                }) => {
-                    let bindings = dunder_callable
-                        .bindings(db)
-                        .with_constructor_instance_type(init_ty);
-
-                    bindings
-                        .match_parameters(db, &argument_types)
-                        .check_types(db, &argument_types, tcx, &[])
-                        .map_err(CallDunderError::from)
-                        .and_then(|bindings| {
-                            if boundness == Definedness::PossiblyUndefined {
-                                Err(CallDunderError::PossiblyUnbound(Box::new(bindings)))
-                            } else {
-                                Ok(bindings)
-                            }
-                        })
-                }
-            };
-
-            Some(call_result)
-        } else {
-            None
-        };
-
-        // Note that we use `self` here, not `self_type`, so that if constructor argument inference
-        // fails, we fail back to the default specialization.
-        let instance_ty = self
-            .to_instance(db)
-            .expect("type should be convertible to instance type");
-
-        match (generic_origin, new_call_outcome, init_call_outcome) {
-            // All calls are successful or not called at all
-            (
-                Some(generic_origin),
-                new_call_outcome @ (None | Some(Ok(_))),
-                init_call_outcome @ (None | Some(Ok(_))),
-            ) => {
-                fn combine_specializations<'db>(
-                    db: &'db dyn Db,
-                    s1: Option<Specialization<'db>>,
-                    s2: Option<Specialization<'db>>,
-                ) -> Option<Specialization<'db>> {
-                    match (s1, s2) {
-                        (None, None) => None,
-                        (Some(s), None) | (None, Some(s)) => Some(s),
-                        (Some(s1), Some(s2)) => Some(s1.combine(db, s2)),
-                    }
-                }
-
-                let specialize_constructor = |outcome: Option<Bindings<'db>>| {
-                    let (_, binding) = outcome
-                        .as_ref()?
-                        .single_element()?
-                        .matching_overloads()
-                        .next()?;
-                    binding.specialization()?.restrict(db, generic_context?)
-                };
-
-                let new_specialization =
-                    specialize_constructor(new_call_outcome.and_then(Result::ok));
-                let init_specialization =
-                    specialize_constructor(init_call_outcome.and_then(Result::ok));
-                let specialization =
-                    combine_specializations(db, new_specialization, init_specialization);
-                let specialized = specialization
-                    .map(|specialization| {
-                        Type::instance(
-                            db,
-                            generic_origin.apply_specialization(db, |_| specialization),
-                        )
-                    })
-                    .unwrap_or(instance_ty);
-                Ok(specialized)
-            }
-
-            (None, None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
-
-            (_, None | Some(Ok(_)), Some(Err(error))) => {
-                // no custom `__new__` or it was called and succeeded, but `__init__` failed.
-                Err(ConstructorCallError::Init(instance_ty, error))
-            }
-            (_, Some(Err(error)), None | Some(Ok(_))) => {
-                // custom `__new__` was called and failed, but init is ok
-                Err(ConstructorCallError::New(instance_ty, error))
-            }
-            (_, Some(Err(new_error)), Some(Err(init_error))) => {
-                // custom `__new__` was called and failed, and `__init__` is also not ok
-                Err(ConstructorCallError::NewAndInit(
-                    instance_ty,
-                    new_error,
-                    init_error,
-                ))
-            }
         }
     }
 
@@ -10297,107 +10281,6 @@ impl<'db> BoolError<'db> {
                      it incorrectly implements `__bool__`",
                     not_boolable_type.display(context.db())
                 ));
-            }
-        }
-    }
-}
-
-/// Represents possibly failure modes of implicit `__new__` calls.
-#[derive(Debug)]
-enum DunderNewCallError<'db> {
-    /// The call to `__new__` failed.
-    CallError(CallError<'db>),
-    /// The `__new__` method could be unbound. If the call to the
-    /// method has also failed, this variant also includes the
-    /// corresponding `CallError`.
-    PossiblyUnbound(Option<CallError<'db>>),
-}
-
-/// Error returned if a class instantiation call failed
-#[derive(Debug)]
-enum ConstructorCallError<'db> {
-    Init(Type<'db>, CallDunderError<'db>),
-    New(Type<'db>, DunderNewCallError<'db>),
-    NewAndInit(Type<'db>, DunderNewCallError<'db>, CallDunderError<'db>),
-}
-
-impl<'db> ConstructorCallError<'db> {
-    fn return_type(&self) -> Type<'db> {
-        match self {
-            Self::Init(ty, _) => *ty,
-            Self::New(ty, _) => *ty,
-            Self::NewAndInit(ty, _, _) => *ty,
-        }
-    }
-
-    fn report_diagnostic(
-        &self,
-        context: &InferContext<'db, '_>,
-        context_expression_type: Type<'db>,
-        context_expression_node: ast::AnyNodeRef,
-    ) {
-        let report_init_error = |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
-            CallDunderError::MethodNotAvailable => {
-                if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
-                {
-                    // If we are using vendored typeshed, it should be impossible to have missing
-                    // or unbound `__init__` method on a class, as all classes have `object` in MRO.
-                    // Thus the following may only trigger if a custom typeshed is used.
-                    builder.into_diagnostic(format_args!(
-                        "`__init__` method is missing on type `{}`. \
-                         Make sure your `object` in typeshed has its definition.",
-                        context_expression_type.display(context.db()),
-                    ));
-                }
-            }
-            CallDunderError::PossiblyUnbound(bindings) => {
-                if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Method `__init__` on type `{}` may be missing.",
-                        context_expression_type.display(context.db()),
-                    ));
-                }
-
-                bindings.report_diagnostics(context, context_expression_node);
-            }
-            CallDunderError::CallError(_, bindings) => {
-                bindings.report_diagnostics(context, context_expression_node);
-            }
-        };
-
-        let report_new_error = |error: &DunderNewCallError<'db>| match error {
-            DunderNewCallError::PossiblyUnbound(call_error) => {
-                if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Method `__new__` on type `{}` may be missing.",
-                        context_expression_type.display(context.db()),
-                    ));
-                }
-
-                if let Some(CallError(_kind, bindings)) = call_error {
-                    bindings.report_diagnostics(context, context_expression_node);
-                }
-            }
-            DunderNewCallError::CallError(CallError(_kind, bindings)) => {
-                bindings.report_diagnostics(context, context_expression_node);
-            }
-        };
-
-        match self {
-            Self::Init(_, init_call_dunder_error) => {
-                report_init_error(init_call_dunder_error);
-            }
-            Self::New(_, new_call_error) => {
-                report_new_error(new_call_error);
-            }
-            Self::NewAndInit(_, new_call_error, init_call_dunder_error) => {
-                report_new_error(new_call_error);
-                report_init_error(init_call_dunder_error);
             }
         }
     }

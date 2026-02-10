@@ -972,7 +972,9 @@ TMsg = TypeVar("TMsg", bound=Msg)
 class Builder(Generic[TMsg]):
     def build(self) -> Stream[TMsg]:
         stream: Stream[TMsg] = Stream()
-        # TODO: no error
+        # `Stream` is invariant, so `Stream[Msg]` is not a supertype of `Stream[TMsg]`;
+        # therefore `_handler` is not compatible with `apply` here.
+        # error: [invalid-argument-type]
         # error: [invalid-assignment]
         stream = stream.apply(self._handler)
         return stream

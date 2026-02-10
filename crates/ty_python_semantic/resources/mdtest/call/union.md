@@ -99,6 +99,40 @@ def _(flag: bool):
     reveal_type(x)  # revealed: int | str
 ```
 
+## Union of class constructors uses strict checking
+
+A call on a union of class objects must satisfy every constructor.
+
+```py
+class A:
+    def __init__(self, x: int) -> None: ...
+
+class B:
+    def __init__(self, x: str) -> None: ...
+
+def _(flag: bool):
+    cls = A if flag else B
+    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `str`, found `Literal[1]`"
+    reveal_type(cls(1))  # revealed: A | B
+```
+
+## Constructor checking through `type[]` in a union
+
+A call on a union of `type[]` types must satisfy every constructor.
+
+```py
+class A:
+    def __init__(self, x: int) -> None: ...
+
+class B:
+    def __init__(self, x: int) -> None: ...
+
+def _(factory: type[A] | type[B]):
+    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["hello"]`"
+    # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["hello"]`"
+    factory("hello")
+```
+
 ## Any non-callable variant
 
 ```py

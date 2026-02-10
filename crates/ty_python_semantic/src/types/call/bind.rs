@@ -38,7 +38,7 @@ use crate::types::function::{
     OverloadLiteral,
 };
 use crate::types::generics::{
-    InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
+    GenericContext, InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
@@ -68,6 +68,12 @@ pub(crate) struct Bindings<'db> {
     /// The type of the instance being constructed, if this signature is for a constructor.
     constructor_instance_type: Option<Type<'db>>,
 
+    /// Whether implicit `__new__` calls may be missing in constructor bindings.
+    implicit_dunder_new_is_possibly_unbound: bool,
+
+    /// Whether implicit `__init__` calls may be missing in constructor bindings.
+    implicit_dunder_init_is_possibly_unbound: bool,
+
     /// By using `SmallVec`, we avoid an extra heap allocation for the common case of a non-union
     /// type.
     elements: SmallVec<[CallableBinding<'db>; 1]>,
@@ -83,16 +89,26 @@ impl<'db> Bindings<'db> {
     where
         I: IntoIterator<Item = Bindings<'db>>,
     {
-        let elements: SmallVec<_> = elements
-            .into_iter()
-            .flat_map(|s| s.elements.into_iter())
-            .collect();
+        let mut implicit_dunder_new_is_possibly_unbound = false;
+        let mut implicit_dunder_init_is_possibly_unbound = false;
+        let mut elements_acc = SmallVec::new();
+
+        for set in elements {
+            implicit_dunder_new_is_possibly_unbound |= set.implicit_dunder_new_is_possibly_unbound;
+            implicit_dunder_init_is_possibly_unbound |=
+                set.implicit_dunder_init_is_possibly_unbound;
+            elements_acc.extend(set.elements);
+        }
+
+        let elements = elements_acc;
         assert!(!elements.is_empty());
         Self {
             callable_type,
             elements,
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
+            implicit_dunder_new_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound,
         }
     }
 
@@ -121,14 +137,50 @@ impl<'db> Bindings<'db> {
         self
     }
 
+    pub(crate) fn with_generic_context(
+        mut self,
+        db: &'db dyn Db,
+        generic_context: Option<GenericContext<'db>>,
+    ) -> Self {
+        let Some(generic_context) = generic_context else {
+            return self;
+        };
+        for binding in &mut self.elements {
+            for overload in &mut binding.overloads {
+                overload.signature.generic_context = GenericContext::merge_optional(
+                    db,
+                    overload.signature.generic_context,
+                    Some(generic_context),
+                );
+            }
+        }
+        self
+    }
+
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
         for binding in &mut self.elements {
             binding.dunder_call_is_possibly_unbound = true;
         }
     }
 
+    pub(crate) fn set_implicit_dunder_new_is_possibly_unbound(&mut self) {
+        self.implicit_dunder_new_is_possibly_unbound = true;
+    }
+
+    pub(crate) fn set_implicit_dunder_init_is_possibly_unbound(&mut self) {
+        self.implicit_dunder_init_is_possibly_unbound = true;
+    }
+
     pub(crate) fn argument_forms(&self) -> &[Option<ParameterForm>] {
         &self.argument_forms.values
+    }
+
+    pub(crate) fn has_implicit_dunder_new_is_possibly_unbound(&self) -> bool {
+        self.implicit_dunder_new_is_possibly_unbound
+    }
+
+    pub(crate) fn has_implicit_dunder_init_is_possibly_unbound(&self) -> bool {
+        self.implicit_dunder_init_is_possibly_unbound
     }
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, CallableBinding<'db>> {
@@ -140,6 +192,8 @@ impl<'db> Bindings<'db> {
             callable_type: self.callable_type,
             argument_forms: self.argument_forms,
             constructor_instance_type: self.constructor_instance_type,
+            implicit_dunder_new_is_possibly_unbound: self.implicit_dunder_new_is_possibly_unbound,
+            implicit_dunder_init_is_possibly_unbound: self.implicit_dunder_init_is_possibly_unbound,
             elements: self.elements.into_iter().map(f).collect(),
         }
     }
@@ -273,14 +327,47 @@ impl<'db> Bindings<'db> {
         self.callable_type
     }
 
-    pub(crate) fn constructor_instance_type(&self) -> Option<Type<'db>> {
-        self.constructor_instance_type
+    // Constructor calls should combine `__new__`/`__init__` specializations instead of unioning.
+    fn constructor_return_type(&self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let constructor_instance_type = self.constructor_instance_type?;
+        let Some(class_specialization) = constructor_instance_type.class_specialization(db) else {
+            return Some(constructor_instance_type);
+        };
+        let class_context = class_specialization.generic_context(db);
+
+        let mut combined: Option<Specialization<'db>> = None;
+        for binding in &self.elements {
+            // For constructors, use the first matching overload (declaration order) to avoid
+            // merging incompatible constructor specializations.
+            let Some((_, overload)) = binding.matching_overloads().next() else {
+                continue;
+            };
+            let Some(specialization) = overload.specialization else {
+                continue;
+            };
+            let Some(specialization) = specialization.restrict(db, class_context) else {
+                continue;
+            };
+            combined = Some(match combined {
+                None => specialization,
+                Some(previous) => previous.combine(db, specialization),
+            });
+        }
+
+        // If constructor inference doesn't yield a specialization, fall back to the default
+        // specialization to avoid leaking inferable typevars in the constructed instance.
+        let specialization =
+            combined.unwrap_or_else(|| class_context.default_specialization(db, None));
+        Some(constructor_instance_type.apply_specialization(db, specialization))
     }
 
     /// Returns the return type of the call. For successful calls, this is the actual return type.
     /// For calls with binding errors, this is a type that best approximates the return type. For
     /// types that are not callable, returns `Type::Unknown`.
     pub(crate) fn return_type(&self, db: &'db dyn Db) -> Type<'db> {
+        if let Some(return_ty) = self.constructor_return_type(db) {
+            return return_ty;
+        }
         if let [binding] = self.elements.as_slice() {
             return binding.return_type();
         }
@@ -1571,6 +1658,8 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             elements: smallvec_inline![from],
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
+            implicit_dunder_new_is_possibly_unbound: false,
+            implicit_dunder_init_is_possibly_unbound: false,
         }
     }
 }
@@ -1594,6 +1683,8 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             elements: smallvec_inline![callable_binding],
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
+            implicit_dunder_new_is_possibly_unbound: false,
+            implicit_dunder_init_is_possibly_unbound: false,
         }
     }
 }
@@ -1693,6 +1784,15 @@ impl<'db> CallableBinding<'db> {
             overload_call_return_type: None,
             matching_overload_before_type_checking: None,
             overloads: smallvec![],
+        }
+    }
+
+    pub(crate) fn bake_bound_type_into_overloads(&mut self, db: &'db dyn Db) {
+        let Some(bound_self) = self.bound_type.take() else {
+            return;
+        };
+        for overload in &mut self.overloads {
+            overload.signature = overload.signature.bind_self(db, Some(bound_self));
         }
     }
 
@@ -3881,7 +3981,10 @@ impl<'db> Binding<'db> {
         for (keywords_index, keywords_type) in keywords_arguments {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
-        self.return_ty = self.signature.return_ty;
+        // For constructor calls, return the constructed instance type (not `__init__`'s `None`).
+        self.return_ty = self
+            .constructor_instance_type
+            .unwrap_or(self.signature.return_ty);
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
@@ -3926,10 +4029,6 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn return_type(&self) -> Type<'db> {
         self.return_ty
-    }
-
-    pub(crate) fn specialization(&self) -> Option<Specialization<'db>> {
-        self.specialization
     }
 
     /// Returns the bound types for each parameter, in parameter source order, or `None` if no
