@@ -25,12 +25,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typev
 
 ```
 error[invalid-type-variable-default]: An unbounded TypeVar cannot be used as the default for a constrained TypeVar
- --> src/mdtest_snippet.py:6:36
+ --> src/mdtest_snippet.py:3:1
   |
+1 | from typing_extensions import TypeVar
+2 |
+3 | T = TypeVar("T")
+  | ---------------- `T` defined here
+4 |
 5 | # error: [invalid-type-variable-default]
 6 | S = TypeVar("S", int, str, default=T)
   |                                    ^
   |
+info: `T` has no bound or constraints
 info: rule `invalid-type-variable-default` is enabled by default
 
 ```
