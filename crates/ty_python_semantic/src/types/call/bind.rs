@@ -47,8 +47,8 @@ use crate::types::{
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, GenericAlias, InternedConstraintSet, KnownBoundMethodType, KnownClass,
     KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members, todo_type,
+    SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -3356,7 +3356,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.errors.extend(specialization_errors);
 
         // Attempt to promote any literal types assigned to the specialization.
-        let maybe_promote = |typevar, ty: Type<'db>| {
+        let maybe_promote = |typevar: BoundTypeVarInstance<'db>, ty: Type<'db>| {
+            let bound_or_constraints = typevar.typevar(self.db).bound_or_constraints(self.db);
+
+            // For constrained TypeVars, the inferred type is already one of the
+            // constraints. Promoting literals would produce a type that doesn't
+            // match any constraint.
+            if matches!(
+                bound_or_constraints,
+                Some(TypeVarBoundOrConstraints::Constraints(_))
+            ) {
+                return ty;
+            }
+
             let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
 
             let mut combined_tcx = TypeContext::default();
@@ -3398,7 +3410,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            ty.promote_literals(self.db, combined_tcx)
+            let promoted = ty.promote_literals(self.db, combined_tcx);
+
+            // If the TypeVar has an upper bound, only use the promoted type if it
+            // still satisfies the bound.
+            if let Some(TypeVarBoundOrConstraints::UpperBound(bound)) = bound_or_constraints {
+                if !promoted.is_assignable_to(self.db, bound) {
+                    return ty;
+                }
+            }
+
+            promoted
         };
 
         let specialization = builder
