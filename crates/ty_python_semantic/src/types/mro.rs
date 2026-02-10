@@ -704,6 +704,11 @@ fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
     }
 }
 
+/// Determine if an `inconsistent-mro` error could be resolved by moving
+/// a `Generic[]` base to the end of the bases list.
+///
+/// If so, this function will return `Some(i)`, where `i` is the index of
+/// the `Generic[]` base. If not, this function will return `None`.
 fn check_generic_reorder_fixes_mro<'db>(
     db: &'db dyn Db,
     resolved_bases: &[ClassBase<'db>],
