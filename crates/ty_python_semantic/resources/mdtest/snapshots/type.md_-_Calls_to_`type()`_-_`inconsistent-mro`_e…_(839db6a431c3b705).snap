@@ -49,12 +49,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/type.md
 
 ```
 error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo1` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
- --> src/mdtest_snippet.py:6:1
+ --> src/mdtest_snippet.py:6:7
   |
 4 | V = TypeVar("V")
 5 |
 6 | class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |       ^^^^^^^^^^^^^^^^^^^^^^^^^
 7 |
 8 | # fmt: off
   |
@@ -74,18 +74,19 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo2` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
-  --> src/mdtest_snippet.py:10:1
+  --> src/mdtest_snippet.py:10:7
    |
  8 |   # fmt: off
  9 |
-10 | / class Foo2(  # error: [inconsistent-mro]
+10 |   class Foo2(  # error: [inconsistent-mro]
+   |  _______^
 11 | |     # comment1
 12 | |     Generic[K, V],  # comment2
 13 | |     # comment3
 14 | |     dict  # comment4
 15 | |     # comment5
 16 | | ): ...
-   | |______^
+   | |_^
 17 |
 18 |   class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
    |
@@ -107,12 +108,12 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo3` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
-  --> src/mdtest_snippet.py:18:1
+  --> src/mdtest_snippet.py:18:7
    |
 16 | ): ...
 17 |
 18 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 19 |
 20 | class Foo4(  # error: [inconsistent-mro]
    |
@@ -132,11 +133,12 @@ note: This is an unsafe fix and may change runtime behavior
 
 ```
 error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo4` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
-  --> src/mdtest_snippet.py:20:1
+  --> src/mdtest_snippet.py:20:7
    |
 18 |   class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
 19 |
-20 | / class Foo4(  # error: [inconsistent-mro]
+20 |   class Foo4(  # error: [inconsistent-mro]
+   |  _______^
 21 | |     # comment1
 22 | |     Generic[K, V],  # comment2
 23 | |     # comment3
@@ -145,7 +147,7 @@ error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO
 26 | |     metaclass=type  # comment6
 27 | |     # comment7
 28 | | ): ...
-   | |______^
+   | |_^
 29 |
 30 |   # fmt: on
    |

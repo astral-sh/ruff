@@ -1109,8 +1109,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         bases_list,
                         generic_index,
                     } => {
-                        if let Some(builder) =
-                            self.context.report_lint(&INCONSISTENT_MRO, class_node)
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INCONSISTENT_MRO, class.header_range(self.db()))
                         {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
                                 "Cannot create a consistent method resolution order (MRO) \
