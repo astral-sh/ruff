@@ -799,8 +799,7 @@ impl<'db> FunctionLiteral<'db> {
     /// statements, or if it is a `Protocol` method that only has a docstring,
     /// or if it is a `Protocol` method whose body only consists of a single
     /// `raise NotImplementedError` statement.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn as_abstract_method(
+    pub(super) fn as_abstract_method(
         self,
         db: &'db dyn Db,
         enclosing_class: ClassType<'db>,
@@ -827,6 +826,7 @@ impl<'db> FunctionLiteral<'db> {
     ///
     /// For functions without an implementation (e.g., overloaded functions),
     /// returns [`FunctionBodyKind::Stub`].
+    #[salsa::tracked]
     fn body_kind(self, db: &'db dyn Db) -> FunctionBodyKind {
         let (_, implementation) = self.overloads_and_implementation(db);
         let Some(implementation) = implementation else {
@@ -844,11 +844,13 @@ impl<'db> FunctionLiteral<'db> {
     /// Returns `true` if this function has a trivial body.
     ///
     /// A trivial body is one that consists only of `...`, `pass`, or
-    /// `raise NotImplementedError`. Stub files are always considered trivial.
-    #[salsa::tracked(cycle_initial=|_, _, _| false)]
+    /// `raise NotImplementedError`.
+    ///
+    /// Methods defined in stub files are never considered to have trivial bodies,
+    /// since stubs use `...` as a placeholder regardless of the runtime implementation.
     pub(crate) fn has_trivial_body(self, db: &'db dyn Db) -> bool {
-        self.definition(db).file(db).is_stub(db)
-            || matches!(
+        !self.definition(db).file(db).is_stub(db)
+            && matches!(
                 self.body_kind(db),
                 FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
             )

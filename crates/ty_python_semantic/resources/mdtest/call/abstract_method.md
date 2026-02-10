@@ -12,7 +12,7 @@ class Foo(ABC):
     @abstractmethod
     def method(cls) -> int: ...
 
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract classmethod with a trivial body"
+# error: [call-abstract-method] "Cannot call `method` on class object"
 Foo.method()
 ```
 
@@ -28,7 +28,7 @@ class Foo(ABC):
     @abstractmethod
     def method() -> int: ...
 
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract staticmethod with a trivial body"
+# error: [call-abstract-method] "Cannot call `method` on class object"
 Foo.method()
 ```
 
@@ -89,7 +89,7 @@ class Foo(ABC):
     def method(cls) -> int:
         pass
 
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract classmethod with a trivial body"
+# error: [call-abstract-method] "Cannot call `method` on class object"
 Foo.method()
 ```
 
@@ -104,53 +104,8 @@ class Foo(ABC):
     def method(cls) -> int:
         raise NotImplementedError
 
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract classmethod with a trivial body"
+# error: [call-abstract-method] "Cannot call `method` on class object"
 Foo.method()
-```
-
-## Recursive abstract classmethod body does not recurse
-
-```py
-from abc import ABC, abstractmethod
-
-class Foo(ABC):
-    @classmethod
-    @abstractmethod
-    def method(cls) -> int:
-        # error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract classmethod with a trivial body"
-        raise NotImplementedError(Foo.method())
-
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract classmethod with a trivial body"
-Foo.method()
-```
-
-## Recursive abstract staticmethod body does not recurse
-
-```py
-from abc import ABC, abstractmethod
-
-class Foo(ABC):
-    @staticmethod
-    @abstractmethod
-    def method() -> int:
-        # error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract staticmethod with a trivial body"
-        raise NotImplementedError(Foo.method())
-
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract staticmethod with a trivial body"
-Foo.method()
-```
-
-## Non-abstract classmethod is fine
-
-```py
-from abc import ABC
-
-class Foo(ABC):
-    @classmethod
-    def method(cls) -> int:
-        return 42
-
-Foo.method()  # fine
 ```
 
 ## Concrete subclass calling inherited abstract classmethod
@@ -187,7 +142,7 @@ class Base(ABC):
 class StillAbstract(Base):
     pass
 
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract classmethod with a trivial body"
+# error: [call-abstract-method] "Cannot call `method` on class object"
 StillAbstract.method()
 ```
 
@@ -203,24 +158,8 @@ class Foo(ABC):
     @classmethod
     def method(cls) -> int: ...
 
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract classmethod with a trivial body"
+# error: [call-abstract-method] "Cannot call `method` on class object"
 Foo.method()
-```
-
-## Abstract staticmethod with non-trivial body
-
-An abstract staticmethod with a non-trivial body has a default implementation that can be called.
-
-```py
-from abc import ABC, abstractmethod
-
-class Foo(ABC):
-    @staticmethod
-    @abstractmethod
-    def method() -> int:
-        return 42
-
-Foo.method()  # fine
 ```
 
 ## Abstract classmethod with docstring-only body
@@ -237,21 +176,63 @@ class Foo(ABC):
         """This method should be overridden."""
         ...
 
-# error: [call-abstract-method] "Cannot call method `method` on class object because it is an abstract classmethod with a trivial body"
+# error: [call-abstract-method] "Cannot call `method` on class object"
 Foo.method()
 ```
 
-## Abstract instance method is not caught
+## Implicitly abstract classmethod on Protocol
 
-This lint only applies to classmethods and staticmethods, not regular instance methods.
+A classmethod on a `Protocol` class with a trivial body is implicitly abstract, even without
+`@abstractmethod`.
 
 ```py
+from typing import Protocol
+
+class P(Protocol):
+    @classmethod
+    def method(cls) -> int: ...
+
+# error: [call-abstract-method] "Cannot call `method` on class object"
+P.method()
+```
+
+## Implicitly abstract staticmethod on Protocol
+
+```py
+from typing import Protocol
+
+class P(Protocol):
+    @staticmethod
+    def method() -> int: ...
+
+# error: [call-abstract-method] "Cannot call `method` on class object"
+P.method()
+```
+
+## Abstract classmethod defined in stub file
+
+Methods defined in stub files are never considered to have trivial bodies, since stubs use `...` as
+a placeholder regardless of the runtime implementation.
+
+`foo.pyi`:
+
+```pyi
 from abc import ABC, abstractmethod
 
 class Foo(ABC):
+    @classmethod
     @abstractmethod
-    def method(self) -> int: ...
+    def classmethod(cls) -> int: ...
 
-# This would be caught by other mechanisms (Foo is abstract and cannot be instantiated),
-# but this lint specifically does not apply here.
+    @staticmethod
+    @abstractmethod
+    def staticmethod() -> int: ...
+```
+
+```py
+from foo import Foo
+
+# These should not trigger `call-abstract-method` since the methods are defined in a stub.
+Foo.classmethod()
+Foo.staticmethod()
 ```

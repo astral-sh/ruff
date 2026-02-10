@@ -4117,8 +4117,9 @@ pub(crate) fn report_call_to_abstract_method(
     };
     let db = context.db();
     let name = function.name(db);
-    let mut diag = builder.into_diagnostic(format_args!(
-        "Cannot call method `{name}` on class object because it is an abstract {method_kind} with a trivial body"
+    let mut diag = builder.into_diagnostic(format_args!("Cannot call `{name}` on class object"));
+    diag.set_primary_message(format_args!(
+        "`{name}` is an abstract {method_kind} with a trivial body"
     ));
     let spans = function.spans(db);
     let mut sub = SubDiagnostic::new(

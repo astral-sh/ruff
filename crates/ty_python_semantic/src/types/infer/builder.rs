@@ -11659,38 +11659,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match callable_type {
             Type::BoundMethod(bound_method) => {
                 let function = bound_method.function(self.db());
-                if function.is_classmethod(self.db())
-                    && function.has_known_decorator(self.db(), FunctionDecorators::ABSTRACT_METHOD)
-                    && bound_method
-                        .self_instance(self.db())
-                        .to_class_type(self.db())
-                        .is_some()
-                    && function.has_trivial_body(self.db())
+                if let Some(class) = bound_method
+                    .self_instance(self.db())
+                    .to_class_type(self.db())
                 {
-                    report_call_to_abstract_method(
-                        &self.context,
-                        call_expression,
-                        function,
-                        "classmethod",
-                    );
-                }
-            }
-            Type::FunctionLiteral(function)
-                if function.is_staticmethod(self.db())
-                    && function
-                        .has_known_decorator(self.db(), FunctionDecorators::ABSTRACT_METHOD) =>
-            {
-                if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
-                    let value_type = self.expression_type(value);
-                    if value_type.to_class_type(self.db()).is_some()
+                    if function.is_classmethod(self.db())
+                        && function.as_abstract_method(self.db(), class).is_some()
                         && function.has_trivial_body(self.db())
                     {
                         report_call_to_abstract_method(
                             &self.context,
                             call_expression,
                             function,
-                            "staticmethod",
+                            "classmethod",
                         );
+                    }
+                }
+            }
+            Type::FunctionLiteral(function) if function.is_staticmethod(self.db()) => {
+                if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
+                    let value_type = self.expression_type(value);
+                    if let Some(class) = value_type.to_class_type(self.db()) {
+                        if function.as_abstract_method(self.db(), class).is_some()
+                            && function.has_trivial_body(self.db())
+                        {
+                            report_call_to_abstract_method(
+                                &self.context,
+                                call_expression,
+                                function,
+                                "staticmethod",
+                            );
+                        }
                     }
                 }
             }
