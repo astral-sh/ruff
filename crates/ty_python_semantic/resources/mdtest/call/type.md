@@ -607,7 +607,22 @@ from typing import Generic, TypeVar
 K = TypeVar("K")
 V = TypeVar("V")
 
-class Foo(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+
+
+class Foo2(  # comment
+    Generic[K, V],  # comment 1
+    dict  # comment 2
+): ...  # error: [inconsistent-mro]
+
+class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+
+class Foo4(
+    Generic[K, V],  # comment
+    dict,
+    metaclass=type
+): ...  # error: [inconsistent-mro]
+
 ```
 
 ## MRO error highlighting (snapshot)

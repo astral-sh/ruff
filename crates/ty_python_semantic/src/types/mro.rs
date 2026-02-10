@@ -12,6 +12,8 @@ use crate::types::{
     StaticClassLiteral, Type,
 };
 
+use itertools::Itertools;
+
 /// The inferred method resolution order of a given class.
 ///
 /// An MRO cannot contain non-specialized generic classes. (This is why [`ClassBase`] contains a

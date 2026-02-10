@@ -1,0 +1,140 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: type.md - Calls to `type()` - `inconsistent-mro` errors with autofixes
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Generic, TypeVar
+ 2 | 
+ 3 | K = TypeVar("K")
+ 4 | V = TypeVar("V")
+ 5 | 
+ 6 | class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+ 7 | 
+ 8 | 
+ 9 | class Foo2(  # comment
+10 |     Generic[K, V],  # comment 1
+11 |     dict  # comment 2
+12 | ): ...  # error: [inconsistent-mro]
+13 | 
+14 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+15 | 
+16 | class Foo4(
+17 |     Generic[K, V],  # comment
+18 |     dict,
+19 |     metaclass=type
+20 | ): ...  # error: [inconsistent-mro]
+```
+
+# Diagnostics
+
+```
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo1` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+ --> src/mdtest_snippet.py:6:1
+  |
+4 | V = TypeVar("V")
+5 |
+6 | class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Move `Generic[K, V]` to the end of the bases list
+info: rule `inconsistent-mro` is enabled by default
+3 | K = TypeVar("K")
+4 | V = TypeVar("V")
+5 | 
+  - class Foo1(Generic[K, V], dict): ...  # error: [inconsistent-mro]
+6 + class Foo1(dict, Generic[K, V]): ...  # error: [inconsistent-mro]
+7 | 
+8 | 
+9 | class Foo2(  # comment
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo2` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:9:1
+   |
+ 9 | / class Foo2(  # comment
+10 | |     Generic[K, V],  # comment 1
+11 | |     dict  # comment 2
+12 | | ): ...  # error: [inconsistent-mro]
+   | |______^
+13 |
+14 |   class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+   |
+help: Move `Generic[K, V]` to the end of the bases list
+info: rule `inconsistent-mro` is enabled by default
+7  | 
+8  | 
+9  | class Foo2(  # comment
+   -     Generic[K, V],  # comment 1
+   -     dict  # comment 2
+10 +     dict, Generic[K, V]  # comment 2
+11 | ): ...  # error: [inconsistent-mro]
+12 | 
+13 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo3` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:14:1
+   |
+12 | ): ...  # error: [inconsistent-mro]
+13 |
+14 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 |
+16 | class Foo4(
+   |
+help: Move `Generic[K, V]` to the end of the bases list
+info: rule `inconsistent-mro` is enabled by default
+11 |     dict  # comment 2
+12 | ): ...  # error: [inconsistent-mro]
+13 | 
+   - class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+14 + class Foo3(dict, Generic[K, V], metaclass=type): ...  # error: [inconsistent-mro]
+15 | 
+16 | class Foo4(
+17 |     Generic[K, V],  # comment
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[inconsistent-mro]: Cannot create a consistent method resolution order (MRO) for class `Foo4` with bases list `[<special-form 'typing.Generic[K, V]'>, <class 'dict'>]`
+  --> src/mdtest_snippet.py:16:1
+   |
+14 |   class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+15 |
+16 | / class Foo4(
+17 | |     Generic[K, V],  # comment
+18 | |     dict,
+19 | |     metaclass=type
+20 | | ): ...  # error: [inconsistent-mro]
+   | |______^
+   |
+help: Move `Generic[K, V]` to the end of the bases list
+info: rule `inconsistent-mro` is enabled by default
+14 | class Foo3(Generic[K, V], dict, metaclass=type): ...  # error: [inconsistent-mro]
+15 | 
+16 | class Foo4(
+   -     Generic[K, V],  # comment
+   -     dict,
+17 +     dict, Generic[K, V],
+18 |     metaclass=type
+19 | ): ...  # error: [inconsistent-mro]
+note: This is an unsafe fix and may change runtime behavior
+
+```
