@@ -124,35 +124,6 @@ from typing import TypeVar
 T = TypeVar("T", invalid_keyword=True)
 ```
 
-## Invalid default with bound
-
-```py
-from typing_extensions import TypeVar
-
-# error: [invalid-type-variable-default]
-T = TypeVar("T", bound=str, default=int)
-```
-
-## Invalid default with constraints
-
-```py
-from typing_extensions import TypeVar
-
-# error: [invalid-type-variable-default]
-T = TypeVar("T", int, str, default=bytes)
-```
-
-## Invalid constrained default from unbounded type variable
-
-```py
-from typing_extensions import TypeVar
-
-T = TypeVar("T")
-
-# error: [invalid-type-variable-default]
-S = TypeVar("S", int, str, default=T)
-```
-
 ## Invalid feature for this Python version
 
 ```toml

@@ -191,6 +191,8 @@ python-version = "3.13"
 
 #### Concrete default with a bound
 
+<!-- snapshot-diagnostics -->
+
 The default must be assignable to the bound:
 
 ```py
@@ -203,6 +205,8 @@ S = TypeVar("S", bound=float, default=int)
 ```
 
 #### Concrete default with constraints
+
+<!-- snapshot-diagnostics -->
 
 The default must be one of the constrained types, even if it is a subtype of one of them:
 
@@ -224,6 +228,8 @@ V = TypeVar("V", int, str, default=Any)
 
 #### TypeVar default with a bounded outer
 
+<!-- snapshot-diagnostics -->
+
 When the default is a TypeVar, the default TypeVar's upper bound must be assignable to the outer
 TypeVar's bound:
 
@@ -244,6 +250,8 @@ U = TypeVar("U", default=T3, bound=float)
 
 #### Unbounded TypeVar default with bounded outer
 
+<!-- snapshot-diagnostics -->
+
 An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
 restrictive bound:
 
@@ -257,6 +265,8 @@ S = TypeVar("S", default=T1, bound=int)
 ```
 
 #### TypeVar default with bounded outer (constrained default)
+
+<!-- snapshot-diagnostics -->
 
 When the default TypeVar has constraints, all constraints must be assignable to the outer bound:
 
@@ -280,6 +290,8 @@ V = TypeVar("V", default=T2, bound=int)
 
 #### TypeVar default with constrained outer (constrained default)
 
+<!-- snapshot-diagnostics -->
+
 When the default has constraints, the outer's constraints must be a superset:
 
 ```py
@@ -297,6 +309,8 @@ U = TypeVar("U", bool, complex, default=T1)
 ```
 
 #### TypeVar default with constrained outer (non-constrained default)
+
+<!-- snapshot-diagnostics -->
 
 A non-constrained TypeVar (bounded or unbounded) is incompatible as the default for a constrained
 TypeVar:
