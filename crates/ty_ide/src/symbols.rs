@@ -2713,6 +2713,79 @@ class X:
         );
     }
 
+    #[test]
+    fn deprecated_function() {
+        let test = public_test(
+            "\
+@deprecated('use new_foo instead')
+def foo(): ...
+
+def bar(): ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, foo) = &syms[0];
+        assert_eq!(&*foo.name, "foo");
+        assert!(foo.deprecated);
+
+        let (_, bar) = &syms[1];
+        assert_eq!(&*bar.name, "bar");
+        assert!(!bar.deprecated);
+    }
+
+    #[test]
+    fn deprecated_class() {
+        let test = public_test(
+            "\
+@deprecated('use NewClass instead')
+class OldClass: ...
+
+class NewClass: ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, old) = &syms[0];
+        assert_eq!(&*old.name, "OldClass");
+        assert!(old.deprecated);
+
+        let (_, new) = &syms[1];
+        assert_eq!(&*new.name, "NewClass");
+        assert!(!new.deprecated);
+    }
+
+    #[test]
+    fn deprecated_bare_decorator() {
+        let test = public_test(
+            "\
+@deprecated
+def foo(): ...
+
+@deprecated
+class C: ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, foo) = &syms[0];
+        assert_eq!(&*foo.name, "foo");
+        assert!(foo.deprecated);
+
+        let (_, c) = &syms[1];
+        assert_eq!(&*c.name, "C");
+        assert!(foo.deprecated);
+    }
+
     fn matches(query: &str, symbol: &str) -> bool {
         super::QueryPattern::fuzzy(query).is_match_symbol_name(symbol)
     }
@@ -2735,13 +2808,24 @@ class X:
             self.exports_for("test.py")
         }
 
+        /// Returns the [`FlatSymbols`] for `test.py`.
+        fn exported_symbols(&self) -> &super::FlatSymbols {
+            self.exported_symbols_for("test.py")
+        }
+
+        /// Returns the [`FlatSymbols`] for the module at the given path.
+        ///
+        /// The path given must have been written to this test's salsa DB.
+        fn exported_symbols_for(&self, path: impl AsRef<SystemPath>) -> &super::FlatSymbols {
+            let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
+            symbols_for_file_global_only(&self.db, file)
+        }
+
         /// Returns the exports from the module at the given path.
         ///
         /// The path given must have been written to this test's salsa DB.
         fn exports_for(&self, path: impl AsRef<SystemPath>) -> String {
-            let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
-            let symbols = symbols_for_file_global_only(&self.db, file);
-            symbols
+            self.exported_symbols_for(path)
                 .iter()
                 .map(|(_, symbol)| {
                     let mut snapshot =
