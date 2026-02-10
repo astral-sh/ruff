@@ -73,6 +73,7 @@ pub(crate) use crate::types::narrow::{
     infer_narrowing_constraint,
 };
 use crate::types::newtype::NewType;
+use crate::types::partial_callable::PartialCallableType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
@@ -111,6 +112,7 @@ mod mro;
 mod narrow;
 mod newtype;
 mod overrides;
+mod partial_callable;
 mod protocol_class;
 pub(crate) mod relation;
 mod signatures;
@@ -794,6 +796,9 @@ pub enum Type<'db> {
     /// This type doesn't handle an unbound super object like `super(A)`; for that we just use
     /// a `Type::NominalInstance` of `builtins.super`.
     BoundSuper(BoundSuperType<'db>),
+    /// A `functools.partial(func, ...)` call result where we could determine
+    /// the remaining callable signature after binding some arguments.
+    PartialCallable(PartialCallableType<'db>),
     /// A subtype of `bool` that allows narrowing in both positive and negative cases.
     TypeIs(TypeIsType<'db>),
     /// A subtype of `bool` that allows narrowing in only the positive case.
@@ -1548,6 +1553,7 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::FunctionLiteral(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
@@ -1617,6 +1623,7 @@ impl<'db> Type<'db> {
             Type::Intersection(_)
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::BoundMethod(_)
             | Type::KnownBoundMethod(_)
             | Type::AlwaysTruthy
@@ -1773,6 +1780,9 @@ impl<'db> Type<'db> {
             Type::BoundSuper(bound_super) => visitor.visit(self, || {
                 Type::BoundSuper(bound_super.normalized_impl(db, visitor))
             }),
+            Type::PartialCallable(partial) => visitor.visit(self, || {
+                Type::PartialCallable(partial.normalized_impl(db, visitor))
+            }),
             Type::GenericAlias(generic) => visitor.visit(self, || {
                 Type::GenericAlias(generic.normalized_impl(db, visitor))
             }),
@@ -1903,6 +1913,9 @@ impl<'db> Type<'db> {
             Type::BoundSuper(bound_super) => bound_super
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::BoundSuper),
+            Type::PartialCallable(partial) => partial
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Type::PartialCallable),
             Type::GenericAlias(generic) => generic
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::GenericAlias),
@@ -1992,6 +2005,7 @@ impl<'db> Type<'db> {
             | Type::Intersection(_)
             | Type::Callable(_)
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_)
@@ -2110,6 +2124,8 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
+
+            Type::PartialCallable(partial) => Some(CallableTypes::one(partial.callable(db))),
 
             // TODO
             Type::DataclassDecorator(_)
@@ -2263,6 +2279,8 @@ impl<'db> Type<'db> {
             // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BoundSuper(..) => false,
+            // Each `partial()` call creates a distinct object at runtime.
+            Type::PartialCallable(..) => false,
             Type::BooleanLiteral(_)
             | Type::FunctionLiteral(..)
             | Type::WrapperDescriptor(..)
@@ -2384,6 +2402,9 @@ impl<'db> Type<'db> {
                 false
             }
 
+            // Each `partial()` call creates a distinct object at runtime.
+            Type::PartialCallable(_) => false,
+
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypeGuard(type_guard) => type_guard.is_bound(db),
 
@@ -2499,6 +2520,9 @@ impl<'db> Type<'db> {
             // `BoundSuper` should look up the name in the MRO of `builtins.super`.
             Type::BoundSuper(_) => KnownClass::Super
                 .to_class_literal(db)
+                .find_name_in_mro_with_policy(db, name, policy),
+
+            Type::PartialCallable(partial) => Type::NominalInstance(partial.instance(db))
                 .find_name_in_mro_with_policy(db, name, policy),
 
             // We eagerly normalize type[object], i.e. Type::SubclassOf(object) to `type`,
@@ -2705,6 +2729,10 @@ impl<'db> Type<'db> {
             // If you want to look up a member in the MRO of the `super`'s owner,
             // refer to [`Type::member`] instead.
             Type::BoundSuper(_) => KnownClass::Super.to_instance(db).instance_member(db, name),
+
+            Type::PartialCallable(partial) => {
+                Type::NominalInstance(partial.instance(db)).instance_member(db, name)
+            }
 
             // TODO: we currently don't model the fact that class literals and subclass-of types have
             // a `__dict__` that is filled with class level attributes. Modeling this is currently not
@@ -3545,6 +3573,9 @@ impl<'db> Type<'db> {
                     .try_call_dunder_get_on_attribute(db, owner_attr)
                     .unwrap_or(owner_attr)
             }
+
+            Type::PartialCallable(partial) => Type::NominalInstance(partial.instance(db))
+                .member_lookup_with_policy(db, name, policy),
         }
     }
 
@@ -3772,6 +3803,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::PropertyInstance(_)
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::KnownInstance(_)
             | Type::SpecialForm(_)
             | Type::AlwaysTruthy => Truthiness::AlwaysTrue,
@@ -3985,6 +4017,8 @@ impl<'db> Type<'db> {
                 CallableBinding::from_overloads(self, callable.signatures(db).iter().cloned())
                     .into()
             }
+
+            Type::PartialCallable(partial) => Type::Callable(partial.callable(db)).bindings(db),
 
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -5393,6 +5427,7 @@ impl<'db> Type<'db> {
                 | Type::BooleanLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::PartialCallable(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_) => None
@@ -5755,6 +5790,7 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::LiteralString
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
@@ -5812,6 +5848,7 @@ impl<'db> Type<'db> {
             | Type::Never
             | Type::FunctionLiteral(_)
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::TypeIs(_)
@@ -6132,6 +6169,9 @@ impl<'db> Type<'db> {
             }
             Type::AlwaysTruthy | Type::AlwaysFalsy => KnownClass::Type.to_instance(db),
             Type::BoundSuper(_) => KnownClass::Super.to_class_literal(db),
+            Type::PartialCallable(partial) => {
+                Type::NominalInstance(partial.instance(db)).to_meta_type(db)
+            }
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
             // `TypedDict` instances are instances of `dict` at runtime, but its important that we
             // understand a more specific meta type in order to correctly handle `__getitem__`.
@@ -6517,7 +6557,8 @@ impl<'db> Type<'db> {
             // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
-            | Type::SpecialForm(_) => self,
+            | Type::SpecialForm(_)
+            | Type::PartialCallable(_) => self,
         }
     }
 
@@ -6750,6 +6791,7 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::SpecialForm(_)
             | Type::TypedDict(_) => {}
         }
@@ -6908,7 +6950,8 @@ impl<'db> Type<'db> {
             | Self::WrapperDescriptor(_)
             | Self::DataclassDecorator(_)
             | Self::DataclassTransformer(_)
-            | Self::BoundSuper(_) => self.to_meta_type(db).definition(db),
+            | Self::BoundSuper(_)
+            | Self::PartialCallable(_) => self.to_meta_type(db).definition(db),
 
             Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
 
@@ -7117,6 +7160,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::TypeVar(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_)

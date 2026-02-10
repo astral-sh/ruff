@@ -1281,6 +1281,16 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             ),
 
+            (Type::PartialCallable(partial), _) => Type::NominalInstance(partial.instance(db))
+                .has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+
             (Type::SubclassOf(subclass_of), _) | (_, Type::SubclassOf(subclass_of))
                 if subclass_of.is_type_var() =>
             {
@@ -2458,6 +2468,16 @@ impl<'db> Type<'db> {
             }
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 KnownClass::Super.to_instance(db).is_disjoint_from_impl(
+                    db,
+                    other,
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                )
+            }
+
+            (Type::PartialCallable(partial), other) | (other, Type::PartialCallable(partial)) => {
+                Type::NominalInstance(partial.instance(db)).is_disjoint_from_impl(
                     db,
                     other,
                     inferable,

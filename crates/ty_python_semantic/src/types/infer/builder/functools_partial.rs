@@ -19,7 +19,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     pub(super) fn infer_functools_partial_call(
         &self,
         arguments: &ast::Arguments,
-    ) -> Option<Type<'db>> {
+    ) -> Option<CallableType<'db>> {
         let db = self.db();
 
         // We need at least one positional argument (the wrapped function).
@@ -92,11 +92,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             .collect();
 
         let new_callable_sig = CallableSignature::from_overloads(new_overloads);
-        Some(Type::Callable(CallableType::new(
+        Some(CallableType::new(
             db,
             new_callable_sig,
             CallableTypeKind::Regular,
-        )))
+        ))
     }
 
     /// Check that bound arguments to `partial()` are compatible with the wrapped

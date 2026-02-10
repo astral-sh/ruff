@@ -129,13 +129,13 @@ use crate::types::{
     CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, PartialCallableType, Signature,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -6051,6 +6051,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 false
             }
+            Type::PartialCallable(_) => {
+                infer_value_ty(self, TypeContext::default());
+
+                if emit_diagnostics
+                    && let Some(builder) = self.context.report_lint(&INVALID_ASSIGNMENT, target)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Cannot assign to attribute `{attribute}` on type `{}`",
+                        object_ty.display(self.db()),
+                    ));
+                }
+                false
+            }
 
             Type::Dynamic(..) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
@@ -10073,6 +10086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::TypeVar(_)
                 | Type::BoundSuper(_)
+                | Type::PartialCallable(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
@@ -12303,10 +12317,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         if let Some(class) = class
             && class.is_known(db, KnownClass::FunctoolsPartial)
+            && let Type::NominalInstance(instance) = return_ty
+            && let Some(callable) = self.infer_functools_partial_call(arguments)
         {
-            if let Some(partial_ty) = self.infer_functools_partial_call(arguments) {
-                return partial_ty;
-            }
+            return Type::PartialCallable(PartialCallableType::new(db, instance, callable));
         }
 
         let find_narrowed_place = || match arguments.args.first() {
@@ -13590,6 +13604,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::PartialCallable(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
@@ -14256,6 +14271,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::PartialCallable(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
@@ -14286,6 +14302,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BytesLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
+                | Type::PartialCallable(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)

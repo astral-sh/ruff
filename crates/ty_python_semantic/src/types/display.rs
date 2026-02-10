@@ -1197,6 +1197,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
+            Type::PartialCallable(partial) => {
+                f.write_str("partial[")?;
+                Type::Callable(partial.callable(self.db))
+                    .display_with(self.db, self.settings.singleline())
+                    .fmt_detailed(f)?;
+                f.write_str("]")
+            }
             Type::TypeIs(type_is) => fmt_type_guard_like(self.db, type_is, &self.settings, f),
             Type::TypeGuard(type_guard) => {
                 fmt_type_guard_like(self.db, type_guard, &self.settings, f)

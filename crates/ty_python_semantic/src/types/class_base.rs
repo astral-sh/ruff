@@ -176,6 +176,7 @@ impl<'db> ClassBase<'db> {
             | Type::ModuleLiteral(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
+            | Type::PartialCallable(_)
             | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
