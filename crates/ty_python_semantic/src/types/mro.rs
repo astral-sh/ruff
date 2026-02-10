@@ -301,7 +301,7 @@ impl<'db> Mro<'db> {
                     } else {
                         Err(StaticMroErrorKind::UnresolvableMro {
                             bases_list: original_bases.iter().copied().collect(),
-                            generic_fix: check_generic_reorder_fixes_mro(
+                            generic_index: check_generic_reorder_fixes_mro(
                                 db,
                                 resolved_bases.as_slice(),
                                 original_bases,
@@ -633,10 +633,10 @@ pub(super) enum StaticMroErrorKind<'db> {
     UnresolvableMro {
         bases_list: Box<[Type<'db>]>,
         /// If the error can be resolved by moving a `Generic[]` base
-        /// to the end of the MRO, this field will be `Some(i)`,
-        /// where `i` is the index of the `Generic[]` base. This allows
-        /// us to construct an autofix when the diagnostic is emitted.
-        generic_fix: Option<usize>,
+        /// to the end of the MRO, this field indicates the index of
+        /// the `Generic[]` base. This allows us to provide an
+        /// autofix when the diagnostic is emitted.
+        generic_index: Option<usize>,
     },
 }
 

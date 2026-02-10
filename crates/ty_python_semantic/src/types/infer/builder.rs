@@ -949,7 +949,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                     StaticMroErrorKind::UnresolvableMro {
                         bases_list,
-                        generic_fix,
+                        generic_index,
                     } => {
                         if let Some(builder) =
                             self.context.report_lint(&INCONSISTENT_MRO, class_node)
@@ -963,7 +963,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .map(|base| base.display(self.db()))
                                     .join(", ")
                             ));
-                            if let Some(index) = *generic_fix
+                            if let Some(index) = *generic_index
                                 && let [first_base, .., last_base] = class_node.bases()
                             {
                                 let source = source_text(self.context.db(), self.context.file());
