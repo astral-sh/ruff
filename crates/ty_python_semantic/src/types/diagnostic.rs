@@ -106,6 +106,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&INVALID_TYPE_VARIABLE_BOUND);
+    registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
@@ -1752,6 +1753,32 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_VARIABLE_BOUND = {
         summary: "detects invalid type variable bounds",
         status: LintStatus::stable("0.0.15"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for [type variables] whose default type is not compatible with
+    /// the type variable's bound or constraints.
+    ///
+    /// ## Why is this bad?
+    /// If a type variable has a bound, the default must be assignable to that
+    /// bound (see: [bound rules]). If a type variable has constraints, the default
+    /// must be one of the constraints (see: [constraint rules]).
+    ///
+    /// ## Examples
+    /// ```python
+    /// T = TypeVar("T", bound=str, default=int)  # error: [invalid-type-variable-default]
+    /// U = TypeVar("U", int, str, default=bytes)  # error: [invalid-type-variable-default]
+    /// ```
+    ///
+    /// [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
+    /// [bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules
+    /// [constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules
+    pub(crate) static INVALID_TYPE_VARIABLE_DEFAULT = {
+        summary: "detects invalid type variable defaults",
+        status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
     }
 }

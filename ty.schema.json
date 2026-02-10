@@ -1010,6 +1010,16 @@
             }
           ]
         },
+        "invalid-type-variable-default": {
+          "title": "detects invalid type variable defaults",
+          "description": "## What it does\nChecks for [type variables] whose default type is not compatible with\nthe type variable's bound or constraints.\n\n## Why is this bad?\nIf a type variable has a bound, the default must be assignable to that\nbound (see: [bound rules]). If a type variable has constraints, the default\nmust be one of the constraints (see: [constraint rules]).\n\n## Examples\n```python\nT = TypeVar(\"T\", bound=str, default=int)  # error: [invalid-type-variable-default]\nU = TypeVar(\"U\", int, str, default=bytes)  # error: [invalid-type-variable-default]\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar\n[bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules\n[constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-header": {
           "title": "detects invalid statements in `TypedDict` class headers",
           "description": "## What it does\nDetects errors in `TypedDict` class headers, such as unexpected arguments\nor invalid base classes.\n\n## Why is this bad?\nThe typing spec states that `TypedDict`s are not permitted to have\ncustom metaclasses. Using `**` unpacking in a `TypedDict` header\nis also prohibited by ty, as it means that ty cannot statically determine\nwhether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]\n    ...\n\ndef f(x: dict):\n    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]\n        ...\n```",

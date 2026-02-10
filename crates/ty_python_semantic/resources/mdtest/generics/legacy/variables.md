@@ -180,6 +180,140 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid(Generic[U]): ...
 ```
 
+### Invalid defaults
+
+A TypeVar default must be compatible with its bound or constraints.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+#### Concrete default with a bound
+
+The default must be assignable to the bound:
+
+```py
+from typing import TypeVar
+
+# error: [invalid-type-variable-default] "Default type `int` is not assignable to bound `str`"
+T = TypeVar("T", bound=str, default=int)
+
+S = TypeVar("S", bound=float, default=int)
+```
+
+#### Concrete default with constraints
+
+The default must be one of the constrained types, even if it is a subtype of one of them:
+
+```py
+from typing import Any, TypeVar
+
+# error: [invalid-type-variable-default] "Default type `bytes` is not one of the constrained types"
+T = TypeVar("T", int, str, default=bytes)
+
+S = TypeVar("S", int, str, default=int)
+
+# A subtype is not sufficient; the default must be exactly one of the constraints.
+# error: [invalid-type-variable-default] "Default type `bool` is not one of the constrained types"
+U = TypeVar("U", int, str, default=bool)
+
+# `Any` is always allowed as a default, even for constrained TypeVars.
+V = TypeVar("V", int, str, default=Any)
+```
+
+#### TypeVar default with a bounded outer
+
+When the default is a TypeVar, the default TypeVar's upper bound must be assignable to the outer
+TypeVar's bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T2 = TypeVar("T2", bound=float)
+T3 = TypeVar("T3", bound=str)
+
+# OK: `float` in a type expression means `int | float`,
+# and the upper bound of `T` (`int`) is assignable to `int | float`
+S = TypeVar("S", default=T1, bound=float)
+
+# error: [invalid-type-variable-default] "Default type `T3` is not assignable to bound `int | float`"
+U = TypeVar("U", default=T3, bound=float)
+```
+
+#### Unbounded TypeVar default with bounded outer
+
+An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
+restrictive bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1")
+
+# error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
+S = TypeVar("S", default=T1, bound=int)
+```
+
+#### TypeVar default with bounded outer (constrained default)
+
+When the default TypeVar has constraints, all constraints must be assignable to the outer bound:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", int, str)
+T2 = TypeVar("T2", int, bool)
+
+# OK: `T1`'s constraints are `int` and `str,
+# which are both assignable to `object`
+S = TypeVar("S", default=T1, bound=object)
+
+# error: [invalid-type-variable-default] "Default type `T1` is not assignable to bound `int`"
+U = TypeVar("U", default=T1, bound=int)
+
+# OK: `T2`'s constraints are `int` and `bool`,
+# which are both assignable to `int`
+V = TypeVar("V", default=T2, bound=int)
+```
+
+#### TypeVar default with constrained outer (constrained default)
+
+When the default has constraints, the outer's constraints must be a superset:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", int, str)
+T2 = TypeVar("T2", int, str, bool)
+
+# OK: `T1`'s constraints ({int, str}) are a subset
+# of `S`'s constraints ({int, str, bool})
+S = TypeVar("S", int, str, bool, default=T1)
+
+# error: [invalid-type-variable-default]
+U = TypeVar("U", bool, complex, default=T1)
+```
+
+#### TypeVar default with constrained outer (non-constrained default)
+
+A non-constrained TypeVar (bounded or unbounded) is incompatible as the default for a constrained
+TypeVar:
+
+```py
+from typing import Generic, TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T2 = TypeVar("T2")
+
+# error: [invalid-type-variable-default]
+S = TypeVar("S", float, str, default=T1)
+
+# error: [invalid-type-variable-default]
+U = TypeVar("U", str, bytes, default=T2)
+```
+
 ### Type variables with an upper bound
 
 ```py
