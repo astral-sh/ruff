@@ -585,9 +585,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             let name = symbol.name();
 
             // Walk up the scope stack to find the enclosing scope where this symbol
-            // is bound AND not itself nonlocal.
+            // is bound AND not itself nonlocal. Class and module scopes are skipped,
+            // mirroring Python's nonlocal resolution semantics.
             for scope_info in self.scope_stack.iter().rev() {
                 let enclosing_scope_id = scope_info.file_scope_id;
+
+                if !self.scopes[enclosing_scope_id].kind().is_function_like() {
+                    continue;
+                }
+
                 let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
                 let Some(enclosing_symbol_id) = enclosing_place_table.symbol_id(name) else {

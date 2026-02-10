@@ -408,6 +408,24 @@ def f():
     reveal_type(x)  # revealed: Literal[1] | Unknown
 ```
 
+With a class scope between the inner and outer functions, `nonlocal` skips the class scope and
+targets the outer function's binding:
+
+```py
+def outer():
+    x = 1
+
+    class C:
+        x = "c"
+
+        @staticmethod
+        def g():
+            nonlocal x
+            x += 1
+
+    reveal_type(x)  # revealed: Literal[1] | Unknown
+```
+
 With a declaration-only nonlocal target (annotation without binding), the `ExternallyModified`
 binding widens the type:
 
