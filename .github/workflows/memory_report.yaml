@@ -87,7 +87,7 @@ jobs:
               --old-ty "./ty-old" \
               --new-ty "./ty-new" \
               --projects-dir "${GITHUB_WORKSPACE}/memory_projects" \
-              --output ../memory_report_diff
+              --output ../memory_report_diff.diff
           )
 
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
@@ -96,4 +96,4 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: memory_report_diff
-          path: memory_report_diff
+          path: memory_report_diff.diff
