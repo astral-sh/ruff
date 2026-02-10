@@ -1402,6 +1402,12 @@ impl System for WasmSystem {
         CaseSensitivity::CaseSensitive
     }
 
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        // Since permissions of all files is 755,
+        // it follows that every file is executable.
+        self.is_file(path)
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.fs.current_directory()
     }

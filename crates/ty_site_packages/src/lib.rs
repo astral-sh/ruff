@@ -214,10 +214,8 @@ impl PythonEnvironment {
                 .map(Some);
         }
 
-        #[cfg(not(target_family = "wasm"))]
-        if let Ok(paths) = system.env_var("PATH")
-            && let Some(env) = environment_from_binary(system, "python3", &paths)
-                .or_else(|| environment_from_binary(system, "python", &paths))
+        if let Some(env) = environment_from_binary(system, "python3")
+            .or_else(|| environment_from_binary(system, "python"))
         {
             return Ok(Some(env));
         }
@@ -725,23 +723,31 @@ pub(crate) fn conda_environment_from_env(
     Some(path)
 }
 
-#[cfg(not(target_family = "wasm"))]
 pub(crate) fn environment_from_binary(
-    system: &dyn System,
-    binary: &str,
-    paths: &str,
+    _system: &dyn System,
+    _binary: &str,
 ) -> Option<PythonEnvironment> {
-    // TODO: replace which logic to better respect the environment from System
-    // which_in_global can access environment variables directly, like HOME for tilde expansion
-    let binary = which::which_in_global(binary, Some(&paths)).ok()?.next()?;
-    let binary = SystemPathBuf::from_path_buf(binary).ok()?;
-    let env = PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, system).ok()?;
+    #[cfg(target_family = "wasm")]
+    {
+        return None;
+    }
 
-    // TODO: replace this with better shim support, e.g. pyenv
-    // sanity check to filter out shims
-    env.site_packages_paths(system).ok()?;
+    #[cfg(not(target_family = "wasm"))]
+    {
+        let binary = which::WhichConfig::new_with_sys(_system)
+            .binary_name(_binary.into())
+            .first_result()
+            .ok()?;
+        let binary = SystemPathBuf::from_path_buf(binary).ok()?;
+        let env =
+            PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, _system).ok()?;
 
-    Some(env)
+        // TODO: replace this with better shim support, e.g. pyenv
+        // sanity check to filter out shims
+        env.site_packages_paths(_system).ok()?;
+
+        Some(env)
+    }
 }
 
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.

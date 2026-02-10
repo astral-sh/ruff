@@ -290,6 +290,10 @@ impl System for MdtestSystem {
         self.as_system().case_sensitivity()
     }
 
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        self.as_system().is_executable(path)
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.as_system().current_directory()
     }
