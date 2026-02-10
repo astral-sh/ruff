@@ -728,7 +728,7 @@ pub(crate) fn environment_from_binary(
     _system: &dyn System,
     _binary: &str,
 ) -> Option<PythonEnvironment> {
-    return None;
+    None
 }
 
 #[cfg(not(target_family = "wasm"))]
