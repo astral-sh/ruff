@@ -106,7 +106,7 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     let fix = if has_bytes {
         None
     } else if checker.settings().flake8_type_checking.quote_annotations {
-        quote_union(checker, &strings, expr)
+        Some(quote_union(checker, &strings, expr))
     } else {
         unquote_and_add_future_import(checker, &strings)
     };
@@ -166,7 +166,7 @@ fn unquote_and_add_future_import(checker: &Checker, strings: &[&Expr]) -> Option
     Some(Fix::unsafe_edits(first, edits_iter))
 }
 
-fn quote_union(checker: &Checker, strings: &[&Expr], union_expr: &Expr) -> Option<Fix> {
+fn quote_union(checker: &Checker, strings: &[&Expr], union_expr: &Expr) -> Fix {
     let mut union_text = checker.locator().slice(union_expr.range()).to_string();
     let mut unquoted: Vec<_> = strings
         .iter()
@@ -186,10 +186,7 @@ fn quote_union(checker: &Checker, strings: &[&Expr], union_expr: &Expr) -> Optio
         union_text.replace_range(start..end, value);
     }
     let quoted_union = format!("\"{union_text}\"");
-    Some(Fix::safe_edit(Edit::range_replacement(
-        quoted_union,
-        union_expr.range(),
-    )))
+    Fix::safe_edit(Edit::range_replacement(quoted_union, union_expr.range()))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
