@@ -723,31 +723,31 @@ pub(crate) fn conda_environment_from_env(
     Some(path)
 }
 
+#[cfg(target_family = "wasm")]
 pub(crate) fn environment_from_binary(
     _system: &dyn System,
     _binary: &str,
 ) -> Option<PythonEnvironment> {
-    #[cfg(target_family = "wasm")]
-    {
-        return None;
-    }
+    return None;
+}
 
-    #[cfg(not(target_family = "wasm"))]
-    {
-        let binary = which::WhichConfig::new_with_sys(_system)
-            .binary_name(_binary.into())
-            .first_result()
-            .ok()?;
-        let binary = SystemPathBuf::from_path_buf(binary).ok()?;
-        let env =
-            PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, _system).ok()?;
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn environment_from_binary(
+    system: &dyn System,
+    binary: &str,
+) -> Option<PythonEnvironment> {
+    let binary = which::WhichConfig::new_with_sys(system)
+        .binary_name(binary.into())
+        .first_result()
+        .ok()?;
+    let binary = SystemPathBuf::from_path_buf(binary).ok()?;
+    let env = PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, system).ok()?;
 
-        // TODO: replace this with better shim support, e.g. pyenv
-        // sanity check to filter out shims
-        env.site_packages_paths(_system).ok()?;
+    // TODO: replace this with better shim support, e.g. pyenv
+    // sanity check to filter out shims
+    env.site_packages_paths(system).ok()?;
 
-        Some(env)
-    }
+    Some(env)
 }
 
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.
