@@ -100,6 +100,11 @@ pub(crate) fn invalid_noqa_code(
 
         if valid_codes.is_empty() {
             all_codes_invalid_diagnostic(directive, invalid_codes, context);
+        } else if valid_codes
+            .iter()
+            .any(|code| code.as_str() == Rule::InvalidRuleCode.noqa_code())
+        {
+            // RUF102 suppressed
         } else {
             for invalid_code in invalid_codes {
                 some_codes_are_invalid_diagnostic(directive, invalid_code, locator, context);
