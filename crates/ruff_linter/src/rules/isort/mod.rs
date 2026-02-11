@@ -1271,6 +1271,7 @@ mod tests {
     #[test_case(Path::new("import_heading_already_present.py"))]
     #[test_case(Path::new("import_heading_unsorted.py"))]
     #[test_case(Path::new("import_heading_already_correct.py"))]
+    #[test_case(Path::new("import_heading_duplicate.py"))]
     fn import_heading(path: &Path) -> Result<()> {
         let snapshot = format!("import_heading_{}", path.to_string_lossy());
         let diagnostics = test_path(
