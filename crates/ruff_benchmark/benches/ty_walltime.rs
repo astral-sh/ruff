@@ -231,10 +231,6 @@ static STATIC_FRAME: Benchmark = Benchmark::new(
         max_dep_date: "2025-08-09",
         python_version: PythonVersion::PY311,
     },
-    // Increased from 1700 after TypeVarTuple support was implemented.
-    // static-frame heavily uses TypeVarTuple for DataFrame typing; now that
-    // TypeVarTuple is a real type instead of @Todo, more diagnostics are emitted.
-    // This may decrease as variadic specialization support improves.
     1850,
 );
 

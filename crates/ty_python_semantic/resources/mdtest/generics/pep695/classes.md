@@ -210,6 +210,25 @@ reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
 ```
 
+TypeVarTuple specializations pack variadic arguments into a tuple:
+
+```py
+class Variadic[*Ts]: ...
+
+reveal_type(Variadic[int, str, bytes]())  # revealed: Variadic[tuple[int, str, bytes]]
+reveal_type(Variadic[int]())  # revealed: Variadic[tuple[int]]
+```
+
+When a TypeVarTuple appears alongside fixed type variables, leading and trailing arguments are
+matched with the fixed variables and the rest goes to the TypeVarTuple:
+
+```py
+class Mixed[T, *Ts]: ...
+
+reveal_type(Mixed[int, str, bytes]())  # revealed: Mixed[int, tuple[str, bytes]]
+reveal_type(Mixed[int]())  # revealed: Mixed[int, tuple[()]]
+```
+
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't
