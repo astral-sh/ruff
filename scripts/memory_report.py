@@ -104,7 +104,7 @@ def format_diff(*, old_bytes: int, new_bytes: int) -> str:
     if old_bytes == 0:
         return f"{sign}{format_bytes(diff)} (new)"
 
-    return f"{sign}{diff / old_bytes:.1%} ({format_bytes(abs(diff))})"
+    return f"{sign}{diff / old_bytes:.2%} ({format_bytes(abs(diff))})"
 
 
 def format_outcome(*, old_bytes: int, new_bytes: int) -> str:
