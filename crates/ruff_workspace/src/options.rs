@@ -2500,6 +2500,13 @@ pub struct IsortOptions {
             local-folder = "Local folder imports"
         "#
     )]
+    #[cfg_attr(feature = "schemars", schemars(extend("properties" = {
+        "future": {"type": "string"},
+        "standard-library": {"type": "string"},
+        "third-party": {"type": "string"},
+        "first-party": {"type": "string"},
+        "local-folder": {"type": "string"}
+    })))]
     pub import_heading: Option<FxHashMap<ImportSection, String>>,
 
     /// The number of blank lines to place after imports.
