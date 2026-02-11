@@ -114,8 +114,7 @@ pub(crate) fn organize_imports(
     // the first import, so they're collected and can be stripped/re-added correctly.
     let import_headings = &settings.isort.import_headings;
     let (comment_start, fix_start) = if import_headings.is_empty() {
-        // Preserve original behavior: comments from import start,
-        // fix range from line start.
+        // Preserve original behavior: comments from import start, fix range from line start.
         (range.start(), locator.line_start(range.start()))
     } else {
         // Heading comments are already formatted as "# {heading}" in settings.
