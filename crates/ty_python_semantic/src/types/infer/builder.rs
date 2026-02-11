@@ -4957,20 +4957,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             default,
         } = node;
 
-        // Handle deferred default evaluation
         if default.is_some() {
             self.deferred.insert(definition, self.multi_inference_state);
         }
-
-        // Create the TypeVarTuple identity
         let identity = TypeVarIdentity::new(
             self.db(),
             &name.id,
             Some(definition),
             TypeVarKind::Pep695TypeVarTuple,
         );
-
-        // Create the TypeVar instance (TypeVarTuple has no bounds/constraints)
         let ty = Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
             self.db(),
             identity,
@@ -4978,7 +4973,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             None, // explicit_variance
             default.as_deref().map(|_| TypeVarDefaultEvaluation::Lazy),
         )));
-
         self.add_declaration_with_binding(
             node.into(),
             definition,
@@ -6925,7 +6919,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let arguments = &call_expr.arguments;
-        let _python_version = Program::get(db).python_version(db);
 
         let mut default = None;
         let mut name_param_ty = None;
@@ -12301,8 +12294,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
             }
 
-            // Inference of correctly-placed `TypeVar`, `ParamSpec`, and `NewType` definitions
-            // is done in `infer_legacy_typevar`, `infer_paramspec`, and
+            // Inference of correctly-placed `TypeVar`, `ParamSpec`, `TypeVarTuple`, and
+            // `NewType` definitions is done in `infer_legacy_typevar`,
+            // `infer_legacy_paramspec`, `infer_legacy_typevartuple`, and
             // `infer_newtype_expression`, and doesn't use the full call-binding machinery. If
             // we reach here, it means that someone is trying to instantiate one of these in an
             // invalid context.
@@ -12324,6 +12318,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         builder.into_diagnostic(
                             "A `ParamSpec` definition must be a simple variable assignment",
+                        );
+                    }
+                }
+                Some(KnownClass::TypeVarTuple) => {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `TypeVarTuple` definition must be a simple variable assignment",
                         );
                     }
                 }
@@ -12469,17 +12473,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
 
-        // TypeVarTuples should be returned directly without iteration
-        match iterable_type {
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                if typevar.is_typevartuple(db) =>
-            {
-                return iterable_type;
-            }
-            Type::TypeVar(bound_typevar) if bound_typevar.typevar(db).is_typevartuple(db) => {
-                return iterable_type;
-            }
-            _ => {}
+        if iterable_type.is_typevartuple(db) {
+            return iterable_type;
         }
 
         iterable_type
@@ -16372,20 +16367,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
             Type::SpecialForm(SpecialFormType::Unpack) => {
-                // If the argument is a TypeVarTuple, return it directly
-                // Unpack[Ts] expands the TypeVarTuple
-                match slice_ty {
-                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
-                        if typevar.is_typevartuple(db) =>
-                    {
-                        Ok(slice_ty)
-                    }
-                    Type::TypeVar(bound_typevar)
-                        if bound_typevar.typevar(db).is_typevartuple(db) =>
-                    {
-                        Ok(slice_ty)
-                    }
-                    _ => Ok(Type::Dynamic(DynamicType::TodoUnpack)),
+                if slice_ty.is_typevartuple(db) {
+                    Ok(slice_ty)
+                } else {
+                    Ok(Type::Dynamic(DynamicType::TodoUnpack))
                 }
             }
             Type::SpecialForm(SpecialFormType::Concatenate) => {
