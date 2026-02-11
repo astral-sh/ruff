@@ -1725,7 +1725,7 @@ impl ToSettingsError {
 
         impl fmt::Display for DisplayPretty<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let display_config = DisplayDiagnosticConfig::default()
+                let display_config = DisplayDiagnosticConfig::new("ty")
                     .format(self.error.output_format.into())
                     .color(self.error.color);
 

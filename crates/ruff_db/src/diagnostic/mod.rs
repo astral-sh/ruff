@@ -1321,9 +1321,7 @@ impl SubDiagnosticSeverity {
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
     /// The program name used in structured output formats (e.g., JUnit, GitHub).
-    ///
-    /// Defaults to `"ty"`.
-    program: String,
+    program: &'static str,
     /// The format to use for diagnostic rendering.
     ///
     /// This uses the "full" format by default.
@@ -1365,11 +1363,18 @@ pub struct DisplayDiagnosticConfig {
 }
 
 impl DisplayDiagnosticConfig {
-    /// Set the program name used in structured output formats.
-    pub fn program(self, program: impl Into<String>) -> DisplayDiagnosticConfig {
+    pub fn new(program: &'static str) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
-            program: program.into(),
-            ..self
+            program,
+            format: DiagnosticFormat::default(),
+            color: false,
+            context: 2,
+            preview: false,
+            hide_severity: false,
+            show_fix_status: false,
+            show_fix_diff: false,
+            fix_applicability: Applicability::Safe,
+            cancellation_token: None,
         }
     }
 
@@ -1456,23 +1461,6 @@ impl DisplayDiagnosticConfig {
         self.cancellation_token
             .as_ref()
             .is_some_and(|token| token.is_cancelled())
-    }
-}
-
-impl Default for DisplayDiagnosticConfig {
-    fn default() -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
-            program: "ty".to_string(),
-            format: DiagnosticFormat::default(),
-            color: false,
-            context: 2,
-            preview: false,
-            hide_severity: false,
-            show_fix_status: false,
-            show_fix_diff: false,
-            fix_applicability: Applicability::Safe,
-            cancellation_token: None,
-        }
     }
 }
 

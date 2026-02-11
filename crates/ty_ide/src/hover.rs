@@ -4973,7 +4973,7 @@ def function():
             )
             .unwrap();
 
-            let config = DisplayDiagnosticConfig::default()
+            let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
                 .format(DiagnosticFormat::Full);
 

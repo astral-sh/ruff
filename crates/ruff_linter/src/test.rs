@@ -460,7 +460,7 @@ pub(crate) fn print_jupyter_messages(
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let config = DisplayDiagnosticConfig::default()
+    let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
@@ -479,7 +479,7 @@ pub(crate) fn print_jupyter_messages(
 }
 
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
-    let config = DisplayDiagnosticConfig::default()
+    let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)

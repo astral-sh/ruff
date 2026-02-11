@@ -137,7 +137,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver, &self.config.program)
+                junit::JunitRenderer::new(self.resolver, self.config.program)
                     .render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
@@ -145,7 +145,7 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
                 gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, &self.config.program)
+                GithubRenderer::new(self.resolver, self.config.program)
                     .render(f, self.diagnostics)?;
             }
         }
@@ -2540,7 +2540,7 @@ watermelon
         pub(super) fn new() -> TestEnvironment {
             TestEnvironment {
                 db: TestDb::new(),
-                config: DisplayDiagnosticConfig::default(),
+                config: DisplayDiagnosticConfig::new("ty"),
             }
         }
 
@@ -2551,16 +2551,14 @@ watermelon
             // be `Copy` (which it could be, at time of writing, 2025-03-07),
             // but it seems likely to me that it will grow non-`Copy`
             // configuration. So just deal with this inconvenience for now.
-            let mut config = std::mem::take(&mut self.config);
-            config = config.context(lines);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.context(lines);
         }
 
         /// Set the output format to use in diagnostic rendering.
         pub(super) fn format(&mut self, format: DiagnosticFormat) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.format(format);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.format(format);
         }
 
         /// Enable preview functionality for diagnostic rendering.
@@ -2569,37 +2567,32 @@ watermelon
             reason = "This is currently only used for JSON but will be needed soon for other formats"
         )]
         pub(super) fn preview(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.preview(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.preview(yes);
         }
 
         /// Hide diagnostic severity when rendering.
         pub(super) fn hide_severity(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.hide_severity(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.hide_severity(yes);
         }
 
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.with_show_fix_status(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.with_show_fix_status(yes);
         }
 
         /// Show a diff for the fix when rendering.
         pub(super) fn show_fix_diff(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.show_fix_diff(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.show_fix_diff(yes);
         }
 
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.with_fix_applicability(applicability);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.with_fix_applicability(applicability);
         }
 
         /// Add a file with the given path and contents to this environment.

@@ -455,7 +455,7 @@ impl MainLoop {
                 // Only render diagnostics if they're going to be displayed, since doing
                 // so is expensive.
                 if stdout.is_enabled() {
-                    let display_config = DisplayDiagnosticConfig::default()
+                    let display_config = DisplayDiagnosticConfig::new("ty")
                         .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
