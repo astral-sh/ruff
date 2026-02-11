@@ -118,6 +118,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
+    registry.register_lint(&OVERRIDE_OF_FINAL_VARIABLE);
     registry.register_lint(&INEFFECTIVE_FINAL);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
@@ -2080,6 +2081,33 @@ declare_lint! {
     pub(crate) static OVERRIDE_OF_FINAL_METHOD = {
         summary: "detects overrides of final methods",
         status: LintStatus::stable("0.0.1-alpha.29"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for class variables on subclasses that override a superclass variable
+    /// that has been declared as `Final`.
+    ///
+    /// ## Why is this bad?
+    /// Declaring a variable as `Final` indicates to the type checker that it should not be
+    /// overridden on any subclass.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import Final
+    ///
+    /// class A:
+    ///     X: Final[int] = 1
+    ///
+    /// class B(A):
+    ///     X = 2  # Error raised here
+    /// ```
+    pub(crate) static OVERRIDE_OF_FINAL_VARIABLE = {
+        summary: "detects overrides of Final class variables",
+        status: LintStatus::stable("0.0.16"),
         default_level: Level::Error,
     }
 }
@@ -5187,6 +5215,60 @@ pub(super) fn report_overridden_final_method<'db>(
         diagnostic.help(format_args!("Remove the getter and setter for `{member}`"));
     } else {
         diagnostic.help(format_args!("Remove the override of `{member}`"));
+    }
+}
+
+pub(super) fn report_overridden_final_variable<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    subclass_definition: Definition<'db>,
+    superclass: ClassType<'db>,
+    subclass: ClassType<'db>,
+    superclass_definition: Option<Definition<'db>>,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(
+        &OVERRIDE_OF_FINAL_VARIABLE,
+        subclass_definition.focus_range(db, context.module()),
+    ) else {
+        return;
+    };
+
+    let superclass_name = if superclass.name(db) == subclass.name(db) {
+        superclass.qualified_name(db).to_string()
+    } else {
+        superclass.name(db).to_string()
+    };
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Cannot override `{superclass_name}.{member}`"));
+    diagnostic.set_primary_message(format_args!(
+        "Overrides a final variable from superclass `{superclass_name}`"
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Cannot override final variable `{member}` from superclass `{superclass_name}`"
+    ));
+
+    if let Some(superclass_def) = superclass_definition {
+        let mut sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "`{superclass_name}.{member}` is declared as `Final`, forbidding overrides"
+            ),
+        );
+        sub.annotate(
+            Annotation::secondary(Span::from(
+                superclass_def
+                    .focus_range(db, &parsed_module(db, superclass_def.file(db)).load(db)),
+            ))
+            .message(format_args!("`{superclass_name}.{member}` defined here")),
+        );
+        diagnostic.sub(sub);
+    } else {
+        diagnostic.info(format_args!(
+            "`{superclass_name}.{member}` is declared as `Final`, forbidding overrides"
+        ));
     }
 }
 

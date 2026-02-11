@@ -27,6 +27,11 @@ impl<'db> Member<'db> {
         }
     }
 
+    /// Returns the type qualifiers of this member.
+    pub(super) fn qualifiers(&self) -> crate::types::TypeQualifiers {
+        self.inner.qualifiers
+    }
+
     /// Returns `true` if the inner place is undefined (i.e. there is no such member).
     pub(super) fn is_undefined(&self) -> bool {
         self.inner.place.is_undefined()
