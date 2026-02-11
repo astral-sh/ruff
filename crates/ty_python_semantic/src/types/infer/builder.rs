@@ -4908,10 +4908,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// Infer the type for a loop header definition.
     ///
     /// The loop header sees all bindings that loop-back, either by reaching the end of the loop
-    /// body or a `continue` statement. This includes bindings from before the loop too, though
-    /// that's technically redundant, since the loop header definition itself doesn't shadow those
-    /// bindings. See `struct LoopHeader` in the semantic index for more on how all this fits
-    /// together.
+    /// body or a `continue` statement. This only includes bindings created within the loop (and
+    /// the loop header definitions themselves, which are filtered out below). Bindings from before
+    /// the loop are not included, since the loop header definition doesn't shadow them and they
+    /// are already visible through normal control flow.
     fn infer_loop_header_definition(
         &mut self,
         loop_header_kind: &LoopHeaderDefinitionKind<'db>,

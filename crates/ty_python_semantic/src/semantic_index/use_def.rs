@@ -1366,19 +1366,33 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
+    /// The next `ScopedDefinitionId` that will be assigned. This can be used as a threshold
+    /// to distinguish pre-existing bindings from those created after this point.
+    pub(super) fn next_definition_id(&self) -> ScopedDefinitionId {
+        ScopedDefinitionId::from_usize(self.all_definitions.len())
+    }
+
     /// Get a snapshot of the current bindings for a place. We use this at the end of loop bodies
     /// to populate the loop header definitions (bindings in the loop body that are visible via
     /// loop-back to prior uses in the loop body and also to the loop condition).
+    ///
+    /// `min_definition_id` filters out bindings that existed before the loop started, since those
+    /// are already visible through normal control flow and don't need to be duplicated in the
+    /// loop header.
     pub(super) fn loop_back_bindings(
         &self,
         place: ScopedPlaceId,
+        min_definition_id: ScopedDefinitionId,
     ) -> impl Iterator<Item = LiveBinding> + '_ {
         let bindings = match place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
             ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
         };
 
-        bindings.iter().copied()
+        bindings
+            .iter()
+            .copied()
+            .filter(move |b| b.binding >= min_definition_id)
     }
 
     /// Restore the current builder places state to the given snapshot.

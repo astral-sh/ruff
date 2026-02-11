@@ -47,7 +47,8 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, ScopedDefinitionId, ScopedEnclosingSnapshotId,
+    UseDefMapBuilder,
 };
 use crate::semantic_index::{
     ExpressionsScopeMap, LoopHeader, LoopToken, SemanticIndex, VisibleAncestorsIter,
@@ -859,10 +860,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// to uses in the same loop via "loop header definitions". We call this after merging control
     /// flow from all the loop-back edges, most importantly at the end of the loop body, and also
     /// at any `continue` statements.
+    ///
+    /// `min_definition_id` is used to filter out bindings that existed before the loop. Since loop
+    /// header definitions don't shadow prior bindings, those pre-loop bindings are already visible
+    /// through normal control flow and don't need to be stored in the loop header.
     fn populate_loop_header(
         &mut self,
         loop_header_places: &FxHashSet<ScopedPlaceId>,
         loop_token: LoopToken<'db>,
+        min_definition_id: ScopedDefinitionId,
     ) {
         let mut loop_header = LoopHeader::new();
         let use_def = self.current_use_def_map_mut();
@@ -877,7 +883,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !use_def.is_statically_unreachable() {
             // Collect bindings.
             for place_id in loop_header_places {
-                for live_binding in use_def.loop_back_bindings(*place_id) {
+                for live_binding in use_def.loop_back_bindings(*place_id, min_definition_id) {
                     loop_header.add_binding(*place_id, live_binding);
                 }
             }
@@ -2135,10 +2141,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut maybe_loop_header_info = None;
                 // Avoid allocating a `LoopToken` if there are no bound places in this loop.
                 if !bound_places.is_empty() {
-                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
-                        LoopStmtRef::While(while_stmt),
-                        bound_places,
-                    ));
+                    let min_definition_id =
+                        self.current_use_def_map_mut().next_definition_id();
+                    let (loop_token, bound_place_ids) =
+                        self.synthesize_loop_header_definitions(
+                            LoopStmtRef::While(while_stmt),
+                            bound_places,
+                        );
+                    maybe_loop_header_info =
+                        Some((loop_token, bound_place_ids, min_definition_id));
                 }
 
                 // Visit the test expression after creating loop headers, so that loop-back values
@@ -2165,8 +2176,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
-                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
-                    self.populate_loop_header(&bound_place_ids, loop_token);
+                if let Some((loop_token, bound_place_ids, min_definition_id)) =
+                    maybe_loop_header_info
+                {
+                    self.populate_loop_header(
+                        &bound_place_ids,
+                        loop_token,
+                        min_definition_id,
+                    );
                 }
 
                 // We execute the `else` branch once the condition evaluates to false. This could
@@ -2252,10 +2269,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut maybe_loop_header_info = None;
                 // Avoid allocating a `LoopToken` if there are no bound places in this loop.
                 if !bound_places.is_empty() {
-                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
-                        LoopStmtRef::For(for_stmt),
-                        bound_places,
-                    ));
+                    let min_definition_id =
+                        self.current_use_def_map_mut().next_definition_id();
+                    let (loop_token, bound_place_ids) =
+                        self.synthesize_loop_header_definitions(
+                            LoopStmtRef::For(for_stmt),
+                            bound_places,
+                        );
+                    maybe_loop_header_info =
+                        Some((loop_token, bound_place_ids, min_definition_id));
                 }
 
                 self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
@@ -2273,8 +2295,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // Collect all the loop-back bindings (including the `continue` states we just
                 // merged) and populate the `LoopHeader`.
-                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
-                    self.populate_loop_header(&bound_place_ids, loop_token);
+                if let Some((loop_token, bound_place_ids, min_definition_id)) =
+                    maybe_loop_header_info
+                {
+                    self.populate_loop_header(
+                        &bound_place_ids,
+                        loop_token,
+                        min_definition_id,
+                    );
                 }
 
                 // We may execute the `else` clause without ever executing the body, so merge in
