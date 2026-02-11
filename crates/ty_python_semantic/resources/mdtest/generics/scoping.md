@@ -297,17 +297,12 @@ happens to have a type parameter with the same name as the enclosing scope's typ
 as the nested class only uses its own type parameters.
 
 ```py
-class TypedFieldValue[T]:
+class Base[T]:
     pass
 
-class CodecBase[T]:
-    typed_field_value_cls: type[TypedFieldValue[T]]
-
-    def __init_subclass__(cls) -> None:
-        class ConcreteTypedFieldValue[U](TypedFieldValue[U]):
-            pass
-
-        cls.typed_field_value_cls = ConcreteTypedFieldValue[T]
+class Outer[T]:
+    class Inner[U](Base[U]):
+        pass
 ```
 
 But it is still an error to directly reference the enclosing scope's type variable in the base class
