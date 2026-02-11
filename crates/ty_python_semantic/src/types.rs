@@ -1379,9 +1379,11 @@ impl<'db> Type<'db> {
 
     /// Returns the number of union clauses in this type. If the type is not a union, returns 1.
     pub(crate) fn union_size(self, db: &'db dyn Db) -> usize {
-        self.as_union()
-            .map(|union_type| union_type.elements(db).len())
-            .unwrap_or(1)
+        match self {
+            Type::Union(union_type) => union_type.elements(db).len(),
+            Type::Never => 0,
+            _ => 1,
+        }
     }
 
     /// Returns the number of intersection clauses in this type. If the type is a union, this is
