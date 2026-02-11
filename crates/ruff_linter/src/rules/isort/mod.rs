@@ -231,7 +231,7 @@ fn format_import_block(
 
         // Insert heading comment for this section, if configured.
         if let Some(heading) = settings.import_headings.get(import_section) {
-            write!(output, "{heading}").unwrap();
+            output.push_str(&heading);
             output.push_str(&stylist.line_ending());
         }
 
