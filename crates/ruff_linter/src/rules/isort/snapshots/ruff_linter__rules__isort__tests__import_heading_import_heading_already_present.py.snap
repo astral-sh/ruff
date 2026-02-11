@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/isort/mod.rs
+assertion_line: 1284
 ---
 I001 [*] Import block is un-sorted or un-formatted
   --> import_heading_already_present.py:2:1
