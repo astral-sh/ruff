@@ -52,6 +52,12 @@ def default_var(v: V) -> V:
     return v
 
 
+# TypeVar used in multiple parameter annotations should still be detected
+def multi_param(t: list[T], c: Callable[[T], None]) -> T:
+    c(t[0])
+    return t[1]
+
+
 # these cases are not handled
 
 def outer():
