@@ -1815,9 +1815,10 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
+                        let constraints = ConstraintSetBuilder::new();
                         let result = tracked
                             .constraints(db)
-                            .implies(db, || other.constraints(db));
+                            .implies(db, &constraints, || other.constraints(db));
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),

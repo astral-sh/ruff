@@ -490,25 +490,23 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match other {
-            Tuple::Fixed(other) => {
-                ConstraintSet::from_bool(constraints, self.0.len() == other.0.len()).and(db, || {
-                    (self.0.iter().zip(&other.0)).when_all(
+            Tuple::Fixed(other) => ConstraintSet::from_bool(
+                constraints,
+                self.0.len() == other.0.len(),
+            )
+            .and(db, constraints, || {
+                (self.0.iter().zip(&other.0)).when_all(db, constraints, |(self_ty, other_ty)| {
+                    self_ty.has_relation_to_impl(
                         db,
+                        *other_ty,
                         constraints,
-                        |(self_ty, other_ty)| {
-                            self_ty.has_relation_to_impl(
-                                db,
-                                *other_ty,
-                                constraints,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        },
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
                     )
                 })
-            }
+            }),
 
             Tuple::Variable(other) => {
                 // This tuple must have enough elements to match up with the other tuple's prefix
@@ -529,7 +527,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                         disjointness_visitor,
                     );
                     if result
-                        .intersect(db, element_constraints)
+                        .intersect(db, constraints, element_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -549,7 +547,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                         disjointness_visitor,
                     );
                     if result
-                        .intersect(db, element_constraints)
+                        .intersect(db, constraints, element_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -558,7 +556,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 
                 // In addition, any remaining elements in this tuple must satisfy the
                 // variable-length portion of the other tuple.
-                result.and(db, || {
+                result.and(db, constraints, || {
                     self_iter.when_all(db, constraints, |self_ty| {
                         self_ty.has_relation_to_impl(
                             db,
@@ -1015,7 +1013,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         disjointness_visitor,
                     );
                     if result
-                        .intersect(db, element_constraints)
+                        .intersect(db, constraints, element_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -1036,7 +1034,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         disjointness_visitor,
                     );
                     if result
-                        .intersect(db, element_constraints)
+                        .intersect(db, constraints, element_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -1107,7 +1105,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         }
                     };
                     if result
-                        .intersect(db, pair_constraints)
+                        .intersect(db, constraints, pair_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -1164,7 +1162,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         }
                     };
                     if result
-                        .intersect(db, pair_constraints)
+                        .intersect(db, constraints, pair_constraints)
                         .is_never_satisfied(db)
                     {
                         return result;
@@ -1172,7 +1170,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 }
 
                 // And lastly, the variable-length portions must satisfy the relation.
-                result.and(db, || {
+                result.and(db, constraints, || {
                     self.variable().has_relation_to_impl(
                         db,
                         other.variable(),
@@ -1520,7 +1518,7 @@ impl<'db> Tuple<Type<'db>> {
                 relation_visitor,
                 false,
             )
-            .or(db, || {
+            .or(db, constraints, || {
                 any_disjoint(
                     db,
                     self_tuple.suffix_elements(),
@@ -1544,7 +1542,7 @@ impl<'db> Tuple<Type<'db>> {
                 relation_visitor,
                 false,
             )
-            .or(db, || {
+            .or(db, constraints, || {
                 any_disjoint(
                     db,
                     fixed.all_elements(),

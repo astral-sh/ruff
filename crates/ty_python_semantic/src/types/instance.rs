@@ -175,7 +175,7 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             );
             if result
-                .union(db, nominally_satisfied)
+                .union(db, constraints, nominally_satisfied)
                 .is_always_satisfied(db)
             {
                 return result;
@@ -223,7 +223,7 @@ impl<'db> Type<'db> {
                     )
                 })
         };
-        result.or(db, || structurally_satisfied)
+        result.or(db, constraints, || structurally_satisfied)
     }
 }
 
@@ -497,13 +497,16 @@ impl<'db> NominalInstanceType<'db> {
                     disjointness_visitor,
                     relation_visitor,
                 );
-                if result.union(db, compatible).is_always_satisfied(db) {
+                if result
+                    .union(db, constraints, compatible)
+                    .is_always_satisfied(db)
+                {
                     return result;
                 }
             }
         }
 
-        result.or(db, || {
+        result.or(db, constraints, || {
             ConstraintSet::from_bool(
                 constraints,
                 !self

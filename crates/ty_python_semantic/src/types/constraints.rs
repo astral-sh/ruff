@@ -361,6 +361,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn implies_subtype_of(
         self,
         db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         lhs: Type<'db>,
         rhs: Type<'db>,
     ) -> Self {
@@ -395,7 +396,12 @@ impl<'db> ConstraintSet<'db> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
+    pub(crate) fn union(
+        &mut self,
+        db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        other: Self,
+    ) -> Self {
         self.node = self.node.or_with_offset(db, other.node);
         *self
     }
@@ -404,13 +410,18 @@ impl<'db> ConstraintSet<'db> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
+    pub(crate) fn intersect(
+        &mut self,
+        db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        other: Self,
+    ) -> Self {
         self.node = self.node.and_with_offset(db, other.node);
         *self
     }
 
     /// Returns the negation of this constraint set.
-    pub(crate) fn negate(self, db: &'db dyn Db) -> Self {
+    pub(crate) fn negate(self, db: &'db dyn Db, _builder: &ConstraintSetBuilder<'db>) -> Self {
         Self {
             node: self.node.negate(db),
         }
@@ -422,9 +433,14 @@ impl<'db> ConstraintSet<'db> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    pub(crate) fn and(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+    pub(crate) fn and(
+        mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        other: impl FnOnce() -> Self,
+    ) -> Self {
         if !self.is_never_satisfied(db) {
-            self.intersect(db, other());
+            self.intersect(db, builder, other());
         }
         self
     }
@@ -435,9 +451,14 @@ impl<'db> ConstraintSet<'db> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    pub(crate) fn or(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
+    pub(crate) fn or(
+        mut self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        other: impl FnOnce() -> Self,
+    ) -> Self {
         if !self.is_always_satisfied(db) {
-            self.union(db, other());
+            self.union(db, builder, other());
         }
         self
     }
@@ -446,15 +467,25 @@ impl<'db> ConstraintSet<'db> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
-        self.negate(db).or(db, other)
+    pub(crate) fn implies(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        other: impl FnOnce() -> Self,
+    ) -> Self {
+        self.negate(db, builder).or(db, builder, other)
     }
 
     /// Returns a constraint set encoding that this constraint set is equivalent to another.
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
+    pub(crate) fn iff(
+        self,
+        db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
+        other: Self,
+    ) -> Self {
         ConstraintSet {
             node: self.node.iff_with_offset(db, other.node),
         }
@@ -468,6 +499,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
         let node = self.node.exists(db, to_remove);
@@ -4384,7 +4416,8 @@ mod tests {
         let u_bool = ConstraintSet::constrain_typevar(&db, &constraints, u, bool_type, bool_type);
         // Construct this in a different order than above to make the source_orders more
         // interesting.
-        let constraints = (u_str.or(&db, || u_bool)).and(&db, || t_str.or(&db, || t_bool));
+        let constraints = (u_str.or(&db, &constraints, || u_bool))
+            .and(&db, &constraints, || t_str.or(&db, &constraints, || t_bool));
         let actual = constraints.node.display_graph(&db, &"").to_string();
         assert_eq!(actual, expected);
     }

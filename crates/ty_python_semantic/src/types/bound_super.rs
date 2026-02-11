@@ -846,7 +846,7 @@ impl<'db> BoundSuperType<'db> {
                     relation_visitor,
                     disjointness_visitor,
                 )
-                .and(db, || {
+                .and(db, constraints, || {
                     Type::from(l_class).when_equivalent_to_impl(
                         db,
                         Type::from(r_class),
@@ -859,6 +859,6 @@ impl<'db> BoundSuperType<'db> {
                 ConstraintSet::from_bool(constraints, false)
             }
         };
-        class_equivalence.intersect(db, owner_equivalence)
+        class_equivalence.intersect(db, constraints, owner_equivalence)
     }
 }

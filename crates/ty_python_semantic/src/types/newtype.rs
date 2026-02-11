@@ -145,11 +145,13 @@ impl<'db> NewType<'db> {
         // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
         // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
         // it's not possible for some third type to multiply-inherit from both.
-        let mut self_not_subtype_of_other =
-            self.has_relation_to_impl(db, other, constraints).negate(db);
-        let other_not_subtype_of_self =
-            other.has_relation_to_impl(db, self, constraints).negate(db);
-        self_not_subtype_of_other.intersect(db, other_not_subtype_of_self)
+        let mut self_not_subtype_of_other = self
+            .has_relation_to_impl(db, other, constraints)
+            .negate(db, constraints);
+        let other_not_subtype_of_self = other
+            .has_relation_to_impl(db, self, constraints)
+            .negate(db, constraints);
+        self_not_subtype_of_other.intersect(db, constraints, other_not_subtype_of_self)
     }
 
     /// Create a new `NewType` by mapping the underlying `ClassType`. This descends through any

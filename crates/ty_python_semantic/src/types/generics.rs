@@ -1035,12 +1035,12 @@ fn is_subtype_in_invariant_position<'db>(
         // is a subset of the range covered by `Base`.
         (MaterializationKind::Top, MaterializationKind::Top) => {
             is_subtype_of(base_bottom, derived_bottom)
-                .and(db, || is_subtype_of(derived_top, base_top))
+                .and(db, constraints, || is_subtype_of(derived_top, base_top))
         }
         // One bottom is a subtype of another if it covers a strictly larger set of materializations.
         (MaterializationKind::Bottom, MaterializationKind::Bottom) => {
             is_subtype_of(derived_bottom, base_bottom)
-                .and(db, || is_subtype_of(base_top, derived_top))
+                .and(db, constraints, || is_subtype_of(base_top, derived_top))
         }
         // The bottom materialization of `Derived` is a subtype of the top materialization
         // of `Base` if there is some type that is both within the
@@ -1048,21 +1048,21 @@ fn is_subtype_in_invariant_position<'db>(
         // exists, it's a subtype of `Top[base]` and a supertype of `Bottom[derived]`.
         (MaterializationKind::Bottom, MaterializationKind::Top) => {
             is_subtype_of(base_bottom, derived_bottom)
-                .and(db, || is_subtype_of(derived_bottom, base_top))
-                .or(db, || {
+                .and(db, constraints, || is_subtype_of(derived_bottom, base_top))
+                .or(db, constraints, || {
                     is_subtype_of(base_bottom, derived_top)
-                        .and(db, || is_subtype_of(derived_top, base_top))
+                        .and(db, constraints, || is_subtype_of(derived_top, base_top))
                 })
-                .or(db, || {
+                .or(db, constraints, || {
                     is_subtype_of(base_top, derived_top)
-                        .and(db, || is_subtype_of(derived_bottom, base_top))
+                        .and(db, constraints, || is_subtype_of(derived_bottom, base_top))
                 })
         }
         // A top materialization is a subtype of a bottom materialization only if both original
         // un-materialized types are the same fully static type.
         (MaterializationKind::Top, MaterializationKind::Bottom) => {
             is_subtype_of(derived_top, base_bottom)
-                .and(db, || is_subtype_of(base_top, derived_bottom))
+                .and(db, constraints, || is_subtype_of(base_top, derived_bottom))
         }
     }
 }
@@ -1119,7 +1119,7 @@ fn has_relation_in_invariant_position<'db>(
                 relation_visitor,
                 disjointness_visitor,
             )
-            .and(db, || {
+            .and(db, constraints, || {
                 base_type.has_relation_to_impl(
                     db,
                     *derived_type,
