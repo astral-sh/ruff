@@ -8215,24 +8215,6 @@ impl<'db> TypeVarInstance<'db> {
         })
     }
 
-    /// Similar to `bound_or_constraints`, but does not check that the bounds or constraints are non-generic.
-    pub(crate) fn bound_or_constraints_unchecked(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<TypeVarBoundOrConstraints<'db>> {
-        self._bound_or_constraints(db).and_then(|w| match w {
-            TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
-                Some(bound_or_constraints)
-            }
-            TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
-                .lazy_bound_unchecked(db)
-                .map(TypeVarBoundOrConstraints::UpperBound),
-            TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
-                .lazy_constraints_unchecked(db)
-                .map(TypeVarBoundOrConstraints::Constraints),
-        })
-    }
-
     /// Returns the bounds or constraints of this typevar. If the typevar is unbounded, returns
     /// `object` as its upper bound.
     pub(crate) fn require_bound_or_constraints(

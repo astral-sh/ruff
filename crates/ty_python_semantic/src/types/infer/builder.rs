@@ -659,7 +659,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.check_static_class_definitions();
             self.check_overloaded_functions(node);
             self.check_type_guard_definitions();
-            self.check_pep695_typevars();
             self.check_legacy_positional_only_convention();
             self.check_final_without_value();
         }
@@ -2197,60 +2196,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-            }
-        }
-    }
-
-    fn check_pep695_typevars(&mut self) {
-        let typevars = self.declarations.iter().filter_map(|(definition, ty)| {
-            if let DefinitionKind::TypeVar(typevar) = definition.kind(self.db()) {
-                Some((typevar.node(self.module()), ty.inner_type()))
-            } else {
-                None
-            }
-        });
-
-        // The current Python type specification is that the bounds and constraints of type variables must be concrete types,
-        // and an error must occur if type variables are included.
-        for (node, ty) in typevars {
-            let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty else {
-                continue;
-            };
-            let Some(bound) = node.bound.as_deref() else {
-                continue;
-            };
-            match typevar.bound_or_constraints_unchecked(self.db()) {
-                Some(TypeVarBoundOrConstraints::UpperBound(bound_ty)) => {
-                    if bound_ty.has_typevar_or_typevar_instance(self.db())
-                        && let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_TYPE_VARIABLE_BOUND, bound)
-                    {
-                        builder.into_diagnostic("TypeVar upper bound cannot be generic");
-                    }
-                }
-                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    let ast::Expr::Tuple(tuple) = bound else {
-                        continue;
-                    };
-                    for constraint in constraints
-                        .elements(self.db())
-                        .iter()
-                        .enumerate()
-                        .filter_map(|(i, ty)| {
-                            ty.has_typevar_or_typevar_instance(self.db())
-                                .then_some(tuple.elts.get(i)?)
-                        })
-                    {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, constraint)
-                        {
-                            builder.into_diagnostic("TypeVar constraint cannot be generic");
-                        }
-                    }
-                }
-                None => {}
             }
         }
     }
@@ -4343,9 +4288,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let bound_node = bound.as_deref();
         let bound_or_constraints = match bound_node {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
-                // Here, we interpret `bound` as a heterogeneous tuple and convert it to `TypeVarConstraints` in `TypeVarInstance::lazy_constraints`.
-                let constraint_tys: Box<[Type]> =
-                    elts.iter().map(|e| self.infer_type_expression(e)).collect();
+                // Here, we interpret `bound` as a heterogeneous tuple and convert it to `TypeVarConstraints`
+                // in `TypeVarInstance::lazy_constraints`.
+                let constraint_tys: Box<[Type<'_>]> = elts
+                    .iter()
+                    .map(|expr| {
+                        let constraint = self.infer_type_expression(expr);
+                        if constraint.has_typevar_or_typevar_instance(self.db())
+                            && let Some(builder) = self
+                                .context
+                                .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, expr)
+                        {
+                            builder.into_diagnostic("TypeVar constraint cannot be generic");
+                        }
+                        constraint
+                    })
+                    .collect();
+
                 let tuple_ty = Type::heterogeneous_tuple(self.db(), constraint_tys.clone());
                 self.store_expression_type(expr, tuple_ty);
                 // Mirror the `< 2` guard from `infer_typevar_definition` to avoid
@@ -4361,6 +4320,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Some(expr) => {
                 let bound_ty = self.infer_type_expression(expr);
+                if bound_ty.has_typevar_or_typevar_instance(self.db())
+                    && let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_VARIABLE_BOUND, expr)
+                {
+                    builder.into_diagnostic("TypeVar upper bound cannot be generic");
+                }
+
                 Some(TypeVarBoundOrConstraints::UpperBound(bound_ty))
             }
             None => None,
@@ -7285,14 +7251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
         let inferred = self.infer_type_expression(&arguments.args[1]);
 
-        let is_typevar = &|ty| {
-            matches!(
-                ty,
-                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
-            )
-        };
-
-        if any_over_type(self.db(), inferred, false, is_typevar) {
+        if inferred.has_typevar_or_typevar_instance(self.db()) {
             if let Some(builder) = self
                 .context
                 .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
