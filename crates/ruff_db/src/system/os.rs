@@ -129,6 +129,10 @@ impl System for OsSystem {
         self.inner.case_sensitivity
     }
 
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        is_executable::is_executable(path.as_std_path())
+    }
+
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
     }
@@ -361,12 +365,16 @@ impl WritableSystem for OsSystem {
         std::fs::File::create_new(path).map(drop)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }
 

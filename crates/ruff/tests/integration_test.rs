@@ -97,7 +97,7 @@ impl<'a> RuffCheck<'a> {
 fn stdin_success() {
     let mut cmd = RuffCheck::default().args([]).build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin(""), @r"
+        .pass_stdin(""), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -111,7 +111,7 @@ fn stdin_success() {
 fn stdin_error() {
     let mut cmd = RuffCheck::default().args([]).build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\n"), @r"
+        .pass_stdin("import os\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -136,7 +136,7 @@ fn stdin_filename() {
         .args(["--stdin-filename", "F401.py"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\n"), @r"
+        .pass_stdin("import os\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -172,7 +172,7 @@ import bar   # unused import
     )?;
 
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
-        .args(["check", "--isolated", "--no-cache", "--select", "F401"]).current_dir(tempdir.path()), @r"
+        .args(["check", "--isolated", "--no-cache", "--select", "F401"]).current_dir(tempdir.path()), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -208,7 +208,7 @@ fn check_warn_stdin_filename_with_files() {
         .filename("foo.py")
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\n"), @r"
+        .pass_stdin("import os\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -235,7 +235,7 @@ fn stdin_source_type_py() {
         .args(["--stdin-filename", "TCH.py"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\n"), @r"
+        .pass_stdin("import os\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -261,7 +261,7 @@ fn stdin_source_type_pyi() {
         .args(["--stdin-filename", "TCH.pyi", "--select", "TCH"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\n"), @r"
+        .pass_stdin("import os\n"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -294,7 +294,7 @@ fn stdin_json() {
 fn stdin_fix_py() {
     let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\nimport sys\n\nprint(sys.version)\n"), @r"
+        .pass_stdin("import os\nimport sys\n\nprint(sys.version)\n"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -572,7 +572,7 @@ fn stdin_override_parser_ipynb() {
  },
  "nbformat": 4,
  "nbformat_minor": 5
-}"#), @r"
+}"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -610,7 +610,7 @@ fn stdin_override_parser_py() {
         ])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\n"), @r"
+        .pass_stdin("import os\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -633,7 +633,7 @@ fn stdin_override_parser_py() {
 fn stdin_fix_when_not_fixable_should_still_print_contents() {
     let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"), @r###"
+        .pass_stdin("import os\nimport sys\n\nif (1, 2):\n     print(sys.version)\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -654,14 +654,14 @@ fn stdin_fix_when_not_fixable_should_still_print_contents() {
       |
 
     Found 2 errors (1 fixed, 1 remaining).
-    "###);
+    ");
 }
 
 #[test]
 fn stdin_fix_when_no_issues_should_still_print_contents() {
     let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("import sys\n\nprint(sys.version)\n"), @r"
+        .pass_stdin("import sys\n\nprint(sys.version)\n"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -805,7 +805,7 @@ fn stdin_format_jupyter() {
 fn stdin_parse_error() {
     let mut cmd = RuffCheck::default().build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("from foo import\n"), @r"
+        .pass_stdin("from foo import\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -826,7 +826,7 @@ fn stdin_parse_error() {
 fn stdin_multiple_parse_error() {
     let mut cmd = RuffCheck::default().build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("from foo import\nbar =\n"), @r"
+        .pass_stdin("from foo import\nbar =\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -857,7 +857,7 @@ fn parse_error_not_included() {
     // Parse errors are always shown
     let mut cmd = RuffCheck::default().args(["--select=I"]).build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("foo =\n"), @r"
+        .pass_stdin("foo =\n"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -878,7 +878,7 @@ fn parse_error_not_included() {
 fn full_output_preview() {
     let mut cmd = RuffCheck::default().args(["--preview"]).build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("l = 1"), @r"
+        .pass_stdin("l = 1"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -907,7 +907,7 @@ preview = true
 ",
     )?;
     let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
-    assert_cmd_snapshot!(cmd.pass_stdin("l = 1"), @r"
+    assert_cmd_snapshot!(cmd.pass_stdin("l = 1"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -929,7 +929,7 @@ preview = true
 fn full_output_format() {
     let mut cmd = RuffCheck::default().output_format("full").build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("l = 1"), @r"
+        .pass_stdin("l = 1"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -967,7 +967,7 @@ fn rule_f401_output_text() {
 
 #[test]
 fn rule_invalid_rule_name() {
-    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @r"
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -981,7 +981,7 @@ fn rule_invalid_rule_name() {
 
 #[test]
 fn rule_invalid_rule_name_output_json() {
-    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "json"]), @r"
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "json"]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -995,7 +995,7 @@ fn rule_invalid_rule_name_output_json() {
 
 #[test]
 fn rule_invalid_rule_name_output_text() {
-    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "text"]), @r"
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "text"]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1016,7 +1016,7 @@ fn show_statistics() {
                          .pass_stdin(r#"
 def mvce(keys, values):
     return {key: value for key, value in zip(keys, values)}
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1037,7 +1037,7 @@ fn show_statistics_unsafe_fixes() {
                          .pass_stdin(r#"
 def mvce(keys, values):
     return {key: value for key, value in zip(keys, values)}
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1152,7 +1152,7 @@ fn show_statistics_partial_fix() {
         .args(["--select", "UP035", "--statistics"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("from typing import List, AsyncGenerator"), @r"
+        .pass_stdin("from typing import List, AsyncGenerator"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1173,7 +1173,7 @@ fn show_statistics_syntax_errors() {
     // ParseError
     assert_cmd_snapshot!(
         cmd.pass_stdin("x ="),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1186,7 +1186,7 @@ fn show_statistics_syntax_errors() {
     // match before 3.10, UnsupportedSyntaxError
     assert_cmd_snapshot!(
         cmd.pass_stdin("match 2:\n  case 1: ..."),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1199,7 +1199,7 @@ fn show_statistics_syntax_errors() {
     // rebound comprehension variable, SemanticSyntaxError
     assert_cmd_snapshot!(
         cmd.pass_stdin("[x := 1 for x in range(0)]"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1216,7 +1216,7 @@ fn preview_enabled_prefix() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF9", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1238,7 +1238,7 @@ fn preview_enabled_all() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "ALL", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1265,7 +1265,7 @@ fn preview_enabled_direct() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF911", "--output-format=concise", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1282,7 +1282,7 @@ fn preview_disabled_direct() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF911", "--output-format=concise"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1299,7 +1299,7 @@ fn preview_disabled_prefix_empty() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF91", "--output-format=concise"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1316,7 +1316,7 @@ fn preview_disabled_does_not_warn_for_empty_ignore_selections() {
     let mut cmd = RuffCheck::default()
         .args(["--ignore", "RUF9", "--output-format=concise"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1332,7 +1332,7 @@ fn preview_disabled_does_not_warn_for_empty_fixable_selections() {
     let mut cmd = RuffCheck::default()
         .args(["--fixable", "RUF9", "--output-format=concise"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1354,7 +1354,7 @@ fn preview_group_selector() {
         ])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin("I=42\n"), @r"
+        .pass_stdin("I=42\n"), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1379,7 +1379,7 @@ fn preview_enabled_group_ignore() {
             "--output-format=concise",
         ])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1400,7 +1400,7 @@ fn preview_enabled_group_ignore() {
 fn removed_direct() {
     // Selection of a removed rule should fail
     let mut cmd = RuffCheck::default().args(["--select", "RUF931"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1418,7 +1418,7 @@ fn removed_direct_multiple() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF930", "--select", "RUF931"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1436,7 +1436,7 @@ fn removed_indirect() {
     // Selection _including_ a removed rule without matching should not fail
     // nor should the rule be used
     let mut cmd = RuffCheck::default().args(["--select", "RUF93"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1449,7 +1449,7 @@ fn removed_indirect() {
 #[test]
 fn removed_ignore_direct() {
     let mut cmd = RuffCheck::default().args(["--ignore", "UP027"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1466,7 +1466,7 @@ fn removed_ignore_multiple_direct() {
     let mut cmd = RuffCheck::default()
         .args(["--ignore", "UP027", "--ignore", "PLR1706"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1482,7 +1482,7 @@ fn removed_ignore_multiple_direct() {
 #[test]
 fn removed_ignore_remapped_direct() {
     let mut cmd = RuffCheck::default().args(["--ignore", "PGH001"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1498,7 +1498,7 @@ fn removed_ignore_indirect() {
     // `PLR170` includes removed rules but should not select or warn
     // since it is not a "direct" selection
     let mut cmd = RuffCheck::default().args(["--ignore", "PLR170"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1512,7 +1512,7 @@ fn removed_ignore_indirect() {
 fn redirect_direct() {
     // Selection of a redirected rule directly should use the new rule and warn
     let mut cmd = RuffCheck::default().args(["--select", "RUF940"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1531,7 +1531,7 @@ fn redirect_indirect() {
     // Selection _including_ a redirected rule without matching should not fail
     // nor should the rule be used
     let mut cmd = RuffCheck::default().args(["--select", "RUF94"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1546,7 +1546,7 @@ fn redirect_prefix() {
     // Selection using a redirected prefix should switch to all rules in the
     // new prefix
     let mut cmd = RuffCheck::default().args(["--select", "RUF96"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1565,7 +1565,7 @@ fn deprecated_direct() {
     // Selection of a deprecated rule without preview enabled should still work
     // but a warning should be displayed
     let mut cmd = RuffCheck::default().args(["--select", "RUF920"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1586,7 +1586,7 @@ fn deprecated_multiple_direct() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF920", "--select", "RUF921"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1609,7 +1609,7 @@ fn deprecated_indirect() {
     // `RUF92` includes deprecated rules but should not warn
     // since it is not a "direct" selection
     let mut cmd = RuffCheck::default().args(["--select", "RUF92"]).build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1625,7 +1625,7 @@ fn deprecated_direct_preview_enabled() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF920", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1642,7 +1642,7 @@ fn deprecated_indirect_preview_enabled() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF92", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1659,7 +1659,7 @@ fn deprecated_multiple_direct_preview_enabled() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF920", "--select", "RUF921", "--preview"])
         .build();
-    assert_cmd_snapshot!(cmd, @r"
+    assert_cmd_snapshot!(cmd, @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1720,7 +1720,7 @@ fn unreadable_dir() -> Result<()> {
         .filename(unreadable_dir.to_str().unwrap())
         .args([])
         .build();
-    assert_cmd_snapshot!(cmd, @r###"
+    assert_cmd_snapshot!(cmd, @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1728,7 +1728,7 @@ fn unreadable_dir() -> Result<()> {
 
     ----- stderr -----
     warning: Encountered error: Permission denied (os error 13)
-    "###);
+    ");
     Ok(())
 }
 
@@ -1758,7 +1758,7 @@ fn check_input_from_argfile() -> Result<()> {
         (file_a_path.display().to_string().as_str(), "/path/to/a.py"),
     ]}, {
         assert_cmd_snapshot!(cmd
-            .pass_stdin(""), @r"
+            .pass_stdin(""), @"
         success: false
         exit_code: 1
         ----- stdout -----
@@ -1787,17 +1787,17 @@ fn missing_argfile_reports_error() {
     insta::with_settings!({filters => vec![
         ("The system cannot find the file specified.", "No such file or directory")
     ]}, {
-        assert_cmd_snapshot!(cmd, @r"
-    success: false
-    exit_code: 2
-    ----- stdout -----
+        assert_cmd_snapshot!(cmd, @"
+        success: false
+        exit_code: 2
+        ----- stdout -----
 
-    ----- stderr -----
-    ruff failed
-      Cause: Failed to read CLI arguments from files
-      Cause: failed to open file `!.txt`
-      Cause: No such file or directory (os error 2)
-    ");
+        ----- stderr -----
+        ruff failed
+          Cause: Failed to read CLI arguments from files
+          Cause: failed to open file `!.txt`
+          Cause: No such file or directory (os error 2)
+        ");
     });
 }
 
@@ -1807,7 +1807,7 @@ fn check_hints_hidden_unsafe_fixes() {
         .args(["--select", "RUF901,RUF902"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1829,7 +1829,7 @@ fn check_hints_hidden_unsafe_fixes_with_no_safe_fixes() {
     let mut cmd = RuffCheck::default().args(["--select", "RUF902"]).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1849,7 +1849,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
         .args(["--select", "RUF901,RUF902", "--no-unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1873,7 +1873,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_with_no_safe_fixes_when_disabled() {
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\n"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1892,7 +1892,7 @@ fn check_shows_unsafe_fixes_with_opt_in() {
         .args(["--select", "RUF901,RUF902", "--unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1915,7 +1915,7 @@ fn fix_applies_safe_fixes_by_default() {
         .args(["--select", "RUF901,RUF902", "--fix"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1936,7 +1936,7 @@ fn fix_applies_unsafe_fixes_with_opt_in() {
         .args(["--select", "RUF901,RUF902", "--fix", "--unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1955,7 +1955,7 @@ fn fix_does_not_apply_display_only_fixes() {
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1975,7 +1975,7 @@ fn fix_does_not_apply_display_only_fixes_with_unsafe_fixes_enabled() {
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1994,7 +1994,7 @@ fn fix_only_unsafe_fixes_available() {
         .args(["--select", "RUF902", "--fix"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2014,7 +2014,7 @@ fn fix_only_flag_applies_safe_fixes_by_default() {
         .args(["--select", "RUF901,RUF902", "--fix-only"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2031,7 +2031,7 @@ fn fix_only_flag_applies_unsafe_fixes_with_opt_in() {
         .args(["--select", "RUF901,RUF902", "--fix-only", "--unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2049,7 +2049,7 @@ fn diff_shows_safe_fixes_by_default() {
         .args(["--select", "RUF901,RUF902", "--diff"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2069,7 +2069,7 @@ fn diff_shows_unsafe_fixes_with_opt_in() {
         .args(["--select", "RUF901,RUF902", "--diff", "--unsafe-fixes"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2091,7 +2091,7 @@ fn diff_does_not_show_display_only_fixes_with_unsafe_fixes_enabled() {
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("def add_to_list(item, some_list=[]): ..."),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2106,7 +2106,7 @@ fn diff_only_unsafe_fixes_available() {
         .args(["--select", "RUF902", "--diff"])
         .build();
     assert_cmd_snapshot!(cmd,
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2134,7 +2134,7 @@ extend-unsafe-fixes = ["RUF901"]
         .args(["--select", "RUF901,RUF902"])
         .build();
     assert_cmd_snapshot!(cmd,
-            @r"
+            @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2170,7 +2170,7 @@ extend-safe-fixes = ["RUF902"]
         .args(["--select", "RUF901,RUF902"])
         .build();
     assert_cmd_snapshot!(cmd,
-            @r"
+            @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2208,7 +2208,7 @@ extend-safe-fixes = ["RUF902"]
         .args(["--select", "RUF901,RUF902"])
         .build();
     assert_cmd_snapshot!(cmd,
-            @r"
+            @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2248,7 +2248,7 @@ extend-safe-fixes = ["RUF9"]
         .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = {'a': 1, 'a': 1}\nprint(('foo'))\nprint(str('foo'))\nisinstance(x, (int, str))\n"),
-            @r"
+            @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2307,7 +2307,7 @@ def log(x, base) -> float:
         .args(["--select", "D41"])
         .build();
     assert_cmd_snapshot!(cmd
-        .pass_stdin(stdin), @r"
+        .pass_stdin(stdin), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2360,7 +2360,7 @@ select = ["RUF017"]
     let mut cmd = RuffCheck::default().config(&ruff_toml).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = [1, 2, 3]\ny = [4, 5, 6]\nsum([x, y], [])"),
-            @r"
+            @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2401,7 +2401,7 @@ unfixable = ["RUF"]
     let mut cmd = RuffCheck::default().config(&ruff_toml).build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("x = [1, 2, 3]\ny = [4, 5, 6]\nsum([x, y], [])"),
-            @r"
+            @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2431,7 +2431,7 @@ fn pyproject_toml_stdin_syntax_error() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2457,7 +2457,7 @@ fn pyproject_toml_stdin_schema_error() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project]\nname = 1"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2484,7 +2484,7 @@ fn pyproject_toml_stdin_no_applicable_rules_selected() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2503,7 +2503,7 @@ fn pyproject_toml_stdin_no_applicable_rules_selected_2() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2522,7 +2522,7 @@ fn pyproject_toml_stdin_no_errors() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin(r#"[project]\nname = "ruff"\nversion = "0.0.0""#),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2547,7 +2547,7 @@ fn pyproject_toml_stdin_schema_error_fix() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project]\nname = 1"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2581,7 +2581,7 @@ fn pyproject_toml_stdin_schema_error_fix_only() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project]\nname = 1"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2607,7 +2607,7 @@ fn pyproject_toml_stdin_schema_error_fix_diff() {
 
     assert_cmd_snapshot!(
         cmd.pass_stdin("[project]\nname = 1"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----

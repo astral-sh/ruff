@@ -39,6 +39,7 @@ mod pull_diagnostics;
 mod rename;
 mod semantic_tokens;
 mod signature_help;
+mod workspace_folders;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::num::NonZeroUsize;
@@ -52,8 +53,8 @@ use crossbeam::channel::RecvTimeoutError;
 use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
 use lsp_types::notification::{
-    DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument, Exit,
-    Initialized, Notification,
+    DidChangeTextDocument, DidChangeWatchedFiles, DidChangeWorkspaceFolders, DidCloseTextDocument,
+    DidOpenTextDocument, Exit, Initialized, Notification,
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest,
@@ -64,16 +65,16 @@ use lsp_types::{
     ClientCapabilities, CompletionItem, CompletionParams, CompletionResponse,
     CompletionTriggerKind, ConfigurationParams, DiagnosticClientCapabilities,
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
-    DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, Range, SemanticTokensResult, SignatureHelp,
-    SignatureHelpParams, SignatureHelpTriggerKind, TextDocumentClientCapabilities,
+    DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent,
+    Hover, HoverParams, InitializeParams, InitializeResult, InitializedParams, InlayHint,
+    InlayHintClientCapabilities, InlayHintParams, NumberOrString, PartialResultParams, Position,
+    PreviousResultId, PublishDiagnosticsClientCapabilities, Range, SemanticTokensResult,
+    SignatureHelp, SignatureHelpParams, SignatureHelpTriggerKind, TextDocumentClientCapabilities,
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
     TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
     WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceEdit, WorkspaceFolder,
+    WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -258,7 +259,7 @@ impl TestServer {
 
         let workspace_configurations = workspaces
             .into_iter()
-            .filter_map(|(folder, options)| Some((folder.uri, options?)))
+            .map(|(folder, options)| (folder.uri, options.unwrap_or_default()))
             .collect::<HashMap<_, _>>();
 
         Self {
@@ -721,9 +722,9 @@ impl TestServer {
 
     /// Handle workspace configuration requests from the server.
     ///
-    /// Use the [`get_request`] method to wait for the server to send this request.
+    /// Use the [`await_request`] method to wait for the server to send this request.
     ///
-    /// [`get_request`]: TestServer::get_request
+    /// [`await_request`]: TestServer::await_request
     #[track_caller]
     fn handle_workspace_configuration_request(
         &mut self,
@@ -785,6 +786,21 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
+    #[expect(dead_code)]
+    pub(crate) fn write_file(
+        &self,
+        path: impl AsRef<SystemPath>,
+        content: impl AsRef<str>,
+    ) -> Result<()> {
+        let file_path = self.file_path(path);
+        // Ensure parent directories exists
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent.as_std_path())?;
+        }
+        fs::write(file_path.as_std_path(), content.as_ref())?;
+        Ok(())
+    }
+
     /// Send a `textDocument/didOpen` notification
     pub(crate) fn open_text_document(
         &mut self,
@@ -834,6 +850,35 @@ impl TestServer {
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
         self.send_notification::<DidChangeWatchedFiles>(params);
+    }
+
+    /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed
+    /// workspace folders. The paths provided should be paths to the root of the workspace folder.
+    pub(crate) fn change_workspace_folders<P: AsRef<SystemPath>>(
+        &mut self,
+        added: impl IntoIterator<Item = P>,
+        removed: impl IntoIterator<Item = P>,
+    ) {
+        let path_to_workspace_folder = |path: &SystemPath| -> WorkspaceFolder {
+            let uri = self.file_uri(path);
+            WorkspaceFolder {
+                uri,
+                name: path.file_name().unwrap_or("").to_string(),
+            }
+        };
+        let params = DidChangeWorkspaceFoldersParams {
+            event: WorkspaceFoldersChangeEvent {
+                added: added
+                    .into_iter()
+                    .map(|path| path_to_workspace_folder(path.as_ref()))
+                    .collect(),
+                removed: removed
+                    .into_iter()
+                    .map(|path| path_to_workspace_folder(path.as_ref()))
+                    .collect(),
+            },
+        };
+        self.send_notification::<DidChangeWorkspaceFolders>(params);
     }
 
     pub(crate) fn rename(
@@ -999,6 +1044,31 @@ impl TestServer {
             },
         )
     }
+
+    /// Adds a workspace folder configuration to this wrapper's state.
+    ///
+    /// This is meant to roughly model VS Code's "Add Folder to Workspace"
+    /// functionality.
+    ///
+    /// This doesn't actually correspond to any communication with an LSP
+    /// server. To do that, you'll want `change_workspace_folders`.
+    ///
+    /// # Errors
+    ///
+    /// This can return an error when there is a problem converting the
+    /// given workspace folder root path to a URL.
+    pub(crate) fn add_workspace_folder(
+        &mut self,
+        path: &SystemPath,
+        options: Option<ClientOptions>,
+    ) -> Result<()> {
+        let path = self.test_context.root().join(path);
+        let url = Url::from_file_path(path.as_std_path())
+            .map_err(|()| anyhow!("Failed to convert workspace path to URL: {path}"))?;
+        self.workspace_configurations
+            .insert(url, options.unwrap_or_default());
+        Ok(())
+    }
 }
 
 impl fmt::Debug for TestServer {
@@ -1118,7 +1188,11 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: vec![("VIRTUAL_ENV".to_string(), None)],
+            env_vars: vec![
+                ("HOME".into(), None),
+                ("PATH".into(), None),
+                ("VIRTUAL_ENV".into(), None),
+            ],
         })
     }
 
@@ -1150,11 +1224,6 @@ impl TestServerBuilder {
         workspace_root: &SystemPath,
         options: Option<ClientOptions>,
     ) -> Result<Self> {
-        // TODO: Support multiple workspaces in the test server
-        if self.workspaces.len() == 1 {
-            anyhow::bail!("Test server doesn't support multiple workspaces yet");
-        }
-
         let workspace_path = self.test_context.root().join(workspace_root);
         fs::create_dir_all(workspace_path.as_std_path())?;
 

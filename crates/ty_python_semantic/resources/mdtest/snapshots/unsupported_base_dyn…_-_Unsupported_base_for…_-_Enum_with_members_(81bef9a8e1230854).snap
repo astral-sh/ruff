@@ -1,0 +1,38 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: unsupported_base_dynamic_type.md - Unsupported base for dynamic `type()` classes - Enum with members
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_base_dynamic_type.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from enum import Enum
+2 | 
+3 | class Color(Enum):
+4 |     RED = 1
+5 |     GREEN = 2
+6 | 
+7 | X = type("X", (Color,), {})  # error: [subclass-of-final-class]
+```
+
+# Diagnostics
+
+```
+error[subclass-of-final-class]: Class `X` cannot inherit from final class `Color`
+ --> src/mdtest_snippet.py:7:16
+  |
+5 |     GREEN = 2
+6 |
+7 | X = type("X", (Color,), {})  # error: [subclass-of-final-class]
+  |                ^^^^^
+  |
+info: rule `subclass-of-final-class` is enabled by default
+
+```

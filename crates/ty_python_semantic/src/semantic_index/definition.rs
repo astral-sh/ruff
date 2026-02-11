@@ -5,7 +5,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -275,6 +275,7 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Assignment(AssignmentDefinitionNodeRef<'ast, 'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef<'ast>),
     AugmentedAssignment(&'ast ast::StmtAugAssign),
+    DictKeyAssignment(DictKeyAssignmentNodeRef<'ast, 'db>),
     Comprehension(ComprehensionDefinitionNodeRef<'ast, 'db>),
     VariadicPositionalParameter(&'ast ast::Parameter),
     VariadicKeywordParameter(&'ast ast::Parameter),
@@ -371,6 +372,12 @@ impl<'ast> From<AnnotatedAssignmentDefinitionNodeRef<'ast>> for DefinitionNodeRe
     }
 }
 
+impl<'ast, 'db> From<DictKeyAssignmentNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node_ref: DictKeyAssignmentNodeRef<'ast, 'db>) -> Self {
+        Self::DictKeyAssignment(node_ref)
+    }
+}
+
 impl<'ast, 'db> From<WithItemDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
     fn from(node_ref: WithItemDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::WithItem(node_ref)
@@ -424,6 +431,8 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
+    pub(crate) module: &'ast ast::Identifier,
+    pub(crate) module_index: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -439,6 +448,13 @@ pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
     pub(crate) annotation: &'ast ast::Expr,
     pub(crate) value: Option<&'ast ast::Expr>,
     pub(crate) target: &'ast ast::Expr,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
+    pub(crate) key: &'ast ast::Expr,
+    pub(crate) value: &'ast ast::Expr,
+    pub(crate) assignment: Definition<'db>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -506,8 +522,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }),
             DefinitionNodeRef::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
                 node,
+                module,
+                module_index,
             }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
+                module: AstNodeRef::new(parsed, module),
+                module_index,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
@@ -550,6 +570,15 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
+            DefinitionNodeRef::DictKeyAssignment(DictKeyAssignmentNodeRef {
+                key,
+                value,
+                assignment,
+            }) => DefinitionKind::DictKeyAssignment(DictKeyAssignmentKind {
+                key: AstNodeRef::new(parsed, key),
+                value: AstNodeRef::new(parsed, value),
+                assignment,
+            }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
                 unpack,
                 iterable,
@@ -634,7 +663,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-            Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef { node }) => node.into(),
+            Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef { node, .. }) => {
+                node.into()
+            }
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
             Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
@@ -658,6 +689,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
+            Self::DictKeyAssignment(node) => DefinitionNodeKey(NodeKey::from_node(node.key)),
             Self::For(ForStmtDefinitionNodeRef {
                 target,
                 iterable: _,
@@ -742,6 +774,7 @@ pub enum DefinitionKind<'db> {
     Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionKind),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
+    DictKeyAssignment(DictKeyAssignmentKind<'db>),
     For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind<'db>),
     VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
@@ -805,7 +838,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
-            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.target_range(module),
             DefinitionKind::StarImport(import) => import.alias(module).range(),
             DefinitionKind::Function(function) => function.node(module).name.range(),
             DefinitionKind::Class(class) => class.node(module).name.range(),
@@ -815,6 +848,9 @@ impl DefinitionKind<'_> {
             DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => {
                 aug_assign.node(module).target.range()
+            }
+            DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
+                dict_key_assignment.key.node(module).range()
             }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
@@ -843,7 +879,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
-            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.module(module).range(),
             DefinitionKind::StarImport(import) => import.import(module).range(),
             DefinitionKind::Function(function) => function.node(module).range(),
             DefinitionKind::Class(class) => class.node(module).range(),
@@ -865,6 +901,9 @@ impl DefinitionKind<'_> {
                 full_range
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
+            DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
+                dict_key_assignment.key.node(module).range()
+            }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => {
@@ -927,7 +966,8 @@ impl DefinitionKind<'_> {
                 }
             }
             // all of these bind values without declaring a type
-            DefinitionKind::NamedExpression(_)
+            DefinitionKind::DictKeyAssignment(_)
+            | DefinitionKind::NamedExpression(_)
             | DefinitionKind::Assignment(_)
             | DefinitionKind::AugmentedAssignment(_)
             | DefinitionKind::For(_)
@@ -936,6 +976,18 @@ impl DefinitionKind<'_> {
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
+        }
+    }
+
+    /// Returns the value expression for assignment-based definitions.
+    ///
+    /// Returns `Some` for `Assignment` and `AnnotatedAssignment` (if it has a value),
+    /// `None` for all other definition kinds.
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        match self {
+            DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+            _ => None,
         }
     }
 }
@@ -1083,11 +1135,39 @@ impl ImportFromDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromSubmoduleDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
+    module: AstNodeRef<ast::Identifier>,
+    module_index: usize,
 }
 
 impl ImportFromSubmoduleDefinitionKind {
     pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
+    }
+
+    pub fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+        self.module.node(module)
+    }
+
+    pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+        let module_ident = self.module(module);
+        let module_str = module_ident.as_str();
+
+        // Find the dot that terminates the target component.
+        let Some((end_offset, _)) = module_str.match_indices('.').nth(self.module_index) else {
+            // This shouldn't happen but just in case, provide a safe default
+            return module_ident.range();
+        };
+
+        // Find the start of the target component (after the previous dot, or string start).
+        let start_offset = module_str[..end_offset].rfind('.').map_or(0, |pos| pos + 1);
+
+        let Ok(start) = TextSize::try_from(start_offset) else {
+            return module_ident.range();
+        };
+        let Ok(end) = TextSize::try_from(end_offset) else {
+            return module_ident.range();
+        };
+        TextRange::new(start, end) + module_ident.start()
     }
 }
 
@@ -1130,6 +1210,23 @@ impl AnnotatedAssignmentDefinitionKind {
 
     pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.target.node(module)
+    }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct DictKeyAssignmentKind<'db> {
+    pub(crate) key: AstNodeRef<ast::Expr>,
+    pub(crate) value: AstNodeRef<ast::Expr>,
+    pub(crate) assignment: Definition<'db>,
+}
+
+impl DictKeyAssignmentKind<'_> {
+    pub(crate) fn key<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.key.node(module)
+    }
+
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.value.node(module)
     }
 }
 

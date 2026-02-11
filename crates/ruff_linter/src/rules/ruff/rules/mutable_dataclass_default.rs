@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
@@ -6,7 +6,8 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation};
+use crate::preview::is_mutable_default_in_dataclass_field_enabled;
+use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation, is_dataclass_field};
 
 /// ## What it does
 /// Checks for mutable default values in dataclass attributes.
@@ -21,6 +22,10 @@ use crate::rules::ruff::helpers::{dataclass_kind, is_class_var_annotation};
 ///
 /// If the default value is intended to be mutable, it must be annotated with
 /// `typing.ClassVar`; otherwise, a `ValueError` will be raised.
+///
+/// In [preview](https://docs.astral.sh/ruff/preview/) this rule also detects mutable defaults passed via the `default` keyword
+/// argument in `field()` (for stdlib dataclasses), `attrs.field()`, `attr.ib()`,
+/// and `attr.attrib()` calls.
 ///
 /// ## Example
 /// ```python
@@ -69,9 +74,9 @@ impl Violation for MutableDataclassDefault {
 pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::StmtClassDef) {
     let semantic = checker.semantic();
 
-    if dataclass_kind(class_def, semantic).is_none() {
+    let Some((dataclass_kind, _)) = dataclass_kind(class_def, semantic) else {
         return;
-    }
+    };
 
     for statement in &class_def.body {
         let Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -80,6 +85,21 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
             ..
         }) = statement
         else {
+            continue;
+        };
+
+        let value = match &**value {
+            Expr::Call(ast::ExprCall {
+                func, arguments, ..
+            }) if is_mutable_default_in_dataclass_field_enabled(checker.settings())
+                && is_dataclass_field(func, checker.semantic(), dataclass_kind) =>
+            {
+                arguments.find_argument_value("default", 0)
+            }
+            value => Some(value),
+        };
+
+        let Some(value) = value else {
             continue;
         };
 

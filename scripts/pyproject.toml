@@ -1,7 +1,7 @@
 [project]
 name = "scripts"
 version = "0.0.1"
-dependencies = ["stdlibs", "tqdm", "mdformat", "pyyaml"]
+dependencies = ["stdlibs", "tqdm", "mdformat", "pyyaml", "mypy-primer"]
 requires-python = ">=3.12"
 
 [tool.black]
@@ -14,6 +14,10 @@ extend = "../pyproject.toml"
 # `ty_benchmark` is a standalone project with its own pyproject.toml files, search paths, etc.
 exclude = ["./ty_benchmark"]
 
+[tool.uv.sources]
+mypy-primer = { git = "https://github.com/hauntsaninja/mypy_primer" }
+
 [tool.ty.rules]
 possibly-unresolved-reference = "error"
 division-by-zero = "error"
+unused-ignore-comment = "error"

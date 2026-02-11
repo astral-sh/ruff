@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use ty_combine::Combine;
 use ty_ide::{CompletionSettings, InlayHintSettings};
+use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
@@ -145,16 +146,16 @@ impl ClientOptions {
 #[serde(rename_all = "camelCase")]
 pub struct GlobalOptions {
     /// Diagnostic mode for the language server.
-    diagnostic_mode: Option<DiagnosticMode>,
+    pub diagnostic_mode: Option<DiagnosticMode>,
 
     /// Experimental features that the server provides on an opt-in basis.
-    pub(crate) experimental: Option<Experimental>,
+    pub experimental: Option<Experimental>,
 
     /// If `true` or [`None`], show syntax errors as diagnostics.
     ///
     /// This is useful when using ty with other language servers, allowing the user to refer
     /// to syntax errors from only one source.
-    pub(crate) show_syntax_errors: Option<bool>,
+    pub show_syntax_errors: Option<bool>,
 }
 
 impl GlobalOptions {
@@ -369,6 +370,17 @@ impl DiagnosticMode {
         matches!(self, DiagnosticMode::OpenFilesOnly)
     }
 
+    /// Returns this diagnostic mode as a check mode.
+    ///
+    /// This returns `None` when diagnostics are disabled.
+    pub(crate) const fn to_check_mode(self) -> Option<CheckMode> {
+        match self {
+            DiagnosticMode::Off => None,
+            DiagnosticMode::OpenFilesOnly => Some(CheckMode::OpenFiles),
+            DiagnosticMode::Workspace => Some(CheckMode::AllFiles),
+        }
+    }
+
     pub(crate) const fn is_off(self) -> bool {
         matches!(self, DiagnosticMode::Off)
     }
@@ -396,7 +408,7 @@ impl Combine for DiagnosticMode {
     clippy::empty_structs_with_brackets,
     reason = "The LSP fails to deserialize the options when this is a unit type"
 )]
-pub(crate) struct Experimental {}
+pub struct Experimental {}
 
 impl Experimental {
     #[expect(clippy::unused_self)]

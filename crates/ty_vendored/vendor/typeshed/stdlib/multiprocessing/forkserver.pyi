@@ -64,6 +64,28 @@ def write_signed(fd: int, n: int) -> None: ...
 
 _forkserver: ForkServer
 ensure_running = _forkserver.ensure_running
+"""Make sure that a fork server is running.
+
+This can be called from any process.  Note that usually a child
+process will just reuse the forkserver started by its parent, so
+ensure_running() will do nothing.
+"""
+
 get_inherited_fds = _forkserver.get_inherited_fds
+"""Return list of fds inherited from parent process.
+
+This returns None if the current process was not started by fork
+server.
+"""
+
 connect_to_new_process = _forkserver.connect_to_new_process
+"""Request forkserver to create a child process.
+
+Returns a pair of fds (status_r, data_w).  The calling process can read
+the child process's pid and (eventually) its returncode from status_r.
+The calling process should write to data_w the pickled preparation and
+process data.
+"""
+
 set_forkserver_preload = _forkserver.set_forkserver_preload
+"""Set list of module names to try to load in forkserver process."""

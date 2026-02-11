@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: union_call.md - Calling a union of function types - Try to cover all possible reasons - Cover non-keyword related reasons
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
@@ -199,7 +200,7 @@ info: Type variable defined here
    |        ^^^^^^
 14 |     return 0
    |
-info: Union variant `def f4[T](x: T@f4) -> int` is incompatible with this call site
+info: Union variant `def f4[T](x: T) -> int` is incompatible with this call site
 info: Attempted to call union type `(def f1() -> int) | (def f2(name: str) -> int) | (def f3(a: int, b: int) -> int) | ... omitted 5 union elements`
 info: rule `invalid-argument-type` is enabled by default
 

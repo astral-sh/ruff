@@ -118,32 +118,6 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
-## Class patterns where the class pattern does not resolve to a class
-
-In general this does not allow for narrowing, but we make an exception for `Any`. This is to support
-[real ecosystem code](https://github.com/jax-ml/jax/blob/d2ce04b6c3d03ae18b145965b8b8b92e09e8009c/jax/_src/pallas/mosaic_gpu/lowering.py#L3372-L3387)
-found in `jax`.
-
-```py
-from typing import Any
-
-X = Any
-
-def f(obj: object):
-    match obj:
-        case int():
-            reveal_type(obj)  # revealed: int
-        case X():
-            reveal_type(obj)  # revealed: Any & ~int
-
-def g(obj: object, Y: Any):
-    match obj:
-        case int():
-            reveal_type(obj)  # revealed: int
-        case Y():
-            reveal_type(obj)  # revealed: Any & ~int
-```
-
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
@@ -374,4 +348,90 @@ try:
     reveal_type(Answer.MAYBE.assert_yes())  # revealed: Literal[Answer.MAYBE]
 except ValueError:
     pass
+```
+
+## Narrowing tagged unions of tuples
+
+Narrow unions of tuples based on literal tag elements in `match` statements:
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    match x[0]:
+        case "tag1":
+            reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+            reveal_type(x[1])  # revealed: A
+        case "tag2":
+            reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+            reveal_type(x[1])  # revealed: B
+            reveal_type(x[2])  # revealed: C
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# With int literals
+def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
+    match x[0]:
+        case 1:
+            reveal_type(x)  # revealed: tuple[Literal[1], A]
+        case 2:
+            reveal_type(x)  # revealed: tuple[Literal[2], B]
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# With bytes literals
+def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
+    match x[0]:
+        case b"a":
+            reveal_type(x)  # revealed: tuple[Literal[b"a"], A]
+        case b"b":
+            reveal_type(x)  # revealed: tuple[Literal[b"b"], B]
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# Using index 1 instead of 0
+def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
+    match x[1]:
+        case "tag1":
+            reveal_type(x)  # revealed: tuple[A, Literal["tag1"]]
+        case "tag2":
+            reveal_type(x)  # revealed: tuple[B, Literal["tag2"]]
+        case _:
+            reveal_type(x)  # revealed: Never
+```
+
+Narrowing is restricted to `Literal` tag elements:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
+    match x[0]:
+        case "tag1":
+            # Can't narrow because second tuple has `str` (not literal) at index 0
+            reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
+        case _:
+            # But we *can* narrow with inequality
+            reveal_type(x)  # revealed: tuple[str, B]
+```
+
+and it is also restricted to `match` patterns that solely consist of value patterns:
+
+```py
+class Config:
+    MODE: str = "default"
+
+def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
+    match u[0]:
+        case Config.MODE | "foo":
+            # Config.mode has type `str` (not a literal), which could match
+            # any string value at runtime. We cannot narrow based on "foo" alone
+            # because the actual match might have been against Config.mode.
+            reveal_type(u)  # revealed: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]
+        case "bar":
+            # Since the previous case could match any string, this case can
+            # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
+            reveal_type(u)  # revealed: tuple[Literal["bar"], str]
 ```

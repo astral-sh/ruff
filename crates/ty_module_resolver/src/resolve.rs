@@ -466,7 +466,7 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
 /// Get the search-paths for desperate resolution of relative imports in this file.
 ///
 /// Currently this is "the closest ancestor dir that contains a pyproject.toml (or ty.toml)",
-/// which is a completely arbitrary decision. However it's farily important that relative
+/// which is a completely arbitrary decision. However it's fairly important that relative
 /// desperate search-paths pick a single "best" answer because every one is *valid* but one
 /// that's too long or too short may cause problems.
 ///
@@ -1623,6 +1623,10 @@ impl fmt::Display for RelaxedModuleName {
 /// ```python
 /// __path__ = __import__("pkgutil").extend_path(__path__, __name__)
 /// ```
+/// or
+/// ```python
+/// __import__('pkg_resources').declare_namespace(__name__)
+/// ```
 #[derive(Default)]
 struct LegacyNamespacePackageVisitor {
     is_legacy_namespace_package: bool,
@@ -1650,11 +1654,26 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
             return;
         }
 
-        let ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) = stmt else {
-            return;
-        };
+        match stmt {
+            // __path__ = pkgutil.extend_path(__path__, __name__)
+            // __path__ = __import__("pkgutil").extend_path(__path__, __name__)
+            ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
+                self.check_pkgutil_extend_path(targets, value);
+            }
+            // __import__('pkg_resources').declare_namespace(__name__)
+            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                self.check_pkg_resources_declare_namespace(value);
+            }
+            _ => {}
+        }
+    }
+}
 
-        let [ast::Expr::Name(maybe_path)] = &**targets else {
+impl LegacyNamespacePackageVisitor {
+    /// Check for `__path__ = pkgutil.extend_path(__path__, __name__)` or
+    /// `__path__ = __import__("pkgutil").extend_path(__path__, __name__)`
+    fn check_pkgutil_extend_path(&mut self, targets: &[ast::Expr], value: &ast::Expr) {
+        let [ast::Expr::Name(maybe_path)] = targets else {
             return;
         };
 
@@ -1666,7 +1685,7 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
             func: extend_func,
             arguments: extend_arguments,
             ..
-        }) = &**value
+        }) = value
         else {
             return;
         };
@@ -1730,6 +1749,66 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
         };
 
         self.is_legacy_namespace_package = path.id() == "__path__" && name.id() == "__name__";
+    }
+
+    /// Check for `__import__('pkg_resources').declare_namespace(__name__)`
+    fn check_pkg_resources_declare_namespace(&mut self, value: &ast::Expr) {
+        let ast::Expr::Call(ast::ExprCall {
+            func,
+            arguments: declare_arguments,
+            ..
+        }) = value
+        else {
+            return;
+        };
+
+        let ast::Expr::Attribute(ast::ExprAttribute {
+            value: maybe_pkg_resources,
+            attr: maybe_declare_namespace,
+            ..
+        }) = &**func
+        else {
+            return;
+        };
+
+        if maybe_declare_namespace != "declare_namespace" {
+            return;
+        }
+
+        // Match `__import__("pkg_resources")`
+        let ast::Expr::Call(ast::ExprCall {
+            func: maybe_import,
+            arguments: import_arguments,
+            ..
+        }) = &**maybe_pkg_resources
+        else {
+            return;
+        };
+
+        let ast::Expr::Name(maybe_import) = &**maybe_import else {
+            return;
+        };
+
+        if maybe_import.id() != "__import__" {
+            return;
+        }
+
+        let Some(ast::Expr::StringLiteral(name)) = import_arguments.find_argument_value("name", 0)
+        else {
+            return;
+        };
+
+        if name.value.to_str() != "pkg_resources" {
+            return;
+        }
+
+        // Check that the argument is `__name__`
+        let Some(ast::Expr::Name(name_arg)) = declare_arguments.find_argument_value("name", 0)
+        else {
+            return;
+        };
+
+        self.is_legacy_namespace_package = name_arg.id() == "__name__";
     }
 }
 

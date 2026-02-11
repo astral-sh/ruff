@@ -1,0 +1,99 @@
+name: Run memory report
+
+permissions: {}
+
+on:
+  pull_request:
+    paths:
+      - "crates/ty*/**"
+      - "!crates/ty_ide/**"
+      - "!crates/ty_server/**"
+      - "!crates/ty_test/**"
+      - "!crates/ty_completion_eval/**"
+      - "!crates/ty_wasm/**"
+      - "crates/ruff_db"
+      - "crates/ruff_python_ast"
+      - "crates/ruff_python_parser"
+      - "scripts/memory_report.py"
+      - ".github/workflows/memory_report.yaml"
+      - "Cargo.lock"
+      - "!**.md"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  CARGO_TERM_COLOR: always
+  RUSTUP_MAX_RETRIES: 10
+  RUST_BACKTRACE: 1
+  PYTHON_VERSION: 3.14
+
+jobs:
+  memory_report:
+    name: Compute memory usage diff
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          workspaces: "ruff"
+
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Compute memory usage diff
+        shell: bash
+        env:
+          TY_MEMORY_REPORT: json
+          # Disabling multithreading improves the stability of memory usage numbers.
+          TY_MAX_PARALLELISM: 1
+        run: |
+          # Build the executable for the old and new commit
+          (
+            cd ruff
+
+            echo "new commit"
+            git rev-list --format=%s --max-count=1 "$GITHUB_SHA"
+            cargo build --bin ty --profile profiling
+            mv target/profiling/ty ty-new
+
+            MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
+            git checkout -b old_commit "$MERGE_BASE"
+            echo "old commit (merge base)"
+            git rev-list --format=%s --max-count=1 old_commit
+            cargo build --bin ty --profile profiling
+            mv target/profiling/ty ty-old
+          )
+
+          (
+            echo "Creating comment with memory comparison"
+            cd ruff
+            git switch - --detach
+
+            python "./scripts/memory_report.py" run \
+              --old-ty "./ty-old" \
+              --new-ty "./ty-new" \
+              --projects-dir "${GITHUB_WORKSPACE}/memory_projects" \
+              --output ../memory_report_diff.diff
+          )
+
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
+      - name: Upload diff
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: memory_report_diff
+          path: memory_report_diff.diff

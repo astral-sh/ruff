@@ -167,9 +167,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::StringLiteral(string) => self.infer_string_annotation_expression(string),
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
-            ast::Expr::Starred(starred) => {
-                TypeAndQualifiers::declared(self.infer_starred_expression(starred))
-            }
+            ast::Expr::Starred(starred) => TypeAndQualifiers::declared(
+                self.infer_starred_expression(starred, TypeContext::default()),
+            ),
 
             ast::Expr::BytesLiteral(bytes) => {
                 if let Some(builder) = self
@@ -282,6 +282,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             match type_qualifier {
                                 SpecialFormType::ClassVar => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
+                                    if type_and_qualifiers.inner_type().has_typevar(self.db())
+                                        && let Some(builder) =
+                                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                    {
+                                        builder.into_diagnostic(
+                                            "`ClassVar` cannot contain type variables",
+                                        );
+                                    }
                                 }
                                 SpecialFormType::Final => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);

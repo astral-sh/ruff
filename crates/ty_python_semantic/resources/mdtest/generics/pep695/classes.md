@@ -118,6 +118,27 @@ reveal_mro(Baz)
 reveal_mro(Baz[int])
 ```
 
+## Class keyword arguments
+
+Class keyword arguments are evaluated inside the type-parameter scope, so they must be resolved
+cross-scope when validating against `__init_subclass__`:
+
+```py
+from typing import TypedDict
+
+class Base:
+    def __init_subclass__(cls, *, setting: int) -> None: ...
+
+class Valid[T](Base, setting=1): ...
+class InvalidType[T](Base, setting="x"): ...  # error: [invalid-argument-type]
+class Fine[T](TypedDict, total=True): ...
+class NotFine[T](TypedDict, total=None): ...  # error: [invalid-argument-type]
+
+def _(kwargs: dict[str, int], bad_kwargs: dict[str, str]):
+    class AlsoFine[T](Base, **kwargs): ...
+    class AlsoNotFine[T](Base, **bad_kwargs): ...  # error: [invalid-argument-type]
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
@@ -226,15 +247,13 @@ class C[T]:
     x: T
 
 c: C[int] = C()
-# TODO: revealed: C[int]
-reveal_type(c)  # revealed: C[Unknown]
+reveal_type(c)  # revealed: C[int]
 ```
 
 The typevars of a fully specialized generic class should no longer be visible:
 
 ```py
-# TODO: revealed: int
-reveal_type(c.x)  # revealed: Unknown
+reveal_type(c.x)  # revealed: int
 ```
 
 If the type parameter is not specified explicitly, and there are no constraints that let us infer a
@@ -279,7 +298,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -300,7 +319,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -324,7 +343,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -348,6 +367,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
+# TODO: The revealed type in the error message should be `C[str]`.
 # error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
@@ -366,7 +386,8 @@ reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
 
-# error: [invalid-assignment] "Object of type `D[int | str]` is not assignable to `D[int]`"
+# TODO: The revealed type in the error message should be `D[str]`.
+# error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -486,7 +507,7 @@ reveal_type(C(1, 1))  # revealed: C[int]
 reveal_type(C(1, "string"))  # revealed: C[int]
 reveal_type(C(1, True))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
@@ -702,7 +723,7 @@ class WithOverloadedMethod[T]:
     def method[S](self, x: S | T) -> S | T:
         return x
 
-# revealed: Overload[(self, x: int) -> int, (self, x: S@method) -> S@method | int]
+# revealed: Overload[(self, x: int) -> int, [S](self, x: S) -> S | int]
 reveal_type(WithOverloadedMethod[int].method)
 ```
 
@@ -710,14 +731,23 @@ reveal_type(WithOverloadedMethod[int].method)
 
 ### No back-references
 
-Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars:
+Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars. Furthermore,
+bounds/constraints cannot refer to other type variables, i.e. they must be non-generic.
 
 ```py
-# TODO error
+# error: [invalid-type-variable-bound]
 class C[S: T, T]:
     pass
 
-class D[S: X]:
+# error: [invalid-type-variable-bound]
+class D[S, T: S]:
+    pass
+
+# error: [invalid-type-variable-constraints]
+class E[S: (int, T), T]:
+    pass
+
+class F[S: X]:
     pass
 
 X = int

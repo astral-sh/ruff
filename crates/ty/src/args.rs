@@ -54,6 +54,10 @@ pub(crate) struct CheckCommand {
     )]
     pub paths: Vec<SystemPathBuf>,
 
+    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    #[arg(long)]
+    pub(crate) add_ignore: bool,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
@@ -126,7 +130,7 @@ pub(crate) struct CheckCommand {
     pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.
-    #[arg(long)]
+    #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
     pub(crate) output_format: Option<OutputFormat>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
@@ -142,7 +146,7 @@ pub(crate) struct CheckCommand {
     pub(crate) watch: bool,
 
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
-    /// Use `--no-respect-gitignore` to disable.
+    /// Use `--no-respect-ignore-files` to disable.
     #[arg(
         long,
         overrides_with("no_respect_ignore_files"),
@@ -311,7 +315,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'error'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -319,7 +323,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -327,7 +331,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("Disables the rule. Can be specified multiple times.")
+                .help("Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )

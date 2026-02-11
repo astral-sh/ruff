@@ -116,6 +116,76 @@ def foo(
     Ok(())
 }
 
+/// Regression test for <https://github.com/astral-sh/ty/issues/2310>
+#[test]
+fn stack_size() -> Result<()> {
+    use std::fmt::Write;
+
+    let _filter = filter_result_id();
+
+    let mut content = String::new();
+    writeln!(
+        &mut content,
+        "
+from typing_extensions import reveal_type
+total = 1{plus_one_repeated}
+reveal_type(total)
+        ",
+        plus_one_repeated = " + 1".repeat(2000 - 1)
+    )?;
+
+    let file_path = SystemPath::new("src/foo.py");
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(file_path, &content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(file_path, content, 1);
+    let diagnostics = server.document_diagnostic_request(file_path, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn pull_excluded_file() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let main_path = SystemPath::new("src/foo.py");
+    let main_content = r#"reveal_type("included")"#;
+
+    let excluded_path = SystemPath::new("src/excluded/lib.py");
+    let excluded_content = r#"reveal_type("Excluded")"#;
+
+    let config = r#"
+[src]
+exclude = ["src/excluded/"]
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(main_path, main_content)?
+        .with_file(excluded_path, excluded_content)?
+        .with_file(SystemPath::new("ty.toml"), config)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(main_path, main_content, 1);
+    let main_diagnostics = server.document_diagnostic_request(main_path, None);
+    assert_compact_json_snapshot!("main", main_diagnostics);
+
+    server.open_text_document(excluded_path, excluded_content, 1);
+    let excluded_diagnostics = server.document_diagnostic_request(excluded_path, None);
+    assert_compact_json_snapshot!("excluded", excluded_diagnostics);
+
+    Ok(())
+}
+
 #[test]
 fn document_diagnostic_caching_unchanged() -> Result<()> {
     let _filter = filter_result_id();
@@ -982,7 +1052,7 @@ fn create_workspace_server_with_file(
 /// Sends a workspace diagnostic request to the server.
 ///
 /// Unlike [`TestServer::workspace_diagnostic_request`], this function does not wait for the response.
-fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
+pub(crate) fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
     server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
         identifier: None,
         previous_result_ids: Vec::new(),
@@ -995,7 +1065,7 @@ fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::Req
     })
 }
 
-fn shutdown_and_await_workspace_diagnostic(
+pub(crate) fn shutdown_and_await_workspace_diagnostic(
     mut server: TestServer,
     request_id: &RequestId,
 ) -> WorkspaceDiagnosticReportResult {
@@ -1013,7 +1083,7 @@ fn shutdown_and_await_workspace_diagnostic(
 }
 
 #[track_caller]
-fn assert_workspace_diagnostics_suspends_for_long_polling(
+pub(crate) fn assert_workspace_diagnostics_suspends_for_long_polling(
     server: &mut TestServer,
     request_id: &lsp_server::RequestId,
 ) {

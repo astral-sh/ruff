@@ -1,0 +1,59 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: union_call.md - Calling a union of function types - Union with overloaded method and incompatible variant
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/union_call.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(x: bytes | str | int):
+2 |     # error: [invalid-argument-type]
+3 |     # error: [possibly-missing-attribute]
+4 |     x.split(" ")
+```
+
+# Diagnostics
+
+```
+warning[possibly-missing-attribute]: Attribute `split` may be missing on object of type `bytes | str | int`
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     # error: [invalid-argument-type]
+3 |     # error: [possibly-missing-attribute]
+4 |     x.split(" ")
+  |     ^^^^^^^
+  |
+info: rule `possibly-missing-attribute` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to bound method `split` is incorrect
+ --> src/mdtest_snippet.py:4:13
+  |
+2 |     # error: [invalid-argument-type]
+3 |     # error: [possibly-missing-attribute]
+4 |     x.split(" ")
+  |             ^^^ Expected `Buffer | None`, found `Literal[" "]`
+  |
+info: Method defined here
+    --> stdlib/builtins.pyi:1761:9
+     |
+1759 |         """
+1760 |
+1761 |     def split(self, sep: ReadableBuffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]:
+     |         ^^^^^       --------------------------------- Parameter declared here
+1762 |         """Return a list of the sections in the bytes, using sep as the delimiter.
+     |
+info: Union variant `bound method bytes.split(sep: Buffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]` is incompatible with this call site
+info: Attempted to call union type `(bound method bytes.split(sep: Buffer | None = None, maxsplit: SupportsIndex = -1) -> list[bytes]) | (Overload[(sep: LiteralString | None = None, maxsplit: SupportsIndex = -1) -> list[LiteralString], (sep: str | None = None, maxsplit: SupportsIndex = -1) -> list[str]])`
+info: rule `invalid-argument-type` is enabled by default
+
+```

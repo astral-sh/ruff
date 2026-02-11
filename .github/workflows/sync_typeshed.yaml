@@ -61,12 +61,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         name: Checkout Ruff
         with:
           path: ruff
           persist-credentials: true
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         name: Checkout typeshed
         with:
           repository: python/typeshed
@@ -76,7 +76,9 @@ jobs:
         run: |
           git config --global user.name typeshedbot
           git config --global user.email '<>'
-      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          version: "0.10.0"
       - name: Sync typeshed stubs
         run: |
           rm -rf "ruff/${VENDORED_TYPESHED}"
@@ -125,12 +127,14 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         name: Checkout Ruff
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          version: "0.10.0"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot
@@ -164,12 +168,14 @@ jobs:
       contents: write
       pull-requests: write
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         name: Checkout Ruff
         with:
           persist-credentials: true
           ref: ${{ env.UPSTREAM_BRANCH}}
-      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+      - uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          version: "0.10.0"
       - name: Setup git
         run: |
           git config --global user.name typeshedbot

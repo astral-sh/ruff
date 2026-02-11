@@ -42,7 +42,9 @@ def project_setup(
         cwd = Path(tempdir)
         project.clone(cwd)
 
-        venv = Venv.create(cwd, project.python_version)
+        venv = Venv.create(
+            project=project.name, parent=cwd, python_version=project.python_version
+        )
         venv.install(project.install_arguments)
 
         yield project, venv

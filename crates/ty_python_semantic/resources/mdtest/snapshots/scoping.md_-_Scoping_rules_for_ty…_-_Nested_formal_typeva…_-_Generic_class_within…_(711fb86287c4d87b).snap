@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: scoping.md - Scoping rules for type variables - Nested formal typevars must be distinct - Generic class within generic class
 mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md

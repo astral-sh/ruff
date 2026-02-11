@@ -14,7 +14,6 @@ from airflow.contrib.aws_athena_hook import AWSAthenaHook
 from airflow.datasets import DatasetAliasEvent, DatasetEvent
 from airflow.operators.postgres_operator import Mapping
 from airflow.operators.subdag import SubDagOperator
-from airflow.secrets.cache import SecretCache
 from airflow.secrets.local_filesystem import LocalFilesystemBackend
 from airflow.triggers.external_task import TaskStateTrigger
 from airflow.utils import dates
@@ -29,7 +28,6 @@ from airflow.utils.dates import (
     scale_time_units,
 )
 from airflow.utils.db import create_session
-from airflow.utils.decorators import apply_defaults
 from airflow.utils.file import mkdirs
 from airflow.utils.state import SHUTDOWN, terminating_states
 from airflow.utils.trigger_rule import TriggerRule
@@ -61,9 +59,6 @@ Mapping()
 # get_connection
 LocalFilesystemBackend()
 
-# airflow.secrets.cache
-SecretCache()
-
 
 # airflow.triggers.external_task
 TaskStateTrigger()
@@ -90,8 +85,6 @@ test_cycle
 # airflow.utils.db
 create_session
 
-# airflow.utils.decorators
-apply_defaults
 
 # airflow.utils.file
 mkdirs
@@ -103,7 +96,6 @@ terminating_states
 
 #  airflow.utils.trigger_rule
 TriggerRule.DUMMY
-TriggerRule.NONE_FAILED_OR_SKIPPED
 
 
 # airflow.www.auth

@@ -98,7 +98,11 @@ if sys.platform == "win32":
     dllhandle: int
 dont_write_bytecode: bool
 displayhook: Callable[[object], Any]
+"""Print an object to sys.stdout and also save it in builtins._"""
+
 excepthook: Callable[[type[BaseException], BaseException, TracebackType | None], Any]
+"""Handle an exception by displaying it with a traceback on sys.stderr."""
+
 exec_prefix: str
 executable: str
 float_repr_style: Literal["short", "legacy"]
@@ -159,6 +163,10 @@ _xoptions: dict[Any, Any]
 _UninstantiableStructseq: TypeAlias = structseq[Any]
 
 flags: _flags
+"""sys.flags
+
+Flags provided through command line arguments or environment vars.
+"""
 
 # This class is not exposed at runtime. It calls itself sys.flags.
 # As a tuple, it can have a length between 15 and 18. We don't model
@@ -311,6 +319,12 @@ class _flags(_UninstantiableStructseq, tuple[int, ...]):
         """-X int_max_str_digits"""
 
 float_info: _float_info
+"""sys.float_info
+
+A named tuple holding information about the float type. It contains low level
+information about the precision and internal representation. Please study
+your system's :file:`float.h` for more information.
+"""
 
 # This class is not exposed at runtime. It calls itself sys.float_info.
 @final
@@ -383,6 +397,11 @@ class _float_info(structseq[float], tuple[float, int, int, float, int, int, int,
         """FLT_ROUNDS -- rounding mode used for arithmetic operations"""
 
 hash_info: _hash_info
+"""hash_info
+
+A named tuple providing parameters used for computing
+hashes. The attributes are read only.
+"""
 
 # This class is not exposed at runtime. It calls itself sys.hash_info.
 @final
@@ -449,6 +468,11 @@ class _implementation:
     def __getattr__(self, name: str) -> Any: ...
 
 int_info: _int_info
+"""sys.int_info
+
+A named tuple that holds information about Python's
+internal representation of integers.  The attributes are read only.
+"""
 
 # This class is not exposed at runtime. It calls itself sys.int_info.
 @final
@@ -507,6 +531,11 @@ class _thread_info(_UninstantiableStructseq, tuple[_ThreadInfoName, _ThreadInfoL
         """name and version of the thread library"""
 
 thread_info: _thread_info
+"""sys.thread_info
+
+A named tuple holding information about the thread implementation.
+"""
+
 _ReleaseLevel: TypeAlias = Literal["alpha", "beta", "candidate", "final"]
 
 # This class is not exposed at runtime. It calls itself sys.version_info.
@@ -542,6 +571,10 @@ class _version_info(_UninstantiableStructseq, tuple[int, int, int, _ReleaseLevel
         """Serial release number"""
 
 version_info: _version_info
+"""sys.version_info
+
+Version information as a named tuple.
+"""
 
 def call_tracing(func: Callable[..., _T], args: Any, /) -> _T:
     """Call func(*args), while tracing is enabled.
@@ -831,6 +864,16 @@ class UnraisableHookArgs(Protocol):
     object: _object
 
 unraisablehook: Callable[[UnraisableHookArgs], Any]
+"""Handle an unraisable exception.
+
+The unraisable argument has the following attributes:
+
+* exc_type: Exception type.
+* exc_value: Exception value, can be None.
+* exc_traceback: Exception traceback, can be None.
+* err_msg: Error message, can be None.
+* object: Object causing the exception, can be None.
+"""
 
 def __unraisablehook__(unraisable: UnraisableHookArgs, /) -> Any:
     """Handle an unraisable exception.

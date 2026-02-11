@@ -102,6 +102,11 @@ async def create_item(item: Item) -> Dict[str, str]:
     return item
 
 
+@app.post("/items/", response_model=Foo)
+async def create_item(item: Item) -> Foo:
+    return item
+
+
 app = None
 
 

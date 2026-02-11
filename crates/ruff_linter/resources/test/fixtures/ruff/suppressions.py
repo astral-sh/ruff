@@ -57,7 +57,7 @@ def f():
 
 
 def f():
-    # TODO: Duplicate codes should be counted as duplicate, not unused
+    # Duplicate codes that are actually used.
     # ruff: disable[F841, F841]
     foo = 0
 

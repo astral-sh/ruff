@@ -1087,92 +1087,13 @@ impl<'r> EscapedSourceCode<'r> {
                 continue;
             }
             let start = range.start();
-            let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
+            let end =
+                TextSize::try_from(self.text.ceil_char_boundary(start.to_usize() + 1)).unwrap();
             ann.range = TextRange::new(start, end);
         }
 
         self
     }
-}
-
-/// Finds the closest [`TextSize`] not less than the offset given for which
-/// `is_char_boundary` is `true`. Unless the offset given is greater than
-/// the length of the underlying contents, in which case, the length of the
-/// contents is returned.
-///
-/// Can be replaced with `str::ceil_char_boundary` once it's stable.
-///
-/// # Examples
-///
-/// From `std`:
-///
-/// ```
-/// use ruff_db::diagnostic::ceil_char_boundary;
-/// use ruff_text_size::{Ranged, TextLen, TextSize};
-///
-/// let source = "❤️🧡💛💚💙💜";
-/// assert_eq!(source.text_len(), TextSize::from(26));
-/// assert!(!source.is_char_boundary(13));
-///
-/// let closest = ceil_char_boundary(source, TextSize::from(13));
-/// assert_eq!(closest, TextSize::from(14));
-/// assert_eq!(&source[..closest.to_usize()], "❤️🧡💛");
-/// ```
-///
-/// Additional examples:
-///
-/// ```
-/// use ruff_db::diagnostic::ceil_char_boundary;
-/// use ruff_text_size::{Ranged, TextRange, TextSize};
-///
-/// let source = "Hello";
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(0)),
-///     TextSize::from(0)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(5)),
-///     TextSize::from(5)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(6)),
-///     TextSize::from(5)
-/// );
-///
-/// let source = "α";
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(0)),
-///     TextSize::from(0)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(1)),
-///     TextSize::from(2)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(2)),
-///     TextSize::from(2)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(3)),
-///     TextSize::from(2)
-/// );
-/// ```
-pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
-    let upper_bound = offset
-        .to_u32()
-        .saturating_add(4)
-        .min(text.text_len().to_u32());
-    (offset.to_u32()..upper_bound)
-        .map(TextSize::from)
-        .find(|offset| text.is_char_boundary(offset.to_usize()))
-        .unwrap_or_else(|| TextSize::from(upper_bound))
 }
 
 /// A stub implementation of [`FileResolver`] intended for testing.
@@ -1284,7 +1205,7 @@ watermelon
         let diag = env.err().primary("animals", "5", "5", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1308,7 +1229,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         warning[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1328,7 +1249,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         info[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1355,7 +1276,7 @@ watermelon
         let diag = builder.build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1374,7 +1295,7 @@ watermelon
         let diag = builder.build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1395,7 +1316,7 @@ watermelon
         let diag = env.err().primary("non-ascii", "5", "5", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> non-ascii:5:1
           |
@@ -1414,7 +1335,7 @@ watermelon
         let diag = env.err().primary("non-ascii", "2:4", "2:8", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> non-ascii:2:2
           |
@@ -1438,7 +1359,7 @@ watermelon
         env.context(1);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1455,7 +1376,7 @@ watermelon
         env.context(0);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1470,7 +1391,7 @@ watermelon
         env.context(2);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1487,7 +1408,7 @@ watermelon
         env.context(2);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:11:1
            |
@@ -1504,7 +1425,7 @@ watermelon
         env.context(200);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:5:1
            |
@@ -1537,7 +1458,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:1:1
            |
@@ -1581,7 +1502,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1606,7 +1527,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1634,7 +1555,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1662,7 +1583,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1687,7 +1608,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:1:1
            |
@@ -1718,7 +1639,7 @@ watermelon
         // window.
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:1:1
            |
@@ -1756,7 +1677,7 @@ watermelon
         let diag = env.err().primary("spacey-animals", "8", "8", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> spacey-animals:8:1
           |
@@ -1773,7 +1694,7 @@ watermelon
         let diag = env.err().primary("spacey-animals", "12", "12", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> spacey-animals:12:1
            |
@@ -1791,7 +1712,7 @@ watermelon
         let diag = env.err().primary("spacey-animals", "13", "13", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> spacey-animals:13:1
            |
@@ -1831,7 +1752,7 @@ watermelon
         // instead of special casing the snippet assembly.
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> spacey-animals:3:1
           |
@@ -1860,7 +1781,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1897,7 +1818,7 @@ watermelon
         );
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1934,7 +1855,7 @@ watermelon
         );
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1962,7 +1883,7 @@ watermelon
         diag.sub(env.sub_warn().primary("fruits", "3", "3", "").build());
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1998,7 +1919,7 @@ watermelon
         diag.sub(env.sub_warn().primary("animals", "11", "11", "").build());
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -2037,7 +1958,7 @@ watermelon
         diag.sub(env.sub_warn().primary("fruits", "3", "3", "").build());
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -2085,7 +2006,7 @@ watermelon
         diag.sub(env.sub_warn().secondary("animals", "3", "3", "").build());
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -2121,7 +2042,7 @@ watermelon
         let diag = env.err().primary("animals", "5", "6", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2144,7 +2065,7 @@ watermelon
         let diag = env.err().primary("animals", "5", "7:0", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2164,7 +2085,7 @@ watermelon
         let diag = env.err().primary("animals", "5", "7:1", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2184,7 +2105,7 @@ watermelon
         let diag = env.err().primary("animals", "5:3", "8:8", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:5:4
            |
@@ -2206,7 +2127,7 @@ watermelon
         let diag = env.err().secondary("animals", "5:3", "8:8", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:5:4
            |
@@ -2238,7 +2159,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:4:1
           |
@@ -2267,7 +2188,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:4:1
           |
@@ -2298,7 +2219,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2333,7 +2254,7 @@ watermelon
         // better using only ASCII art.
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2361,7 +2282,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2393,7 +2314,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:3
           |
@@ -2415,7 +2336,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:3
           |
@@ -2448,7 +2369,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:8:1
            |
@@ -2488,7 +2409,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2532,7 +2453,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> fruits:1:1
           |
@@ -2567,7 +2488,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:11:1
            |

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: basic.md - Structures - Attempting to import a stdlib module that was previously removed
 mdtest path: crates/ty_python_semantic/resources/mdtest/import/basic.md

@@ -71,7 +71,7 @@ async def task(name: str) -> int:
     return len(name)
 
 async def main():
-    (a, b) = await asyncio.gather(
+    a, b = await asyncio.gather(
         task("A"),
         task("B"),
     )
@@ -116,4 +116,16 @@ from typing import Generator
 def _():
     result = yield from retrieve().__await__()
     reveal_type(result)  # revealed: int
+```
+
+## Un-annotated async functions
+
+An `async def` with no annotated return type is still known to return `CoroutineType` of `Unknown`,
+not just `Unknown`:
+
+```py
+async def f():
+    pass
+
+reveal_type(f())  # revealed: CoroutineType[Any, Any, Unknown]
 ```

@@ -56,7 +56,7 @@ class AlsoBad(Generic[T], Generic[S]): ...  # error: [duplicate-base]
 You cannot use the same typevar more than once.
 
 ```py
-# TODO: error
+# error: [invalid-generic-class]
 class RepeatedTypevar(Generic[T, T]): ...
 ```
 
@@ -263,15 +263,13 @@ class C(Generic[T]):
     x: T
 
 c: C[int] = C()
-# TODO: revealed: C[int]
-reveal_type(c)  # revealed: C[Unknown]
+reveal_type(c)  # revealed: C[int]
 ```
 
 The typevars of a fully specialized generic class should no longer be visible:
 
 ```py
-# TODO: revealed: int
-reveal_type(c.x)  # revealed: Unknown
+reveal_type(c.x)  # revealed: int
 ```
 
 If the type parameter is not specified explicitly, and there are no constraints that let us infer a
@@ -316,7 +314,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -338,7 +336,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -363,7 +361,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -388,6 +386,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
+# TODO: The revealed type in the error message should be `C[str]`.
 # error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
@@ -404,7 +403,8 @@ reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
 
-# error: [invalid-assignment] "Object of type `D[int | str]` is not assignable to `D[int]`"
+# TODO: The revealed type in the error message should be `D[str]`.
+# error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -550,7 +550,7 @@ reveal_type(C(1, 1))  # revealed: C[int]
 reveal_type(C(1, "string"))  # revealed: C[int]
 reveal_type(C(1, True))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
@@ -817,7 +817,7 @@ class WithOverloadedMethod(Generic[T]):
     def method(self, x: S | T) -> S | T:
         return x
 
-# revealed: Overload[(self, x: int) -> int, (self, x: S@method) -> S@method | int]
+# revealed: Overload[(self, x: int) -> int, [S](self, x: S) -> S | int]
 reveal_type(WithOverloadedMethod[int].method)
 ```
 

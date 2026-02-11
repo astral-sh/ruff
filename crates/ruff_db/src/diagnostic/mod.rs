@@ -8,7 +8,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
-    ceil_char_boundary,
     github::{DisplayGithubDiagnostics, GithubRenderer},
 };
 use crate::cancellation::CancellationToken;
@@ -96,6 +95,44 @@ impl Diagnostic {
         let span = span.into().with_range(range.range());
         diag.annotate(Annotation::primary(span));
         diag
+    }
+
+    /// Adds sub diagnostics that tell the user that this is a bug in ty
+    /// and asks them to open an issue on GitHub.
+    pub fn add_bug_sub_diagnostics(&mut self, url_encoded_title: &str) {
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "This indicates a bug in ty.",
+        ));
+
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title={url_encoded_title}, we'd be very appreciative!"
+            ),
+        ));
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format!(
+                "Platform: {os} {arch}",
+                os = std::env::consts::OS,
+                arch = std::env::consts::ARCH
+            ),
+        ));
+        if let Some(version) = crate::program_version() {
+            self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("Version: {version}"),
+            ));
+        }
+
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format!(
+                "Args: {args:?}",
+                args = std::env::args().collect::<Vec<_>>()
+            ),
+        ));
     }
 
     /// Add an annotation to this diagnostic.
@@ -1002,6 +1039,9 @@ pub enum DiagnosticId {
     /// Use of an invalid command-line option.
     InvalidCliOption,
 
+    /// Experimental feature requires preview mode.
+    PreviewFeature,
+
     /// An internal assumption was violated.
     ///
     /// This indicates a bug in the program rather than a user error.
@@ -1017,6 +1057,13 @@ impl DiagnosticId {
     /// Returns `true` if this `DiagnosticId` represents a lint.
     pub fn is_lint(&self) -> bool {
         matches!(self, DiagnosticId::Lint(_))
+    }
+
+    pub const fn as_lint(&self) -> Option<LintName> {
+        match self {
+            DiagnosticId::Lint(name) => Some(*name),
+            _ => None,
+        }
     }
 
     /// Returns `true` if this `DiagnosticId` represents a lint with the given name.
@@ -1047,6 +1094,7 @@ impl DiagnosticId {
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
             DiagnosticId::Unformatted => "unformatted",
             DiagnosticId::InvalidCliOption => "invalid-cli-option",
+            DiagnosticId::PreviewFeature => "preview-feature",
             DiagnosticId::InternalError => "internal-error",
         }
     }

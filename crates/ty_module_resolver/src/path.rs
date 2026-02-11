@@ -554,8 +554,15 @@ impl SearchPath {
         )
     }
 
+    /// Is this search path in "first party" code? i.e., The
+    /// end user's project code.
     pub fn is_first_party(&self) -> bool {
         matches!(&*self.0, SearchPathInner::FirstParty(_))
+    }
+
+    /// Is the module in a site-packages directory?
+    pub fn is_site_packages(&self) -> bool {
+        matches!(&*self.0, SearchPathInner::SitePackages(_))
     }
 
     fn is_valid_extension(&self, extension: &str) -> bool {
