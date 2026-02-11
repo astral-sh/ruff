@@ -1,6 +1,5 @@
 //! Rules from [isort](https://pypi.org/project/isort/).
 
-use std::fmt::Write;
 use std::path::PathBuf;
 
 use annotate::annotate_imports;
@@ -184,9 +183,6 @@ fn format_import_block(
 
     let mut output = String::new();
 
-    // Heading comments are already formatted as "# {heading}" in settings.
-    let heading_comments = settings.import_headings;
-
     // Generate replacement source code.
     let mut is_first_block = true;
     let mut pending_lines_before = false;
@@ -213,9 +209,8 @@ fn format_import_block(
                     ImportFrom((_, comments, _, _)) => &mut comments.atop,
                 };
                 atop.retain(|comment| {
-                    !heading_comments
-                        .iter()
-                    !settings.import_headings
+                    !settings
+                        .import_headings
                         .values()
                         .any(|heading| comment == heading)
                 });
@@ -233,7 +228,7 @@ fn format_import_block(
 
         // Insert heading comment for this section, if configured.
         if let Some(heading) = settings.import_headings.get(import_section) {
-            output.push_str(&heading);
+            output.push_str(heading);
             output.push_str(&stylist.line_ending());
         }
 
