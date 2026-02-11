@@ -468,6 +468,11 @@ impl<'db> CompletionBuilder<'db> {
         self
     }
 
+    fn deprecated(mut self, deprecated: bool) -> CompletionBuilder<'db> {
+        self.deprecated = deprecated;
+        self
+    }
+
     fn builtin(mut self, yes: bool) -> CompletionBuilder<'db> {
         self.builtin = yes;
         self
@@ -1663,6 +1668,7 @@ fn add_unimported_completions<'db>(
                 .kind(symbol.kind().to_completion_kind())
                 .module_name(module_name)
                 .import(import_action.import().cloned())
+                .deprecated(symbol.deprecated())
                 .module_dependency_kind(ModuleDependencyKind::from_module(db, symbol.module())),
         );
     }
