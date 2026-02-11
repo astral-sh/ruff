@@ -1,7 +1,7 @@
 use std::{path::Path, sync::LazyLock};
 
 use regex::Regex;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_formatter::format_module_source;
 use ruff_python_trivia::textwrap::{dedent, indent};
 use ruff_source_file::{Line, UniversalNewlines};
@@ -91,9 +91,10 @@ pub fn format_code_blocks(
 
                 // Maybe python, try formatting it
                 let language = language.to_ascii_lowercase();
-                let py_source_type = match settings.extension.get_extension(&language) {
-                    None => PySourceType::from_extension(&language),
-                    Some(language) => PySourceType::from(language),
+                let SourceType::Python(py_source_type) =
+                    settings.extension.get_source_type_by_extension(&language)
+                else {
+                    break;
                 };
 
                 let end = code_line.start();

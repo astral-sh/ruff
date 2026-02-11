@@ -10,7 +10,7 @@ use ruff_graph::{Direction, ImportMap, ModuleDb, ModuleImports};
 use ruff_linter::package::PackageRoot;
 use ruff_linter::source_kind::SourceKind;
 use ruff_linter::{warn_user, warn_user_once};
-use ruff_python_ast::{PySourceType, SourceType};
+use ruff_python_ast::SourceType;
 use ruff_workspace::resolver::{ResolvedFile, match_exclusion, python_files_in_path};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 use std::io::Write;
@@ -137,19 +137,16 @@ pub(crate) fn analyze_graph(
                 }
 
                 // Ignore non-Python files.
-                let source_type = match settings.analyze.extension.get(path) {
-                    None => match SourceType::from(&path) {
-                        SourceType::Python(source_type) => source_type,
-                        SourceType::Toml(_) => {
-                            debug!("Ignoring TOML file: {}", path.display());
-                            continue;
-                        }
-                        SourceType::Markdown => {
-                            debug!("Ignoring Markdown file: {}", path.display());
-                            continue;
-                        }
-                    },
-                    Some(language) => PySourceType::from(language),
+                let source_type = match settings.analyze.extension.get_source_type(path) {
+                    SourceType::Python(source_type) => source_type,
+                    SourceType::Toml(_) => {
+                        debug!("Ignoring TOML file: {}", path.display());
+                        continue;
+                    }
+                    SourceType::Markdown => {
+                        debug!("Ignoring Markdown file: {}", path.display());
+                        continue;
+                    }
                 };
 
                 // Convert to system paths.
