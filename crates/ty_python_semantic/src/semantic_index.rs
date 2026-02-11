@@ -107,33 +107,56 @@ pub fn tdd_stats_for_file(
     use ruff_text_size::Ranged;
 
     use crate::semantic_index::tdd_stats::{
-        FileTddStatsSummary, ScopeTddStatsSummary, TddHotNodeSummary, TddRootRef,
+        FileTddStatsSummary, ScopeTddStatsSummary, TddHotNodeSummary, TddRootKind, TddRootRef,
+        TddRootSource,
     };
 
     fn format_root_ref(
         db: &dyn Db,
         file: File,
         parsed: &ParsedModuleRef,
+        ast_ids: &crate::semantic_index::ast_ids::AstIds,
         root: TddRootRef,
     ) -> String {
-        let node_index = root.node.node_index();
-        if node_index.as_u32().is_some() {
+        let format_node = |node: crate::node_key::NodeKey| -> Option<String> {
+            let node_index = node.node_index();
+            node_index.as_u32()?;
             let node = parsed.get_by_index(node_index);
             let range = node.range();
             let line_column =
                 line_index(db, file).line_column(range.start(), &source_text(db, file));
-            format!(
-                "{}:{} (constraint={})",
-                line_column.line,
-                line_column.column,
-                root.constraint.as_u32()
-            )
-        } else {
-            format!(
-                "{:?} [Unknown] (constraint={})",
-                root.node,
-                root.constraint.as_u32()
-            )
+            Some(format!("{}:{}", line_column.line, line_column.column))
+        };
+
+        match root.source {
+            TddRootSource::Node(node) => {
+                let location = format_node(node).unwrap_or_else(|| format!("{node:?} [Unknown]"));
+                format!("{location} (constraint={})", root.constraint.as_u32())
+            }
+            TddRootSource::Use { use_id, binding } => {
+                let location = ast_ids
+                    .node_key_for_use(use_id)
+                    .and_then(format_node)
+                    .unwrap_or_else(|| format!("use={} [Unknown]", use_id.as_u32()));
+                format!(
+                    "{location} [use={}, binding={binding}] (constraint={})",
+                    use_id.as_u32(),
+                    root.constraint.as_u32()
+                )
+            }
+            TddRootSource::EnclosingSnapshot {
+                snapshot_id,
+                binding,
+            } => {
+                let binding = binding
+                    .map(|binding| format!(", binding={binding}"))
+                    .unwrap_or_default();
+                format!(
+                    "snapshot={}{binding} (constraint={})",
+                    snapshot_id.as_u32(),
+                    root.constraint.as_u32()
+                )
+            }
         }
     }
 
@@ -141,30 +164,45 @@ pub fn tdd_stats_for_file(
     let parsed = parsed_module(db, file).load(db);
     let mut scopes = Vec::new();
     for (scope_id, use_def) in index.use_def_maps.iter_enumerated() {
+        let ast_ids = index.ast_ids(scope_id);
         let report = use_def.tdd_stats_report();
         if report.roots.is_empty() {
             continue;
         }
         let root_count = report.roots.len();
-        let total_interior_nodes = report.roots.iter().map(|root| root.interior_nodes).sum();
-        let max_interior_nodes = report
-            .roots
-            .iter()
-            .map(|root| root.interior_nodes)
-            .max()
-            .unwrap_or(0);
+        let mut total_interior_nodes = 0;
+        let mut max_interior_nodes = 0;
+        let mut reachability_roots = 0;
+        let mut reachability_interior_nodes = 0;
+        let mut narrowing_roots = 0;
+        let mut narrowing_interior_nodes = 0;
+        for root in &report.roots {
+            total_interior_nodes += root.interior_nodes;
+            max_interior_nodes = max_interior_nodes.max(root.interior_nodes);
+            match root.root.kind {
+                TddRootKind::NodeReachability => {
+                    reachability_roots += 1;
+                    reachability_interior_nodes += root.interior_nodes;
+                }
+                TddRootKind::NarrowingConstraint => {
+                    narrowing_roots += 1;
+                    narrowing_interior_nodes += root.interior_nodes;
+                }
+            }
+        }
         let mut hot_nodes = Vec::with_capacity(report.hot_nodes.len());
         for hot in report.hot_nodes {
             let mut sample_roots = hot
                 .sample_roots
                 .into_iter()
-                .map(|root| format_root_ref(db, file, &parsed, root))
+                .map(|root| format_root_ref(db, file, &parsed, ast_ids, root))
                 .collect::<Vec<_>>();
             sample_roots.sort();
             sample_roots.dedup();
             hot_nodes.push(TddHotNodeSummary {
-                constraint_id: hot.constraint.as_u32(),
-                predicate_id: hot.predicate.as_u32(),
+                kind: hot.kind.as_str(),
+                constraint_id: hot.constraint,
+                predicate_id: hot.predicate,
                 subtree_interior_nodes: hot.subtree_interior_nodes,
                 root_uses: hot.root_uses,
                 score: hot.score,
@@ -173,18 +211,32 @@ pub fn tdd_stats_for_file(
         }
         hot_nodes.sort();
         scopes.push(ScopeTddStatsSummary {
-            scope_id: scope_id.as_u32(),
+            scope_id,
             root_count,
             total_interior_nodes,
             max_interior_nodes,
+            reachability_roots,
+            reachability_interior_nodes,
+            narrowing_roots,
+            narrowing_interior_nodes,
             histogram: report.histogram,
             hot_nodes,
         });
     }
-    scopes.sort_unstable_by_key(|scope| scope.scope_id);
+    scopes.sort_unstable_by_key(|scope| scope.scope_id.as_u32());
 
     let total_roots = scopes.iter().map(|scope| scope.root_count).sum();
     let total_interior_nodes = scopes.iter().map(|scope| scope.total_interior_nodes).sum();
+    let reachability_roots = scopes.iter().map(|scope| scope.reachability_roots).sum();
+    let reachability_interior_nodes = scopes
+        .iter()
+        .map(|scope| scope.reachability_interior_nodes)
+        .sum();
+    let narrowing_roots = scopes.iter().map(|scope| scope.narrowing_roots).sum();
+    let narrowing_interior_nodes = scopes
+        .iter()
+        .map(|scope| scope.narrowing_interior_nodes)
+        .sum();
     let max_interior_nodes = scopes
         .iter()
         .map(|scope| scope.max_interior_nodes)
@@ -192,11 +244,15 @@ pub fn tdd_stats_for_file(
         .unwrap_or(0);
 
     FileTddStatsSummary {
-        file_path: file.path(db).to_string(),
+        file_path: file.path(db).clone(),
         scopes,
         total_roots,
         total_interior_nodes,
         max_interior_nodes,
+        reachability_roots,
+        reachability_interior_nodes,
+        narrowing_roots,
+        narrowing_interior_nodes,
     }
 }
 

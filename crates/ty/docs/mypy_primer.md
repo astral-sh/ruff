@@ -35,7 +35,10 @@ diff for all projects we currently enable in CI, use `--project-selector "/($(pa
 
 If you're investigating performance regressions, you can also enable TDD stats while running `mypy_primer`
 by setting `TY_TDD_STATS_REPORT` and `TY_LOG=ty.tdd_stats=info` in the environment (for `tdd-stats` builds).
-See [`TY_TDD_STATS_REPORT`](./environment.md#ty_tdd_stats_report) for details.
+For baseline comparisons, `TY_TDD_STATS_REPORT=1` is usually easiest to diff.
+Switch to `TY_TDD_STATS_REPORT=2` when you need scope-level histograms and hot-node details.
+(`short`/`full` are aliases for `1`/`2`.)
+See [`TY_TDD_STATS_REPORT`](./environment.md#ty_tdd_stats_report) and [Tracing](./tracing.md) for details.
 
 You can also take a look at the [full list of ecosystem projects]. Note that some of them might still need a `ty_paths` configuration
 option to work correctly.

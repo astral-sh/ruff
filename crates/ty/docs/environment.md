@@ -40,17 +40,22 @@ Without this feature, no TDD stats collection code is compiled into the binary.
 
 Accepted values:
 
-- `short`: Emit per-file summary through tracing target `ty.tdd_stats`.
-- `full`: Emit per-file and per-scope summaries (including histograms) through tracing target `ty.tdd_stats`.
+- `0`: Disable TDD stats output (default when unset).
+- `1` or `short`: Emit summary and per-file counts through tracing target `ty.tdd_stats`.
+  Includes both `reachability_*` and `narrowing_*` counters.
+- `2` or `full`: Emit `1` output plus per-scope summaries (including histograms) and
+  hot-node diagnostics through tracing target `ty.tdd_stats`.
+
+Values greater than `2` are treated as `2` (`full`).
 
 Example:
 
 ```bash
-TY_TDD_STATS_REPORT=short TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
+TY_TDD_STATS_REPORT=1 TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
 ```
 
 ```bash
-TY_TDD_STATS_REPORT=full TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
+TY_TDD_STATS_REPORT=2 TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
 ```
 
 For tracing filter syntax and logging tips, see [Tracing](./tracing.md).
@@ -60,25 +65,26 @@ For tracing filter syntax and logging tips, see [Tracing](./tracing.md).
 In `full` mode, ty emits `tdd_stats_hot_node` lines on the `ty.tdd_stats` target:
 
 ```text
-INFO tdd_stats_hot_node file=... scope=... constraint=... predicate=... subtree_nodes=... root_uses=... score=... roots=...
+INFO tdd_stats_hot_node file=... scope=... kind=... subtree_nodes=... root_uses=... score=... roots=...
 ```
 
 Field meanings:
 
-- `constraint`: Internal reachability-constraint node ID (the hot interior TDD node).
-- `predicate`: Predicate ID at that interior node.
+- `kind`: Which root family this hotspot is attributed to (`reachability` or `narrowing`).
 - `subtree_nodes`: Number of interior nodes reachable from `constraint` (subtree size).
 - `root_uses`: Number of root constraints whose TDD includes this interior node.
 - `score`: Hotness score, computed as `subtree_nodes * root_uses`.
 - `roots`: Up to five sample roots that include this node.
-    - `line:column (constraint=...)` means source location was resolved.
-    - `NodeKey(...)` means an internal AST node key fallback.
+    - `line:column (constraint=...)` means source location was resolved from an AST node.
+    - `line:column [use=..., binding=...] (constraint=...)` means a narrowing root tied to a use-site binding.
+    - `NodeKey(...)` or `use=... [Unknown]` are fallbacks when source location could not be resolved.
 
 Practical interpretation:
 
 - Higher `score` means a larger subtree reused by many roots, hence a likely hotspot.
 - If multiple top rows share very similar `roots`, they are often one clustered hotspot, not unrelated issues.
 - Use `subtree_nodes` to spot deep/large structures and `root_uses` to spot broad fanout; both can dominate runtime.
+- In `short` mode, compare `reachability_*` vs `narrowing_*` first to decide which family to investigate in `full` mode.
 
 ### `TY_MAX_PARALLELISM`
 

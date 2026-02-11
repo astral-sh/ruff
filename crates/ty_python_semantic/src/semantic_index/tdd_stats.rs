@@ -1,21 +1,49 @@
 use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
+use ruff_db::files::FilePath;
+
 use crate::node_key::NodeKey;
+use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::predicate::ScopedPredicateId;
 use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
+use crate::semantic_index::{FileScopeId, ScopedEnclosingSnapshotId};
 
 /// TDD root that we want to measure.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TddRootKind {
     NodeReachability,
+    NarrowingConstraint,
+}
+
+impl TddRootKind {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::NodeReachability => "reachability",
+            Self::NarrowingConstraint => "narrowing",
+        }
+    }
+}
+
+/// Source location for a measured root.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub(crate) enum TddRootSource {
+    Node(NodeKey),
+    Use {
+        use_id: ScopedUseId,
+        binding: u32,
+    },
+    EnclosingSnapshot {
+        snapshot_id: ScopedEnclosingSnapshotId,
+        binding: Option<u32>,
+    },
 }
 
 /// Debug reference to a measured root.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct TddRootRef {
     pub(crate) kind: TddRootKind,
-    pub(crate) node: NodeKey,
+    pub(crate) source: TddRootSource,
     pub(crate) constraint: ScopedReachabilityConstraintId,
 }
 
@@ -29,6 +57,7 @@ pub(crate) struct TddRootStat {
 /// Hot interior node aggregated across multiple roots.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TddHotNodeStat {
+    pub(crate) kind: TddRootKind,
     pub(crate) constraint: ScopedReachabilityConstraintId,
     pub(crate) predicate: ScopedPredicateId,
     pub(crate) subtree_interior_nodes: usize,
@@ -42,7 +71,7 @@ impl Ord for TddRootRef {
         self.kind
             .cmp(&other.kind)
             .then_with(|| self.constraint.as_u32().cmp(&other.constraint.as_u32()))
-            .then_with(|| self.node.cmp(&other.node))
+            .then_with(|| self.source.cmp(&other.source))
     }
 }
 
@@ -57,14 +86,7 @@ impl Ord for TddRootStat {
         other
             .interior_nodes
             .cmp(&self.interior_nodes)
-            .then_with(|| {
-                self.root
-                    .constraint
-                    .as_u32()
-                    .cmp(&other.root.constraint.as_u32())
-            })
-            .then_with(|| self.root.node.cmp(&other.root.node))
-            .then_with(|| self.root.kind.cmp(&other.root.kind))
+            .then_with(|| self.root.cmp(&other.root))
     }
 }
 
@@ -85,6 +107,7 @@ impl Ord for TddHotNodeStat {
                     .cmp(&self.subtree_interior_nodes)
             })
             .then_with(|| other.root_uses.cmp(&self.root_uses))
+            .then_with(|| self.kind.cmp(&other.kind))
             .then_with(|| self.constraint.as_u32().cmp(&other.constraint.as_u32()))
             .then_with(|| self.predicate.as_u32().cmp(&other.predicate.as_u32()))
             .then_with(|| self.sample_roots.cmp(&other.sample_roots))
@@ -136,8 +159,9 @@ impl TddStatsReport {
 /// Public hot-node summary used by `ty` for reporting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TddHotNodeSummary {
-    pub constraint_id: u32,
-    pub predicate_id: u32,
+    pub kind: &'static str,
+    pub(crate) constraint_id: ScopedReachabilityConstraintId,
+    pub(crate) predicate_id: ScopedPredicateId,
     pub subtree_interior_nodes: usize,
     pub root_uses: usize,
     pub score: usize,
@@ -147,20 +171,28 @@ pub struct TddHotNodeSummary {
 /// Public, file-level summary used by `ty` for reporting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FileTddStatsSummary {
-    pub file_path: String,
+    pub file_path: FilePath,
     pub scopes: Vec<ScopeTddStatsSummary>,
     pub total_roots: usize,
     pub total_interior_nodes: usize,
     pub max_interior_nodes: usize,
+    pub reachability_roots: usize,
+    pub reachability_interior_nodes: usize,
+    pub narrowing_roots: usize,
+    pub narrowing_interior_nodes: usize,
 }
 
 /// Public, scope-level summary used by `ty` for reporting.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ScopeTddStatsSummary {
-    pub scope_id: u32,
+    pub scope_id: FileScopeId,
     pub root_count: usize,
     pub total_interior_nodes: usize,
     pub max_interior_nodes: usize,
+    pub reachability_roots: usize,
+    pub reachability_interior_nodes: usize,
+    pub narrowing_roots: usize,
+    pub narrowing_interior_nodes: usize,
     pub histogram: Vec<TddHistogramBin>,
     pub hot_nodes: Vec<TddHotNodeSummary>,
 }
@@ -176,7 +208,12 @@ impl Ord for TddHotNodeSummary {
                     .cmp(&self.subtree_interior_nodes)
             })
             .then_with(|| other.root_uses.cmp(&self.root_uses))
-            .then_with(|| self.constraint_id.cmp(&other.constraint_id))
+            .then_with(|| self.kind.cmp(other.kind))
+            .then_with(|| {
+                self.constraint_id
+                    .as_u32()
+                    .cmp(&other.constraint_id.as_u32())
+            })
             .then_with(|| self.predicate_id.cmp(&other.predicate_id))
             .then_with(|| self.sample_roots.cmp(&other.sample_roots))
     }
@@ -195,7 +232,19 @@ impl Ord for ScopeTddStatsSummary {
             .cmp(&self.total_interior_nodes)
             .then_with(|| other.max_interior_nodes.cmp(&self.max_interior_nodes))
             .then_with(|| other.root_count.cmp(&self.root_count))
-            .then_with(|| self.scope_id.cmp(&other.scope_id))
+            .then_with(|| {
+                other
+                    .reachability_interior_nodes
+                    .cmp(&self.reachability_interior_nodes)
+            })
+            .then_with(|| {
+                other
+                    .narrowing_interior_nodes
+                    .cmp(&self.narrowing_interior_nodes)
+            })
+            .then_with(|| other.reachability_roots.cmp(&self.reachability_roots))
+            .then_with(|| other.narrowing_roots.cmp(&self.narrowing_roots))
+            .then_with(|| self.scope_id.as_u32().cmp(&other.scope_id.as_u32()))
             .then_with(|| self.histogram.cmp(&other.histogram))
             .then_with(|| self.hot_nodes.cmp(&other.hot_nodes))
     }
@@ -214,7 +263,19 @@ impl Ord for FileTddStatsSummary {
             .cmp(&self.total_interior_nodes)
             .then_with(|| other.max_interior_nodes.cmp(&self.max_interior_nodes))
             .then_with(|| other.total_roots.cmp(&self.total_roots))
-            .then_with(|| self.file_path.cmp(&other.file_path))
+            .then_with(|| {
+                other
+                    .reachability_interior_nodes
+                    .cmp(&self.reachability_interior_nodes)
+            })
+            .then_with(|| {
+                other
+                    .narrowing_interior_nodes
+                    .cmp(&self.narrowing_interior_nodes)
+            })
+            .then_with(|| other.reachability_roots.cmp(&self.reachability_roots))
+            .then_with(|| other.narrowing_roots.cmp(&self.narrowing_roots))
+            .then_with(|| self.file_path.as_str().cmp(other.file_path.as_str()))
             .then_with(|| self.scopes.cmp(&other.scopes))
     }
 }

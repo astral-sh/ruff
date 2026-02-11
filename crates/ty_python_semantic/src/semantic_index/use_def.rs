@@ -422,28 +422,104 @@ impl<'db> UseDefMap<'db> {
     #[cfg(feature = "tdd-stats")]
     pub(crate) fn tdd_stats_report(&self) -> crate::semantic_index::tdd_stats::TddStatsReport {
         use crate::semantic_index::tdd_stats::{
-            TddHotNodeStat, TddRootKind, TddRootRef, TddRootStat, TddStatsReport,
+            TddHotNodeStat, TddRootKind, TddRootRef, TddRootSource, TddRootStat, TddStatsReport,
         };
+        use rustc_hash::FxHashSet;
 
-        let mut roots = Vec::with_capacity(self.node_reachability.len());
-        for (&node, &constraint) in &self.node_reachability {
+        let estimated_narrowing_roots: usize = self
+            .bindings_by_use
+            .iter()
+            .map(|bindings| bindings.iter().len())
+            .sum();
+        let estimated_snapshot_roots: usize = self
+            .enclosing_snapshots
+            .iter()
+            .map(|snapshot| match snapshot {
+                EnclosingSnapshot::Constraint(_) => 1,
+                EnclosingSnapshot::Bindings(bindings) => bindings.iter().len(),
+            })
+            .sum();
+        let mut roots = Vec::with_capacity(
+            self.node_reachability.len() + estimated_narrowing_roots + estimated_snapshot_roots,
+        );
+        let mut seen_roots: FxHashSet<TddRootRef> = FxHashSet::default();
+
+        let mut push_root = |root: TddRootRef| {
+            if !seen_roots.insert(root) {
+                return;
+            }
             roots.push(TddRootStat {
-                root: TddRootRef {
-                    kind: TddRootKind::NodeReachability,
-                    node,
-                    constraint,
-                },
+                root,
                 interior_nodes: self
                     .reachability_constraints
-                    .interior_node_count(constraint),
+                    .interior_node_count(root.constraint),
+            });
+        };
+        for (&node, &constraint) in &self.node_reachability {
+            push_root(TddRootRef {
+                kind: TddRootKind::NodeReachability,
+                source: TddRootSource::Node(node),
+                constraint,
             });
         }
+        for (use_id, bindings) in self.bindings_by_use.iter_enumerated() {
+            for binding in bindings.iter() {
+                let constraint = binding.narrowing_constraint;
+                if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                    continue;
+                }
+                push_root(TddRootRef {
+                    kind: TddRootKind::NarrowingConstraint,
+                    source: TddRootSource::Use {
+                        use_id,
+                        binding: binding.binding.as_u32(),
+                    },
+                    constraint,
+                });
+            }
+        }
+        for (snapshot_id, snapshot) in self.enclosing_snapshots.iter_enumerated() {
+            match snapshot {
+                EnclosingSnapshot::Constraint(constraint) => {
+                    if *constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                        continue;
+                    }
+                    push_root(TddRootRef {
+                        kind: TddRootKind::NarrowingConstraint,
+                        source: TddRootSource::EnclosingSnapshot {
+                            snapshot_id,
+                            binding: None,
+                        },
+                        constraint: *constraint,
+                    });
+                }
+                EnclosingSnapshot::Bindings(bindings) => {
+                    for binding in bindings.iter() {
+                        let constraint = binding.narrowing_constraint;
+                        if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                            continue;
+                        }
+                        push_root(TddRootRef {
+                            kind: TddRootKind::NarrowingConstraint,
+                            source: TddRootSource::EnclosingSnapshot {
+                                snapshot_id,
+                                binding: Some(binding.binding.as_u32()),
+                            },
+                            constraint,
+                        });
+                    }
+                }
+            }
+        }
+        roots.shrink_to_fit();
         roots.sort();
 
-        let mut root_uses_by_node: FxHashMap<ScopedReachabilityConstraintId, usize> =
+        let mut root_uses_by_node: FxHashMap<(TddRootKind, ScopedReachabilityConstraintId), usize> =
             FxHashMap::default();
-        let mut sample_roots_by_node: FxHashMap<ScopedReachabilityConstraintId, Vec<TddRootRef>> =
-            FxHashMap::default();
+        let mut sample_roots_by_node: FxHashMap<
+            (TddRootKind, ScopedReachabilityConstraintId),
+            Vec<TddRootRef>,
+        > = FxHashMap::default();
         let mut subtree_size_memo: FxHashMap<ScopedReachabilityConstraintId, usize> =
             FxHashMap::default();
 
@@ -452,8 +528,9 @@ impl<'db> UseDefMap<'db> {
                 .reachability_constraints
                 .interior_nodes(root.root.constraint);
             for interior in interior_nodes {
-                *root_uses_by_node.entry(interior).or_default() += 1;
-                let sample_roots = sample_roots_by_node.entry(interior).or_default();
+                let hot_key = (root.root.kind, interior);
+                *root_uses_by_node.entry(hot_key).or_default() += 1;
+                let sample_roots = sample_roots_by_node.entry(hot_key).or_default();
                 if sample_roots.len() < 5 {
                     sample_roots.push(root.root);
                 }
@@ -465,12 +542,15 @@ impl<'db> UseDefMap<'db> {
         }
 
         let mut hot_nodes = Vec::with_capacity(root_uses_by_node.len());
-        for (constraint, root_uses) in root_uses_by_node {
+        for ((kind, constraint), root_uses) in root_uses_by_node {
             let subtree_interior_nodes = subtree_size_memo[&constraint];
             let score = subtree_interior_nodes.saturating_mul(root_uses);
             let predicate = self.reachability_constraints.interior_atom(constraint);
-            let sample_roots = sample_roots_by_node.remove(&constraint).unwrap_or_default();
+            let sample_roots = sample_roots_by_node
+                .remove(&(kind, constraint))
+                .unwrap_or_default();
             hot_nodes.push(TddHotNodeStat {
+                kind,
                 constraint,
                 predicate,
                 subtree_interior_nodes,
@@ -479,6 +559,7 @@ impl<'db> UseDefMap<'db> {
                 sample_roots,
             });
         }
+        hot_nodes.shrink_to_fit();
         hot_nodes.sort();
 
         TddStatsReport::from_roots(roots, hot_nodes)
@@ -733,7 +814,7 @@ impl<'db> UseDefMap<'db> {
 ///
 /// There is a unique ID for each distinct [`EnclosingSnapshotKey`] in the file.
 #[newtype_index]
-#[derive(get_size2::GetSize)]
+#[derive(get_size2::GetSize, PartialOrd, Ord)]
 pub(crate) struct ScopedEnclosingSnapshotId;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]

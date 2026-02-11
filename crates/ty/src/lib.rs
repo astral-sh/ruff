@@ -200,30 +200,88 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 #[cfg(feature = "tdd-stats")]
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 enum TddStatsReportMode {
+    Off = 0,
     Short,
     Full,
 }
 
 #[cfg(feature = "tdd-stats")]
-fn tdd_stats_report_mode() -> Option<TddStatsReportMode> {
-    match std::env::var(EnvVars::TY_TDD_STATS_REPORT).as_deref() {
-        Ok("short") => Some(TddStatsReportMode::Short),
-        Ok("full") => Some(TddStatsReportMode::Full),
-        Ok(other) => {
-            tracing::warn!(
-                "Unknown value for `TY_TDD_STATS_REPORT`: `{other}`. Valid values are `short` and `full`."
-            );
-            None
+impl TddStatsReportMode {
+    const MAX_LEVEL: u8 = TddStatsReportMode::Full as u8;
+
+    const fn from_level(level: u8) -> Self {
+        match level {
+            0 => TddStatsReportMode::Off,
+            1 => TddStatsReportMode::Short,
+            _ => TddStatsReportMode::Full,
         }
-        Err(_) => None,
+    }
+
+    const fn level(self) -> u8 {
+        self as u8
+    }
+}
+
+#[cfg(feature = "tdd-stats")]
+fn tdd_stats_report_mode() -> TddStatsReportMode {
+    match std::env::var(EnvVars::TY_TDD_STATS_REPORT) {
+        Ok(raw) => {
+            let raw = raw.trim();
+            if raw.eq_ignore_ascii_case("short") {
+                return TddStatsReportMode::Short;
+            }
+
+            if raw.eq_ignore_ascii_case("full") {
+                return TddStatsReportMode::Full;
+            }
+
+            match raw.parse::<u8>() {
+                Ok(level) if level <= TddStatsReportMode::MAX_LEVEL => {
+                    TddStatsReportMode::from_level(level)
+                }
+                Ok(level) => {
+                    tracing::warn!(
+                        "Value for `TY_TDD_STATS_REPORT` is capped at {} (full), got `{level}`.",
+                        TddStatsReportMode::MAX_LEVEL
+                    );
+                    TddStatsReportMode::Full
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        "Unknown value for `TY_TDD_STATS_REPORT`: `{raw}`. Valid values are `0`, `1`, `2`, `short`, and `full`."
+                    );
+                    TddStatsReportMode::Off
+                }
+            }
+        }
+        Err(_) => TddStatsReportMode::Off,
     }
 }
 
 #[cfg(feature = "tdd-stats")]
 fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
-    let Some(mode) = tdd_stats_report_mode() else {
+    use ty_python_semantic::semantic_index::tdd_stats::FileTddStatsSummary;
+
+    enum FileSummaryIter<'a> {
+        Full(std::slice::Iter<'a, FileTddStatsSummary>),
+        Short(std::iter::Take<std::slice::Iter<'a, FileTddStatsSummary>>),
+    }
+
+    impl<'a> Iterator for FileSummaryIter<'a> {
+        type Item = &'a FileTddStatsSummary;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self {
+                FileSummaryIter::Full(iter) => iter.next(),
+                FileSummaryIter::Short(iter) => iter.next(),
+            }
+        }
+    }
+
+    let mode = tdd_stats_report_mode();
+    if matches!(mode, TddStatsReportMode::Off) {
         return;
-    };
+    }
 
     let project = db.project();
     let files = project.files(db);
@@ -249,6 +307,22 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         .iter()
         .map(|summary| summary.total_interior_nodes)
         .sum();
+    let reachability_roots: usize = summaries
+        .iter()
+        .map(|summary| summary.reachability_roots)
+        .sum();
+    let reachability_interior_nodes: usize = summaries
+        .iter()
+        .map(|summary| summary.reachability_interior_nodes)
+        .sum();
+    let narrowing_roots: usize = summaries
+        .iter()
+        .map(|summary| summary.narrowing_roots)
+        .sum();
+    let narrowing_interior_nodes: usize = summaries
+        .iter()
+        .map(|summary| summary.narrowing_interior_nodes)
+        .sum();
     let global_max = summaries
         .iter()
         .map(|summary| summary.max_interior_nodes)
@@ -257,74 +331,75 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
 
     tracing::info!(
         target: "ty.tdd_stats",
-        mode = ?mode,
+        level = mode.level(),
         files = summaries.len(),
         total_roots,
         total_interior_nodes,
+        reachability_roots,
+        reachability_nodes = reachability_interior_nodes,
+        narrowing_roots,
+        narrowing_nodes = narrowing_interior_nodes,
         max_root_nodes = global_max,
         "tdd_stats_summary"
     );
 
-    match mode {
-        TddStatsReportMode::Short => {
-            for summary in summaries.iter().take(20) {
-                tracing::info!(
-                    target: "ty.tdd_stats",
-                    file = %summary.file_path,
-                    summary.total_roots,
-                    total_nodes = summary.total_interior_nodes,
-                    max_root_nodes = summary.max_interior_nodes,
-                    "tdd_stats_file"
-                );
-            }
-        }
-        TddStatsReportMode::Full => {
-            for summary in &summaries {
-                tracing::info!(
-                    target: "ty.tdd_stats",
-                    file = %summary.file_path,
-                    roots = summary.total_roots,
-                    total_nodes = summary.total_interior_nodes,
-                    max_root_nodes = summary.max_interior_nodes,
-                    "tdd_stats_file"
-                );
-                let mut scopes = summary.scopes.clone();
-                scopes.sort();
-                for scope in &scopes {
-                    let mut histogram = String::new();
-                    for bin in &scope.histogram {
-                        if !histogram.is_empty() {
-                            histogram.push(' ');
-                        }
-                        let _ = write!(&mut histogram, "{}=>{}", bin.interior_nodes, bin.count);
+    let is_full = mode.level() >= TddStatsReportMode::Full.level();
+    let file_summaries = if is_full {
+        FileSummaryIter::Full(summaries.iter())
+    } else {
+        FileSummaryIter::Short(summaries.iter().take(20))
+    };
+
+    for summary in file_summaries {
+        tracing::info!(
+            target: "ty.tdd_stats",
+            file = %summary.file_path,
+            roots = summary.total_roots,
+            total_nodes = summary.total_interior_nodes,
+            reachability_roots = summary.reachability_roots,
+            reachability_nodes = summary.reachability_interior_nodes,
+            narrowing_roots = summary.narrowing_roots,
+            narrowing_nodes = summary.narrowing_interior_nodes,
+            max_root_nodes = summary.max_interior_nodes,
+            "tdd_stats_file"
+        );
+
+        if is_full {
+            let mut scopes = summary.scopes.clone();
+            scopes.sort();
+            for scope in &scopes {
+                let mut histogram = String::new();
+                for bin in &scope.histogram {
+                    if !histogram.is_empty() {
+                        histogram.push(' ');
                     }
+                    let _ = write!(&mut histogram, "{}=>{}", bin.interior_nodes, bin.count);
+                }
+                tracing::info!(
+                    target: "ty.tdd_stats",
+                    file = %summary.file_path,
+                    scope = scope.scope_id.as_u32(),
+                    scope.root_count,
+                    total_nodes = scope.total_interior_nodes,
+                    max_root_nodes = scope.max_interior_nodes,
+                    histogram = %histogram,
+                    "tdd_stats_scope"
+                );
+
+                let mut hot_nodes = scope.hot_nodes.clone();
+                hot_nodes.sort();
+                for hot in hot_nodes.iter().take(20) {
                     tracing::info!(
                         target: "ty.tdd_stats",
                         file = %summary.file_path,
-                        scope = scope.scope_id,
-                        scope.root_count,
-                        total_nodes = scope.total_interior_nodes,
-                        max_root_nodes = scope.max_interior_nodes,
-                        histogram = %histogram,
-                        "tdd_stats_scope"
+                        scope = scope.scope_id.as_u32(),
+                        kind = hot.kind,
+                        subtree_nodes = hot.subtree_interior_nodes,
+                        root_uses = hot.root_uses,
+                        score = hot.score,
+                        roots = %hot.sample_roots.join(" | "),
+                        "tdd_stats_hot_node"
                     );
-
-                    let mut hot_nodes = scope.hot_nodes.clone();
-                    hot_nodes.sort();
-                    for hot in hot_nodes.iter().take(20) {
-                        tracing::info!(
-                            target: "ty.tdd_stats",
-                            file = %summary.file_path,
-                            scope = scope.scope_id,
-                            constraint = hot.constraint_id,
-                            predicate = hot.predicate_id,
-                            subtree_nodes = hot.subtree_interior_nodes,
-                            root_uses = hot.root_uses,
-                            score = hot.score,
-                            roots = %hot.sample_roots.join(" | "),
-                            "tdd_stats_hot_node"
-                        );
-                    }
                 }
             }
         }

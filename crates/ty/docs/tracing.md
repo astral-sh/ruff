@@ -81,8 +81,18 @@ This very quickly leads to extremely long outputs.
 This is useful for analyzing TDD blowups and hot nodes.
 
 ```bash
-TY_TDD_STATS_REPORT=full TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
+TY_TDD_STATS_REPORT=2 TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
 ```
+
+For quick regressions checks, start with:
+
+```bash
+TY_TDD_STATS_REPORT=1 TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
+```
+
+`short` mode reports `reachability_*` and `narrowing_*` counters, which makes old/new diffs easier to scan.
+Use `full` when you need per-scope histograms and `tdd_stats_hot_node` output.
+(`short`/`full` are aliases for `1`/`2`.)
 
 See [`TY_TDD_STATS_REPORT`](./environment.md#ty_tdd_stats_report) for modes and output interpretation.
 
