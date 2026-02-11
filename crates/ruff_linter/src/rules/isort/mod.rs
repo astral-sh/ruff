@@ -215,7 +215,9 @@ fn format_import_block(
                 atop.retain(|comment| {
                     !heading_comments
                         .iter()
-                        .any(|&heading| comment.as_ref() == heading)
+                    !settings.import_headings
+                        .values()
+                        .any(|heading| comment == heading)
                 });
             }
         }
