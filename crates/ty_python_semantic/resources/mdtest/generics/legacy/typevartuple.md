@@ -110,3 +110,44 @@ from typing_extensions import TypeVarTuple
 
 Ts = TypeVarTuple("Ts", default=tuple[int, str])
 ```
+
+## Usage in generic classes
+
+### Specialization preserves variadic arguments
+
+```py
+from typing_extensions import Generic, TypeVarTuple, Unpack
+from ty_extensions import generic_context
+
+Ts = TypeVarTuple("Ts")
+
+class Array(Generic[Unpack[Ts]]): ...
+
+# revealed: ty_extensions.GenericContext[*Ts@Array]
+reveal_type(generic_context(Array))
+
+def check(a: Array[int, str, bytes]):
+    reveal_type(a)  # revealed: Array[tuple[int, str, bytes]]
+
+def check_single(a: Array[int]):
+    reveal_type(a)  # revealed: Array[tuple[int]]
+```
+
+### Mixed TypeVar and TypeVarTuple
+
+```py
+from typing import TypeVar
+from typing_extensions import Generic, TypeVarTuple, Unpack
+from ty_extensions import generic_context
+
+T = TypeVar("T")
+Ts = TypeVarTuple("Ts")
+
+class Pair(Generic[T, Unpack[Ts]]): ...
+
+# revealed: ty_extensions.GenericContext[T@Pair, *Ts@Pair]
+reveal_type(generic_context(Pair))
+
+def check(a: Pair[int, str, bytes]):
+    reveal_type(a)  # revealed: Pair[int, tuple[str, bytes]]
+```

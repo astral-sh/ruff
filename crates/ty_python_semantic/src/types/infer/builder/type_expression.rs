@@ -694,6 +694,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         } else {
                             let starred_value_ty = self.expression_type(starred_value);
+                            // A TypeVarTuple can appear in three different type representations:
+                            // 1. `TodoTypeVarTuple` — legacy placeholder for unresolved cases
+                            // 2. `NominalInstance(TypeVarTuple)` — error-recovery fallback when
+                            //    the TypeVarTuple constructor fails validation
+                            // 3. A proper TypeVarTuple via `is_typevartuple()`, which handles
+                            //    both `KnownInstance(TypeVar(...))` and bound `TypeVar` forms
                             let is_typevar_tuple = starred_value_ty
                                 == Type::Dynamic(DynamicType::TodoTypeVarTuple)
                                 || matches!(

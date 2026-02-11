@@ -3491,6 +3491,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::homogeneous_tuple(self.db(), Type::unknown())
                         }
                     }
+                } else if annotated_type.is_typevartuple(self.db()) {
+                    Type::heterogeneous_tuple(self.db(), [annotated_type])
                 } else {
                     Type::homogeneous_tuple(self.db(), annotated_type)
                 }
@@ -12473,6 +12475,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let iterable_type = self.infer_expression(value, tcx);
 
+        // TypeVarTuples are not iterable at runtime, but `*Ts` in value-expression
+        // contexts (e.g., `Generic[*Ts]` in base class lists) needs to pass through
+        // without a "not-iterable" diagnostic. Type annotation contexts handle this
+        // separately via `infer_starred_type_expression`.
         if iterable_type.is_typevartuple(db) {
             return iterable_type;
         }
@@ -15945,41 +15951,45 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut error: Option<ExplicitSpecializationError> = None;
 
-        for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
-            match item {
-                EitherOrBoth::Both(typevar, expr) => {
-                    if typevar.default_type(db).is_some() {
-                        typevar_with_defaults += 1;
-                    }
+        // Find the TypeVarTuple position (if any) to handle variadic packing.
+        let typevars_vec: Vec<_> = generic_context.variables(db).collect();
+        let tvt_index = typevars_vec
+            .iter()
+            .position(|tv| tv.typevar(db).is_typevartuple(db));
 
-                    let provided_type = if typevar.is_paramspec(db) {
-                        match self.infer_paramspec_explicit_specialization_value(
-                            expr,
-                            exactly_one_paramspec,
-                        ) {
-                            Ok(paramspec_value) => paramspec_value,
-                            Err(()) => {
-                                error = Some(ExplicitSpecializationError::InvalidParamSpec);
-                                Type::paramspec_value_callable(db, Parameters::unknown())
-                            }
-                        }
-                    } else {
-                        self.infer_type_expression(expr)
-                    };
+        if let Some(tvt_idx) = tvt_index {
+            // TypeVarTuple-aware specialization: split type arguments into
+            // leading fixed, variadic (packed into a tuple), and trailing fixed.
+            let n_fixed_before = tvt_idx;
+            let n_fixed_after = typevars_vec.len() - tvt_idx - 1;
+            let total_fixed = n_fixed_before + n_fixed_after;
+            let n_args = type_arguments.len();
+            let tvt_arg_count = n_args.saturating_sub(total_fixed);
 
-                    inferred_type_arguments.push(provided_type);
+            // Phase 1: Infer all type argument expressions up front, so that
+            // Phase 2 only needs immutable access to `self`.
+            for expr in type_arguments {
+                let provided_type = self.infer_type_expression(expr);
+                inferred_type_arguments.push(provided_type);
+            }
 
-                    // TODO consider just accepting the given specialization without checking
-                    // against bounds/constraints, but recording the expression for deferred
-                    // checking at end of scope. This would avoid a lot of cycles caused by eagerly
-                    // doing assignment checks here.
+            // Phase 2: Validate fixed type variables and pack the variadic slot.
+            //
+            // Closure for validating a fixed (non-TypeVarTuple) type variable
+            // against a provided type, pushing the result into `specialization_types`.
+            let validate_fixed_var =
+                |typevar: BoundTypeVarInstance<'db>,
+                 provided_type: Type<'db>,
+                 arg_idx: usize,
+                 specialization_types: &mut Vec<Option<Type<'db>>>,
+                 error: &mut Option<ExplicitSpecializationError>| {
                     match typevar.typevar(db).bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if provided_type
                                 .when_assignable_to(db, bound, InferableTypeVars::None)
                                 .is_never_satisfied(db)
                             {
-                                let node = get_node(index);
+                                let node = get_node(arg_idx);
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
                                 {
@@ -15992,17 +16002,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ));
                                     add_typevar_definition(db, &mut diagnostic, typevar);
                                 }
-                                error = Some(ExplicitSpecializationError::UnsatisfiedBound);
+                                *error = Some(ExplicitSpecializationError::UnsatisfiedBound);
                                 specialization_types.push(Some(Type::unknown()));
                             } else {
                                 specialization_types.push(Some(provided_type));
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                            // TODO: this is wrong, the given specialization needs to be assignable
-                            // to _at least one_ of the individual constraints, not to the union of
-                            // all of them. `int | str` is not a valid specialization of a typevar
-                            // constrained to `(int, str)`.
                             if provided_type
                                 .when_assignable_to(
                                     db,
@@ -16011,7 +16017,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 )
                                 .is_never_satisfied(db)
                             {
-                                let node = get_node(index);
+                                let node = get_node(arg_idx);
                                 if let Some(builder) =
                                     self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
                                 {
@@ -16028,7 +16034,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ));
                                     add_typevar_definition(db, &mut diagnostic, typevar);
                                 }
-                                error = Some(ExplicitSpecializationError::UnsatisfiedConstraints);
+                                *error = Some(ExplicitSpecializationError::UnsatisfiedConstraints);
                                 specialization_types.push(Some(Type::unknown()));
                             } else {
                                 specialization_types.push(Some(provided_type));
@@ -16038,19 +16044,167 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             specialization_types.push(Some(provided_type));
                         }
                     }
+                };
+
+            // Leading fixed type variables
+            for i in 0..n_fixed_before {
+                let typevar = typevars_vec[i];
+                if typevar.default_type(db).is_some() {
+                    typevar_with_defaults += 1;
                 }
-                EitherOrBoth::Left(typevar) => {
-                    if typevar.default_type(db).is_none() {
-                        // This is an error case, so no need to push into the specialization types.
-                        missing_typevars.push(typevar);
-                    } else {
-                        typevar_with_defaults += 1;
-                        specialization_types.push(None);
+                if i < n_args {
+                    validate_fixed_var(
+                        typevar,
+                        inferred_type_arguments[i],
+                        i,
+                        &mut specialization_types,
+                        &mut error,
+                    );
+                } else if typevar.default_type(db).is_none() {
+                    missing_typevars.push(typevar);
+                } else {
+                    specialization_types.push(None);
+                }
+            }
+
+            // TypeVarTuple slot: pack the variadic arguments into a tuple type.
+            let tvt_start = n_fixed_before.min(n_args);
+            let tvt_end = (tvt_start + tvt_arg_count).min(n_args);
+            let tvt_types: Vec<_> = inferred_type_arguments[tvt_start..tvt_end].to_vec();
+            specialization_types.push(Some(Type::heterogeneous_tuple(db, tvt_types)));
+
+            // Trailing fixed type variables
+            for i in 0..n_fixed_after {
+                let var_idx = tvt_idx + 1 + i;
+                let arg_idx = tvt_end + i;
+                let typevar = typevars_vec[var_idx];
+                if typevar.default_type(db).is_some() {
+                    typevar_with_defaults += 1;
+                }
+                if arg_idx < n_args {
+                    validate_fixed_var(
+                        typevar,
+                        inferred_type_arguments[arg_idx],
+                        arg_idx,
+                        &mut specialization_types,
+                        &mut error,
+                    );
+                } else if typevar.default_type(db).is_none() {
+                    missing_typevars.push(typevar);
+                } else {
+                    specialization_types.push(None);
+                }
+            }
+        } else {
+            for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
+                match item {
+                    EitherOrBoth::Both(typevar, expr) => {
+                        if typevar.default_type(db).is_some() {
+                            typevar_with_defaults += 1;
+                        }
+
+                        let provided_type = if typevar.is_paramspec(db) {
+                            match self.infer_paramspec_explicit_specialization_value(
+                                expr,
+                                exactly_one_paramspec,
+                            ) {
+                                Ok(paramspec_value) => paramspec_value,
+                                Err(()) => {
+                                    error = Some(ExplicitSpecializationError::InvalidParamSpec);
+                                    Type::paramspec_value_callable(db, Parameters::unknown())
+                                }
+                            }
+                        } else {
+                            self.infer_type_expression(expr)
+                        };
+
+                        inferred_type_arguments.push(provided_type);
+
+                        // TODO consider just accepting the given specialization without checking
+                        // against bounds/constraints, but recording the expression for deferred
+                        // checking at end of scope. This would avoid a lot of cycles caused by
+                        // eagerly doing assignment checks here.
+                        match typevar.typevar(db).bound_or_constraints(db) {
+                            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                                if provided_type
+                                    .when_assignable_to(db, bound, InferableTypeVars::None)
+                                    .is_never_satisfied(db)
+                                {
+                                    let node = get_node(index);
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
+                                    {
+                                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                                            "Type `{}` is not assignable to upper bound \
+                                                    `{}` of type variable `{}`",
+                                            provided_type.display(db),
+                                            bound.display(db),
+                                            typevar.identity(db).display(db),
+                                        ));
+                                        add_typevar_definition(db, &mut diagnostic, typevar);
+                                    }
+                                    error = Some(ExplicitSpecializationError::UnsatisfiedBound);
+                                    specialization_types.push(Some(Type::unknown()));
+                                } else {
+                                    specialization_types.push(Some(provided_type));
+                                }
+                            }
+                            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                                // TODO: this is wrong, the given specialization needs to be
+                                // assignable to _at least one_ of the individual constraints,
+                                // not to the union of all of them. `int | str` is not a valid
+                                // specialization of a typevar constrained to `(int, str)`.
+                                if provided_type
+                                    .when_assignable_to(
+                                        db,
+                                        constraints.as_type(db),
+                                        InferableTypeVars::None,
+                                    )
+                                    .is_never_satisfied(db)
+                                {
+                                    let node = get_node(index);
+                                    if let Some(builder) =
+                                        self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
+                                    {
+                                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                                            "Type `{}` does not satisfy constraints `{}` \
+                                                    of type variable `{}`",
+                                            provided_type.display(db),
+                                            constraints
+                                                .elements(db)
+                                                .iter()
+                                                .map(|c| c.display(db))
+                                                .format("`, `"),
+                                            typevar.identity(db).display(db),
+                                        ));
+                                        add_typevar_definition(db, &mut diagnostic, typevar);
+                                    }
+                                    error =
+                                        Some(ExplicitSpecializationError::UnsatisfiedConstraints);
+                                    specialization_types.push(Some(Type::unknown()));
+                                } else {
+                                    specialization_types.push(Some(provided_type));
+                                }
+                            }
+                            None => {
+                                specialization_types.push(Some(provided_type));
+                            }
+                        }
                     }
-                }
-                EitherOrBoth::Right(expr) => {
-                    inferred_type_arguments.push(self.infer_type_expression(expr));
-                    first_excess_type_argument_index.get_or_insert(index);
+                    EitherOrBoth::Left(typevar) => {
+                        if typevar.default_type(db).is_none() {
+                            // This is an error case, so no need to push into the
+                            // specialization types.
+                            missing_typevars.push(typevar);
+                        } else {
+                            typevar_with_defaults += 1;
+                            specialization_types.push(None);
+                        }
+                    }
+                    EitherOrBoth::Right(expr) => {
+                        inferred_type_arguments.push(self.infer_type_expression(expr));
+                        first_excess_type_argument_index.get_or_insert(index);
+                    }
                 }
             }
         }
@@ -16075,14 +16229,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             error = Some(ExplicitSpecializationError::MissingTypeVars);
         }
 
-        let has_typevartuple = generic_context
-            .variables(db)
-            .any(|typevar| typevar.typevar(db).is_typevartuple(db));
-
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
-            if has_typevartuple {
-                // Variadic type parameters can consume any number of arguments.
-            } else if let Type::GenericAlias(alias) = value_ty
+            if let Type::GenericAlias(alias) = value_ty
                 && let spec = alias.specialization(self.db())
                 && spec
                     .types(self.db())
