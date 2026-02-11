@@ -957,11 +957,11 @@ A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 ```py
 from typing import Any
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 def f[S, T: list[S]](x: S, y: T) -> S | T:
     return x or y
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 class C[S, T: list[S]]:
     x: S
     y: T
@@ -969,21 +969,21 @@ class C[S, T: list[S]]:
 reveal_type(C[int, list[Any]]().x)  # revealed: int
 reveal_type(C[int, list[Any]]().y)  # revealed: list[Any]
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 def g[T: list[T]](x: T) -> T:
     return x
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 class D[T: list[T]]:
     x: T
 
 reveal_type(D[list[Any]]().x)  # revealed: list[Any]
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
     return x or y
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 class E[S, T: (list[S], str)]:
     x: S
     y: T
@@ -991,11 +991,11 @@ class E[S, T: (list[S], str)]:
 reveal_type(E[int, str]().x)  # revealed: int
 reveal_type(E[int, str]().y)  # revealed: str
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 def i[T: (list[T], str)](x: T) -> T:
     return x
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 class F[T: (list[T], str)]:
     x: T
 
