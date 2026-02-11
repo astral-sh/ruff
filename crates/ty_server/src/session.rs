@@ -1095,15 +1095,29 @@ impl Session {
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
-            workspace_settings: document_handle
-                .notebook_or_file_path()
-                .as_system()
-                .and_then(|path| self.workspaces.settings_for_path(path))
+            workspace_settings: self
+                .workspace_settings_for_document(document_handle.notebook_or_file_path())
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
             document: document_handle,
             client_name: self.client_name,
         })
+    }
+
+    fn workspace_settings_for_document(
+        &self,
+        path: &AnySystemPath,
+    ) -> Option<Arc<WorkspaceSettings>> {
+        // Virtual documents use the same "owner" heuristic as `project_state`.
+        match path {
+            AnySystemPath::System(system_path) => self.workspaces.settings_for_path(system_path),
+            AnySystemPath::SystemVirtual(_) => {
+                let project = self.project_state(path);
+                self.workspaces
+                    .settings_for_path(project.db.project().root(&project.db))
+                    .or_else(|| self.workspaces.first_settings())
+            }
+        }
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
@@ -1517,6 +1531,10 @@ impl Workspaces {
     /// workspace registered for the path.
     fn settings_for_path(&self, path: impl AsRef<SystemPath>) -> Option<Arc<WorkspaceSettings>> {
         self.for_path(path).map(Workspace::settings_arc)
+    }
+
+    fn first_settings(&self) -> Option<Arc<WorkspaceSettings>> {
+        self.workspaces.values().next().map(Workspace::settings_arc)
     }
 
     /// Returns `true` if all workspaces have been [initialized].
