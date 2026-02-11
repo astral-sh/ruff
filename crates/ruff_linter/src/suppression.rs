@@ -7,6 +7,7 @@ use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_index::Indexer;
 use rustc_hash::FxHashSet;
 use std::cell::Cell;
+use std::sync::LazyLock;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -15,7 +16,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
 use crate::checkers::ast::LintContext;
-use crate::codes::Rule;
+use crate::codes::{NoqaCode, Rule};
 use crate::fix::edits::delete_comment;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
@@ -23,6 +24,20 @@ use crate::rules::ruff::rules::{
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
 use crate::{Locator, Violation};
+
+/// Determine if the rule code is a `RUF10x` diagnostic generated while processing diagnostics
+pub fn is_suppression_diagnostic_code(code: &str) -> bool {
+    static SUPPRESSION_CODES: LazyLock<Vec<NoqaCode>> = LazyLock::new(|| {
+        vec![
+            Rule::UnusedNOQA.noqa_code(),
+            Rule::RedirectedNOQA.noqa_code(),
+            Rule::InvalidRuleCode.noqa_code(),
+            Rule::InvalidSuppressionComment.noqa_code(),
+            Rule::UnmatchedSuppressionComment.noqa_code(),
+        ]
+    });
+    SUPPRESSION_CODES.iter().any(|sc| sc == &code)
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionAction {
@@ -836,8 +851,23 @@ mod tests {
 
     use crate::suppression::{
         InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
-        SuppressionParser, Suppressions,
+        SuppressionParser, Suppressions, is_suppression_diagnostic_code,
     };
+
+    #[test]
+    fn suppression_diagnostic_codes() {
+        // Suppression-related diagnostics
+        assert!(is_suppression_diagnostic_code("RUF100")); // UnusedNOQA
+        assert!(is_suppression_diagnostic_code("RUF101")); // RedirectedNOQA
+        assert!(is_suppression_diagnostic_code("RUF102")); // InvalidRuleCode
+        assert!(is_suppression_diagnostic_code("RUF103")); // InvalidSuppressionComment
+        assert!(is_suppression_diagnostic_code("RUF104")); // UnmatchedSuppressionComment
+
+        // Random rules
+        assert!(!is_suppression_diagnostic_code("RUF013"));
+        assert!(!is_suppression_diagnostic_code("F401"));
+        assert!(!is_suppression_diagnostic_code("E101"));
+    }
 
     #[test]
     fn no_suppression() {
