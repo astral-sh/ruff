@@ -123,10 +123,7 @@ pub(crate) fn format(
                     let path = resolved_file.path();
                     let settings = resolver.resolve(path);
 
-                    let source_type = match settings.formatter.extension.get(path) {
-                        None => SourceType::from(path),
-                        Some(language) => SourceType::Python(PySourceType::from(language)),
-                    };
+                    let source_type = settings.formatter.extension.mapped_path(path);
                     if source_type.is_toml() {
                         // Ignore TOML files.
                         return None;
