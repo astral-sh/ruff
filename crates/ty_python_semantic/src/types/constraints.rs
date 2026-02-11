@@ -68,7 +68,7 @@
 
 use std::cell::RefCell;
 use std::cmp::Ordering;
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 use std::marker::PhantomData;
 use std::ops::Range;
 
@@ -93,42 +93,42 @@ use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
 pub(crate) trait OptionConstraintsExtension<T> {
     /// Returns a constraint set that is always satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_none_or<'db>(
+    fn when_none_or<'db, 'c>(
         self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db>;
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c>;
 
     /// Returns a constraint set that is never satisfiable if the option is `None`; otherwise
     /// applies a function to determine under what constraints the value inside of it holds.
-    fn when_some_and<'db>(
+    fn when_some_and<'db, 'c>(
         self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db>;
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c>;
 }
 
 impl<T> OptionConstraintsExtension<T> for Option<T> {
-    fn when_none_or<'db>(
+    fn when_none_or<'db, 'c>(
         self,
         _db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db> {
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match self {
             Some(value) => f(value),
             None => ConstraintSet::always(builder),
         }
     }
 
-    fn when_some_and<'db>(
+    fn when_some_and<'db, 'c>(
         self,
         _db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        f: impl FnOnce(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db> {
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnOnce(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match self {
             Some(value) => f(value),
             None => ConstraintSet::never(builder),
@@ -143,49 +143,70 @@ pub(crate) trait IteratorConstraintsExtension<T> {
     /// This method short-circuits; if we encounter any element that
     /// [`is_always_satisfied`][ConstraintSet::is_always_satisfied], then the overall result
     /// must be as well, and we stop consuming elements from the iterator.
-    fn when_any<'db>(
+    fn when_any<'db, 'c>(
         self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        f: impl FnMut(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db>;
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c>;
 
     /// Returns the constraints under which every element of the iterator holds.
     ///
     /// This method short-circuits; if we encounter any element that
     /// [`is_never_satisfied`][ConstraintSet::is_never_satisfied], then the overall result
     /// must be as well, and we stop consuming elements from the iterator.
-    fn when_all<'db>(
+    fn when_all<'db, 'c>(
         self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
-        f: impl FnMut(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db>;
+        builder: &'c ConstraintSetBuilder<'db>,
+        f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c>;
 }
 
 impl<I, T> IteratorConstraintsExtension<T> for I
 where
     I: Iterator<Item = T>,
 {
-    fn when_any<'db>(
+    fn when_any<'db, 'c>(
         self,
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
-        mut f: impl FnMut(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db> {
-        let node = Node::distributed_or(db, self.map(|element| f(element).node));
-        ConstraintSet { node }
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let node = Node::distributed_or(
+            db,
+            self.map(|element| {
+                let constraint = f(element);
+                constraint.verify_builder(builder);
+                constraint.node
+            }),
+        );
+        ConstraintSet::from_node(builder, node)
     }
 
-    fn when_all<'db>(
+    fn when_all<'db, 'c>(
         self,
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
-        mut f: impl FnMut(T) -> ConstraintSet<'db>,
-    ) -> ConstraintSet<'db> {
-        let node = Node::distributed_and(db, self.map(|element| f(element).node));
-        ConstraintSet { node }
+        builder: &'c ConstraintSetBuilder<'db>,
+        mut f: impl FnMut(T) -> ConstraintSet<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        let node = Node::distributed_and(
+            db,
+            self.map(|element| {
+                let constraint = f(element);
+                constraint.verify_builder(builder);
+                constraint.node
+            }),
+        );
+        ConstraintSet::from_node(builder, node)
     }
+}
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub struct OwnedConstraintSet<'db> {
+    /// The BDD representing this constraint set
+    node: Node<'db>,
+    storage: ConstraintSetStorage<'db>,
 }
 
 /// A set of constraints under which a type property holds.
@@ -198,26 +219,27 @@ where
 /// [`or`][Self::or] in a consistent order.
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
-pub struct ConstraintSet<'db> {
+#[derive(Clone, Copy)]
+pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: Node<'db>,
+    builder: &'c ConstraintSetBuilder<'db>,
 }
 
-impl<'db> ConstraintSet<'db> {
-    fn never(_builder: &ConstraintSetBuilder<'db>) -> Self {
-        Self {
-            node: Node::AlwaysFalse,
-        }
+impl<'db, 'c> ConstraintSet<'db, 'c> {
+    fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: Node<'db>) -> Self {
+        Self { node, builder }
     }
 
-    fn always(_builder: &ConstraintSetBuilder<'db>) -> Self {
-        Self {
-            node: Node::AlwaysTrue,
-        }
+    fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self::from_node(builder, Node::AlwaysFalse)
     }
 
-    pub(crate) fn from_bool(builder: &ConstraintSetBuilder<'db>, b: bool) -> Self {
+    fn always(builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        Self::from_node(builder, Node::AlwaysTrue)
+    }
+
+    pub(crate) fn from_bool(builder: &'c ConstraintSetBuilder<'db>, b: bool) -> Self {
         if b {
             Self::always(builder)
         } else {
@@ -228,14 +250,20 @@ impl<'db> ConstraintSet<'db> {
     /// Returns a constraint set that constraints a typevar to a particular range of types.
     pub(crate) fn constrain_typevar(
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self {
-            node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
-        }
+        Self::from_node(
+            builder,
+            ConstrainedTypeVar::new_node(db, typevar, lower, upper),
+        )
+    }
+
+    #[track_caller]
+    fn verify_builder(self, builder: &'c ConstraintSetBuilder<'db>) {
+        debug_assert!(std::ptr::eq(self.builder, builder));
     }
 
     /// Returns whether this constraint set never holds
@@ -361,13 +389,12 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn implies_subtype_of(
         self,
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         lhs: Type<'db>,
         rhs: Type<'db>,
     ) -> Self {
-        Self {
-            node: self.node.implies_subtype_of(db, lhs, rhs),
-        }
+        self.verify_builder(builder);
+        Self::from_node(builder, self.node.implies_subtype_of(db, lhs, rhs))
     }
 
     /// Returns whether this constraint set is satisfied by all of the typevars that it mentions.
@@ -385,7 +412,7 @@ impl<'db> ConstraintSet<'db> {
     /// means that those additional typevars trivially satisfy the constraint set, regardless of
     /// whether they are inferable or not.
     pub(crate) fn satisfied_by_all_typevars(
-        self,
+        &self,
         db: &'db dyn Db,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> bool {
@@ -399,9 +426,10 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn union(
         &mut self,
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
+        self.verify_builder(builder);
         self.node = self.node.or_with_offset(db, other.node);
         *self
     }
@@ -413,18 +441,18 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn intersect(
         &mut self,
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
+        self.verify_builder(builder);
         self.node = self.node.and_with_offset(db, other.node);
         *self
     }
 
     /// Returns the negation of this constraint set.
-    pub(crate) fn negate(self, db: &'db dyn Db, _builder: &ConstraintSetBuilder<'db>) -> Self {
-        Self {
-            node: self.node.negate(db),
-        }
+    pub(crate) fn negate(self, db: &'db dyn Db, builder: &'c ConstraintSetBuilder<'db>) -> Self {
+        self.verify_builder(builder);
+        Self::from_node(builder, self.node.negate(db))
     }
 
     /// Returns the intersection of this constraint set and another. The other constraint set is
@@ -436,11 +464,14 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn and(
         mut self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         other: impl FnOnce() -> Self,
     ) -> Self {
+        self.verify_builder(builder);
         if !self.is_never_satisfied(db) {
-            self.intersect(db, builder, other());
+            let other = other();
+            other.verify_builder(builder);
+            self.intersect(db, builder, other);
         }
         self
     }
@@ -454,11 +485,14 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn or(
         mut self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         other: impl FnOnce() -> Self,
     ) -> Self {
+        self.verify_builder(builder);
         if !self.is_always_satisfied(db) {
-            self.union(db, builder, other());
+            let other = other();
+            other.verify_builder(builder);
+            self.union(db, builder, other);
         }
         self
     }
@@ -470,7 +504,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn implies(
         self,
         db: &'db dyn Db,
-        builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         other: impl FnOnce() -> Self,
     ) -> Self {
         self.negate(db, builder).or(db, builder, other)
@@ -483,12 +517,11 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn iff(
         self,
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         other: Self,
     ) -> Self {
-        ConstraintSet {
-            node: self.node.iff_with_offset(db, other.node),
-        }
+        self.verify_builder(builder);
+        Self::from_node(builder, self.node.iff_with_offset(db, other.node))
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -499,11 +532,11 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn reduce_inferable(
         self,
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
+        builder: &'c ConstraintSetBuilder<'db>,
         to_remove: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
     ) -> Self {
-        let node = self.node.exists(db, to_remove);
-        Self { node }
+        self.verify_builder(builder);
+        Self::from_node(builder, self.node.exists(db, to_remove))
     }
 
     pub(crate) fn solutions(self, db: &'db dyn Db) -> Solutions<'db> {
@@ -527,15 +560,47 @@ impl<'db> ConstraintSet<'db> {
     }
 }
 
+impl Debug for ConstraintSet<'_, '_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ConstraintSet")
+            .field("node", &self.node)
+            .finish()
+    }
+}
+
+#[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
+    storage: RefCell<ConstraintSetStorage<'db>>,
+}
+
+#[derive(Clone, Debug, Default, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+struct ConstraintSetStorage<'db> {
     _dummy: PhantomData<&'db ()>,
 }
 
-impl ConstraintSetBuilder<'_> {
+impl<'db> ConstraintSetBuilder<'db> {
     pub(crate) fn new() -> Self {
-        Self {
-            _dummy: PhantomData,
+        Self::default()
+    }
+
+    pub(crate) fn into_owned(
+        self,
+        f: impl for<'c> FnOnce(&'c Self) -> ConstraintSet<'db, 'c>,
+    ) -> OwnedConstraintSet<'db> {
+        let constraint = f(&self);
+        let node = constraint.node;
+        OwnedConstraintSet {
+            node,
+            storage: self.storage.into_inner(),
         }
+    }
+
+    pub(crate) fn load<'c>(&'c self, other: &OwnedConstraintSet<'db>) -> ConstraintSet<'db, 'c> {
+        // For now, all constraints are still salsa-interned globally, so we can just coerce the
+        // constraint set to consider ourselves as where it's stored. Once we migrate to actually
+        // storing the constraints in ConstraintSetStorage, this will need to copy the relevant BDD
+        // nodes from other's storage into ourselves.
+        ConstraintSet::from_node(self, other.node)
     }
 }
 
@@ -1936,7 +2001,7 @@ impl<'db> Node<'db> {
                     Node::Interior(_) => {
                         let mut clauses = self.node.satisfied_clauses(self.db);
                         clauses.simplify(self.db);
-                        clauses.display(self.db).fmt(f)
+                        Display::fmt(&clauses.display(self.db), f)
                     }
                 }
             }
@@ -4230,11 +4295,11 @@ impl<'db> BoundTypeVarInstance<'db> {
 }
 
 impl<'db> GenericContext<'db> {
-    pub(crate) fn specialize_constrained(
+    pub(crate) fn specialize_constrained<'c>(
         self,
         db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
-        constraints: ConstraintSet<'db>,
+        _builder: &'c ConstraintSetBuilder<'db>,
+        constraints: ConstraintSet<'db, 'c>,
     ) -> Result<Specialization<'db>, ()> {
         tracing::trace!(
             target: "ty_python_semantic::types::constraints::specialize_constrained",

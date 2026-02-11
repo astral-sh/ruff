@@ -235,13 +235,13 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
-    pub(super) fn when_subtype_of(
+    pub(super) fn when_subtype_of<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(db, target, constraints, inferable, TypeRelation::Subtyping)
     }
 
@@ -249,14 +249,14 @@ impl<'db> Type<'db> {
     /// all of the restrictions in `constraints` hold.
     ///
     /// See [`TypeRelation::SubtypingAssuming`] for more details.
-    pub(super) fn when_subtype_of_assuming(
+    pub(super) fn when_subtype_of_assuming<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        assuming: ConstraintSet<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        assuming: ConstraintSet<'db, 'c>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             target,
@@ -288,13 +288,13 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
-    pub(super) fn when_assignable_to(
+    pub(super) fn when_assignable_to<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(
             db,
             target,
@@ -304,13 +304,13 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(super) fn when_constraint_set_assignable_to(
+    pub(super) fn when_constraint_set_assignable_to<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to(
             db,
             target,
@@ -349,14 +349,14 @@ impl<'db> Type<'db> {
         is_redundant_with_impl(db, self, other)
     }
 
-    pub(super) fn has_relation_to(
+    pub(super) fn has_relation_to<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             target,
@@ -369,16 +369,16 @@ impl<'db> Type<'db> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub(super) fn has_relation_to_impl(
+    pub(super) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         // Subtyping implies assignability, so if subtyping is reflexive and the two types are
         // equal, it is both a subtype and assignable. Assignability is always reflexive.
         //
@@ -1760,12 +1760,12 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
-    pub(crate) fn when_equivalent_to(
+    pub(crate) fn when_equivalent_to<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db> {
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         let relation_visitor = HasRelationToVisitor::default(constraints);
         let disjointness_visitor = IsDisjointVisitor::default(constraints);
         self.when_equivalent_to_impl(
@@ -1777,14 +1777,14 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn when_equivalent_to_impl(
+    pub(crate) fn when_equivalent_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        constraints: &'c ConstraintSetBuilder<'db>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             other,
@@ -1828,13 +1828,13 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
-    pub(crate) fn when_disjoint_from(
+    pub(crate) fn when_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.is_disjoint_from_impl(
             db,
             other,
@@ -1845,24 +1845,24 @@ impl<'db> Type<'db> {
         )
     }
 
-    pub(crate) fn is_disjoint_from_impl(
+    pub(crate) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        fn any_protocol_members_absent_or_disjoint<'db>(
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        fn any_protocol_members_absent_or_disjoint<'db, 'c>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
-            constraints: &ConstraintSetBuilder<'db>,
+            constraints: &'c ConstraintSetBuilder<'db>,
             inferable: InferableTypeVars<'_, 'db>,
-            disjointness_visitor: &IsDisjointVisitor<'db>,
-            relation_visitor: &HasRelationToVisitor<'db>,
-        ) -> ConstraintSet<'db> {
+            disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+            relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        ) -> ConstraintSet<'db, 'c> {
             protocol
                 .interface(db)
                 .members(db)
@@ -2722,21 +2722,21 @@ impl<'db> Type<'db> {
 }
 
 /// A [`PairVisitor`] that is used in `has_relation_to` methods.
-pub(crate) type HasRelationToVisitor<'db> = CycleDetector<
+pub(crate) type HasRelationToVisitor<'db, 'c> = CycleDetector<
     TypeRelation,
     (Type<'db>, Type<'db>, TypeRelation),
-    ConstraintSet<'db>,
-    ConstraintSet<'db>,
+    ConstraintSet<'db, 'c>,
+    ConstraintSet<'db, 'c>,
 >;
 
-impl<'db> HasRelationToVisitor<'db> {
-    pub(crate) fn default(constraints: &ConstraintSetBuilder<'db>) -> Self {
+impl<'db, 'c> HasRelationToVisitor<'db, 'c> {
+    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         HasRelationToVisitor::with_given(constraints, ConstraintSet::from_bool(constraints, false))
     }
 
     pub(crate) fn with_given(
-        constraints: &ConstraintSetBuilder<'db>,
-        given: ConstraintSet<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
+        given: ConstraintSet<'db, 'c>,
     ) -> Self {
         let fallback = ConstraintSet::from_bool(constraints, true);
         HasRelationToVisitor::with_extra(fallback, given)
@@ -2744,13 +2744,13 @@ impl<'db> HasRelationToVisitor<'db> {
 }
 
 /// A [`PairVisitor`] that is used in `is_disjoint_from` methods.
-pub(crate) type IsDisjointVisitor<'db> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db>>;
+pub(crate) type IsDisjointVisitor<'db, 'c> = PairVisitor<'db, IsDisjoint, ConstraintSet<'db, 'c>>;
 
 #[derive(Debug)]
 pub(crate) struct IsDisjoint;
 
-impl<'db> IsDisjointVisitor<'db> {
-    pub(crate) fn default(constraints: &ConstraintSetBuilder<'db>) -> Self {
+impl<'db, 'c> IsDisjointVisitor<'db, 'c> {
+    pub(crate) fn default(constraints: &'c ConstraintSetBuilder<'db>) -> Self {
         IsDisjointVisitor::new(ConstraintSet::from_bool(constraints, false))
     }
 }

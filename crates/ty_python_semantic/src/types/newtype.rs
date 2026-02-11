@@ -117,12 +117,12 @@ impl<'db> NewType<'db> {
     // Since a regular class can't inherit from a newtype, the only way for one newtype to be a
     // subtype of another is to have the other in its chain of newtype bases. Once we reach the
     // base class, we don't have to keep looking.
-    pub(crate) fn has_relation_to_impl(
+    pub(crate) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db> {
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         if self.is_equivalent_to_impl(db, other) {
             return ConstraintSet::from_bool(constraints, true);
         }
@@ -136,12 +136,12 @@ impl<'db> NewType<'db> {
         ConstraintSet::from_bool(constraints, false)
     }
 
-    pub(crate) fn is_disjoint_from_impl(
+    pub(crate) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db> {
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
         // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
         // it's not possible for some third type to multiply-inherit from both.

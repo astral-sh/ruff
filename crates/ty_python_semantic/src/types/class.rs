@@ -1124,13 +1124,13 @@ impl<'db> ClassType<'db> {
         .is_always_satisfied(db)
     }
 
-    pub(super) fn when_subclass_of(
+    pub(super) fn when_subclass_of<'c>(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             other,
@@ -1143,16 +1143,16 @@ impl<'db> ClassType<'db> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub(super) fn has_relation_to_impl(
+    pub(super) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         self.iter_mro(db).when_any(db, constraints, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
@@ -7473,12 +7473,12 @@ impl KnownClass {
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
-    pub(super) fn when_subclass_of<'db>(
+    pub(super) fn when_subclass_of<'db, 'c>(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
-    ) -> ConstraintSet<'db> {
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         ConstraintSet::from_bool(constraints, self.is_subclass_of(db, other))
     }
 

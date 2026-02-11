@@ -747,14 +747,14 @@ impl<'db> BoundSuperType<'db> {
     /// cannot simply delegate to `Type::is_equivalent_to_impl` for this
     /// case, because `Type::is_equivalent_to_impl` itself delegates back to
     /// `Type::has_relation_to_impl`, which would cause an infinite loop.
-    pub(crate) fn is_equivalent_to_impl(
+    pub(crate) fn is_equivalent_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        constraints: &'c ConstraintSetBuilder<'db>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         let mut class_equivalence = match (self.pivot_class(db), other.pivot_class(db)) {
             (ClassBase::Class(left), ClassBase::Class(right)) => Type::from(left)
                 .when_equivalent_to_impl(

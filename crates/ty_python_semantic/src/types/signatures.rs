@@ -289,16 +289,16 @@ impl<'db> CallableSignature<'db> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub(crate) fn has_relation_to_impl(
+    pub(crate) fn has_relation_to_impl<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         Self::has_relation_to_inner(
             db,
             &self.overloads,
@@ -331,13 +331,13 @@ impl<'db> CallableSignature<'db> {
             .map(|bound_typevar| (bound_typevar, signature.return_ty))
     }
 
-    pub(crate) fn when_constraint_set_assignable_to(
+    pub(crate) fn when_constraint_set_assignable_to<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             other,
@@ -354,14 +354,14 @@ impl<'db> CallableSignature<'db> {
     ///
     /// This is intentionally accept-only. If the probe does not definitely succeed, it returns
     /// `None` and callers should fall back to legacy per-overload relation checks.
-    fn try_unary_overload_aggregate_relation(
+    fn try_unary_overload_aggregate_relation<'c>(
         db: &'db dyn Db,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         self_signatures: &[Signature<'db>],
         other_signature: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-    ) -> Option<ConstraintSet<'db>> {
+    ) -> Option<ConstraintSet<'db, 'c>> {
         let single_required_positional_parameter_type = |signature: &Signature<'db>| {
             if signature.parameters().len() != 1 {
                 return None;
@@ -451,16 +451,16 @@ impl<'db> CallableSignature<'db> {
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
     #[expect(clippy::too_many_arguments)]
-    fn has_relation_to_inner(
+    fn has_relation_to_inner<'c>(
         db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         if relation.is_constraint_set_assignability() {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let self_is_single_paramspec = Self::signatures_is_single_paramspec(self_signatures);
@@ -1043,13 +1043,13 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn when_constraint_set_assignable_to_signatures(
+    pub(crate) fn when_constraint_set_assignable_to_signatures<'c>(
         &self,
         db: &'db dyn Db,
         other: &CallableSignature<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         // If this signature is a paramspec, bind it to the entire overloaded other callable.
         if let Some(self_bound_typevar) = self.parameters.as_paramspec()
             && other.is_single_paramspec().is_none()
@@ -1095,13 +1095,13 @@ impl<'db> Signature<'db> {
             })
     }
 
-    fn when_constraint_set_assignable_to(
+    fn when_constraint_set_assignable_to<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             other,
@@ -1115,16 +1115,16 @@ impl<'db> Signature<'db> {
 
     /// Implementation of subtyping and assignability for signature.
     #[expect(clippy::too_many_arguments)]
-    fn has_relation_to_impl(
+    fn has_relation_to_impl<'c>(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         // If either signature is generic, their typevars should also be considered inferable when
         // checking whether one signature is a subtype/etc of the other, since we only need to find
         // one specialization that causes the check to succeed.
@@ -1165,16 +1165,16 @@ impl<'db> Signature<'db> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn has_relation_to_inner(
+    fn has_relation_to_inner<'c>(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.

@@ -991,17 +991,17 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn is_subtype_in_invariant_position<'db>(
+fn is_subtype_in_invariant_position<'db, 'c>(
     db: &'db dyn Db,
     derived_type: &Type<'db>,
     derived_materialization: MaterializationKind,
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
-    constraints: &ConstraintSetBuilder<'db>,
+    constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'_, 'db>,
-    relation_visitor: &HasRelationToVisitor<'db>,
-    disjointness_visitor: &IsDisjointVisitor<'db>,
-) -> ConstraintSet<'db> {
+    relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c> {
     let derived_top = derived_type.top_materialization(db);
     let derived_bottom = derived_type.bottom_materialization(db);
     let base_top = base_type.top_materialization(db);
@@ -1071,18 +1071,18 @@ fn is_subtype_in_invariant_position<'db>(
 /// have a relation (subtyping or assignability), taking into account
 /// that the two types may come from a top or bottom materialization.
 #[expect(clippy::too_many_arguments)]
-fn has_relation_in_invariant_position<'db>(
+fn has_relation_in_invariant_position<'db, 'c>(
     db: &'db dyn Db,
     derived_type: &Type<'db>,
     derived_materialization: Option<MaterializationKind>,
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
-    constraints: &ConstraintSetBuilder<'db>,
+    constraints: &'c ConstraintSetBuilder<'db>,
     inferable: InferableTypeVars<'_, 'db>,
     relation: TypeRelation,
-    relation_visitor: &HasRelationToVisitor<'db>,
-    disjointness_visitor: &IsDisjointVisitor<'db>,
-) -> ConstraintSet<'db> {
+    relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+) -> ConstraintSet<'db, 'c> {
     match (derived_materialization, base_materialization, relation) {
         // Top and bottom materializations are fully static types, so subtyping
         // is the same as assignability.
@@ -1475,16 +1475,16 @@ impl<'db> Specialization<'db> {
     }
 
     #[expect(clippy::too_many_arguments)]
-    pub(crate) fn has_relation_to_impl(
+    pub(crate) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
             return ConstraintSet::from_bool(constraints, false);
@@ -1555,13 +1555,13 @@ impl<'db> Specialization<'db> {
         })
     }
 
-    pub(crate) fn is_disjoint_from(
+    pub(crate) fn is_disjoint_from<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.is_disjoint_from_impl(
             db,
             other,
@@ -1572,15 +1572,15 @@ impl<'db> Specialization<'db> {
         )
     }
 
-    pub(crate) fn is_disjoint_from_impl(
+    pub(crate) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        constraints: &ConstraintSetBuilder<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         let generic_context = self.generic_context(db);
         if generic_context != other.generic_context(db) {
             return ConstraintSet::from_bool(constraints, true);
@@ -1823,10 +1823,10 @@ impl<'db> SpecializationBuilder<'db> {
     /// specialization directly from that constraint set. This method lets us migrate to that brave
     /// new world incrementally, by using the new constraint set mechanism piecemeal for certain
     /// type comparisons.
-    fn add_type_mappings_from_constraint_set(
+    fn add_type_mappings_from_constraint_set<'c>(
         &mut self,
         formal: Type<'db>,
-        constraints: ConstraintSet<'db>,
+        constraints: ConstraintSet<'db, 'c>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), ()> {
         let solutions = match constraints.solutions(self.db) {
