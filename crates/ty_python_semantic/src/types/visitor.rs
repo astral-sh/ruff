@@ -298,8 +298,8 @@ impl<'db> TypeCollector<'db> {
 pub(super) fn any_over_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    query: &dyn Fn(Type<'db>) -> bool,
     should_visit_lazy_type_attributes: bool,
+    query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
         query: &'a dyn Fn(Type<'db>) -> bool,
@@ -328,7 +328,7 @@ pub(super) fn any_over_type<'db>(
     }
 
     let visitor = AnyOverTypeVisitor {
-        query,
+        query: &query,
         recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::new(false),
         should_visit_lazy_type_attributes,

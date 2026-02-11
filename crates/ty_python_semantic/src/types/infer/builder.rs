@@ -7173,7 +7173,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         };
         let db = self.db();
-        let is_generic = |ty| any_over_type(db, ty, is_typevar, false);
+        let is_generic = |ty| any_over_type(db, ty, false, is_typevar);
         let mut constraint_tys = Vec::new();
         for arg in arguments.args.iter().skip(1) {
             let constraint = self.infer_type_expression(arg);
@@ -7245,7 +7245,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         };
 
-        if any_over_type(self.db(), inferred, &is_typevar, false) {
+        if any_over_type(self.db(), inferred, false, is_typevar) {
             if let Some(builder) = self
                 .context
                 .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
@@ -16020,20 +16020,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         && instance.has_known_class(db, KnownClass::TypeVarTuple)
                     {
                         return Err(LegacyGenericContextError::TypeVarTupleMustBeUnpacked);
-                    } else if any_over_type(
-                        db,
-                        argument_ty,
-                        &|inner_ty| match inner_ty {
-                            Type::Dynamic(
-                                DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
-                            ) => true,
-                            Type::NominalInstance(nominal) => {
-                                nominal.has_known_class(db, KnownClass::TypeVarTuple)
-                            }
-                            _ => false,
-                        },
-                        true,
-                    ) {
+                    } else if any_over_type(db, argument_ty, true, |inner_ty| match inner_ty {
+                        Type::Dynamic(
+                            DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
+                        ) => true,
+                        Type::NominalInstance(nominal) => {
+                            nominal.has_known_class(db, KnownClass::TypeVarTuple)
+                        }
+                        _ => false,
+                    }) {
                         return Err(LegacyGenericContextError::NotYetSupported);
                     } else {
                         return Err(LegacyGenericContextError::InvalidArgument(argument_ty));

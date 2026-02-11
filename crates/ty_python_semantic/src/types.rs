@@ -862,12 +862,9 @@ impl<'db> Type<'db> {
 
     /// Returns `true` if this type contains a `Self` type variable.
     pub(crate) fn contains_self(&self, db: &'db dyn Db) -> bool {
-        any_over_type(
-            db,
-            *self,
-            &|ty| matches!(ty, Type::TypeVar(tv) if tv.typevar(db).is_self(db)),
-            false,
-        )
+        any_over_type(db, *self, false, |ty| {
+            ty.as_typevar().is_some_and(|tv| tv.typevar(db).is_self(db))
+        })
     }
 
     /// Returns `true` if `self` is [`Type::Callable`].
@@ -914,17 +911,11 @@ impl<'db> Type<'db> {
                 // oscillation, since Divergent is only introduced at the start of fixpoint
                 // iteration.
                 let has_divergent_type_in_cycle = |ty| {
-                    any_over_type(
-                        db,
-                        ty,
-                        &|nested_ty| {
-                            matches!(
-                    nested_ty,
-                    Type::Dynamic(DynamicType::Divergent(DivergentType { id }))
-                    if cycle.head_ids().contains(&id))
-                        },
-                        false,
-                    )
+                    any_over_type(db, ty, false, |nested_ty| {
+                        nested_ty
+                            .as_divergent()
+                            .is_some_and(|DivergentType { id }| cycle.head_ids().contains(&id))
+                    })
                 };
                 if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
                     self
@@ -1200,16 +1191,13 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn has_typevar(self, db: &'db dyn Db) -> bool {
-        any_over_type(db, self, &|ty| matches!(ty, Type::TypeVar(_)), false)
+        any_over_type(db, self, false, |ty| matches!(ty, Type::TypeVar(_)))
     }
 
     pub(crate) fn has_unspecialized_type_var(self, db: &'db dyn Db) -> bool {
-        any_over_type(
-            db,
-            self,
-            &|ty| matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar)),
-            false,
-        )
+        any_over_type(db, self, false, |ty| {
+            matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
+        })
     }
 
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
@@ -1256,6 +1244,13 @@ impl<'db> Type<'db> {
     pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
+            _ => None,
+        }
+    }
+
+    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
+        match self {
+            Type::Dynamic(DynamicType::Divergent(divergent)) => Some(divergent),
             _ => None,
         }
     }
@@ -6366,7 +6361,7 @@ impl<'db> Type<'db> {
                     }
                 });
 
-                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), &|ty| ty.is_divergent(), false);
+                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), false, |ty| ty.is_divergent());
 
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
                 //
@@ -8319,18 +8314,13 @@ impl<'db> TypeVarInstance<'db> {
 
     fn type_is_self_referential(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
         let identity = self.identity(db);
-        any_over_type(
-            db,
-            ty,
-            &|ty| match ty {
-                Type::TypeVar(bound_typevar) => identity == bound_typevar.typevar(db).identity(db),
-                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                    identity == typevar.identity(db)
-                }
-                _ => false,
-            },
-            false,
-        )
+        any_over_type(db, ty, false, |ty| match ty {
+            Type::TypeVar(bound_typevar) => identity == bound_typevar.typevar(db).identity(db),
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                identity == typevar.identity(db)
+            }
+            _ => false,
+        })
     }
 
     #[salsa::tracked(
