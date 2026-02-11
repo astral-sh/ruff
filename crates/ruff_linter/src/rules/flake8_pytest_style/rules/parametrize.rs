@@ -752,40 +752,13 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
 }
 
 fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {
-    let content = checker.generator().expr(expr);
-    // The generator may unparse tuples without outer parentheses at level 0.
-    // For example, `(1, 2)` becomes `1, 2` and `((1,),)` becomes `(1,),`.
-    // When these are used as elements in a list, it causes syntax errors.
-    // We detect this by checking if the content ends with a trailing comma
-    // that is not inside parentheses.
+    let content = checker.locator().slice(expr);
     if let Expr::Tuple(tuple) = expr {
-        if !tuple.is_empty() && !is_parenthesized(&content) {
+        if !tuple.is_empty() && !tuple.parenthesized {
             return format!("({content})");
         }
     }
-    content
-}
-
-/// Check if the content is fully parenthesized (starts with '(' and the matching ')' is at the end).
-fn is_parenthesized(content: &str) -> bool {
-    if !content.starts_with('(') {
-        return false;
-    }
-    let mut depth = 0;
-    for (i, c) in content.chars().enumerate() {
-        match c {
-            '(' => depth += 1,
-            ')' => {
-                depth -= 1;
-                if depth == 0 {
-                    // If we close the first paren before the end, it's not fully parenthesized
-                    return i == content.len() - 1;
-                }
-            }
-            _ => {}
-        }
-    }
-    false
+    content.to_string()
 }
 
 fn handle_value_rows(
