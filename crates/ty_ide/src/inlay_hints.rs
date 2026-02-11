@@ -26,16 +26,17 @@ pub struct InlayHint {
 
 impl InlayHint {
     fn variable_type(
-        context: InlayHintContext,
+        context: InlayHintImportContext,
         expr: &Expr,
         rhs: &Expr,
         ty: Type,
         allow_edits: bool,
     ) -> Option<Self> {
-        let InlayHintContext {
+        let InlayHintImportContext {
             db,
             file,
-            dynamic_importer,
+            importer,
+            dynamic_imports,
         } = context;
 
         let position = expr.range().end();
@@ -46,6 +47,9 @@ impl InlayHint {
         if call_matches_name(rhs, &details.label) {
             return None;
         }
+
+        let members = importer.members_in_scope_at(expr.into(), expr.range().start());
+        let mut dynamic_importer = DynamicImporter::new(importer, members, dynamic_imports);
 
         // Ok so the idea here is that we potentially have a random soup of spans here,
         // and each byte of the string can have at most one target associate with it.
@@ -60,7 +64,7 @@ impl InlayHint {
         // This edit label could be different from the original label if we need to
         // qualify certain imported symbols. `A` could turn into `foo.A`.
         let mut edit_label = details.label.clone();
-        let mut edit_offset = 0;
+        let mut edit_offset: isize = 0;
 
         let mut label_parts = vec![": ".into()];
         for (target, detail) in details.targets.iter().zip(&details.details) {
@@ -92,7 +96,7 @@ impl InlayHint {
 
                         let module = file_to_module(db, definition.file(db))?;
 
-                        if dont_import_symbol(db, module, ty) {
+                        if should_skip_import(db, module, *ty) {
                             return None;
                         }
 
@@ -107,16 +111,14 @@ impl InlayHint {
 
                     // Ok, this is the first type that claimed these bytes, give it the target
                     if start >= offset {
-                        // Try import the symbol and update the edit label if required
-                        if let Some(qualified_name) = qualified_name(dynamic_importer) {
-                            let original_label_length = end - start;
-                            let new_label_length = qualified_name.len();
+                        // Try to import the symbol and update the edit label if required
+                        if let Some(qualified_name) = qualified_name(&mut dynamic_importer) {
+                            let edit_start = (start.cast_signed() + edit_offset).cast_unsigned();
+                            let edit_end = (end.cast_signed() + edit_offset).cast_unsigned();
 
-                            edit_label.replace_range(
-                                start + edit_offset..end + edit_offset,
-                                &qualified_name,
-                            );
-                            edit_offset += new_label_length - original_label_length;
+                            edit_label.replace_range(edit_start..edit_end, &qualified_name);
+                            edit_offset +=
+                                qualified_name.len().cast_signed() - (end - start).cast_signed();
                         }
 
                         let target = ty.navigation_targets(db).into_iter().next();
@@ -331,10 +333,11 @@ impl Default for InlayHintSettings {
     }
 }
 
-struct InlayHintContext<'a, 'db> {
+struct InlayHintImportContext<'a, 'db> {
     db: &'db dyn Db,
     file: File,
-    dynamic_importer: &'a mut DynamicImporter<'a, 'db>,
+    importer: &'a Importer<'db>,
+    dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
 }
 
 struct InlayHintVisitor<'a, 'db> {
@@ -381,16 +384,11 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
-        let members = self
-            .importer
-            .members_in_scope_at(expr.into(), expr.range().start());
-        let mut dynamic_importer =
-            DynamicImporter::new(&self.importer, members, &mut self.dynamic_imports);
-
-        let context = InlayHintContext {
+        let context = InlayHintImportContext {
             db: self.db,
             file: self.model.file(),
-            dynamic_importer: &mut dynamic_importer,
+            importer: &self.importer,
+            dynamic_imports: &mut self.dynamic_imports,
         };
 
         if let Some(inlay_hint) = InlayHint::variable_type(context, expr, rhs, ty, allow_edits) {
@@ -588,16 +586,8 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
     }
 }
 
-fn dont_import_symbol(db: &dyn Db, module: ty_module_resolver::Module, ty: &Type) -> bool {
-    if module.is_known(db, ty_module_resolver::KnownModule::Builtins) {
-        return true;
-    }
-
-    if ty.is_none(db) {
-        return true;
-    }
-
-    false
+fn should_skip_import(db: &dyn Db, module: ty_module_resolver::Module, ty: Type) -> bool {
+    module.is_known(db, ty_module_resolver::KnownModule::Builtins) || ty.is_none(db)
 }
 
 fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
@@ -664,16 +654,6 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
     ) -> Option<String> {
         use std::collections::hash_map::Entry;
 
-        let qualified_name = |import_action: &ImportAction| {
-            if import_action.import().is_some() {
-                return None;
-            }
-
-            let symbol_text = import_action.symbol_text();
-
-            Some(symbol_text.to_string())
-        };
-
         if self.members.contains_symbol(symbol_name) {
             return None;
         }
@@ -695,20 +675,13 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
                 };
 
                 let import_action = self.importer.import(request, &self.members);
-
-                let qualified_name = qualified_name(&import_action);
-
-                entry.insert(import_action);
+                let action = entry.insert(import_action);
 
                 self.imported_members.push(key);
 
-                qualified_name
+                qualified_symbol_text(action).map(str::to_string)
             }
-            Entry::Occupied(entry) => {
-                let import_action = entry.get();
-
-                qualified_name(import_action)
-            }
+            Entry::Occupied(entry) => qualified_symbol_text(entry.get()).map(str::to_string),
         }
     }
 
@@ -727,6 +700,15 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
             })
             .collect()
     }
+}
+
+/// If the import action requires qualifying the symbol (e.g. `import foo` instead of
+/// `from foo import A`), returns the qualified symbol text. Otherwise returns `None`.
+fn qualified_symbol_text(import_action: &ImportAction) -> Option<&str> {
+    if import_action.import().is_some() {
+        return None;
+    }
+    Some(import_action.symbol_text())
 }
 
 #[cfg(test)]
