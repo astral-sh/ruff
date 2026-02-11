@@ -1173,8 +1173,7 @@ pub enum OutputFormat {
     ///
     /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
     Github,
-    /// Print diagnostics as a JUnit-style XML report, commonly used by test &
-    /// Continuous-Integration tools
+    /// Print diagnostics as a JUnit-style XML report.
     Junit,
 }
 

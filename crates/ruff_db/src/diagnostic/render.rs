@@ -137,14 +137,16 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                junit::JunitRenderer::new(self.resolver, &self.config.program)
+                    .render(f, self.diagnostics)?;
             }
             #[cfg(feature = "serde")]
             DiagnosticFormat::Gitlab => {
                 gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
             }
             DiagnosticFormat::Github => {
-                GithubRenderer::new(self.resolver, "ty").render(f, self.diagnostics)?;
+                GithubRenderer::new(self.resolver, &self.config.program)
+                    .render(f, self.diagnostics)?;
             }
         }
 

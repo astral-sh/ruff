@@ -235,6 +235,7 @@ impl Printer {
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
         let config = DisplayDiagnosticConfig::default()
+            .program("ruff")
             .preview(preview)
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())

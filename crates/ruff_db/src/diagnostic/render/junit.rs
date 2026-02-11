@@ -7,22 +7,22 @@ use ruff_source_file::LineColumn;
 
 use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
 
-/// A renderer for diagnostics in the [JUnit] format.
+/// Print diagnostics as a JUnit-style XML report.
 ///
 /// See [`junit.xsd`] for the specification in the JUnit repository and an annotated [version]
 /// linked from the [`quick_junit`] docs.
 ///
-/// [JUnit]: https://junit.org/
 /// [`junit.xsd`]: https://github.com/junit-team/junit-framework/blob/2870b7d8fd5bf7c1efe489d3991d3ed3900e82bb/platform-tests/src/test/resources/jenkins-junit.xsd
 /// [version]: https://llg.cubic.org/docs/junit/
 /// [`quick_junit`]: https://docs.rs/quick-junit/latest/quick_junit/
-pub struct JunitRenderer<'a> {
+pub(super) struct JunitRenderer<'a> {
     resolver: &'a dyn FileResolver,
+    program: &'a str,
 }
 
 impl<'a> JunitRenderer<'a> {
-    pub fn new(resolver: &'a dyn FileResolver) -> Self {
-        Self { resolver }
+    pub(super) fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
+        Self { resolver, program }
     }
 
     pub(super) fn render(
@@ -30,15 +30,16 @@ impl<'a> JunitRenderer<'a> {
         f: &mut std::fmt::Formatter,
         diagnostics: &[Diagnostic],
     ) -> std::fmt::Result {
-        let mut report = Report::new("ruff");
+        let package = format!("org.{}", self.program);
+        let mut report = Report::new(self.program);
 
         if diagnostics.is_empty() {
-            let mut test_suite = TestSuite::new("ruff");
+            let mut test_suite = TestSuite::new(self.program);
             test_suite
                 .extra
-                .insert(XmlString::new("package"), XmlString::new("org.ruff"));
+                .insert(XmlString::new("package"), XmlString::new(&package));
             let mut case = TestCase::new("No errors found", TestCaseStatus::success());
-            case.set_classname("ruff");
+            case.set_classname(self.program);
             test_suite.add_test_case(case);
             report.add_test_suite(test_suite);
         } else {
@@ -47,7 +48,9 @@ impl<'a> JunitRenderer<'a> {
                 let mut test_suite = TestSuite::new(filename);
                 test_suite
                     .extra
-                    .insert(XmlString::new("package"), XmlString::new("org.ruff"));
+                    .insert(XmlString::new("package"), XmlString::new(&package));
+
+                let classname = Path::new(filename).with_extension("");
 
                 for diagnostic in diagnostics {
                     let DiagnosticWithLocation {
@@ -58,33 +61,37 @@ impl<'a> JunitRenderer<'a> {
                     let code = diagnostic
                         .secondary_code()
                         .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
-                    let status = TestCaseStatus::non_success(NonSuccessKind::Failure);
+                    let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
+                    status.set_message(diagnostic.concise_message().to_str());
 
-                    let mut case = TestCase::new(format!("org.ruff.{code}"), status);
-                    let classname = Path::new(filename).with_extension("");
+                    if let Some(location) = location {
+                        status.set_description(format!(
+                            "line {row}, col {col}, {body}",
+                            row = location.line,
+                            col = location.column,
+                            body = diagnostic.concise_message()
+                        ));
+                    } else {
+                        status.set_description(diagnostic.concise_message().to_str());
+                    }
+
+                    let mut case = TestCase::new(
+                        format!("org.{program}.{code}", program = self.program),
+                        status,
+                    );
                     case.set_classname(classname.to_str().unwrap_or(filename));
-                    let msg = diagnostic.concise_message().to_str();
-                    case.status.set_message(msg.clone());
 
-                    let loc = location
-                        .and_then(|location| {
-                            case.extra.insert(
-                                XmlString::new("line"),
-                                XmlString::new(location.line.to_string()),
-                            );
-                            case.extra.insert(
-                                XmlString::new("column"),
-                                XmlString::new(location.column.to_string()),
-                            );
-                            Some(format!(
-                                "line {row}, col {col}, ",
-                                row = location.line,
-                                col = location.column,
-                            ))
-                        })
-                        .unwrap_or_default();
+                    if let Some(location) = location {
+                        case.extra.insert(
+                            XmlString::new("line"),
+                            XmlString::new(location.line.to_string()),
+                        );
+                        case.extra.insert(
+                            XmlString::new("column"),
+                            XmlString::new(location.column.to_string()),
+                        );
+                    }
 
-                    case.status.set_description(format!("{loc}{msg}"));
                     test_suite.add_test_case(case);
                 }
                 report.add_test_suite(test_suite);

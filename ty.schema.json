@@ -214,7 +214,7 @@
           "const": "github"
         },
         {
-          "description": "Print diagnostics as a JUnit-style XML report, commonly used by test &\nContinuous-Integration tools",
+          "description": "Print diagnostics as a JUnit-style XML report.",
           "type": "string",
           "const": "junit"
         }

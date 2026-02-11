@@ -366,8 +366,7 @@ pub enum OutputFormat {
     /// Print diagnostics in the format used by GitHub Actions workflow error annotations.
     #[value(name = "github")]
     Github,
-    /// Print diagnostics as a JUnit-style XML report, commonly used by test &
-    /// Continuous-Integration tools
+    /// Print diagnostics as a JUnit-style XML report.
     #[value(name = "junit")]
     Junit,
 }

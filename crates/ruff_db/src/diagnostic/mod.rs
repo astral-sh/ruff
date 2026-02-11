@@ -1320,6 +1320,10 @@ impl SubDiagnosticSeverity {
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
+    /// The program name used in structured output formats (e.g., JUnit, GitHub).
+    ///
+    /// Defaults to `"ty"`.
+    program: String,
     /// The format to use for diagnostic rendering.
     ///
     /// This uses the "full" format by default.
@@ -1361,6 +1365,14 @@ pub struct DisplayDiagnosticConfig {
 }
 
 impl DisplayDiagnosticConfig {
+    /// Set the program name used in structured output formats.
+    pub fn program(self, program: impl Into<String>) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            program: program.into(),
+            ..self
+        }
+    }
+
     /// Whether to enable concise diagnostic output or not.
     pub fn format(self, format: DiagnosticFormat) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { format, ..self }
@@ -1450,6 +1462,7 @@ impl DisplayDiagnosticConfig {
 impl Default for DisplayDiagnosticConfig {
     fn default() -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
+            program: "ty".to_string(),
             format: DiagnosticFormat::default(),
             color: false,
             context: 2,
