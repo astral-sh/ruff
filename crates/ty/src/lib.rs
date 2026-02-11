@@ -302,12 +302,7 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
     }
 
     summaries.sort();
-    let total_roots: usize = summaries.iter().map(|summary| summary.total_roots).sum();
-    let total_interior_nodes: usize = summaries
-        .iter()
-        .map(|summary| summary.total_interior_nodes)
-        .sum();
-    let global_max = summaries
+    let max_root_nodes = summaries
         .iter()
         .map(|summary| summary.max_interior_nodes)
         .max()
@@ -320,6 +315,11 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         .iter()
         .map(|summary| summary.reachability_interior_nodes)
         .sum();
+    let reachability_max_depth = summaries
+        .iter()
+        .map(|summary| summary.reachability_max_depth)
+        .max()
+        .unwrap_or(0);
     let narrowing_roots: usize = summaries
         .iter()
         .map(|summary| summary.narrowing_roots)
@@ -328,11 +328,6 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         .iter()
         .map(|summary| summary.narrowing_interior_nodes)
         .sum();
-    let reachability_max_depth = summaries
-        .iter()
-        .map(|summary| summary.reachability_max_depth)
-        .max()
-        .unwrap_or(0);
     let narrowing_max_depth = summaries
         .iter()
         .map(|summary| summary.narrowing_max_depth)
@@ -343,9 +338,7 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         target: "ty.tdd_stats",
         verbose = mode.verbose(),
         files = summaries.len(),
-        total_roots,
-        total_interior_nodes,
-        max_root_nodes = global_max,
+        max_root_nodes,
         reachability_roots,
         reachability_nodes = reachability_interior_nodes,
         reachability_max_depth,
@@ -366,8 +359,6 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         tracing::info!(
             target: "ty.tdd_stats",
             file = %summary.file_path,
-            roots = summary.total_roots,
-            total_nodes = summary.total_interior_nodes,
             max_root_nodes = summary.max_interior_nodes,
             reachability_roots = summary.reachability_roots,
             reachability_nodes = summary.reachability_interior_nodes,
@@ -392,13 +383,13 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
                 tracing::info!(
                     target: "ty.tdd_stats",
                     file = %summary.file_path,
-                    scope = scope.scope_id.as_u32(),
-                    scope.root_count,
+                    scope_id = scope.scope_id.as_u32(),
+                    root_count = scope.root_count,
                     total_nodes = scope.total_interior_nodes,
                     max_root_nodes = scope.max_interior_nodes,
                     reachability_max_depth = scope.reachability_max_depth,
                     narrowing_max_depth = scope.narrowing_max_depth,
-                    histogram = %histogram,
+                    node_histogram = %histogram,
                     "tdd_stats_scope"
                 );
 
@@ -408,7 +399,7 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
                     tracing::info!(
                         target: "ty.tdd_stats",
                         file = %summary.file_path,
-                        scope = scope.scope_id.as_u32(),
+                        scope_id = scope.scope_id.as_u32(),
                         kind = hot.kind,
                         subtree_nodes = hot.subtree_interior_nodes,
                         root_uses = hot.root_uses,

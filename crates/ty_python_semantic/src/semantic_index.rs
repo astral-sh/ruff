@@ -130,20 +130,12 @@ pub fn tdd_stats_for_file(
 
         match root.source {
             TddRootSource::Node(node) => {
-                let location = format_node(node).unwrap_or_else(|| format!("{node:?} [Unknown]"));
-                format!("{location} (constraint={})", root.constraint.as_u32())
+                format_node(node).unwrap_or_else(|| format!("unknown(node={node:?})"))
             }
-            TddRootSource::Use { use_id, binding } => {
-                let location = ast_ids
-                    .node_key_for_use(use_id)
-                    .and_then(format_node)
-                    .unwrap_or_else(|| format!("use={} [Unknown]", use_id.as_u32()));
-                format!(
-                    "{location} [use={}, binding={binding}] (constraint={})",
-                    use_id.as_u32(),
-                    root.constraint.as_u32()
-                )
-            }
+            TddRootSource::Use { use_id, binding } => ast_ids
+                .node_key_for_use(use_id)
+                .and_then(format_node)
+                .unwrap_or_else(|| format!("unknown(binding={binding})")),
             TddRootSource::EnclosingSnapshot {
                 snapshot_id,
                 binding,
@@ -151,11 +143,7 @@ pub fn tdd_stats_for_file(
                 let binding = binding
                     .map(|binding| format!(", binding={binding}"))
                     .unwrap_or_default();
-                format!(
-                    "snapshot={}{binding} (constraint={})",
-                    snapshot_id.as_u32(),
-                    root.constraint.as_u32()
-                )
+                format!("unknown(snapshot={}{binding})", snapshot_id.as_u32(),)
             }
         }
     }
