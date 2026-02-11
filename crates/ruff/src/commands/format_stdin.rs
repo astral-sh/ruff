@@ -52,7 +52,7 @@ pub(crate) fn format_stdin(
     let settings = &resolver.base_settings().formatter;
 
     let source_type = path
-        .map(|path| settings.extension.mapped_path(path))
+        .map(|path| settings.extension.get_source_type(path))
         .unwrap_or_default();
     if source_type.is_toml() {
         if mode.is_write() {

@@ -208,7 +208,7 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match settings.extension.mapped_path(path) {
+    let source_type = match settings.extension.get_source_type(path) {
         SourceType::Toml(TomlSourceType::Pyproject) => {
             let diagnostics = if settings
                 .rules
@@ -352,7 +352,7 @@ pub(crate) fn lint_stdin(
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
     let (source_type, py_source_type) = match path
-        .map(|path| settings.linter.extension.mapped_path(path))
+        .map(|path| settings.linter.extension.get_source_type(path))
         .unwrap_or_default()
     {
         SourceType::Toml(source_type) if source_type.is_pyproject() => {

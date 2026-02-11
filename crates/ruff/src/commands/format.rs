@@ -123,7 +123,7 @@ pub(crate) fn format(
                     let path = resolved_file.path();
                     let settings = resolver.resolve(path);
 
-                    let source_type = settings.formatter.extension.mapped_path(path);
+                    let source_type = settings.formatter.extension.get_source_type(path);
                     if source_type.is_toml() {
                         // Ignore TOML files.
                         return None;

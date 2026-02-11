@@ -92,7 +92,7 @@ pub fn format_code_blocks(
                 // Maybe python, try formatting it
                 let language = language.to_ascii_lowercase();
                 let SourceType::Python(py_source_type) =
-                    settings.extension.mapped_extension(&language)
+                    settings.extension.get_source_type_by_extension(&language)
                 else {
                     break;
                 };

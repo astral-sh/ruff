@@ -510,7 +510,7 @@ impl ExtensionMapping {
     }
 
     /// Return a mapped [`SourceType`] for a given path.
-    pub fn mapped_path(&self, path: &Path) -> SourceType {
+    pub fn get_source_type(&self, path: &Path) -> SourceType {
         match self.get(path) {
             None => SourceType::from(path),
             Some(language) => SourceType::from(language),
@@ -518,7 +518,7 @@ impl ExtensionMapping {
     }
 
     /// Return a mapped [`SourceType`] for a given file extension.
-    pub fn mapped_extension(&self, ext: &str) -> SourceType {
+    pub fn get_source_type_by_extension(&self, ext: &str) -> SourceType {
         match self.get_extension(ext) {
             None => SourceType::from_extension(ext),
             Some(language) => SourceType::from(language),

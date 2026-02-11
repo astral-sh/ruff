@@ -137,7 +137,7 @@ pub(crate) fn analyze_graph(
                 }
 
                 // Ignore non-Python files.
-                let source_type = match settings.analyze.extension.mapped_path(path) {
+                let source_type = match settings.analyze.extension.get_source_type(path) {
                     SourceType::Python(source_type) => source_type,
                     SourceType::Toml(_) => {
                         debug!("Ignoring TOML file: {}", path.display());
