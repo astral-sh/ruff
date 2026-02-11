@@ -1269,23 +1269,10 @@ mod tests {
 
     #[test_case(Path::new("import_heading.py"))]
     #[test_case(Path::new("import_heading_already_present.py"))]
+    #[test_case(Path::new("import_heading_unsorted.py"))]
+    #[test_case(Path::new("import_heading_already_correct.py"))]
     fn import_heading(path: &Path) -> Result<()> {
         let snapshot = format!("import_heading_{}", path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("isort").join(path).as_path(),
-            &LinterSettings {
-                isort: isort_settings_with_all_headings(),
-                src: vec![test_resource_path("fixtures/isort")],
-                ..LinterSettings::for_rule(Rule::UnsortedImports)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Path::new("import_heading_unsorted.py"))]
-    fn import_heading_unsorted(path: &Path) -> Result<()> {
-        let snapshot = format!("import_heading_unsorted_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
@@ -1399,22 +1386,6 @@ mod tests {
                     )]),
                     ..super::settings::Settings::default()
                 },
-                src: vec![test_resource_path("fixtures/isort")],
-                ..LinterSettings::for_rule(Rule::UnsortedImports)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    /// Test that already-correct imports with headings produce no diagnostic.
-    #[test_case(Path::new("import_heading_already_correct.py"))]
-    fn import_heading_already_correct(path: &Path) -> Result<()> {
-        let snapshot = format!("import_heading_already_correct_{}", path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("isort").join(path).as_path(),
-            &LinterSettings {
-                isort: isort_settings_with_all_headings(),
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)
             },
