@@ -196,10 +196,8 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 
                         if let (Some(left_import), Some(right_import)) =
                             (left_binding.as_any_import(), right_binding.as_any_import())
-                        {
-                            if left_import.qualified_name() == right_import.qualified_name() {
-                                return false;
-                            }
+                            && if left_import.qualified_name() == right_import.qualified_name() {
+                            return false;
                         }
                     }
 
