@@ -422,7 +422,7 @@ impl<'db> UseDefMap<'db> {
     #[cfg(feature = "tdd-stats")]
     pub(crate) fn tdd_stats_report(&self) -> crate::semantic_index::tdd_stats::TddStatsReport {
         use crate::semantic_index::tdd_stats::{
-            TddRootKind, TddRootRef, TddRootStat, TddStatsReport,
+            TddHotNodeStat, TddRootKind, TddRootRef, TddRootStat, TddStatsReport,
         };
 
         let mut roots = Vec::with_capacity(self.node_reachability.len());
@@ -438,8 +438,50 @@ impl<'db> UseDefMap<'db> {
                     .interior_node_count(constraint),
             });
         }
-        roots.sort_unstable_by(|a, b| b.interior_nodes.cmp(&a.interior_nodes));
-        TddStatsReport::from_roots(roots)
+        roots.sort();
+
+        let mut root_uses_by_node: FxHashMap<ScopedReachabilityConstraintId, usize> =
+            FxHashMap::default();
+        let mut sample_roots_by_node: FxHashMap<ScopedReachabilityConstraintId, Vec<TddRootRef>> =
+            FxHashMap::default();
+        let mut subtree_size_memo: FxHashMap<ScopedReachabilityConstraintId, usize> =
+            FxHashMap::default();
+
+        for root in &roots {
+            let interior_nodes = self
+                .reachability_constraints
+                .interior_nodes(root.root.constraint);
+            for interior in interior_nodes {
+                *root_uses_by_node.entry(interior).or_default() += 1;
+                let sample_roots = sample_roots_by_node.entry(interior).or_default();
+                if sample_roots.len() < 5 {
+                    sample_roots.push(root.root);
+                }
+
+                subtree_size_memo
+                    .entry(interior)
+                    .or_insert_with(|| self.reachability_constraints.interior_node_count(interior));
+            }
+        }
+
+        let mut hot_nodes = Vec::with_capacity(root_uses_by_node.len());
+        for (constraint, root_uses) in root_uses_by_node {
+            let subtree_interior_nodes = subtree_size_memo[&constraint];
+            let score = subtree_interior_nodes.saturating_mul(root_uses);
+            let predicate = self.reachability_constraints.interior_atom(constraint);
+            let sample_roots = sample_roots_by_node.remove(&constraint).unwrap_or_default();
+            hot_nodes.push(TddHotNodeStat {
+                constraint,
+                predicate,
+                subtree_interior_nodes,
+                root_uses,
+                score,
+                sample_roots,
+            });
+        }
+        hot_nodes.sort();
+
+        TddStatsReport::from_roots(roots, hot_nodes)
     }
 
     pub(crate) fn end_of_scope_bindings(

@@ -308,6 +308,23 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
                         histogram = %histogram,
                         "tdd_stats_scope"
                     );
+
+                    let mut hot_nodes = scope.hot_nodes.clone();
+                    hot_nodes.sort();
+                    for hot in hot_nodes.iter().take(20) {
+                        tracing::info!(
+                            target: "ty.tdd_stats",
+                            file = %summary.file_path,
+                            scope = scope.scope_id,
+                            constraint = hot.constraint_id,
+                            predicate = hot.predicate_id,
+                            subtree_nodes = hot.subtree_interior_nodes,
+                            root_uses = hot.root_uses,
+                            score = hot.score,
+                            roots = %hot.sample_roots.join(" | "),
+                            "tdd_stats_hot_node"
+                        );
+                    }
                 }
             }
         }

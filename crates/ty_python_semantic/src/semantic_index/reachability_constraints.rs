@@ -196,7 +196,9 @@
 use std::cmp::Ordering;
 
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
+#[cfg(feature = "tdd-stats")]
+use rustc_hash::FxHashSet;
 
 use crate::Db;
 use crate::dunder_all::dunder_all_names;
@@ -288,7 +290,7 @@ impl ScopedReachabilityConstraintId {
         self.0 >= SMALLEST_TERMINAL.0
     }
 
-    fn as_u32(self) -> u32 {
+    pub(crate) fn as_u32(self) -> u32 {
         self.0
     }
 }
@@ -763,6 +765,7 @@ impl ReachabilityConstraints {
     }
 
     /// Returns the number of unique interior TDD nodes reachable from `root`.
+    #[cfg(feature = "tdd-stats")]
     pub(crate) fn interior_node_count(&self, root: ScopedReachabilityConstraintId) -> usize {
         if root.is_terminal() {
             return 0;
@@ -781,6 +784,39 @@ impl ReachabilityConstraints {
         }
 
         seen.len()
+    }
+
+    /// Returns all unique interior TDD nodes reachable from `root`.
+    #[cfg(feature = "tdd-stats")]
+    pub(crate) fn interior_nodes(
+        &self,
+        root: ScopedReachabilityConstraintId,
+    ) -> Vec<ScopedReachabilityConstraintId> {
+        if root.is_terminal() {
+            return Vec::new();
+        }
+
+        let mut seen = FxHashSet::default();
+        let mut stack = vec![root];
+        let mut nodes = Vec::new();
+        while let Some(id) = stack.pop() {
+            if id.is_terminal() || !seen.insert(id) {
+                continue;
+            }
+            nodes.push(id);
+            let node = self.get_interior_node(id);
+            stack.push(node.if_true);
+            stack.push(node.if_ambiguous);
+            stack.push(node.if_false);
+        }
+
+        nodes.sort_unstable_by_key(|id| id.as_u32());
+        nodes
+    }
+
+    #[cfg(feature = "tdd-stats")]
+    pub(crate) fn interior_atom(&self, id: ScopedReachabilityConstraintId) -> ScopedPredicateId {
+        self.get_interior_node(id).atom
     }
 
     /// Narrow a type by walking a TDD narrowing constraint.

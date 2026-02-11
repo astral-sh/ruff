@@ -33,6 +33,11 @@ impl ScopedPredicateId {
     fn is_terminal(self) -> bool {
         self >= Self::SMALLEST_TERMINAL
     }
+
+    #[cfg(feature = "tdd-stats")]
+    pub(crate) fn as_u32(self) -> u32 {
+        self.0
+    }
 }
 
 impl Idx for ScopedPredicateId {

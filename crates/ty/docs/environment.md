@@ -53,6 +53,33 @@ TY_TDD_STATS_REPORT=short TY_LOG=ty.tdd_stats=info cargo run -p ty --features td
 TY_TDD_STATS_REPORT=full TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
 ```
 
+For tracing filter syntax and logging tips, see [Tracing](./tracing.md).
+
+#### How to read `tdd_stats_hot_node` (full mode)
+
+In `full` mode, ty emits `tdd_stats_hot_node` lines on the `ty.tdd_stats` target:
+
+```text
+INFO tdd_stats_hot_node file=... scope=... constraint=... predicate=... subtree_nodes=... root_uses=... score=... roots=...
+```
+
+Field meanings:
+
+- `constraint`: Internal reachability-constraint node ID (the hot interior TDD node).
+- `predicate`: Predicate ID at that interior node.
+- `subtree_nodes`: Number of interior nodes reachable from `constraint` (subtree size).
+- `root_uses`: Number of root constraints whose TDD includes this interior node.
+- `score`: Hotness score, computed as `subtree_nodes * root_uses`.
+- `roots`: Up to five sample roots that include this node.
+    - `line:column (constraint=...)` means source location was resolved.
+    - `NodeKey(...)` means an internal AST node key fallback.
+
+Practical interpretation:
+
+- Higher `score` means a larger subtree reused by many roots, hence a likely hotspot.
+- If multiple top rows share very similar `roots`, they are often one clustered hotspot, not unrelated issues.
+- Use `subtree_nodes` to spot deep/large structures and `root_uses` to spot broad fanout; both can dominate runtime.
+
 ### `TY_MAX_PARALLELISM`
 
 Specifies an upper limit for the number of tasks ty is allowed to run in parallel.

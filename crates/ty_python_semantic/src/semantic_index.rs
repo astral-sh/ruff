@@ -102,9 +102,43 @@ pub fn tdd_stats_for_file(
     db: &dyn Db,
     file: File,
 ) -> crate::semantic_index::tdd_stats::FileTddStatsSummary {
-    use crate::semantic_index::tdd_stats::{FileTddStatsSummary, ScopeTddStatsSummary};
+    use ruff_db::parsed::ParsedModuleRef;
+    use ruff_db::source::{line_index, source_text};
+    use ruff_text_size::Ranged;
+
+    use crate::semantic_index::tdd_stats::{
+        FileTddStatsSummary, ScopeTddStatsSummary, TddHotNodeSummary, TddRootRef,
+    };
+
+    fn format_root_ref(
+        db: &dyn Db,
+        file: File,
+        parsed: &ParsedModuleRef,
+        root: TddRootRef,
+    ) -> String {
+        let node_index = root.node.node_index();
+        if node_index.as_u32().is_some() {
+            let node = parsed.get_by_index(node_index);
+            let range = node.range();
+            let line_column =
+                line_index(db, file).line_column(range.start(), &source_text(db, file));
+            format!(
+                "{}:{} (constraint={})",
+                line_column.line,
+                line_column.column,
+                root.constraint.as_u32()
+            )
+        } else {
+            format!(
+                "{:?} [Unknown] (constraint={})",
+                root.node,
+                root.constraint.as_u32()
+            )
+        }
+    }
 
     let index = semantic_index(db, file);
+    let parsed = parsed_module(db, file).load(db);
     let mut scopes = Vec::new();
     for (scope_id, use_def) in index.use_def_maps.iter_enumerated() {
         let report = use_def.tdd_stats_report();
@@ -119,12 +153,32 @@ pub fn tdd_stats_for_file(
             .map(|root| root.interior_nodes)
             .max()
             .unwrap_or(0);
+        let mut hot_nodes = Vec::with_capacity(report.hot_nodes.len());
+        for hot in report.hot_nodes {
+            let mut sample_roots = hot
+                .sample_roots
+                .into_iter()
+                .map(|root| format_root_ref(db, file, &parsed, root))
+                .collect::<Vec<_>>();
+            sample_roots.sort();
+            sample_roots.dedup();
+            hot_nodes.push(TddHotNodeSummary {
+                constraint_id: hot.constraint.as_u32(),
+                predicate_id: hot.predicate.as_u32(),
+                subtree_interior_nodes: hot.subtree_interior_nodes,
+                root_uses: hot.root_uses,
+                score: hot.score,
+                sample_roots,
+            });
+        }
+        hot_nodes.sort();
         scopes.push(ScopeTddStatsSummary {
             scope_id: scope_id.as_u32(),
             root_count,
             total_interior_nodes,
             max_interior_nodes,
             histogram: report.histogram,
+            hot_nodes,
         });
     }
     scopes.sort_unstable_by_key(|scope| scope.scope_id);

@@ -2,10 +2,11 @@ use std::cmp::Ordering;
 use std::collections::BTreeMap;
 
 use crate::node_key::NodeKey;
+use crate::semantic_index::predicate::ScopedPredicateId;
 use crate::semantic_index::reachability_constraints::ScopedReachabilityConstraintId;
 
 /// TDD root that we want to measure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub(crate) enum TddRootKind {
     NodeReachability,
 }
@@ -25,6 +26,77 @@ pub(crate) struct TddRootStat {
     pub(crate) interior_nodes: usize,
 }
 
+/// Hot interior node aggregated across multiple roots.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct TddHotNodeStat {
+    pub(crate) constraint: ScopedReachabilityConstraintId,
+    pub(crate) predicate: ScopedPredicateId,
+    pub(crate) subtree_interior_nodes: usize,
+    pub(crate) root_uses: usize,
+    pub(crate) score: usize,
+    pub(crate) sample_roots: Vec<TddRootRef>,
+}
+
+impl Ord for TddRootRef {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.kind
+            .cmp(&other.kind)
+            .then_with(|| self.constraint.as_u32().cmp(&other.constraint.as_u32()))
+            .then_with(|| self.node.cmp(&other.node))
+    }
+}
+
+impl PartialOrd for TddRootRef {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TddRootStat {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .interior_nodes
+            .cmp(&self.interior_nodes)
+            .then_with(|| {
+                self.root
+                    .constraint
+                    .as_u32()
+                    .cmp(&other.root.constraint.as_u32())
+            })
+            .then_with(|| self.root.node.cmp(&other.root.node))
+            .then_with(|| self.root.kind.cmp(&other.root.kind))
+    }
+}
+
+impl PartialOrd for TddRootStat {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TddHotNodeStat {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .score
+            .cmp(&self.score)
+            .then_with(|| {
+                other
+                    .subtree_interior_nodes
+                    .cmp(&self.subtree_interior_nodes)
+            })
+            .then_with(|| other.root_uses.cmp(&self.root_uses))
+            .then_with(|| self.constraint.as_u32().cmp(&other.constraint.as_u32()))
+            .then_with(|| self.predicate.as_u32().cmp(&other.predicate.as_u32()))
+            .then_with(|| self.sample_roots.cmp(&other.sample_roots))
+    }
+}
+
+impl PartialOrd for TddHotNodeStat {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 /// Histogram bucket keyed by exact interior-node count.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct TddHistogramBin {
@@ -37,10 +109,11 @@ pub struct TddHistogramBin {
 pub(crate) struct TddStatsReport {
     pub(crate) roots: Vec<TddRootStat>,
     pub(crate) histogram: Vec<TddHistogramBin>,
+    pub(crate) hot_nodes: Vec<TddHotNodeStat>,
 }
 
 impl TddStatsReport {
-    pub(crate) fn from_roots(roots: Vec<TddRootStat>) -> Self {
+    pub(crate) fn from_roots(roots: Vec<TddRootStat>, hot_nodes: Vec<TddHotNodeStat>) -> Self {
         let mut by_size: BTreeMap<usize, usize> = BTreeMap::new();
         for stat in &roots {
             *by_size.entry(stat.interior_nodes).or_default() += 1;
@@ -52,8 +125,23 @@ impl TddStatsReport {
                 count,
             })
             .collect();
-        Self { roots, histogram }
+        Self {
+            roots,
+            histogram,
+            hot_nodes,
+        }
     }
+}
+
+/// Public hot-node summary used by `ty` for reporting.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TddHotNodeSummary {
+    pub constraint_id: u32,
+    pub predicate_id: u32,
+    pub subtree_interior_nodes: usize,
+    pub root_uses: usize,
+    pub score: usize,
+    pub sample_roots: Vec<String>,
 }
 
 /// Public, file-level summary used by `ty` for reporting.
@@ -74,6 +162,30 @@ pub struct ScopeTddStatsSummary {
     pub total_interior_nodes: usize,
     pub max_interior_nodes: usize,
     pub histogram: Vec<TddHistogramBin>,
+    pub hot_nodes: Vec<TddHotNodeSummary>,
+}
+
+impl Ord for TddHotNodeSummary {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .score
+            .cmp(&self.score)
+            .then_with(|| {
+                other
+                    .subtree_interior_nodes
+                    .cmp(&self.subtree_interior_nodes)
+            })
+            .then_with(|| other.root_uses.cmp(&self.root_uses))
+            .then_with(|| self.constraint_id.cmp(&other.constraint_id))
+            .then_with(|| self.predicate_id.cmp(&other.predicate_id))
+            .then_with(|| self.sample_roots.cmp(&other.sample_roots))
+    }
+}
+
+impl PartialOrd for TddHotNodeSummary {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl Ord for ScopeTddStatsSummary {
@@ -85,6 +197,7 @@ impl Ord for ScopeTddStatsSummary {
             .then_with(|| other.root_count.cmp(&self.root_count))
             .then_with(|| self.scope_id.cmp(&other.scope_id))
             .then_with(|| self.histogram.cmp(&other.histogram))
+            .then_with(|| self.hot_nodes.cmp(&other.hot_nodes))
     }
 }
 
