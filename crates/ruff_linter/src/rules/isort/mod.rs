@@ -1271,23 +1271,9 @@ mod tests {
     }
 
     #[test_case(Path::new("import_heading.py"))]
+    #[test_case(Path::new("import_heading_already_present.py"))]
     fn import_heading(path: &Path) -> Result<()> {
         let snapshot = format!("import_heading_{}", path.to_string_lossy());
-        let diagnostics = test_path(
-            Path::new("isort").join(path).as_path(),
-            &LinterSettings {
-                isort: isort_settings_with_all_headings(),
-                src: vec![test_resource_path("fixtures/isort")],
-                ..LinterSettings::for_rule(Rule::UnsortedImports)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
-    #[test_case(Path::new("import_heading_already_present.py"))]
-    fn import_heading_already_present(path: &Path) -> Result<()> {
-        let snapshot = format!("import_heading_already_present_{}", path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &LinterSettings {
