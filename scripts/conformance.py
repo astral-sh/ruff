@@ -297,18 +297,22 @@ class GroupedDiagnostics:
                 else:
                     # We select the line with the most diagnostics
                     # as our true positive, while the rest are false positives
+                    # TODO: The ty diagnostics below are because we are not
+                    # inferring a precise type for the `key` lambda, which gives
+                    # us the wrong type for `max_line`.
+                    # https://github.com/astral-sh/ty/issues/181
                     max_line = max(
                         groupby(
                             diagnostics, key=lambda d: d.location.positions.begin.line
                         ),
                         key=lambda x: len(x[1]),
                     )
-                    remaining = len(diagnostics) - max_line
+                    remaining = len(diagnostics) - max_line  # ty: ignore[unsupported-operator]
                     # We can never exceed the number of distinct lines
                     # if the diagnostic is multi, so we ignore that case
                     return Evaluation(
                         classification=Classification.FALSE_POSITIVE,
-                        true_positives=max_line,
+                        true_positives=max_line,  # ty: ignore[invalid-argument-type]
                         false_positives=remaining,
                         true_negatives=0,
                         false_negatives=0,

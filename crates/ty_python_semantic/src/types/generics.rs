@@ -15,7 +15,6 @@ use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension, Solutions};
-use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
@@ -550,6 +549,7 @@ impl<'db> GenericContext<'db> {
         generic_context: Option<Self>,
         parameters: &Parameters<'db>,
         return_type: Type<'db>,
+        function_definition: Definition<'db>,
     ) -> (Option<Self>, Type<'db>) {
         #[derive(Default)]
         struct TypeVarLocations<'db> {
@@ -572,6 +572,7 @@ impl<'db> GenericContext<'db> {
             fn finalize(
                 self,
                 db: &'db dyn Db,
+                function_definition: Definition<'db>,
             ) -> (
                 FxHashSet<BoundTypeVarInstance<'db>>,
                 FxHashMap<CallableType<'db>, CallableType<'db>>,
@@ -581,9 +582,14 @@ impl<'db> GenericContext<'db> {
                     .found_inside_callable_return
                     .into_iter()
                     .filter_map(|(callable, mut bound_typevars)| {
-                        // Only keep the typevars that appear _only_ in this callable.
+                        // Only keep typevars that appear _only_ in this callable and are
+                        // actually bound by this function. If we renamed typevars bound by an
+                        // enclosing generic context (e.g., class typevars in a method), we'd
+                        // disconnect them from class specialization.
                         bound_typevars.retain(|bound_typevar| {
                             !self.found_outside_callable_return.contains(bound_typevar)
+                                && bound_typevar.binding_context(db).definition()
+                                    == Some(function_definition)
                         });
                         if bound_typevars.is_empty() {
                             return None;
@@ -714,8 +720,10 @@ impl<'db> GenericContext<'db> {
 
         // Then update those return type Callables to be generic, with their generic context
         // containing the typevars that don't appear outside any return type Callable.
-        let (found_only_inside_callable_return, replacements) =
-            find_typevar_locations.locations.into_inner().finalize(db);
+        let (found_only_inside_callable_return, replacements) = find_typevar_locations
+            .locations
+            .into_inner()
+            .finalize(db, function_definition);
         let type_mapping = TypeMapping::RescopeReturnCallables(&replacements);
         let return_type = return_type.apply_type_mapping(db, &type_mapping, TypeContext::default());
 
@@ -1885,9 +1893,11 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         constraints: ConstraintSet<'db>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
-    ) {
-        let Solutions::Constrained(solutions) = constraints.solutions(self.db) else {
-            return;
+    ) -> Result<(), ()> {
+        let solutions = match constraints.solutions(self.db) {
+            Solutions::Unsatisfiable => return Err(()),
+            Solutions::Unconstrained => return Ok(()),
+            Solutions::Constrained(solutions) => solutions,
         };
         for solution in solutions {
             for binding in solution {
@@ -1895,6 +1905,7 @@ impl<'db> SpecializationBuilder<'db> {
                 self.add_type_mapping(binding.bound_typevar, binding.solution, variance, &mut f);
             }
         }
+        Ok(())
     }
 
     /// Infer type mappings by comparing formal callable signatures against actual callables.
@@ -1904,7 +1915,7 @@ impl<'db> SpecializationBuilder<'db> {
         formal_signature: &CallableSignature<'db>,
         actual_callables: &CallableTypes<'db>,
         f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
-    ) {
+    ) -> Result<(), ()> {
         let formal_is_single_paramspec = formal_signature.is_single_paramspec().is_some();
 
         for actual_callable in actual_callables.as_slice() {
@@ -1912,18 +1923,31 @@ impl<'db> SpecializationBuilder<'db> {
                 let when = actual_callable
                     .signatures(self.db)
                     .when_constraint_set_assignable_to(self.db, formal_signature, self.inferable);
-                self.add_type_mappings_from_constraint_set(formal, when, &mut *f);
+                self.add_type_mappings_from_constraint_set(formal, when, &mut *f)?;
             } else {
+                // An overloaded actual callable is compatible with the formal signature if at
+                // least one of its overloads is. We collect type mappings from all satisfiable
+                // overloads, and only report an error if none of them are satisfiable.
+                let mut any_satisfiable = false;
                 for actual_signature in &actual_callable.signatures(self.db).overloads {
                     let when = actual_signature.when_constraint_set_assignable_to_signatures(
                         self.db,
                         formal_signature,
                         self.inferable,
                     );
-                    self.add_type_mappings_from_constraint_set(formal, when, &mut *f);
+                    if self
+                        .add_type_mappings_from_constraint_set(formal, when, &mut *f)
+                        .is_ok()
+                    {
+                        any_satisfiable = true;
+                    }
+                }
+                if !any_satisfiable {
+                    return Err(());
                 }
             }
         }
+        Ok(())
     }
 
     /// Infer type mappings for the specialization based on a given type and its declared type.
@@ -2286,14 +2310,27 @@ impl<'db> SpecializationBuilder<'db> {
                     Type::NominalInstance(formal_nominal) => {
                         formal_nominal.class(self.db).into_generic_alias()
                     }
-                    // TODO: This will only handle classes that explicit implement a generic protocol
-                    // by listing it as a base class. To handle classes that implicitly implement a
-                    // generic protocol, we will need to check the types of the protocol members to be
-                    // able to infer the specialization of the protocol that the class implements.
-                    Type::ProtocolInstance(ProtocolInstanceType {
-                        inner: Protocol::FromClass(class),
-                        ..
-                    }) => class.into_generic_alias(),
+
+                    Type::ProtocolInstance(_) => {
+                        // TODO: For protocols, we use the new constraint set implementation, which
+                        // will handle implicitly implemented protocols and generic protocols. We
+                        // eventually want this logic to be used for _all_ nominal instances
+                        // (replacing the logic below).
+                        let when = actual.when_constraint_set_assignable_to(
+                            self.db,
+                            formal,
+                            self.inferable,
+                        );
+                        // For protocol inference via constraint sets, we currently treat
+                        // unsatisfiable results as "no inference" instead of an immediate
+                        // specialization error. This matches the previous behavior (where
+                        // unsatisfied comparisons simply produced no type mappings), and avoids
+                        // false positives for callable-wrapper patterns while this path is still
+                        // a hybrid of old and new solver logic.
+                        let _ = self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                        return Ok(());
+                    }
+
                     _ => None,
                 };
 
@@ -2337,10 +2374,21 @@ impl<'db> SpecializationBuilder<'db> {
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     return Ok(());
                 };
+
                 // The `__call__` method is bound to `self`, so we need to bind it to get the
                 // callable signature that the actual type needs to match.
                 let formal_signature = call_method.bind_self(self.db, None).signatures(self.db);
-                self.infer_from_callable_signature(formal, formal_signature, &actual_callables, f);
+
+                // For callable-signature inference, keep unsatisfiable constraint-set
+                // comparisons non-fatal for now. The hybrid inference/checking pipeline still
+                // depends on post-specialization assignability checks for some callable wrapper
+                // patterns (e.g. `functools.wraps`, callback adapters).
+                let _ = self.infer_from_callable_signature(
+                    formal,
+                    formal_signature,
+                    &actual_callables,
+                    f,
+                );
             }
 
             (Type::Callable(formal_callable), _) => {
@@ -2348,7 +2396,17 @@ impl<'db> SpecializationBuilder<'db> {
                     return Ok(());
                 };
                 let formal_signature = formal_callable.signatures(self.db);
-                self.infer_from_callable_signature(formal, formal_signature, &actual_callables, f);
+
+                // For callable-signature inference, keep unsatisfiable constraint-set
+                // comparisons non-fatal for now. The hybrid inference/checking pipeline still
+                // depends on post-specialization assignability checks for some callable wrapper
+                // patterns (e.g. `functools.wraps`, callback adapters).
+                let _ = self.infer_from_callable_signature(
+                    formal,
+                    formal_signature,
+                    &actual_callables,
+                    f,
+                );
             }
 
             // Expand type aliases in the actual type.
