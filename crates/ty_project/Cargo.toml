@@ -64,6 +64,7 @@ schemars = [
     "ty_python_semantic/schemars",
 ]
 zstd = ["ty_vendored/zstd"]
+junit = ["ruff_db/junit"]
 format = ["ruff_python_formatter"]
 testing = []
 
