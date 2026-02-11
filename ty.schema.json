@@ -212,6 +212,11 @@
           "description": "Print diagnostics in the format used by [GitHub Actions] workflow error annotations.\n\n[GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message",
           "type": "string",
           "const": "github"
+        },
+        {
+          "description": "Print diagnostics as a JUnit-style XML report.",
+          "type": "string",
+          "const": "junit"
         }
       ]
     },

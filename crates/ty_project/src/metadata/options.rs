@@ -1173,6 +1173,9 @@ pub enum OutputFormat {
     ///
     /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
     Github,
+    /// Print diagnostics as a JUnit-style XML report.
+    #[cfg(feature = "junit")]
+    Junit,
 }
 
 impl OutputFormat {
@@ -1193,6 +1196,8 @@ impl From<OutputFormat> for DiagnosticFormat {
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
+            #[cfg(feature = "junit")]
+            OutputFormat::Junit => Self::Junit,
         }
     }
 }
@@ -1228,7 +1233,7 @@ pub struct TerminalOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
-        value_type = "full | concise",
+        value_type = "full | concise | github | gitlab | junit",
         example = r#"
             output-format = "concise"
         "#
@@ -1722,7 +1727,7 @@ impl ToSettingsError {
 
         impl fmt::Display for DisplayPretty<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let display_config = DisplayDiagnosticConfig::default()
+                let display_config = DisplayDiagnosticConfig::new("ty")
                     .format(self.error.output_format.into())
                     .color(self.error.color);
 

@@ -624,7 +624,7 @@ impl<'a> FormatResults<'a> {
             .collect();
 
         let context = EmitterContext::new(&notebook_index);
-        let config = DisplayDiagnosticConfig::default()
+        let config = DisplayDiagnosticConfig::new("ruff")
             .hide_severity(true)
             .show_fix_diff(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());

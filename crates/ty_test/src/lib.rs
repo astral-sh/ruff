@@ -744,7 +744,7 @@ fn create_diagnostic_snapshot(
     test: &parser::MarkdownTest,
     diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
-    let display_config = DisplayDiagnosticConfig::default()
+    let display_config = DisplayDiagnosticConfig::new("ty")
         .color(false)
         .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly);

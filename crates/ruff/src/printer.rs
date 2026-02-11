@@ -234,7 +234,7 @@ impl Printer {
         let context = EmitterContext::new(&diagnostics.notebook_indexes);
         let fixables = FixableStatistics::try_from(diagnostics, self.unsafe_fixes);
 
-        let config = DisplayDiagnosticConfig::default()
+        let config = DisplayDiagnosticConfig::new("ruff")
             .preview(preview)
             .hide_severity(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
@@ -408,7 +408,7 @@ impl Printer {
             }
 
             let context = EmitterContext::new(&diagnostics.notebook_indexes);
-            let config = DisplayDiagnosticConfig::default()
+            let config = DisplayDiagnosticConfig::new("ruff")
                 .preview(preview)
                 .hide_severity(true)
                 .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize())
