@@ -597,7 +597,6 @@ impl Display for OutputFormat {
 
 /// The subset of output formats only implemented in Ruff, not in `ruff_db` via `DisplayDiagnostics`.
 pub enum RuffOutputFormat {
-    Github,
     Grouped,
     Sarif,
 }
@@ -616,7 +615,7 @@ impl TryFrom<OutputFormat> for DiagnosticFormat {
             OutputFormat::Pylint => Ok(DiagnosticFormat::Pylint),
             OutputFormat::Rdjson => Ok(DiagnosticFormat::Rdjson),
             OutputFormat::Azure => Ok(DiagnosticFormat::Azure),
-            OutputFormat::Github => Err(RuffOutputFormat::Github),
+            OutputFormat::Github => Ok(DiagnosticFormat::Github),
             OutputFormat::Grouped => Err(RuffOutputFormat::Grouped),
             OutputFormat::Sarif => Err(RuffOutputFormat::Sarif),
         }
