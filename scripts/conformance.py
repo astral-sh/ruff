@@ -297,6 +297,10 @@ class GroupedDiagnostics:
                 else:
                     # We select the line with the most diagnostics
                     # as our true positive, while the rest are false positives
+                    # TODO: The ty diagnostics below are because we are not
+                    # inferring a precise type for the `key` lambda, which gives
+                    # us the wrong type for `max_line`.
+                    # https://github.com/astral-sh/ty/issues/181
                     max_line = max(
                         groupby(
                             diagnostics, key=lambda d: d.location.positions.begin.line
