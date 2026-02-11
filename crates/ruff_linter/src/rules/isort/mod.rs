@@ -206,7 +206,7 @@ fn format_import_block(
         // as they will be re-added in the correct position.
         // Heading comments may be on any import (not just the first) since
         // sorting may have reordered them.
-        if !heading_comments.is_empty() {
+        if !settings.import_headings.is_empty() {
             for import in &mut imports {
                 let atop = match import {
                     Import((_, comments)) => &mut comments.atop,
