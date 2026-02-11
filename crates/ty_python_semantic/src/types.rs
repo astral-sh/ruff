@@ -1021,6 +1021,14 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) fn is_typevartuple(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar.is_typevartuple(db),
+            Type::TypeVar(bound_typevar) => bound_typevar.typevar(db).is_typevartuple(db),
+            _ => false,
+        }
+    }
+
     pub const fn is_generic_alias(&self) -> bool {
         matches!(self, Type::GenericAlias(_))
     }
@@ -6550,10 +6558,7 @@ impl<'db> Type<'db> {
                     // `P.kwargs`.
                     Some(bound_typevar.without_paramspec_attr(db))
                 }
-                TypeVarKind::TypeVarTuple => {
-                    // For legacy TypeVarTuple, include it in the generic context
-                    Some(*bound_typevar)
-                }
+                TypeVarKind::TypeVarTuple => Some(*bound_typevar),
                 _ => None,
             }
         };
@@ -6694,7 +6699,9 @@ impl<'db> Type<'db> {
                         .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 }
                 KnownInstanceType::TypeVar(typevar) => {
-                    // Only handle TypeVarTuples here - regular TypeVars should not be touched
+                    // Regular TypeVars appear as `Type::TypeVar` (bound) in annotations,
+                    // not as `KnownInstance`. TypeVarTuples inside `Unpack[Ts]` resolve
+                    // to `KnownInstance(TypeVar(...))`, so we need to collect them here.
                     if typevar.is_typevartuple(db) {
                         let context = match binding_context {
                             Some(def) => BindingContext::Definition(def),
@@ -6708,7 +6715,6 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::SubscriptedGeneric(context)
                 | KnownInstanceType::SubscriptedProtocol(context) => {
-                    // Traverse into the generic context to find TypeVarTuples
                     for variable in context.variables(db) {
                         if let Some(variable) = matching_typevar(&variable) {
                             typevars.insert(variable);
