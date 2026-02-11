@@ -151,30 +151,46 @@ impl<'db> Type<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
+        // `self` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
+        // `self` has the protocol class in its MRO. This is a much cheaper check than the
+        // structural check we perform below, so we do it first to avoid the structural check when
+        // we can.
+        let mut result = ConstraintSet::from(false);
+        if let Some(nominal_instance) = protocol.to_nominal_instance() {
+            // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
+            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
+            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
+            // `Q`'s members in a Liskov-incompatible way.
+            let type_to_test = self
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance)
+                .map(Type::NominalInstance)
+                .unwrap_or(self);
+            let nominally_satisfied = type_to_test.has_relation_to_impl(
+                db,
+                Type::NominalInstance(nominal_instance),
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            );
+            if result
+                .union(db, nominally_satisfied)
+                .is_always_satisfied(db)
+            {
+                return result;
+            }
+        }
+
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
-            let self_as_nominal = self_protocol.to_nominal_instance();
-            let other_as_nominal = protocol.to_nominal_instance();
-            let nominal_match = match self_as_nominal.zip(other_as_nominal) {
-                Some((self_as_nominal, other_as_nominal)) => self_as_nominal.has_relation_to_impl(
-                    db,
-                    other_as_nominal,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-                _ => ConstraintSet::from(false),
-            };
-            nominal_match.or(db, || {
-                self_protocol.interface(db).has_relation_to_impl(
-                    db,
-                    protocol.interface(db),
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            })
+            self_protocol.interface(db).has_relation_to_impl(
+                db,
+                protocol.interface(db),
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            )
         } else {
             protocol
                 .inner
@@ -191,37 +207,7 @@ impl<'db> Type<'db> {
                     )
                 })
         };
-
-        // Even if `self` does not satisfy the protocol from a structural perspective,
-        // we may still need to consider it as satisfying the protocol if `protocol` is
-        // a class-based protocol and `self` has the protocol class in its MRO.
-        //
-        // This matches the behaviour of other type checkers, and is required for us to
-        // recognise `str` as a subtype of `Container[str]`.
-        structurally_satisfied.or(db, || {
-            let Some(nominal_instance) = protocol.to_nominal_instance() else {
-                return ConstraintSet::from(false);
-            };
-
-            // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
-            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
-            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
-            // `Q`'s members in a Liskov-incompatible way.
-            let type_to_test = self
-                .as_protocol_instance()
-                .and_then(ProtocolInstanceType::to_nominal_instance)
-                .map(Type::NominalInstance)
-                .unwrap_or(self);
-
-            type_to_test.has_relation_to_impl(
-                db,
-                Type::NominalInstance(nominal_instance),
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            )
-        })
+        result.or(db, || structurally_satisfied)
     }
 }
 
