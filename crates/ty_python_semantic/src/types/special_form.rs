@@ -5,12 +5,14 @@ use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{
-    FileScopeId, definition::Definition, place_table, scope::ScopeId, semantic_index, use_def_map,
+    FileScopeId, definition::{Definition, DefinitionKind}, place_table, scope::ScopeId,
+    semantic_index, use_def_map,
 };
 use crate::types::IntersectionType;
 use crate::types::{
-    CallableType, InvalidTypeExpression, InvalidTypeExpressionError, TypeDefinition,
-    TypeQualifiers, generics::typing_self, infer::nearest_enclosing_class,
+    CallableType, FunctionDecorators, InvalidTypeExpression, InvalidTypeExpressionError,
+    TypeDefinition, TypeQualifiers, generics::typing_self,
+    infer::{infer_definition_types, nearest_enclosing_class},
 };
 use ruff_db::files::File;
 use strum_macros::EnumString;
@@ -670,11 +672,52 @@ impl SpecialFormType {
                     });
                 };
 
-                Ok(
-                    typing_self(db, scope_id, typevar_binding_context, class.into())
-                        .map(Type::TypeVar)
-                        .unwrap_or(Type::SpecialForm(self)),
-                )
+                let typing_self =
+                    typing_self(db, scope_id, typevar_binding_context, class.into());
+
+                let in_staticmethod = typing_self.is_some_and(|typing_self| {
+                    let Some(binding_definition) = typing_self.binding_context(db).definition()
+                    else {
+                        return false;
+                    };
+
+                    let DefinitionKind::Function(_) = binding_definition.kind(db) else {
+                        return false;
+                    };
+
+                    infer_definition_types(db, binding_definition)
+                        .declaration_type(binding_definition)
+                        .inner_type()
+                        .as_function_literal()
+                        .is_some_and(|function| {
+                            function.name(db).as_str() != "__new__"
+                                && function
+                                    .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+                        })
+                });
+                if in_staticmethod {
+                    return Err(InvalidTypeExpressionError {
+                        fallback_type: Type::unknown(),
+                        invalid_expressions: smallvec::smallvec_inline![
+                            InvalidTypeExpression::TypingSelfInStaticMethod
+                        ],
+                    });
+                }
+
+                let is_in_metaclass = KnownClass::Type
+                    .to_class_literal(db)
+                    .to_class_type(db)
+                    .is_some_and(|type_class| class.is_subclass_of(db, None, type_class));
+                if is_in_metaclass {
+                    return Err(InvalidTypeExpressionError {
+                        fallback_type: Type::unknown(),
+                        invalid_expressions: smallvec::smallvec_inline![
+                            InvalidTypeExpression::TypingSelfInMetaclass
+                        ],
+                    });
+                }
+
+                Ok(typing_self.map(Type::TypeVar).unwrap_or(Type::SpecialForm(self)))
             }
             // We ensure that `typing.TypeAlias` used in the expected position (annotating an
             // annotated assignment statement) doesn't reach here. Using it in any other type
