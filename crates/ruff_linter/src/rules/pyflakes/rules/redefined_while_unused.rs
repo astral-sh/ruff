@@ -77,41 +77,6 @@ impl Violation for RedefinedWhileUnused {
     }
 }
 
-struct EntryInfo {
-    is_type_checking_duplicate: bool,
-    runtime_import: Option<NodeId>,
-}
-
-impl EntryInfo {
-    fn new(shadowed: &Binding, binding: &Binding, source: NodeId, checker: &Checker) -> Self {
-        let shadowed_in_type_checking = shadowed
-            .source
-            .map(|source| is_in_type_checking_block(checker, source))
-            .unwrap_or(false);
-
-        let binding_in_type_checking = binding
-            .source
-            .map(|source| is_in_type_checking_block(checker, source))
-            .unwrap_or(false);
-
-        let is_type_checking_duplicate = (shadowed_in_type_checking || binding_in_type_checking)
-            && !(shadowed_in_type_checking && binding_in_type_checking);
-
-        let runtime_import = if shadowed_in_type_checking && !binding_in_type_checking {
-            binding.source
-        } else if !shadowed_in_type_checking && binding_in_type_checking {
-            shadowed.source
-        } else {
-            Some(source)
-        };
-
-        Self {
-            is_type_checking_duplicate,
-            runtime_import,
-        }
-    }
-}
-
 /// F811
 pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     // Index the redefined bindings by statement.
@@ -196,7 +161,8 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 
                         if let (Some(left_import), Some(right_import)) =
                             (left_binding.as_any_import(), right_binding.as_any_import())
-                            && if left_import.qualified_name() == right_import.qualified_name() {
+                            && left_import.qualified_name() == right_import.qualified_name()
+                        {
                             return false;
                         }
                     }
@@ -327,6 +293,41 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                     diagnostic.set_fix(fix.clone());
                 }
             }
+        }
+    }
+}
+
+struct EntryInfo {
+    is_type_checking_duplicate: bool,
+    runtime_import: Option<NodeId>,
+}
+
+impl EntryInfo {
+    fn new(shadowed: &Binding, binding: &Binding, source: NodeId, checker: &Checker) -> Self {
+        let shadowed_in_type_checking = shadowed
+            .source
+            .map(|source| is_in_type_checking_block(checker, source))
+            .unwrap_or(false);
+
+        let binding_in_type_checking = binding
+            .source
+            .map(|source| is_in_type_checking_block(checker, source))
+            .unwrap_or(false);
+
+        let is_type_checking_duplicate = (shadowed_in_type_checking || binding_in_type_checking)
+            && !(shadowed_in_type_checking && binding_in_type_checking);
+
+        let runtime_import = if shadowed_in_type_checking && !binding_in_type_checking {
+            binding.source
+        } else if !shadowed_in_type_checking && binding_in_type_checking {
+            shadowed.source
+        } else {
+            Some(source)
+        };
+
+        Self {
+            is_type_checking_duplicate,
+            runtime_import,
         }
     }
 }
