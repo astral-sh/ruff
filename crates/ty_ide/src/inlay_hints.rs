@@ -11,9 +11,9 @@ use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, Traversal
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_module_resolver::file_to_module;
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
-use ty_module_resolver::file_to_module;
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -8132,6 +8132,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing import Any
 
         def foo(x: Any):
@@ -8156,13 +8157,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
          --> main2.py:5:15
@@ -8220,6 +8221,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from foo import foo
 
         a[: dict[TypeVar, Any] | None] = foo()
@@ -8279,13 +8281,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:950:11
+           --> stdlib/types.pyi:969:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           ^^^^^^^^
-        951 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         info: Source
          --> main2.py:4:26
