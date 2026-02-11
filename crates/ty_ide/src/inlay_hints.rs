@@ -48,8 +48,7 @@ impl InlayHint {
             return None;
         }
 
-        let members = importer.members_in_scope_at(expr.into(), expr.range().start());
-        let mut dynamic_importer = DynamicImporter::new(importer, members, dynamic_imports);
+        let mut dynamic_importer = DynamicImporter::new(importer, expr, dynamic_imports);
 
         // Ok so the idea here is that we potentially have a random soup of spans here,
         // and each byte of the string can have at most one target associate with it.
@@ -625,7 +624,10 @@ struct DynamicallyImportedMember {
 
 struct DynamicImporter<'a, 'db> {
     importer: &'a Importer<'db>,
-    members: MembersInScope<'db>,
+    /// The expression node used to compute members in scope (lazily).
+    scope_node: AnyNodeRef<'a>,
+    scope_offset: TextSize,
+    members: Option<MembersInScope<'db>>,
     dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
     imported_members: Vec<DynamicallyImportedMember>,
 }
@@ -633,12 +635,14 @@ struct DynamicImporter<'a, 'db> {
 impl<'a, 'db> DynamicImporter<'a, 'db> {
     fn new(
         importer: &'a Importer<'db>,
-        members: MembersInScope<'db>,
+        expr: &'a Expr,
         dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
     ) -> Self {
         Self {
             importer,
-            members,
+            scope_node: expr.into(),
+            scope_offset: expr.range().start(),
+            members: None,
             dynamic_imports,
             imported_members: Vec::new(),
         }
@@ -654,7 +658,13 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
     ) -> Option<String> {
         use std::collections::hash_map::Entry;
 
-        if self.members.contains_symbol(symbol_name) {
+        // Ensure members are computed before borrowing other fields.
+        let members = self.members.get_or_insert_with(|| {
+            self.importer
+                .members_in_scope_at(self.scope_node, self.scope_offset)
+        });
+
+        if members.contains_symbol(symbol_name) {
             return None;
         }
 
@@ -674,7 +684,7 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
                     ImportRequest::import_from(module_name, symbol_name)
                 };
 
-                let import_action = self.importer.import(request, &self.members);
+                let import_action = self.importer.import(request, members);
                 let action = entry.insert(import_action);
 
                 self.imported_members.push(key);
