@@ -185,11 +185,7 @@ fn format_import_block(
     let mut output = String::new();
 
     // Heading comments are already formatted as "# {heading}" in settings.
-    let heading_comments: Vec<&str> = settings
-        .import_headings
-        .values()
-        .map(String::as_str)
-        .collect();
+    let heading_comments = settings.import_headings;
 
     // Generate replacement source code.
     let mut is_first_block = true;
