@@ -722,7 +722,7 @@ from typing import Callable, Protocol, cast
 
 class GenericClass[**P, T]:
     def hint(self) -> Callable[P, T]:
-        return cast(Callable[P, T], lambda *args, **kwargs: None)
+        raise NotImplementedError
 
 class GenericProtocol[**P, T](Protocol):
     def hint(self) -> Callable[P, T]: ...

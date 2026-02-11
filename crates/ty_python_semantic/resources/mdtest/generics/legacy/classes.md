@@ -837,7 +837,7 @@ T = TypeVar("T")
 
 class GenericClass(Generic[P, T]):
     def hint(self) -> Callable[P, T]:
-        return cast(Callable[P, T], lambda *args, **kwargs: None)
+        raise NotImplementedError
 
 class GenericProtocol(Protocol[P, T]):
     def hint(self) -> Callable[P, T]: ...
