@@ -157,3 +157,13 @@ t"i}'"#;
 
     insta::assert_debug_snapshot!(error);
 }
+
+#[test]
+fn test_tstring_fstring_middle() {
+    let source = "t'{:{F'{\0}F";
+    let parsed = parse_expression(source);
+
+    let error = parsed.unwrap_err();
+
+    insta::assert_debug_snapshot!(error);
+}
