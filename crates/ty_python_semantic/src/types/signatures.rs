@@ -344,8 +344,8 @@ impl<'db> CallableSignature<'db> {
             constraints,
             inferable,
             TypeRelation::ConstraintSetAssignability,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(constraints),
+            &IsDisjointVisitor::default(constraints),
         )
     }
 
@@ -356,6 +356,7 @@ impl<'db> CallableSignature<'db> {
     /// `None` and callers should fall back to legacy per-overload relation checks.
     fn try_unary_overload_aggregate_relation(
         db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
         self_signatures: &[Signature<'db>],
         other_signature: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
@@ -409,7 +410,7 @@ impl<'db> CallableSignature<'db> {
                 return None;
             }
             let signatures_are_disjoint = self_parameter_type
-                .when_disjoint_from(db, other_parameter_type, inferable)
+                .when_disjoint_from(db, other_parameter_type, constraints, inferable)
                 .is_always_satisfied(db);
 
             if signatures_are_disjoint {
@@ -429,12 +430,14 @@ impl<'db> CallableSignature<'db> {
         let parameters_cover_target = other_parameter_type.has_relation_to(
             db,
             parameter_type_union.build(),
+            constraints,
             inferable,
             relation,
         );
         let returns_match_target = return_type_union.build().has_relation_to(
             db,
             other_signature.return_ty,
+            constraints,
             inferable,
             relation,
         );
@@ -473,6 +476,7 @@ impl<'db> CallableSignature<'db> {
                 ) => {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         self_bound_typevar,
                         Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
@@ -505,6 +509,7 @@ impl<'db> CallableSignature<'db> {
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         self_bound_typevar,
                         Type::Never,
                         upper,
@@ -542,6 +547,7 @@ impl<'db> CallableSignature<'db> {
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         other_bound_typevar,
                         lower,
                         Type::object(),
@@ -585,6 +591,7 @@ impl<'db> CallableSignature<'db> {
             (_, [other_signature]) => {
                 if let Some(aggregate_relation) = Self::try_unary_overload_aggregate_relation(
                     db,
+                    constraints,
                     self_signatures,
                     other_signature,
                     inferable,
@@ -1057,8 +1064,13 @@ impl<'db> Signature<'db> {
                 })),
                 CallableTypeKind::ParamSpecValue,
             ));
-            let param_spec_matches =
-                ConstraintSet::constrain_typevar(db, self_bound_typevar, Type::Never, upper);
+            let param_spec_matches = ConstraintSet::constrain_typevar(
+                db,
+                constraints,
+                self_bound_typevar,
+                Type::Never,
+                upper,
+            );
             let return_types_match = other
                 .overloads
                 .iter()
@@ -1067,6 +1079,7 @@ impl<'db> Signature<'db> {
                     self.return_ty.when_constraint_set_assignable_to(
                         db,
                         other_return_type,
+                        constraints,
                         inferable,
                     )
                 });
@@ -1094,8 +1107,8 @@ impl<'db> Signature<'db> {
             constraints,
             inferable,
             TypeRelation::ConstraintSetAssignability,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(constraints),
+            &IsDisjointVisitor::default(constraints),
         )
     }
 
@@ -1218,7 +1231,7 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let mut result = ConstraintSet::from(true);
+        let mut result = ConstraintSet::from_bool(constraints, true);
 
         let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
             match (type1, type2) {
@@ -1277,15 +1290,15 @@ impl<'db> Signature<'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_object())
         {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(constraints, true);
         }
 
         // The top signature is supertype of (and assignable from) all other signatures. It is a
         // subtype of no signature except itself, and assignable only to the gradual signature.
         if other.parameters.is_top() {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(constraints, true);
         } else if self.parameters.is_top() && !other.parameters.is_gradual() {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
 
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
@@ -1293,11 +1306,12 @@ impl<'db> Signature<'db> {
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
             return match relation {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
-                    ConstraintSet::from(false)
+                    ConstraintSet::from_bool(constraints, false)
                 }
                 TypeRelation::Redundancy { .. } => result.intersect(
                     db,
-                    ConstraintSet::from(
+                    ConstraintSet::from_bool(
+                        constraints,
                         self.parameters.is_gradual() && other.parameters.is_gradual(),
                     ),
                 ),
@@ -1315,6 +1329,7 @@ impl<'db> Signature<'db> {
                 (Some(self_bound_typevar), Some(other_bound_typevar)) => {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         self_bound_typevar,
                         Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
@@ -1335,6 +1350,7 @@ impl<'db> Signature<'db> {
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         self_bound_typevar,
                         Type::Never,
                         upper,
@@ -1355,6 +1371,7 @@ impl<'db> Signature<'db> {
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         other_bound_typevar,
                         lower,
                         Type::object(),
@@ -1402,7 +1419,7 @@ impl<'db> Signature<'db> {
                         // `other`, then the non-variadic parameters in `self` must have a default
                         // value.
                         if default_type.is_none() {
-                            return ConstraintSet::from(false);
+                            return ConstraintSet::from_bool(constraints, false);
                         }
                     }
                     ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
@@ -1414,7 +1431,7 @@ impl<'db> Signature<'db> {
                 EitherOrBoth::Right(_) => {
                     // If there are more parameters in `other` than in `self`, then `self` is not a
                     // subtype of `other`.
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
@@ -1434,7 +1451,7 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_default.is_none() && other_default.is_some() {
-                                return ConstraintSet::from(false);
+                                return ConstraintSet::from_bool(constraints, false);
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
@@ -1455,11 +1472,11 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_name != other_name {
-                                return ConstraintSet::from(false);
+                                return ConstraintSet::from_bool(constraints, false);
                             }
                             // The following checks are the same as positional-only parameters.
                             if self_default.is_none() && other_default.is_some() {
-                                return ConstraintSet::from(false);
+                                return ConstraintSet::from_bool(constraints, false);
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
@@ -1544,7 +1561,7 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return ConstraintSet::from(false),
+                        _ => return ConstraintSet::from_bool(constraints, false),
                     }
                 }
             }
@@ -1578,7 +1595,7 @@ impl<'db> Signature<'db> {
                     // only contains keyword-only and keyword-variadic parameters. However, if the
                     // parameter has a default, it's valid because callers don't need to provide it.
                     if default_type.is_none() {
-                        return ConstraintSet::from(false);
+                        return ConstraintSet::from_bool(constraints, false);
                     }
                 }
                 ParameterKind::Variadic { .. } => {}
@@ -1606,7 +1623,7 @@ impl<'db> Signature<'db> {
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
-                                    return ConstraintSet::from(false);
+                                    return ConstraintSet::from_bool(constraints, false);
                                 }
                                 if !check_types(
                                     other_parameter.annotated_type(),
@@ -1627,14 +1644,14 @@ impl<'db> Signature<'db> {
                             return result;
                         }
                     } else {
-                        return ConstraintSet::from(false);
+                        return ConstraintSet::from_bool(constraints, false);
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
-                        return ConstraintSet::from(false);
+                        return ConstraintSet::from_bool(constraints, false);
                     };
                     if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
                         return result;
@@ -1642,7 +1659,7 @@ impl<'db> Signature<'db> {
                 }
                 _ => {
                     // This can only occur in case of a syntax error.
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 }
             }
         }
@@ -1651,7 +1668,7 @@ impl<'db> Signature<'db> {
         // optional otherwise the subtype relation is invalid.
         for (_, self_parameter) in self_keywords {
             if self_parameter.default_type().is_none() {
-                return ConstraintSet::from(false);
+                return ConstraintSet::from_bool(constraints, false);
             }
         }
 

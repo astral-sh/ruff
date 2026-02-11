@@ -1199,7 +1199,7 @@ impl<'db> FunctionType<'db> {
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.literal(db) != other.literal(db) {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
 
         let self_signature = self.signature(db);

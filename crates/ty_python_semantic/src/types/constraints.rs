@@ -114,24 +114,24 @@ impl<T> OptionConstraintsExtension<T> for Option<T> {
     fn when_none_or<'db>(
         self,
         _db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
+        builder: &ConstraintSetBuilder<'db>,
         f: impl FnOnce(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::always(),
+            None => ConstraintSet::always(builder),
         }
     }
 
     fn when_some_and<'db>(
         self,
         _db: &'db dyn Db,
-        _builder: &ConstraintSetBuilder<'db>,
+        builder: &ConstraintSetBuilder<'db>,
         f: impl FnOnce(T) -> ConstraintSet<'db>,
     ) -> ConstraintSet<'db> {
         match self {
             Some(value) => f(value),
-            None => ConstraintSet::never(),
+            None => ConstraintSet::never(builder),
         }
     }
 }
@@ -205,21 +205,30 @@ pub struct ConstraintSet<'db> {
 }
 
 impl<'db> ConstraintSet<'db> {
-    fn never() -> Self {
+    fn never(_builder: &ConstraintSetBuilder<'db>) -> Self {
         Self {
             node: Node::AlwaysFalse,
         }
     }
 
-    fn always() -> Self {
+    fn always(_builder: &ConstraintSetBuilder<'db>) -> Self {
         Self {
             node: Node::AlwaysTrue,
+        }
+    }
+
+    pub(crate) fn from_bool(builder: &ConstraintSetBuilder<'db>, b: bool) -> Self {
+        if b {
+            Self::always(builder)
+        } else {
+            Self::never(builder)
         }
     }
 
     /// Returns a constraint set that constraints a typevar to a particular range of types.
     pub(crate) fn constrain_typevar(
         db: &'db dyn Db,
+        _builder: &ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
@@ -475,15 +484,6 @@ impl<'db> ConstraintSet<'db> {
         self.node.solutions(db)
     }
 
-    pub(crate) fn range(
-        db: &'db dyn Db,
-        lower: Type<'db>,
-        typevar: BoundTypeVarInstance<'db>,
-        upper: Type<'db>,
-    ) -> Self {
-        Self::constrain_typevar(db, typevar, lower, upper)
-    }
-
     #[expect(dead_code)] // Keep this around for debugging purposes
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.simplify_for_display(db).display(db)
@@ -492,12 +492,6 @@ impl<'db> ConstraintSet<'db> {
     #[expect(dead_code)] // Keep this around for debugging purposes
     pub(crate) fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
         self.node.display_graph(db, prefix)
-    }
-}
-
-impl From<bool> for ConstraintSet<'_> {
-    fn from(b: bool) -> Self {
-        if b { Self::always() } else { Self::never() }
     }
 }
 
@@ -4383,10 +4377,11 @@ mod tests {
             BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
-        let t_str = ConstraintSet::range(&db, str_type, t, str_type);
-        let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type);
-        let u_str = ConstraintSet::range(&db, str_type, u, str_type);
-        let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type);
+        let constraints = ConstraintSetBuilder::new();
+        let t_str = ConstraintSet::constrain_typevar(&db, &constraints, t, str_type, str_type);
+        let t_bool = ConstraintSet::constrain_typevar(&db, &constraints, t, bool_type, bool_type);
+        let u_str = ConstraintSet::constrain_typevar(&db, &constraints, u, str_type, str_type);
+        let u_bool = ConstraintSet::constrain_typevar(&db, &constraints, u, bool_type, bool_type);
         // Construct this in a different order than above to make the source_orders more
         // interesting.
         let constraints = (u_str.or(&db, || u_bool)).and(&db, || t_str.or(&db, || t_bool));

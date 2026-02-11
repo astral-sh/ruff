@@ -154,7 +154,7 @@ impl<'db> Type<'db> {
         // `self` has the protocol class in its MRO. This is a much cheaper check than the
         // structural check we perform below, so we do it first to avoid the structural check when
         // we can.
-        let mut result = ConstraintSet::from(false);
+        let mut result = ConstraintSet::from_bool(constraints, false);
         if let Some(nominal_instance) = protocol.to_nominal_instance() {
             // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
@@ -449,7 +449,7 @@ impl<'db> NominalInstanceType<'db> {
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.0, other.0) {
-            (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
+            (_, NominalInstanceInner::Object) => ConstraintSet::from_bool(constraints, true),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
@@ -484,9 +484,9 @@ impl<'db> NominalInstanceType<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.is_object() || other.is_object() {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
-        let mut result = ConstraintSet::from(false);
+        let mut result = ConstraintSet::from_bool(constraints, false);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
                 let compatible = self_spec.is_disjoint_from_impl(
@@ -504,10 +504,11 @@ impl<'db> NominalInstanceType<'db> {
         }
 
         result.or(db, || {
-            ConstraintSet::from(
+            ConstraintSet::from_bool(
+                constraints,
                 !self
                     .class(db)
-                    .could_coexist_in_mro_with(db, other.class(db)),
+                    .could_coexist_in_mro_with(db, other.class(db), constraints),
             )
         })
     }
@@ -725,15 +726,16 @@ impl<'db> ProtocolInstanceType<'db> {
             protocol: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
+            let constraints = ConstraintSetBuilder::new();
             Type::object()
                 .satisfies_protocol(
                     db,
                     protocol,
-                    &ConstraintSetBuilder::new(),
+                    &constraints,
                     InferableTypeVars::None,
                     TypeRelation::Subtyping,
-                    &HasRelationToVisitor::default(),
-                    &IsDisjointVisitor::default(),
+                    &HasRelationToVisitor::default(&constraints),
+                    &IsDisjointVisitor::default(&constraints),
                 )
                 .is_always_satisfied(db)
         }
@@ -762,11 +764,11 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         _db: &'db dyn Db,
         _other: Self,
-        _constraints: &ConstraintSetBuilder<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
         _inferable: InferableTypeVars<'_, 'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        ConstraintSet::from(false)
+        ConstraintSet::from_bool(constraints, false)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

@@ -1137,8 +1137,8 @@ impl<'db> ClassType<'db> {
             constraints,
             inferable,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(constraints),
+            &IsDisjointVisitor::default(constraints),
         )
     }
 
@@ -1158,42 +1158,45 @@ impl<'db> ClassType<'db> {
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy { .. }
-                    | TypeRelation::SubtypingAssuming => ConstraintSet::from(other.is_object(db)),
+                    | TypeRelation::SubtypingAssuming => {
+                        ConstraintSet::from_bool(constraints, other.is_object(db))
+                    }
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                        ConstraintSet::from(!other.is_final(db))
+                        ConstraintSet::from_bool(constraints, !other.is_final(db))
                     }
                 },
 
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
                 ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => {
-                    ConstraintSet::from(false)
+                    ConstraintSet::from_bool(constraints, false)
                 }
 
                 ClassBase::Class(base) => match (base, other) {
                     // Two non-generic classes match if they have the same class literal.
                     (ClassType::NonGeneric(base_literal), ClassType::NonGeneric(other_literal)) => {
-                        ConstraintSet::from(base_literal == other_literal)
+                        ConstraintSet::from_bool(constraints, base_literal == other_literal)
                     }
 
                     // Two generic classes match if they have the same origin and compatible specializations.
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        ConstraintSet::from(base.origin(db) == other.origin(db)).and(db, || {
-                            base.specialization(db).has_relation_to_impl(
-                                db,
-                                other.specialization(db),
-                                constraints,
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
+                        ConstraintSet::from_bool(constraints, base.origin(db) == other.origin(db))
+                            .and(db, || {
+                                base.specialization(db).has_relation_to_impl(
+                                    db,
+                                    other.specialization(db),
+                                    constraints,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            })
                     }
 
                     // Generic and non-generic classes don't match.
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
                     | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
-                        ConstraintSet::from(false)
+                        ConstraintSet::from_bool(constraints, false)
                     }
                 },
             }
@@ -1222,7 +1225,12 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if this class could exist in the MRO of `other`.
-    pub(super) fn could_exist_in_mro_of(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn could_exist_in_mro_of(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
         other
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -1237,6 +1245,7 @@ impl<'db> ClassType<'db> {
                             .is_disjoint_from(
                                 db,
                                 other_alias.specialization(db),
+                                constraints,
                                 InferableTypeVars::None,
                             )
                             .is_always_satisfied(db)
@@ -1251,17 +1260,22 @@ impl<'db> ClassType<'db> {
     /// For two given classes `A` and `B`, it is often possible to say for sure
     /// that there could never exist any class `C` that inherits from both `A` and `B`.
     /// In these situations, this method returns `false`; in all others, it returns `true`.
-    pub(super) fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn could_coexist_in_mro_with(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
         if self == other {
             return true;
         }
 
         if self.is_final(db) {
-            return other.could_exist_in_mro_of(db, self);
+            return other.could_exist_in_mro_of(db, self, constraints);
         }
 
         if other.is_final(db) {
-            return self.could_exist_in_mro_of(db, other);
+            return self.could_exist_in_mro_of(db, other, constraints);
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
@@ -1298,7 +1312,15 @@ impl<'db> ClassType<'db> {
         let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
             return true;
         };
-        if self_metaclass_instance.is_disjoint_from(db, other_metaclass_instance) {
+        if self_metaclass_instance
+            .when_disjoint_from(
+                db,
+                other_metaclass_instance,
+                constraints,
+                InferableTypeVars::None,
+            )
+            .is_always_satisfied(db)
+        {
             return false;
         }
 
@@ -7455,8 +7477,9 @@ impl KnownClass {
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
+        constraints: &ConstraintSetBuilder<'db>,
     ) -> ConstraintSet<'db> {
-        ConstraintSet::from(self.is_subclass_of(db, other))
+        ConstraintSet::from_bool(constraints, self.is_subclass_of(db, other))
     }
 
     /// Return the module in which we should look up the definition for this class
