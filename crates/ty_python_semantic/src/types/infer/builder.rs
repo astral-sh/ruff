@@ -1432,15 +1432,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let scope = class.body_scope(self.db()).scope(self.db());
                 if let Some(parent) = scope.parent() {
-                    for self_typevar in class.typevars_referenced_in_definition(self.db()) {
-                        let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
+                    // Check that the class's own type parameters don't shadow
+                    // type variables from enclosing scopes (by name).
+                    if let Some(generic_context) = class.generic_context(self.db()) {
+                        for self_typevar in generic_context.variables(self.db()) {
+                            let name = self_typevar.typevar(self.db()).name(self.db());
+                            for enclosing in
+                                enclosing_generic_contexts(self.db(), self.index, parent)
+                            {
+                                if let Some(other_typevar) =
+                                    enclosing.binds_named_typevar(self.db(), name)
+                                {
+                                    report_rebound_typevar(
+                                        &self.context,
+                                        name,
+                                        class,
+                                        class_node,
+                                        other_typevar,
+                                    );
+                                }
+                            }
+                        }
+                    }
+
+                    // Check that the class's base classes don't reference type
+                    // variables from enclosing scopes (by identity).
+                    for base_typevar in class.typevars_referenced_in_bases(self.db()) {
+                        let typevar = base_typevar.typevar(self.db());
                         for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
-                            if let Some(other_typevar) =
-                                enclosing.binds_named_typevar(self.db(), self_typevar_name)
+                            if let Some(other_typevar) = enclosing.binds_typevar(self.db(), typevar)
                             {
                                 report_rebound_typevar(
                                     &self.context,
-                                    self_typevar_name,
+                                    typevar.name(self.db()),
                                     class,
                                     class_node,
                                     other_typevar,

@@ -31,7 +31,7 @@ use crate::types::function::{
     is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
+    GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
@@ -2322,11 +2322,10 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    /// Returns all of the typevars that are referenced in this class's definition. This includes
-    /// any typevars bound in its generic context, as well as any typevars mentioned in its base
-    /// class list. (This is used to ensure that classes do not bind or reference typevars from
-    /// enclosing generic contexts.)
-    pub(crate) fn typevars_referenced_in_definition(
+    /// Returns all of the typevars that are referenced in this class's base class list.
+    /// (This is used to ensure that classes do not reference typevars from enclosing
+    /// generic contexts.)
+    pub(crate) fn typevars_referenced_in_bases(
         self,
         db: &'db dyn Db,
     ) -> FxIndexSet<BoundTypeVarInstance<'db>> {
@@ -2355,9 +2354,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let visitor = CollectTypeVars::default();
-        if let Some(generic_context) = self.generic_context(db) {
-            walk_generic_context(db, generic_context, &visitor);
-        }
         for base in self.explicit_bases(db) {
             visitor.visit_type(db, *base);
         }
