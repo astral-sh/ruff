@@ -16,8 +16,8 @@ use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
-    overload_co_definitions_for_function,
+    call_signature_details, call_type_simplified_by_overloads,
+    definitions_and_overloads_for_function, definitions_for_keyword_argument,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
@@ -440,13 +440,12 @@ impl GotoTarget<'_> {
             // For property setters/deleters, the getter is a co-definition of
             // the same logical symbol.
             GotoTarget::FunctionDef(function) => {
-                let mut defs = vec![ResolvedDefinition::Definition(function.definition(model))];
+                let mut defs = definitions_and_overloads_for_function(model, function);
                 defs.extend(
                     property_getter_definitions(function, model, alias_resolution)
                         .into_iter()
                         .flatten(),
                 );
-                defs.extend(overload_co_definitions_for_function(model, function));
                 Some(defs)
             }
 
