@@ -119,11 +119,11 @@ pub(crate) fn organize_imports(
         (range.start(), locator.line_start(range.start()))
     } else {
         // Heading comments are already formatted as "# {heading}" in settings.
-        // Walk backward through comment ranges to find adjacent heading comments
-        // above the first import.
+        // Walk backward through comment ranges to find adjacent heading comments above the first import.
         let comment_ranges: &[TextRange] = indexer.comment_ranges();
         let import_line_start = locator.line_start(range.start());
-        let partition = comment_ranges.partition_point(|c| c.start() < import_line_start);
+        let partition =
+            comment_ranges.partition_point(|comment| comment.start() < import_line_start);
 
         let mut earliest = import_line_start;
         for comment_range in comment_ranges[..partition].iter().rev() {
@@ -133,7 +133,10 @@ pub(crate) fn organize_imports(
             }
 
             let comment_text = locator.slice(*comment_range);
-            if import_headings.values().any(|h| comment_text == h.as_str()) {
+            if import_headings
+                .values()
+                .any(|header| comment_text == header.as_str())
+            {
                 earliest = locator.line_start(comment_range.start());
             } else {
                 break;
