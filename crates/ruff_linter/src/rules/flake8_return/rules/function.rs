@@ -523,11 +523,18 @@ fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
                 true
             }
         }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().any(|case| {
-            case.body
+        Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            if cases.iter().any(|case| {
+                case.body
+                    .last()
+                    .is_some_and(|last| has_implicit_return(checker, last))
+            }) {
+                return true;
+            }
+            !cases
                 .last()
-                .is_some_and(|last| has_implicit_return(checker, last))
-        }),
+                .is_some_and(|case| case.pattern.is_irrefutable())
+        }
         Stmt::With(ast::StmtWith { body, .. }) => body
             .last()
             .is_some_and(|last_stmt| has_implicit_return(checker, last_stmt)),
