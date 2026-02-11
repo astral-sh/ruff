@@ -342,27 +342,10 @@ impl Session {
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
         match path {
-            AnySystemPath::System(system_path) => {
-                self.project_state_for_path(system_path).unwrap_or_else(|| {
-                    // TODO: While ty supports multiple workspace folders, we still
-                    // need to figure out which project should this virtual path
-                    // belong to: https://github.com/astral-sh/ty/issues/794
-                    self.projects
-                        .values()
-                        .next()
-                        .expect("To always have at least one project")
-                })
-            }
-            AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: While ty supports multiple workspace folders, we still
-                // need to figure out which project should this virtual path
-                // belong to: https://github.com/astral-sh/ty/issues/794
-                self.projects
-                    .iter()
-                    .next()
-                    .map(|(_, project)| project)
-                    .unwrap()
-            }
+            AnySystemPath::System(system_path) => self
+                .project_state_for_path(system_path)
+                .unwrap_or_else(|| self.first_project_state()),
+            AnySystemPath::SystemVirtual(_virtual_path) => self.first_project_state(),
         }
     }
 
@@ -385,23 +368,9 @@ impl Session {
                     return self.projects.range_mut(range).next_back().unwrap().1;
                 }
 
-                // TODO: While ty supports multiple workspace folders, we still
-                // need to figure out which project should this virtual path
-                // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
-                // look for the first project with an overlapping search path?)
-                self.projects.values_mut().next().unwrap()
+                self.first_project_state_mut()
             }
-            AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: While ty supports multiple workspace folders, we still
-                // need to figure out which project should this virtual path
-                // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
-                // look for the first project with an overlapping search path?)
-                self.projects
-                    .iter_mut()
-                    .next()
-                    .map(|(_, project)| project)
-                    .unwrap()
-            }
+            AnySystemPath::SystemVirtual(_virtual_path) => self.first_project_state_mut(),
         }
     }
 
@@ -415,6 +384,21 @@ impl Session {
             .range(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, project)| project)
+    }
+
+    // TODO: While ty supports multiple workspace folders, we still
+    // need to figure out which project should this virtual path
+    // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
+    // look for the first project with an overlapping search path?)
+    fn first_project_state(&self) -> &ProjectState {
+        self.projects
+            .values()
+            .next()
+            .expect("To always have at least one project")
+    }
+
+    fn first_project_state_mut(&mut self) -> &mut ProjectState {
+        self.projects.values_mut().next().unwrap()
     }
 
     pub(crate) fn apply_changes(
