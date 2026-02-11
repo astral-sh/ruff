@@ -344,8 +344,8 @@ impl Session {
         match path {
             AnySystemPath::System(system_path) => self
                 .project_state_for_path(system_path)
-                .unwrap_or_else(|| self.first_project_state()),
-            AnySystemPath::SystemVirtual(_virtual_path) => self.first_project_state(),
+                .unwrap_or_else(|| self.project_state_virtual_fallback()),
+            AnySystemPath::SystemVirtual(_virtual_path) => self.project_state_virtual_fallback(),
         }
     }
 
@@ -368,9 +368,11 @@ impl Session {
                     return self.projects.range_mut(range).next_back().unwrap().1;
                 }
 
-                self.first_project_state_mut()
+                self.project_state_virtual_fallback_mut()
             }
-            AnySystemPath::SystemVirtual(_virtual_path) => self.first_project_state_mut(),
+            AnySystemPath::SystemVirtual(_virtual_path) => {
+                self.project_state_virtual_fallback_mut()
+            }
         }
     }
 
@@ -390,14 +392,14 @@ impl Session {
     // need to figure out which project should this virtual path
     // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
     // look for the first project with an overlapping search path?)
-    fn first_project_state(&self) -> &ProjectState {
+    fn project_state_virtual_fallback(&self) -> &ProjectState {
         self.projects
             .values()
             .next()
             .expect("To always have at least one project")
     }
 
-    fn first_project_state_mut(&mut self) -> &mut ProjectState {
+    fn project_state_virtual_fallback_mut(&mut self) -> &mut ProjectState {
         self.projects.values_mut().next().unwrap()
     }
 
@@ -1115,7 +1117,7 @@ impl Session {
                 let project = self.project_state(path);
                 self.workspaces
                     .settings_for_path(project.db.project().root(&project.db))
-                    .or_else(|| self.workspaces.first_settings())
+                    .or_else(|| self.workspaces.settings_virtual_fallback())
             }
         }
     }
@@ -1533,7 +1535,7 @@ impl Workspaces {
         self.for_path(path).map(Workspace::settings_arc)
     }
 
-    fn first_settings(&self) -> Option<Arc<WorkspaceSettings>> {
+    fn settings_virtual_fallback(&self) -> Option<Arc<WorkspaceSettings>> {
         self.workspaces.values().next().map(Workspace::settings_arc)
     }
 
