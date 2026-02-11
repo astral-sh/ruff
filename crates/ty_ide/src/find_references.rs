@@ -382,6 +382,64 @@ value = my_function
     }
 
     #[test]
+    fn overloaded_function_declaration_references_include_all_overloads_and_implementation() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+from typing import overload, Any
+
+@overload
+def test<CURSOR>() -> None: ...
+@overload
+def test(a: str) -> str: ...
+@overload
+def test(a: int) -> int: ...
+
+def test(a: Any) -> Any:
+    return a
+"#,
+            )
+            .source(
+                "main.py",
+                r#"
+from lib import test
+
+test("test")
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @"
+        info[references]: Found 6 references
+          --> lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ----
+         6 | @overload
+         7 | def test(a: str) -> str: ...
+           |     ----
+         8 | @overload
+         9 | def test(a: int) -> int: ...
+           |     ----
+        10 |
+        11 | def test(a: Any) -> Any:
+           |     ----
+        12 |     return a
+           |
+          ::: main.py:2:17
+           |
+         2 | from lib import test
+           |                 ----
+         3 |
+         4 | test(\"test\")
+           | ----
+           |
+        ");
+    }
+
+    #[test]
     fn class_definition_references() {
         let test = cursor_test(
             "

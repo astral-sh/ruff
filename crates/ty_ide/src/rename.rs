@@ -1578,23 +1578,31 @@ result = func(10, y=20)
             .build();
 
         assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 3 locations)
-         --> lib.py:5:5
-          |
-        4 | @overload
-        5 | def test() -> None: ...
-          |     ^^^^
-        6 | @overload
-        7 | def test(a: str) -> str: ...
-          |
-         ::: main.py:2:17
-          |
-        2 | from lib import test
-          |                 ----
-        3 |
-        4 | test("test")
-          | ----
-          |
+        info[rename]: Rename symbol (found 6 locations)
+          --> lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ^^^^
+         6 | @overload
+         7 | def test(a: str) -> str: ...
+           |     ----
+         8 | @overload
+         9 | def test(a: int) -> int: ...
+           |     ----
+        10 |
+        11 | def test(a: Any) -> Any:
+           |     ----
+        12 |     return a
+           |
+          ::: main.py:2:17
+           |
+         2 | from lib import test
+           |                 ----
+         3 |
+         4 | test("test")
+           | ----
+           |
         "#);
     }
 
@@ -1630,23 +1638,31 @@ result = func(10, y=20)
             .build();
 
         assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 2 locations)
-         --> lib.py:6:9
-          |
-        4 | class Test:
-        5 |     @overload
-        6 |     def test() -> None: ...
-          |         ^^^^
-        7 |     @overload
-        8 |     def test(a: str) -> str: ...
-          |
-         ::: main.py:4:8
-          |
-        2 | from lib import Test
-        3 |
-        4 | Test().test("test")
-          |        ----
-          |
+        info[rename]: Rename symbol (found 5 locations)
+          --> lib.py:6:9
+           |
+         4 | class Test:
+         5 |     @overload
+         6 |     def test() -> None: ...
+           |         ^^^^
+         7 |     @overload
+         8 |     def test(a: str) -> str: ...
+           |         ----
+         9 |     @overload
+        10 |     def test(a: int) -> int: ...
+           |         ----
+        11 |
+        12 |     def test(a: Any) -> Any:
+           |         ----
+        13 |         return a
+           |
+          ::: main.py:4:8
+           |
+         2 | from lib import Test
+         3 |
+         4 | Test().test("test")
+           |        ----
+           |
         "#);
     }
 

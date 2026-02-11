@@ -11,7 +11,7 @@ use crate::types::{
     CallDunderError, CallableTypes, ClassBase, ClassLiteral, ClassType, KnownUnion, Type,
     TypeContext, UnionType,
 };
-use crate::{Db, DisplaySettings, HasType, SemanticModel};
+use crate::{Db, DisplaySettings, HasDefinition, HasType, SemanticModel};
 use itertools::Either;
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
@@ -479,6 +479,28 @@ pub fn definitions_for_imported_symbol<'db>(
         &mut visited,
         alias_resolution,
     )
+}
+
+/// Returns the definition and overload co-definitions for a function declaration.
+///
+/// For overloaded functions this includes sibling overload declarations and the
+/// implementation, if present.
+pub fn definitions_and_overloads_for_function<'db>(
+    model: &SemanticModel<'db>,
+    function: &ast::StmtFunctionDef,
+) -> Vec<ResolvedDefinition<'db>> {
+    if let Some(function_type) = function
+        .inferred_type(model)
+        .and_then(Type::as_function_literal)
+    {
+        function_type
+            .iter_overloads_and_implementation(model.db())
+            .filter_map(|overload| overload.signature(model.db()).definition())
+            .map(ResolvedDefinition::Definition)
+            .collect()
+    } else {
+        vec![ResolvedDefinition::Definition(function.definition(model))]
+    }
 }
 
 /// Details about a callable signature for IDE support.
