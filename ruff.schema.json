@@ -1764,6 +1764,23 @@
             "object",
             "null"
           ],
+          "properties": {
+            "first-party": {
+              "type": "string"
+            },
+            "future": {
+              "type": "string"
+            },
+            "local-folder": {
+              "type": "string"
+            },
+            "standard-library": {
+              "type": "string"
+            },
+            "third-party": {
+              "type": "string"
+            }
+          },
           "additionalProperties": {
             "type": "string"
           }
