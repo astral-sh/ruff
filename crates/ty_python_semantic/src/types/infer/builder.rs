@@ -1459,11 +1459,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // variables from enclosing scopes (by identity).
                     for base_typevar in class.typevars_referenced_in_bases(self.db()) {
                         let typevar = base_typevar.typevar(self.db());
-                        for enclosing in
-                            enclosing_generic_contexts(self.db(), self.index, parent)
-                        {
-                            if let Some(other_typevar) =
-                                enclosing.binds_typevar(self.db(), typevar)
+                        for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
+                            if let Some(other_typevar) = enclosing.binds_typevar(self.db(), typevar)
                             {
                                 report_rebound_typevar(
                                     &self.context,
