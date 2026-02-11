@@ -13296,30 +13296,24 @@ pub(crate) mod tests {
         assert!(!div.is_redundant_with(&db, Type::unknown()));
         assert!(!Type::unknown().is_redundant_with(&db, div));
 
-        // `Divergent & T` and `Divergent & ~T` both simplify to `Divergent`, except for the
-        // specific case of `Divergent & Never`, which simplifies to `Never`.
-        let divergent_intersection = IntersectionBuilder::new(&db)
+        let truthy_div = IntersectionBuilder::new(&db)
             .add_positive(div)
-            .add_positive(todo_type!("2"))
-            .add_negative(todo_type!("3"))
+            .add_negative(Type::AlwaysFalsy)
             .build();
-        assert_eq!(divergent_intersection, div);
-        let divergent_intersection = IntersectionBuilder::new(&db)
-            .add_positive(todo_type!("2"))
-            .add_negative(todo_type!("3"))
-            .add_positive(div)
-            .build();
-        assert_eq!(divergent_intersection, div);
-        let divergent_never_intersection = IntersectionBuilder::new(&db)
-            .add_positive(div)
-            .add_positive(Type::Never)
-            .build();
-        assert_eq!(divergent_never_intersection, Type::Never);
-        let divergent_never_intersection = IntersectionBuilder::new(&db)
-            .add_positive(Type::Never)
-            .add_positive(div)
-            .build();
-        assert_eq!(divergent_never_intersection, Type::Never);
+
+        let union = UnionType::from_elements(&db, [Type::unknown(), truthy_div]);
+        assert!(!truthy_div.is_redundant_with(&db, Type::unknown()));
+        assert_eq!(
+            union.display(&db).to_string(),
+            "Unknown | (Divergent & ~AlwaysFalsy)"
+        );
+
+        let union = UnionType::from_elements(&db, [truthy_div, Type::unknown()]);
+        assert!(!Type::unknown().is_redundant_with(&db, truthy_div));
+        assert_eq!(
+            union.display(&db).to_string(),
+            "(Divergent & ~AlwaysFalsy) | Unknown"
+        );
 
         // The `object` type has a good convergence property, that is, its union with all other types is `object`.
         // (e.g. `object | tuple[Divergent] == object`, `object | tuple[object] == object`)

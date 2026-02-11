@@ -427,26 +427,6 @@ while random():
     reveal_type(x)  # revealed: Divergent
 ```
 
-### Avoid oscillations
-
-We need to avoid oscillating cycles in cases like the following, where the type of one of these loop
-variables also influences the static reachability of its bindings. This case was minimized from a
-real crash that came up during development checking these lines of `sympy`:
-<https://github.com/sympy/sympy/blob/c2bfd65accf956576b58f0ae57bf5821a0c4ff49/sympy/core/numbers.py#L158-L166>
-
-```py
-def random() -> bool:
-    return False
-
-x = 1
-y = 2
-while random():
-    if x:
-        x, y = y, x
-    reveal_type(x)  # revealed: Literal[2, 1]
-    reveal_type(y)  # revealed: Literal[1, 2]
-```
-
 ### Loop bodies that are guaranteed to execute at least once
 
 TODO: We should be able to see when a loop body is guaranteed to execute at least once. However,
@@ -473,57 +453,6 @@ while True:
     if VAL - 1:
         x = 2
 ```
-
-### `Divergent` in narrowing conditions doesn't run afoul of "monotonic widening" in cycle recovery
-
-The following is a deceptively-simple-looking case of narrowing that was difficult to get right in
-the initial implementation of cyclic control flow. We start with a non-empty linked list, and we
-advance it in a loop until there's exactly one node left:
-
-```py
-class Node:
-    def __init__(self, next: "Node | None" = None):
-        self.next: "Node | None" = next
-
-node = Node(Node(Node()))
-while node.next is not None:
-    node = node.next
-reveal_type(node)  # revealed: Node
-reveal_type(node.next)  # revealed: None
-```
-
-There's nothing wrong with this code, and it was minimized from [real cases] in the ecosystem. But
-it's prone to false-positive `[possibly-missing-attribute]` warnings on the `node.next` accesses if
-we lose track of the fact that the `node` variable is never `None`. Note that the loop condition
-narrows `node.next`, not `node` itself, so that constraint needs to flow through the assignment in
-the loop body, and through the loop header definition that sees that assignment, to the prior uses
-of `node` in the loop condition and in the RHS of the assignment. We expect that to become a Salsa
-cycle that we resolve through fixpoint iteration. That runs into two of our cycle recovery
-behaviors:
-
-1. When cycles show up in a standalone expression definition (in this case, the `while` loop
-    condition), the `cycle_initial` value (`expression_cycle_initial`) is an empty map with a
-    "fallback type" that reports `Divergent` for _every_ sub-expression. That even includes literal
-    expressions like `42` and (in this case) `None`.
-1. To avoid oscillations in cycle recovery (`Type::cycle_normalized`), we union together the type
-    inferred in the previous iteration with the type inferred in the current one, as long as
-    neither of them contains `Divergent`. In other words, we do "monotonic widening".
-
-The interaction we have to worry about is getting stuck with a type that's too wide. When we try to
-do narrowing in the first cycle iteration, `is not None` behaves like `is not Divergent`. If the
-consequence is that we don't do any narrowing at all, then for that iteration we'll end up inferring
-`Node | None` for `node`. (For completeness, we actually infer `Node | None | Divergent` because of
-a nested cycle, but we strip out _that_ `Divergent` in another part of cycle recovery. The
-[full chain of events here][divergent_debugging] is quite long.) In the second cycle iteration we'll
-get the narrowing right and infer that `node` is of type `Node`, but then our monotonic widening
-step will union `Node` with `Node | None` from the previous iteration, reproduce the same wrong
-answer, and declare that to be the fixpoint. Finally we get false-positive warnings from the fact
-that `Node` doesn't have a `.next` field.
-
-So, because we do monotonic widening in cycle recovery, we need to make sure that temporarily
-`Divergent` expressions in narrowing constraints don't lead to too-wide-but-not-visibly-`Divergent`
-types. Instead, `Divergent` should "poison" any value we try to narrow against it, so that our cycle
-recovery logic doesn't carry that result forward.
 
 ### `global` and `nonlocal` keywords in a loop
 
@@ -572,6 +501,3 @@ while True:
     x  # error: [possibly-unresolved-reference]
     x = 1
 ```
-
-[divergent_debugging]: https://github.com/astral-sh/ruff/pull/22794#issuecomment-3852095578
-[real cases]: https://github.com/Finistere/antidote/blob/7d64ff76b7e283e5d9593ca09ea7a52b9b054957/src/antidote/_internal/localns.py#L34-L35
