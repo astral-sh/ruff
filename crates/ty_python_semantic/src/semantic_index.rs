@@ -40,6 +40,8 @@ mod re_exports;
 mod reachability_constraints;
 pub(crate) mod scope;
 pub(crate) mod symbol;
+#[cfg(feature = "tdd-stats")]
+pub mod tdd_stats;
 mod use_def;
 
 pub(crate) use self::use_def::{
@@ -93,6 +95,55 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
     Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+}
+
+#[cfg(feature = "tdd-stats")]
+pub fn tdd_stats_for_file(
+    db: &dyn Db,
+    file: File,
+) -> crate::semantic_index::tdd_stats::FileTddStatsSummary {
+    use crate::semantic_index::tdd_stats::{FileTddStatsSummary, ScopeTddStatsSummary};
+
+    let index = semantic_index(db, file);
+    let mut scopes = Vec::new();
+    for (scope_id, use_def) in index.use_def_maps.iter_enumerated() {
+        let report = use_def.tdd_stats_report();
+        if report.roots.is_empty() {
+            continue;
+        }
+        let root_count = report.roots.len();
+        let total_interior_nodes = report.roots.iter().map(|root| root.interior_nodes).sum();
+        let max_interior_nodes = report
+            .roots
+            .iter()
+            .map(|root| root.interior_nodes)
+            .max()
+            .unwrap_or(0);
+        scopes.push(ScopeTddStatsSummary {
+            scope_id: scope_id.as_u32(),
+            root_count,
+            total_interior_nodes,
+            max_interior_nodes,
+            histogram: report.histogram,
+        });
+    }
+    scopes.sort_unstable_by_key(|scope| scope.scope_id);
+
+    let total_roots = scopes.iter().map(|scope| scope.root_count).sum();
+    let total_interior_nodes = scopes.iter().map(|scope| scope.total_interior_nodes).sum();
+    let max_interior_nodes = scopes
+        .iter()
+        .map(|scope| scope.max_interior_nodes)
+        .max()
+        .unwrap_or(0);
+
+    FileTddStatsSummary {
+        file_path: file.path(db).to_string(),
+        scopes,
+        total_roots,
+        total_interior_nodes,
+        max_interior_nodes,
+    }
 }
 
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching

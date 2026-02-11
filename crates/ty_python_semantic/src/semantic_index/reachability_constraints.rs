@@ -196,7 +196,7 @@
 use std::cmp::Ordering;
 
 use ruff_index::{Idx, IndexVec};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
 use crate::dunder_all::dunder_all_names;
@@ -762,6 +762,27 @@ impl ReachabilityConstraints {
         self.used_interiors[index]
     }
 
+    /// Returns the number of unique interior TDD nodes reachable from `root`.
+    pub(crate) fn interior_node_count(&self, root: ScopedReachabilityConstraintId) -> usize {
+        if root.is_terminal() {
+            return 0;
+        }
+
+        let mut seen = FxHashSet::default();
+        let mut stack = vec![root];
+        while let Some(id) = stack.pop() {
+            if id.is_terminal() || !seen.insert(id) {
+                continue;
+            }
+            let node = self.get_interior_node(id);
+            stack.push(node.if_true);
+            stack.push(node.if_ambiguous);
+            stack.push(node.if_false);
+        }
+
+        seen.len()
+    }
+
     /// Narrow a type by walking a TDD narrowing constraint.
     ///
     /// The TDD represents a ternary formula over predicates that encodes which predicates
@@ -919,21 +940,7 @@ impl ReachabilityConstraints {
                 ALWAYS_TRUE => return Truthiness::AlwaysTrue,
                 AMBIGUOUS => return Truthiness::Ambiguous,
                 ALWAYS_FALSE => return Truthiness::AlwaysFalse,
-                _ => {
-                    // `id` gives us the index of this node in the IndexVec that we used when
-                    // constructing this BDD. When finalizing the builder, we threw away any
-                    // interior nodes that weren't marked as used. The `used_indices` bit vector
-                    // lets us verify that this node was marked as used, and the rank of that bit
-                    // in the bit vector tells us where this node lives in the "condensed"
-                    // `used_interiors` vector.
-                    let raw_index = id.as_u32() as usize;
-                    debug_assert!(
-                        self.used_indices.get_bit(raw_index).unwrap_or(false),
-                        "all used reachability constraints should have been marked as used",
-                    );
-                    let index = self.used_indices.rank(raw_index) as usize;
-                    self.used_interiors[index]
-                }
+                _ => self.get_interior_node(id),
             };
             let predicate = &predicates[node.atom];
             match Self::analyze_single(db, predicate) {

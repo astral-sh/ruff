@@ -418,6 +418,30 @@ impl<'db> UseDefMap<'db> {
             .may_be_true()
     }
 
+    /// Returns a debug report describing TDD sizes for recorded node reachability roots.
+    #[cfg(feature = "tdd-stats")]
+    pub(crate) fn tdd_stats_report(&self) -> crate::semantic_index::tdd_stats::TddStatsReport {
+        use crate::semantic_index::tdd_stats::{
+            TddRootKind, TddRootRef, TddRootStat, TddStatsReport,
+        };
+
+        let mut roots = Vec::with_capacity(self.node_reachability.len());
+        for (&node, &constraint) in &self.node_reachability {
+            roots.push(TddRootStat {
+                root: TddRootRef {
+                    kind: TddRootKind::NodeReachability,
+                    node,
+                    constraint,
+                },
+                interior_nodes: self
+                    .reachability_constraints
+                    .interior_node_count(constraint),
+            });
+        }
+        roots.sort_unstable_by(|a, b| b.interior_nodes.cmp(&a.interior_nodes));
+        TddStatsReport::from_roots(roots)
+    }
+
     pub(crate) fn end_of_scope_bindings(
         &self,
         place: ScopedPlaceId,

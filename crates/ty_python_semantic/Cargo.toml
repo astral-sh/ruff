@@ -73,6 +73,7 @@ quickcheck_macros = { workspace = true }
 schemars = ["dep:schemars", "dep:serde_json"]
 serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
 testing = []
+tdd-stats = []
 
 [[test]]
 name = "mdtest"

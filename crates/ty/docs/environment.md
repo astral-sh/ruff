@@ -30,6 +30,29 @@ If set to `"1"` or `"true"`, ty will enable flamegraph profiling.
 This creates a `tracing.folded` file that can be used to generate flame graphs
 for performance analysis.
 
+### `TY_TDD_STATS_REPORT`
+
+Controls reporting of TDD (ternary decision diagram) size statistics after `ty check`.
+
+This is a developer-focused diagnostic mode and is only available when ty is built
+with the `tdd-stats` cargo feature.
+Without this feature, no TDD stats collection code is compiled into the binary.
+
+Accepted values:
+
+- `short`: Emit per-file summary through tracing target `ty.tdd_stats`.
+- `full`: Emit per-file and per-scope summaries (including histograms) through tracing target `ty.tdd_stats`.
+
+Example:
+
+```bash
+TY_TDD_STATS_REPORT=short TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
+```
+
+```bash
+TY_TDD_STATS_REPORT=full TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-stats -- check path/to/project
+```
+
 ### `TY_MAX_PARALLELISM`
 
 Specifies an upper limit for the number of tasks ty is allowed to run in parallel.
@@ -76,4 +99,3 @@ Path to user-level configuration directory on Unix systems.
 ### `_CONDA_ROOT`
 
 Used to determine the root install path of Conda.
-

@@ -27,6 +27,8 @@ use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, suppress_all_diagnostics, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
+#[cfg(feature = "tdd-stats")]
+use ty_python_semantic::semantic_index::tdd_stats_for_file;
 use ty_server::run_server;
 use ty_static::EnvVars;
 
@@ -181,6 +183,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         }
         Err(_) => {}
     }
+    drop(stdout);
+
+    #[cfg(feature = "tdd-stats")]
+    write_tdd_stats_report(&db, printer);
 
     std::mem::forget(db);
 
@@ -188,6 +194,123 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Ok(ExitStatus::Success)
     } else {
         Ok(exit_status)
+    }
+}
+
+#[cfg(feature = "tdd-stats")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum TddStatsReportMode {
+    Short,
+    Full,
+}
+
+#[cfg(feature = "tdd-stats")]
+fn tdd_stats_report_mode() -> Option<TddStatsReportMode> {
+    match std::env::var(EnvVars::TY_TDD_STATS_REPORT).as_deref() {
+        Ok("short") => Some(TddStatsReportMode::Short),
+        Ok("full") => Some(TddStatsReportMode::Full),
+        Ok(other) => {
+            tracing::warn!(
+                "Unknown value for `TY_TDD_STATS_REPORT`: `{other}`. Valid values are `short` and `full`."
+            );
+            None
+        }
+        Err(_) => None,
+    }
+}
+
+#[cfg(feature = "tdd-stats")]
+fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
+    let Some(mode) = tdd_stats_report_mode() else {
+        return;
+    };
+
+    let project = db.project();
+    let files = project.files(db);
+
+    let mut summaries = Vec::new();
+    for file in &files {
+        if !project.should_check_file(db, file) {
+            continue;
+        }
+        let summary = tdd_stats_for_file(db, file);
+        if summary.total_roots > 0 {
+            summaries.push(summary);
+        }
+    }
+
+    if summaries.is_empty() {
+        return;
+    }
+
+    summaries.sort();
+    let total_roots: usize = summaries.iter().map(|summary| summary.total_roots).sum();
+    let total_interior_nodes: usize = summaries
+        .iter()
+        .map(|summary| summary.total_interior_nodes)
+        .sum();
+    let global_max = summaries
+        .iter()
+        .map(|summary| summary.max_interior_nodes)
+        .max()
+        .unwrap_or(0);
+
+    tracing::info!(
+        target: "ty.tdd_stats",
+        mode = ?mode,
+        files = summaries.len(),
+        total_roots,
+        total_interior_nodes,
+        max_root_nodes = global_max,
+        "tdd_stats_summary"
+    );
+
+    match mode {
+        TddStatsReportMode::Short => {
+            for summary in summaries.iter().take(20) {
+                tracing::info!(
+                    target: "ty.tdd_stats",
+                    file = %summary.file_path,
+                    summary.total_roots,
+                    total_nodes = summary.total_interior_nodes,
+                    max_root_nodes = summary.max_interior_nodes,
+                    "tdd_stats_file"
+                );
+            }
+        }
+        TddStatsReportMode::Full => {
+            for summary in &summaries {
+                tracing::info!(
+                    target: "ty.tdd_stats",
+                    file = %summary.file_path,
+                    roots = summary.total_roots,
+                    total_nodes = summary.total_interior_nodes,
+                    max_root_nodes = summary.max_interior_nodes,
+                    "tdd_stats_file"
+                );
+                let mut scopes = summary.scopes.clone();
+                scopes.sort();
+                for scope in &scopes {
+                    let mut histogram = String::new();
+                    for bin in &scope.histogram {
+                        if !histogram.is_empty() {
+                            histogram.push(' ');
+                        }
+                        let _ = write!(&mut histogram, "{}=>{}", bin.interior_nodes, bin.count);
+                    }
+                    tracing::info!(
+                        target: "ty.tdd_stats",
+                        file = %summary.file_path,
+                        scope = scope.scope_id,
+                        scope.root_count,
+                        total_nodes = scope.total_interior_nodes,
+                        max_root_nodes = scope.max_interior_nodes,
+                        histogram = %histogram,
+                        "tdd_stats_scope"
+                    );
+                }
+            }
+        }
     }
 }
 
