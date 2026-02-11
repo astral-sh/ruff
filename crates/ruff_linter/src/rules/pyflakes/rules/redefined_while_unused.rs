@@ -230,9 +230,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             .iter()
             .any(|info| info.is_type_checking_duplicate);
 
-        let runtime_import = entry_infos.iter().find_map(|info| info.runtime_import);
-
-        let Some(source) = runtime_import else {
+        let Some(source) = entry_infos.iter().find_map(|info| info.runtime_import) else {
             continue;
         };
 
