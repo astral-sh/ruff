@@ -383,9 +383,6 @@ impl<'db> Type<'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => ConstraintSet::from(true),
 
-            // Two `Self` typevars with the same owner class are the same type, even if their
-            // binding contexts differ (e.g., `Self@LinkedList` from a class body annotation vs
-            // `Self@next` from a method signature).
             (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar))
                 if self_typevar.is_same_typevar_as(db, other_typevar) =>
             {

@@ -8911,20 +8911,7 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     /// Returns whether two bound typevars represent the same logical typevar, regardless of e.g.
     /// differences in their bounds or constraints due to materialization.
-    ///
-    /// For `Self` typevars, two instances are considered the same if they share the same owner
-    /// class (derived from their upper bound), even if their binding contexts differ (e.g.,
-    /// `Self@LinkedList` from a class body vs `Self@next` from a method).
     pub(crate) fn is_same_typevar_as(self, db: &'db dyn Db, other: Self) -> bool {
-        if self.typevar(db).is_self(db) && other.typevar(db).is_self(db) {
-            if let (Some(left), Some(right)) = (
-                self_typevar_owner_class_literal(db, self),
-                self_typevar_owner_class_literal(db, other),
-            ) {
-                return left == right && self.paramspec_attr(db) == other.paramspec_attr(db);
-            }
-        }
-
         self.identity(db) == other.identity(db)
     }
 
