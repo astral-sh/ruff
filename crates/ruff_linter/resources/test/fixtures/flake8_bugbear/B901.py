@@ -1,7 +1,8 @@
 """
 Should emit:
-B901 - on lines 9, 36
+B901 - on lines 9, 36, 56, 60, 72, 83, 88, 112, 119, 126
 """
+import pytest
 
 
 def broken():
@@ -86,3 +87,34 @@ async def broken6():
 async def broken7():
     yield 1
     return [1, 2, 3]
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport():
+    result = yield
+    return result
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_fixture_setup():
+    result = yield
+    result.some_attr = "modified"
+    return result
+
+
+@pytest.hookimpl()
+def pytest_configure():
+    yield
+    return "should error"
+
+
+@pytest.hookimpl(wrapper=False)
+def pytest_unconfigure():
+    yield
+    return "should error"
+
+
+@pytest.fixture()
+def my_fixture():
+    yield
+    return "should error"
