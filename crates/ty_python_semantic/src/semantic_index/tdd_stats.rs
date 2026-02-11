@@ -52,6 +52,7 @@ pub(crate) struct TddRootRef {
 pub(crate) struct TddRootStat {
     pub(crate) root: TddRootRef,
     pub(crate) interior_nodes: usize,
+    pub(crate) max_depth: usize,
 }
 
 /// Hot interior node aggregated across multiple roots.
@@ -86,6 +87,7 @@ impl Ord for TddRootStat {
         other
             .interior_nodes
             .cmp(&self.interior_nodes)
+            .then_with(|| other.max_depth.cmp(&self.max_depth))
             .then_with(|| self.root.cmp(&other.root))
     }
 }
@@ -178,8 +180,10 @@ pub struct FileTddStatsSummary {
     pub max_interior_nodes: usize,
     pub reachability_roots: usize,
     pub reachability_interior_nodes: usize,
+    pub reachability_max_depth: usize,
     pub narrowing_roots: usize,
     pub narrowing_interior_nodes: usize,
+    pub narrowing_max_depth: usize,
 }
 
 /// Public, scope-level summary used by `ty` for reporting.
@@ -191,8 +195,10 @@ pub struct ScopeTddStatsSummary {
     pub max_interior_nodes: usize,
     pub reachability_roots: usize,
     pub reachability_interior_nodes: usize,
+    pub reachability_max_depth: usize,
     pub narrowing_roots: usize,
     pub narrowing_interior_nodes: usize,
+    pub narrowing_max_depth: usize,
     pub histogram: Vec<TddHistogramBin>,
     pub hot_nodes: Vec<TddHotNodeSummary>,
 }
@@ -239,9 +245,15 @@ impl Ord for ScopeTddStatsSummary {
             })
             .then_with(|| {
                 other
+                    .reachability_max_depth
+                    .cmp(&self.reachability_max_depth)
+            })
+            .then_with(|| {
+                other
                     .narrowing_interior_nodes
                     .cmp(&self.narrowing_interior_nodes)
             })
+            .then_with(|| other.narrowing_max_depth.cmp(&self.narrowing_max_depth))
             .then_with(|| other.reachability_roots.cmp(&self.reachability_roots))
             .then_with(|| other.narrowing_roots.cmp(&self.narrowing_roots))
             .then_with(|| self.scope_id.as_u32().cmp(&other.scope_id.as_u32()))
@@ -270,9 +282,15 @@ impl Ord for FileTddStatsSummary {
             })
             .then_with(|| {
                 other
+                    .reachability_max_depth
+                    .cmp(&self.reachability_max_depth)
+            })
+            .then_with(|| {
+                other
                     .narrowing_interior_nodes
                     .cmp(&self.narrowing_interior_nodes)
             })
+            .then_with(|| other.narrowing_max_depth.cmp(&self.narrowing_max_depth))
             .then_with(|| other.reachability_roots.cmp(&self.reachability_roots))
             .then_with(|| other.narrowing_roots.cmp(&self.narrowing_roots))
             .then_with(|| self.file_path.as_str().cmp(other.file_path.as_str()))

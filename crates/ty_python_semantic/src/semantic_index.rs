@@ -174,8 +174,10 @@ pub fn tdd_stats_for_file(
         let mut max_interior_nodes = 0;
         let mut reachability_roots = 0;
         let mut reachability_interior_nodes = 0;
+        let mut reachability_max_depth = 0;
         let mut narrowing_roots = 0;
         let mut narrowing_interior_nodes = 0;
+        let mut narrowing_max_depth = 0;
         for root in &report.roots {
             total_interior_nodes += root.interior_nodes;
             max_interior_nodes = max_interior_nodes.max(root.interior_nodes);
@@ -183,10 +185,12 @@ pub fn tdd_stats_for_file(
                 TddRootKind::NodeReachability => {
                     reachability_roots += 1;
                     reachability_interior_nodes += root.interior_nodes;
+                    reachability_max_depth = reachability_max_depth.max(root.max_depth);
                 }
                 TddRootKind::NarrowingConstraint => {
                     narrowing_roots += 1;
                     narrowing_interior_nodes += root.interior_nodes;
+                    narrowing_max_depth = narrowing_max_depth.max(root.max_depth);
                 }
             }
         }
@@ -217,8 +221,10 @@ pub fn tdd_stats_for_file(
             max_interior_nodes,
             reachability_roots,
             reachability_interior_nodes,
+            reachability_max_depth,
             narrowing_roots,
             narrowing_interior_nodes,
+            narrowing_max_depth,
             histogram: report.histogram,
             hot_nodes,
         });
@@ -237,6 +243,16 @@ pub fn tdd_stats_for_file(
         .iter()
         .map(|scope| scope.narrowing_interior_nodes)
         .sum();
+    let reachability_max_depth = scopes
+        .iter()
+        .map(|scope| scope.reachability_max_depth)
+        .max()
+        .unwrap_or(0);
+    let narrowing_max_depth = scopes
+        .iter()
+        .map(|scope| scope.narrowing_max_depth)
+        .max()
+        .unwrap_or(0);
     let max_interior_nodes = scopes
         .iter()
         .map(|scope| scope.max_interior_nodes)
@@ -251,8 +267,10 @@ pub fn tdd_stats_for_file(
         max_interior_nodes,
         reachability_roots,
         reachability_interior_nodes,
+        reachability_max_depth,
         narrowing_roots,
         narrowing_interior_nodes,
+        narrowing_max_depth,
     }
 }
 

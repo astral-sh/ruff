@@ -814,6 +814,35 @@ impl ReachabilityConstraints {
         nodes
     }
 
+    /// Returns the maximum interior depth reachable from `root`.
+    ///
+    /// Terminal constraints have depth `0`. An interior node has depth
+    /// `1 + max(depth(if_true), depth(if_ambiguous), depth(if_false))`.
+    #[cfg(feature = "tdd-stats")]
+    pub(crate) fn max_depth(&self, root: ScopedReachabilityConstraintId) -> usize {
+        fn max_depth_inner(
+            constraints: &ReachabilityConstraints,
+            id: ScopedReachabilityConstraintId,
+            memo: &mut FxHashMap<ScopedReachabilityConstraintId, usize>,
+        ) -> usize {
+            if id.is_terminal() {
+                return 0;
+            }
+            if let Some(depth) = memo.get(&id) {
+                return *depth;
+            }
+            let node = constraints.get_interior_node(id);
+            let depth = 1 + max_depth_inner(constraints, node.if_true, memo)
+                .max(max_depth_inner(constraints, node.if_ambiguous, memo))
+                .max(max_depth_inner(constraints, node.if_false, memo));
+            memo.insert(id, depth);
+            depth
+        }
+
+        let mut memo = FxHashMap::default();
+        max_depth_inner(self, root, &mut memo)
+    }
+
     #[cfg(feature = "tdd-stats")]
     pub(crate) fn interior_atom(&self, id: ScopedReachabilityConstraintId) -> ScopedPredicateId {
         self.get_interior_node(id).atom

@@ -60,6 +60,33 @@ TY_TDD_STATS_REPORT=2 TY_LOG=ty.tdd_stats=info cargo run -p ty --features tdd-st
 
 For tracing filter syntax and logging tips, see [Tracing](./tracing.md).
 
+#### How to read `tdd_stats_summary` and `tdd_stats_file`
+
+`short` and `full` both emit project-level and per-file summary lines on the `ty.tdd_stats` target:
+
+```text
+INFO tdd_stats_summary verbose=... files=... total_roots=... total_interior_nodes=... max_root_nodes=... reachability_roots=... reachability_nodes=... reachability_max_depth=... narrowing_roots=... narrowing_nodes=... narrowing_max_depth=...
+INFO tdd_stats_file file=... roots=... total_nodes=... max_root_nodes=... reachability_roots=... reachability_nodes=... reachability_max_depth=... narrowing_roots=... narrowing_nodes=... narrowing_max_depth=...
+```
+
+Field meanings:
+
+- `verbose`: Effective verbosity level (`1` for short, `2` for full).
+- `files`: Number of analyzed files with non-empty stats (summary line only).
+- `total_roots` / `roots`: Number of root constraints in scope (project/file).
+- `total_interior_nodes` / `total_nodes`: Total interior-node visits from all roots in scope.
+- `max_root_nodes`: Largest interior-node count among single roots in scope.
+- `reachability_roots` / `narrowing_roots`: Root counts split by family.
+- `reachability_nodes` / `narrowing_nodes`: Interior-node visits split by family.
+- `reachability_max_depth` / `narrowing_max_depth`: Maximum TDD depth observed in each family.
+
+Equations:
+
+- `total_roots == reachability_roots + narrowing_roots`
+- `total_interior_nodes == reachability_nodes + narrowing_nodes`
+- `roots == reachability_roots + narrowing_roots`
+- `total_nodes == reachability_nodes + narrowing_nodes`
+
 #### How to read `tdd_stats_hot_node` (full mode)
 
 In `full` mode, ty emits `tdd_stats_hot_node` lines on the `ty.tdd_stats` target:

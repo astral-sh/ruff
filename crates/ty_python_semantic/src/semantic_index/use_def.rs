@@ -453,6 +453,7 @@ impl<'db> UseDefMap<'db> {
                 interior_nodes: self
                     .reachability_constraints
                     .interior_node_count(root.constraint),
+                max_depth: self.reachability_constraints.max_depth(root.constraint),
             });
         };
         for (&node, &constraint) in &self.node_reachability {

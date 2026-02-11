@@ -209,15 +209,15 @@ enum TddStatsReportMode {
 impl TddStatsReportMode {
     const MAX_LEVEL: u8 = TddStatsReportMode::Full as u8;
 
-    const fn from_level(level: u8) -> Self {
-        match level {
+    const fn from_verbose(verbose: u8) -> Self {
+        match verbose {
             0 => TddStatsReportMode::Off,
             1 => TddStatsReportMode::Short,
             _ => TddStatsReportMode::Full,
         }
     }
 
-    const fn level(self) -> u8 {
+    const fn verbose(self) -> u8 {
         self as u8
     }
 }
@@ -236,12 +236,12 @@ fn tdd_stats_report_mode() -> TddStatsReportMode {
             }
 
             match raw.parse::<u8>() {
-                Ok(level) if level <= TddStatsReportMode::MAX_LEVEL => {
-                    TddStatsReportMode::from_level(level)
+                Ok(verbose) if verbose <= TddStatsReportMode::MAX_LEVEL => {
+                    TddStatsReportMode::from_verbose(verbose)
                 }
-                Ok(level) => {
+                Ok(verbose) => {
                     tracing::warn!(
-                        "Value for `TY_TDD_STATS_REPORT` is capped at {} (full), got `{level}`.",
+                        "Value for `TY_TDD_STATS_REPORT` is capped at {} (full), got `{verbose}`.",
                         TddStatsReportMode::MAX_LEVEL
                     );
                     TddStatsReportMode::Full
@@ -307,6 +307,11 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         .iter()
         .map(|summary| summary.total_interior_nodes)
         .sum();
+    let global_max = summaries
+        .iter()
+        .map(|summary| summary.max_interior_nodes)
+        .max()
+        .unwrap_or(0);
     let reachability_roots: usize = summaries
         .iter()
         .map(|summary| summary.reachability_roots)
@@ -323,27 +328,34 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         .iter()
         .map(|summary| summary.narrowing_interior_nodes)
         .sum();
-    let global_max = summaries
+    let reachability_max_depth = summaries
         .iter()
-        .map(|summary| summary.max_interior_nodes)
+        .map(|summary| summary.reachability_max_depth)
+        .max()
+        .unwrap_or(0);
+    let narrowing_max_depth = summaries
+        .iter()
+        .map(|summary| summary.narrowing_max_depth)
         .max()
         .unwrap_or(0);
 
     tracing::info!(
         target: "ty.tdd_stats",
-        level = mode.level(),
+        verbose = mode.verbose(),
         files = summaries.len(),
         total_roots,
         total_interior_nodes,
+        max_root_nodes = global_max,
         reachability_roots,
         reachability_nodes = reachability_interior_nodes,
+        reachability_max_depth,
         narrowing_roots,
         narrowing_nodes = narrowing_interior_nodes,
-        max_root_nodes = global_max,
+        narrowing_max_depth,
         "tdd_stats_summary"
     );
 
-    let is_full = mode.level() >= TddStatsReportMode::Full.level();
+    let is_full = mode.verbose() >= TddStatsReportMode::Full.verbose();
     let file_summaries = if is_full {
         FileSummaryIter::Full(summaries.iter())
     } else {
@@ -356,11 +368,13 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
             file = %summary.file_path,
             roots = summary.total_roots,
             total_nodes = summary.total_interior_nodes,
+            max_root_nodes = summary.max_interior_nodes,
             reachability_roots = summary.reachability_roots,
             reachability_nodes = summary.reachability_interior_nodes,
+            reachability_max_depth = summary.reachability_max_depth,
             narrowing_roots = summary.narrowing_roots,
             narrowing_nodes = summary.narrowing_interior_nodes,
-            max_root_nodes = summary.max_interior_nodes,
+            narrowing_max_depth = summary.narrowing_max_depth,
             "tdd_stats_file"
         );
 
@@ -382,6 +396,8 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
                     scope.root_count,
                     total_nodes = scope.total_interior_nodes,
                     max_root_nodes = scope.max_interior_nodes,
+                    reachability_max_depth = scope.reachability_max_depth,
+                    narrowing_max_depth = scope.narrowing_max_depth,
                     histogram = %histogram,
                     "tdd_stats_scope"
                 );
