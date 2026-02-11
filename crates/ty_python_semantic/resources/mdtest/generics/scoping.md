@@ -290,6 +290,35 @@ class C[T]:
     class Bad2(Iterable[T]): ...
 ```
 
+### Generic class with base that has same-named typevar as enclosing scope
+
+A nested generic class that inherits from a generic base should not be flagged when the base class
+happens to have a type parameter with the same name as the enclosing scope's type parameter, as long
+as the nested class only uses its own type parameters.
+
+```py
+class TypedFieldValue[T]:
+    pass
+
+class CodecBase[T]:
+    typed_field_value_cls: type[TypedFieldValue[T]]
+
+    def __init_subclass__(cls) -> None:
+        class ConcreteTypedFieldValue[U](TypedFieldValue[U]):
+            pass
+
+        cls.typed_field_value_cls = ConcreteTypedFieldValue[T]
+```
+
+But it is still an error to directly reference the enclosing scope's type variable in the base class
+list:
+
+```py
+class Outer[T]:
+    # error: [invalid-generic-class]
+    class Bad(list[T]): ...
+```
+
 ## Class bases are evaluated within the type parameter scope
 
 ```py
