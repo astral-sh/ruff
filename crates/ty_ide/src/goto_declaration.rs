@@ -93,6 +93,40 @@ mod tests {
     }
 
     #[test]
+    fn goto_declaration_typed_dict_key() {
+        let test = cursor_test(
+            r#"
+        from typing import TypedDict
+
+        class Person(TypedDict):
+            name: str
+            age: int
+
+        def foo(person: Person):
+            person["na<CURSOR>me"]
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:9:12
+          |
+        8 | def foo(person: Person):
+        9 |     person["name"]
+          |            ^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        4 | class Person(TypedDict):
+        5 |     name: str
+          |     ----
+        6 |     age: int
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_declaration_class_instantiation() {
         let test = cursor_test(
             "

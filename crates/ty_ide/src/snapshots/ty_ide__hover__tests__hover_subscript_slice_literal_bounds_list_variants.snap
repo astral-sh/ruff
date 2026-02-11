@@ -1,0 +1,121 @@
+---
+source: crates/ty_ide/src/hover.rs
+expression: output
+---
+list case 0:
+list[str]
+---------------------------------------------
+```python
+list[str]
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:1
+  |
+2 | values: list[str] = ["a", "b"]
+3 | values[1:]
+  | ^^^^^^^^-^
+  | |       |
+  | |       Cursor offset
+  | source
+  |
+
+
+
+list case 1:
+list[str]
+---------------------------------------------
+```python
+list[str]
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:1
+  |
+2 | values: list[str] = ["a", "b"]
+3 | values[:-1]
+  | ^^^^^^^^-^^
+  | |       |
+  | |       Cursor offset
+  | source
+  |
+
+
+
+list case 2:
+list[str]
+---------------------------------------------
+```python
+list[str]
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:1
+  |
+2 | values: list[str] = ["a", "b"]
+3 | values[:-1]
+  | ^^^^^^^^^-^
+  | |        |
+  | |        Cursor offset
+  | source
+  |
+
+
+
+list case 3:
+list[str]
+---------------------------------------------
+```python
+list[str]
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:1
+  |
+2 | values: list[str] = ["a", "b"]
+3 | values[: -1]
+  | ^^^^^^^^^^^-
+  | |          |
+  | |          Cursor offset
+  | source
+  |
+
+
+
+list case 4:
+list[str]
+---------------------------------------------
+```python
+list[str]
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:1
+  |
+2 | values: list[str] = ["a", "b"]
+3 | values[:2]
+  | ^^^^^^^-^^
+  | |      |
+  | |      Cursor offset
+  | source
+  |
+
+
+
+list case 5:
+list[str]
+---------------------------------------------
+```python
+list[str]
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:1
+  |
+2 | values: list[str] = ["a", "b"]
+3 | values[:2]
+  | ^^^^^^^^-^
+  | |       |
+  | |       Cursor offset
+  | source
+  |

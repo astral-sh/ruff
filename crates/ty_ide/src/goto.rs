@@ -18,6 +18,7 @@ use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads,
     definitions_and_overloads_for_function, definitions_for_keyword_argument,
+    typed_dict_key_definition,
 };
 use ty_python_semantic::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
@@ -231,6 +232,12 @@ pub(crate) enum GotoTarget<'a> {
         /// If the expression is a Name of some kind this is the name (just a cached result).
         name: Option<String>,
     },
+
+    /// Go to on a string-literal subscript key (e.g. `person["name"]`).
+    SubscriptStringLiteralKey {
+        subscript: &'a ast::ExprSubscript,
+        literal_key: &'a str,
+    },
 }
 
 /// The resolved definitions for a `GotoTarget`
@@ -382,6 +389,9 @@ impl GotoTarget<'_> {
             GotoTarget::UnaryOp { expression, .. } => {
                 let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
                 Some(ty)
+            }
+            GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
+                subscript.inferred_type(model)
             }
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
@@ -671,6 +681,12 @@ impl GotoTarget<'_> {
                     alias_resolution,
                 ))
             }
+
+            GotoTarget::SubscriptStringLiteralKey {
+                subscript,
+                literal_key,
+            } => typed_dict_key_definition(model, subscript, literal_key)
+                .map(|definition| vec![definition]),
         };
         definitions.map(Definitions)
     }
@@ -736,7 +752,9 @@ impl GotoTarget<'_> {
             }
             GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
             GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
-            GotoTarget::BinOp { .. } | GotoTarget::UnaryOp { .. } => None,
+            GotoTarget::BinOp { .. }
+            | GotoTarget::UnaryOp { .. }
+            | GotoTarget::SubscriptStringLiteralKey { .. } => None,
         }
     }
 
@@ -749,7 +767,102 @@ impl GotoTarget<'_> {
     ) -> Option<GotoTarget<'a>> {
         tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
-        match covering_node.node() {
+        let node = covering_node.node();
+        let string_annotation = match node {
+            AnyNodeRef::ExprStringLiteral(string_expr) => {
+                model.enter_string_annotation(string_expr)
+            }
+            _ => None,
+        };
+
+        // Special-case subscripts: if the cursor lands on a literal index/key, slice bound, or
+        // slice inside `value[...]`, retarget to the parent `ExprSubscript` (or a string-literal
+        // key target). Non-literal subscripts (e.g. `value[a<CURSOR>b]`) still hover the
+        // identifier itself. This avoids "no hover" on literals and lets hover/goto show the
+        // subscript result type.
+        if let Some(expr) = node.as_expr_ref()
+            && string_annotation.is_none()
+        {
+            let enclosing_subscript_with_slice_range =
+                |range: TextRange| -> Option<&'a ast::ExprSubscript> {
+                    covering_node.ancestors().find_map(|node| {
+                        let AnyNodeRef::ExprSubscript(subscript) = node else {
+                            return None;
+                        };
+                        (subscript.slice.range() == range).then_some(subscript)
+                    })
+                };
+
+            // 1. Cursor on the `ExprSlice` itself (e.g. `values[<CURSOR>:2]`,
+            // `values[:<CURSOR>2]`).
+            if expr.is_slice_expr()
+                && let Some(subscript) = enclosing_subscript_with_slice_range(expr.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 2. Cursor on a literal or signed-literal `ExprSubscript.slice` (e.g. `values[0]`,
+            // `person["name"]`, `values[-1]` where the covering node is the bracketed
+            // expression).
+            let slice_expr_range = if expr.is_literal_expr() {
+                Some(expr.range())
+            } else if let Some(unary_op) = expr.unary_op_expr()
+                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand.is_literal_expr()
+            {
+                Some(unary_op.range())
+            } else {
+                None
+            };
+
+            if let Some(slice_range) = slice_expr_range
+                && let Some(subscript) = enclosing_subscript_with_slice_range(slice_range)
+            {
+                if let Some(literal) = subscript.slice.as_string_literal_expr() {
+                    let key = literal.value.to_str();
+                    return Some(GotoTarget::SubscriptStringLiteralKey {
+                        subscript,
+                        literal_key: key,
+                    });
+                }
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 3. Cursor on the unary-op operand for `values[-1]` (e.g. `values[-<CURSOR>1]`,
+            // covering node is the inner literal and parent is `ExprUnaryOp`).
+            if expr.is_literal_expr()
+                && let Some(AnyNodeRef::ExprUnaryOp(unary_op)) = covering_node.parent()
+                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand.is_literal_expr()
+                && unary_op.operand.range() == expr.range()
+                && let Some(subscript) = enclosing_subscript_with_slice_range(unary_op.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 4. Cursor on a literal or signed-literal `ExprSlice` bound (e.g. `values[1:<CURSOR>2]`,
+            // `values[:-<CURSOR>1]`).
+            if slice_expr_range.is_some()
+                && let Some(slice) = covering_node.ancestors().find_map(|node| match node {
+                    AnyNodeRef::ExprSlice(slice) => Some(slice),
+                    _ => None,
+                })
+                && let Some(subscript) = enclosing_subscript_with_slice_range(slice.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 5. Cursor immediately before the `[` (e.g. `values<CURSOR>[0]` or
+            // `values<CURSOR>[1:]`).
+            if let Some(AnyNodeRef::ExprSubscript(subscript)) = covering_node.parent()
+                && subscript.value.range() == expr.range()
+                && expr.range().end() == offset
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+        }
+
+        match node {
             AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
                 Some(AnyNodeRef::StmtFunctionDef(function)) => {
                     Some(GotoTarget::FunctionDef(function))
@@ -937,7 +1050,7 @@ impl GotoTarget<'_> {
 
             node @ AnyNodeRef::ExprStringLiteral(string_expr) => {
                 // Check if we've clicked on a sub-GotoTarget inside a string annotation's sub-AST
-                if let Some((subast, submodel)) = model.enter_string_annotation(string_expr)
+                if let Some((subast, submodel)) = string_annotation
                     && let Some(sub_goto_target) = find_goto_target_impl(
                         &submodel,
                         subast.tokens(),
@@ -1039,6 +1152,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::Globals { identifier, .. } => identifier.range,
             GotoTarget::BinOp { operator_range, .. }
             | GotoTarget::UnaryOp { operator_range, .. } => *operator_range,
+            GotoTarget::SubscriptStringLiteralKey { subscript, .. } => subscript.slice.range(),
         }
     }
 }
