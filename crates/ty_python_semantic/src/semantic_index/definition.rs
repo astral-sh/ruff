@@ -5,7 +5,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -1151,20 +1151,23 @@ impl ImportFromSubmoduleDefinitionKind {
     pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
         let module_ident = self.module(module);
         let module_str = module_ident.as_str();
-        let Some(component_str) = module_str.split('.').nth(self.module_index) else {
+
+        // Find the dot that terminates the target component.
+        let Some((end_offset, _)) = module_str.match_indices('.').nth(self.module_index) else {
             // This shouldn't happen but just in case, provide a safe default
             return module_ident.range();
         };
-        let base_addr = module_str.as_ptr().addr();
-        let component_addr = component_str.as_ptr().addr();
-        let offset = base_addr.saturating_sub(component_addr);
-        let Ok(offset_size) = TextSize::try_from(offset) else {
-            // This shouldn't happen but just in case, provide a safe default
+
+        // Find the start of the target component (after the previous dot, or string start).
+        let start_offset = module_str[..end_offset].rfind('.').map_or(0, |pos| pos + 1);
+
+        let Ok(start) = TextSize::try_from(start_offset) else {
             return module_ident.range();
         };
-        let start = module_ident.start().saturating_add(offset_size);
-        let end = start.saturating_add(component_str.text_len());
-        TextRange::new(start, end)
+        let Ok(end) = TextSize::try_from(end_offset) else {
+            return module_ident.range();
+        };
+        TextRange::new(start, end) + module_ident.start()
     }
 }
 
