@@ -4288,9 +4288,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let bound_node = bound.as_deref();
         let bound_or_constraints = match bound_node {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
-                // Here, we interpret `bound` as a heterogeneous tuple and convert it to `TypeVarConstraints` in `TypeVarInstance::lazy_constraints`.
-                let constraint_tys: Box<[Type]> =
-                    elts.iter().map(|e| self.infer_type_expression(e)).collect();
+                // Here, we interpret `bound` as a heterogeneous tuple and convert it to `TypeVarConstraints`
+                // in `TypeVarInstance::lazy_constraints`.
+                let constraint_tys: Box<[Type<'_>]> = elts
+                    .iter()
+                    .map(|expr| {
+                        let constraint = self.infer_type_expression(expr);
+                        if constraint.has_typevar_or_typevar_instance(self.db())
+                            && let Some(builder) = self
+                                .context
+                                .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, expr)
+                        {
+                            builder.into_diagnostic("TypeVar constraint cannot be generic");
+                        }
+                        constraint
+                    })
+                    .collect();
+
                 let tuple_ty = Type::heterogeneous_tuple(self.db(), constraint_tys.clone());
                 self.store_expression_type(expr, tuple_ty);
                 // Mirror the `< 2` guard from `infer_typevar_definition` to avoid
@@ -4306,6 +4320,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             Some(expr) => {
                 let bound_ty = self.infer_type_expression(expr);
+                if bound_ty.has_typevar_or_typevar_instance(self.db())
+                    && let Some(builder) =
+                        self.context.report_lint(&INVALID_TYPE_VARIABLE_BOUND, expr)
+                {
+                    builder.into_diagnostic("TypeVar upper bound cannot be generic");
+                }
+
                 Some(TypeVarBoundOrConstraints::UpperBound(bound_ty))
             }
             None => None,
@@ -7166,20 +7187,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_newtype_assignment_deferred(arguments);
             return;
         }
-        let is_typevar = &|t| {
-            matches!(
-                t,
-                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
-            )
-        };
-        let db = self.db();
-        let is_generic = |ty| any_over_type(db, ty, false, is_typevar);
         let mut constraint_tys = Vec::new();
         for arg in arguments.args.iter().skip(1) {
             let constraint = self.infer_type_expression(arg);
             constraint_tys.push(constraint);
 
-            if is_generic(constraint)
+            if constraint.has_typevar_or_typevar_instance(self.db())
                 && let Some(builder) = self
                     .context
                     .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, arg)
@@ -7198,7 +7211,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let bound_type = self.infer_type_expression(&bound.value);
             bound_or_constraints = Some(TypeVarBoundOrConstraints::UpperBound(bound_type));
 
-            if is_generic(bound_type)
+            if bound_type.has_typevar_or_typevar_instance(self.db())
                 && let Some(builder) = self
                     .context
                     .report_lint(&INVALID_TYPE_VARIABLE_BOUND, bound)
@@ -7238,14 +7251,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
         let inferred = self.infer_type_expression(&arguments.args[1]);
 
-        let is_typevar = &|ty| {
-            matches!(
-                ty,
-                Type::KnownInstance(KnownInstanceType::TypeVar(_)) | Type::TypeVar(_)
-            )
-        };
-
-        if any_over_type(self.db(), inferred, false, is_typevar) {
+        if inferred.has_typevar_or_typevar_instance(self.db()) {
             if let Some(builder) = self
                 .context
                 .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
