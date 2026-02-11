@@ -5908,11 +5908,52 @@ impl<'db> Type<'db> {
                         });
                     };
 
-                    Ok(
-                        typing_self(db, scope_id, typevar_binding_context, class.into())
-                            .map(Type::TypeVar)
-                            .unwrap_or(*self),
-                    )
+                    let typing_self =
+                        typing_self(db, scope_id, typevar_binding_context, class.into());
+
+                    let in_staticmethod = typing_self.is_some_and(|typing_self| {
+                        let Some(binding_definition) = typing_self.binding_context(db).definition()
+                        else {
+                            return false;
+                        };
+
+                        let DefinitionKind::Function(_) = binding_definition.kind(db) else {
+                            return false;
+                        };
+
+                        infer_definition_types(db, binding_definition)
+                            .declaration_type(binding_definition)
+                            .inner_type()
+                            .as_function_literal()
+                            .is_some_and(|function| {
+                                function.name(db).as_str() != "__new__"
+                                    && function
+                                        .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
+                            })
+                    });
+                    if in_staticmethod {
+                        return Err(InvalidTypeExpressionError {
+                            fallback_type: Type::unknown(),
+                            invalid_expressions: smallvec_inline![
+                                InvalidTypeExpression::TypingSelfInStaticMethod
+                            ],
+                        });
+                    }
+
+                    let is_in_metaclass = KnownClass::Type
+                        .to_class_literal(db)
+                        .to_class_type(db)
+                        .is_some_and(|type_class| class.is_subclass_of(db, None, type_class));
+                    if is_in_metaclass {
+                        return Err(InvalidTypeExpressionError {
+                            fallback_type: Type::unknown(),
+                            invalid_expressions: smallvec_inline![
+                                InvalidTypeExpression::TypingSelfInMetaclass
+                            ],
+                        });
+                    }
+
+                    Ok(typing_self.map(Type::TypeVar).unwrap_or(*self))
                 }
                 // We ensure that `typing.TypeAlias` used in the expected position (annotating an
                 // annotated assignment statement) doesn't reach here. Using it in any other type
@@ -7895,6 +7936,10 @@ enum InvalidTypeExpression<'db> {
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
     TypeQualifierRequiresOneArgument(SpecialFormType),
+    /// `typing.Self` cannot be used in `@staticmethod` definitions.
+    TypingSelfInStaticMethod,
+    /// `typing.Self` cannot be used in metaclass definitions.
+    TypingSelfInMetaclass,
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }
@@ -7963,6 +8008,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
+                    InvalidTypeExpression::TypingSelfInStaticMethod => {
+                        f.write_str("`Self` cannot be used in a static method")
+                    }
+                    InvalidTypeExpression::TypingSelfInMetaclass => {
+                        f.write_str("`Self` cannot be used in a metaclass")
+                    }
                     InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
                         write!(
                             f,
