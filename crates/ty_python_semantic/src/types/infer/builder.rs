@@ -16120,6 +16120,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         inferred_type_arguments.push(provided_type);
 
+                        // A TypeVarTuple cannot be used as a type argument for a
+                        // regular TypeVar, since it represents a variable number of
+                        // types while a TypeVar expects exactly one.
+                        if provided_type.is_typevartuple(db) {
+                            let node = get_node(index);
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
+                            {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "TypeVarTuple cannot be used as a type argument \
+                                        for regular type variable `{}`",
+                                    typevar.identity(db).display(db),
+                                ));
+                                add_typevar_definition(db, &mut diagnostic, typevar);
+                            }
+                            error = Some(ExplicitSpecializationError::UnsatisfiedBound);
+                            specialization_types.push(Some(Type::unknown()));
+                            continue;
+                        }
+
                         // TODO consider just accepting the given specialization without checking
                         // against bounds/constraints, but recording the expression for deferred
                         // checking at end of scope. This would avoid a lot of cycles caused by
