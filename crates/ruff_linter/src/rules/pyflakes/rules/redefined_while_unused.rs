@@ -10,8 +10,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
-use crate::{Fix, FixAvailability, Violation};
 use crate::preview::is_f811_shadowing_in_type_checking_enabled;
+use crate::{Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for variable definitions that redefine (or "shadow") unused
@@ -102,6 +102,23 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             // shadowed binding, abort.
             if !binding.redefines(shadowed) {
                 continue;
+            }
+
+            if !is_f811_shadowing_in_type_checking_enabled(checker.settings()) {
+                let shadowed_in_type_checking = shadowed
+                    .source
+                    .map(|source| is_in_type_checking_block(checker, source))
+                    .unwrap_or(false);
+                let binding_in_type_checking = binding
+                    .source
+                    .map(|source| is_in_type_checking_block(checker, source))
+                    .unwrap_or(false);
+
+                if (shadowed_in_type_checking || binding_in_type_checking)
+                    && !(shadowed_in_type_checking && binding_in_type_checking)
+                {
+                    continue;
+                }
             }
 
             if shadow.same_scope() {
@@ -310,6 +327,13 @@ fn bindings_in_different_forks(
 ) -> bool {
     let left_ = is_in_type_checking_block(checker, left);
     let right_ = is_in_type_checking_block(checker, right);
+
+    if !is_f811_shadowing_in_type_checking_enabled(checker.settings())
+        && (left_ || right_)
+        && !(left_ && right_)
+    {
+        return !checker.semantic().same_branch(left, right);
+    }
 
     if (left_ || right_) && !(left_ && right_) {
         let left_binding = &checker.semantic().bindings[shadow.shadowed_id()];

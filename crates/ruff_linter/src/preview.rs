@@ -306,3 +306,8 @@ pub(crate) const fn is_ble001_exc_info_suppression_enabled(settings: &LinterSett
 pub(crate) const fn is_py315_support_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/22560
+pub(crate) const fn is_f811_shadowing_in_type_checking_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
