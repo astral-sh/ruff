@@ -4277,10 +4277,11 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         if result.place.is_undefined() {
-            return Place::Defined(
-                DefinedPlace::new(Type::unknown()).with_definedness(Definedness::PossiblyUndefined),
-            )
-            .into();
+            // The attribute is declared in `__slots__` but has no explicit binding
+            // or annotation in the class body or any method. This is analogous to a
+            // bare annotation like `x: int` in a class body: the attribute is
+            // considered declared and accessible on instances, just without a known type.
+            return Place::Defined(DefinedPlace::new(Type::unknown())).into();
         }
 
         result

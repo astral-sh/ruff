@@ -16,6 +16,20 @@ a.bar = "woo"
 a.baz = 3  # error: [unresolved-attribute]
 ```
 
+## Accessing slot-declared but uninitialized attributes
+
+A slot declaration is analogous to a bare annotation like `x: int` in a class body: the attribute is
+considered declared and accessible on instances, even if it was never explicitly initialized.
+
+```py
+class A:
+    __slots__ = ("x",)
+
+a = A()
+reveal_type(a.x)  # revealed: Unknown
+a.x = 1
+```
+
 ## Accessing undefined attributes
 
 ```py
@@ -43,7 +57,7 @@ class A:
     __slots__ = "x"
 
 a = A()
-a.x = 1  # error: [possibly-missing-attribute]
+a.x = 1
 a.y = 2  # error: [unresolved-attribute]
 ```
 
@@ -57,7 +71,7 @@ class A:
     __slots__ = "xyz"
 
 a = A()
-a.xyz = 1  # error: [possibly-missing-attribute]
+a.xyz = 1
 a.x = 2  # error: [unresolved-attribute]
 a.y = 3  # error: [unresolved-attribute]
 a.z = 4  # error: [unresolved-attribute]
