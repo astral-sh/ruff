@@ -11,6 +11,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
 use crate::{Fix, FixAvailability, Violation};
+use crate::preview::is_f811_shadowing_in_type_checking_enabled;
 
 /// ## What it does
 /// Checks for variable definitions that redefine (or "shadow") unused
