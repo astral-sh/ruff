@@ -267,7 +267,7 @@ impl<'db> Place<'db> {
 
             Place::Defined(defined) => {
                 if let Some((dunder_get_return_ty, _)) =
-                    defined.ty.try_call_dunder_get(db, Type::none(db), owner)
+                    defined.ty.try_call_dunder_get(db, None, owner)
                 {
                     Place::Defined(DefinedPlace {
                         ty: dunder_get_return_ty,
