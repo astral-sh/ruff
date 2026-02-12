@@ -4207,7 +4207,9 @@ impl<'db> StaticClassLiteral<'db> {
             return Place::Undefined.into();
         }
 
-        match MroLookup::new(db, self.iter_mro(db, specialization)).instance_member(name) {
+        let result = match MroLookup::new(db, self.iter_mro(db, specialization))
+            .instance_member(name)
+        {
             InstanceMemberResult::Done(result) => result,
             InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
                 .to_instance(db)
@@ -4221,7 +4223,67 @@ impl<'db> StaticClassLiteral<'db> {
                         TypeContext::default(),
                     )
                 }),
+        };
+
+        self.apply_slots_constraint(db, specialization, name, result)
+    }
+
+    /// Apply `__slots__` constraints across the MRO.
+    ///
+    /// If every class in the MRO defines `__slots__` (and none includes `"__dict__"`),
+    /// then only attributes named in those slots are permitted on instances.
+    fn apply_slots_constraint(
+        self,
+        db: &'db dyn Db,
+        specialization: Option<Specialization<'db>>,
+        name: &str,
+        result: PlaceAndQualifiers<'db>,
+    ) -> PlaceAndQualifiers<'db> {
+        let mut all_slot_names: FxHashSet<Name> = FxHashSet::default();
+        let mut any_class_defines_slots = false;
+
+        for base in self.iter_mro(db, specialization) {
+            let ClassBase::Class(class) = base else {
+                continue;
+            };
+            let Some((static_literal, _)) = class.static_class_literal(db) else {
+                // Dynamic class base; no restriction.
+                return result;
+            };
+            // `object` has `__slots__ = ()` at runtime but typeshed doesn't
+            // declare it, so skip it to avoid falsely concluding "no restriction".
+            if static_literal.is_known(db, KnownClass::Object) {
+                continue;
+            }
+            let Some(slot_names) = static_literal.own_slots_names(db) else {
+                // This class does not define `__slots__`; the class has `__dict__`,
+                // so there's no restriction.
+                return result;
+            };
+            if slot_names.iter().any(|n| n == "__dict__") {
+                return result;
+            }
+            any_class_defines_slots = true;
+            all_slot_names.extend(slot_names.iter().cloned());
         }
+
+        if !any_class_defines_slots {
+            // No class in the MRO defines `__slots__`, so there's no restriction.
+            return result;
+        }
+
+        if !all_slot_names.contains(name) {
+            return Place::Undefined.into();
+        }
+
+        if result.place.is_undefined() {
+            return Place::Defined(
+                DefinedPlace::new(Type::unknown()).with_definedness(Definedness::PossiblyUndefined),
+            )
+            .into();
+        }
+
+        result
     }
 
     /// Tries to find declarations/bindings of an attribute named `name` that are only
@@ -4741,17 +4803,14 @@ impl<'db> StaticClassLiteral<'db> {
                     // The attribute is not *declared* in the class body. It could still be declared/bound
                     // in a method.
 
-                    let result =
-                        Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-                    self.apply_slots_constraints(db, name, result.inner)
+                    Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
                 }
             }
         } else {
             // This attribute is neither declared nor bound in the class body.
             // It could still be implicitly defined in a method.
 
-            let result = Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
-            self.apply_slots_constraints(db, name, result.inner)
+            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
         }
     }
 
@@ -4871,9 +4930,10 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    /// Extract the names of attributes defined in `__slots__` as a set of strings.
-    /// Returns `None` if `__slots__` is not defined, empty, or dynamic.
-    fn slots_members(self, db: &'db dyn Db) -> Option<FxHashSet<String>> {
+    /// Extract the names of attributes defined in `__slots__` for this class only.
+    /// Returns `None` if `__slots__` is not defined, possibly-undefined, or dynamic.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    pub(super) fn own_slots_names(self, db: &'db dyn Db) -> Option<Box<[Name]>> {
         let Place::Defined(DefinedPlace {
             ty: slots_ty,
             definedness,
@@ -4891,54 +4951,28 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         match slots_ty {
-            // __slots__ = ("a", "b")
+            // A tuple of string literals, e.g. `__slots__ = ("a", "b")`.
             Type::NominalInstance(nominal) => {
-                let mut slots = FxHashSet::default();
                 let tuple_spec = nominal.tuple_spec(db)?;
+                let mut slots = Vec::with_capacity(tuple_spec.all_elements().len());
                 for &element in tuple_spec.all_elements() {
                     if let Type::StringLiteral(string_literal) = element {
-                        slots.insert(string_literal.value(db).to_string());
+                        slots.push(Name::new(string_literal.value(db)));
                     } else {
                         return None;
                     }
                 }
-                Some(slots)
+                Some(slots.into_boxed_slice())
             }
 
-            // __slots__ = "abc"  # A single slot named "abc"
+            // A bare string literal is treated as a single slot name,
+            // e.g. `__slots__ = "abc"` is equivalent to `__slots__ = ("abc",)`.
             Type::StringLiteral(string_literal) => {
-                let mut slots = FxHashSet::default();
-                slots.insert(string_literal.value(db).to_string());
-                Some(slots)
+                Some(Box::new([Name::new(string_literal.value(db))]))
             }
 
             _ => None,
         }
-    }
-
-    /// Apply `__slots__` constraints to attribute access.
-    fn apply_slots_constraints(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        result: PlaceAndQualifiers<'db>,
-    ) -> Member<'db> {
-        if let Some(slots) = self.slots_members(db) {
-            if slots.contains(name) {
-                if result.place.is_undefined() {
-                    return Member {
-                        inner: Place::Defined(
-                            DefinedPlace::new(Type::unknown())
-                                .with_definedness(Definedness::PossiblyUndefined),
-                        )
-                        .into(),
-                    };
-                }
-                return Member { inner: result };
-            }
-            return Member::unbound();
-        }
-        Member { inner: result }
     }
 }
 
