@@ -158,6 +158,12 @@ class Variadic(Generic[Unpack[Ts]]):
 
 def accept_variadic(v: Variadic[int, str]):
     v.method((1, "hello"))
+
+# `tuple[object, ...]` should be assignable to `tuple[*Ts]` since a TypeVarTuple's
+# implicit element upper bound is `object`.
+def returns_variadic() -> tuple[Unpack[Ts]] | None:
+    args: tuple[object, ...] = ()
+    return args
 ```
 
 ### Mixed TypeVar and TypeVarTuple
