@@ -233,6 +233,21 @@ def _(a: object, b: SupportsStr, c: Falsy, d: AlwaysFalsy, e: None, f: Foo | Non
     f.__str__()
 ```
 
+## Method calls on subclasses of `Any`
+
+```py
+from typing_extensions import assert_type, Any
+
+class SubclassOfAny(Any):
+    def method(self) -> int:
+        return 1
+
+a = SubclassOfAny()
+assert_type(a.method(), int)
+
+assert_type(a.non_existing_method(), Any)
+```
+
 ## Error cases: Calling `__get__` for methods
 
 The `__get__` method on `types.FunctionType` has the following overloaded signature in typeshed:
