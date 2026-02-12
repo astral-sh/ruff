@@ -27,6 +27,8 @@ use ty_project::metadata::settings::TerminalSettings;
 use ty_project::watch::ProjectWatcher;
 use ty_project::{CollectReporter, Db, suppress_all_diagnostics, watch};
 use ty_project::{ProjectDatabase, ProjectMetadata};
+#[cfg(feature = "tdd-stats")]
+use ty_python_semantic::semantic_index::tdd_stats_for_file;
 use ty_server::run_server;
 use ty_static::EnvVars;
 
@@ -179,6 +181,10 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         }
         Err(_) => {}
     }
+    drop(stdout);
+
+    #[cfg(feature = "tdd-stats")]
+    write_tdd_stats_report(&db, printer);
 
     std::mem::forget(db);
 
@@ -186,6 +192,230 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Ok(ExitStatus::Success)
     } else {
         Ok(exit_status)
+    }
+}
+
+#[cfg(feature = "tdd-stats")]
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+enum TddStatsReportMode {
+    Off = 0,
+    Short,
+    Full,
+}
+
+#[cfg(feature = "tdd-stats")]
+impl TddStatsReportMode {
+    const MAX_LEVEL: u8 = TddStatsReportMode::Full as u8;
+
+    const fn from_verbose(verbose: u8) -> Self {
+        match verbose {
+            0 => TddStatsReportMode::Off,
+            1 => TddStatsReportMode::Short,
+            _ => TddStatsReportMode::Full,
+        }
+    }
+
+    const fn verbose(self) -> u8 {
+        self as u8
+    }
+}
+
+#[cfg(feature = "tdd-stats")]
+fn tdd_stats_report_mode() -> TddStatsReportMode {
+    match std::env::var(EnvVars::TY_TDD_STATS_REPORT) {
+        Ok(raw) => {
+            let raw = raw.trim();
+            if raw.eq_ignore_ascii_case("short") {
+                return TddStatsReportMode::Short;
+            }
+
+            if raw.eq_ignore_ascii_case("full") {
+                return TddStatsReportMode::Full;
+            }
+
+            match raw.parse::<u8>() {
+                Ok(verbose) if verbose <= TddStatsReportMode::MAX_LEVEL => {
+                    TddStatsReportMode::from_verbose(verbose)
+                }
+                Ok(verbose) => {
+                    tracing::warn!(
+                        "Value for `TY_TDD_STATS_REPORT` is capped at {} (full), got `{verbose}`.",
+                        TddStatsReportMode::MAX_LEVEL
+                    );
+                    TddStatsReportMode::Full
+                }
+                Err(_) => {
+                    tracing::warn!(
+                        "Unknown value for `TY_TDD_STATS_REPORT`: `{raw}`. Valid values are `0`, `1`, `2`, `short`, and `full`."
+                    );
+                    TddStatsReportMode::Off
+                }
+            }
+        }
+        Err(_) => TddStatsReportMode::Off,
+    }
+}
+
+#[cfg(feature = "tdd-stats")]
+fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
+    use ty_python_semantic::semantic_index::tdd_stats::FileTddStatsSummary;
+
+    enum FileSummaryIter<'a> {
+        Full(std::slice::Iter<'a, FileTddStatsSummary>),
+        Short(std::iter::Take<std::slice::Iter<'a, FileTddStatsSummary>>),
+    }
+
+    impl<'a> Iterator for FileSummaryIter<'a> {
+        type Item = &'a FileTddStatsSummary;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            match self {
+                FileSummaryIter::Full(iter) => iter.next(),
+                FileSummaryIter::Short(iter) => iter.next(),
+            }
+        }
+    }
+
+    let mode = tdd_stats_report_mode();
+    if matches!(mode, TddStatsReportMode::Off) {
+        return;
+    }
+
+    let project = db.project();
+    let files = project.files(db);
+
+    let mut summaries = Vec::new();
+    for file in &files {
+        if !project.should_check_file(db, file) {
+            continue;
+        }
+        let summary = tdd_stats_for_file(db, file);
+        if summary.total_roots > 0 {
+            summaries.push(summary);
+        }
+    }
+
+    if summaries.is_empty() {
+        return;
+    }
+
+    summaries.sort();
+    let max_root_nodes = summaries
+        .iter()
+        .map(|summary| summary.max_interior_nodes)
+        .max()
+        .unwrap_or(0);
+    let tdd_pool_nodes: usize = summaries.iter().map(|summary| summary.tdd_pool_nodes).sum();
+    let tdd_pool_roots: usize = summaries.iter().map(|summary| summary.tdd_pool_roots).sum();
+    let reachability_roots: usize = summaries
+        .iter()
+        .map(|summary| summary.reachability_roots)
+        .sum();
+    let reachability_interior_nodes: usize = summaries
+        .iter()
+        .map(|summary| summary.reachability_interior_nodes)
+        .sum();
+    let reachability_max_depth = summaries
+        .iter()
+        .map(|summary| summary.reachability_max_depth)
+        .max()
+        .unwrap_or(0);
+    let narrowing_roots: usize = summaries
+        .iter()
+        .map(|summary| summary.narrowing_roots)
+        .sum();
+    let narrowing_interior_nodes: usize = summaries
+        .iter()
+        .map(|summary| summary.narrowing_interior_nodes)
+        .sum();
+    let narrowing_max_depth = summaries
+        .iter()
+        .map(|summary| summary.narrowing_max_depth)
+        .max()
+        .unwrap_or(0);
+
+    tracing::info!(
+        target: "ty.tdd_stats",
+        verbose = mode.verbose(),
+        files = summaries.len(),
+        max_root_nodes,
+        tdd_pool_roots,
+        tdd_pool_nodes,
+        reachability_roots,
+        reachability_nodes = reachability_interior_nodes,
+        reachability_max_depth,
+        narrowing_roots,
+        narrowing_nodes = narrowing_interior_nodes,
+        narrowing_max_depth,
+        "tdd_stats_summary"
+    );
+
+    let is_full = mode.verbose() >= TddStatsReportMode::Full.verbose();
+    let file_summaries = if is_full {
+        FileSummaryIter::Full(summaries.iter())
+    } else {
+        FileSummaryIter::Short(summaries.iter().take(20))
+    };
+
+    for summary in file_summaries {
+        tracing::info!(
+            target: "ty.tdd_stats",
+            file = %summary.file_path,
+            max_root_nodes = summary.max_interior_nodes,
+            tdd_pool_roots = summary.tdd_pool_roots,
+            tdd_pool_nodes = summary.tdd_pool_nodes,
+            reachability_roots = summary.reachability_roots,
+            reachability_nodes = summary.reachability_interior_nodes,
+            reachability_max_depth = summary.reachability_max_depth,
+            narrowing_roots = summary.narrowing_roots,
+            narrowing_nodes = summary.narrowing_interior_nodes,
+            narrowing_max_depth = summary.narrowing_max_depth,
+            "tdd_stats_file"
+        );
+
+        if is_full {
+            let mut scopes = summary.scopes.clone();
+            scopes.sort();
+            for scope in &scopes {
+                let mut histogram = String::new();
+                for bin in &scope.histogram {
+                    if !histogram.is_empty() {
+                        histogram.push(' ');
+                    }
+                    let _ = write!(&mut histogram, "{}=>{}", bin.interior_nodes, bin.count);
+                }
+                tracing::info!(
+                    target: "ty.tdd_stats",
+                    file = %summary.file_path,
+                    scope_id = scope.scope_id.as_u32(),
+                    root_count = scope.root_count,
+                    total_nodes = scope.total_interior_nodes,
+                    max_root_nodes = scope.max_interior_nodes,
+                    tdd_pool_roots = scope.tdd_pool_roots,
+                    tdd_pool_nodes = scope.tdd_pool_nodes,
+                    reachability_max_depth = scope.reachability_max_depth,
+                    narrowing_max_depth = scope.narrowing_max_depth,
+                    node_histogram = %histogram,
+                    "tdd_stats_scope"
+                );
+
+                let mut hot_nodes = scope.hot_nodes.clone();
+                hot_nodes.sort();
+                for hot in hot_nodes.iter().take(20) {
+                    tracing::info!(
+                        target: "ty.tdd_stats",
+                        file = %summary.file_path,
+                        scope_id = scope.scope_id.as_u32(),
+                        kind = hot.kind,
+                        subtree_nodes = hot.subtree_interior_nodes,
+                        root_uses = hot.root_uses,
+                        score = hot.score,
+                        roots = %hot.sample_roots.join(" | "),
+                        "tdd_stats_hot_node"
+                    );
+                }
+            }
+        }
     }
 }
 

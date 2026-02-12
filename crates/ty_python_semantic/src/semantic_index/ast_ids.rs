@@ -5,6 +5,8 @@ use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
 use crate::Db;
+#[cfg(feature = "tdd-stats")]
+use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
@@ -28,11 +30,21 @@ use crate::semantic_index::semantic_index;
 pub(crate) struct AstIds {
     /// Maps expressions which "use" a place (that is, [`ast::ExprName`], [`ast::ExprAttribute`] or [`ast::ExprSubscript`]) to a use id.
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    #[cfg(feature = "tdd-stats")]
+    use_nodes: Vec<ExpressionNodeKey>,
 }
 
 impl AstIds {
     fn use_id(&self, key: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         self.uses_map[&key.into()]
+    }
+
+    #[cfg(feature = "tdd-stats")]
+    pub(super) fn node_key_for_use(&self, use_id: ScopedUseId) -> Option<NodeKey> {
+        self.use_nodes
+            .get(use_id.as_u32() as usize)
+            .copied()
+            .map(ExpressionNodeKey::node_key)
     }
 }
 
@@ -42,7 +54,7 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
 
 /// Uniquely identifies a use of a name in a [`crate::semantic_index::FileScopeId`].
 #[newtype_index]
-#[derive(get_size2::GetSize)]
+#[derive(get_size2::GetSize, PartialOrd, Ord)]
 pub struct ScopedUseId;
 
 pub trait HasScopedUseId {
@@ -88,23 +100,32 @@ impl HasScopedUseId for ast::ExprRef<'_> {
 #[derive(Debug, Default)]
 pub(super) struct AstIdsBuilder {
     uses_map: FxHashMap<ExpressionNodeKey, ScopedUseId>,
+    #[cfg(feature = "tdd-stats")]
+    use_nodes: Vec<ExpressionNodeKey>,
 }
 
 impl AstIdsBuilder {
     /// Adds `expr` to the use ids map and returns its id.
     pub(super) fn record_use(&mut self, expr: impl Into<ExpressionNodeKey>) -> ScopedUseId {
         let use_id = self.uses_map.len().into();
+        let expr = expr.into();
 
-        self.uses_map.insert(expr.into(), use_id);
+        self.uses_map.insert(expr, use_id);
+        #[cfg(feature = "tdd-stats")]
+        self.use_nodes.push(expr);
 
         use_id
     }
 
     pub(super) fn finish(mut self) -> AstIds {
         self.uses_map.shrink_to_fit();
+        #[cfg(feature = "tdd-stats")]
+        self.use_nodes.shrink_to_fit();
 
         AstIds {
             uses_map: self.uses_map,
+            #[cfg(feature = "tdd-stats")]
+            use_nodes: self.use_nodes,
         }
     }
 }
@@ -117,6 +138,13 @@ pub(crate) mod node_key {
 
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
     pub(crate) struct ExpressionNodeKey(NodeKey);
+
+    impl ExpressionNodeKey {
+        #[cfg(feature = "tdd-stats")]
+        pub(super) fn node_key(self) -> NodeKey {
+            self.0
+        }
+    }
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
         fn from(value: ast::ExprRef<'_>) -> Self {
@@ -145,6 +173,12 @@ pub(crate) mod node_key {
     impl From<&ast::Identifier> for ExpressionNodeKey {
         fn from(value: &ast::Identifier) -> Self {
             Self(NodeKey::from_node(value))
+        }
+    }
+
+    impl From<NodeKey> for ExpressionNodeKey {
+        fn from(value: NodeKey) -> Self {
+            Self(value)
         }
     }
 }

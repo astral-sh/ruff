@@ -40,6 +40,8 @@ mod re_exports;
 mod reachability_constraints;
 pub(crate) mod scope;
 pub(crate) mod symbol;
+#[cfg(feature = "tdd-stats")]
+pub mod tdd_stats;
 mod use_def;
 
 pub(crate) use self::use_def::{
@@ -93,6 +95,175 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     let _span = tracing::trace_span!("use_def_map", scope=?scope.as_id(), ?file).entered();
     let index = semantic_index(db, file);
     Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
+}
+
+#[cfg(feature = "tdd-stats")]
+pub fn tdd_stats_for_file(
+    db: &dyn Db,
+    file: File,
+) -> crate::semantic_index::tdd_stats::FileTddStatsSummary {
+    use ruff_db::parsed::ParsedModuleRef;
+    use ruff_db::source::{line_index, source_text};
+    use ruff_text_size::Ranged;
+
+    use crate::semantic_index::tdd_stats::{
+        FileTddStatsSummary, ScopeTddStatsSummary, TddHotNodeSummary, TddRootKind, TddRootRef,
+        TddRootSource,
+    };
+
+    fn format_root_ref(
+        db: &dyn Db,
+        file: File,
+        parsed: &ParsedModuleRef,
+        ast_ids: &crate::semantic_index::ast_ids::AstIds,
+        root: TddRootRef,
+    ) -> String {
+        let format_node = |node: crate::node_key::NodeKey| -> Option<String> {
+            let node_index = node.node_index();
+            node_index.as_u32()?;
+            let node = parsed.get_by_index(node_index);
+            let range = node.range();
+            let line_column =
+                line_index(db, file).line_column(range.start(), &source_text(db, file));
+            Some(format!("{}:{}", line_column.line, line_column.column))
+        };
+
+        match root.source {
+            TddRootSource::Node(node) => {
+                format_node(node).unwrap_or_else(|| format!("unknown(node={node:?})"))
+            }
+            TddRootSource::Use { use_id, binding } => ast_ids
+                .node_key_for_use(use_id)
+                .and_then(format_node)
+                .unwrap_or_else(|| format!("unknown(binding={binding})")),
+            TddRootSource::EnclosingSnapshot {
+                snapshot_id,
+                binding,
+            } => {
+                let binding = binding
+                    .map(|binding| format!(", binding={binding}"))
+                    .unwrap_or_default();
+                format!("unknown(snapshot={}{binding})", snapshot_id.as_u32(),)
+            }
+        }
+    }
+
+    let index = semantic_index(db, file);
+    let parsed = parsed_module(db, file).load(db);
+    let mut scopes = Vec::new();
+    for (scope_id, use_def) in index.use_def_maps.iter_enumerated() {
+        let ast_ids = index.ast_ids(scope_id);
+        let report = use_def.tdd_stats_report();
+        if report.roots.is_empty() {
+            continue;
+        }
+        let root_count = report.roots.len();
+        let mut total_interior_nodes = 0;
+        let mut max_interior_nodes = 0;
+        let reachability_roots = report.reachability_roots;
+        let mut reachability_interior_nodes = 0;
+        let mut reachability_max_depth = 0;
+        let narrowing_roots = report.narrowing_roots;
+        let mut narrowing_interior_nodes = 0;
+        let mut narrowing_max_depth = 0;
+        for root in &report.roots {
+            total_interior_nodes += root.interior_nodes;
+            max_interior_nodes = max_interior_nodes.max(root.interior_nodes);
+            match root.root.kind {
+                TddRootKind::NodeReachability => {
+                    reachability_interior_nodes += root.interior_nodes;
+                    reachability_max_depth = reachability_max_depth.max(root.max_depth);
+                }
+                TddRootKind::NarrowingConstraint => {
+                    narrowing_interior_nodes += root.interior_nodes;
+                    narrowing_max_depth = narrowing_max_depth.max(root.max_depth);
+                }
+            }
+        }
+        let mut hot_nodes = Vec::with_capacity(report.hot_nodes.len());
+        for hot in report.hot_nodes {
+            let mut sample_roots = hot
+                .sample_roots
+                .into_iter()
+                .map(|root| format_root_ref(db, file, &parsed, ast_ids, root))
+                .collect::<Vec<_>>();
+            sample_roots.sort();
+            sample_roots.dedup();
+            hot_nodes.push(TddHotNodeSummary {
+                kind: hot.kind.as_str(),
+                constraint_id: hot.constraint,
+                predicate_id: hot.predicate,
+                subtree_interior_nodes: hot.subtree_interior_nodes,
+                root_uses: hot.root_uses,
+                score: hot.score,
+                sample_roots,
+            });
+        }
+        hot_nodes.sort();
+        scopes.push(ScopeTddStatsSummary {
+            scope_id,
+            root_count,
+            total_interior_nodes,
+            max_interior_nodes,
+            tdd_pool_nodes: report.tdd_pool_nodes,
+            tdd_pool_roots: report.tdd_pool_roots,
+            reachability_roots,
+            reachability_interior_nodes,
+            reachability_max_depth,
+            narrowing_roots,
+            narrowing_interior_nodes,
+            narrowing_max_depth,
+            histogram: report.histogram,
+            hot_nodes,
+        });
+    }
+    scopes.sort_unstable_by_key(|scope| scope.scope_id.as_u32());
+
+    let total_roots = scopes.iter().map(|scope| scope.root_count).sum();
+    let total_interior_nodes = scopes.iter().map(|scope| scope.total_interior_nodes).sum();
+    let reachability_roots = scopes.iter().map(|scope| scope.reachability_roots).sum();
+    let reachability_interior_nodes = scopes
+        .iter()
+        .map(|scope| scope.reachability_interior_nodes)
+        .sum();
+    let narrowing_roots = scopes.iter().map(|scope| scope.narrowing_roots).sum();
+    let narrowing_interior_nodes = scopes
+        .iter()
+        .map(|scope| scope.narrowing_interior_nodes)
+        .sum();
+    let tdd_pool_nodes = scopes.iter().map(|scope| scope.tdd_pool_nodes).sum();
+    let tdd_pool_roots = scopes.iter().map(|scope| scope.tdd_pool_roots).sum();
+    let reachability_max_depth = scopes
+        .iter()
+        .map(|scope| scope.reachability_max_depth)
+        .max()
+        .unwrap_or(0);
+    let narrowing_max_depth = scopes
+        .iter()
+        .map(|scope| scope.narrowing_max_depth)
+        .max()
+        .unwrap_or(0);
+    let max_interior_nodes = scopes
+        .iter()
+        .map(|scope| scope.max_interior_nodes)
+        .max()
+        .unwrap_or(0);
+
+    FileTddStatsSummary {
+        file_path: file.path(db).clone(),
+        scopes,
+        total_roots,
+        total_interior_nodes,
+        max_interior_nodes,
+        tdd_pool_nodes,
+        tdd_pool_roots,
+        reachability_roots,
+        reachability_interior_nodes,
+        reachability_max_depth,
+        narrowing_roots,
+        narrowing_interior_nodes,
+        narrowing_max_depth,
+    }
 }
 
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching

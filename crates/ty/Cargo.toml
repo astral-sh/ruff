@@ -57,6 +57,7 @@ toml = { workspace = true }
 
 [features]
 default = []
+tdd-stats = ["ty_python_semantic/tdd-stats"]
 
 [lints]
 workspace = true

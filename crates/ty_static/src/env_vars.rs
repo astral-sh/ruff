@@ -32,6 +32,16 @@ impl EnvVars {
     #[attr_hidden]
     pub const TY_MEMORY_REPORT: &'static str = "TY_MEMORY_REPORT";
 
+    /// Control TDD stats reporting format after ty execution (requires `tdd-stats` feature).
+    ///
+    /// Accepted values:
+    ///
+    /// * `short` - emit a per-file summary through tracing target `ty.tdd_stats`
+    /// * `full` - emit per-file and per-scope summaries (including histograms)
+    ///   through tracing target `ty.tdd_stats`
+    #[attr_hidden]
+    pub const TY_TDD_STATS_REPORT: &'static str = "TY_TDD_STATS_REPORT";
+
     /// Specifies an upper limit for the number of tasks ty is allowed to run in parallel.
     ///
     /// For example, how many files should be checked in parallel.

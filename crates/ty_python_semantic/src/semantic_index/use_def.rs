@@ -418,6 +418,186 @@ impl<'db> UseDefMap<'db> {
             .may_be_true()
     }
 
+    /// Returns a debug report describing TDD sizes for recorded node reachability roots.
+    #[cfg(feature = "tdd-stats")]
+    pub(crate) fn tdd_stats_report(&self) -> crate::semantic_index::tdd_stats::TddStatsReport {
+        use crate::semantic_index::tdd_stats::{
+            TddHotNodeStat, TddRootKind, TddRootRef, TddRootSource, TddRootStat, TddStatsReport,
+        };
+        use rustc_hash::FxHashSet;
+
+        let estimated_narrowing_roots: usize = self
+            .bindings_by_use
+            .iter()
+            .map(|bindings| bindings.iter().len())
+            .sum();
+        let estimated_snapshot_roots: usize = self
+            .enclosing_snapshots
+            .iter()
+            .map(|snapshot| match snapshot {
+                EnclosingSnapshot::Constraint(_) => 1,
+                EnclosingSnapshot::Bindings(bindings) => bindings.iter().len(),
+            })
+            .sum();
+        let mut roots = Vec::with_capacity(
+            self.node_reachability.len() + estimated_narrowing_roots + estimated_snapshot_roots,
+        );
+        let mut seen_roots: FxHashSet<TddRootRef> = FxHashSet::default();
+        let mut tdd_pool_roots: FxHashSet<ScopedReachabilityConstraintId> = FxHashSet::default();
+        let mut reachability_roots: FxHashSet<ScopedReachabilityConstraintId> =
+            FxHashSet::default();
+        let mut narrowing_roots: FxHashSet<ScopedReachabilityConstraintId> = FxHashSet::default();
+        if self.end_of_scope_reachability != ScopedReachabilityConstraintId::ALWAYS_TRUE
+            && self.end_of_scope_reachability != ScopedReachabilityConstraintId::ALWAYS_FALSE
+            && self.end_of_scope_reachability != ScopedReachabilityConstraintId::AMBIGUOUS
+        {
+            tdd_pool_roots.insert(self.end_of_scope_reachability);
+        }
+
+        let mut push_root = |root: TddRootRef| {
+            if !seen_roots.insert(root) {
+                return;
+            }
+            if root.constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+                && root.constraint != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                && root.constraint != ScopedReachabilityConstraintId::AMBIGUOUS
+            {
+                tdd_pool_roots.insert(root.constraint);
+            }
+            match root.kind {
+                TddRootKind::NodeReachability => {
+                    reachability_roots.insert(root.constraint);
+                }
+                TddRootKind::NarrowingConstraint => {
+                    narrowing_roots.insert(root.constraint);
+                }
+            }
+            roots.push(TddRootStat {
+                root,
+                interior_nodes: self
+                    .reachability_constraints
+                    .interior_node_count(root.constraint),
+                max_depth: self.reachability_constraints.max_depth(root.constraint),
+            });
+        };
+
+        for (&node, &constraint) in &self.node_reachability {
+            push_root(TddRootRef {
+                kind: TddRootKind::NodeReachability,
+                source: TddRootSource::Node(node),
+                constraint,
+            });
+        }
+        for (use_id, bindings) in self.bindings_by_use.iter_enumerated() {
+            for binding in bindings.iter() {
+                let constraint = binding.narrowing_constraint;
+                if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                    continue;
+                }
+                push_root(TddRootRef {
+                    kind: TddRootKind::NarrowingConstraint,
+                    source: TddRootSource::Use {
+                        use_id,
+                        binding: binding.binding.as_u32(),
+                    },
+                    constraint,
+                });
+            }
+        }
+        for (snapshot_id, snapshot) in self.enclosing_snapshots.iter_enumerated() {
+            match snapshot {
+                EnclosingSnapshot::Constraint(constraint) => {
+                    if *constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                        continue;
+                    }
+                    push_root(TddRootRef {
+                        kind: TddRootKind::NarrowingConstraint,
+                        source: TddRootSource::EnclosingSnapshot {
+                            snapshot_id,
+                            binding: None,
+                        },
+                        constraint: *constraint,
+                    });
+                }
+                EnclosingSnapshot::Bindings(bindings) => {
+                    for binding in bindings.iter() {
+                        let constraint = binding.narrowing_constraint;
+                        if constraint == ScopedReachabilityConstraintId::ALWAYS_TRUE {
+                            continue;
+                        }
+                        push_root(TddRootRef {
+                            kind: TddRootKind::NarrowingConstraint,
+                            source: TddRootSource::EnclosingSnapshot {
+                                snapshot_id,
+                                binding: Some(binding.binding.as_u32()),
+                            },
+                            constraint,
+                        });
+                    }
+                }
+            }
+        }
+        roots.shrink_to_fit();
+        roots.sort();
+
+        let mut root_uses_by_node: FxHashMap<(TddRootKind, ScopedReachabilityConstraintId), usize> =
+            FxHashMap::default();
+        let mut sample_roots_by_node: FxHashMap<
+            (TddRootKind, ScopedReachabilityConstraintId),
+            Vec<TddRootRef>,
+        > = FxHashMap::default();
+        let mut subtree_size_memo: FxHashMap<ScopedReachabilityConstraintId, usize> =
+            FxHashMap::default();
+
+        for root in &roots {
+            let interior_nodes = self
+                .reachability_constraints
+                .interior_nodes(root.root.constraint);
+            for interior in interior_nodes {
+                let hot_key = (root.root.kind, interior);
+                *root_uses_by_node.entry(hot_key).or_default() += 1;
+                let sample_roots = sample_roots_by_node.entry(hot_key).or_default();
+                if sample_roots.len() < 5 {
+                    sample_roots.push(root.root);
+                }
+
+                subtree_size_memo
+                    .entry(interior)
+                    .or_insert_with(|| self.reachability_constraints.interior_node_count(interior));
+            }
+        }
+
+        let mut hot_nodes = Vec::with_capacity(root_uses_by_node.len());
+        for ((kind, constraint), root_uses) in root_uses_by_node {
+            let subtree_interior_nodes = subtree_size_memo[&constraint];
+            let score = subtree_interior_nodes.saturating_mul(root_uses);
+            let predicate = self.reachability_constraints.interior_atom(constraint);
+            let sample_roots = sample_roots_by_node
+                .remove(&(kind, constraint))
+                .unwrap_or_default();
+            hot_nodes.push(TddHotNodeStat {
+                kind,
+                constraint,
+                predicate,
+                subtree_interior_nodes,
+                root_uses,
+                score,
+                sample_roots,
+            });
+        }
+        hot_nodes.shrink_to_fit();
+        hot_nodes.sort();
+
+        TddStatsReport::from_roots(
+            roots,
+            hot_nodes,
+            self.reachability_constraints.pool_interior_node_count(),
+            tdd_pool_roots.len(),
+            reachability_roots.len(),
+            narrowing_roots.len(),
+        )
+    }
+
     pub(crate) fn end_of_scope_bindings(
         &self,
         place: ScopedPlaceId,
@@ -667,7 +847,7 @@ impl<'db> UseDefMap<'db> {
 ///
 /// There is a unique ID for each distinct [`EnclosingSnapshotKey`] in the file.
 #[newtype_index]
-#[derive(get_size2::GetSize)]
+#[derive(get_size2::GetSize, PartialOrd, Ord)]
 pub(crate) struct ScopedEnclosingSnapshotId;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
