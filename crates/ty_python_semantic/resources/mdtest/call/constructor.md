@@ -580,3 +580,24 @@ reveal_type(C())  # revealed: C
 # Meta.__lt__ is implicitly called here:
 reveal_type(C < C)  # revealed: Literal[True]
 ```
+
+## `__new__` returning `Never`
+
+If `__new__` returns `Never`, the constructor call should also return `Never`, since the constructor
+can never complete successfully.
+
+```py
+from typing_extensions import Never, NoReturn
+
+class AlwaysRaises:
+    def __new__(cls) -> Never:
+        raise RuntimeError("cannot instantiate")
+
+reveal_type(AlwaysRaises())  # revealed: Never
+
+class AlwaysRaisesNoReturn:
+    def __new__(cls) -> NoReturn:
+        raise RuntimeError("cannot instantiate")
+
+reveal_type(AlwaysRaisesNoReturn())  # revealed: Never
+```

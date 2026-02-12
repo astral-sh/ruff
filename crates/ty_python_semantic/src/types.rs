@@ -7312,7 +7312,7 @@ impl ConstructorReturnDisposition {
             }
             Type::Dynamic(DynamicType::Any) => Self::NotInstance,
             Type::Dynamic(_) | Type::TypeVar(_) => Self::Uncertain,
-            Type::Never => Self::Instance,
+            Type::Never => Self::NotInstance,
             Type::NominalInstance(instance) => {
                 // Check origin class identity first, since `is_subclass_of` returns false
                 // for Generic vs NonGeneric variants of the same class.
