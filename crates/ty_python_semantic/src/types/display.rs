@@ -2063,13 +2063,14 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
         // display them as `**P` instead, so avoid multiline in that case.
-        // TODO: This might change once we support `Concatenate`
+        // For `Gradual` kind without prefix params (len <= 2), display as `...`.
         let multiline = self.settings.multiline
             && self.parameters.len() > 1
-            && !matches!(
+            && !matches!(self.parameters.kind(), ParametersKind::ParamSpec(_))
+            && !(matches!(
                 self.parameters.kind(),
-                ParametersKind::Gradual | ParametersKind::ParamSpec(_)
-            );
+                ParametersKind::Gradual | ParametersKind::Top
+            ) && self.parameters.len() <= 2);
         // Opening parenthesis
         f.write_char('(')?;
         if multiline {
@@ -2128,10 +2129,61 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 }
             }
             ParametersKind::Gradual | ParametersKind::Top => {
-                // We represent gradual form as `...` in the signature, internally the parameters still
-                // contain `(*args, **kwargs)` parameters. (Top parameters are displayed the same
-                // as gradual parameters, we just wrap the entire signature in `Top[]`.)
-                f.write_str("...")?;
+                if self.parameters.len() > 2 {
+                    // Concatenate gradual form: display prefix params + *args, **kwargs
+                    // using the same logic as Standard parameters.
+                    let mut star_added = false;
+                    let mut needs_slash = false;
+                    let mut first = true;
+                    let arg_separator = if multiline { ",\n    " } else { ", " };
+
+                    for parameter in self.parameters.as_slice() {
+                        if !star_added && parameter.is_keyword_only() {
+                            if !first {
+                                f.write_str(arg_separator)?;
+                            }
+                            f.write_char('*')?;
+                            star_added = true;
+                            first = false;
+                        }
+                        if parameter.is_positional_only() {
+                            needs_slash = true;
+                        } else if needs_slash {
+                            if !first {
+                                f.write_str(arg_separator)?;
+                            }
+                            f.write_char('/')?;
+                            needs_slash = false;
+                            first = false;
+                        }
+
+                        if !first {
+                            f.write_str(arg_separator)?;
+                        }
+
+                        let param_name = parameter
+                            .display_name()
+                            .map(|name| name.to_string())
+                            .unwrap_or_default();
+                        parameter
+                            .display_with(self.db, self.settings.singleline())
+                            .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
+
+                        first = false;
+                    }
+
+                    if needs_slash {
+                        if !first {
+                            f.write_str(arg_separator)?;
+                        }
+                        f.write_char('/')?;
+                    }
+                } else {
+                    // We represent gradual form as `...` in the signature, internally the parameters still
+                    // contain `(*args, **kwargs)` parameters. (Top parameters are displayed the same
+                    // as gradual parameters, we just wrap the entire signature in `Top[]`.)
+                    f.write_str("...")?;
+                }
             }
             ParametersKind::ParamSpec(typevar) => {
                 write!(f, "**{}", typevar.name(self.db))?;
