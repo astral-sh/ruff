@@ -166,10 +166,10 @@ def returns_variadic() -> tuple[Unpack[Ts]] | None:
     return args
 ```
 
-### Starred TypeVarTuple cannot be used for a regular TypeVar
+### Unpacked types cannot be used for a regular TypeVar
 
-A starred TypeVarTuple (`*Ts`) cannot be used as a type argument for a regular `TypeVar`, because a
-`TypeVarTuple` represents a variable number of types while a `TypeVar` expects exactly one.
+An unpacked type (`*Ts` or `*tuple[float, ...]`) cannot be used as a type argument for a regular
+`TypeVar`, because it represents a variable number of types while a `TypeVar` expects exactly one.
 
 ```toml
 [environment]
@@ -182,11 +182,20 @@ from typing_extensions import TypeVarTuple, Unpack
 
 T = TypeVar("T")
 Ts = TypeVarTuple("Ts")
+Ts2 = TypeVarTuple("Ts2")
 
 IntTupleGeneric = tuple[int, T]
 
 # error: [invalid-type-arguments]
 IntTupleGeneric[*Ts]
+
+# error: [invalid-type-arguments]
+IntTupleGeneric[*tuple[float, ...]]
+
+VariadicAlias = tuple[T, *Ts]
+
+# error: [invalid-type-arguments]
+VariadicAlias[*Ts2]
 ```
 
 ### Mixed TypeVar and TypeVarTuple

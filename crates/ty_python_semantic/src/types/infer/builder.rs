@@ -16053,13 +16053,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     typevar_with_defaults += 1;
                 }
                 if i < n_args {
-                    validate_fixed_var(
-                        typevar,
-                        inferred_type_arguments[i],
-                        i,
-                        &mut specialization_types,
-                        &mut error,
-                    );
+                    if inferred_type_arguments[i].is_typevartuple(db) {
+                        let node = get_node(i);
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Unpacked type is not allowed as a type argument \
+                                    for regular type variable `{}`",
+                                typevar.identity(db).display(db),
+                            ));
+                            add_typevar_definition(db, &mut diagnostic, typevar);
+                        }
+                        error = Some(ExplicitSpecializationError::UnsatisfiedBound);
+                        specialization_types.push(Some(Type::unknown()));
+                    } else {
+                        validate_fixed_var(
+                            typevar,
+                            inferred_type_arguments[i],
+                            i,
+                            &mut specialization_types,
+                            &mut error,
+                        );
+                    }
                 } else if typevar.default_type(db).is_none() {
                     missing_typevars.push(typevar);
                 } else {
@@ -16082,13 +16098,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     typevar_with_defaults += 1;
                 }
                 if arg_idx < n_args {
-                    validate_fixed_var(
-                        typevar,
-                        inferred_type_arguments[arg_idx],
-                        arg_idx,
-                        &mut specialization_types,
-                        &mut error,
-                    );
+                    if inferred_type_arguments[arg_idx].is_typevartuple(db) {
+                        let node = get_node(arg_idx);
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Unpacked type is not allowed as a type argument \
+                                    for regular type variable `{}`",
+                                typevar.identity(db).display(db),
+                            ));
+                            add_typevar_definition(db, &mut diagnostic, typevar);
+                        }
+                        error = Some(ExplicitSpecializationError::UnsatisfiedBound);
+                        specialization_types.push(Some(Type::unknown()));
+                    } else {
+                        validate_fixed_var(
+                            typevar,
+                            inferred_type_arguments[arg_idx],
+                            arg_idx,
+                            &mut specialization_types,
+                            &mut error,
+                        );
+                    }
                 } else if typevar.default_type(db).is_none() {
                     missing_typevars.push(typevar);
                 } else {
@@ -16120,16 +16152,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         inferred_type_arguments.push(provided_type);
 
-                        // A TypeVarTuple cannot be used as a type argument for a
-                        // regular TypeVar, since it represents a variable number of
-                        // types while a TypeVar expects exactly one.
-                        if provided_type.is_typevartuple(db) {
+                        // An unpacked type (e.g. `*Ts` or `*tuple[float, ...]`)
+                        // cannot be used as a type argument for a regular TypeVar,
+                        // since it represents a variable number of types while a
+                        // TypeVar expects exactly one.
+                        if matches!(expr, ast::Expr::Starred(_)) {
                             let node = get_node(index);
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node)
                             {
                                 let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "TypeVarTuple cannot be used as a type argument \
+                                    "Unpacked type is not allowed as a type argument \
                                         for regular type variable `{}`",
                                     typevar.identity(db).display(db),
                                 ));
