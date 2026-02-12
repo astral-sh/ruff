@@ -679,6 +679,19 @@ impl<'db> Type<'db> {
                 | Type::ProtocolInstance(_),
             ) if source.is_object() => ConstraintSet::from(false),
 
+            // A TypeVarTuple used as a type (e.g., as the variable element of a tuple)
+            // has an implicit upper bound of `object`. Anything assignable to `object`
+            // is assignable to the TypeVarTuple.
+            (_, Type::TypeVar(typevar)) if typevar.typevar(db).is_typevartuple(db) => self
+                .has_relation_to_impl(
+                    db,
+                    Type::object(),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+
             // Fast path: `object` is not a subtype of any non-inferable type variable, since the
             // type variable could be specialized to a type smaller than `object`.
             (Type::NominalInstance(source), Type::TypeVar(typevar))
