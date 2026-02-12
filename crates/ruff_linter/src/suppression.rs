@@ -228,7 +228,7 @@ impl Suppressions {
              grouped_diagnostic: &Option<(TextRange, SuppressionDiagnostic)>|
              -> bool {
                 if let Some((group_key, group)) = grouped_diagnostic
-                    && (key.is_none() || key.is_some_and(|key| key != *group_key))
+                    && key.is_none_or(|key| key != *group_key)
                 {
                     if group.any_invalid() {
                         Suppressions::report_suppression_codes(
