@@ -184,14 +184,13 @@ impl Options {
             }
         };
 
-        let self_site_packages = self_environment_search_paths(
+        let self_environment = self_environment_search_paths(
             python_environment
                 .as_ref()
                 .map(ty_python_semantic::PythonEnvironment::origin)
                 .cloned(),
             system,
-        )
-        .unwrap_or_default();
+        );
 
         let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
             let site_packages_paths = python_environment
@@ -210,10 +209,19 @@ impl Options {
                     }
                 }
             };
-            self_site_packages.concatenate(site_packages_paths)
+            match self_environment {
+                // When ty is installed in a virtual environment (e.g., `uvx --with ...`),
+                // the self-environment takes priority over the discovered environment.
+                Some((self_site_packages, true)) => {
+                    self_site_packages.concatenate(site_packages_paths)
+                }
+                // When ty is installed in a system Python, do not include the system
+                // Python's site-packages if there's a discovered project environment.
+                Some((_, false)) | None => site_packages_paths,
+            }
         } else {
             tracing::debug!("No virtual environment found");
-            self_site_packages
+            self_environment.map(|(paths, _)| paths).unwrap_or_default()
         };
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
@@ -518,10 +526,15 @@ impl Options {
 ///
 /// Since ty may be executed from an arbitrary non-Python location, errors during discovery of ty's
 /// environment are not raised, instead [`None`] is returned.
+///
+/// Returns a tuple of (`site_packages`, `is_virtual_env`). When the self-environment is a virtual
+/// environment (e.g., `uvx --with ...`), it takes priority over other environments.
+/// When it's a system Python and there's a project environment (like `.venv`), the system
+/// Python's site-packages are excluded entirely.
 fn self_environment_search_paths(
     existing_origin: Option<SysPrefixPathOrigin>,
     system: &dyn System,
-) -> Option<SitePackagesPaths> {
+) -> Option<(SitePackagesPaths, bool)> {
     if existing_origin.is_some_and(|origin| !origin.allows_concatenation_with_self_environment()) {
         return None;
     }
@@ -535,15 +548,17 @@ fn self_environment_search_paths(
         .inspect_err(|err| tracing::debug!("Failed to discover ty's environment: {err}"))
         .ok()?;
 
+    let is_virtual_env = environment.is_virtual();
+
     let search_paths = environment
         .site_packages_paths(system)
         .inspect_err(|err| {
             tracing::debug!("Failed to discover site-packages in ty's environment: {err}");
         })
-        .ok();
+        .ok()?;
 
     tracing::debug!("Using site-packages from ty's environment");
-    search_paths
+    Some((search_paths, is_virtual_env))
 }
 
 #[derive(
