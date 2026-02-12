@@ -169,10 +169,9 @@ MyConfig(1).get("key")
 
 ### Metaclass `__call__` returning `Any`
 
-When a metaclass `__call__` returns `Any`, we treat it as "dynamic/unknown" and proceed to check
-`__new__`/`__init__` normally. This is because many metaclasses (like SQLModel, Pydantic, etc.) use
-`-> Any` because the actual return type is dynamic, but at runtime they still return an instance of
-the class.
+When a metaclass `__call__` returns `Any`, the return type is not an instance of the class being
+constructed, so we use the metaclass `__call__` signature directly and skip `__new__`/`__init__`
+validation. This is consistent with the treatment of `-> Any` on `__new__`, and matches pyright.
 
 ```py
 from typing import Any
@@ -185,12 +184,10 @@ class Foo(metaclass=Meta):
     def __init__(self, x: int) -> None:
         pass
 
-# __init__ IS checked because Any is treated as "unknown", not "definitely not an instance"
-# error: [missing-argument]
-reveal_type(Foo())  # revealed: Foo
-
-# error: [invalid-argument-type]
-reveal_type(Foo("wrong"))  # revealed: Foo
+# The metaclass `__call__` accepts `(*args, **kwargs)` and returns `Any`,
+# so we use that directly, skipping `__init__` validation.
+reveal_type(Foo())  # revealed: Any
+reveal_type(Foo("wrong"))  # revealed: Any
 ```
 
 ### Overloaded metaclass `__call__` with mixed return types

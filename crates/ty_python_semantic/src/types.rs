@@ -4857,12 +4857,11 @@ impl<'db> Type<'db> {
 
             // All overloads must return a non-instance type for us to treat the metaclass
             // `__call__` as fully overriding `type.__call__`. If any overload returns the
-            // class instance type (or is dynamic/contains typevars), fall through to
+            // class instance type (or contains typevars), fall through to
             // evaluate `__new__`/`__init__`.
             let all_overloads_return_non_instance = !signature.overloads.is_empty()
                 && signature.overloads.iter().all(|sig| {
-                    !sig.return_ty.is_dynamic()
-                        && !sig.return_ty.has_typevar(db)
+                    !sig.return_ty.has_typevar(db)
                         && ConstructorReturnDisposition::of(db, sig.return_ty, class)
                             .is_not_instance()
                 });
