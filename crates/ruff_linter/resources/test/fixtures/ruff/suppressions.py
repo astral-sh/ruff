@@ -109,3 +109,10 @@ def f():
     # ruff: disable
     # ruff: disable[]
     print("hello")
+
+
+# Ensure LAST suppression in file is reported.
+# https://github.com/astral-sh/ruff/issues/23235
+# ruff:disable[F401]
+print("goodbye")
+# ruff:enable[F401]

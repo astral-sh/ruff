@@ -222,60 +222,71 @@ impl Suppressions {
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
         let mut unmatched_ranges = FxHashSet::default();
+
+        let process_pending_diagnostics =
+            |key: Option<TextRange>,
+             grouped_diagnostic: &Option<(TextRange, SuppressionDiagnostic)>|
+             -> bool {
+                if let Some((group_key, group)) = grouped_diagnostic
+                    && key.is_none_or(|key| key != *group_key)
+                {
+                    if group.any_invalid() {
+                        Suppressions::report_suppression_codes(
+                            context,
+                            locator,
+                            group.suppression,
+                            &group.invalid_codes,
+                            true,
+                            InvalidRuleCode {
+                                rule_code: group.invalid_codes.iter().join(", "),
+                                kind: InvalidRuleCodeKind::Suppression,
+                                whole_comment: group.suppression.codes().len()
+                                    == group.invalid_codes.len(),
+                            },
+                        );
+                    }
+                    if group.any_unused() {
+                        let mut codes = group.disabled_codes.clone();
+                        codes.extend(group.unused_codes.clone());
+                        Suppressions::report_suppression_codes(
+                            context,
+                            locator,
+                            group.suppression,
+                            &codes,
+                            false,
+                            UnusedNOQA {
+                                codes: Some(UnusedCodes {
+                                    disabled: group
+                                        .disabled_codes
+                                        .iter()
+                                        .map(ToString::to_string)
+                                        .collect_vec(),
+                                    duplicated: group
+                                        .duplicated_codes
+                                        .iter()
+                                        .map(ToString::to_string)
+                                        .collect_vec(),
+                                    unmatched: group
+                                        .unused_codes
+                                        .iter()
+                                        .map(ToString::to_string)
+                                        .collect_vec(),
+                                    ..Default::default()
+                                }),
+                                kind: UnusedNOQAKind::Suppression,
+                            },
+                        );
+                    }
+                    true
+                } else {
+                    false
+                }
+            };
+
         for suppression in &self.valid {
             let key = suppression.comments.disable_comment().range;
 
-            // Process any pending grouped diagnostics
-            if let Some((group_key, ref group)) = grouped_diagnostic
-                && key != group_key
-            {
-                if group.any_invalid() {
-                    Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &group.invalid_codes,
-                        true,
-                        InvalidRuleCode {
-                            rule_code: group.invalid_codes.iter().join(", "),
-                            kind: InvalidRuleCodeKind::Suppression,
-                            whole_comment: group.suppression.codes().len()
-                                == group.invalid_codes.len(),
-                        },
-                    );
-                }
-                if group.any_unused() {
-                    let mut codes = group.disabled_codes.clone();
-                    codes.extend(group.unused_codes.clone());
-                    Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &codes,
-                        false,
-                        UnusedNOQA {
-                            codes: Some(UnusedCodes {
-                                disabled: group
-                                    .disabled_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                duplicated: group
-                                    .duplicated_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                unmatched: group
-                                    .unused_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                ..Default::default()
-                            }),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
-                    );
-                }
+            if process_pending_diagnostics(Some(key), &grouped_diagnostic) {
                 grouped_diagnostic = None;
             }
 
@@ -323,6 +334,8 @@ impl Suppressions {
                 }
             }
         }
+
+        process_pending_diagnostics(None, &grouped_diagnostic);
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {

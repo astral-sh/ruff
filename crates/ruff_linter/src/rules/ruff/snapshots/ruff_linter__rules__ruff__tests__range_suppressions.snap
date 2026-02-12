@@ -382,6 +382,7 @@ help: Remove suppression comment
     -     # ruff: disable
 109 |     # ruff: disable[]
 110 |     print("hello")
+111 | 
 note: This is an unsafe fix and may change runtime behavior
 
 RUF103 [*] Invalid suppression comment: missing suppression codes like `[E501, ...]`
@@ -399,4 +400,25 @@ help: Remove suppression comment
 109 |     # ruff: disable
     -     # ruff: disable[]
 110 |     print("hello")
+111 | 
+112 | 
 note: This is an unsafe fix and may change runtime behavior
+
+RUF100 [*] Unused suppression (non-enabled: `F401`)
+   --> suppressions.py:116:1
+    |
+114 | # Ensure LAST suppression in file is reported.
+115 | # https://github.com/astral-sh/ruff/issues/23235
+116 | # ruff:disable[F401]
+    | ^^^^^^^^^^^^^^^^^^^^
+117 | print("goodbye")
+118 | # ruff:enable[F401]
+    | -------------------
+    |
+help: Remove unused suppression
+113 | 
+114 | # Ensure LAST suppression in file is reported.
+115 | # https://github.com/astral-sh/ruff/issues/23235
+    - # ruff:disable[F401]
+116 | print("goodbye")
+    - # ruff:enable[F401]
