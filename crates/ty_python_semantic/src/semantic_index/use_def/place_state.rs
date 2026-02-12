@@ -338,22 +338,22 @@ impl Bindings {
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
 
-                    // A branch contributes narrowing only when it is reachable.
-                    //
-                    // Without this gating, `OR(narrowing_a, narrowing_b)` allows an unreachable
-                    // branch with `ALWAYS_TRUE` narrowing to cancel useful narrowing from the
-                    // reachable branch.
                     let narrowing_constraint = if a.narrowing_constraint
                         == ScopedNarrowingConstraint::ALWAYS_TRUE
                         && b.narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
                     {
                         ScopedNarrowingConstraint::ALWAYS_TRUE
                     } else {
-                        let a_gated = reachability_constraints
+                        // A branch contributes narrowing only when it is reachable.
+                        // Without this gating, `OR(a_narrowing, b_narrowing)` allows an unreachable
+                        // branch with `ALWAYS_TRUE` narrowing to cancel useful narrowing from the
+                        // reachable branch.
+                        let a_narrowing_gated = reachability_constraints
                             .add_and_constraint(a.narrowing_constraint, a.reachability_constraint);
-                        let b_gated = reachability_constraints
+                        let b_narrowing_gated = reachability_constraints
                             .add_and_constraint(b.narrowing_constraint, b.reachability_constraint);
-                        reachability_constraints.add_or_constraint(a_gated, b_gated)
+                        reachability_constraints
+                            .add_or_constraint(a_narrowing_gated, b_narrowing_gated)
                     };
 
                     self.live_bindings.push(LiveBinding {
