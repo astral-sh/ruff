@@ -94,8 +94,8 @@ reveal_type(Foo(1))  # revealed: Foo
 ### Metaclass `__call__` with specific parameters
 
 When the metaclass `__call__` has specific parameters (not just `*args, **kwargs`), we validate them
-even when the return type is an instance type. Here `__init__` accepts anything, so the errors must
-come from the metaclass `__call__`.
+even when the return type is an instance type. Here both `__new__` and `__init__` accept anything,
+so the errors must come from the metaclass `__call__`.
 
 ```py
 from typing import Any, TypeVar
@@ -107,6 +107,9 @@ class Meta(type):
         return object.__new__(cls)
 
 class Foo(metaclass=Meta):
+    def __new__(cls, *args: Any, **kwargs: Any) -> "Foo":
+        return object.__new__(cls)
+
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
