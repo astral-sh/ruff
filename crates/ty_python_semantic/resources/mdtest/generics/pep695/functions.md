@@ -1072,5 +1072,69 @@ def g[S: (bool, str)](x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
 ```
 
+## Inferring generic function parameter types from union arguments
+
+When a generic function is called with a union-typed argument, we should infer the type variable
+from all elements of the union.
+
+### Basic union inference
+
+```py
+def f[T](x: T) -> T:
+    return x
+
+def check(x: int | str) -> None:
+    reveal_type(f(x))  # revealed: int | str
+```
+
+### Bounded TypeVar with union argument
+
+```py
+class Base: ...
+class Sub1(Base): ...
+class Sub2(Base): ...
+
+def f[T: Base](x: T) -> T:
+    return x
+
+def check(x: Sub1 | Sub2) -> None:
+    reveal_type(f(x))  # revealed: Sub1 | Sub2
+```
+
+### Bounded TypeVar rejects union when one element violates the bound
+
+```py
+class Base: ...
+class Sub(Base): ...
+
+def f[T: Base](x: T) -> T:
+    return x
+
+def check(x: Sub | int) -> None:
+    f(x)  # error: [invalid-argument-type]
+```
+
+### Constrained TypeVar still rejects union arguments
+
+A union `int | str` does not satisfy a constrained TypeVar `T: (int, str)`, because the TypeVar
+requires a single constraint to be chosen, not a union of constraints.
+
+```py
+def f[T: (int, str)](x: T) -> T:
+    return x
+
+def check(x: int | str) -> None:
+    f(x)  # error: [invalid-argument-type]
+```
+
+### `round` with `int | float`
+
+`round` returns `int` for both `int` and `float` arguments.
+
+```py
+def check(x: int | float) -> None:
+    reveal_type(round(x))  # revealed: int
+```
+
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md
 [ty#2371]: https://github.com/astral-sh/ty/issues/2371
