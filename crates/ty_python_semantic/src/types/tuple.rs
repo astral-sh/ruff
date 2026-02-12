@@ -980,16 +980,34 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> TupleSpec<'db> {
-        Self::mixed(
-            self.prefix_elements()
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-            self.variable()
-                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-            self.suffix_elements()
-                .iter()
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
-        )
+        let variable = self.variable();
+        let mapped_variable = variable.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+
+        // When the variable element is a TypeVarTuple that maps to a concrete tuple type,
+        // splice the mapped tuple into the result rather than using it as the variable element.
+        if variable.is_typevartuple(db)
+            && let Some(mapped_tuple) = mapped_variable.tuple_instance_spec(db)
+        {
+            let mut builder = TupleSpecBuilder::with_capacity(0);
+            for ty in self.prefix_elements() {
+                builder.push(ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            }
+            builder = builder.concat(db, &mapped_tuple);
+            for ty in self.suffix_elements() {
+                builder.push(ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+            }
+            builder.build()
+        } else {
+            Self::mixed(
+                self.prefix_elements()
+                    .iter()
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                mapped_variable,
+                self.suffix_elements()
+                    .iter()
+                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            )
+        }
     }
 
     fn find_legacy_typevars_impl(

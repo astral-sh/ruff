@@ -133,6 +133,33 @@ def check_single(a: Array[int]):
     reveal_type(a)  # revealed: Array[tuple[int]]
 ```
 
+### `tuple[Unpack[Ts]]` in type annotations
+
+The `Unpack[Ts]` subscript form and the `*Ts` starred form in tuple type annotations should both
+produce a variadic tuple, not a fixed 1-element tuple.
+
+```py
+from typing_extensions import Generic, TypeVarTuple, Unpack
+
+Ts = TypeVarTuple("Ts")
+
+def pass_through(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
+    return args
+
+def forward(*args: Unpack[Ts]) -> None:
+    inner: tuple[Unpack[Ts]] = args
+
+def takes_args(args: tuple[Unpack[Ts]]) -> None: ...
+def gives_args(*args: Unpack[Ts]) -> None:
+    takes_args(args)
+
+class Variadic(Generic[Unpack[Ts]]):
+    def method(self, args: tuple[Unpack[Ts]]) -> None: ...
+
+def accept_variadic(v: Variadic[int, str]):
+    v.method((1, "hello"))
+```
+
 ### Mixed TypeVar and TypeVarTuple
 
 ```py

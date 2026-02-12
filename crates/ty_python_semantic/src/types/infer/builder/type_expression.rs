@@ -720,6 +720,32 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 // TODO: emit a diagnostic
                             }
                         }
+                    } else if element_ty.is_typevartuple(self.db()) {
+                        // Handle `Unpack[Ts]` (subscript form) the same as `*Ts` (starred form):
+                        // the TypeVarTuple becomes the variable-length element.
+                        if let Some(first) = first_unpacked_variadic_tuple {
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                            {
+                                let mut diagnostic = builder.into_diagnostic(
+                                    "Multiple unpacked variadic tuples \
+                                        are not allowed in a `tuple` specialization",
+                                );
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(first)
+                                        .message("First unpacked variadic tuple"),
+                                );
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(element)
+                                        .message("Later unpacked variadic tuple"),
+                                );
+                            }
+                        } else {
+                            first_unpacked_variadic_tuple = Some(element);
+                        }
+                        element_types = element_types.set_variable(element_ty);
                     } else {
                         element_types.push(element_ty);
                     }
@@ -758,6 +784,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.db(),
                         Type::Dynamic(DynamicType::TodoTypeVarTuple),
                     ))
+                } else if single_element_ty.is_typevartuple(self.db()) {
+                    Some(TupleType::homogeneous(self.db(), single_element_ty))
                 } else {
                     TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
                 }
