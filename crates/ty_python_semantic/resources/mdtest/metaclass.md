@@ -139,7 +139,8 @@ reveal_type(Foo(1))  # revealed: Foo
 ### Metaclass `__call__` returning bare `type`
 
 When the metaclass `__call__` is annotated as returning `type`, we use that return type. This is
-stricter than mypy and pyright, which ignore the `-> type` annotation in this case.
+stricter than mypy and pyright, which ignore the `-> type` annotation in this case. `__init__` is
+skipped because the return type is not an instance of the class being constructed.
 
 ```py
 from typing import Any
@@ -161,11 +162,13 @@ class MyConfig(metaclass=Singleton):
         return key
 
 # The metaclass `__call__` returns `type`, so that's what we infer.
-reveal_type(MyConfig(1))  # revealed: type
+# `__init__` is not checked: `MyConfig()` would violate `__init__(self, x: int)`,
+# but we skip it because the return type is `type`, not `MyConfig`.
+reveal_type(MyConfig())  # revealed: type
 
 # Instance methods are not available on `type`.
 # error: [unresolved-attribute]
-MyConfig(1).get("key")
+MyConfig().get("key")
 ```
 
 ### Metaclass `__call__` returning `Any`
@@ -244,7 +247,8 @@ class Bar(metaclass=Meta):
     def __init__(self, x: int, y: int) -> None:
         pass
 
-# The metaclass __call__ overloads control construction; __init__ is not checked.
+# `__init__` is not checked: it requires two `int` args, but we only pass one.
+# No error is raised because the metaclass `__call__` controls construction.
 reveal_type(Bar(1))  # revealed: int
 reveal_type(Bar("hello"))  # revealed: str
 ```
@@ -269,7 +273,8 @@ class Baz(metaclass=Meta):
     def __init__(self, x: int, y: int) -> None:
         pass
 
-# The metaclass __call__ overloads control construction; __init__ is not checked.
+# `__init__` is not checked: it requires two `int` args, but we only pass one.
+# No error is raised because the metaclass `__call__` controls construction.
 reveal_type(Baz(1))  # revealed: () -> int
 reveal_type(Baz("hello"))  # revealed: () -> str
 ```
