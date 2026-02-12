@@ -444,6 +444,9 @@ impl<'db> UseDefMap<'db> {
         );
         let mut seen_roots: FxHashSet<TddRootRef> = FxHashSet::default();
         let mut tdd_pool_roots: FxHashSet<ScopedReachabilityConstraintId> = FxHashSet::default();
+        let mut reachability_roots: FxHashSet<ScopedReachabilityConstraintId> =
+            FxHashSet::default();
+        let mut narrowing_roots: FxHashSet<ScopedReachabilityConstraintId> = FxHashSet::default();
         if self.end_of_scope_reachability != ScopedReachabilityConstraintId::ALWAYS_TRUE
             && self.end_of_scope_reachability != ScopedReachabilityConstraintId::ALWAYS_FALSE
             && self.end_of_scope_reachability != ScopedReachabilityConstraintId::AMBIGUOUS
@@ -460,6 +463,14 @@ impl<'db> UseDefMap<'db> {
                 && root.constraint != ScopedReachabilityConstraintId::AMBIGUOUS
             {
                 tdd_pool_roots.insert(root.constraint);
+            }
+            match root.kind {
+                TddRootKind::NodeReachability => {
+                    reachability_roots.insert(root.constraint);
+                }
+                TddRootKind::NarrowingConstraint => {
+                    narrowing_roots.insert(root.constraint);
+                }
             }
             roots.push(TddRootStat {
                 root,
@@ -582,6 +593,8 @@ impl<'db> UseDefMap<'db> {
             hot_nodes,
             self.reachability_constraints.pool_interior_node_count(),
             tdd_pool_roots.len(),
+            reachability_roots.len(),
+            narrowing_roots.len(),
         )
     }
 

@@ -160,10 +160,10 @@ pub fn tdd_stats_for_file(
         let root_count = report.roots.len();
         let mut total_interior_nodes = 0;
         let mut max_interior_nodes = 0;
-        let mut reachability_roots = 0;
+        let reachability_roots = report.reachability_roots;
         let mut reachability_interior_nodes = 0;
         let mut reachability_max_depth = 0;
-        let mut narrowing_roots = 0;
+        let narrowing_roots = report.narrowing_roots;
         let mut narrowing_interior_nodes = 0;
         let mut narrowing_max_depth = 0;
         for root in &report.roots {
@@ -171,12 +171,10 @@ pub fn tdd_stats_for_file(
             max_interior_nodes = max_interior_nodes.max(root.interior_nodes);
             match root.root.kind {
                 TddRootKind::NodeReachability => {
-                    reachability_roots += 1;
                     reachability_interior_nodes += root.interior_nodes;
                     reachability_max_depth = reachability_max_depth.max(root.max_depth);
                 }
                 TddRootKind::NarrowingConstraint => {
-                    narrowing_roots += 1;
                     narrowing_interior_nodes += root.interior_nodes;
                     narrowing_max_depth = narrowing_max_depth.max(root.max_depth);
                 }

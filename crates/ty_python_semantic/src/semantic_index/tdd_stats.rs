@@ -137,6 +137,8 @@ pub(crate) struct TddStatsReport {
     pub(crate) hot_nodes: Vec<TddHotNodeStat>,
     pub(crate) tdd_pool_nodes: usize,
     pub(crate) tdd_pool_roots: usize,
+    pub(crate) reachability_roots: usize,
+    pub(crate) narrowing_roots: usize,
 }
 
 impl TddStatsReport {
@@ -145,6 +147,8 @@ impl TddStatsReport {
         hot_nodes: Vec<TddHotNodeStat>,
         tdd_pool_nodes: usize,
         tdd_pool_roots: usize,
+        reachability_roots: usize,
+        narrowing_roots: usize,
     ) -> Self {
         let mut by_size: BTreeMap<usize, usize> = BTreeMap::new();
         for stat in &roots {
@@ -163,6 +167,8 @@ impl TddStatsReport {
             hot_nodes,
             tdd_pool_nodes,
             tdd_pool_roots,
+            reachability_roots,
+            narrowing_roots,
         }
     }
 }

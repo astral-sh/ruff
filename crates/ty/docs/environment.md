@@ -74,7 +74,7 @@ Field meanings:
 - `verbose`: Effective verbosity level (`1` for short, `2` for full).
 - `files`: Number of analyzed files with non-empty stats (summary line only).
 - `max_root_nodes`: Largest interior-node count among single roots in scope.
-- `reachability_roots` / `narrowing_roots`: Root counts split by family.
+- `reachability_roots` / `narrowing_roots`: Unique root-constraint ID counts split by family.
 - `reachability_nodes` / `narrowing_nodes`: Interior-node visits split by family.
 - `reachability_max_depth` / `narrowing_max_depth`: Maximum TDD depth observed in each family.
 
