@@ -8324,11 +8324,15 @@ impl SlotsKind {
 }
 
 /// Helper functions for __slots__ support
-impl<'db> ClassLiteral<'db> {
+impl<'db> StaticClassLiteral<'db> {
     /// Extract the names of attributes defined in __slots__ as a set of strings.
     /// Returns None if __slots__ is not defined, empty, or dynamic.
-    pub(super) fn slots_members(self, db: &'db dyn Db) -> Option<FxHashSet<String>> {
-        let Place::Defined(slots_ty, _, definedness) = self
+    fn slots_members(self, db: &'db dyn Db) -> Option<FxHashSet<String>> {
+        let Place::Defined(DefinedPlace {
+            ty: slots_ty,
+            definedness,
+            ..
+        }) = self
             .own_class_member(db, self.generic_context(db), None, "__slots__")
             .inner
             .place
@@ -8343,29 +8347,22 @@ impl<'db> ClassLiteral<'db> {
         match slots_ty {
             // __slots__ = ("a", "b")
             Type::NominalInstance(nominal) => {
-                if let Some(tuple_spec) = nominal.tuple_spec(db) {
-                    let mut slots = FxHashSet::default();
-                    for element in tuple_spec.all_elements() {
-                        if let Type::StringLiteral(string_literal) = element {
-                            slots.insert(string_literal.value(db).to_string());
-                        } else {
-                            // Non-string element, consider it dynamic
-                            return None;
-                        }
+                let mut slots = FxHashSet::default();
+                let tuple_spec = nominal.tuple_spec(db)?;
+                for &element in tuple_spec.all_elements() {
+                    if let Type::StringLiteral(string_literal) = element {
+                        slots.insert(string_literal.value(db).to_string());
+                    } else {
+                        return None;
                     }
-                    Some(slots)
-                } else {
-                    None
                 }
+                Some(slots)
             }
 
             // __slots__ = "abc"  # Expands to slots "a", "b", "c"
             Type::StringLiteral(string_literal) => {
                 let mut slots = FxHashSet::default();
-                let slot_value = string_literal.value(db);
-
-                // Python treats a bare string as a sequence of slot names (one per character)
-                for ch in slot_value.chars() {
+                for ch in string_literal.value(db).chars() {
                     slots.insert(ch.to_string());
                 }
                 Some(slots)
@@ -8382,27 +8379,19 @@ impl<'db> ClassLiteral<'db> {
         name: &str,
         result: PlaceAndQualifiers<'db>,
     ) -> Member<'db> {
-        // TODO: This function will be extended to support:
-        // - Inheritance: Check slots across the MRO chain
-        // - `__dict__` special case: Allow dynamic attributes when `__dict__` is in slots
-
         if let Some(slots) = self.slots_members(db) {
             if slots.contains(name) {
-                // Attribute is in __slots__, so it's allowed even if not found elsewhere
                 if result.place.is_undefined() {
-                    // Return as possibly unbound since it's declared but not necessarily initialized
                     return Member {
                         inner: Place::Defined(
-                            Type::unknown(),
-                            TypeOrigin::Inferred,
-                            Definedness::PossiblyUndefined,
+                            DefinedPlace::new(Type::unknown())
+                                .with_definedness(Definedness::PossiblyUndefined),
                         )
                         .into(),
                     };
                 }
                 return Member { inner: result };
             }
-            // Attribute is not in __slots__
             return Member::unbound();
         }
         Member { inner: result }
