@@ -2558,16 +2558,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // kind of constraint to mark the following code as unreachable.
                 //
                 // Ideally, these constraints should be added for every call expression, even those in
-                // sub-expressions and in the module-level scope. But doing so makes the number of
-                // such constraints so high that it significantly degrades performance. We thus cut
-                // scope here and add these constraints only at statement level function calls,
-                // like `sys.exit()`, and not within sub-expression like `3 + sys.exit()` etc.
-                //
-                // We also only add these inside function scopes, since considering module-level
-                // constraints can affect the type of imported symbols, leading to a lot more
-                // work in third-party code.
+                // sub-expressions. But doing so makes the number of such constraints so high that
+                // it significantly degrades performance. We thus cut scope here and add these
+                // constraints only at statement-level function calls, like `sys.exit()`, and not
+                // within sub-expressions like `3 + sys.exit()` etc.
                 if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                    if !self.source_type.is_stub() && self.in_function_scope() {
+                    if !self.source_type.is_stub() {
                         let callable = self.add_standalone_expression(func);
                         let call_expr = self.add_standalone_expression(value.as_ref());
 
