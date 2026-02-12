@@ -815,10 +815,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn record_expression_narrowing_constraint(
         &mut self,
         predicate_node: &ast::Expr,
-    ) -> PredicateOrLiteral<'db> {
+    ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
         let predicate = self.build_predicate(predicate_node);
-        self.record_narrowing_constraint(predicate);
-        predicate
+        let predicate_id = self.record_narrowing_constraint(predicate);
+        (predicate, predicate_id)
     }
 
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
@@ -881,11 +881,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Adds and records a narrowing constraint for only the places that could possibly be narrowed.
-    fn record_narrowing_constraint(&mut self, predicate: PredicateOrLiteral<'db>) {
+    ///
+    /// Returns the `ScopedPredicateId` for the positive predicate, which can later be passed to
+    /// `record_negated_narrowing_constraint` for TDD-level negation.
+    fn record_narrowing_constraint(
+        &mut self,
+        predicate: PredicateOrLiteral<'db>,
+    ) -> ScopedPredicateId {
         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
         let use_def = self.current_use_def_map_mut();
         let predicate_id = use_def.add_predicate(predicate);
         use_def.record_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
+        predicate_id
     }
 
     /// Computes the conservative set of places that could possibly be narrowed by a predicate.
@@ -926,14 +933,18 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Negates the given predicate and then adds it as a narrowing constraint to the places
     /// that could possibly be narrowed.
+    ///
+    /// Takes the `ScopedPredicateId` from the positive recording so that TDD-level negation
+    /// (`add_not_constraint`) uses the same atom. This ensures `atom(P) OR NOT(atom(P))`
+    /// simplifies to `ALWAYS_TRUE`, correctly cancelling narrowing after complete if/else blocks.
     fn record_negated_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
-    ) -> ScopedPredicateId {
+        predicate_id: ScopedPredicateId,
+    ) {
         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
-        let id = self.add_negated_predicate(predicate);
-        self.record_narrowing_constraint_id_for_places(id, &possibly_narrowed);
-        id
+        self.current_use_def_map_mut()
+            .record_negated_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
     }
 
     /// Records that all remaining statements in the current block are unreachable.
@@ -1058,7 +1069,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
-    ) -> (PredicateOrLiteral<'db>, PatternPredicate<'db>) {
+        is_catchall: bool,
+    ) -> (
+        PredicateOrLiteral<'db>,
+        ScopedPredicateId,
+        PatternPredicate<'db>,
+    ) {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
@@ -1082,12 +1098,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             guard,
             previous_pattern.map(Box::new),
         );
+
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
         });
-        self.record_narrowing_constraint(predicate);
-        (predicate, pattern_predicate)
+
+        // For the last catchall case (irrefutable wildcard without guard), we skip
+        // recording the narrowing constraint from the pattern. The accumulated negated
+        // constraints from earlier cases (~P1, ~P2, ...) are sufficient. This ensures
+        // `P1 OR (~P1 AND P2) OR (~P1 AND ~P2)` simplifies to ALWAYS_TRUE, preserving
+        // the original type after an exhaustive match. The reachability and pattern
+        // predicates are still created normally for proper control flow tracking.
+        let predicate_id = if is_catchall {
+            ScopedPredicateId::ALWAYS_TRUE
+        } else {
+            self.record_narrowing_constraint(predicate)
+        };
+        (predicate, predicate_id, pattern_predicate)
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -1241,7 +1269,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for if_expr in &generator.ifs {
             self.visit_expr(if_expr);
-            self.record_expression_narrowing_constraint(if_expr);
+            let _ = self.record_expression_narrowing_constraint(if_expr);
         }
 
         for generator in generators_iter {
@@ -1259,7 +1287,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             for if_expr in &generator.ifs {
                 self.visit_expr(if_expr);
-                self.record_expression_narrowing_constraint(if_expr);
+                let _ = self.record_expression_narrowing_constraint(if_expr);
             }
         }
 
@@ -1963,7 +1991,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
-                let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
+                let (mut last_predicate, mut last_narrowing_id) =
+                    self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
 
@@ -2004,7 +2033,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // taken
                     self.flow_restore(no_branch_taken.clone());
 
-                    self.record_negated_narrowing_constraint(last_predicate);
+                    self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     if let Some(elif_test) = clause_test {
@@ -2012,7 +2041,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
 
-                        last_predicate = self.record_expression_narrowing_constraint(elif_test);
+                        (last_predicate, last_narrowing_id) =
+                            self.record_expression_narrowing_constraint(elif_test);
 
                         last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
@@ -2057,7 +2087,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
+                let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
                 let outer_loop = self.push_loop();
@@ -2081,7 +2111,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .add_atom(later_predicate_id);
                 self.record_negated_reachability_constraint(later_reachability_constraint);
 
-                self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_narrowing_constraint(predicate, predicate_id);
 
                 self.visit_body(orelse);
 
@@ -2188,12 +2218,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // here because the effects of visiting a pattern is binding
                     // symbols, and this doesn't occur unless the pattern
                     // actually matches
-                    let (match_predicate, match_pattern_predicate) = self
+                    let is_catchall = has_catchall && i == cases.len() - 1;
+                    let (match_predicate, match_narrowing_id, match_pattern_predicate) = self
                         .add_pattern_narrowing_constraint(
                             subject_expr,
                             &case.pattern,
                             case.guard.as_deref(),
                             previous_pattern,
+                            is_catchall,
                         );
                     previous_pattern = Some(match_pattern_predicate);
                     let reachability_constraint =
@@ -2211,10 +2243,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
                         });
-                        self.record_negated_narrowing_constraint(predicate);
+                        // Add the predicate once, then use TDD-level negation for the failure
+                        // path. This ensures the positive and negative atoms share the same ID.
+                        let guard_predicate_id = self.add_predicate(predicate);
+                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+                        self.current_use_def_map_mut()
+                            .record_negated_narrowing_constraint_for_places(
+                                guard_predicate_id,
+                                &possibly_narrowed,
+                            );
                         let match_success_guard_failure = self.flow_snapshot();
                         self.flow_restore(post_guard_eval);
-                        self.record_narrowing_constraint(predicate);
+                        self.current_use_def_map_mut()
+                            .record_narrowing_constraint_for_places(
+                                guard_predicate_id,
+                                &possibly_narrowed,
+                            );
                         match_success_guard_failure
                     });
 
@@ -2227,7 +2271,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // one. The last one will just become the state that we merge the other
                         // snapshots into.
                         self.flow_restore(no_case_matched.clone());
-                        self.record_negated_narrowing_constraint(match_predicate);
+                        self.record_negated_narrowing_constraint(
+                            match_predicate,
+                            match_narrowing_id,
+                        );
                         self.record_negated_reachability_constraint(reachability_constraint);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
@@ -2531,9 +2578,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             }),
                             is_positive: false,
                         };
-                        self.record_reachability_constraint(PredicateOrLiteral::Predicate(
-                            predicate,
-                        ));
+                        let constraint = self.record_reachability_constraint(
+                            PredicateOrLiteral::Predicate(predicate),
+                        );
+
+                        // Also gate narrowing by this constraint: if the call returns
+                        // `Never`, any narrowing in the current branch should be
+                        // invalidated (since this path is unreachable). This enables
+                        // narrowing to be preserved after if-statements where one branch
+                        // calls a `NoReturn` function like `sys.exit()`.
+                        self.current_use_def_map_mut()
+                            .record_narrowing_constraint_for_all_places(constraint);
                     }
                 }
             }
@@ -2752,13 +2807,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
+                let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
 
-                self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_narrowing_constraint(predicate, predicate_id);
                 self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
