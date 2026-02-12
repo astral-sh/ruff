@@ -57,7 +57,7 @@ use crate::{Edit, Fix, FixAvailability};
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct RuntimeStringUnion {
-    strategy: Strategy,
+    strategy: Option<Strategy>,
 }
 
 impl Violation for RuntimeStringUnion {
@@ -67,15 +67,15 @@ impl Violation for RuntimeStringUnion {
         "Invalid string member in `X | Y`-style union type".to_string()
     }
     fn fix_title(&self) -> Option<String> {
-        match self.strategy {
+        match self.strategy? {
             Strategy::FutureImport { has_import } => {
                 if has_import {
                     Some("Remove quotes from string literals".to_string())
                 } else {
-                    Some("Add `from __future__ import annotations` and remove quotes from string literals".to_string())
+                    Some("Add `from __future__ import annotations` and unquote".to_string())
                 }
             }
-            Strategy::QuoteUnion => Some("Quote the entire union expression".to_string()),
+            Strategy::QuoteUnion => Some("Quote entire union".to_string()),
         }
     }
 }
@@ -95,28 +95,32 @@ pub(crate) fn runtime_string_union(checker: &Checker, expr: &Expr) {
     let mut has_bytes = false;
     traverse_op(expr, &mut strings, &mut has_bytes);
 
-    let strategy = if checker.settings().flake8_type_checking.quote_annotations {
-        Strategy::QuoteUnion
-    } else {
-        Strategy::FutureImport {
+    let strategy = if checker.settings().future_annotations {
+        Some(Strategy::FutureImport {
             has_import: checker.future_annotations_or_stub(),
-        }
+        })
+    } else if checker.settings().flake8_type_checking.quote_annotations {
+        Some(Strategy::QuoteUnion)
+    } else {
+        None
     };
 
     let fix = if has_bytes {
         None
-    } else if checker.settings().flake8_type_checking.quote_annotations {
-        Some(quote_union(checker, &strings, expr))
     } else {
-        unquote_and_add_future_import(checker, &strings)
+        match strategy {
+            Some(Strategy::QuoteUnion) => generate_quote_union_fix(checker, &strings, expr),
+            Some(Strategy::FutureImport { .. }) => generate_future_import_fix(checker, &strings),
+            None => None,
+        }
     };
 
-    if !strings.is_empty() {
+    for string in &strings {
         let mut diagnostic =
-            checker.report_diagnostic(RuntimeStringUnion { strategy }, expr.range());
+            checker.report_diagnostic(RuntimeStringUnion { strategy }, string.range());
 
-        if !has_bytes && let Some(fix) = fix {
-            diagnostic.set_fix(fix);
+        if let Some(ref fix) = fix {
+            diagnostic.set_fix(fix.clone());
         }
     }
 }
@@ -144,7 +148,7 @@ fn traverse_op<'a>(expr: &'a Expr, strings: &mut Vec<&'a Expr>, has_bytes: &mut 
     }
 }
 
-fn unquote_and_add_future_import(checker: &Checker, strings: &[&Expr]) -> Option<Fix> {
+fn generate_future_import_fix(checker: &Checker, strings: &[&Expr]) -> Option<Fix> {
     let mut edits = vec![];
     for string_expr in strings {
         if let Expr::StringLiteral(ExprStringLiteral { value, .. }) = string_expr {
@@ -158,15 +162,17 @@ fn unquote_and_add_future_import(checker: &Checker, strings: &[&Expr]) -> Option
         let future_import = checker.importer().add_future_import();
         edits.push(future_import);
     }
-    if edits.is_empty() {
-        return None;
-    }
+
     let mut edits_iter = edits.into_iter();
-    let first = edits_iter.next().expect("Empty edits");
+    let first = edits_iter.next()?;
     Some(Fix::unsafe_edits(first, edits_iter))
 }
 
-fn quote_union(checker: &Checker, strings: &[&Expr], union_expr: &Expr) -> Fix {
+fn generate_quote_union_fix(
+    checker: &Checker,
+    strings: &[&Expr],
+    union_expr: &Expr,
+) -> Option<Fix> {
     let mut union_text = checker.locator().slice(union_expr.range()).to_string();
     let mut unquoted: Vec<_> = strings
         .iter()
@@ -185,8 +191,17 @@ fn quote_union(checker: &Checker, strings: &[&Expr], union_expr: &Expr) -> Fix {
     for (start, end, value) in unquoted {
         union_text.replace_range(start..end, value);
     }
-    let quoted_union = format!("\"{union_text}\"");
-    Fix::safe_edit(Edit::range_replacement(quoted_union, union_expr.range()))
+    let quoted_union = if !union_text.contains('"') {
+        format!("\"{union_text}\"")
+    } else if !union_text.contains('\'') {
+        format!("'{union_text}'")
+    } else {
+        return None;
+    };
+    Some(Fix::safe_edit(Edit::range_replacement(
+        quoted_union,
+        union_expr.range(),
+    )))
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

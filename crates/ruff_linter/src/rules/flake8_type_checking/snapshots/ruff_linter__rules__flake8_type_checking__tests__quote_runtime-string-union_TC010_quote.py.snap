@@ -2,14 +2,14 @@
 source: crates/ruff_linter/src/rules/flake8_type_checking/mod.rs
 ---
 TC010 [*] Invalid string member in `X | Y`-style union type
- --> TC010_quote.py:4:18
+ --> TC010_quote.py:4:24
   |
 4 | a = TypeVar('a', int | 'str', str)
-  |                  ^^^^^^^^^^^
+  |                        ^^^^^
 5 |
 6 | b = TypeVar('b', 'int' | 'str', bool)
   |
-help: Quote the entire union expression
+help: Quote entire union
 1 | from typing import TypeVar, NewType
 2 | 
 3 | 
@@ -25,11 +25,31 @@ TC010 [*] Invalid string member in `X | Y`-style union type
 4 | a = TypeVar('a', int | 'str', str)
 5 |
 6 | b = TypeVar('b', 'int' | 'str', bool)
-  |                  ^^^^^^^^^^^^^
+  |                  ^^^^^
 7 |
 8 | c = TypeVar('c', bound="int" | str)
   |
-help: Quote the entire union expression
+help: Quote entire union
+3 | 
+4 | a = TypeVar('a', int | 'str', str)
+5 | 
+  - b = TypeVar('b', 'int' | 'str', bool)
+6 + b = TypeVar('b', "int | str", bool)
+7 | 
+8 | c = TypeVar('c', bound="int" | str)
+9 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+ --> TC010_quote.py:6:26
+  |
+4 | a = TypeVar('a', int | 'str', str)
+5 |
+6 | b = TypeVar('b', 'int' | 'str', bool)
+  |                          ^^^^^
+7 |
+8 | c = TypeVar('c', bound="int" | str)
+  |
+help: Quote entire union
 3 | 
 4 | a = TypeVar('a', int | 'str', str)
 5 | 
@@ -45,11 +65,11 @@ TC010 [*] Invalid string member in `X | Y`-style union type
  6 | b = TypeVar('b', 'int' | 'str', bool)
  7 |
  8 | c = TypeVar('c', bound="int" | str)
-   |                        ^^^^^^^^^^^
+   |                        ^^^^^
  9 |
 10 | d = NewType('d', "int" | str)
    |
-help: Quote the entire union expression
+help: Quote entire union
 5  | 
 6  | b = TypeVar('b', 'int' | 'str', bool)
 7  | 
@@ -57,6 +77,7 @@ help: Quote the entire union expression
 8  + c = TypeVar('c', bound="int | str")
 9  | 
 10 | d = NewType('d', "int" | str)
+11 | 
 
 TC010 [*] Invalid string member in `X | Y`-style union type
   --> TC010_quote.py:10:18
@@ -64,11 +85,245 @@ TC010 [*] Invalid string member in `X | Y`-style union type
  8 | c = TypeVar('c', bound="int" | str)
  9 |
 10 | d = NewType('d', "int" | str)
-   |                  ^^^^^^^^^^^
+   |                  ^^^^^
+11 |
+12 | e = TypeVar('e', bound='int' | 'str' | 'float')
    |
-help: Quote the entire union expression
+help: Quote entire union
 7  | 
 8  | c = TypeVar('c', bound="int" | str)
 9  | 
    - d = NewType('d', "int" | str)
 10 + d = NewType('d', "int | str")
+11 | 
+12 | e = TypeVar('e', bound='int' | 'str' | 'float')
+13 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:12:24
+   |
+10 | d = NewType('d', "int" | str)
+11 |
+12 | e = TypeVar('e', bound='int' | 'str' | 'float')
+   |                        ^^^^^
+13 |
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+   |
+help: Quote entire union
+9  | 
+10 | d = NewType('d', "int" | str)
+11 | 
+   - e = TypeVar('e', bound='int' | 'str' | 'float')
+12 + e = TypeVar('e', bound="int | str | float")
+13 | 
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+15 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:12:32
+   |
+10 | d = NewType('d', "int" | str)
+11 |
+12 | e = TypeVar('e', bound='int' | 'str' | 'float')
+   |                                ^^^^^
+13 |
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+   |
+help: Quote entire union
+9  | 
+10 | d = NewType('d', "int" | str)
+11 | 
+   - e = TypeVar('e', bound='int' | 'str' | 'float')
+12 + e = TypeVar('e', bound="int | str | float")
+13 | 
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+15 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:12:40
+   |
+10 | d = NewType('d', "int" | str)
+11 |
+12 | e = TypeVar('e', bound='int' | 'str' | 'float')
+   |                                        ^^^^^^^
+13 |
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+   |
+help: Quote entire union
+9  | 
+10 | d = NewType('d', "int" | str)
+11 | 
+   - e = TypeVar('e', bound='int' | 'str' | 'float')
+12 + e = TypeVar('e', bound="int | str | float")
+13 | 
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+15 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:14:18
+   |
+12 | e = TypeVar('e', bound='int' | 'str' | 'float')
+13 |
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+   |                  ^^^^^^^^^^^^
+15 |
+16 | g = TypeVar('g', 'Dict["Key", "Value"]' | None, dict)
+   |
+help: Quote entire union
+11 | 
+12 | e = TypeVar('e', bound='int' | 'str' | 'float')
+13 | 
+   - f = TypeVar('f', "Foo['Bar']" | None, str)
+14 + f = TypeVar('f', "Foo['Bar'] | None", str)
+15 | 
+16 | g = TypeVar('g', 'Dict["Key", "Value"]' | None, dict)
+17 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:16:18
+   |
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+15 |
+16 | g = TypeVar('g', 'Dict["Key", "Value"]' | None, dict)
+   |                  ^^^^^^^^^^^^^^^^^^^^^^
+17 |
+18 | h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+   |
+help: Quote entire union
+13 | 
+14 | f = TypeVar('f', "Foo['Bar']" | None, str)
+15 | 
+   - g = TypeVar('g', 'Dict["Key", "Value"]' | None, dict)
+16 + g = TypeVar('g', 'Dict["Key", "Value"] | None', dict)
+17 | 
+18 | h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+19 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:18:18
+   |
+16 | g = TypeVar('g', 'Dict["Key", "Value"]' | None, dict)
+17 |
+18 | h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+   |                  ^^^^^^^^^^^
+19 |
+20 | i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+   |
+help: Quote entire union
+15 | 
+16 | g = TypeVar('g', 'Dict["Key", "Value"]' | None, dict)
+17 | 
+   - h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+18 + h = TypeVar('h', "list[int] | dict[str, int]", list)
+19 | 
+20 | i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+21 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:18:32
+   |
+16 | g = TypeVar('g', 'Dict["Key", "Value"]' | None, dict)
+17 |
+18 | h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+   |                                ^^^^^^^^^^^^^^^^
+19 |
+20 | i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+   |
+help: Quote entire union
+15 | 
+16 | g = TypeVar('g', 'Dict["Key", "Value"]' | None, dict)
+17 | 
+   - h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+18 + h = TypeVar('h', "list[int] | dict[str, int]", list)
+19 | 
+20 | i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+21 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:20:24
+   |
+18 | h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+19 |
+20 | i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+   |                        ^^^^^^^^^^^^^^^^^
+21 |
+22 | j = TypeVar('j', """int""" | str, float)
+   |
+help: Quote entire union
+17 | 
+18 | h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+19 | 
+   - i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+20 + i = TypeVar('i', bound="tuple[int, ...] | set[str]")
+21 | 
+22 | j = TypeVar('j', """int""" | str, float)
+23 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:20:44
+   |
+18 | h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+19 |
+20 | i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+   |                                            ^^^^^^^^^^
+21 |
+22 | j = TypeVar('j', """int""" | str, float)
+   |
+help: Quote entire union
+17 | 
+18 | h = TypeVar('h', "list[int]" | 'dict[str, int]', list)
+19 | 
+   - i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+20 + i = TypeVar('i', bound="tuple[int, ...] | set[str]")
+21 | 
+22 | j = TypeVar('j', """int""" | str, float)
+23 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:22:18
+   |
+20 | i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+21 |
+22 | j = TypeVar('j', """int""" | str, float)
+   |                  ^^^^^^^^^
+23 |
+24 | k = TypeVar('k', '''str''' | bool, int)
+   |
+help: Quote entire union
+19 | 
+20 | i = TypeVar('i', bound="tuple[int, ...]" | 'set[str]')
+21 | 
+   - j = TypeVar('j', """int""" | str, float)
+22 + j = TypeVar('j', "int | str", float)
+23 | 
+24 | k = TypeVar('k', '''str''' | bool, int)
+25 | 
+
+TC010 [*] Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:24:18
+   |
+22 | j = TypeVar('j', """int""" | str, float)
+23 |
+24 | k = TypeVar('k', '''str''' | bool, int)
+   |                  ^^^^^^^^^
+25 |
+26 | l = TypeVar('l', "Literal['a\"b']" | None, str)
+   |
+help: Quote entire union
+21 | 
+22 | j = TypeVar('j', """int""" | str, float)
+23 | 
+   - k = TypeVar('k', '''str''' | bool, int)
+24 + k = TypeVar('k', "str | bool", int)
+25 | 
+26 | l = TypeVar('l', "Literal['a\"b']" | None, str)
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:26:18
+   |
+24 | k = TypeVar('k', '''str''' | bool, int)
+25 |
+26 | l = TypeVar('l', "Literal['a\"b']" | None, str)
+   |                  ^^^^^^^^^^^^^^^^^
+   |
+help: Quote entire union
