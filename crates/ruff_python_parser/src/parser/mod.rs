@@ -1337,10 +1337,10 @@ bitflags! {
         const LAMBDA_PARAMETERS = 1 << 24;
         const WITH_ITEMS_PARENTHESIZED = 1 << 25;
         const WITH_ITEMS_PARENTHESIZED_EXPRESSION = 1 << 26;
-        const WITH_ITEMS_UNPARENTHESIZED = 1 << 28;
-        const F_STRING_ELEMENTS = 1 << 29;
-        const T_STRING_ELEMENTS = 1 << 30;
-        const F_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 27;
+        const WITH_ITEMS_UNPARENTHESIZED = 1 << 27;
+        const F_STRING_ELEMENTS = 1 << 28;
+        const T_STRING_ELEMENTS = 1 << 29;
+        const F_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 30;
         const T_STRING_ELEMENTS_IN_FORMAT_SPEC = 1 << 31;
     }
 }
