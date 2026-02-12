@@ -331,7 +331,7 @@ mod tests {
 
     #[test]
     fn range_suppressions() -> Result<()> {
-        assert_diagnostics_diff!(
+        let diagnostics = test_path(
             Path::new("ruff/suppressions.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
@@ -342,17 +342,8 @@ mod tests {
                 Rule::UnmatchedSuppressionComment,
             ])
             .with_external_rules(&["TK421"]),
-            &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedVariable,
-                Rule::AmbiguousVariableName,
-                Rule::UnusedNOQA,
-                Rule::InvalidRuleCode,
-                Rule::InvalidSuppressionComment,
-                Rule::UnmatchedSuppressionComment,
-            ])
-            .with_external_rules(&["TK421"])
-            .with_preview_mode(),
-        );
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
