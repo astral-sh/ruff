@@ -111,8 +111,12 @@ class Foo(metaclass=Meta):
         pass
 
 # The metaclass `__call__` requires exactly one `int` argument.
-Foo("wrong")  # error: [invalid-argument-type]
-Foo()  # error: [missing-argument]
+# error: [invalid-argument-type]
+reveal_type(Foo("wrong"))  # revealed: Foo
+# error: [missing-argument]
+reveal_type(Foo())  # revealed: Foo
+# error: [too-many-positional-arguments]
+reveal_type(Foo(1, 2))  # revealed: Foo
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
