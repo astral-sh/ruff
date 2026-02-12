@@ -700,7 +700,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             //    the TypeVarTuple constructor fails validation
                             // 3. A proper TypeVarTuple via `is_typevartuple()`, which handles
                             //    both `KnownInstance(TypeVar(...))` and bound `TypeVar` forms
-                            let is_typevar_tuple = starred_value_ty
+                            if starred_value_ty.is_typevartuple(self.db()) {
+                                report_too_many_unpacked_tuples();
+                                element_types = element_types.set_variable(element_ty);
+                            } else if starred_value_ty
                                 == Type::Dynamic(DynamicType::TodoTypeVarTuple)
                                 || matches!(
                                     starred_value_ty,
@@ -710,8 +713,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                         KnownClass::TypeVarTuple
                                     )
                                 )
-                                || starred_value_ty.is_typevartuple(self.db());
-                            if is_typevar_tuple {
+                            {
                                 return_todo = true;
                                 report_too_many_unpacked_tuples();
                             } else {

@@ -1977,6 +1977,23 @@ impl<'db> TupleSpecBuilder<'db> {
         }
     }
 
+    /// Transitions from a Fixed builder to a Variable builder by setting
+    /// the variable-length element. Existing fixed elements become the prefix.
+    pub(crate) fn set_variable(self, variable: Type<'db>) -> Self {
+        match self {
+            TupleSpecBuilder::Fixed(prefix) => TupleSpecBuilder::Variable {
+                prefix,
+                variable,
+                suffix: Vec::new(),
+            },
+            TupleSpecBuilder::Variable { .. } => {
+                // Already variable — this shouldn't happen as we check for
+                // multiple unpacked variadic tuples. Keep the first one.
+                self
+            }
+        }
+    }
+
     /// Concatenates another tuple to the end of this tuple, returning a new tuple.
     pub(crate) fn concat(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
         match (&mut self, other) {

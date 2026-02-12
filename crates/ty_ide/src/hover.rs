@@ -2558,10 +2558,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        AB@Alias3 (bivariant)
+        AB@Alias3 (covariant)
         ---------------------------------------------
         ```python
-        AB@Alias3 (bivariant)
+        AB@Alias3 (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2691,10 +2691,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"
-        Ts@Alias (bivariant)
+        Ts@Alias (covariant)
         ---------------------------------------------
         ```python
-        Ts@Alias (bivariant)
+        Ts@Alias (covariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
