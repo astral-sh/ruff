@@ -118,32 +118,6 @@ def f(x: Covariant[int]):
             assert_never(x)
 ```
 
-## Class patterns where the class pattern does not resolve to a class
-
-In general this does not allow for narrowing, but we make an exception for `Any`. This is to support
-[real ecosystem code](https://github.com/jax-ml/jax/blob/d2ce04b6c3d03ae18b145965b8b8b92e09e8009c/jax/_src/pallas/mosaic_gpu/lowering.py#L3372-L3387)
-found in `jax`.
-
-```py
-from typing import Any
-
-X = Any
-
-def f(obj: object):
-    match obj:
-        case int():
-            reveal_type(obj)  # revealed: int
-        case X():
-            reveal_type(obj)  # revealed: Any & ~int
-
-def g(obj: object, Y: Any):
-    match obj:
-        case int():
-            reveal_type(obj)  # revealed: int
-        case Y():
-            reveal_type(obj)  # revealed: Any & ~int
-```
-
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
@@ -278,7 +252,7 @@ def _(x: Literal["foo", b"bar"] | int):
             pass
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
             pass
-        case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
+        case _ if reveal_type(x):  # revealed: int | Literal["foo", b"bar"]
             pass
 ```
 
@@ -376,6 +350,45 @@ except ValueError:
     pass
 ```
 
+## Narrowing is preserved when a terminal branch prevents a path from flowing through
+
+When one branch of a `match` statement is terminal (e.g. contains `raise`), narrowing from the
+non-terminal branches is preserved after the merge point.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: A | B | C):
+    match x:
+        case A():
+            pass
+        case B():
+            pass
+        case _:
+            raise ValueError()
+
+    reveal_type(x)  # revealed: B | (A & ~B)
+```
+
+Reassignment in non-terminal branches is also preserved when the default branch is terminal:
+
+```py
+def _(number_of_periods: int | None, interval: str):
+    match interval:
+        case "monthly":
+            if number_of_periods is None:
+                number_of_periods = 1
+        case "daily":
+            if number_of_periods is None:
+                number_of_periods = 30
+        case _:
+            raise ValueError("unsupported interval")
+
+    reveal_type(number_of_periods)  # revealed: int
+```
+
 ## Narrowing tagged unions of tuples
 
 Narrow unions of tuples based on literal tag elements in `match` statements:
@@ -441,4 +454,23 @@ def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
         case _:
             # But we *can* narrow with inequality
             reveal_type(x)  # revealed: tuple[str, B]
+```
+
+and it is also restricted to `match` patterns that solely consist of value patterns:
+
+```py
+class Config:
+    MODE: str = "default"
+
+def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
+    match u[0]:
+        case Config.MODE | "foo":
+            # Config.mode has type `str` (not a literal), which could match
+            # any string value at runtime. We cannot narrow based on "foo" alone
+            # because the actual match might have been against Config.mode.
+            reveal_type(u)  # revealed: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]
+        case "bar":
+            # Since the previous case could match any string, this case can
+            # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
+            reveal_type(u)  # revealed: tuple[Literal["bar"], str]
 ```

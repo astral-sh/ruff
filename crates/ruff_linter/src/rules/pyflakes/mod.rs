@@ -263,9 +263,21 @@ mod tests {
         FOO = 42",
         "f401_preview_first_party_submodule_dunder_all"
     )]
+    // Regression test for https://github.com/astral-sh/ruff/issues/22221
+    #[test_case(
+        r"
+        import submodule.bar
+        import submodule.baz
+        __all__ = ['submodule']
+        FOO = 42",
+        "f401_preview_dunder_all_multiple_bindings"
+    )]
     fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
+            &SourceKind::Python {
+                code: dedent(contents).to_string(),
+                is_stub: false,
+            },
             Path::new("f401_preview_first_party_submodule/__init__.py"),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
@@ -564,7 +576,10 @@ mod tests {
     )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
+            &SourceKind::Python {
+                code: dedent(contents).to_string(),
+                is_stub: false,
+            },
             Path::new("f401_preview_submodule.py"),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
@@ -940,7 +955,10 @@ mod tests {
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
-        let source_kind = SourceKind::Python(contents.to_string());
+        let source_kind = SourceKind::Python {
+            code: contents.to_string(),
+            is_stub: source_type.is_stub(),
+        };
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
         let target_version = settings.unresolved_target_version;
         let options =
@@ -957,8 +975,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let suppressions =
-            Suppressions::from_tokens(&settings, locator.contents(), parsed.tokens());
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
         let mut messages = check_path(
             Path::new("<filename>"),
             None,

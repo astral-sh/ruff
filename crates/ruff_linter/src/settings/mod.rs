@@ -504,7 +504,7 @@ impl Default for LinterSettings {
 /// unset. In contrast, we want to default to `PythonVersion::default()` for lint rules. These
 /// correspond to the [`TargetVersion::parser_version`] and [`TargetVersion::linter_version`]
 /// methods, respectively.
-#[derive(Debug, Clone, Copy, CacheKey)]
+#[derive(Debug, Clone, Copy, CacheKey, PartialEq, Eq)]
 pub struct TargetVersion(pub Option<PythonVersion>);
 
 impl TargetVersion {

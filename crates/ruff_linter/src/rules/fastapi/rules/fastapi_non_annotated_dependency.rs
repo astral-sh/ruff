@@ -284,6 +284,7 @@ fn create_diagnostic(
 
                 if is_default_argument_ellipsis && seen_default {
                     // For ellipsis after a parameter with default, can't remove the default
+                    diagnostic.info("Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.");
                     return Ok(None);
                 }
 
@@ -315,6 +316,7 @@ fn create_diagnostic(
             }
             _ => {
                 if seen_default {
+                    diagnostic.info("Automatic fix is unavailable because a required parameter would follow an optional parameter. Consider reordering arguments to enable the fix.");
                     return Ok(None);
                 }
                 format!(

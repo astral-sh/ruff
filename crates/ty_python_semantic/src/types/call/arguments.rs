@@ -7,9 +7,25 @@ use ruff_python_ast as ast;
 use crate::Db;
 use crate::types::KnownClass;
 use crate::types::enums::{enum_member_literals, enum_metadata};
-use crate::types::tuple::{Tuple, TupleType};
+use crate::types::tuple::Tuple;
 
 use super::Type;
+
+/// Maximum number of expanded types that can be generated from a single tuple's
+/// Cartesian product in [`expand_type`].
+///
+/// See: [pyright's `maxSingleOverloadArgTypeExpansionCount`][pyright]
+///
+/// [pyright]: https://github.com/microsoft/pyright/blob/5a325e4874e775436671eed65ad696787a1ef74b/packages/pyright-internal/src/analyzer/typeEvaluator.ts#L570
+const MAX_TUPLE_EXPANSION: usize = 64;
+
+/// Maximum total number of expanded argument type combinations across all arguments
+/// in [`CallArguments::expand`].
+///
+/// See: [pyright's `maxTotalOverloadArgTypeExpansionCount`][pyright]
+///
+/// [pyright]: https://github.com/microsoft/pyright/blob/5a325e4874e775436671eed65ad696787a1ef74b/packages/pyright-internal/src/analyzer/typeEvaluator.ts#L566
+const MAX_TOTAL_EXPANSION: usize = 256;
 
 #[derive(Clone, Copy, Debug)]
 pub(crate) enum Argument<'a> {
@@ -73,23 +89,23 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     /// typechecking.
     pub(crate) fn from_arguments_typed(
         arguments: &'a ast::Arguments,
-        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
+        mut infer_argument_type: impl FnMut(&ast::Expr) -> Type<'db>,
     ) -> Self {
         arguments
             .arguments_source_order()
             .map(|arg_or_keyword| match arg_or_keyword {
                 ast::ArgOrKeyword::Arg(arg) => match arg {
                     ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
-                        let ty = infer_argument_type(Some(arg), value);
+                        let ty = infer_argument_type(value);
                         (Argument::Variadic, Some(ty))
                     }
                     _ => {
-                        let ty = infer_argument_type(None, arg);
+                        let ty = infer_argument_type(arg);
                         (Argument::Positional, Some(ty))
                     }
                 },
                 ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
-                    let ty = infer_argument_type(None, value);
+                    let ty = infer_argument_type(value);
                     if let Some(arg) = arg {
                         (Argument::Keyword(&arg.id), Some(ty))
                     } else {
@@ -166,9 +182,6 @@ impl<'a, 'db> CallArguments<'a, 'db> {
     ///
     /// [argument type expansion]: https://typing.python.org/en/latest/spec/overload.html#argument-type-expansion
     pub(super) fn expand(&self, db: &'db dyn Db) -> impl Iterator<Item = Expansion<'a, 'db>> + '_ {
-        /// Maximum number of argument lists that can be generated in a single expansion step.
-        static MAX_EXPANSIONS: usize = 512;
-
         /// Represents the state of the expansion process.
         enum State<'a, 'b, 'db> {
             LimitReached(usize),
@@ -226,10 +239,10 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 };
 
                 let expansion_size = expanded_types.len() * state.len();
-                if expansion_size > MAX_EXPANSIONS {
+                if expansion_size > MAX_TOTAL_EXPANSION {
                     tracing::debug!(
                         "Skipping argument type expansion as it would exceed the \
-                            maximum number of expansions ({MAX_EXPANSIONS})"
+                            maximum number of expansions ({MAX_TOTAL_EXPANSION})"
                     );
                     return Some(State::LimitReached(index));
                 }
@@ -380,23 +393,30 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             if let Some(spec) = instance.tuple_spec(db) {
                 return match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => {
-                        let expanded = fixed_length_tuple
+                        // Pre-expand each element and compute the total Cartesian product size.
+                        // Bail out early if the product would exceed `MAX_TUPLE_EXPANSION` to
+                        // avoid exponential blowup (e.g. a 37-element tuple with 2-element
+                        // unions would produce 2^37 types).
+                        let per_element: Vec<_> = fixed_length_tuple
                             .iter_all_elements()
                             .map(|element| {
-                                if let Some(expanded) = expand_type(db, element) {
-                                    Either::Left(expanded.into_iter())
-                                } else {
-                                    Either::Right(std::iter::once(element))
-                                }
+                                expand_type(db, element).unwrap_or_else(|| vec![element])
                             })
-                            .multi_cartesian_product()
-                            .map(|types| Type::tuple(TupleType::heterogeneous(db, types)))
-                            .collect::<Vec<_>>();
+                            .collect();
 
-                        if expanded.len() == 1 {
-                            // There are no elements in the tuple type that can be expanded.
+                        let product_size: usize = per_element
+                            .iter()
+                            .try_fold(1usize, |acc, v| acc.checked_mul(v.len()))
+                            .unwrap_or(usize::MAX);
+
+                        if product_size <= 1 || product_size > MAX_TUPLE_EXPANSION {
                             None
                         } else {
+                            let expanded = per_element
+                                .into_iter()
+                                .multi_cartesian_product()
+                                .map(|types| Type::heterogeneous_tuple(db, types))
+                                .collect::<Vec<_>>();
                             Some(expanded)
                         }
                     }

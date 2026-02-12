@@ -11,8 +11,8 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection
   | |______________________________________________________________^
 6 |   )
   |
-help: Wrap implicitly concatenated strings in parentheses
 help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
 1 | facts = (
 2 |     "Lobsters have blue blood.",
 3 |     "The liver is the only human organ that can fully regenerate itself.",
@@ -35,8 +35,8 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection
    | |______________________________________________________________^
 13 |   ]
    |
-help: Wrap implicitly concatenated strings in parentheses
 help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
 8  | facts = [
 9  |     "Lobsters have blue blood.",
 10 |     "The liver is the only human organ that can fully regenerate itself.",
@@ -59,8 +59,8 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection
    | |______________________________________________________________^
 20 |   }
    |
-help: Wrap implicitly concatenated strings in parentheses
 help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
 15 | facts = {
 16 |     "Lobsters have blue blood.",
 17 |     "The liver is the only human organ that can fully regenerate itself.",
@@ -83,8 +83,8 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection
    | |_________________________^
 33 |   )
    |
-help: Wrap implicitly concatenated strings in parentheses
 help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
 27 | }
 28 | 
 29 | facts = (
@@ -108,8 +108,8 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection
    | |_________________________^
 39 |   ]
    |
-help: Wrap implicitly concatenated strings in parentheses
 help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
 33 | )
 34 | 
 35 | facts = [
@@ -133,8 +133,8 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection
    | |_________________________^
 45 |   }
    |
-help: Wrap implicitly concatenated strings in parentheses
 help: Did you forget a comma?
+help: Wrap implicitly concatenated strings in parentheses
 39 | ]
 40 | 
 41 | facts = {

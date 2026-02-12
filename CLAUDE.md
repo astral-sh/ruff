@@ -22,10 +22,16 @@ Run tests for a specific crate:
 cargo nextest run -p ty_python_semantic
 ```
 
-Run a specific mdtest (use a substring of the test name):
+Run a single mdtest file:
 
 ```sh
-MDTEST_TEST_FILTER="<filter>" cargo nextest run -p ty_python_semantic mdtest
+cargo nextest run -p ty_python_semantic --test mdtest -- mdtest::<path/to/mdtest_file.md>
+```
+
+To run a specific mdtest within a file, use a substring of the Markdown header text as `MDTEST_TEST_FILTER`. Only use this if it's necessary to isolate a single test case:
+
+```sh
+MDTEST_TEST_FILTER="<filter>" cargo nextest run -p ty_python_semantic --test mdtest -- mdtest::<path/to/mdtest_file.md>
 ```
 
 Update snapshots after running tests:
@@ -56,6 +62,15 @@ Run ty:
 cargo run --bin ty -- check path/to/file.py
 ```
 
+## Reproducing ty ecosystem changes
+
+If asked to reproduce changes in the ty ecosystem, use this script to clone the project to some
+directory and install its dependencies into `.venv`:
+
+```sh
+uv run scripts/setup_primer_project.py <project-name> <some-temp-dir>
+```
+
 ## Pull Requests
 
 When working on ty, PR titles should start with `[ty]` and be tagged with the `ty` GitHub label.
@@ -69,3 +84,5 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Avoid writing significant amounts of new code. This is often a sign that we're missing an existing method or mechanism that could help solve the problem. Look for existing utilities first.
 - Avoid falling back to patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system.
 - Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability.
+- If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible.
+- Use comments purposefully. Don't use comments to narrate code, but do use them to explain invariants and why something unusual was done a particular way.

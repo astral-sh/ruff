@@ -21,7 +21,7 @@ pub fn goto_declaration(
 
     let declaration_targets = goto_target
         .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
-        .declaration_targets(db)?;
+        .declaration_targets(&model, &goto_target)?;
 
     Some(RangedValue {
         range: FileRange::new(file, goto_target.range()),
@@ -93,6 +93,40 @@ mod tests {
     }
 
     #[test]
+    fn goto_declaration_typed_dict_key() {
+        let test = cursor_test(
+            r#"
+        from typing import TypedDict
+
+        class Person(TypedDict):
+            name: str
+            age: int
+
+        def foo(person: Person):
+            person["na<CURSOR>me"]
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:9:12
+          |
+        8 | def foo(person: Person):
+        9 |     person["name"]
+          |            ^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:5:5
+          |
+        4 | class Person(TypedDict):
+        5 |     name: str
+          |     ----
+        6 |     age: int
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_declaration_class_instantiation() {
         let test = cursor_test(
             "
@@ -104,7 +138,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.goto_declaration(), @"
+        assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Go to declaration
          --> main.py:6:12
           |
@@ -113,13 +147,12 @@ mod tests {
         6 | instance = MyClass()
           |            ^^^^^^^ Clicking here
           |
-        info: Found 2 declarations
+        info: Found 1 declaration
          --> main.py:2:7
           |
         2 | class MyClass:
           |       -------
         3 |     def __init__(self):
-          |         --------
         4 |         pass
           |
         ");
@@ -1107,6 +1140,212 @@ def another_helper(path):
         );
 
         assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested1() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class | int'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass | int'] | None"
+          |           ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass | int'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested2() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:17
+          |
+        2 | x: "list['int | MyClass'] | None"
+          |                 ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['int | MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested3() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | None'] | My<CURSOR>Class"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:26
+          |
+        2 | x: "list['int | None'] | MyClass"
+          |                          ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['int | None'] | MyClass"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested4() {
+        let test = cursor_test(
+            r#"
+        x: "list['int' | 'My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:19
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+          |                   ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_nested5() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class' | 'str'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+          |           ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_too_nested1() {
+        let test = cursor_test(
+            r#"
+        x: """'list["My<CURSOR>Class" | "str"]' | None"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_too_nested2() {
+        let test = cursor_test(
+            r#"
+        x: """'list["int" | "str"]' | My<CURSOR>Class"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:31
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+          |                               ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -2498,10 +2737,6 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        // TODO(submodule-imports): this should only highlight `subpkg` in the import statement
-        // This happens because DefinitionKind::ImportFromSubmodule claims the entire ImportFrom node,
-        // which is correct but unhelpful. Unfortunately even if it only claimed the LHS identifier it
-        // would highlight `subpkg.submod` which is strictly better but still isn't what we want.
         assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:4:5
@@ -2512,10 +2747,10 @@ def ab(a: int, *, c: int): ...
           |     ^^^^^^ Clicking here
           |
         info: Found 1 declaration
-         --> mypackage/__init__.py:2:1
+         --> mypackage/__init__.py:2:7
           |
         2 | from .subpkg.submod import val
-          | ------------------------------
+          |       ------
         3 |
         4 | x = subpkg
           |
@@ -2722,19 +2957,20 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        // TODO(submodule-imports): Ok this one is FASCINATING and it's kinda right but confusing!
+        // TODO(submodule-imports): Ok this one is FASCINATING but definitely wrong!
         //
         // So there's 3 relevant definitions here:
         //
-        // * `subpkg: int = 10` in the other file is in fact the original definition
+        // * `subpkg: int = 10` in the other file is in fact the original definition.
+        //    Including it here is accurate and possibly useful?
         //
         // *  the LHS `subpkg` in the import is an instance of `subpkg = ...`
         //    because it's a `DefinitionKind::ImportFromSubmodle`.
-        //    This is the span that covers the entire import.
+        //    Including it here is Pedantically Correct but Unhelpful.
         //
         // * `the RHS `subpkg` in the import is a second instance of `subpkg = ...`
-        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition
-        //    This span seemingly doesn't appear at all!? Is it getting hidden by the LHS span?
+        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition.
+        //    This is the most important one and doesn't show up at all! Sadness!
         assert_snapshot!(test.goto_declaration(), @"
         info[goto-declaration]: Go to declaration
          --> mypackage/__init__.py:4:5
@@ -2745,10 +2981,10 @@ def ab(a: int, *, c: int): ...
           |     ^^^^^^ Clicking here
           |
         info: Found 2 declarations
-         --> mypackage/__init__.py:2:1
+         --> mypackage/__init__.py:2:7
           |
         2 | from .subpkg import subpkg
-          | --------------------------
+          |       ------
         3 |
         4 | x = subpkg
           |

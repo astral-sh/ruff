@@ -13,6 +13,7 @@ use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    YieldOutsideFunctionKind,
 };
 use ruff_text_size::TextRange;
 use ty_module_resolver::{ModuleName, resolve_module};
@@ -24,11 +25,13 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
-    DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, ImportFromSubmoduleDefinitionNodeRef,
-    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, MatchPatternDefinitionNodeRef,
+    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
@@ -48,6 +51,7 @@ use crate::semantic_index::use_def::{
 };
 use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
+use crate::types::PossiblyNarrowedPlaces;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
@@ -755,13 +759,66 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (definition, num_definitions)
     }
 
+    // Creates a definition for each key-value assignment in the dictionary.
+    //
+    // If there are multiple targets, a given key-value definition will be created multiple
+    // times for each target.
+    fn add_dict_key_assignment_definitions(
+        &mut self,
+        targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for target in targets {
+            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+                self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
+            }
+        }
+    }
+
+    fn add_dict_key_assignment_definitions_impl(
+        &mut self,
+        target: &MemberExprBuilder,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for item in &dict.items {
+            let Some(key) = item.key.as_ref() else {
+                continue;
+            };
+
+            let Some(member_expr) = MemberExprBuilder::visit_subscript_expr(target.clone(), key)
+            else {
+                continue;
+            };
+
+            // Recurse into nested dictionaries.
+            if let ast::Expr::Dict(dict_value) = &item.value {
+                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
+            }
+
+            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
+                let place_id = self.add_place(place_expr);
+
+                self.add_definition(
+                    place_id,
+                    DictKeyAssignmentNodeRef {
+                        key,
+                        assignment,
+                        value: &item.value,
+                    },
+                );
+            }
+        }
+    }
+
     fn record_expression_narrowing_constraint(
         &mut self,
         predicate_node: &ast::Expr,
-    ) -> PredicateOrLiteral<'db> {
+    ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
         let predicate = self.build_predicate(predicate_node);
-        self.record_narrowing_constraint(predicate);
-        predicate
+        let predicate_id = self.record_narrowing_constraint(predicate);
+        (predicate, predicate_id)
     }
 
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
@@ -801,7 +858,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
-    /// [`SemanticIndexBuilder::record_narrowing_constraint_id`].
+    /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
     fn add_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut().add_predicate(predicate)
     }
@@ -812,28 +869,82 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .add_predicate(predicate.negated())
     }
 
-    /// Records a previously added narrowing constraint by adding it to all live bindings.
-    fn record_narrowing_constraint_id(&mut self, predicate: ScopedPredicateId) {
+    /// Records a previously added narrowing constraint by adding it to the live bindings
+    /// of the specified places.
+    fn record_narrowing_constraint_id_for_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+        places: &PossiblyNarrowedPlaces,
+    ) {
         self.current_use_def_map_mut()
-            .record_narrowing_constraint(predicate);
+            .record_narrowing_constraint_for_places(predicate, places);
     }
 
-    /// Adds and records a narrowing constraint, i.e. adds it to all live bindings.
-    fn record_narrowing_constraint(&mut self, predicate: PredicateOrLiteral<'db>) {
-        let use_def = self.current_use_def_map_mut();
-        let predicate_id = use_def.add_predicate(predicate);
-        use_def.record_narrowing_constraint(predicate_id);
-    }
-
-    /// Negates the given predicate and then adds it as a narrowing constraint to all live
-    /// bindings.
-    fn record_negated_narrowing_constraint(
+    /// Adds and records a narrowing constraint for only the places that could possibly be narrowed.
+    ///
+    /// Returns the `ScopedPredicateId` for the positive predicate, which can later be passed to
+    /// `record_negated_narrowing_constraint` for TDD-level negation.
+    fn record_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
     ) -> ScopedPredicateId {
-        let id = self.add_negated_predicate(predicate);
-        self.record_narrowing_constraint_id(id);
-        id
+        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+        let use_def = self.current_use_def_map_mut();
+        let predicate_id = use_def.add_predicate(predicate);
+        use_def.record_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
+        predicate_id
+    }
+
+    /// Computes the conservative set of places that could possibly be narrowed by a predicate.
+    ///
+    /// This uses the closure-based approach to avoid calling Salsa queries that depend on
+    /// the semantic index (which is still being built).
+    fn compute_possibly_narrowed_places(
+        &self,
+        predicate: &PredicateOrLiteral<'db>,
+    ) -> PossiblyNarrowedPlaces {
+        use crate::types::PossiblyNarrowedPlacesBuilder;
+
+        match predicate {
+            PredicateOrLiteral::Literal(_) => PossiblyNarrowedPlaces::default(),
+            PredicateOrLiteral::Predicate(pred) => {
+                let place_table = self.current_place_table();
+
+                match pred.node {
+                    PredicateNode::Expression(expression) => {
+                        let module = self.module;
+                        let expression_node = expression.node_ref(self.db, module);
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .expression(expression_node)
+                    }
+                    PredicateNode::Pattern(pattern) => {
+                        let module = self.module;
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .pattern(pattern, module)
+                    }
+                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                        // These predicates don't narrow any places
+                        PossiblyNarrowedPlaces::default()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Negates the given predicate and then adds it as a narrowing constraint to the places
+    /// that could possibly be narrowed.
+    ///
+    /// Takes the `ScopedPredicateId` from the positive recording so that TDD-level negation
+    /// (`add_not_constraint`) uses the same atom. This ensures `atom(P) OR NOT(atom(P))`
+    /// simplifies to `ALWAYS_TRUE`, correctly cancelling narrowing after complete if/else blocks.
+    fn record_negated_narrowing_constraint(
+        &mut self,
+        predicate: PredicateOrLiteral<'db>,
+        predicate_id: ScopedPredicateId,
+    ) {
+        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+        self.current_use_def_map_mut()
+            .record_negated_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
     }
 
     /// Records that all remaining statements in the current block are unreachable.
@@ -958,7 +1069,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
-    ) -> (PredicateOrLiteral<'db>, PatternPredicate<'db>) {
+        is_catchall: bool,
+    ) -> (
+        PredicateOrLiteral<'db>,
+        ScopedPredicateId,
+        PatternPredicate<'db>,
+    ) {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
@@ -982,12 +1098,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             guard,
             previous_pattern.map(Box::new),
         );
+
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
         });
-        self.record_narrowing_constraint(predicate);
-        (predicate, pattern_predicate)
+
+        // For the last catchall case (irrefutable wildcard without guard), we skip
+        // recording the narrowing constraint from the pattern. The accumulated negated
+        // constraints from earlier cases (~P1, ~P2, ...) are sufficient. This ensures
+        // `P1 OR (~P1 AND P2) OR (~P1 AND ~P2)` simplifies to ALWAYS_TRUE, preserving
+        // the original type after an exhaustive match. The reachability and pattern
+        // predicates are still created normally for proper control flow tracking.
+        let predicate_id = if is_catchall {
+            ScopedPredicateId::ALWAYS_TRUE
+        } else {
+            self.record_narrowing_constraint(predicate)
+        };
+        (predicate, predicate_id, pattern_predicate)
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -1121,6 +1249,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // nodes are evaluated in the inner scope.
         let value = self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
+
+        // Clear the assignment stack before entering the comprehension scope.
+        // If the comprehension appears inside an assignment target (e.g., error-recovered
+        // `arr[::[x for *b in y for (b: _` is parsed as `StmtAnnAssign`), the outer
+        // assignment context must not leak into the inner scope.
+        let saved_assignments = std::mem::take(&mut self.current_assignments);
+
         self.push_scope(scope);
 
         self.add_unpackable_assignment(
@@ -1134,7 +1269,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for if_expr in &generator.ifs {
             self.visit_expr(if_expr);
-            self.record_expression_narrowing_constraint(if_expr);
+            let _ = self.record_expression_narrowing_constraint(if_expr);
         }
 
         for generator in generators_iter {
@@ -1152,12 +1287,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             for if_expr in &generator.ifs {
                 self.visit_expr(if_expr);
-                self.record_expression_narrowing_constraint(if_expr);
+                let _ = self.record_expression_narrowing_constraint(if_expr);
             }
         }
 
         visit_outer_elt(self);
         self.pop_scope();
+
+        self.current_assignments = saved_assignments;
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
@@ -1528,7 +1665,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
 
-                    if node.module.is_some()
+                    if let Some(module_node) = &node.module
                         && let Some(relative_submodule) = module_name.relative_to(&thispackage)
                         && let Some(direct_submodule) = relative_submodule.components().next()
                         && !self.seen_submodule_imports.contains(direct_submodule)
@@ -1539,9 +1676,23 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                         let direct_submodule_name = Name::new(direct_submodule);
                         let symbol = self.add_symbol(direct_submodule_name);
+
+                        let module_index = if node.level == 0 {
+                            // "whatever.thispackage.x.y" we want `x`
+                            thispackage.components().count()
+                        } else {
+                            // ".x.y" we want `x` (level 1 => index 0)
+                            // "..x.y" we want `y` (level 2 => index 1)
+                            // (The Identifier doesn't include the prefix dots)
+                            node.level as usize - 1
+                        };
                         self.add_definition(
                             symbol.into(),
-                            ImportFromSubmoduleDefinitionNodeRef { node },
+                            ImportFromSubmoduleDefinitionNodeRef {
+                                node,
+                                module: module_node,
+                                module_index,
+                            },
                         );
                     }
                 }
@@ -1840,7 +1991,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
-                let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
+                let (mut last_predicate, mut last_narrowing_id) =
+                    self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
 
@@ -1881,7 +2033,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // taken
                     self.flow_restore(no_branch_taken.clone());
 
-                    self.record_negated_narrowing_constraint(last_predicate);
+                    self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     if let Some(elif_test) = clause_test {
@@ -1889,7 +2041,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
 
-                        last_predicate = self.record_expression_narrowing_constraint(elif_test);
+                        (last_predicate, last_narrowing_id) =
+                            self.record_expression_narrowing_constraint(elif_test);
 
                         last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
@@ -1934,7 +2087,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(test);
 
                 let pre_loop = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
+                let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
                 let outer_loop = self.push_loop();
@@ -1958,7 +2111,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .add_atom(later_predicate_id);
                 self.record_negated_reachability_constraint(later_reachability_constraint);
 
-                self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_narrowing_constraint(predicate, predicate_id);
 
                 self.visit_body(orelse);
 
@@ -2065,12 +2218,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // here because the effects of visiting a pattern is binding
                     // symbols, and this doesn't occur unless the pattern
                     // actually matches
-                    let (match_predicate, match_pattern_predicate) = self
+                    let is_catchall = has_catchall && i == cases.len() - 1;
+                    let (match_predicate, match_narrowing_id, match_pattern_predicate) = self
                         .add_pattern_narrowing_constraint(
                             subject_expr,
                             &case.pattern,
                             case.guard.as_deref(),
                             previous_pattern,
+                            is_catchall,
                         );
                     previous_pattern = Some(match_pattern_predicate);
                     let reachability_constraint =
@@ -2088,10 +2243,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
                         });
-                        self.record_negated_narrowing_constraint(predicate);
+                        // Add the predicate once, then use TDD-level negation for the failure
+                        // path. This ensures the positive and negative atoms share the same ID.
+                        let guard_predicate_id = self.add_predicate(predicate);
+                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+                        self.current_use_def_map_mut()
+                            .record_negated_narrowing_constraint_for_places(
+                                guard_predicate_id,
+                                &possibly_narrowed,
+                            );
                         let match_success_guard_failure = self.flow_snapshot();
                         self.flow_restore(post_guard_eval);
-                        self.record_narrowing_constraint(predicate);
+                        self.current_use_def_map_mut()
+                            .record_narrowing_constraint_for_places(
+                                guard_predicate_id,
+                                &possibly_narrowed,
+                            );
                         match_success_guard_failure
                     });
 
@@ -2104,7 +2271,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // one. The last one will just become the state that we merge the other
                         // snapshots into.
                         self.flow_restore(no_case_matched.clone());
-                        self.record_negated_narrowing_constraint(match_predicate);
+                        self.record_negated_narrowing_constraint(
+                            match_predicate,
+                            match_narrowing_id,
+                        );
                         self.record_negated_reachability_constraint(reachability_constraint);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
@@ -2408,9 +2578,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             }),
                             is_positive: false,
                         };
-                        self.record_reachability_constraint(PredicateOrLiteral::Predicate(
-                            predicate,
-                        ));
+                        let constraint = self.record_reachability_constraint(
+                            PredicateOrLiteral::Predicate(predicate),
+                        );
+
+                        // Also gate narrowing by this constraint: if the call returns
+                        // `Never`, any narrowing in the current branch should be
+                        // invalidated (since this path is unreachable). This enables
+                        // narrowing to be preserved after if-statements where one branch
+                        // calls a `NoReturn` function like `sys.exit()`.
+                        self.current_use_def_map_mut()
+                            .record_narrowing_constraint_for_all_places(constraint);
                     }
                 }
             }
@@ -2480,7 +2658,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_definition {
                         match self.current_assignment() {
                             Some(CurrentAssignment::Assign { node, unpack }) => {
-                                self.add_definition(
+                                let assignment = self.add_definition(
                                     place_id,
                                     AssignmentDefinitionNodeRef {
                                         unpack,
@@ -2488,10 +2666,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         target: expr,
                                     },
                                 );
+
+                                if let ast::Expr::Dict(dict) = &*node.value {
+                                    self.add_dict_key_assignment_definitions(
+                                        &node.targets,
+                                        dict,
+                                        assignment,
+                                    );
+                                }
                             }
                             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                                 self.add_standalone_type_expression(&ann_assign.annotation);
-                                self.add_definition(
+                                let assignment = self.add_definition(
                                     place_id,
                                     AnnotatedAssignmentDefinitionNodeRef {
                                         node: ann_assign,
@@ -2500,6 +2686,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         target: expr,
                                     },
                                 );
+
+                                if let Some(ast::Expr::Dict(dict)) = ann_assign.value.as_deref() {
+                                    self.add_dict_key_assignment_definitions(
+                                        [&*ann_assign.target],
+                                        dict,
+                                        assignment,
+                                    );
+                                }
                             }
                             Some(CurrentAssignment::AugAssign(aug_assign)) => {
                                 self.add_definition(place_id, aug_assign);
@@ -2613,13 +2807,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
+                let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
 
-                self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_narrowing_constraint(predicate, predicate_id);
                 self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
@@ -2695,6 +2889,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // anymore.
                     if index < values.len() - 1 {
                         let predicate = self.build_predicate(value);
+                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                         let predicate_id = match op {
                             ast::BoolOp::And => self.add_predicate(predicate),
                             ast::BoolOp::Or => self.add_negated_predicate(predicate),
@@ -2717,7 +2912,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
-                        self.record_narrowing_constraint_id(predicate_id);
+                        self.record_narrowing_constraint_id_for_places(
+                            predicate_id,
+                            &possibly_narrowed,
+                        );
                         reachability_constraints.push(reachability_constraint);
                     }
                 }
@@ -2916,6 +3114,17 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        // TODO(brent) The long-term fix for this is for `YieldOutsideFunction` not to apply to
+        // `await` at all and only to emit the more specific `AwaitOutsideAsyncFunction` instead.
+        // However, to preserve backwards compatibility with the corresponding Ruff rules, we
+        // temporarily filter out the diagnostic for ty instead.
+        if matches!(
+            error.kind,
+            SemanticSyntaxErrorKind::YieldOutsideFunction(YieldOutsideFunctionKind::Await)
+        ) {
+            return;
+        }
+
         if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }

@@ -117,6 +117,10 @@ class _lru_cache_wrapper(Generic[_T_co]):
     def __copy__(self) -> _lru_cache_wrapper[_T_co]: ...
     def __deepcopy__(self, memo: Any, /) -> _lru_cache_wrapper[_T_co]: ...
 
+    # as with ``Callable``, we'll assume that these attributes exist
+    __name__: str
+    __qualname__: str
+
 @overload
 def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Callable[..., _T]], _lru_cache_wrapper[_T]]:
     """Least-recently-used cache decorator.

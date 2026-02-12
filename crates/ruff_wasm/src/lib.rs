@@ -212,7 +212,10 @@ impl Workspace {
         let source_type = PySourceType::default();
 
         // TODO(dhruvmanila): Support Jupyter Notebooks
-        let source_kind = SourceKind::Python(contents.to_string());
+        let source_kind = SourceKind::Python {
+            code: contents.to_string(),
+            is_stub: source_type.is_stub(),
+        };
 
         // Use the unresolved version because we don't have a file path.
         let target_version = self.settings.linter.unresolved_target_version;
@@ -241,8 +244,7 @@ impl Workspace {
             &indexer,
         );
 
-        let suppressions =
-            Suppressions::from_tokens(&self.settings.linter, locator.contents(), parsed.tokens());
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
 
         // Generate checks.
         let diagnostics = check_path(

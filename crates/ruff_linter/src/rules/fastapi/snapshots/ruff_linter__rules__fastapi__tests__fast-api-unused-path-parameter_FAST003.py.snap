@@ -365,24 +365,155 @@ help: Add `id` to function signature
 note: This is an unsafe fix and may change runtime behavior
 
 FAST003 Parameter `import` appears in route path, but not in `get_import` signature
-   --> FAST003.py:261:20
+   --> FAST003.py:266:20
     |
-260 | # https://github.com/astral-sh/ruff/issues/20941
-261 | @app.get("/imports/{import}")
+265 | # https://github.com/astral-sh/ruff/issues/20941
+266 | @app.get("/imports/{import}")
     |                    ^^^^^^^^
-262 | async def get_import():
-263 |     ...
+267 | async def get_import():
+268 |     ...
     |
 help: Add `import` to function signature
 
 FAST003 Parameter `__debug__` appears in route path, but not in `get_debug` signature
-   --> FAST003.py:265:18
+   --> FAST003.py:270:18
     |
-263 |     ...
-264 |
-265 | @app.get("/debug/{__debug__}")
+268 |     ...
+269 |
+270 | @app.get("/debug/{__debug__}")
     |                  ^^^^^^^^^^^
-266 | async def get_debug():
-267 |     ...
+271 | async def get_debug():
+272 |     ...
     |
 help: Add `__debug__` to function signature
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_vararg` signature
+   --> FAST003.py:278:19
+    |
+277 | # Errors: vararg-only and kwarg-only functions
+278 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+279 | async def read_thing_vararg(*query: str): ...
+    |
+help: Add `thing_id` to function signature
+276 | 
+277 | # Errors: vararg-only and kwarg-only functions
+278 | @app.get("/things/{thing_id}")
+    - async def read_thing_vararg(*query: str): ...
+279 + async def read_thing_vararg(thing_id, *query: str): ...
+280 | 
+281 | @app.get("/things/{thing_id}")
+282 | async def read_thing_kwarg(**query: str): ...
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_kwarg` signature
+   --> FAST003.py:281:19
+    |
+279 | async def read_thing_vararg(*query: str): ...
+280 |
+281 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+282 | async def read_thing_kwarg(**query: str): ...
+    |
+help: Add `thing_id` to function signature
+279 | async def read_thing_vararg(*query: str): ...
+280 | 
+281 | @app.get("/things/{thing_id}")
+    - async def read_thing_kwarg(**query: str): ...
+282 + async def read_thing_kwarg(thing_id, **query: str): ...
+283 | 
+284 | @app.get("/things/{thing_id}")
+285 | async def read_thing_vararg_kwarg(*args, **kwargs): ...
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_vararg_kwarg` signature
+   --> FAST003.py:284:19
+    |
+282 | async def read_thing_kwarg(**query: str): ...
+283 |
+284 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+285 | async def read_thing_vararg_kwarg(*args, **kwargs): ...
+    |
+help: Add `thing_id` to function signature
+282 | async def read_thing_kwarg(**query: str): ...
+283 | 
+284 | @app.get("/things/{thing_id}")
+    - async def read_thing_vararg_kwarg(*args, **kwargs): ...
+285 + async def read_thing_vararg_kwarg(thing_id, *args, **kwargs): ...
+286 | 
+287 | # Errors: positional-only parameter edge cases
+288 | @app.get("/things/{thing_id}")
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_posonly` signature
+   --> FAST003.py:288:19
+    |
+287 | # Errors: positional-only parameter edge cases
+288 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+289 | async def read_thing_posonly(query: str, /): ...
+    |
+help: Add `thing_id` to function signature
+286 | 
+287 | # Errors: positional-only parameter edge cases
+288 | @app.get("/things/{thing_id}")
+    - async def read_thing_posonly(query: str, /): ...
+289 + async def read_thing_posonly(query: str, /, thing_id): ...
+290 | 
+291 | @app.get("/things/{thing_id}")
+292 | async def read_thing_posonly_trailing(query: str, /,): ...
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_posonly_trailing` signature
+   --> FAST003.py:291:19
+    |
+289 | async def read_thing_posonly(query: str, /): ...
+290 |
+291 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+292 | async def read_thing_posonly_trailing(query: str, /,): ...
+    |
+help: Add `thing_id` to function signature
+289 | async def read_thing_posonly(query: str, /): ...
+290 | 
+291 | @app.get("/things/{thing_id}")
+    - async def read_thing_posonly_trailing(query: str, /,): ...
+292 + async def read_thing_posonly_trailing(query: str, /, thing_id,): ...
+293 | 
+294 | @app.get("/things/{thing_id}")
+295 | async def read_thing_posonly_default(query: str = "", /): ...
+note: This is an unsafe fix and may change runtime behavior
+
+FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_default` signature
+   --> FAST003.py:294:19
+    |
+292 | async def read_thing_posonly_trailing(query: str, /,): ...
+293 |
+294 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+295 | async def read_thing_posonly_default(query: str = "", /): ...
+    |
+help: Add `thing_id` to function signature
+
+FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_default_trailing` signature
+   --> FAST003.py:297:19
+    |
+295 | async def read_thing_posonly_default(query: str = "", /): ...
+296 |
+297 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+298 | async def read_thing_posonly_default_trailing(query: str = "", /,): ...
+    |
+help: Add `thing_id` to function signature
+
+FAST003 Parameter `thing_id` appears in route path, but not in `read_thing_posonly_with_regular` signature
+   --> FAST003.py:300:19
+    |
+298 | async def read_thing_posonly_default_trailing(query: str = "", /,): ...
+299 |
+300 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+301 | async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
+    |
+help: Add `thing_id` to function signature

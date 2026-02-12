@@ -12,7 +12,7 @@ use salsa::Setter as _;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
-use ty_module_resolver::SearchPaths;
+use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program, default_lint_registry};
 
@@ -58,12 +58,28 @@ impl Db {
         let analysis = if let Some(options) = options {
             let AnalysisSettings {
                 respect_type_ignore_comments: respect_type_ignore_comments_default,
+                allowed_unresolved_imports: allowed_unresolved_imports_default,
             } = AnalysisSettings::default();
+
+            let allowed_unresolved_imports = if let Some(allowed_unresolved_imports) =
+                options.allowed_unresolved_imports.as_deref()
+            {
+                let mut builder = ModuleGlobSetBuilder::new();
+                for pattern in allowed_unresolved_imports {
+                    builder
+                        .add(pattern)
+                        .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}");
+                }
+                builder.build().unwrap()
+            } else {
+                allowed_unresolved_imports_default
+            };
 
             AnalysisSettings {
                 respect_type_ignore_comments: options
                     .respect_type_ignore_comments
                     .unwrap_or(respect_type_ignore_comments_default),
+                allowed_unresolved_imports,
             }
         } else {
             AnalysisSettings::default()
@@ -134,7 +150,7 @@ impl SemanticDb for Db {
         false
     }
 
-    fn analysis_settings(&self) -> &AnalysisSettings {
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
         self.settings().analysis(self)
     }
 }
@@ -272,6 +288,10 @@ impl System for MdtestSystem {
 
     fn case_sensitivity(&self) -> CaseSensitivity {
         self.as_system().case_sensitivity()
+    }
+
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        self.as_system().is_executable(path)
     }
 
     fn current_directory(&self) -> &SystemPath {

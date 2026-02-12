@@ -53,6 +53,31 @@ def _(a: type[int]):
     assert_type(a, Type[int])  # fine
 ```
 
+## Unspellable types
+
+<!-- snapshot-diagnostics -->
+
+If the actual type is an unspellable subtype, we emit `assert-type-unspellable-subtype` instead of
+`type-assertion-failure`, on the grounds that it is often useful to distinguish this from cases
+where the type assertion failure is "fixable".
+
+```py
+from typing_extensions import assert_type
+
+class Foo: ...
+class Bar: ...
+class Baz: ...
+
+def f(x: Foo):
+    assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Bar` does not match asserted type `Foo`"
+    if isinstance(x, Bar):
+        assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Bar` does not match asserted type `Foo & Bar`"
+
+        # The actual type must be a subtype of the asserted type, as well as being unspellable,
+        # in order for `assert-type-unspellable-subtype` to be emitted instead of `type-assertion-failure`
+        assert_type(x, Baz)  # error: [type-assertion-failure]
+```
+
 ## Gradual types
 
 ```py

@@ -258,6 +258,12 @@ pub struct SymbolInfo<'a> {
     pub name: Cow<'a, str>,
     /// The kind of symbol (function, class, variable, etc.)
     pub kind: SymbolKind,
+    /// Whether this symbol has a `@deprecated` decorator.
+    pub deprecated: bool,
+    /// Whether this symbol was imported from another module.
+    ///
+    /// And if so, this includes the name of that module.
+    pub imported_from: Option<ImportedFrom>,
     /// The range of the symbol name
     pub name_range: TextRange,
     /// The full range of the symbol (including body)
@@ -269,6 +275,8 @@ impl SymbolInfo<'_> {
         SymbolInfo {
             name: Cow::Owned(self.name.to_string()),
             kind: self.kind,
+            deprecated: self.deprecated,
+            imported_from: self.imported_from.clone(),
             name_range: self.name_range,
             full_range: self.full_range,
         }
@@ -280,6 +288,15 @@ impl<'a> From<&'a SymbolTree> for SymbolInfo<'a> {
         SymbolInfo {
             name: Cow::Borrowed(&symbol.name),
             kind: symbol.kind,
+            deprecated: symbol.deprecated,
+            // The clone here isn't great, but doing actual work here
+            // probably isn't the super common case. Namely, most
+            // imports aren't re-exports and get filtered out before
+            // we construct a `SymbolInfo`. This should only do actual
+            // work (like cloning a `ModuleName`) when this symbol
+            // is both imported from another module *and* determined
+            // to be a re-export. ---AG
+            imported_from: symbol.imported_from.clone(),
             name_range: symbol.name_range,
             full_range: symbol.full_range,
         }
@@ -411,9 +428,37 @@ struct SymbolTree {
     parent: Option<SymbolId>,
     name: String,
     kind: SymbolKind,
+    deprecated: bool,
     name_range: TextRange,
     full_range: TextRange,
-    import_kind: Option<ImportKind>,
+    imported_from: Option<ImportedFrom>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+pub struct ImportedFrom {
+    module_name: ModuleName,
+    kind: ImportKind,
+}
+
+impl ImportedFrom {
+    fn import(alias: &ast::Alias, kind: ImportKind) -> Option<ImportedFrom> {
+        let module_name = ModuleName::new(&alias.name)?;
+        Some(ImportedFrom { module_name, kind })
+    }
+
+    fn import_from(
+        db: &dyn Db,
+        importing_file: File,
+        ast: &ast::StmtImportFrom,
+        kind: ImportKind,
+    ) -> Option<ImportedFrom> {
+        let module_name = ModuleName::from_import_statement(db, importing_file, ast).ok()?;
+        Some(ImportedFrom { module_name, kind })
+    }
+
+    pub fn module_name(&self) -> &ModuleName {
+        &self.module_name
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
@@ -421,6 +466,16 @@ enum ImportKind {
     Normal,
     RedundantAlias,
     Wildcard,
+}
+
+impl From<&ast::Alias> for ImportKind {
+    fn from(alias: &ast::Alias) -> ImportKind {
+        if alias.asname.as_ref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
+            ImportKind::RedundantAlias
+        } else {
+            ImportKind::Normal
+        }
+    }
 }
 
 /// An abstraction for managing module scope imports.
@@ -606,6 +661,21 @@ impl<'db> ImportModuleName<'db> {
     }
 }
 
+#[derive(Clone, Copy, Debug)]
+enum AstImport<'a> {
+    Import(&'a ast::StmtImport),
+    ImportFrom(&'a ast::StmtImportFrom),
+}
+
+impl Ranged for AstImport<'_> {
+    fn range(&self) -> TextRange {
+        match *self {
+            AstImport::Import(ast) => ast.range(),
+            AstImport::ImportFrom(ast) => ast.range(),
+        }
+    }
+}
+
 /// A visitor over all symbols in a single file.
 ///
 /// This guarantees that child symbols have a symbol ID greater
@@ -773,38 +843,46 @@ impl<'db> SymbolVisitor<'db> {
             parent: None,
             name: name.id.to_string(),
             kind,
+            deprecated: false,
             name_range: name.range(),
             full_range: stmt.range(),
-            import_kind: None,
+            imported_from: None,
         };
         self.add_symbol(symbol)
     }
 
     /// Adds a symbol introduced via an import `stmt`.
-    fn add_import_alias(&mut self, stmt: &ast::Stmt, alias: &ast::Alias) -> SymbolId {
+    fn add_import_alias(&mut self, import: AstImport<'_>, alias: &ast::Alias) -> Option<SymbolId> {
         let name = alias.asname.as_ref().unwrap_or(&alias.name);
-        let kind = if stmt.is_import_stmt() {
+        let kind = if matches!(import, AstImport::Import(_)) {
             SymbolKind::Module
         } else if Self::is_constant_name(name.as_str()) {
             SymbolKind::Constant
         } else {
             SymbolKind::Variable
         };
-        let re_export = Some(
-            if alias.asname.as_ref().map(ast::Identifier::as_str) == Some(alias.name.as_str()) {
-                ImportKind::RedundantAlias
-            } else {
-                ImportKind::Normal
-            },
-        );
-        self.add_symbol(SymbolTree {
+        let import_kind = ImportKind::from(alias);
+        let full_range = import.range();
+        let Some(imported_from) = (match import {
+            AstImport::Import(_) => ImportedFrom::import(alias, import_kind),
+            AstImport::ImportFrom(ast) => {
+                ImportedFrom::import_from(self.db, self.file, ast, import_kind)
+            }
+        }) else {
+            tracing::debug!(
+                "Dropping imported symbol {name} since its module name could not be discovered",
+            );
+            return None;
+        };
+        Some(self.add_symbol(SymbolTree {
             parent: None,
             name: name.id.to_string(),
             kind,
+            deprecated: false,
             name_range: name.range(),
-            full_range: stmt.range(),
-            import_kind: re_export,
-        })
+            full_range,
+            imported_from: Some(imported_from),
+        }))
     }
 
     /// Extracts `__all__` names from the given assignment.
@@ -955,7 +1033,20 @@ impl<'db> SymbolVisitor<'db> {
                     return None;
                 }
                 let mut symbol = symbol.clone();
-                symbol.import_kind = Some(ImportKind::Wildcard);
+                let Some(imported_from) = ImportedFrom::import_from(
+                    self.db,
+                    self.file,
+                    import_from,
+                    ImportKind::Wildcard,
+                ) else {
+                    tracing::debug!(
+                        "Dropping wildcard imported symbol {name} since \
+                         its module name could not be discovered",
+                        name = symbol.name,
+                    );
+                    return None;
+                };
+                symbol.imported_from = Some(imported_from);
                 Some(symbol)
             }));
         // If the imported module defines an `__all__` AND `__all__` is
@@ -1041,6 +1132,17 @@ impl<'db> SymbolVisitor<'db> {
         name.chars().all(|c| c.is_ascii_uppercase() || c == '_')
     }
 
+    fn has_deprecated_decorator(decorator_list: &[ast::Decorator]) -> bool {
+        decorator_list.iter().any(|decorator| {
+            let expr = match &decorator.expression {
+                ast::Expr::Call(call) => &*call.func,
+                other => other,
+            };
+            UnqualifiedName::from_expr(expr)
+                .is_some_and(|name| name.segments().last() == Some(&"deprecated"))
+        })
+    }
+
     /// This routine determines whether the given symbol should be
     /// considered part of the public API of this module. The given
     /// symbol should defined or imported into this module.
@@ -1070,8 +1172,8 @@ impl<'db> SymbolVisitor<'db> {
         // * `import X as X`
         // * `from Y import X as X`
         // * `from Y import *`
-        if let Some(kind) = symbol.import_kind {
-            return match kind {
+        if let Some(ref imported_from) = symbol.imported_from {
+            return match imported_from.kind {
                 ImportKind::RedundantAlias | ImportKind::Wildcard => true,
                 ImportKind::Normal => false,
             };
@@ -1113,9 +1215,10 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     parent: None,
                     name: func_def.name.to_string(),
                     kind,
+                    deprecated: Self::has_deprecated_decorator(&func_def.decorator_list),
                     name_range: func_def.name.range(),
                     full_range: stmt.range(),
-                    import_kind: None,
+                    imported_from: None,
                 };
 
                 if self.exports_only {
@@ -1142,9 +1245,10 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     parent: None,
                     name: class_def.name.to_string(),
                     kind: SymbolKind::Class,
+                    deprecated: Self::has_deprecated_decorator(&class_def.decorator_list),
                     name_range: class_def.name.range(),
                     full_range: stmt.range(),
-                    import_kind: None,
+                    imported_from: None,
                 };
 
                 if self.exports_only {
@@ -1267,7 +1371,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                 }
                 self.imports.add_import(import);
                 for alias in &import.names {
-                    self.add_import_alias(stmt, alias);
+                    self.add_import_alias(AstImport::Import(import), alias);
                 }
             }
             ast::Stmt::ImportFrom(import_from) => {
@@ -1294,7 +1398,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                         {
                             self.add_all_from_import(import_from);
                         }
-                        self.add_import_alias(stmt, alias);
+                        self.add_import_alias(AstImport::ImportFrom(import_from), alias);
                     }
                 }
             }
@@ -1566,7 +1670,7 @@ from collections import defaultdict as dd
             public_test("\
 import numpy as numpy
 ").exports(),
-            @"numpy :: Module",
+            @"numpy :: Module :: Re-exported from `numpy`",
         );
     }
 
@@ -1576,7 +1680,7 @@ import numpy as numpy
             public_test("\
 from collections import defaultdict as defaultdict
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
     }
 
@@ -1587,7 +1691,7 @@ from collections import defaultdict as defaultdict
 from collections import defaultdict
 __all__ = ['defaultdict']
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
 
         insta::assert_snapshot!(
@@ -1595,7 +1699,7 @@ __all__ = ['defaultdict']
 from collections import defaultdict
 __all__ = ('defaultdict',)
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
     }
 
@@ -1606,7 +1710,7 @@ __all__ = ('defaultdict',)
 from collections import defaultdict
 __all__: list[str] = ['defaultdict']
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
 
         insta::assert_snapshot!(
@@ -1614,7 +1718,7 @@ __all__: list[str] = ['defaultdict']
 from collections import defaultdict
 __all__: tuple[str, ...] = ('defaultdict',)
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
     }
 
@@ -1626,7 +1730,7 @@ from collections import defaultdict
 __all__ = []
 __all__ += ['defaultdict']
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
 
         insta::assert_snapshot!(
@@ -1635,7 +1739,7 @@ from collections import defaultdict
 __all__ = []
 __all__ += ('defaultdict',)
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
 
         insta::assert_snapshot!(
@@ -1644,7 +1748,7 @@ from collections import defaultdict
 __all__ = []
 __all__ += {'defaultdict'}
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
     }
 
@@ -1667,7 +1771,7 @@ from collections import defaultdict
 __all__ = []
 __all__.extend(['defaultdict'])
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
     }
 
@@ -1690,7 +1794,7 @@ from collections import defaultdict
 __all__ = []
 __all__.append('defaultdict')
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
     }
 
@@ -1702,7 +1806,7 @@ from collections import defaultdict
 __all__ = []
 __all__ += ['defaultdict']
 ").exports(),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `collections`",
         );
     }
 
@@ -1763,7 +1867,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"ZQZQZQ :: Constant",
+            @"ZQZQZQ :: Constant :: Re-exported from `foo`",
         );
     }
 
@@ -1823,7 +1927,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"collections :: Module",
+            @"collections :: Module :: Re-exported from `foo`",
         );
     }
 
@@ -1854,7 +1958,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"defaultdict :: Variable",
+            @"defaultdict :: Variable :: Re-exported from `foo`",
         );
     }
 
@@ -1872,7 +1976,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"ZQZQZQ :: Constant",
+            @"ZQZQZQ :: Constant :: Re-exported from `foo`",
         );
     }
 
@@ -1890,9 +1994,9 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        ZQZQZQ :: Constant
-        __all__ :: Variable
+            @r"
+        ZQZQZQ :: Constant :: Re-exported from `foo`
+        __all__ :: Variable :: Re-exported from `foo`
         ",
         );
     }
@@ -1960,7 +2064,7 @@ class X:
         // import) and does not itself include `TRICKSY`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"__all__ :: Variable",
+            @"__all__ :: Variable :: Re-exported from `foo`",
         );
     }
 
@@ -2006,8 +2110,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        __all__ :: Variable
+            @r"
+        __all__ :: Variable :: Re-exported from `foo`
         TRICKSY :: Constant
         ",
         );
@@ -2060,9 +2164,9 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        __all__ :: Variable
-        defaultdict :: Variable
+            @r"
+        __all__ :: Variable :: Re-exported from `foo`
+        defaultdict :: Variable :: Re-exported from `collections`
         ",
         );
     }
@@ -2105,7 +2209,7 @@ class X:
         // `from foo import *` will try to import it anyway.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"__all__ :: Variable",
+            @"__all__ :: Variable :: Re-exported from `foo`",
         );
     }
 
@@ -2155,8 +2259,8 @@ class X:
         // `from foo import *` will try to import it anyway.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        __all__ :: Variable
+            @r"
+        __all__ :: Variable :: Re-exported from `foo`
         TRICKSY :: Constant
         ",
         );
@@ -2274,8 +2378,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZQZQZQ :: Constant
+            @r"
+        _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2303,8 +2407,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZQZQZQ :: Constant
+            @r"
+        _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2332,8 +2436,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZQZQZQ :: Constant
+            @r"
+        _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2362,8 +2466,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZQZQZQ :: Constant
+            @r"
+        _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2392,8 +2496,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZQZQZQ :: Constant
+            @r"
+        _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2422,8 +2526,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZQZQZQ :: Constant
+            @r"
+        _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2452,8 +2556,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZQZQZQ :: Constant
+            @r"
+        _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2482,8 +2586,8 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZQZQZQ :: Constant
+            @r"
+        _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2514,9 +2618,9 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("a.py"),
-            @"
-        _ZBZBZB :: Constant
-        _ZAZAZA :: Constant
+            @r"
+        _ZBZBZB :: Constant :: Re-exported from `b`
+        _ZAZAZA :: Constant :: Re-exported from `b`
         ",
         );
     }
@@ -2559,8 +2663,8 @@ class X:
         // `_ZBZBZB` instead of `_ZFZFZF`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZFZFZF :: Constant
+            @r"
+        _ZFZFZF :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
         );
@@ -2600,13 +2704,86 @@ class X:
         // answer should just be `_ZFZFZF` and `_ZYZYZY`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @"
-        _ZFZFZF :: Constant
-        foo :: Module
+            @r"
+        _ZFZFZF :: Constant :: Re-exported from `parent.foo`
+        foo :: Module :: Re-exported from `parent`
         _ZYZYZY :: Constant
         __all__ :: Variable
         ",
         );
+    }
+
+    #[test]
+    fn deprecated_function() {
+        let test = public_test(
+            "\
+@deprecated('use new_foo instead')
+def foo(): ...
+
+def bar(): ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, foo) = &syms[0];
+        assert_eq!(&*foo.name, "foo");
+        assert!(foo.deprecated);
+
+        let (_, bar) = &syms[1];
+        assert_eq!(&*bar.name, "bar");
+        assert!(!bar.deprecated);
+    }
+
+    #[test]
+    fn deprecated_class() {
+        let test = public_test(
+            "\
+@deprecated('use NewClass instead')
+class OldClass: ...
+
+class NewClass: ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, old) = &syms[0];
+        assert_eq!(&*old.name, "OldClass");
+        assert!(old.deprecated);
+
+        let (_, new) = &syms[1];
+        assert_eq!(&*new.name, "NewClass");
+        assert!(!new.deprecated);
+    }
+
+    #[test]
+    fn deprecated_bare_decorator() {
+        let test = public_test(
+            "\
+@deprecated
+def foo(): ...
+
+@deprecated
+class C: ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, foo) = &syms[0];
+        assert_eq!(&*foo.name, "foo");
+        assert!(foo.deprecated);
+
+        let (_, c) = &syms[1];
+        assert_eq!(&*c.name, "C");
+        assert!(foo.deprecated);
     }
 
     fn matches(query: &str, symbol: &str) -> bool {
@@ -2631,16 +2808,35 @@ class X:
             self.exports_for("test.py")
         }
 
+        /// Returns the [`FlatSymbols`] for `test.py`.
+        fn exported_symbols(&self) -> &super::FlatSymbols {
+            self.exported_symbols_for("test.py")
+        }
+
+        /// Returns the [`FlatSymbols`] for the module at the given path.
+        ///
+        /// The path given must have been written to this test's salsa DB.
+        fn exported_symbols_for(&self, path: impl AsRef<SystemPath>) -> &super::FlatSymbols {
+            let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
+            symbols_for_file_global_only(&self.db, file)
+        }
+
         /// Returns the exports from the module at the given path.
         ///
         /// The path given must have been written to this test's salsa DB.
         fn exports_for(&self, path: impl AsRef<SystemPath>) -> String {
-            let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
-            let symbols = symbols_for_file_global_only(&self.db, file);
-            symbols
+            self.exported_symbols_for(path)
                 .iter()
                 .map(|(_, symbol)| {
-                    format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind)
+                    let mut snapshot =
+                        format!("{name} :: {kind:?}", name = symbol.name, kind = symbol.kind,);
+                    if let Some(ref imported_from) = symbol.imported_from {
+                        snapshot = format!(
+                            "{snapshot} :: Re-exported from `{module_name}`",
+                            module_name = imported_from.module_name()
+                        );
+                    }
+                    snapshot
                 })
                 .collect::<Vec<String>>()
                 .join("\n")

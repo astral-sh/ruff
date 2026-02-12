@@ -6,7 +6,6 @@ use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextSize};
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_safe_super_call_with_parameters_fix_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -48,10 +47,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// This rule's fix is marked as unsafe because removing the arguments from a call
 /// may delete comments that are attached to the arguments.
-///
-/// In [preview], the fix is marked safe if no comments are present.
-///
-/// [preview]: https://docs.astral.sh/ruff/preview/
 ///
 /// ## References
 /// - [Python documentation: `super`](https://docs.python.org/3/library/functions.html#super)
@@ -186,12 +181,10 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
 
     // Only provide a fix if there are no keyword arguments, since super() doesn't accept keyword arguments
     if call.arguments.keywords.is_empty() {
-        let applicability = if !checker.comment_ranges().intersects(call.arguments.range())
-            && is_safe_super_call_with_parameters_fix_enabled(checker.settings())
-        {
-            Applicability::Safe
-        } else {
+        let applicability = if checker.comment_ranges().intersects(call.arguments.range()) {
             Applicability::Unsafe
+        } else {
+            Applicability::Safe
         };
 
         diagnostic.set_fix(Fix::applicable_edit(

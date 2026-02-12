@@ -5,7 +5,7 @@ use anyhow::Result;
 use log::error;
 
 use ruff_linter::source_kind::{SourceError, SourceKind};
-use ruff_python_ast::{PySourceType, SourceType};
+use ruff_python_ast::SourceType;
 use ruff_workspace::FormatterSettings;
 use ruff_workspace::resolver::{PyprojectConfig, Resolver, match_exclusion, python_file_at_path};
 
@@ -51,18 +51,15 @@ pub(crate) fn format_stdin(
     let path = cli.stdin_filename.as_deref();
     let settings = &resolver.base_settings().formatter;
 
-    let source_type = match path.and_then(|path| settings.extension.get(path)) {
-        None => match path.map(SourceType::from).unwrap_or_default() {
-            SourceType::Python(source_type) => source_type,
-            SourceType::Toml(_) => {
-                if mode.is_write() {
-                    parrot_stdin()?;
-                }
-                return Ok(ExitStatus::Success);
-            }
-        },
-        Some(language) => PySourceType::from(language),
-    };
+    let source_type = path
+        .map(|path| settings.extension.get_source_type(path))
+        .unwrap_or_default();
+    if source_type.is_toml() {
+        if mode.is_write() {
+            parrot_stdin()?;
+        }
+        return Ok(ExitStatus::Success);
+    }
 
     // Format the file.
     match format_source_code(path, cli.range, settings, source_type, mode) {
@@ -88,7 +85,7 @@ fn format_source_code(
     path: Option<&Path>,
     range: Option<FormatRange>,
     settings: &FormatterSettings,
-    source_type: PySourceType,
+    source_type: SourceType,
     mode: FormatMode,
 ) -> Result<FormatResult, FormatCommandError> {
     // Read the source from stdin.
@@ -104,7 +101,7 @@ fn format_source_code(
     };
 
     // Format the source.
-    let formatted = format_source(&source_kind, source_type, path, settings, range)?;
+    let formatted = format_source(&source_kind, path, settings, range)?;
 
     match &formatted {
         FormattedSource::Formatted(formatted) => match mode {
