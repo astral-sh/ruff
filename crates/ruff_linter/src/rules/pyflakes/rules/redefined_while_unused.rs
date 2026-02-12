@@ -158,7 +158,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 
             redefinitions
                 .entry(binding.source)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(EntryInfo::new(shadowed, binding, checker));
         }
     }
