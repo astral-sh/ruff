@@ -2,6 +2,7 @@ use ruff_python_ast::Expr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
+use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
 use ruff_python_semantic::analyze::typing::ModuleMember;
 use ruff_text_size::Ranged;
 
@@ -99,14 +100,17 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                         checker.semantic(),
                     )?;
                     let binding_edit = Edit::range_replacement(binding, expr.range());
-                    let applicability = if checker.target_version() >= PythonVersion::PY310 {
-                        Applicability::Safe
-                    } else {
-                        Applicability::Unsafe
-                    };
+                    let (applicability, future_import) = fix_applicability(checker);
+                    let mut secondary_edit = Vec::new();
+                    if let Some(import) = import_edit {
+                        secondary_edit.push(import);
+                    }
+                    if let Some(future) = future_import {
+                        secondary_edit.push(future);
+                    }
                     Ok(Fix::applicable_edits(
                         binding_edit,
-                        import_edit,
+                        secondary_edit,
                         applicability,
                     ))
                 });
@@ -120,17 +124,38 @@ pub(crate) fn use_pep585_annotation(checker: &Checker, expr: &Expr, replacement:
                         checker.semantic(),
                     )?;
                     let reference_edit = Edit::range_replacement(binding, expr.range());
+                    let (applicability, future_import) = fix_applicability(checker);
+                    let mut secondary_edit = Vec::new();
+                    secondary_edit.push(import_edit);
+                    if let Some(future) = future_import {
+                        secondary_edit.push(future);
+                    }
                     Ok(Fix::applicable_edits(
-                        import_edit,
-                        [reference_edit],
-                        if checker.target_version() >= PythonVersion::PY310 {
-                            Applicability::Safe
-                        } else {
-                            Applicability::Unsafe
-                        },
+                        reference_edit,
+                        secondary_edit,
+                        applicability,
                     ))
                 });
             }
         }
+    }
+}
+
+fn fix_applicability(checker: &Checker) -> (Applicability, Option<Edit>) {
+    if checker.target_version() >= PythonVersion::PY39 {
+        return (Applicability::Safe, None);
+    }
+    if checker.settings().pyupgrade.keep_runtime_typing {
+        return (Applicability::Unsafe, None);
+    }
+    if checker.settings().future_annotations {
+        if checker.future_annotations_or_stub() {
+            (Applicability::Safe, None)
+        } else {
+            let future_import = checker.importer().add_future_import();
+            (Applicability::Safe, Some(future_import))
+        }
+    } else {
+        (Applicability::Unsafe, None)
     }
 }

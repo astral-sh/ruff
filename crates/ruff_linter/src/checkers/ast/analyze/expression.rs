@@ -294,37 +294,21 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     }
 
                     // Ex) List[...]
-                    if checker.any_rule_enabled(&[
-                        Rule::FutureRewritableTypeAnnotation,
-                        Rule::NonPEP585Annotation,
-                    ]) {
+                    if checker.is_rule_enabled(Rule::NonPEP585Annotation) {
                         if let Some(replacement) =
                             typing::to_pep585_generic(expr, &checker.semantic)
                         {
-                            if checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation) {
-                                if !checker.semantic.future_annotations_or_stub()
-                                    && checker.target_version() < PythonVersion::PY39
-                                    && checker.target_version() >= PythonVersion::PY37
+                            if checker.source_type.is_stub()
+                                || checker.target_version() >= PythonVersion::PY39
+                                || (checker.target_version() >= PythonVersion::PY37
                                     && checker.semantic.in_annotation()
-                                    && !checker.settings().pyupgrade.keep_runtime_typing
-                                {
-                                    flake8_future_annotations::rules::future_rewritable_type_annotation(checker, expr);
-                                }
-                            }
-                            if checker.is_rule_enabled(Rule::NonPEP585Annotation) {
-                                if checker.source_type.is_stub()
-                                    || checker.target_version() >= PythonVersion::PY39
-                                    || (checker.target_version() >= PythonVersion::PY37
-                                        && checker.semantic.future_annotations_or_stub()
-                                        && checker.semantic.in_annotation()
-                                        && !checker.settings().pyupgrade.keep_runtime_typing)
-                                {
-                                    pyupgrade::rules::use_pep585_annotation(
-                                        checker,
-                                        expr,
-                                        &replacement,
-                                    );
-                                }
+                                    && !checker.settings().pyupgrade.keep_runtime_typing)
+                            {
+                                pyupgrade::rules::use_pep585_annotation(
+                                    checker,
+                                    expr,
+                                    &replacement,
+                                );
                             }
                         }
                     }
@@ -403,33 +387,15 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             }
 
             // Ex) typing.List[...]
-            if checker.any_rule_enabled(&[
-                Rule::FutureRewritableTypeAnnotation,
-                Rule::NonPEP585Annotation,
-            ]) {
+            if checker.is_rule_enabled(Rule::NonPEP585Annotation) {
                 if let Some(replacement) = typing::to_pep585_generic(expr, &checker.semantic) {
-                    if checker.is_rule_enabled(Rule::FutureRewritableTypeAnnotation) {
-                        if !checker.semantic.future_annotations_or_stub()
-                            && checker.target_version() < PythonVersion::PY39
-                            && checker.target_version() >= PythonVersion::PY37
+                    if checker.source_type.is_stub()
+                        || checker.target_version() >= PythonVersion::PY39
+                        || (checker.target_version() >= PythonVersion::PY37
                             && checker.semantic.in_annotation()
-                            && !checker.settings().pyupgrade.keep_runtime_typing
-                        {
-                            flake8_future_annotations::rules::future_rewritable_type_annotation(
-                                checker, expr,
-                            );
-                        }
-                    }
-                    if checker.is_rule_enabled(Rule::NonPEP585Annotation) {
-                        if checker.source_type.is_stub()
-                            || checker.target_version() >= PythonVersion::PY39
-                            || (checker.target_version() >= PythonVersion::PY37
-                                && checker.semantic.future_annotations_or_stub()
-                                && checker.semantic.in_annotation()
-                                && !checker.settings().pyupgrade.keep_runtime_typing)
-                        {
-                            pyupgrade::rules::use_pep585_annotation(checker, expr, &replacement);
-                        }
+                            && !checker.settings().pyupgrade.keep_runtime_typing)
+                    {
+                        pyupgrade::rules::use_pep585_annotation(checker, expr, &replacement);
                     }
                 }
             }
