@@ -7314,7 +7314,11 @@ impl ConstructorReturnDisposition {
             Type::Dynamic(_) | Type::TypeVar(_) => Self::Uncertain,
             Type::Never => Self::Instance,
             Type::NominalInstance(instance) => {
-                if instance.class(db).is_subclass_of(db, constructor_class) {
+                // Check origin class identity first, since `is_subclass_of` returns false
+                // for Generic vs NonGeneric variants of the same class.
+                if instance.class(db).class_literal(db) == constructor_class.class_literal(db)
+                    || instance.class(db).is_subclass_of(db, constructor_class)
+                {
                     Self::Instance
                 } else {
                     Self::NotInstance

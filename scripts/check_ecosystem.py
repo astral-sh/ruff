@@ -383,7 +383,7 @@ async def main(
     errors = 0
 
     for diff in diffs.values():
-        if isinstance(diff, Exception):
+        if isinstance(diff, BaseException):
             errors += 1
         else:
             total_removed += len(diff.removed)
@@ -399,7 +399,7 @@ async def main(
         print()
 
         for (org, repo), diff in diffs.items():
-            if isinstance(diff, Exception):
+            if isinstance(diff, BaseException):
                 changes = "error"
                 print(f"<details><summary>{repo} ({changes})</summary>")
                 repo = repositories[(org, repo)]
