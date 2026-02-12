@@ -16,7 +16,7 @@ Released on 2026-02-12.
 - \[`refurb`\] Check subscripts in tuple do not use lambda parameters in `reimplemented-operator` (`FURB118`) ([#23079](https://github.com/astral-sh/ruff/pull/23079))
 - \[`ruff`\] Detect mutable defaults in `field` calls (`RUF008`) ([#23046](https://github.com/astral-sh/ruff/pull/23046))
 - \[`ruff`\] Ignore std `cmath.inf` (`RUF069`) ([#23120](https://github.com/astral-sh/ruff/pull/23120))
-- \[`ruff`\] New rule float-comparison (`RUF069`) ([#20585](https://github.com/astral-sh/ruff/pull/20585))
+- \[`ruff`\] New rule `float-equality-comparison` (`RUF069`) ([#20585](https://github.com/astral-sh/ruff/pull/20585))
 - Don't format unlabeled Markdown code blocks ([#23106](https://github.com/astral-sh/ruff/pull/23106))
 - Markdown formatting support in LSP ([#23063](https://github.com/astral-sh/ruff/pull/23063))
 - Support Quarto Markdown language markers ([#22947](https://github.com/astral-sh/ruff/pull/22947))
@@ -38,7 +38,7 @@ Released on 2026-02-12.
 
 ### Rule changes
 
-- Use `DisplayDiagnosticsConfig::program` for Ruff's GitHub output ([#23240](https://github.com/astral-sh/ruff/pull/23240))
+- Use `ruff` instead of `Ruff` as the program name in GitHub output format ([#23240](https://github.com/astral-sh/ruff/pull/23240))
 - \[`PT006`\] Fix syntax error when unpacking nested tuples in `parametrize` fixes (#22441) ([#22464](https://github.com/astral-sh/ruff/pull/22464))
 - \[`airflow`\] Catch deprecated attribute access from context key for Airflow 3.0 (`AIR301`) ([#22850](https://github.com/astral-sh/ruff/pull/22850))
 - \[`airflow`\] Capture deprecated arguments and a decorator (`AIR301`) ([#23170](https://github.com/astral-sh/ruff/pull/23170))
@@ -62,7 +62,6 @@ Released on 2026-02-12.
 ### Other changes
 
 - Exclude WASM artifacts from GitHub releases ([#23221](https://github.com/astral-sh/ruff/pull/23221))
-- [ty] Allow setting the Python version to 3.15 ([#23082](https://github.com/astral-sh/ruff/pull/23082))
 
 ### Contributors
 
