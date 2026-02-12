@@ -961,7 +961,7 @@ impl<'db> Type<'db> {
         .recursive_type_normalized(db, cycle)
     }
 
-    fn is_none(&self, db: &'db dyn Db) -> bool {
+    pub fn is_none(&self, db: &'db dyn Db) -> bool {
         self.is_instance_of(db, KnownClass::NoneType)
     }
 

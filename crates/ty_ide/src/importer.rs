@@ -362,6 +362,10 @@ impl<'ast> MembersInScope<'ast> {
             .collect();
         MembersInScope { at, map }
     }
+
+    pub(crate) fn contains_symbol(&self, symbol_name: &str) -> bool {
+        self.map.iter().any(|(name, _)| name == symbol_name)
+    }
 }
 
 #[derive(Debug)]
