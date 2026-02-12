@@ -75,27 +75,12 @@ impl<'db> PredicatesBuilder<'db> {
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Predicate<'db> {
     pub(crate) node: PredicateNode<'db>,
-    pub(crate) is_positive: bool,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateOrLiteral<'db> {
     Literal(bool),
     Predicate(Predicate<'db>),
-}
-
-impl PredicateOrLiteral<'_> {
-    pub(crate) fn negated(self) -> Self {
-        match self {
-            PredicateOrLiteral::Literal(value) => PredicateOrLiteral::Literal(!value),
-            PredicateOrLiteral::Predicate(Predicate { node, is_positive }) => {
-                PredicateOrLiteral::Predicate(Predicate {
-                    node,
-                    is_positive: !is_positive,
-                })
-            }
-        }
-    }
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -234,7 +219,6 @@ impl<'db> From<StarImportPlaceholderPredicate<'db>> for PredicateOrLiteral<'db> 
     fn from(predicate: StarImportPlaceholderPredicate<'db>) -> Self {
         PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::StarImportPlaceholder(predicate),
-            is_positive: true,
         })
     }
 }

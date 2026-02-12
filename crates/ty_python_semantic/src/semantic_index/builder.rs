@@ -851,7 +851,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             Some(literal) => PredicateOrLiteral::Literal(literal),
             None => PredicateOrLiteral::Predicate(Predicate {
                 node: PredicateNode::Expression(expression),
-                is_positive: true,
             }),
         }
     }
@@ -861,12 +860,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
     fn add_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut().add_predicate(predicate)
-    }
-
-    /// Negates a predicate and adds it to the list of all predicates, does not record it.
-    fn add_negated_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
-        self.current_use_def_map_mut()
-            .add_predicate(predicate.negated())
     }
 
     /// Records a previously added narrowing constraint by adding it to the live bindings
@@ -1101,7 +1094,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
-            is_positive: true,
         });
 
         // For the last catchall case (irrefutable wildcard without guard), we skip
@@ -1868,9 +1860,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 if let Some(msg) = msg {
                     let post_test = self.flow_snapshot();
-                    let negated_predicate = predicate.negated();
-                    self.record_narrowing_constraint(negated_predicate);
-                    self.record_reachability_constraint(negated_predicate);
+                    // Add positive predicate, use TDD negation for msg branch
+                    let predicate_id = self.add_predicate(predicate);
+                    let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+                    self.current_use_def_map_mut()
+                        .record_negated_narrowing_constraint_for_places(
+                            predicate_id,
+                            &possibly_narrowed,
+                        );
+                    let atom = self
+                        .current_reachability_constraints_mut()
+                        .add_atom(predicate_id);
+                    self.record_negated_reachability_constraint(atom);
                     self.visit_expr(msg);
                     self.flow_restore(post_test);
                 }
@@ -2241,7 +2242,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         let post_guard_eval = self.flow_snapshot();
                         let predicate = PredicateOrLiteral::Predicate(Predicate {
                             node: PredicateNode::Expression(guard_expr),
-                            is_positive: true,
                         });
                         // Add the predicate once, then use TDD-level negation for the failure
                         // path. This ensures the positive and negative atoms share the same ID.
@@ -2576,11 +2576,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 callable,
                                 call_expr,
                             }),
-                            is_positive: false,
                         };
-                        let constraint = self.record_reachability_constraint(
-                            PredicateOrLiteral::Predicate(predicate),
-                        );
+                        let predicate_id =
+                            self.add_predicate(PredicateOrLiteral::Predicate(predicate));
+                        let atom = self
+                            .current_reachability_constraints_mut()
+                            .add_atom(predicate_id);
+                        let negated = self
+                            .current_reachability_constraints_mut()
+                            .add_not_constraint(atom);
+                        self.current_use_def_map_mut()
+                            .record_reachability_constraint(negated);
 
                         // Also gate narrowing by this constraint: if the call returns
                         // `Never`, any narrowing in the current branch should be
@@ -2588,7 +2594,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // narrowing to be preserved after if-statements where one branch
                         // calls a `NoReturn` function like `sys.exit()`.
                         self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_all_places(constraint);
+                            .record_narrowing_constraint_for_all_places(negated);
                     }
                 }
             }
@@ -2890,33 +2896,53 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if index < values.len() - 1 {
                         let predicate = self.build_predicate(value);
                         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
-                        let predicate_id = match op {
-                            ast::BoolOp::And => self.add_predicate(predicate),
-                            ast::BoolOp::Or => self.add_negated_predicate(predicate),
-                        };
-                        let reachability_constraint = self
+                        let predicate_id = self.add_predicate(predicate);
+                        let atom = self
                             .current_reachability_constraints_mut()
                             .add_atom(predicate_id);
+                        let not_atom = self
+                            .current_reachability_constraints_mut()
+                            .add_not_constraint(atom);
+
+                        // For `and`, we continue (non-short-circuit) when the predicate is
+                        // truthy, and short-circuit when falsy.
+                        // For `or`, we continue when falsy, and short-circuit when truthy.
+                        let (non_short_circuit_rc, short_circuit_rc) = match op {
+                            ast::BoolOp::And => (atom, not_atom),
+                            ast::BoolOp::Or => (not_atom, atom),
+                        };
 
                         let after_expr = self.flow_snapshot();
 
                         // We first model the short-circuiting behavior. We take the short-circuit
                         // path here if all of the previous short-circuit paths were not taken, so
-                        // we record all previously existing reachability constraints, and negate the
-                        // one for the current expression.
+                        // we record all previously existing reachability constraints, and the
+                        // short-circuit constraint for the current expression.
 
-                        self.record_negated_reachability_constraint(reachability_constraint);
+                        self.current_use_def_map_mut()
+                            .record_reachability_constraint(short_circuit_rc);
                         snapshots.push(self.flow_snapshot());
 
                         // Then we model the non-short-circuiting behavior. Here, we need to delay
                         // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
-                        self.record_narrowing_constraint_id_for_places(
-                            predicate_id,
-                            &possibly_narrowed,
-                        );
-                        reachability_constraints.push(reachability_constraint);
+                        match op {
+                            ast::BoolOp::And => {
+                                self.record_narrowing_constraint_id_for_places(
+                                    predicate_id,
+                                    &possibly_narrowed,
+                                );
+                            }
+                            ast::BoolOp::Or => {
+                                self.current_use_def_map_mut()
+                                    .record_negated_narrowing_constraint_for_places(
+                                        predicate_id,
+                                        &possibly_narrowed,
+                                    );
+                            }
+                        }
+                        reachability_constraints.push(non_short_circuit_rc);
                     }
                 }
 

@@ -10491,10 +10491,6 @@ impl Truthiness {
         }
     }
 
-    pub(crate) const fn negate_if(self, condition: bool) -> Self {
-        if condition { self.negate() } else { self }
-    }
-
     pub(crate) fn or(self, other: Self) -> Self {
         match (self, other) {
             (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => Truthiness::AlwaysFalse,
