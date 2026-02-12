@@ -170,13 +170,11 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let mut stdout = printer.stream_for_requested_summary().lock();
     match std::env::var(EnvVars::TY_MEMORY_REPORT).as_deref() {
         Ok("short") => write!(stdout, "{}", db.salsa_memory_dump().display_short())?,
-        Ok("mypy_primer") => write!(stdout, "{}", db.salsa_memory_dump().display_mypy_primer())?,
-        Ok("full") => {
-            write!(stdout, "{}", db.salsa_memory_dump().display_full())?;
-        }
+        Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
+        Ok("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
         Ok(other) => {
             tracing::warn!(
-                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `mypy_primer`, and `full`."
+                "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `full`, and `json`."
             );
         }
         Err(_) => {}
@@ -348,7 +346,7 @@ impl MainLoop {
                     let result = match self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
-                            if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
+                            if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("json") {
                                 return Ok(ExitStatus::Success);
                             }
 
@@ -457,7 +455,7 @@ impl MainLoop {
                 // Only render diagnostics if they're going to be displayed, since doing
                 // so is expensive.
                 if stdout.is_enabled() {
-                    let display_config = DisplayDiagnosticConfig::default()
+                    let display_config = DisplayDiagnosticConfig::new("ty")
                         .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
                         .with_cancellation_token(Some(self.cancellation_token.clone()))

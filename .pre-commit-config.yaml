@@ -35,7 +35,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.42.1
+    rev: v1.42.3
     hooks:
       - id: typos
         priority: 0
@@ -66,7 +66,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/python-jsonschema/check-jsonschema
-    rev: 0.36.0
+    rev: 0.36.1
     hooks:
       - id: check-github-workflows
         priority: 0
@@ -83,8 +83,8 @@ repos:
       - id: mdformat
         language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
-          - mdformat-mkdocs==5.1.3
-          - mdformat-footnote==0.1.2
+          - mdformat-mkdocs==5.1.4
+          - mdformat-footnote==0.1.3
         exclude: |
           (?x)^(
             docs/formatter/black\.md

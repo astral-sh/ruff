@@ -257,6 +257,11 @@ async def f4():
 async def f5():
     return locals()
 
+# https://github.com/astral-sh/ruff/issues/19831
+# NFKC-equivalent non-ASCII path parameter should not match (would cause infinite loop)
+@app.get("/queries/{𝑞𝑢𝑒𝑟𝑦}")
+async def read_query_nfkc(query: str): ...
+
 # https://github.com/astral-sh/ruff/issues/20941
 @app.get("/imports/{import}")
 async def get_import():
@@ -265,3 +270,32 @@ async def get_import():
 @app.get("/debug/{__debug__}")
 async def get_debug():
     ...
+
+
+# https://github.com/astral-sh/ruff/issues/19831
+
+# Errors: vararg-only and kwarg-only functions
+@app.get("/things/{thing_id}")
+async def read_thing_vararg(*query: str): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_kwarg(**query: str): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_vararg_kwarg(*args, **kwargs): ...
+
+# Errors: positional-only parameter edge cases
+@app.get("/things/{thing_id}")
+async def read_thing_posonly(query: str, /): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_posonly_trailing(query: str, /,): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_posonly_default(query: str = "", /): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_posonly_default_trailing(query: str = "", /,): ...
+
+@app.get("/things/{thing_id}")
+async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...

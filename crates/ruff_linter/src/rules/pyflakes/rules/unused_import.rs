@@ -78,9 +78,8 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// a.b.foo()
 /// ```
 ///
-/// then a diagnostic will only be emitted for the first line under [preview],
-/// whereas a diagnostic would only be emitted for the second line under
-/// stable behavior.
+/// then a diagnostic will be emitted for the second line under [preview],
+/// whereas no diagnostic is emitted under stable behavior.
 ///
 /// Note that this behavior is somewhat subjective and is designed
 /// to conform to the developer's intuition rather than Python's actual
@@ -410,6 +409,19 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                 } else if in_init
                     && binding.scope.is_global()
                     && is_first_party(&binding.import, checker)
+                    // In the situation where we have
+                    // ```
+                    // import a.b # <-- at this binding
+                    // import a.c
+                    //
+                    // __all__ = ["a"]
+                    // ```
+                    // we should not recommend that we re-export the
+                    // symbol `a` or add it to `__all__`.
+                    //
+                    // So we look up the name `a` and see if it has
+                    // a reference in `__all__`.
+                    && (!is_refined_submodule_import_match_enabled(checker.settings())||!symbol_used_in_dunder_all(checker.semantic(), &binding))
                 {
                     UnusedImportContext::DunderInitFirstParty {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
@@ -949,4 +961,15 @@ fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &Semanti
             BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
         ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
     })
+}
+
+fn symbol_used_in_dunder_all(semantic: &SemanticModel<'_>, binding: &ImportBinding) -> bool {
+    semantic
+        .lookup_symbol_in_scope(binding.symbol_stored_in_outer_scope(), binding.scope, false)
+        .is_some_and(|bdg| {
+            semantic
+                .binding(bdg)
+                .references()
+                .any(|refid| semantic.reference(refid).in_dunder_all_definition())
+        })
 }

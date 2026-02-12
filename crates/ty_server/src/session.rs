@@ -24,7 +24,7 @@ use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
-use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
+use ty_project::{ChangeResult, Db as _, ProjectDatabase, ProjectMetadata};
 
 use index::DocumentError;
 use ty_python_semantic::MisconfigurationMode;
@@ -342,27 +342,10 @@ impl Session {
     /// If the path is a virtual path, it will return the first project database in the session.
     pub(crate) fn project_state(&self, path: &AnySystemPath) -> &ProjectState {
         match path {
-            AnySystemPath::System(system_path) => {
-                self.project_state_for_path(system_path).unwrap_or_else(|| {
-                    // TODO: While ty supports multiple workspace folders, we still
-                    // need to figure out which project should this virtual path
-                    // belong to: https://github.com/astral-sh/ty/issues/794
-                    self.projects
-                        .values()
-                        .next()
-                        .expect("To always have at least one project")
-                })
-            }
-            AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: While ty supports multiple workspace folders, we still
-                // need to figure out which project should this virtual path
-                // belong to: https://github.com/astral-sh/ty/issues/794
-                self.projects
-                    .iter()
-                    .next()
-                    .map(|(_, project)| project)
-                    .unwrap()
-            }
+            AnySystemPath::System(system_path) => self
+                .project_state_for_path(system_path)
+                .unwrap_or_else(|| self.project_state_virtual_fallback()),
+            AnySystemPath::SystemVirtual(_virtual_path) => self.project_state_virtual_fallback(),
         }
     }
 
@@ -385,22 +368,10 @@ impl Session {
                     return self.projects.range_mut(range).next_back().unwrap().1;
                 }
 
-                // TODO: While ty supports multiple workspace folders, we still
-                // need to figure out which project should this virtual path
-                // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
-                // look for the first project with an overlapping search path?)
-                self.projects.values_mut().next().unwrap()
+                self.project_state_virtual_fallback_mut()
             }
             AnySystemPath::SystemVirtual(_virtual_path) => {
-                // TODO: While ty supports multiple workspace folders, we still
-                // need to figure out which project should this virtual path
-                // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
-                // look for the first project with an overlapping search path?)
-                self.projects
-                    .iter_mut()
-                    .next()
-                    .map(|(_, project)| project)
-                    .unwrap()
+                self.project_state_virtual_fallback_mut()
             }
         }
     }
@@ -415,6 +386,21 @@ impl Session {
             .range(..=path.as_ref().to_path_buf())
             .next_back()
             .map(|(_, project)| project)
+    }
+
+    // TODO: While ty supports multiple workspace folders, we still
+    // need to figure out which project should this virtual path
+    // belong to: https://github.com/astral-sh/ty/issues/794 (e.g.
+    // look for the first project with an overlapping search path?)
+    fn project_state_virtual_fallback(&self) -> &ProjectState {
+        self.projects
+            .values()
+            .next()
+            .expect("To always have at least one project")
+    }
+
+    fn project_state_virtual_fallback_mut(&mut self) -> &mut ProjectState {
+        self.projects.values_mut().next().unwrap()
     }
 
     pub(crate) fn apply_changes(
@@ -530,12 +516,12 @@ impl Session {
 
         if let Some(global_options) = global_options {
             let global_settings = global_options.into_settings();
-            if global_settings.diagnostic_mode().is_workspace() {
-                for project in self.projects.values_mut() {
-                    project.db.set_check_mode(CheckMode::AllFiles);
-                }
-            }
             self.global_settings = Arc::new(global_settings);
+        }
+        if let Some(check_mode) = self.global_settings.diagnostic_mode().to_check_mode() {
+            for project in self.projects.values_mut() {
+                project.db.set_check_mode(check_mode);
+            }
         }
 
         self.register_capabilities(client);
@@ -1111,15 +1097,29 @@ impl Session {
         Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
-            workspace_settings: document_handle
-                .notebook_or_file_path()
-                .as_system()
-                .and_then(|path| self.workspaces.settings_for_path(path))
+            workspace_settings: self
+                .workspace_settings_for_document(document_handle.notebook_or_file_path())
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
             document: document_handle,
             client_name: self.client_name,
         })
+    }
+
+    fn workspace_settings_for_document(
+        &self,
+        path: &AnySystemPath,
+    ) -> Option<Arc<WorkspaceSettings>> {
+        // Virtual documents use the same "owner" heuristic as `project_state`.
+        match path {
+            AnySystemPath::System(system_path) => self.workspaces.settings_for_path(system_path),
+            AnySystemPath::SystemVirtual(_) => {
+                let project = self.project_state(path);
+                self.workspaces
+                    .settings_for_path(project.db.project().root(&project.db))
+                    .or_else(|| self.workspaces.settings_virtual_fallback())
+            }
+        }
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
@@ -1533,6 +1533,10 @@ impl Workspaces {
     /// workspace registered for the path.
     fn settings_for_path(&self, path: impl AsRef<SystemPath>) -> Option<Arc<WorkspaceSettings>> {
         self.for_path(path).map(Workspace::settings_arc)
+    }
+
+    fn settings_virtual_fallback(&self) -> Option<Arc<WorkspaceSettings>> {
+        self.workspaces.values().next().map(Workspace::settings_arc)
     }
 
     /// Returns `true` if all workspaces have been [initialized].

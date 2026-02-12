@@ -786,6 +786,21 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
+    #[expect(dead_code)]
+    pub(crate) fn write_file(
+        &self,
+        path: impl AsRef<SystemPath>,
+        content: impl AsRef<str>,
+    ) -> Result<()> {
+        let file_path = self.file_path(path);
+        // Ensure parent directories exists
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent.as_std_path())?;
+        }
+        fs::write(file_path.as_std_path(), content.as_ref())?;
+        Ok(())
+    }
+
     /// Send a `textDocument/didOpen` notification
     pub(crate) fn open_text_document(
         &mut self,
@@ -1173,7 +1188,11 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: vec![("VIRTUAL_ENV".to_string(), None)],
+            env_vars: vec![
+                ("HOME".into(), None),
+                ("PATH".into(), None),
+                ("VIRTUAL_ENV".into(), None),
+            ],
         })
     }
 

@@ -1,0 +1,238 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF069 Unreliable floating point equality comparison `x == 0.0`
+  --> RUF069.py:12:8
+   |
+11 | # errors
+12 | assert x == 0.0
+   |        ^^^^^^^^
+13 | print(3.14 != a)
+14 | if x == 0.3: ...
+   |
+
+RUF069 Unreliable floating point equality comparison `3.14 != a`
+  --> RUF069.py:13:7
+   |
+11 | # errors
+12 | assert x == 0.0
+13 | print(3.14 != a)
+   |       ^^^^^^^^^
+14 | if x == 0.3: ...
+15 | if x ==       0.42: ...
+   |
+
+RUF069 Unreliable floating point equality comparison `x == 0.3`
+  --> RUF069.py:14:4
+   |
+12 | assert x == 0.0
+13 | print(3.14 != a)
+14 | if x == 0.3: ...
+   |    ^^^^^^^^
+15 | if x ==       0.42: ...
+   |
+
+RUF069 Unreliable floating point equality comparison `x == 0.42`
+  --> RUF069.py:15:4
+   |
+13 | print(3.14 != a)
+14 | if x == 0.3: ...
+15 | if x ==       0.42: ...
+   |    ^^^^^^^^^^^^^^^
+   |
+
+RUF069 Unreliable floating point equality comparison `a == b - 0.1`
+  --> RUF069.py:19:12
+   |
+18 | def foo(a, b):
+19 |     return a == b - 0.1
+   |            ^^^^^^^^^^^^
+20 |
+21 | print(x == 3.0 == 3.0)
+   |
+
+RUF069 Unreliable floating point equality comparison `x == 3.0`
+  --> RUF069.py:21:7
+   |
+19 |     return a == b - 0.1
+20 |
+21 | print(x == 3.0 == 3.0)
+   |       ^^^^^^^^
+22 | print(1.0 == x == 2)
+   |
+
+RUF069 Unreliable floating point equality comparison `3.0 == 3.0`
+  --> RUF069.py:21:12
+   |
+19 |     return a == b - 0.1
+20 |
+21 | print(x == 3.0 == 3.0)
+   |            ^^^^^^^^^^
+22 | print(1.0 == x == 2)
+   |
+
+RUF069 Unreliable floating point equality comparison `1.0 == x`
+  --> RUF069.py:22:7
+   |
+21 | print(x == 3.0 == 3.0)
+22 | print(1.0 == x == 2)
+   |       ^^^^^^^^
+23 |
+24 | assert x == float(1)
+   |
+
+RUF069 Unreliable floating point equality comparison `x == float(1)`
+  --> RUF069.py:24:8
+   |
+22 | print(1.0 == x == 2)
+23 |
+24 | assert x == float(1)
+   |        ^^^^^^^^^^^^^
+25 | assert (a + b) == 1.0
+26 | assert -x == 1.0
+   |
+
+RUF069 Unreliable floating point equality comparison `a + b == 1.0`
+  --> RUF069.py:25:9
+   |
+24 | assert x == float(1)
+25 | assert (a + b) == 1.0
+   |         ^^^^^^^^^^^^^
+26 | assert -x == 1.0
+27 | assert -x == -1.0
+   |
+
+RUF069 Unreliable floating point equality comparison `-x == 1.0`
+  --> RUF069.py:26:8
+   |
+24 | assert x == float(1)
+25 | assert (a + b) == 1.0
+26 | assert -x == 1.0
+   |        ^^^^^^^^^
+27 | assert -x == -1.0
+28 | assert x**2 == 4.0
+   |
+
+RUF069 Unreliable floating point equality comparison `-x == -1.0`
+  --> RUF069.py:27:8
+   |
+25 | assert (a + b) == 1.0
+26 | assert -x == 1.0
+27 | assert -x == -1.0
+   |        ^^^^^^^^^^
+28 | assert x**2 == 4.0
+29 | assert x / 2 == 1.5
+   |
+
+RUF069 Unreliable floating point equality comparison `x**2 == 4.0`
+  --> RUF069.py:28:8
+   |
+26 | assert -x == 1.0
+27 | assert -x == -1.0
+28 | assert x**2 == 4.0
+   |        ^^^^^^^^^^^
+29 | assert x / 2 == 1.5
+30 | assert (y := x + 1.0) == 2.0
+   |
+
+RUF069 Unreliable floating point equality comparison `x / 2 == 1.5`
+  --> RUF069.py:29:8
+   |
+27 | assert -x == -1.0
+28 | assert x**2 == 4.0
+29 | assert x / 2 == 1.5
+   |        ^^^^^^^^^^^^
+30 | assert (y := x + 1.0) == 2.0
+   |
+
+RUF069 Unreliable floating point equality comparison `y := x + 1.0 == 2.0`
+  --> RUF069.py:30:9
+   |
+28 | assert x**2 == 4.0
+29 | assert x / 2 == 1.5
+30 | assert (y := x + 1.0) == 2.0
+   |         ^^^^^^^^^^^^^^^^^^^^
+31 |
+32 | [i for i in range(10) if i == 1.0]
+   |
+
+RUF069 Unreliable floating point equality comparison `i == 1.0`
+  --> RUF069.py:32:26
+   |
+30 | assert (y := x + 1.0) == 2.0
+31 |
+32 | [i for i in range(10) if i == 1.0]
+   |                          ^^^^^^^^
+33 | {i for i in range(10) if i != 2.0}
+   |
+
+RUF069 Unreliable floating point equality comparison `i != 2.0`
+  --> RUF069.py:33:26
+   |
+32 | [i for i in range(10) if i == 1.0]
+33 | {i for i in range(10) if i != 2.0}
+   |                          ^^^^^^^^
+34 |
+35 | assert x / 2 == 1
+   |
+
+RUF069 Unreliable floating point equality comparison `x / 2 == 1`
+  --> RUF069.py:35:8
+   |
+33 | {i for i in range(10) if i != 2.0}
+34 |
+35 | assert x / 2 == 1
+   |        ^^^^^^^^^^
+36 | assert (x / 2) == (y / 3)
+   |
+
+RUF069 Unreliable floating point equality comparison `x / 2 == y / 3`
+  --> RUF069.py:36:9
+   |
+35 | assert x / 2 == 1
+36 | assert (x / 2) == (y / 3)
+   |         ^^^^^^^^^^^^^^^^
+37 |
+38 | # ok
+   |
+
+RUF069 Unreliable floating point equality comparison `a == b * float("2")`
+  --> RUF069.py:42:12
+   |
+41 | def foo(a, b):
+42 |     return a == b * float("2")
+   |            ^^^^^^^^^^^^^^^^^^^
+43 |
+44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+   |
+
+RUF069 Unreliable floating point equality comparison `complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)`
+  --> RUF069.py:44:8
+   |
+42 |     return a == b * float("2")
+43 |
+44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 |
+46 | assert (y := x / 2) == 1
+   |
+
+RUF069 Unreliable floating point equality comparison `y := x / 2 == 1`
+  --> RUF069.py:46:9
+   |
+44 | assert complex(0.3, 0.2) == complex(0.1 + 0.2, 0.1 + 0.1)
+45 |
+46 | assert (y := x / 2) == 1
+   |         ^^^^^^^^^^^^^^^^
+47 |
+48 | assert (0.3 if x > 0 else 1) == 0.1 + 0.2
+   |
+
+RUF069 Unreliable floating point equality comparison `0.3 if x > 0 else 1 == 0.1 + 0.2`
+  --> RUF069.py:48:9
+   |
+46 | assert (y := x / 2) == 1
+47 |
+48 | assert (0.3 if x > 0 else 1) == 0.1 + 0.2
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |

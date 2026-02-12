@@ -118,6 +118,7 @@ insta = { version = "1.35.1" }
 insta-cmd = { version = "0.6.0" }
 is-macro = { version = "0.3.5" }
 is-wsl = { version = "0.4.0" }
+is_executable = { version = "1.0.5" }
 itertools = { version = "0.14.0" }
 jiff = { version = "0.2.0" }
 jod-thread = { version = "1.0.0" }
@@ -154,7 +155,7 @@ regex-syntax = { version = "0.8.8" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "e9b9ddd4bec50ac777e9353bbb8f1180e5669d89", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "53421c2fff87426fa0bb51cab06632b87646de13", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -210,6 +211,7 @@ uuid = { version = "1.6.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 walkdir = { version = "2.3.2" }
 wasm-bindgen = { version = "0.2.92" }
 wasm-bindgen-test = { version = "0.3.42" }
+which = { version = "8.0.0" }
 wild = { version = "2" }
 zip = { version = "0.6.6", default-features = false }
 

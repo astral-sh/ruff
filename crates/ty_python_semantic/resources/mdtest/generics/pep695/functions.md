@@ -85,13 +85,11 @@ def takes_in_protocol[T](x: CanIndex[T]) -> T:
 
 def deep_list(x: list[str]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[str]
-    # TODO: revealed: str
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_list(x: list[set[str]]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[set[str]]
-    # TODO: revealed: set[str]
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
@@ -124,12 +122,10 @@ class Sub(list[int]): ...
 class GenericSub[T](list[T]): ...
 
 reveal_type(takes_in_list(Sub()))  # revealed: list[int]
-# TODO: revealed: int
-reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
+reveal_type(takes_in_protocol(Sub()))  # revealed: int
 
 reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
-# TODO: revealed: str
-reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
+reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub[T](ExplicitlyImplements[T]): ...
@@ -670,6 +666,20 @@ def _(x: list[int], y: dict[int, int]):
     reveal_type(h(y))  # revealed: int | None
 ```
 
+## Bounded typevar call context through a union
+
+Regression test for an `invalid-assignment` false positive: `list(items)` should be assignable to
+`list[str] | list[int]` when `items` has type `list[T]` and `T: int`.
+
+```py
+def test[T: int](items: list[T]) -> list[T]:
+    ok1: list[str] | list[int] = list(items)
+    ok2: list[int] | list[str] = list(items)
+
+    bad: list[str] | list[bytes] = list(items)  # error: [invalid-assignment]
+    return items
+```
+
 ## Nested functions see typevars bound in outer function
 
 ```py
@@ -972,7 +982,9 @@ TMsg = TypeVar("TMsg", bound=Msg)
 class Builder(Generic[TMsg]):
     def build(self) -> Stream[TMsg]:
         stream: Stream[TMsg] = Stream()
-        # TODO: no error
+        # `Stream` is invariant, so `Stream[Msg]` is not a supertype of `Stream[TMsg]`;
+        # therefore `_handler` is not compatible with `apply` here.
+        # error: [invalid-argument-type]
         # error: [invalid-assignment]
         stream = stream.apply(self._handler)
         return stream
@@ -1002,6 +1014,62 @@ def _(keys: list[str]):
     # TODO: revealed: int
     # revealed: Unknown | Literal[0]
     reveal_type(reduce(lambda total, k: total + len(k), keys, 0))
+```
+
+## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
+
+A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
+the actual TypeVar is equivalent to at least one constraint of the formal TypeVar. This commonly
+arises when wrapping functions from external packages that define private TypeVars with the same
+constraints.
+
+See: <https://github.com/astral-sh/ty/issues/2728>
+
+```py
+def callee[T: (int, str)](x: T) -> T:
+    return x
+
+def caller[S: (int, str)](x: S) -> S:
+    return callee(x)
+
+reveal_type(caller(1))  # revealed: int
+reveal_type(caller("hello"))  # revealed: str
+```
+
+A constrained TypeVar with a subset of constraints is also compatible:
+
+```py
+def wide[T: (int, str, bytes)](x: T) -> T:
+    return x
+
+def narrow[S: (int, str)](x: S) -> S:
+    return wide(x)
+
+reveal_type(narrow(1))  # revealed: int
+reveal_type(narrow("hello"))  # revealed: str
+```
+
+But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
+
+```py
+def target[T: (int, str)](x: T) -> T:
+    return x
+
+def source[U: (int, bytes)](x: U) -> U:
+    return target(x)  # error: [invalid-argument-type]
+```
+
+We require equivalence rather than mere assignability when matching constraints. Constrained
+TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a
+strict subtype would be unsound. For example, a function constrained to `(int, str)` may narrow `T`
+to `int` and return `int(x)`, which would violate a caller's `bool` constraint:
+
+```py
+def f[T: (int, str)](x: T) -> T:
+    return x
+
+def g[S: (bool, str)](x: S) -> S:
+    return f(x)  # error: [invalid-argument-type]
 ```
 
 [implies_subtype_of]: ../../type_properties/implies_subtype_of.md

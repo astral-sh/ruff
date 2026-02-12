@@ -200,6 +200,6 @@ We should only report the specific error for the incompatible variant (`invalid-
 ```py
 def _(x: bytes | str | int):
     # error: [invalid-argument-type]
-    # error: [possibly-missing-attribute]
+    # error: [unresolved-attribute]
     x.split(" ")
 ```

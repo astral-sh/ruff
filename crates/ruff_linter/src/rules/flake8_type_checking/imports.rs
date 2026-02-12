@@ -1,4 +1,4 @@
-use ruff_python_semantic::{AnyImport, Binding, ResolvedReferenceId};
+use ruff_python_semantic::{AnyImport, Binding, ResolvedReference, ResolvedReferenceId};
 use ruff_text_size::{Ranged, TextRange};
 
 /// An import with its surrounding context.
@@ -15,6 +15,8 @@ pub(crate) struct ImportBinding<'a> {
     pub(crate) parent_range: Option<TextRange>,
     /// Whether the binding needs `from __future__ import annotations` to be imported.
     pub(crate) needs_future_import: bool,
+    /// A runtime reference to this import, used for diagnostic annotations.
+    pub(crate) runtime_reference: Option<&'a ResolvedReference>,
 }
 
 impl Ranged for ImportBinding<'_> {

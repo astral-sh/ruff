@@ -26,7 +26,7 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 
     let definition_targets = goto_target
         .get_definition_targets(&model, ReferencesMode::Rename.to_import_alias_resolution())?
-        .declaration_targets(db)?;
+        .declaration_targets(&model, &goto_target)?;
 
     for target in &definition_targets {
         let target_file = target.file();
@@ -339,6 +339,47 @@ class DataProcessor:
           |            ----
           |
         ");
+    }
+
+    #[test]
+    fn multi_file_parameter_rename_updates_keyword_argument_labels() {
+        let test = CursorTest::builder()
+            .source(
+                "example_rename_2.py",
+                "
+class ExampleClass:
+    def __init__(self, <CURSOR>old_name: str) -> None:
+        self.old_name = old_name
+",
+            )
+            .source(
+                "example_rename.py",
+                r#"
+from example_rename_2 import ExampleClass
+
+instance = ExampleClass(old_name="test")
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("new_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> example_rename_2.py:3:24
+          |
+        2 | class ExampleClass:
+        3 |     def __init__(self, old_name: str) -> None:
+          |                        ^^^^^^^^
+        4 |         self.old_name = old_name
+          |                         --------
+          |
+         ::: example_rename.py:4:25
+          |
+        2 | from example_rename_2 import ExampleClass
+        3 |
+        4 | instance = ExampleClass(old_name="test")
+          |                         --------
+          |
+        "#);
     }
 
     #[test]
@@ -1488,20 +1529,21 @@ result = func(10, y=20)
             )
             .build();
 
-        // TODO(submodule-imports): this is incorrect, we should rename the `subpkg` int
-        // and the RHS of the import statement (but *not* rename the LHS).
-        //
-        // However us being cautious here *would* be good as the rename will actually
-        // result in a `subpkg` variable still existing in this code, as the import's LHS
-        // `DefinitionKind::ImportFromSubmodule` would stop being overwritten by the RHS!
+        // Includes import binding and underlying definition in one rename set.
         assert_snapshot!(test.rename("mypkg"), @"
-        info[rename]: Rename symbol (found 1 locations)
-         --> mypackage/__init__.py:4:5
+        info[rename]: Rename symbol (found 3 locations)
+         --> mypackage/__init__.py:2:21
           |
         2 | from .subpkg import subpkg
+          |                     ^^^^^^
         3 |
         4 | x = subpkg
-          |     ^^^^^^
+          |     ------
+          |
+         ::: mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
           |
         ");
     }
@@ -1536,23 +1578,31 @@ result = func(10, y=20)
             .build();
 
         assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 3 locations)
-         --> lib.py:5:5
-          |
-        4 | @overload
-        5 | def test() -> None: ...
-          |     ^^^^
-        6 | @overload
-        7 | def test(a: str) -> str: ...
-          |
-         ::: main.py:2:17
-          |
-        2 | from lib import test
-          |                 ----
-        3 |
-        4 | test("test")
-          | ----
-          |
+        info[rename]: Rename symbol (found 6 locations)
+          --> lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ^^^^
+         6 | @overload
+         7 | def test(a: str) -> str: ...
+           |     ----
+         8 | @overload
+         9 | def test(a: int) -> int: ...
+           |     ----
+        10 |
+        11 | def test(a: Any) -> Any:
+           |     ----
+        12 |     return a
+           |
+          ::: main.py:2:17
+           |
+         2 | from lib import test
+           |                 ----
+         3 |
+         4 | test("test")
+           | ----
+           |
         "#);
     }
 
@@ -1588,23 +1638,31 @@ result = func(10, y=20)
             .build();
 
         assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 2 locations)
-         --> lib.py:6:9
-          |
-        4 | class Test:
-        5 |     @overload
-        6 |     def test() -> None: ...
-          |         ^^^^
-        7 |     @overload
-        8 |     def test(a: str) -> str: ...
-          |
-         ::: main.py:4:8
-          |
-        2 | from lib import Test
-        3 |
-        4 | Test().test("test")
-          |        ----
-          |
+        info[rename]: Rename symbol (found 5 locations)
+          --> lib.py:6:9
+           |
+         4 | class Test:
+         5 |     @overload
+         6 |     def test() -> None: ...
+           |         ^^^^
+         7 |     @overload
+         8 |     def test(a: str) -> str: ...
+           |         ----
+         9 |     @overload
+        10 |     def test(a: int) -> int: ...
+           |         ----
+        11 |
+        12 |     def test(a: Any) -> Any:
+           |         ----
+        13 |         return a
+           |
+          ::: main.py:4:8
+           |
+         2 | from lib import Test
+         3 |
+         4 | Test().test("test")
+           |        ----
+           |
         "#);
     }
 
@@ -1637,8 +1695,9 @@ result = func(10, y=20)
             )
             .build();
 
+        // Includes all overload declarations plus implementation from usage-site rename.
         assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 3 locations)
+       info[rename]: Rename symbol (found 6 locations)
          --> main.py:2:17
           |
         2 | from lib import test
@@ -1654,6 +1713,14 @@ result = func(10, y=20)
           |     ----
         6 | @overload
         7 | def test(a: str) -> str: ...
+          |     ----
+        8 | @overload
+        9 | def test(a: int) -> int: ...
+          |     ----
+       10 |
+       11 | def test(a: Any) -> Any:
+          |     ----
+       12 |     return a
           |
         "#);
     }

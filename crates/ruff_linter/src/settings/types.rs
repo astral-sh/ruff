@@ -16,7 +16,7 @@ use strum_macros::EnumIter;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
-use ruff_python_ast::{self as ast, PySourceType};
+use ruff_python_ast::{self as ast, PySourceType, SourceType};
 
 use crate::Applicability;
 use crate::registry::RuleSet;
@@ -428,6 +428,7 @@ pub enum Language {
     Python,
     Pyi,
     Ipynb,
+    Markdown,
 }
 
 impl FromStr for Language {
@@ -438,6 +439,7 @@ impl FromStr for Language {
             "python" => Ok(Self::Python),
             "pyi" => Ok(Self::Pyi),
             "ipynb" => Ok(Self::Ipynb),
+            "md" => Ok(Self::Markdown),
             _ => {
                 bail!("Unrecognized language: `{s}`. Expected one of `python`, `pyi`, or `ipynb`.")
             }
@@ -445,12 +447,13 @@ impl FromStr for Language {
     }
 }
 
-impl From<Language> for PySourceType {
+impl From<Language> for SourceType {
     fn from(value: Language) -> Self {
         match value {
-            Language::Python => Self::Python,
-            Language::Ipynb => Self::Ipynb,
-            Language::Pyi => Self::Stub,
+            Language::Python => Self::Python(PySourceType::Python),
+            Language::Ipynb => Self::Python(PySourceType::Ipynb),
+            Language::Pyi => Self::Python(PySourceType::Stub),
+            Language::Markdown => Self::Markdown,
         }
     }
 }
@@ -504,6 +507,22 @@ impl ExtensionMapping {
     /// Return the [`Language`] for a given file extension.
     pub fn get_extension(&self, ext: &str) -> Option<Language> {
         self.0.get(ext).copied()
+    }
+
+    /// Return a mapped [`SourceType`] for a given path.
+    pub fn get_source_type(&self, path: &Path) -> SourceType {
+        match self.get(path) {
+            None => SourceType::from(path),
+            Some(language) => SourceType::from(language),
+        }
+    }
+
+    /// Return a mapped [`SourceType`] for a given file extension.
+    pub fn get_source_type_by_extension(&self, ext: &str) -> SourceType {
+        match self.get_extension(ext) {
+            None => SourceType::from_extension(ext),
+            Some(language) => SourceType::from(language),
+        }
     }
 }
 
@@ -578,7 +597,6 @@ impl Display for OutputFormat {
 
 /// The subset of output formats only implemented in Ruff, not in `ruff_db` via `DisplayDiagnostics`.
 pub enum RuffOutputFormat {
-    Github,
     Grouped,
     Sarif,
 }
@@ -597,7 +615,7 @@ impl TryFrom<OutputFormat> for DiagnosticFormat {
             OutputFormat::Pylint => Ok(DiagnosticFormat::Pylint),
             OutputFormat::Rdjson => Ok(DiagnosticFormat::Rdjson),
             OutputFormat::Azure => Ok(DiagnosticFormat::Azure),
-            OutputFormat::Github => Err(RuffOutputFormat::Github),
+            OutputFormat::Github => Ok(DiagnosticFormat::Github),
             OutputFormat::Grouped => Err(RuffOutputFormat::Grouped),
             OutputFormat::Sarif => Err(RuffOutputFormat::Sarif),
         }

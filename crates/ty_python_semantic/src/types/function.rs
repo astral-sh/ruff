@@ -799,8 +799,7 @@ impl<'db> FunctionLiteral<'db> {
     /// statements, or if it is a `Protocol` method that only has a docstring,
     /// or if it is a `Protocol` method whose body only consists of a single
     /// `raise NotImplementedError` statement.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn as_abstract_method(
+    pub(super) fn as_abstract_method(
         self,
         db: &'db dyn Db,
         enclosing_class: ClassType<'db>,
@@ -808,30 +807,53 @@ impl<'db> FunctionLiteral<'db> {
         if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
             return Some(AbstractMethodKind::Explicit);
         }
-        let definition = self.definition(db);
-        let file = definition.file(db);
-        if file.is_stub(db) {
+        if self.definition(db).file(db).is_stub(db) {
             return None;
         }
         if !enclosing_class.is_protocol(db) {
             return None;
         }
-        let (_, implementation) = self.overloads_and_implementation(db);
-        let Some(implementation) = implementation else {
-            return Some(AbstractMethodKind::ImplicitDueToStubBody);
-        };
-        let module = parsed_module(db, file).load(db);
-        let node = implementation.node(db, file, &module);
-        let body_kind = function_body_kind(db, node, |expr| {
-            definition_expression_type(db, definition, expr)
-        });
-        match body_kind {
+        match self.body_kind(db) {
             FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
             FunctionBodyKind::AlwaysRaisesNotImplementedError => {
                 Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
             }
             FunctionBodyKind::Regular => None,
         }
+    }
+
+    /// Returns the [`FunctionBodyKind`] of this function.
+    ///
+    /// For functions without an implementation (e.g., overloaded functions),
+    /// returns [`FunctionBodyKind::Stub`].
+    #[salsa::tracked]
+    fn body_kind(self, db: &'db dyn Db) -> FunctionBodyKind {
+        let (_, implementation) = self.overloads_and_implementation(db);
+        let Some(implementation) = implementation else {
+            return FunctionBodyKind::Stub;
+        };
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let node = implementation.node(db, file, &module);
+        function_body_kind(db, node, |expr| {
+            definition_expression_type(db, definition, expr)
+        })
+    }
+
+    /// Returns `true` if this function has a trivial body.
+    ///
+    /// A trivial body is one that consists only of `...`, `pass`, or
+    /// `raise NotImplementedError`.
+    ///
+    /// Methods defined in stub files are never considered to have trivial bodies,
+    /// since stubs use `...` as a placeholder regardless of the runtime implementation.
+    pub(crate) fn has_trivial_body(self, db: &'db dyn Db) -> bool {
+        !self.definition(db).file(db).is_stub(db)
+            && matches!(
+                self.body_kind(db),
+                FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
+            )
     }
 }
 
@@ -1074,6 +1096,11 @@ impl<'db> FunctionType<'db> {
     /// a diagnostic.
     pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.literal(db).spans(db)
+    }
+
+    /// Returns `true` if this function has a trivial body.
+    pub(crate) fn has_trivial_body(self, db: &'db dyn Db) -> bool {
+        self.literal(db).has_trivial_body(db)
     }
 
     /// Returns all of the overload signatures and the implementation definition, if any, of this
@@ -1573,6 +1600,8 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.reveal_mro`
     RevealMro,
+    /// `struct.unpack`
+    Unpack,
 }
 
 impl KnownFunction {
@@ -1589,6 +1618,14 @@ impl KnownFunction {
         definition: Definition<'db>,
         name: &str,
     ) -> Option<Self> {
+        // Special case: `__dataclass_transform__` is recognized as `DataclassTransform`
+        // regardless of module, for backwards compatibility with earlier versions of the
+        // `dataclass_transform` specification. This matches pyright's behavior:
+        // https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
+        if name == "__dataclass_transform__" {
+            return Some(Self::DataclassTransform);
+        }
+
         let candidate = Self::from_str(name).ok()?;
         candidate
             .check_module(file_to_module(db, definition.file(db))?.known(db)?)
@@ -1646,6 +1683,9 @@ impl KnownFunction {
             | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
+            Self::Unpack => {
+                matches!(module, KnownModule::Struct)
+            }
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
             Self::NamedTuple => matches!(module, KnownModule::Collections),
@@ -1839,8 +1879,8 @@ impl KnownFunction {
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                 if source_type.is_equivalent_to(db, *casted_type)
-                    && !any_over_type(db, *source_type, &contains_unknown_or_todo, true)
-                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo, true)
+                    && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
+                    && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         let source_display = source_type.display(db).to_string();
@@ -2256,6 +2296,7 @@ pub(crate) mod tests {
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,
                 KnownFunction::TotalOrdering => KnownModule::Functools,
+                KnownFunction::Unpack => KnownModule::Struct,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

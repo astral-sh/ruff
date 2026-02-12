@@ -6,7 +6,7 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
-use ruff_python_ast::name::Name;
+use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
@@ -38,47 +38,45 @@ pub fn completion<'db>(
     let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
         return vec![];
     };
+    let model = SemanticModel::new(db, file);
     let query = UserQuery::fuzzy(context.cursor.typed);
-    let mut completions = Completions::new(db, context.collection_context(db), query);
+    let mut completions = Completions::new(db, context.collection_context(db, &model), query);
     match context.kind {
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
         }
-        ContextKind::NonImport(ref non_import) => {
-            let model = SemanticModel::new(db, file);
-            match non_import.target {
-                CompletionTargetAst::ObjectDot { expr } => {
-                    completions.extend(model.attribute_completions(expr));
+        ContextKind::NonImport(ref non_import) => match non_import.target {
+            CompletionTargetAst::ObjectDot { expr } => {
+                completions.extend(model.attribute_completions(expr));
+            }
+            CompletionTargetAst::Scoped(scoped) => {
+                for semantic_completion in model.scoped_completions(scoped.node) {
+                    let module_dependency_kind = if semantic_completion.builtin {
+                        ModuleDependencyKind::Builtin
+                    } else {
+                        ModuleDependencyKind::Current
+                    };
+                    completions.add(
+                        CompletionBuilder::from_semantic_completion(db, semantic_completion)
+                            .module_dependency_kind(module_dependency_kind),
+                    );
                 }
-                CompletionTargetAst::Scoped(scoped) => {
-                    for semantic_completion in model.scoped_completions(scoped.node) {
-                        let module_dependency_kind = if semantic_completion.builtin {
-                            ModuleDependencyKind::Builtin
-                        } else {
-                            ModuleDependencyKind::Current
-                        };
-                        completions.add(
-                            CompletionBuilder::from_semantic_completion(db, semantic_completion)
-                                .module_dependency_kind(module_dependency_kind),
-                        );
-                    }
-                    add_keyword_completions(db, &mut completions);
-                    add_argument_completions(db, &model, &context.cursor, &mut completions);
-                    if settings.auto_import {
-                        add_unimported_completions(
-                            db,
-                            file,
-                            &parsed,
-                            scoped,
-                            |module_name: &ModuleName, symbol: &str| {
-                                ImportRequest::import_from(module_name.as_str(), symbol)
-                            },
-                            &mut completions,
-                        );
-                    }
+                add_keyword_completions(db, &mut completions);
+                add_argument_completions(db, &model, &context.cursor, &mut completions);
+                if settings.auto_import {
+                    add_unimported_completions(
+                        db,
+                        file,
+                        &parsed,
+                        scoped,
+                        |module_name: &ModuleName, symbol: &str| {
+                            ImportRequest::import_from(module_name.as_str(), symbol)
+                        },
+                        &mut completions,
+                    );
                 }
             }
-        }
+        },
     }
 
     completions.into_completions()
@@ -305,6 +303,7 @@ impl<'db> Completion<'db> {
 
 /// A builder for construction a `Completion`.
 #[derive(Debug)]
+#[expect(clippy::struct_excessive_bools)]
 struct CompletionBuilder<'db> {
     // See comments on `Completion` for the meaning of fields.
     name: Name,
@@ -319,6 +318,7 @@ struct CompletionBuilder<'db> {
     is_type_check_only: bool,
     documentation: Option<Docstring>,
     module_dependency_kind: Option<ModuleDependencyKind>,
+    deprecated: bool,
 }
 
 impl<'db> CompletionBuilder<'db> {
@@ -341,6 +341,7 @@ impl<'db> CompletionBuilder<'db> {
             is_type_check_only: false,
             documentation: None,
             module_dependency_kind: None,
+            deprecated: false,
         }
     }
 
@@ -402,7 +403,7 @@ impl<'db> CompletionBuilder<'db> {
             if let Some(exception_ty) = ctx.exception_ty {
                 self.is_context_specific |= ty.is_assignable_to(db, exception_ty);
             }
-            if ctx.is_in_class_def {
+            if ctx.is_in_class_def() {
                 self.is_context_specific |= ty.is_class_literal()
                     || matches!(
                         ty,
@@ -414,6 +415,8 @@ impl<'db> CompletionBuilder<'db> {
                         )
                     );
             }
+
+            self.deprecated = ty.is_deprecated(db);
         }
         let kind = self
             .kind
@@ -462,6 +465,11 @@ impl<'db> CompletionBuilder<'db> {
 
     fn import(mut self, edit: impl Into<Option<Edit>>) -> CompletionBuilder<'db> {
         self.import = edit.into();
+        self
+    }
+
+    fn deprecated(mut self, deprecated: bool) -> CompletionBuilder<'db> {
+        self.deprecated = deprecated;
         self
     }
 
@@ -602,15 +610,30 @@ impl<'m> Context<'m> {
     }
 
     /// Returns a filtering context for use with a completion collector.
-    fn collection_context<'db>(&self, db: &'db dyn Db) -> CollectionContext<'db> {
+    fn collection_context<'db>(
+        &self,
+        db: &'db dyn Db,
+        model: &SemanticModel<'db>,
+    ) -> CollectionContext<'db> {
         match self.kind {
             ContextKind::Import(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
                 let exception_ty = self.cursor.exception_ty(db);
+                let existing_class_bases = self.cursor.enclosing_class_def().map(|class_def| {
+                    let mut bases = extract_base_class_names(class_def);
+                    // Exclude the class being defined from its own base class
+                    // completions, unless the name was previously bound in the
+                    // same scope (in which case the bases refer to the prior
+                    // definition).
+                    if !model.is_class_name_reassigned(class_def) {
+                        bases.insert(class_def.name.id.clone());
+                    }
+                    bases
+                });
                 CollectionContext {
                     exception_ty,
                     is_raising_exception: exception_ty.is_some(),
-                    is_in_class_def: self.cursor.is_in_class_def(),
+                    existing_class_bases,
                     valid_keywords: self.cursor.valid_keywords(),
                 }
             }
@@ -857,23 +880,24 @@ impl<'m> ContextCursor<'m> {
         None
     }
 
-    /// Returns true when the curser is within the
-    /// arguments node of a class definition.
+    /// Returns the class definition if the cursor is within its
+    /// arguments node.
     ///
     /// E.g. `class Foo(Bar<CURSOR>)`
-    fn is_in_class_def(&self) -> bool {
+    fn enclosing_class_def(&self) -> Option<&'m ast::StmtClassDef> {
         for node in self.covering_node.ancestors() {
             if let ast::AnyNodeRef::StmtClassDef(class_def) = node {
                 return class_def
                     .arguments
                     .as_ref()
-                    .is_some_and(|args| args.range.contains_range(self.range));
+                    .is_some_and(|args| args.range.contains_range(self.range))
+                    .then_some(class_def);
             }
             if node.is_statement() {
-                return false;
+                return None;
             }
         }
-        false
+        None
     }
 
     /// Returns a set of keywords that are valid at
@@ -1066,8 +1090,11 @@ struct CollectionContext<'db> {
     exception_ty: Option<Type<'db>>,
     /// Whether we're in an exception context (`raise` or `except`) or not.
     is_raising_exception: bool,
-    /// Whether we're in a class definition context or not.
-    is_in_class_def: bool,
+    /// Names of base classes that are already specified in the class definition,
+    /// including the class being defined (unless its name was previously bound).
+    /// Used to filter out duplicate and self-referential base class suggestions.
+    /// This is only `Some` when we're in a class definition context.
+    existing_class_bases: Option<FxHashSet<Name>>,
     /// When set, the context dictates that only *these* keywords
     /// are acceptable in this context.
     valid_keywords: Option<FxHashSet<&'static str>>,
@@ -1081,6 +1108,11 @@ impl<'db> CollectionContext<'db> {
     /// the "none" context does no additional filtering.
     fn none() -> CollectionContext<'db> {
         CollectionContext::default()
+    }
+
+    /// Whether we're in a class definition context.
+    fn is_in_class_def(&self) -> bool {
+        self.existing_class_bases.is_some()
     }
 
     /// Whether the completion that would be built from the
@@ -1097,8 +1129,35 @@ impl<'db> CollectionContext<'db> {
         {
             return !valid_keywords.contains(builder.name.as_str());
         }
+        // Exclude classes that are already listed as base classes in the class definition.
+        if let Some(ref existing_class_bases) = self.existing_class_bases {
+            // For in-scope completions, check if the simple name matches.
+            if builder.import.is_none() && existing_class_bases.contains(&builder.name) {
+                return true;
+            }
+            // For auto-import completions, check if the qualified name matches.
+            // This handles cases like `class Foo(mod.Bar, ...)` where we want to
+            // filter out auto-import suggestions for `Bar` from module `mod`.
+            if let Some(ref qualified) = builder.qualified
+                && existing_class_bases.contains(qualified)
+            {
+                return true;
+            }
+        }
         false
     }
+}
+
+/// Extracts the names of base classes from a class definition.
+///
+/// For simple name references (e.g., `Foo`), returns the name as-is.
+/// For attribute accesses (e.g., `mod.Foo`), returns the full dotted path.
+fn extract_base_class_names(class_def: &ast::StmtClassDef) -> FxHashSet<Name> {
+    class_def
+        .bases()
+        .iter()
+        .filter_map(|expr| UnqualifiedName::from_expr(expr).map(|name| Name::new(name.to_string())))
+        .collect()
 }
 
 /// Relevance information assigned to a single completion.
@@ -1163,6 +1222,8 @@ struct Relevance {
     /// Sorts based on whether this symbol is only available during
     /// type checking and not at runtime.
     type_check_only: Sort,
+    /// Deprecated symbols appear lower in the completion result
+    deprecated: Sort,
 }
 
 impl Relevance {
@@ -1209,6 +1270,11 @@ impl Relevance {
             },
             module_dependency_kind: c.module_dependency_kind,
             type_check_only: if c.is_type_check_only {
+                Sort::Lower
+            } else {
+                Sort::Even
+            },
+            deprecated: if c.deprecated {
                 Sort::Lower
             } else {
                 Sort::Even
@@ -1602,6 +1668,7 @@ fn add_unimported_completions<'db>(
                 .kind(symbol.kind().to_completion_kind())
                 .module_name(module_name)
                 .import(import_action.import().cloned())
+                .deprecated(symbol.deprecated())
                 .module_dependency_kind(ModuleDependencyKind::from_module(db, symbol.module())),
         );
     }
@@ -3421,7 +3488,6 @@ class Foo(<CURSOR>):
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
-        Foo
         metaclass=
         ");
     }
@@ -3439,7 +3505,6 @@ class Bar: ...
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
-        Foo
         metaclass=
         ");
     }
@@ -3457,7 +3522,6 @@ class Bar: ...
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
-        Foo
         metaclass=
         ");
     }
@@ -3473,7 +3537,6 @@ class Foo(<CURSOR>",
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
-        Foo
         metaclass=
         ");
     }
@@ -3504,6 +3567,225 @@ class Foo(metaclass=x, meta<CURSOR>",
             .skip_builtins()
             .build()
             .not_contains("metaclass");
+    }
+
+    #[test]
+    fn class_base_excludes_class_being_defined() {
+        let builder = completion_test_builder(
+            "\
+class Foo(<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo");
+    }
+
+    #[test]
+    fn class_base_excludes_class_being_defined_with_typed_text() {
+        let builder = completion_test_builder(
+            "\
+class Foo(Fo<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo");
+    }
+
+    #[test]
+    fn class_base_includes_prior_definition_with_same_name() {
+        // When a class with the same name was previously defined,
+        // the bases refer to the prior definition, so it should
+        // still be offered as a completion.
+        let builder = completion_test_builder(
+            "\
+class Foo: ...
+
+class Foo(<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("Foo");
+    }
+
+    #[test]
+    fn class_base_already_specified() {
+        let builder = completion_test_builder(
+            "\
+class Foo: ...
+class Bar: ...
+
+class Baz(Foo, <CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("Foo")
+            .contains("Bar");
+    }
+
+    #[test]
+    fn class_multiple_bases_already_specified() {
+        let builder = completion_test_builder(
+            "\
+class A: ...
+class B: ...
+class C: ...
+
+class D(A, B, <CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("A")
+            .not_contains("B")
+            .contains("C");
+    }
+
+    #[test]
+    fn class_base_same_name_different_module() {
+        // Even though `Foo` is already a base class, the auto-import suggestion
+        // for `other.Foo` should still be shown since it's a different symbol.
+        // Note: We need to type some characters (e.g., "Fo") to trigger auto-import
+        // suggestions, as empty queries don't generate unimported completions.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+class Foo: ...
+
+class Bar(Foo, Fo<CURSOR>
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // The local Foo should be filtered out (no import required)
+        assert!(
+            !foo_completions.iter().any(|c| c.import.is_none()),
+            "Local `Foo` should be filtered out as it's already a base class"
+        );
+
+        // The auto-import Foo from `other` module should be present
+        assert!(
+            foo_completions.iter().any(|c| c.import.is_some()),
+            "Auto-import `Foo` from other module should still be suggested"
+        );
+    }
+
+    #[test]
+    fn class_base_qualified_already_specified() {
+        // When a qualified base class like `other.Foo` is already specified,
+        // the auto-import suggestion for `Foo` from `other` should be filtered.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+import other
+
+class Bar(other.Foo, Fo<CURSOR>
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // The auto-import Foo from `other` should be filtered since `other.Foo`
+        // is already a base class.
+        assert!(
+            foo_completions.is_empty(),
+            "Auto-import `Foo` from `other` should be filtered since `other.Foo` is already a base"
+        );
+    }
+
+    #[test]
+    fn class_base_qualified_attribute_not_filtered() {
+        // TODO: This test documents a known limitation. When completing attributes
+        // on an already-imported module (e.g., `other.F<CURSOR>`), we don't filter
+        // out classes that are already base classes. This is because attribute
+        // completions don't have `import` or `qualified` set, so we can't match
+        // them against the existing base classes.
+        //
+        // This is a false negative (showing a duplicate that should be hidden),
+        // not a false positive, so it's a minor UX issue rather than a bug.
+        let builder = CursorTest::builder()
+            .source(
+                "other.py",
+                "\
+class Foo: ...
+class Bar: ...
+",
+            )
+            .source(
+                "main.py",
+                "\
+import other
+
+class MyClass(other.Foo, other.F<CURSOR>): pass
+",
+            )
+            .completion_test_builder()
+            .skip_keywords()
+            .skip_builtins();
+        let test = builder.build();
+
+        let foo_completions: Vec<_> = test
+            .completions()
+            .iter()
+            .filter(|c| c.name == "Foo")
+            .collect();
+
+        // Ideally this would be empty since `other.Foo` is already a base class,
+        // but we don't currently filter attribute completions on imported modules.
+        assert_eq!(
+            foo_completions.len(),
+            1,
+            "Foo is not filtered out (known limitation)"
+        );
     }
 
     #[test]

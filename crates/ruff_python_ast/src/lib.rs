@@ -47,6 +47,16 @@ pub enum SourceType {
     Markdown,
 }
 
+impl SourceType {
+    pub fn from_extension(ext: &str) -> Self {
+        match ext {
+            "toml" => Self::Toml(TomlSourceType::Unrecognized),
+            "md" | "qmd" => Self::Markdown,
+            _ => Self::Python(PySourceType::from_extension(ext)),
+        }
+    }
+}
+
 impl Default for SourceType {
     fn default() -> Self {
         Self::Python(PySourceType::Python)
@@ -59,11 +69,12 @@ impl<P: AsRef<Path>> From<P> for SourceType {
             Some(filename) if filename == "pyproject.toml" => Self::Toml(TomlSourceType::Pyproject),
             Some(filename) if filename == "Pipfile" => Self::Toml(TomlSourceType::Pipfile),
             Some(filename) if filename == "poetry.lock" => Self::Toml(TomlSourceType::Poetry),
-            _ => match path.as_ref().extension() {
-                Some(ext) if ext == "toml" => Self::Toml(TomlSourceType::Unrecognized),
-                Some(ext) if ext == "md" => Self::Markdown,
-                _ => Self::Python(PySourceType::from(path)),
-            },
+            _ => Self::from_extension(
+                path.as_ref()
+                    .extension()
+                    .and_then(OsStr::to_str)
+                    .unwrap_or(""),
+            ),
         }
     }
 }

@@ -1,12 +1,12 @@
 use crate::diagnostic::{Diagnostic, FileResolver, Severity};
 
-pub struct GithubRenderer<'a> {
+pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
     program: &'a str,
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
+    pub(super) fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
         Self { resolver, program }
     }
 
@@ -91,26 +91,6 @@ impl<'a> GithubRenderer<'a> {
         }
 
         Ok(())
-    }
-}
-
-pub struct DisplayGithubDiagnostics<'a> {
-    renderer: &'a GithubRenderer<'a>,
-    diagnostics: &'a [Diagnostic],
-}
-
-impl<'a> DisplayGithubDiagnostics<'a> {
-    pub fn new(renderer: &'a GithubRenderer<'a>, diagnostics: &'a [Diagnostic]) -> Self {
-        Self {
-            renderer,
-            diagnostics,
-        }
-    }
-}
-
-impl std::fmt::Display for DisplayGithubDiagnostics<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.renderer.render(f, self.diagnostics)
     }
 }
 

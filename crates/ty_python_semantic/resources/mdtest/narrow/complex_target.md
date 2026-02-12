@@ -334,6 +334,20 @@ def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
         reveal_type(x)  # revealed: tuple[A, Literal["tag1"]]
     else:
         reveal_type(x)  # revealed: tuple[B, Literal["tag2"]]
+
+# Works with reversed equality operands too.
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
+    if "a" == x[0]:
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+
+# Works with reversed inequality operands too.
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
+    if "a" != x[0]:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
 ```
 
 Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the

@@ -241,7 +241,27 @@ reformatted code would produce an invalid Python program.
 
 Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
 the normal Python code formatting style, while any code blocks marked with
-`pyi` will be formatted like Python type stub files.
+`pyi` will be formatted like Python type stub files:
+
+````markdown
+```py
+print("hello")
+```
+
+```pyi
+def foo(): ...
+def bar(): ...
+```
+````
+
+Ruff also supports [Quarto](https://quarto.org/) style executable code blocks
+with curly braces surrounding the language name:
+
+````markdown
+```{python}
+print("hello")
+```
+````
 
 While [formatting suppression](#format-suppression) comments will be handled as
 usual within code blocks, the formatter will also skip formatting any code block
@@ -302,6 +322,17 @@ with [`extend-include`](settings.md#extend-include) in your project settings:
     extend-include = ["docs/*.md"]
     ```
 
+If you run Ruff via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit), Markdown
+support needs to be explicitly included by adding it to `types_or`:
+
+```yaml title=".pre-commit-config.yaml"
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.0
+    hooks:
+      - id: ruff-format
+        types_or: [python, pyi, jupyter, markdown]
+```
 
 ## Format suppression
 

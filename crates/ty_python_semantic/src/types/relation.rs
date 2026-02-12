@@ -383,6 +383,12 @@ impl<'db> Type<'db> {
             // It is a subtype of all other types.
             (Type::Never, _) => ConstraintSet::from(true),
 
+            (Type::TypeVar(self_typevar), Type::TypeVar(other_typevar))
+                if self_typevar.is_same_typevar_as(db, other_typevar) =>
+            {
+                ConstraintSet::from(true)
+            }
+
             // In some specific situations, `Any`/`Unknown`/`@Todo` can be simplified out of unions and intersections,
             // but this is not true for divergent types (and moving this case any lower down appears to cause
             // "too many cycle iterations" panics).

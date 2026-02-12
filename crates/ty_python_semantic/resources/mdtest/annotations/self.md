@@ -323,10 +323,12 @@ class Bar:
     def bar(self: Self, x: Foo[Self]):
         # revealed: bound method Foo[Self@bar].foo() -> Self@bar
         reveal_type(x.foo)
+        reveal_type(x.foo())  # revealed: Self@bar
 
 def f[U: Bar](x: Foo[U]):
     # revealed: bound method Foo[U@f].foo() -> U@f
     reveal_type(x.foo)
+    reveal_type(x.foo())  # revealed: U@f
 ```
 
 ## typing_extensions
@@ -473,9 +475,6 @@ reveal_type(Child.create())  # revealed: Child
 
 ## Attributes
 
-TODO: The use of `Self` to annotate the `next_node` attribute should be
-[modeled as a property][self attribute], using `Self` in its parameter and return type.
-
 ```py
 from typing import Self
 
@@ -485,11 +484,87 @@ class LinkedList:
 
     def next(self: Self) -> Self:
         reveal_type(self.value)  # revealed: int
-        # TODO: no error
-        # error: [invalid-return-type]
         return self.next_node
 
 reveal_type(LinkedList().next())  # revealed: LinkedList
+```
+
+Dataclass fields can also use `Self` in their annotations:
+
+```py
+from dataclasses import dataclass
+from typing import Self
+
+@dataclass
+class Node:
+    parent: Self | None = None
+
+Node(Node())
+```
+
+Attributes annotated with `Self` can be assigned on instances:
+
+```py
+from typing import Self
+
+class MyClass:
+    field: Self | None = None
+
+def _(c: MyClass):
+    c.field = c
+```
+
+Self from class body annotations and method signatures represent the same logical type variable.
+When a method returns an attribute annotated with `Self` in the class body, the class-body `Self`
+and the method's `Self` should be considered the same type, even though they have different binding
+contexts internally:
+
+```py
+from typing import Self
+
+class Chain:
+    next: Self
+    value: int
+
+    def advance(self: Self) -> Self:
+        return self.next
+
+    def advance_twice(self: Self) -> Self:
+        return self.advance().advance()
+
+class SubChain(Chain):
+    extra: str
+
+reveal_type(SubChain().advance())  # revealed: SubChain
+reveal_type(SubChain().advance_twice())  # revealed: SubChain
+```
+
+Self-typed attributes that flow through generic containers should also work:
+
+```py
+from typing import Self
+
+class TreeNode:
+    children: list[Self]
+    parent: Self | None
+
+    def first_child(self) -> Self | None:
+        if self.children:
+            return self.children[0]
+        return None
+
+    def all_descendants(self) -> list[Self]:
+        result: list[Self] = []
+        for child in self.children:
+            result.append(child)
+            result.extend(child.all_descendants())
+        return result
+
+    def root(self) -> Self:
+        node = self
+        while node.parent is not None:
+            node = node.parent
+        return node
 ```
 
 Attributes can also refer to a generic parameter:
@@ -504,6 +579,26 @@ class C(Generic[T]):
     def method(self) -> None:
         reveal_type(self)  # revealed: Self@method
         reveal_type(self.foo)  # revealed: T@C
+```
+
+## Callable attributes that return `Self`
+
+Attributes annotated as callables returning `Self` should bind to the concrete class.
+
+```py
+from typing import Callable, Self
+
+class Factory:
+    maker: Callable[[], Self]
+
+    def __init__(self) -> None:
+        self.maker = lambda: self
+
+class Sub(Factory):
+    pass
+
+def _(s: Sub):
+    reveal_type(s.maker())  # revealed: Sub
 ```
 
 ## Generic Classes
@@ -559,7 +654,39 @@ D[K]().h()
 
 ## Protocols
 
-TODO: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
+See also: <https://typing.python.org/en/latest/spec/generics.html#use-in-protocols>
+
+```py
+from typing import Self, Protocol
+
+class Copyable(Protocol):
+    def copy(self) -> Self: ...
+
+class Linkable(Protocol):
+    next_node: Self
+
+    def advance(self) -> Self:
+        return self.next_node
+
+def _(l: Linkable) -> None:
+    # TODO: Should be `Linkable`
+    reveal_type(l.next_node)  # revealed: @Todo(type[T] for protocols)
+
+class CopyableImpl:
+    def copy(self) -> Self:
+        return self
+
+class SubCopyable(CopyableImpl): ...
+
+def copy_it(x: Copyable) -> None:
+    reveal_type(x.copy())  # revealed: Copyable
+
+def copy_concrete(x: CopyableImpl) -> None:
+    reveal_type(x.copy())  # revealed: CopyableImpl
+
+def copy_sub(x: SubCopyable) -> None:
+    reveal_type(x.copy())  # revealed: SubCopyable
+```
 
 ## Annotations
 
@@ -776,4 +903,77 @@ def _(c: CallableTypeOf[C().method]):
     reveal_type(c)  # revealed: (...) -> None
 ```
 
-[self attribute]: https://typing.python.org/en/latest/spec/generics.html#use-in-attribute-annotations
+## Bound methods stored as instance attributes
+
+Bound methods from other objects stored as instance attributes should not have their signatures
+affected by `Self` type binding. This is a regression test for false positives in projects like
+jinja's `LRUCache`.
+
+```py
+from collections import deque
+
+class MyClass:
+    def __init__(self) -> None:
+        self._queue: deque[int] = deque()
+        self._append = self._queue.append
+
+    def add(self, value: int) -> None:
+        self._append(value)
+```
+
+## Self in class attributes with generic classes
+
+Django-like patterns where a class attribute uses `Self` as a type argument to a generic class. Both
+class access (`Confirmation.objects`) and instance access (`instance.objects`) should properly bind
+`Self` to the concrete class.
+
+```py
+from typing import Self, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Manager(Generic[T]):
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Model:
+    objects: Manager[Self]
+
+class Confirmation(Model):
+    expiry_date: int
+
+def test() -> None:
+    # Class access: Self is bound to Confirmation
+    confirmation = Confirmation.objects.get()
+    reveal_type(confirmation)  # revealed: Confirmation
+    x = confirmation.expiry_date  # Should work - Confirmation has expiry_date
+
+    # Instance access: Self should also be bound to Confirmation
+    instance = Confirmation()
+    reveal_type(instance.objects)  # revealed: Manager[Confirmation]
+    instance_result = instance.objects.get()
+    reveal_type(instance_result)  # revealed: Confirmation
+```
+
+## Self in class attributes with descriptors
+
+`Self` binding should also work when the attribute type involves a descriptor.
+
+```py
+from typing import Self, Generic, TypeVar
+
+T = TypeVar("T")
+
+class Descriptor(Generic[T]):
+    def __get__(self, instance, owner) -> T:
+        raise NotImplementedError
+
+class Base:
+    attr: Descriptor[Self] = Descriptor()
+
+class Child(Base):
+    pass
+
+reveal_type(Child.attr)  # revealed: Child
+reveal_type(Child().attr)  # revealed: Child
+```

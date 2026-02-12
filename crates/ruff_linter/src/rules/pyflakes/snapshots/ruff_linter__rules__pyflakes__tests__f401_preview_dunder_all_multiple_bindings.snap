@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `submodule.baz` imported but unused
+ --> __init__.py:3:8
+  |
+2 | import submodule.bar
+3 | import submodule.baz
+  |        ^^^^^^^^^^^^^
+4 | __all__ = ['submodule']
+5 | FOO = 42
+  |
+help: Remove unused import: `submodule.baz`
+1 | 
+2 | import submodule.bar
+  - import submodule.baz
+3 | __all__ = ['submodule']
+4 | FOO = 42
+note: This is an unsafe fix and may change runtime behavior

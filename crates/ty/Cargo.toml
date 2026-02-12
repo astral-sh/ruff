@@ -14,10 +14,10 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ruff_db = { workspace = true, features = ["os", "cache"] }
+ruff_db = { workspace = true, features = ["os", "cache", "junit"] }
 ruff_python_ast = { workspace = true }
 ty_combine = { workspace = true }
-ty_project = { workspace = true, features = ["zstd"] }
+ty_project = { workspace = true, features = ["zstd", "junit"] }
 ty_python_semantic = { workspace = true }
 ty_server = { workspace = true }
 ty_static = { workspace = true }

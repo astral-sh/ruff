@@ -16,7 +16,6 @@ on:
       - "crates/ruff_python_parser"
       - "scripts/conformance.py"
       - ".github/workflows/typing_conformance.yaml"
-      - ".github/workflows/typing_conformance_comment.yaml"
       - "Cargo.lock"
       - "!**.md"
 
@@ -30,7 +29,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: 08f929ba70397b5c898a55bbb73c8b4e2e8e4fbb
+  CONFORMANCE_SUITE_COMMIT: f98d75ebb241d6f49e1a985a4f259f46b2056626
   PYTHON_VERSION: 3.12
 
 jobs:

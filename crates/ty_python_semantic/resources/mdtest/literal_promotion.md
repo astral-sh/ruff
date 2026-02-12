@@ -261,7 +261,7 @@ Explicitly annotated `Literal` types will prevent literal promotion:
 
 ```py
 from enum import Enum
-from typing_extensions import Literal, LiteralString
+from typing import Sequence, Literal, LiteralString
 
 class Color(Enum):
     RED = "red"
@@ -270,10 +270,9 @@ type Y[T] = list[T]
 
 class X[T]:
     value: T
+    def __init__(self, value: list[T]): ...
 
-    def __init__(self, value: T): ...
-
-def x[T](x: T) -> X[T]:
+def x[T](x: list[T]) -> X[T]:
     return X(x)
 
 x1: list[Literal[1]] = [1]
@@ -294,13 +293,13 @@ reveal_type(x5)  # revealed: list[list[Literal[1]]]
 x6: dict[list[Literal[1]], list[Literal[Color.RED]]] = {[1]: [Color.RED, Color.RED]}
 reveal_type(x6)  # revealed: dict[list[Literal[1]], list[Color]]
 
-x7: X[Literal[1]] = X(1)
+x7: X[Literal[1]] = X([1])
 reveal_type(x7)  # revealed: X[Literal[1]]
 
-x8: X[int] = X(1)
+x8: X[int] = X([1])
 reveal_type(x8)  # revealed: X[int]
 
-x9: dict[list[X[Literal[1]]], set[Literal[b"a"]]] = {[X(1)]: {b"a"}}
+x9: dict[list[X[Literal[1]]], set[Literal[b"a"]]] = {[X([1])]: {b"a"}}
 reveal_type(x9)  # revealed: dict[list[X[Literal[1]]], set[Literal[b"a"]]]
 
 x10: list[Literal[1, 2, 3]] = [1, 2, 3]
@@ -341,10 +340,10 @@ reveal_type(x19)  # revealed: list[Literal[1]]
 x20: list[Literal[1]] | None = [1]
 reveal_type(x20)  # revealed: list[Literal[1]]
 
-x21: X[Literal[1]] | None = X(1)
+x21: X[Literal[1]] | None = X([1])
 reveal_type(x21)  # revealed: X[Literal[1]]
 
-x22: X[Literal[1]] | None = x(1)
+x22: X[Literal[1]] | None = x([1])
 reveal_type(x22)  # revealed: X[Literal[1]]
 ```
 
@@ -362,6 +361,12 @@ reveal_type(x2)  # revealed: list[Literal[1, 2, 3]]
 x3: Iterable[Literal[1, 2, 3]] = [1, 2, 3]
 reveal_type(x3)  # revealed: list[Literal[1, 2, 3]]
 
+x4: Iterable[Literal[1, 2, 3]] = list([1, 2, 3])
+reveal_type(x4)  # revealed: list[Literal[1, 2, 3]]
+
+x5: frozenset[Literal[1]] = frozenset([1])
+reveal_type(x5)  # revealed: frozenset[Literal[1]]
+
 class Sup1[T]:
     value: T
 
@@ -370,17 +375,17 @@ class Sub1[T](Sup1[T]): ...
 def sub1[T](value: T) -> Sub1[T]:
     return Sub1()
 
-x4: Sub1[Literal[1]] = sub1(1)
-reveal_type(x4)  # revealed: Sub1[Literal[1]]
-
-x5: Sup1[Literal[1]] = sub1(1)
-reveal_type(x5)  # revealed: Sub1[Literal[1]]
-
-x6: Sup1[Literal[1]] | None = sub1(1)
+x6: Sub1[Literal[1]] = sub1(1)
 reveal_type(x6)  # revealed: Sub1[Literal[1]]
 
-x7: Sup1[Literal[1]] | None = sub1(1)
+x7: Sup1[Literal[1]] = sub1(1)
 reveal_type(x7)  # revealed: Sub1[Literal[1]]
+
+x8: Sup1[Literal[1]] | None = sub1(1)
+reveal_type(x8)  # revealed: Sub1[Literal[1]]
+
+x9: Sup1[Literal[1]] | None = sub1(1)
+reveal_type(x9)  # revealed: Sub1[Literal[1]]
 
 class Sup2A[T, U]:
     value: tuple[T, U]
@@ -393,12 +398,69 @@ class Sub2[T, U](Sup2A[T, Any], Sup2B[Any, U]): ...
 def sub2[T, U](x: T, y: U) -> Sub2[T, U]:
     return Sub2()
 
-x8 = sub2(1, 2)
-reveal_type(x8)  # revealed: Sub2[int, int]
+x10 = sub2(1, 2)
+reveal_type(x10)  # revealed: Sub2[int, int]
 
-x9: Sup2A[Literal[1], Literal[2]] = sub2(1, 2)
-reveal_type(x9)  # revealed: Sub2[Literal[1], int]
+x11: Sup2A[Literal[1], Literal[2]] = sub2(1, 2)
+reveal_type(x11)  # revealed: Sub2[Literal[1], int]
 
-x10: Sup2B[Literal[1], Literal[2]] = sub2(1, 2)
-reveal_type(x10)  # revealed: Sub2[int, Literal[2]]
+x12: Sup2B[Literal[1], Literal[2]] = sub2(1, 2)
+reveal_type(x12)  # revealed: Sub2[int, Literal[2]]
+```
+
+## Constrained TypeVars with Literal constraints
+
+Literal promotion should not apply to constrained TypeVars, since the inferred type is already one
+of the constraints. Promoting it would produce a type that doesn't match any constraint.
+
+```py
+from typing import TypeVar, Literal, Generic
+
+TU = TypeVar("TU", Literal["ms"], Literal["us"])
+
+def f(unit: TU) -> TU:
+    return unit
+
+reveal_type(f("us"))  # revealed: Literal["us"]
+reveal_type(f("ms"))  # revealed: Literal["ms"]
+
+class Timedelta(Generic[TU]):
+    def __init__(self, epoch: int, time_unit: TU) -> None:
+        self._epoch = epoch
+        self._time_unit = time_unit
+
+def convert(nanoseconds: int, time_unit: TU) -> Timedelta[TU]:
+    return Timedelta[TU](nanoseconds // 1_000, time_unit)
+
+delta0 = Timedelta[Literal["us"]](1_000, "us")
+delta1 = Timedelta(1_000, "us")
+delta2 = convert(1_000_000, "us")
+
+reveal_type(delta0)  # revealed: Timedelta[Literal["us"]]
+reveal_type(delta1)  # revealed: Timedelta[Literal["us"]]
+reveal_type(delta2)  # revealed: Timedelta[Literal["us"]]
+
+# Upper-bounded TypeVars with a Literal bound should also avoid promotion
+# when the promoted type would violate the bound.
+TB = TypeVar("TB", bound=Literal["ms", "us"])
+
+def g(unit: TB) -> TB:
+    return unit
+
+reveal_type(g("us"))  # revealed: Literal["us"]
+
+# Upper-bounded TypeVars in invariant return position: promotion should
+# still be blocked when it would violate the bound.
+def g2(unit: TB) -> list[TB]:
+    return [unit]
+
+reveal_type(g2("us"))  # revealed: list[Literal["us"]]
+
+# But a non-Literal upper bound should still allow promotion.
+TI = TypeVar("TI", bound=int)
+
+def h(x: TI) -> list[TI]:
+    return [x]
+
+reveal_type(h(1))  # revealed: list[int]
 ```

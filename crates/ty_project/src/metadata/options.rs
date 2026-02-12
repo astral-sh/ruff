@@ -282,49 +282,45 @@ impl Options {
                 .collect()
         } else {
             let mut roots = vec![];
-            let src = project_root.join("src");
             let is_package = |dir: &SystemPath| {
                 system.is_file(&dir.join("__init__.py"))
                     || system.is_file(&dir.join("__init__.pyi"))
             };
 
+            // Check for `./src` directory (src-layout)
+            let src = project_root.join("src");
             if system.is_directory(&src) && !is_package(&src) {
-                // Default to `src` and the project root if `src` exists and the root hasn't been specified.
-                // This corresponds to the `src-layout`
                 tracing::debug!(
-                    "Including `.` and `./src` in `environment.root` because a `./src` directory exists"
+                    "Including `./src` in `environment.root` because a `./src` directory exists and is not a package"
                 );
                 roots.push(src);
-            } else if system.is_directory(&project_root.join(project_name).join(project_name))
-                && !is_package(&project_root.join(project_name))
-            {
-                // `src-layout` but when the folder isn't called `src` but has the same name as the project.
-                // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
-                tracing::debug!(
-                    "Including `.` and `/{project_name}` in `environment.root` because a `./{project_name}/{project_name}` directory exists"
-                );
-
-                roots.push(project_root.join(project_name));
-            } else {
-                // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
-                tracing::debug!("Including `.` in `environment.root`");
             }
 
+            // Check for `./<project-name>/<project-name>` directory (src-layout with project-named folder)
+            // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
+            let project_name_dir = project_root.join(project_name);
+            if system.is_directory(&project_name_dir.join(project_name))
+                && !is_package(&project_name_dir)
+                && !roots.contains(&project_name_dir)
+            {
+                tracing::debug!(
+                    "Including `./{project_name}` in `environment.root` because a `./{project_name}/{project_name}` directory exists and `./{project_name}` is not a package"
+                );
+                roots.push(project_name_dir);
+            }
+
+            // Check for `./python` directory (maturin-based rust/python projects)
+            // https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
             let python = project_root.join("python");
             if system.is_directory(&python) && !is_package(&python) && !roots.contains(&python) {
-                // If a `./python` directory exists, include it as a source root. This is the recommended layout
-                // for maturin-based rust/python projects [1].
-                //
-                // https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
                 tracing::debug!(
-                    "Including `./python` in `environment.root` because a `./python` directory exists"
+                    "Including `./python` in `environment.root` because a `./python` directory exists and is not a package"
                 );
-
                 roots.push(python);
             }
 
-            // The project root should always be included, and should always come
-            // after any subdirectories such as `./src`, `./tests` and/or `./python`.
+            // The project root is always included, and should always come last
+            // (after any subdirectories such as `./src`, `./<project-name>`, and/or `./python`).
             roots.push(project_root.to_path_buf());
 
             roots
@@ -569,14 +565,13 @@ pub struct EnvironmentOptions {
     ///
     /// Accepts a list of directory paths searched in priority order (first has highest priority).
     ///
-    /// If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:
+    /// If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.
+    /// The project root (`.`) is always included. Additionally, the following directories are included
+    /// if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
     ///
-    /// * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-    /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-    /// * otherwise, default to `.` (flat layout)
-    ///
-    /// Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
-    /// it will also be included in the first party search path.
+    /// * `./src`
+    /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+    /// * `./python`
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -673,11 +668,12 @@ pub struct EnvironmentOptions {
     /// ty uses the `site-packages` directory of your project's Python environment
     /// to resolve third-party (and, in some cases, first-party) imports in your code.
     ///
-    /// If you're using a project management tool such as uv, you should not generally need
-    /// to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
-    /// environment variable to point to your project's virtual environment. ty can also infer
-    /// the location of your environment from an activated Conda environment, and will look for
-    /// a `.venv` directory in the project root if none of the above apply.
+    /// If you're using a project management tool such as uv, you should not generally need to
+    /// specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment
+    /// variable to point to your project's virtual environment. ty can also infer the location of
+    /// your environment from an activated Conda environment, and will look for a `.venv` directory
+    /// in the project root if none of the above apply. Failing that, ty will look for a `python3`
+    /// or `python` binary available in `PATH`.
     ///
     /// Passing a path to a Python executable is supported, but passing a path to a dynamic executable
     /// (such as a shim) is not currently supported.
@@ -711,14 +707,13 @@ pub struct EnvironmentOptions {
 pub struct SrcOptions {
     /// The root of the project, used for finding first-party modules.
     ///
-    /// If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+    /// If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
+    /// The project root (`.`) is always included. Additionally, the following directories are included
+    /// if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
     ///
-    /// * if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-    /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-    /// * otherwise, default to `.` (flat layout)
-    ///
-    /// Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
-    /// it will also be included in the first party search path.
+    /// * `./src`
+    /// * `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+    /// * `./python`
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -1178,6 +1173,9 @@ pub enum OutputFormat {
     ///
     /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
     Github,
+    /// Print diagnostics as a JUnit-style XML report.
+    #[cfg(feature = "junit")]
+    Junit,
 }
 
 impl OutputFormat {
@@ -1198,6 +1196,8 @@ impl From<OutputFormat> for DiagnosticFormat {
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
+            #[cfg(feature = "junit")]
+            OutputFormat::Junit => Self::Junit,
         }
     }
 }
@@ -1233,7 +1233,7 @@ pub struct TerminalOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
-        value_type = "full | concise",
+        value_type = "full | concise | github | gitlab | junit",
         example = r#"
             output-format = "concise"
         "#
@@ -1766,7 +1766,7 @@ impl ToSettingsError {
 
         impl fmt::Display for DisplayPretty<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let display_config = DisplayDiagnosticConfig::default()
+                let display_config = DisplayDiagnosticConfig::new("ty")
                     .format(self.error.output_format.into())
                     .color(self.error.color);
 
