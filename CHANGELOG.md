@@ -8,7 +8,7 @@ Released on 2026-02-12.
 
 - \[`airflow`\] Add ruff rules to catch deprecated Airflow imports for Airflow 3.1 (`AIR321`) ([#22376](https://github.com/astral-sh/ruff/pull/22376))
 - \[`airflow`\] Third positional parameter not named `ti_key` should be flagged for `BaseOperatorLink.get_link` (`AIR303`) ([#22828](https://github.com/astral-sh/ruff/pull/22828))
-- \[`flake8-gettext`\] Fix false negatives for plural argument of ngettext (`INT001`, `INT002`, `INT003`) ([#21078](https://github.com/astral-sh/ruff/pull/21078))
+- \[`flake8-gettext`\] Fix false negatives for plural argument of `ngettext` (`INT001`, `INT002`, `INT003`) ([#21078](https://github.com/astral-sh/ruff/pull/21078))
 - \[`pyflakes`\] Fix infinite loop in preview fix for `unused-import` (`F401`) ([#23038](https://github.com/astral-sh/ruff/pull/23038))
 - \[`pygrep-hooks`\] Detect non-existent mock methods in standalone expressions (`PGH005`) ([#22830](https://github.com/astral-sh/ruff/pull/22830))
 - \[`pylint`\] Allow dunder submodules and improve diagnostic range (`PLC2701`) ([#22804](https://github.com/astral-sh/ruff/pull/22804))
@@ -17,11 +17,11 @@ Released on 2026-02-12.
 - \[`ruff`\] Detect mutable defaults in `field` calls (`RUF008`) ([#23046](https://github.com/astral-sh/ruff/pull/23046))
 - \[`ruff`\] Ignore std `cmath.inf` (`RUF069`) ([#23120](https://github.com/astral-sh/ruff/pull/23120))
 - \[`ruff`\] New rule float-comparison (`RUF069`) ([#20585](https://github.com/astral-sh/ruff/pull/20585))
-- Don't format unlabeled markdown code blocks ([#23106](https://github.com/astral-sh/ruff/pull/23106))
+- Don't format unlabeled Markdown code blocks ([#23106](https://github.com/astral-sh/ruff/pull/23106))
 - Markdown formatting support in LSP ([#23063](https://github.com/astral-sh/ruff/pull/23063))
 - Support Quarto Markdown language markers ([#22947](https://github.com/astral-sh/ruff/pull/22947))
-- Support formatting `pycon` markdown code blocks ([#23112](https://github.com/astral-sh/ruff/pull/23112))
-- Use extension mapping to select markdown code block language ([#22934](https://github.com/astral-sh/ruff/pull/22934))
+- Support formatting `pycon` Markdown code blocks ([#23112](https://github.com/astral-sh/ruff/pull/23112))
+- Use extension mapping to select Markdown code block language ([#22934](https://github.com/astral-sh/ruff/pull/22934))
 
 ### Bug fixes
 
@@ -39,13 +39,13 @@ Released on 2026-02-12.
 ### Rule changes
 
 - Use `DisplayDiagnosticsConfig::program` for Ruff's GitHub output ([#23240](https://github.com/astral-sh/ruff/pull/23240))
-- \[`PT006`\] Fix syntax error when unpacking nested tuples in parametrize fixes (#22441) ([#22464](https://github.com/astral-sh/ruff/pull/22464))
-- \[`airflow`\] Add ruff rules to catch deprecated attribute access from context key for Airflow 3.0 (`AIR301`) ([#22850](https://github.com/astral-sh/ruff/pull/22850))
-- \[`airflow`\] Refine and add rules to capture deprecated arguments and a decorator (`AIR301`) ([#23170](https://github.com/astral-sh/ruff/pull/23170))
+- \[`PT006`\] Fix syntax error when unpacking nested tuples in `parametrize` fixes (#22441) ([#22464](https://github.com/astral-sh/ruff/pull/22464))
+- \[`airflow`\] Catch deprecated attribute access from context key for Airflow 3.0 (`AIR301`) ([#22850](https://github.com/astral-sh/ruff/pull/22850))
+- \[`airflow`\] Capture deprecated arguments and a decorator (`AIR301`) ([#23170](https://github.com/astral-sh/ruff/pull/23170))
 - \[`flake8-boolean-trap`\] Add `multiprocessing.Value` to excluded functions for `FBT003` ([#23010](https://github.com/astral-sh/ruff/pull/23010))
-- \[`flake8-bugbear`\] point previous occurrence (`B033`) ([#22634](https://github.com/astral-sh/ruff/pull/22634))
+- \[`flake8-bugbear`\] Add a secondary annotation showing the previous occurrence (`B033`) ([#22634](https://github.com/astral-sh/ruff/pull/22634))
 - \[`flake8-type-checking`\] Add sub-diagnostic showing the runtime use of an annotation (`TC004`) ([#23091](https://github.com/astral-sh/ruff/pull/23091))
-- \[`isort`\] support for configurable import section heading comments ([#23151](https://github.com/astral-sh/ruff/pull/23151))
+- \[`isort`\] Support configurable import section heading comments ([#23151](https://github.com/astral-sh/ruff/pull/23151))
 - \[`ruff`\] Improve the diagnostic for `RUF012` ([#23202](https://github.com/astral-sh/ruff/pull/23202))
 
 ### Formatter
