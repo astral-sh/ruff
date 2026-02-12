@@ -1144,15 +1144,11 @@ impl<'db> UseDefMapBuilder<'db> {
         constraint: ScopedNarrowingConstraint,
     ) {
         for state in &mut self.symbol_states {
-            if state.has_narrowing_constraints() {
-                state.record_narrowing_constraint(&mut self.reachability_constraints, constraint);
-            }
+            state.record_narrowing_constraint(&mut self.reachability_constraints, constraint);
         }
 
         for state in &mut self.member_states {
-            if state.has_narrowing_constraints() {
-                state.record_narrowing_constraint(&mut self.reachability_constraints, constraint);
-            }
+            state.record_narrowing_constraint(&mut self.reachability_constraints, constraint);
         }
     }
 

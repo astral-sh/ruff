@@ -2558,10 +2558,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // kind of constraint to mark the following code as unreachable.
                 //
                 // Ideally, these constraints should be added for every call expression, even those in
-                // sub-expressions. But doing so makes the number of such constraints so high that
-                // it significantly degrades performance. We thus cut scope here and add these
-                // constraints only at statement-level function calls, like `sys.exit()`, and not
-                // within sub-expressions like `3 + sys.exit()` etc.
+                // sub-expressions and in the module-level scope. But doing so makes the number of
+                // such constraints so high that it significantly degrades performance. We thus cut
+                // scope here and add these constraints only at statement level function calls,
+                // like `sys.exit()`, and not within sub-expression like `3 + sys.exit()` etc.
+                //
+                // At module scope, we only record a narrowing constraint (not a reachability
+                // constraint). Recording reachability constraints at module scope is too expensive
+                // because `record_reachability_constraint` iterates over all symbols in scope,
+                // and modules can have many symbols and many calls. The narrowing constraint
+                // alone is sufficient for post-if-statement narrowing (e.g.
+                // `if x is None: sys.exit()` → `x` is narrowed to non-None after the if).
                 if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
                     if !self.source_type.is_stub() {
                         let callable = self.add_standalone_expression(func);
@@ -2574,17 +2581,28 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             }),
                             is_positive: false,
                         };
-                        let constraint = self.record_reachability_constraint(
-                            PredicateOrLiteral::Predicate(predicate),
-                        );
 
-                        // Also gate narrowing by this constraint: if the call returns
-                        // `Never`, any narrowing in the current branch should be
-                        // invalidated (since this path is unreachable). This enables
-                        // narrowing to be preserved after if-statements where one branch
-                        // calls a `NoReturn` function like `sys.exit()`.
-                        self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_all_places(constraint);
+                        if self.in_function_scope() {
+                            let constraint = self.record_reachability_constraint(
+                                PredicateOrLiteral::Predicate(predicate),
+                            );
+
+                            // Also gate narrowing by this constraint: if the call returns
+                            // `Never`, any narrowing in the current branch should be
+                            // invalidated (since this path is unreachable). This enables
+                            // narrowing to be preserved after if-statements where one branch
+                            // calls a `NoReturn` function like `sys.exit()`.
+                            self.current_use_def_map_mut()
+                                .record_narrowing_constraint_for_all_places(constraint);
+                        } else {
+                            let predicate_id =
+                                self.add_predicate(PredicateOrLiteral::Predicate(predicate));
+                            let constraint = self
+                                .current_reachability_constraints_mut()
+                                .add_atom(predicate_id);
+                            self.current_use_def_map_mut()
+                                .record_narrowing_constraint_for_all_places(constraint);
+                        }
                     }
                 }
             }
