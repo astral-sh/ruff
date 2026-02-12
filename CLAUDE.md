@@ -62,6 +62,15 @@ Run ty:
 cargo run --bin ty -- check path/to/file.py
 ```
 
+## Reproducing ty ecosystem changes
+
+If asked to reproduce changes in the ty ecosystem, use this script to clone the project to some
+directory and install its dependencies into `.venv`:
+
+```sh
+uv run scripts/setup_primer_project.py <project-name> <some-temp-dir>
+```
+
 ## Pull Requests
 
 When working on ty, PR titles should start with `[ty]` and be tagged with the `ty` GitHub label.
@@ -76,3 +85,4 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Avoid falling back to patterns that require `panic!`, `unreachable!`, or `.unwrap()`. Instead, try to encode those constraints in the type system.
 - Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability.
 - If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible.
+- Use comments purposefully. Don't use comments to narrate code, but do use them to explain invariants and why something unusual was done a particular way.

@@ -31,7 +31,7 @@ use crate::types::function::{
     is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
+    GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
@@ -870,6 +870,23 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(literal) => literal,
             Self::Generic(generic) => ClassLiteral::Static(generic.origin(db)),
+        }
+    }
+
+    /// Returns the underlying class literal and specialization, if any.
+    ///
+    /// For a non-generic class, this returns the class literal directly.
+    /// For a generic alias, this returns the alias's origin.
+    pub(crate) fn class_literal_and_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> (ClassLiteral<'db>, Option<Specialization<'db>>) {
+        match self {
+            Self::NonGeneric(literal) => (literal, None),
+            Self::Generic(generic) => (
+                ClassLiteral::Static(generic.origin(db)),
+                Some(generic.specialization(db)),
+            ),
         }
     }
 
@@ -1924,49 +1941,6 @@ impl<'db> ClassType<'db> {
     pub(super) fn definition_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).header_span(db)
     }
-
-    /// Returns `true` if calls to this class type should use constructor call handling
-    /// (via `try_call_constructor`) rather than the regular `try_call` path.
-    ///
-    /// Some known classes have manual signatures defined in `bindings()` and should use
-    /// the `try_call` path. For all other class types, we use `try_call_constructor`
-    /// to properly validate `__new__`/`__init__` signatures.
-    pub(super) fn should_use_constructor_call(self, db: &'db dyn Db) -> bool {
-        // For some known classes we have manual signatures defined and use the regular
-        // `try_call` path instead of constructor call handling.
-        let has_special_cased_constructor = matches!(
-            self.known(db),
-            Some(
-                KnownClass::Bool
-                    | KnownClass::Str
-                    | KnownClass::Type
-                    | KnownClass::Object
-                    | KnownClass::Property
-                    | KnownClass::Super
-                    | KnownClass::TypeAliasType
-                    | KnownClass::Deprecated
-            )
-        ) || (
-            // Constructor calls to `tuple` and subclasses of `tuple` are handled in
-            // `Type::bindings`, but constructor calls to `tuple[int]`, `tuple[int, ...]`,
-            // `tuple[int, *tuple[str, ...]]` (etc.) are handled by the default constructor-call
-            // logic (we synthesize a `__new__` method for them in `ClassType::own_class_member`).
-            self.is_known(db, KnownClass::Tuple) && !self.is_generic()
-        ) || self.static_class_literal(db).is_some_and(
-            |(class_literal, specialization)| {
-                CodeGeneratorKind::TypedDict.matches(db, class_literal.into(), specialization)
-            },
-        );
-
-        // Use regular `try_call` for all subclasses of `enum.Enum`. This is a temporary
-        // special-casing until we support the functional syntax for creating enum classes.
-        let is_enum_subclass = KnownClass::Enum
-            .to_class_literal(db)
-            .to_class_type(db)
-            .is_some_and(|enum_class| self.is_subclass_of(db, enum_class));
-
-        !has_special_cased_constructor && !is_enum_subclass
-    }
 }
 
 fn into_callable_cycle_initial<'db>(
@@ -2348,11 +2322,10 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    /// Returns all of the typevars that are referenced in this class's definition. This includes
-    /// any typevars bound in its generic context, as well as any typevars mentioned in its base
-    /// class list. (This is used to ensure that classes do not bind or reference typevars from
-    /// enclosing generic contexts.)
-    pub(crate) fn typevars_referenced_in_definition(
+    /// Returns all of the typevars that are referenced in this class's base class list.
+    /// (This is used to ensure that classes do not reference typevars from enclosing
+    /// generic contexts.)
+    pub(crate) fn typevars_referenced_in_bases(
         self,
         db: &'db dyn Db,
     ) -> FxIndexSet<BoundTypeVarInstance<'db>> {
@@ -2381,9 +2354,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let visitor = CollectTypeVars::default();
-        if let Some(generic_context) = self.generic_context(db) {
-            walk_generic_context(db, generic_context, &visitor);
-        }
         for base in self.explicit_bases(db) {
             visitor.visit_type(db, *base);
         }

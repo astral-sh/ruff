@@ -43,7 +43,7 @@ rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
 serde = { workspace = true }
-serde_json = { workspace = true, optional = true }
+serde_json = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
@@ -59,12 +59,12 @@ default = ["zstd"]
 deflate = ["ty_vendored/deflate"]
 schemars = [
     "dep:schemars",
-    "dep:serde_json",
     "ruff_db/schemars",
     "ruff_python_ast/schemars",
     "ty_python_semantic/schemars",
 ]
 zstd = ["ty_vendored/zstd"]
+junit = ["ruff_db/junit"]
 format = ["ruff_python_formatter"]
 testing = []
 

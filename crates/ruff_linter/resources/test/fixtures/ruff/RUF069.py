@@ -77,3 +77,11 @@ def _numpy_torch():
     assert numpy_inf == 1e300 * 1e300  # ok
 
     assert torch_inf == 1e300 * 1e300  # ok
+
+
+def _cmath():
+    import cmath
+
+    assert cmath.inf == 1e300 * 1e300  # ok
+
+    assert cmath.infj == complex(0, 1e300 * 1e300)  # ok

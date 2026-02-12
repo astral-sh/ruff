@@ -2131,7 +2131,7 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// For example:
     /// ```python
-    /// import fastapi
+    /// from fastapi import FastAPI
     ///
     /// app = FastAPI("app")
     ///

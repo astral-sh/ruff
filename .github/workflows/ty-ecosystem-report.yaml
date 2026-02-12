@@ -32,10 +32,10 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
         with:
           enable-cache: true
-          version: "0.9.28"
+          version: "0.10.0"
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
@@ -56,11 +56,12 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@c6ccb9fc56755ccd826721a24f53fc871a603474"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@f26093838326d10b6d90f3a9d08125db7aa369d6"
 
           ecosystem-analyzer \
             --verbose \
             --repository ruff \
+            --flaky-runs 20 \
             analyze \
             --profile=profiling \
             --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \

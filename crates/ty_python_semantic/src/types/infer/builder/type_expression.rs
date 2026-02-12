@@ -61,16 +61,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         annotation_ty
     }
 
-    /// Similar to [`infer_type_expression`], but accepts an optional expression.
-    ///
-    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression_with_state
-    pub(super) fn infer_optional_type_expression(
-        &mut self,
-        expression: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
-        expression.map(|expr| self.infer_type_expression(expr))
-    }
-
     fn report_invalid_type_expression(
         &self,
         expression: &ast::Expr,
@@ -893,7 +883,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // instead of two. So until we properly support these, specialize all remaining type
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
-        if any_over_type(self.db(), value_ty, &|ty| ty.is_divergent(), true) {
+        if any_over_type(self.db(), value_ty, true, |ty| ty.is_divergent()) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(

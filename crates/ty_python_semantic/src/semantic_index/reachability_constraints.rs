@@ -911,59 +911,67 @@ impl ReachabilityConstraints {
                 let node = self.get_interior_node(id);
                 let predicate = predicates[node.atom];
 
+                // `ReturnsNever` predicates don't narrow any variable; they only
+                // affect reachability. Evaluate the predicate to determine which
+                // path(s) are reachable, rather than walking both branches.
+                // `ReturnsNever` always evaluates to `AlwaysTrue` or `AlwaysFalse`,
+                // never `Ambiguous`.
+                if matches!(predicate.node, PredicateNode::ReturnsNever(_)) {
+                    return match Self::analyze_single(db, &predicate) {
+                        Truthiness::AlwaysTrue => self.narrow_by_constraint_inner(
+                            db,
+                            predicates,
+                            node.if_true,
+                            base_ty,
+                            place,
+                            accumulated,
+                        ),
+                        Truthiness::AlwaysFalse => self.narrow_by_constraint_inner(
+                            db,
+                            predicates,
+                            node.if_false,
+                            base_ty,
+                            place,
+                            accumulated,
+                        ),
+                        Truthiness::Ambiguous => {
+                            unreachable!("ReturnsNever predicates should never be Ambiguous")
+                        }
+                    };
+                }
+
                 // Check if this predicate narrows the variable we're interested in.
                 let pos_constraint = infer_narrowing_constraint(db, predicate, place);
 
-                if pos_constraint.is_none() {
-                    // This predicate doesn't narrow our variable (e.g., it's a
-                    // `ReturnsNever` constraint, or a narrowing constraint for a
-                    // different variable). Evaluate it to determine which path(s)
-                    // are reachable, rather than walking both branches.
+                // If the true branch is statically unreachable, skip it entirely.
+                if node.if_true == ALWAYS_FALSE {
                     let neg_predicate = Predicate {
                         node: predicate.node,
                         is_positive: !predicate.is_positive,
                     };
                     let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
+                    let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                    return self.narrow_by_constraint_inner(
+                        db,
+                        predicates,
+                        node.if_false,
+                        base_ty,
+                        place,
+                        false_accumulated,
+                    );
+                }
 
-                    if neg_constraint.is_none() {
-                        return match Self::analyze_single(db, &predicate) {
-                            Truthiness::AlwaysTrue => self.narrow_by_constraint_inner(
-                                db,
-                                predicates,
-                                node.if_true,
-                                base_ty,
-                                place,
-                                accumulated,
-                            ),
-                            Truthiness::AlwaysFalse => self.narrow_by_constraint_inner(
-                                db,
-                                predicates,
-                                node.if_false,
-                                base_ty,
-                                place,
-                                accumulated,
-                            ),
-                            Truthiness::Ambiguous => {
-                                let true_ty = self.narrow_by_constraint_inner(
-                                    db,
-                                    predicates,
-                                    node.if_true,
-                                    base_ty,
-                                    place,
-                                    accumulated.clone(),
-                                );
-                                let false_ty = self.narrow_by_constraint_inner(
-                                    db,
-                                    predicates,
-                                    node.if_false,
-                                    base_ty,
-                                    place,
-                                    accumulated,
-                                );
-                                UnionType::from_elements(db, [true_ty, false_ty])
-                            }
-                        };
-                    }
+                // If the false branch is statically unreachable, skip it entirely.
+                if node.if_false == ALWAYS_FALSE {
+                    let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
+                    return self.narrow_by_constraint_inner(
+                        db,
+                        predicates,
+                        node.if_true,
+                        base_ty,
+                        place,
+                        true_accumulated,
+                    );
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing

@@ -173,6 +173,11 @@ impl<'db> AllSymbolInfo<'db> {
             .unwrap_or(SymbolKind::Module)
     }
 
+    /// Returns whether this symbol has a `@deprecated` decorator.
+    pub fn deprecated(&self) -> bool {
+        self.symbol.as_ref().is_some_and(|symbol| symbol.deprecated)
+    }
+
     /// Returns the module this symbol is exported from.
     pub fn module(&self) -> Module<'db> {
         self.module
@@ -411,6 +416,7 @@ mod merge {
                         (&origin.symbol, &mut reexport.symbol)
                     {
                         reexport_sym.kind = origin_sym.kind;
+                        reexport_sym.deprecated = origin_sym.deprecated;
                     }
 
                     // Now we want to find the shortest (in terms of

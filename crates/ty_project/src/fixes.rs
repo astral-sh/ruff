@@ -183,7 +183,7 @@ pub fn suppress_all_diagnostics(
                 "Introduced syntax errors:\n\n{}",
                 DisplayDiagnostics::new(
                     &file_db,
-                    &DisplayDiagnosticConfig::default(),
+                    &DisplayDiagnosticConfig::new("ty"),
                     &parse_diagnostics
                 )
             ));
@@ -712,7 +712,7 @@ class B(A):
                 "## Diagnostics after applying fixes\n\n{diagnostics}\n",
                 diagnostics = DisplayDiagnostics::new(
                     &db,
-                    &DisplayDiagnosticConfig::default(),
+                    &DisplayDiagnosticConfig::new("ty"),
                     &fixes.diagnostics
                 )
             )
@@ -733,7 +733,7 @@ class B(A):
                 "## New diagnostics after re-checking file\n\n{diagnostics}\n",
                 diagnostics = DisplayDiagnostics::new(
                     &db,
-                    &DisplayDiagnosticConfig::default(),
+                    &DisplayDiagnosticConfig::new("ty"),
                     &new_diagnostics
                 )
             )

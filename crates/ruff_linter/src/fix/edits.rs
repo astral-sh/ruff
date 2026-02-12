@@ -325,50 +325,75 @@ pub(crate) fn remove_member(elts: &[ast::Expr], index: usize, source: &str) -> R
 }
 
 /// Generic function to add a (regular) parameter to a function definition.
-pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &str) -> Edit {
+///
+/// Returns `None` if the parameter cannot be added without introducing a syntax error (e.g., a
+/// non-default parameter would follow a positional-only parameter with a default value).
+pub(crate) fn add_parameter(
+    parameter: &str,
+    parameters: &Parameters,
+    source: &str,
+) -> Option<Edit> {
     if let Some(last) = parameters.args.iter().rfind(|arg| arg.default.is_none()) {
-        // Case 1: at least one regular parameter, so append after the last one.
-        Edit::insertion(format!(", {parameter}"), last.end())
-    } else if !parameters.args.is_empty() {
-        // Case 2: no regular parameters, but at least one keyword parameter, so add before the
-        // first.
-        let pos = parameters.start();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
-        let name = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Name)
-            .expect("Unable to find name token");
-        Edit::insertion(format!("{parameter}, "), name.start())
+        // Case 1: at least one regular parameter without a default, so append after the last one.
+        Some(Edit::insertion(format!(", {parameter}"), last.end()))
+    } else if let Some(first) = parameters.args.first() {
+        // Case 2: all regular parameters have defaults, so insert before the first one.
+        // However, if any positional-only parameter has a default, inserting a non-default
+        // parameter here would be a syntax error (the "default required" constraint carries
+        // through the `/` separator).
+        if parameters
+            .posonlyargs
+            .last()
+            .is_some_and(|p| p.default.is_some())
+        {
+            return None;
+        }
+        Some(Edit::insertion(format!("{parameter}, "), first.start()))
     } else if let Some(last) = parameters.posonlyargs.last() {
-        // Case 2: no regular parameter, but a positional-only parameter exists, so add after that.
-        // We take care to add it *after* the `/` separator.
-        let pos = last.end();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        // Case 3: no regular parameters, but positional-only parameters exist.
+        // If any positional-only parameter has a default, we can't add a non-default parameter
+        // after the `/` separator — that would be a syntax error.
+        if last.default.is_some() {
+            return None;
+        }
+        // Insert after the `/` separator.
+        let mut tokenizer = SimpleTokenizer::starts_at(last.end(), source);
         let slash = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Slash)
             .expect("Unable to find `/` token");
         // Try to find a comma after the slash.
         let comma = tokenizer.find(|token| token.kind == SimpleTokenKind::Comma);
         if let Some(comma) = comma {
-            Edit::insertion(format!(" {parameter},"), comma.start() + TextSize::from(1))
+            Some(Edit::insertion(format!(" {parameter},"), comma.end()))
         } else {
-            Edit::insertion(format!(", {parameter}"), slash.start())
+            Some(Edit::insertion(format!(", {parameter}"), slash.end()))
         }
-    } else if !parameters.kwonlyargs.is_empty() {
-        // Case 3: no regular parameter, but a keyword-only parameter exist, so add parameter before that.
-        // We need to backtrack to before the `*` separator.
-        // We know there is no non-keyword-only params, so we can safely assume that the `*` separator is the first
+    } else if parameters.vararg.is_some() || !parameters.kwonlyargs.is_empty() {
+        // Case 4: no regular or positional-only parameters, but a vararg (`*args`) or
+        // keyword-only parameters exist. Insert before the `*` separator.
         let pos = parameters.start();
         let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
         let star = tokenizer
             .find(|token| token.kind == SimpleTokenKind::Star)
             .expect("Unable to find `*` token");
-        Edit::insertion(format!("{parameter}, "), star.start())
+        Some(Edit::insertion(format!("{parameter}, "), star.start()))
+    } else if parameters.kwarg.is_some() {
+        // Case 5: only a `**kwargs` parameter exists. Insert before `**`.
+        let pos = parameters.start();
+        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        let double_star = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::DoubleStar)
+            .expect("Unable to find `**` token");
+        Some(Edit::insertion(
+            format!("{parameter}, "),
+            double_star.start(),
+        ))
     } else {
-        // Case 4: no parameters at all, so add parameter after the opening parenthesis.
-        Edit::insertion(
+        // Case 6: no parameters at all, so add parameter after the opening parenthesis.
+        Some(Edit::insertion(
             parameter.to_string(),
             parameters.start() + TextSize::from(1),
-        )
+        ))
     }
 }
 

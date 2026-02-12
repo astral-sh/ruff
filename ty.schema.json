@@ -112,7 +112,7 @@
           }
         },
         "python": {
-          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nIf you're using a project management tool such as uv, you should not generally need\nto specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`\nenvironment variable to point to your project's virtual environment. ty can also infer\nthe location of your environment from an activated Conda environment, and will look for\na `.venv` directory in the project root if none of the above apply.\n\nPassing a path to a Python executable is supported, but passing a path to a dynamic executable\n(such as a shim) is not currently supported.\n\nThis option can be used to point to virtual or system Python environments.",
+          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. ty can also infer the location of\nyour environment from an activated Conda environment, and will look for a `.venv` directory\nin the project root if none of the above apply. Failing that, ty will look for a `python3`\nor `python` binary available in `PATH`.\n\nPassing a path to a Python executable is supported, but passing a path to a dynamic executable\n(such as a shim) is not currently supported.\n\nThis option can be used to point to virtual or system Python environments.",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"
@@ -212,6 +212,11 @@
           "description": "Print diagnostics in the format used by [GitHub Actions] workflow error annotations.\n\n[GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message",
           "type": "string",
           "const": "github"
+        },
+        {
+          "description": "Print diagnostics as a JUnit-style XML report.",
+          "type": "string",
+          "const": "junit"
         }
       ]
     },
@@ -383,6 +388,16 @@
         "byte-string-type-annotation": {
           "title": "detects byte strings in type annotation positions",
           "description": "## What it does\nChecks for byte-strings in type annotation positions.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that use byte-string notation.\n\n## Examples\n```python\ndef test(): -> b\"int\":\n    ...\n```\n\nUse instead:\n```python\ndef test(): -> \"int\":\n    ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "call-abstract-method": {
+          "title": "detects calls to abstract methods with trivial bodies on class objects",
+          "description": "## What it does\nChecks for calls to abstract `@classmethod`s or `@staticmethod`s\nwith \"trivial bodies\" when accessed on the class object itself.\n\n\"Trivial bodies\" are bodies that solely consist of `...`, `pass`,\na docstring, and/or `raise NotImplementedError`.\n\n## Why is this bad?\nAn abstract method with a trivial body has no concrete implementation\nto execute, so calling such a method directly on the class will probably\nnot have the desired effect.\n\nIt is also unsound to call these methods directly on the class. Unlike\nother methods, ty permits abstract methods with trivial bodies to have\nnon-`None` return types even though they always return `None` at runtime.\nThis is because it is expected that these methods will always be\noverridden rather than being called directly. As a result of this\nexception to the normal rule, ty may infer an incorrect type if one of\nthese methods is called directly, which may then mean that type errors\nelsewhere in your code go undetected by ty.\n\nCalling abstract classmethods or staticmethods via `type[X]` is allowed,\nsince the actual runtime type could be a concrete subclass with an implementation.\n\n## Example\n```python\nfrom abc import ABC, abstractmethod\n\nclass Foo(ABC):\n    @classmethod\n    @abstractmethod\n    def method(cls) -> int: ...\n\nFoo.method()  # Error: cannot call abstract classmethod\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1000,6 +1015,16 @@
             }
           ]
         },
+        "invalid-type-variable-default": {
+          "title": "detects invalid type variable defaults",
+          "description": "## What it does\nChecks for [type variables] whose default type is not compatible with\nthe type variable's bound or constraints.\n\n## Why is this bad?\nIf a type variable has a bound, the default must be assignable to that\nbound (see: [bound rules]). If a type variable has constraints, the default\nmust be one of the constraints (see: [constraint rules]).\n\n## Examples\n```python\nT = TypeVar(\"T\", bound=str, default=int)  # error: [invalid-type-variable-default]\nU = TypeVar(\"U\", int, str, default=bytes)  # error: [invalid-type-variable-default]\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar\n[bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules\n[constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-header": {
           "title": "detects invalid statements in `TypedDict` class headers",
           "description": "## What it does\nDetects errors in `TypedDict` class headers, such as unexpected arguments\nor invalid base classes.\n\n## Why is this bad?\nThe typing spec states that `TypedDict`s are not permitted to have\ncustom metaclasses. Using `**` unpacking in a `TypedDict` header\nis also prohibited by ty, as it means that ty cannot statically determine\nwhether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]\n    ...\n\ndef f(x: dict):\n    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]\n        ...\n```",
@@ -1093,6 +1118,16 @@
         "override-of-final-method": {
           "title": "detects overrides of final methods",
           "description": "## What it does\nChecks for methods on subclasses that override superclass methods decorated with `@final`.\n\n## Why is this bad?\nDecorating a method with `@final` declares to the type checker that it should not be\noverridden on any subclass.\n\n## Example\n\n```python\nfrom typing import final\n\nclass A:\n    @final\n    def foo(self): ...\n\nclass B(A):\n    def foo(self): ...  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "override-of-final-variable": {
+          "title": "detects overrides of Final class variables",
+          "description": "## What it does\nChecks for class variables on subclasses that override a superclass variable\nthat has been declared as `Final`.\n\n## Why is this bad?\nDeclaring a variable as `Final` indicates to the type checker that it should not be\noverridden on any subclass.\n\n## Example\n\n```python\nfrom typing import Final\n\nclass A:\n    X: Final[int] = 1\n\nclass B(A):\n    X = 2  # Error raised here\n```",
           "default": "error",
           "oneOf": [
             {

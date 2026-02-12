@@ -393,13 +393,8 @@ impl<'db> SubclassOfInner<'db> {
                         Self::try_from_instance(db, bound)
                             .and_then(|subclass_of| subclass_of.into_class(db))
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        match &**constraints.elements(db) {
-                            [bound] => Self::try_from_instance(db, *bound)
-                                .and_then(|subclass_of| subclass_of.into_class(db)),
-                            _ => Some(ClassType::object(db)),
-                        }
-                    }
+                    // TODO this is quite imprecise
+                    Some(TypeVarBoundOrConstraints::Constraints(_)) => Some(ClassType::object(db)),
                 }
             }
         }

@@ -282,6 +282,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             match type_qualifier {
                                 SpecialFormType::ClassVar => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
+                                    if type_and_qualifiers.inner_type().has_typevar(self.db())
+                                        && let Some(builder) =
+                                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                    {
+                                        builder.into_diagnostic(
+                                            "`ClassVar` cannot contain type variables",
+                                        );
+                                    }
                                 }
                                 SpecialFormType::Final => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);

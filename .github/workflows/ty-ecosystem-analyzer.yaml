@@ -38,10 +38,10 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
         with:
           enable-cache: true
-          version: "0.9.28"
+          version: "0.10.0"
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
@@ -64,6 +64,7 @@ jobs:
           git checkout -b new_commit "$GITHUB_SHA"
           git rev-list --format=%s --max-count=1 new_commit
           cp crates/ty_python_semantic/resources/primer/good.txt projects_new.txt
+          cp crates/ty_python_semantic/resources/primer/flaky.txt projects_flaky.txt
 
           echo "old commit (merge base)"
           MERGE_BASE="$(git merge-base "$GITHUB_SHA" "origin/$GITHUB_BASE_REF")"
@@ -73,14 +74,16 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@c6ccb9fc56755ccd826721a24f53fc871a603474"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@f26093838326d10b6d90f3a9d08125db7aa369d6"
 
           ecosystem-analyzer \
             --repository ruff \
+            --flaky-runs 10 \
             diff \
             --profile=profiling \
             --projects-old ruff/projects_old.txt \
             --projects-new ruff/projects_new.txt \
+            --projects-flaky ruff/projects_flaky.txt \
             --old old_commit \
             --new new_commit \
             --output-old diagnostics-old.json \

@@ -446,8 +446,7 @@ class C(A):  # error: [subclass-of-final-class]
     def method(self): ...  # error: [override-of-final-method]
 
 class D(B):  # error: [subclass-of-final-class]
-    # TODO: we should emit a diagnostic here
-    def method(self): ...
+    def method(self): ...  # error: [override-of-final-variable]
 ```
 
 ## An `@final` method is overridden by an implicit instance attribute

@@ -23,13 +23,14 @@ use crate::{
     },
     types::{
         CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type,
+        StaticClassLiteral, Type, TypeQualifiers,
         class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
             INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE,
-            INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD, report_invalid_method_override,
-            report_overridden_final_method,
+            INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
+            report_invalid_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
@@ -177,6 +178,7 @@ fn check_class_declaration<'db>(
     let mut has_typeddict_in_mro = false;
     let mut liskov_diagnostic_emitted = false;
     let mut overridden_final_method = None;
+    let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
     let is_private_member = is_mangled_private(member.name.as_str());
 
     // Track the first superclass that defines this method (the "immediate parent" for this method).
@@ -250,31 +252,56 @@ fn check_class_declaration<'db>(
                 immediate_parent_method = Some((superclass, superclass_type));
             }
 
-            if configuration.check_final_method_overridden() {
-                overridden_final_method = overridden_final_method.or_else(|| {
-                    let superclass_symbol_id = superclass_symbol_id?;
+            if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
+                || (configuration.check_final_variable_overridden()
+                    && overridden_final_variable.is_none())
+            {
+                let own_class_member = superclass.own_class_member(db, None, &member.name);
 
-                    // TODO: `@final` should be more like a type qualifier:
-                    // we should also recognise `@final`-decorated methods that don't end up
-                    // as being function- or property-types (because they're wrapped by other
-                    // decorators that transform the type into something else).
-                    let underlying_functions = extract_underlying_functions(
-                        db,
-                        superclass
-                            .own_class_member(db, None, &member.name)
-                            .ignore_possibly_undefined()?,
-                    )?;
+                if configuration.check_final_method_overridden() {
+                    overridden_final_method = overridden_final_method.or_else(|| {
+                        let superclass_symbol_id = superclass_symbol_id?;
 
-                    if underlying_functions
-                        .iter()
-                        .any(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
-                        && is_function_definition(db, superclass_scope, superclass_symbol_id)
-                    {
-                        Some((superclass, underlying_functions))
-                    } else {
-                        None
-                    }
-                });
+                        // TODO: `@final` should be more like a type qualifier:
+                        // we should also recognise `@final`-decorated methods that don't end up
+                        // as being function- or property-types (because they're wrapped by other
+                        // decorators that transform the type into something else).
+                        let underlying_functions = extract_underlying_functions(
+                            db,
+                            own_class_member.ignore_possibly_undefined()?,
+                        )?;
+
+                        if underlying_functions.iter().any(|function| {
+                            function.has_known_decorator(db, FunctionDecorators::FINAL)
+                        }) && is_function_definition(db, superclass_scope, superclass_symbol_id)
+                        {
+                            Some((superclass, underlying_functions))
+                        } else {
+                            None
+                        }
+                    });
+                }
+
+                if configuration.check_final_variable_overridden() {
+                    overridden_final_variable = overridden_final_variable.or_else(|| {
+                        if !own_class_member
+                            .qualifiers()
+                            .contains(TypeQualifiers::FINAL)
+                        {
+                            return None;
+                        }
+
+                        // Find the declaration definition in the superclass for the secondary
+                        // annotation.
+                        let superclass_definition = superclass_symbol_id.and_then(|id| {
+                            use_def_map(db, superclass_scope)
+                                .end_of_scope_symbol_declarations(id)
+                                .find_map(|decl| decl.declaration.definition())
+                        });
+
+                        Some((superclass, superclass_definition))
+                    });
+                }
             }
 
             // **********************************************************
@@ -398,6 +425,17 @@ fn check_class_declaration<'db>(
             &superclass_method,
         );
     }
+
+    if let Some((superclass, superclass_definition)) = overridden_final_variable {
+        report_overridden_final_variable(
+            context,
+            &member.name,
+            *first_reachable_definition,
+            superclass,
+            class,
+            superclass_definition,
+        );
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -416,6 +454,7 @@ bitflags! {
         const FINAL_METHOD_OVERRIDDEN = 1 << 2;
         const PROHIBITED_NAMED_TUPLE_ATTR = 1 << 3;
         const INVALID_DATACLASS = 1 << 4;
+        const FINAL_VARIABLE_OVERRIDDEN = 1 << 5;
     }
 }
 
@@ -441,6 +480,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS)) {
             config |= OverrideRulesConfig::INVALID_DATACLASS;
         }
+        if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_VARIABLE)) {
+            config |= OverrideRulesConfig::FINAL_VARIABLE_OVERRIDDEN;
+        }
 
         config
     }
@@ -465,6 +507,10 @@ impl OverrideRulesConfig {
 
     const fn check_invalid_dataclasses(self) -> bool {
         self.contains(OverrideRulesConfig::INVALID_DATACLASS)
+    }
+
+    const fn check_final_variable_overridden(self) -> bool {
+        self.contains(OverrideRulesConfig::FINAL_VARIABLE_OVERRIDDEN)
     }
 }
 

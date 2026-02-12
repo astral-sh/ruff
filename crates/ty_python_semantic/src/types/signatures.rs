@@ -27,8 +27,8 @@ use crate::types::relation::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, infer_complete_scope_types,
-    todo_type,
+    ParamSpecAttrKind, SelfBinding, TypeContext, TypeMapping, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -710,6 +710,7 @@ impl<'db> Signature<'db> {
             full_generic_context,
             &parameters,
             return_ty,
+            definition,
         );
 
         Self {
@@ -933,10 +934,8 @@ impl<'db> Signature<'db> {
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type {
-            let self_mapping = TypeMapping::BindSelf {
-                self_type,
-                binding_context,
-            };
+            let self_mapping =
+                TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,
@@ -956,10 +955,11 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        let self_mapping = TypeMapping::BindSelf {
+        let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
+            db,
             self_type,
-            binding_context: self.definition.map(BindingContext::Definition),
-        };
+            self.definition.map(BindingContext::Definition),
+        ));
         let parameters = self.parameters.apply_type_mapping_impl(
             db,
             &self_mapping,

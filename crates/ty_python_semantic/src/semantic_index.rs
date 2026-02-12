@@ -640,6 +640,11 @@ impl<'db> SemanticIndex<'db> {
     ///
     /// If the number of definitions associated with the key is not exactly 1 and
     /// the `debug_assertions` feature is enabled, this method will panic.
+    ///
+    /// It is generally safe to use this method for any AST node that does not
+    /// correspond to a `*` (wildcard) import, since `*` imports are the only
+    /// situations that can result in multiple definitions being associated with a
+    /// single AST node.
     #[track_caller]
     pub(crate) fn expect_single_definition(
         &self,

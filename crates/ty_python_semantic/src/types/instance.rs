@@ -3,6 +3,9 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use ruff_python_ast::name::Name;
+use ty_module_resolver::{ModuleName, file_to_module};
+
 use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
@@ -148,6 +151,37 @@ impl<'db> Type<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
+        // `self` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
+        // `self` has the protocol class in its MRO. This is a much cheaper check than the
+        // structural check we perform below, so we do it first to avoid the structural check when
+        // we can.
+        let mut result = ConstraintSet::from(false);
+        if let Some(nominal_instance) = protocol.to_nominal_instance() {
+            // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
+            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
+            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
+            // `Q`'s members in a Liskov-incompatible way.
+            let type_to_test = self
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance)
+                .map(Type::NominalInstance)
+                .unwrap_or(self);
+            let nominally_satisfied = type_to_test.has_relation_to_impl(
+                db,
+                Type::NominalInstance(nominal_instance),
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            );
+            if result
+                .union(db, nominally_satisfied)
+                .is_always_satisfied(db)
+            {
+                return result;
+            }
+        }
+
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
             self_protocol.interface(db).has_relation_to_impl(
                 db,
@@ -173,37 +207,7 @@ impl<'db> Type<'db> {
                     )
                 })
         };
-
-        // Even if `self` does not satisfy the protocol from a structural perspective,
-        // we may still need to consider it as satisfying the protocol if `protocol` is
-        // a class-based protocol and `self` has the protocol class in its MRO.
-        //
-        // This matches the behaviour of other type checkers, and is required for us to
-        // recognise `str` as a subtype of `Container[str]`.
-        structurally_satisfied.or(db, || {
-            let Some(nominal_instance) = protocol.to_nominal_instance() else {
-                return ConstraintSet::from(false);
-            };
-
-            // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
-            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
-            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
-            // `Q`'s members in a Liskov-incompatible way.
-            let type_to_test = self
-                .as_protocol_instance()
-                .and_then(ProtocolInstanceType::to_nominal_instance)
-                .map(Type::NominalInstance)
-                .unwrap_or(self);
-
-            type_to_test.has_relation_to_impl(
-                db,
-                Type::NominalInstance(nominal_instance),
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            )
-        })
+        result.or(db, || structurally_satisfied)
     }
 }
 
@@ -232,6 +236,24 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
 }
 
 impl<'db> NominalInstanceType<'db> {
+    /// Returns the name of the class this is an instance of.
+    ///
+    /// For example, for an instance of `builtins.str`, this returns `"str"`.
+    pub fn class_name(&self, db: &'db dyn Db) -> &'db Name {
+        self.class(db).name(db)
+    }
+
+    /// Returns the fully qualified module name of the module in which the class
+    /// is defined, if it can be resolved.
+    ///
+    /// For example, for an instance of `pathlib.Path`, this returns
+    /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
+    /// to a known module (e.g. for classes defined in scripts or notebooks).
+    pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
+        let file = self.class(db).class_literal(db).file(db);
+        file_to_module(db, file).map(|module| module.name(db))
+    }
+
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),

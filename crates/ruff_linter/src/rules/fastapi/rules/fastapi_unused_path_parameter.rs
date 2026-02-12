@@ -194,11 +194,13 @@ pub(crate) fn fastapi_unused_path_parameter(
                 .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
         );
         if !is_positional && is_identifier(path_param) && path_param != "__debug__" {
-            diagnostic.set_fix(Fix::unsafe_edit(add_parameter(
+            if let Some(edit) = add_parameter(
                 path_param,
                 &function_def.parameters,
                 checker.locator().contents(),
-            )));
+            ) {
+                diagnostic.set_fix(Fix::unsafe_edit(edit));
+            }
         }
     }
 }

@@ -8,7 +8,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
-    github::{DisplayGithubDiagnostics, GithubRenderer},
 };
 use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
@@ -1320,6 +1319,8 @@ impl SubDiagnosticSeverity {
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
+    /// The program name used in structured output formats (e.g., JUnit, GitHub).
+    program: &'static str,
     /// The format to use for diagnostic rendering.
     ///
     /// This uses the "full" format by default.
@@ -1361,6 +1362,21 @@ pub struct DisplayDiagnosticConfig {
 }
 
 impl DisplayDiagnosticConfig {
+    pub fn new(program: &'static str) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            program,
+            format: DiagnosticFormat::default(),
+            color: false,
+            context: 2,
+            preview: false,
+            hide_severity: false,
+            show_fix_status: false,
+            show_fix_diff: false,
+            fix_applicability: Applicability::Safe,
+            cancellation_token: None,
+        }
+    }
+
     /// Whether to enable concise diagnostic output or not.
     pub fn format(self, format: DiagnosticFormat) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { format, ..self }
@@ -1444,22 +1460,6 @@ impl DisplayDiagnosticConfig {
         self.cancellation_token
             .as_ref()
             .is_some_and(|token| token.is_cancelled())
-    }
-}
-
-impl Default for DisplayDiagnosticConfig {
-    fn default() -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
-            format: DiagnosticFormat::default(),
-            color: false,
-            context: 2,
-            preview: false,
-            hide_severity: false,
-            show_fix_status: false,
-            show_fix_diff: false,
-            fix_applicability: Applicability::Safe,
-            cancellation_token: None,
-        }
     }
 }
 

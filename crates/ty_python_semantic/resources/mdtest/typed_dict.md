@@ -258,6 +258,40 @@ a_person: Person
 a_person = {"name": "Alice"}
 ```
 
+Constructor validation should also run when the call target is a generic alias or a `type[...]`
+value:
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class MyGenTD(TypedDict, Generic[T]):
+    a: int
+    b: T
+
+class MyTD(TypedDict):
+    a: int
+
+MyStrTD = MyGenTD[str]
+
+# error: [invalid-argument-type] "Invalid argument to key "a""
+x = MyStrTD(a="foo", b="ok")
+
+# No error: `a` is int, `b` is str (matches T=str)
+w = MyStrTD(a=1, b="ok")
+
+# error: [invalid-argument-type] "Invalid argument to key "b""
+v = MyStrTD(a=1, b=42)
+
+# error: [invalid-argument-type]
+y = MyTD(a="foo")
+
+def _(ATD: type[MyTD]):
+    # error: [invalid-argument-type]
+    z = ATD(a="foo")
+```
+
 All of these have an invalid type for the `name` field:
 
 ```py
@@ -2325,7 +2359,7 @@ class Bing(TypedDict):
 def _(u: Foo | Bar | Baz | Bing):
     if u["tag"] == "foo":
         reveal_type(u)  # revealed: Foo
-    elif u["tag"] == 42:
+    elif 42 == u["tag"]:
         reveal_type(u)  # revealed: Bar
     elif u["tag"] == b"baz":
         reveal_type(u)  # revealed: Baz

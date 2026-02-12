@@ -101,22 +101,26 @@ After a complete if/else where both branches flow through (no terminal), narrowi
 cancelled out at the merge point.
 
 ```py
-def _(x: int | str | None):
-    if isinstance(x, int):
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: A | B | C):
+    if isinstance(x, A):
         pass
     else:
         pass
 
     # Narrowing cancels out: both paths flow, so type is unchanged.
-    reveal_type(x)  # revealed: int | str | None
+    reveal_type(x)  # revealed: A | B | C
 
-    if isinstance(x, str):
-        y = 1
+    if isinstance(x, B):
+        pass
     else:
-        y = 2
+        pass
 
     # Second if-statement's narrowing also cancels out.
-    reveal_type(x)  # revealed: int | str | None
+    reveal_type(x)  # revealed: A | B | C
 ```
 
 ## Narrowing after a `NoReturn` call in one branch
@@ -189,14 +193,14 @@ def _(x: int | None):
 This also works when the always-true condition is nested inside a narrowing branch:
 
 ```py
-def _(val: int | None):
-    if val is None:
+def _(x: int | None):
+    if x is None:
         if 1 + 1 == 2:
             return
 
     # TODO: should be `int` (the inner always-true branch makes the outer
     # if-branch terminal)
-    reveal_type(val)  # revealed: int | None
+    reveal_type(x)  # revealed: int | None
 ```
 
 ## Narrowing from `assert` should not affect reassigned variables
