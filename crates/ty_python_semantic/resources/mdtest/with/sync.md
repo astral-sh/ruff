@@ -195,3 +195,145 @@ class Manager:
 with Manager():
     ...
 ```
+
+## `with` statement suppresses exceptions if `__exit__` returns a truthy value
+
+References:
+
+- <https://typing.python.org/en/latest/spec/exceptions.html#context-managers>
+
+If the return type of a context manager's `__exit__` method is `Literal[True]` or `bool`, the
+context manager is treated as suppressing exceptions raised within the `with` body.
+
+```py
+from typing import Literal, Any
+
+def f() -> str:
+    raise NotImplementedError()
+
+class ExceptionSuppressor1:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[True]:
+        return True
+
+class ExceptionSuppressor2:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class ExceptionPropagator1:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
+
+class ExceptionPropagator2:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        return
+
+class ExceptionPropagator3:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> bool | None:
+        return False
+
+class ExceptionPropagator4:
+    def __enter__(self) -> None: ...
+    def __exit__(self, exc_type, exc_value, traceback) -> Any:
+        return f()
+
+def suppress1(x: int):
+    y: int | str = x
+    with ExceptionSuppressor1() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+def suppress2(x: int):
+    y: int | str = x
+    with ExceptionSuppressor2() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+def suppress3(x: int | str) -> None:
+    if isinstance(x, int):
+        with ExceptionSuppressor1():
+            raise ValueError
+    reveal_type(x)  # revealed: int | str
+
+def propagate1(x: int):
+    y: int | str = x
+    # Since exceptions are not suppressed, we can assume that this block will always be executed to the end (or an exception is raised).
+    with ExceptionPropagator1() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+def propagate2(x: int):
+    y: int | str = x
+    with ExceptionPropagator2() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+def propagate3(x: int):
+    y: int | str = x
+    with ExceptionPropagator3() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+def propagate4(x: int):
+    y: int | str = x
+    with ExceptionPropagator4() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+def propagate5(x: int | str) -> None:
+    if isinstance(x, int):
+        with ExceptionPropagator1():
+            raise ValueError
+    # TODO: should be `str`
+    reveal_type(x)  # revealed: int | str
+```
+
+According to [PEP-343](https://peps.python.org/pep-0343/#specification-the-with-statement), a with
+statement can be translated to a try statement. The following test verifies their equivalence:
+
+```python
+import sys
+
+def propagate5_try(x: int | str) -> None:
+    if isinstance(x, int):
+        mgr = ExceptionPropagator1()
+        exit = type(mgr).__exit__
+        value = type(mgr).__enter__(mgr)
+        exc = True
+        try:
+            try:
+                raise ValueError
+            except:
+                exc = False
+                if not exit(mgr, *sys.exc_info()):
+                    raise
+        finally:
+            if exc:
+                exit(mgr, None, None, None)
+    # TODO: should be `str`
+    reveal_type(x)  # revealed: int | str
+```

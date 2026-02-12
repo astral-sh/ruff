@@ -2570,7 +2570,7 @@ impl<'db> Type<'db> {
     ///
     /// Basically corresponds to `self.to_meta_type().find_name_in_mro(name)`, except for the handling
     /// of union and intersection types.
-    fn class_member(self, db: &'db dyn Db, name: Name) -> PlaceAndQualifiers<'db> {
+    pub(crate) fn class_member(self, db: &'db dyn Db, name: Name) -> PlaceAndQualifiers<'db> {
         self.class_member_with_policy(db, name, MemberLookupPolicy::default())
     }
 

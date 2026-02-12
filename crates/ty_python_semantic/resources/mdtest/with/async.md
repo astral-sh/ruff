@@ -200,6 +200,122 @@ async def main():
         ...
 ```
 
+## `async with` statement suppresses exceptions if `__aexit__` returns a truthy value
+
+References:
+
+- <https://typing.python.org/en/latest/spec/exceptions.html#context-managers>
+
+If the return type of a context manager's `__aexit__` method is `Literal[True]` or `bool`, the
+context manager is treated as suppressing exceptions raised within the `async with` body.
+
+```py
+from typing import Literal, Any
+
+def f() -> str:
+    raise NotImplementedError()
+
+class ExceptionSuppressor1:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[True]:
+        return True
+
+class ExceptionSuppressor2:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool:
+        return True
+
+class ExceptionPropagator1:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Literal[False]:
+        return False
+
+class ExceptionPropagator2:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> None:
+        return
+
+class ExceptionPropagator3:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> bool | None:
+        return False
+
+class ExceptionPropagator4:
+    async def __aenter__(self) -> None: ...
+    async def __aexit__(self, exc_type, exc_value, traceback) -> Any:
+        return f()
+
+async def suppress1(x: int):
+    y: int | str = x
+    async with ExceptionSuppressor1() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+async def suppress2(x: int):
+    y: int | str = x
+    async with ExceptionSuppressor2() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: int | str
+    # error: [possibly-unresolved-reference]
+    reveal_type(z)  # revealed: str
+
+async def suppress3(x: int | str) -> None:
+    if isinstance(x, int):
+        async with ExceptionSuppressor1():
+            raise ValueError
+    reveal_type(x)  # revealed: int | str
+
+async def propagate1(x: int):
+    y: int | str = x
+    # Since exceptions are not suppressed, we can assume that this block will always be executed to the end (or an exception is raised).
+    async with ExceptionPropagator1() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+async def propagate2(x: int):
+    y: int | str = x
+    async with ExceptionPropagator2() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+async def propagate3(x: int):
+    y: int | str = x
+    async with ExceptionPropagator3() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+async def propagate4(x: int):
+    y: int | str = x
+    async with ExceptionPropagator4() as ex:
+        y = f()
+        z = f()
+    reveal_type(ex)  # revealed: None
+    reveal_type(y)  # revealed: str
+    reveal_type(z)  # revealed: str
+
+async def propagator5(x: int | str) -> None:
+    if isinstance(x, int):
+        async with ExceptionPropagator1():
+            raise ValueError
+    # TODO: should be `str`
+    reveal_type(x)  # revealed: int | str
+```
+
 ## `@asynccontextmanager`
 
 ```py

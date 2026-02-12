@@ -200,7 +200,7 @@ use rustc_hash::FxHashMap;
 
 use crate::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{RequiresExplicitReExport, imported_symbol};
+use crate::place::{Place, RequiresExplicitReExport, imported_symbol};
 use crate::rank::RankBitBox;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
@@ -208,8 +208,8 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
-    infer_expression_type,
+    CallableTypes, IntersectionBuilder, KnownClass, Truthiness, Type, TypeContext, UnionBuilder,
+    UnionType, infer_expression_type,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -867,6 +867,39 @@ impl ReachabilityConstraints {
                 infer_expression_type(db, test_expr, TypeContext::default())
                     .bool(db)
                     .negate_if(!predicate.is_positive)
+            }
+            PredicateNode::ContextManagerExit {
+                context_expr,
+                is_async,
+            } => {
+                // If a context manager class implements `__exit__` (or `__aexit__`), its behavior of whether to suppress the exception or not will depend on the return value.
+                // If a truthy value is returned, the exception will be suppressed, but if a falsy value is returned, the exception will be propagated.
+                // Therefore, if a truthy value may be returned, we must consider the possibility that
+                // handling within the with statement body will be interrupted and subsequent handling will continue.
+                // That is,
+                // * Truthy (<=> Literal[True] or bool) => Exceptions may be suppressed => The body may be interrupted => The reachability is ambiguous
+                // * Otherwise                          => Exceptions are propagated    => The body is fully executed  => The body is reachable
+                // Ref: https://typing.python.org/en/latest/spec/exceptions.html#context-managers
+                let context_manager_ty =
+                    infer_expression_type(db, context_expr, TypeContext::default());
+                let exit_method = if is_async {
+                    context_manager_ty.class_member(db, "__aexit__".into())
+                } else {
+                    context_manager_ty.class_member(db, "__exit__".into())
+                };
+                if let Place::Defined(exit) = exit_method.place
+                    && let Some(__exit__) = exit.ty.as_function_literal()
+                    && let return_ty = __exit__
+                        .last_definition_raw_signature(db)
+                        .return_ty
+                    // The specification states that only these two cases should be treated as exceptions that can be suppressed.
+                    && (return_ty.is_equivalent_to(db, KnownClass::Bool.to_instance(db))
+                        || return_ty.is_equivalent_to(db, Type::BooleanLiteral(true)))
+                {
+                    Truthiness::Ambiguous
+                } else {
+                    Truthiness::AlwaysTrue.negate_if(!predicate.is_positive)
+                }
             }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,

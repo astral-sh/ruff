@@ -915,7 +915,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
                             .pattern(pattern, module)
                     }
-                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                    PredicateNode::ReturnsNever(_)
+                    | PredicateNode::StarImportPlaceholder(_)
+                    | PredicateNode::ContextManagerExit { .. } => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
                     }
@@ -2097,6 +2099,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 is_async,
                 ..
             }) => {
+                let mut with_exit_reachability = ScopedReachabilityConstraintId::ALWAYS_TRUE;
+
                 for item @ ast::WithItem {
                     range: _,
                     node_index: _,
@@ -2104,9 +2108,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     optional_vars,
                 } in items
                 {
+                    let context_manager = self.add_standalone_expression(context_expr);
                     self.visit_expr(context_expr);
                     if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
@@ -2116,8 +2120,79 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             context_manager,
                         );
                     }
+
+                    // Context managers may silence exceptions.
+                    // Please refer `ReachabilityConstraints::analyze_single` for more details.
+                    let predicate = PredicateOrLiteral::Predicate(Predicate {
+                        node: PredicateNode::ContextManagerExit {
+                            context_expr: context_manager,
+                            is_async: *is_async,
+                        },
+                        is_positive: true,
+                    });
+                    let predicate_id = self.add_predicate(predicate);
+                    let reachability = self
+                        .current_reachability_constraints_mut()
+                        .add_atom(predicate_id);
+                    // A with statement with multiple context managers (`with A(), B(): ...`) is equivalent to nested with statements.
+                    // An exception escapes the whole statement only if all managers
+                    // choose propagation, so we combine per-manager escape conditions
+                    // with logical AND, starting from `ALWAYS_TRUE`.
+                    with_exit_reachability = self
+                        .current_reachability_constraints_mut()
+                        .add_and_constraint(with_exit_reachability, reachability);
                 }
+
+                // To model the control flow of a with statement, we use the mechanism of a try statement.
+                // In fact, the with statement is equivalent to the following try/except/finally statements
+                // (https://peps.python.org/pep-0343/#specification-the-with-statement):
+                // ```python
+                // with EXPR as VAR:
+                //     BLOCK
+                // ```
+                // ↓
+                // ```python
+                // mgr = (EXPR)
+                // exit = type(mgr).__exit__  # Not calling it yet
+                // value = type(mgr).__enter__(mgr)
+                // exc = True
+                // try:
+                //     try:
+                //         VAR = value  # Only if "as VAR" is present
+                //         BLOCK
+                //     except:
+                //         # The exceptional case is handled here
+                //         exc = False
+                //         if not exit(mgr, *sys.exc_info()):
+                //             raise
+                //         # The exception is swallowed if exit() returns true
+                // finally:
+                //     # The normal and non-local-goto cases are handled here
+                //     if exc:
+                //         exit(mgr, None, None, None)
+                // ```
+
+                // Save the state before entering the with body = `BLOCK`.
+                let pre_with_state = self.flow_snapshot();
+                self.try_node_context_stack_manager.push_context();
                 self.visit_body(body);
+                let raised_states = self.try_node_context_stack_manager.pop_context();
+                let normal_post_with_state = self.flow_snapshot();
+
+                // Handle the exceptional path:
+                // start from the pre-with state, merge in all intermediate states that could raise,
+                // then keep only the branch where the exception is suppressed.
+                self.flow_restore(pre_with_state);
+                for raised_state in raised_states {
+                    self.flow_merge(raised_state);
+                }
+                self.record_negated_reachability_constraint(with_exit_reachability);
+                let suppressed_state = self.flow_snapshot();
+
+                // Handle the normal path (`finally` with `exc` still true),
+                // then merge with the suppressed-exception path.
+                self.flow_restore(normal_post_with_state);
+                self.flow_merge(suppressed_state);
             }
 
             ast::Stmt::For(
