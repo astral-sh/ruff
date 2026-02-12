@@ -93,11 +93,12 @@ reveal_type(Foo(1))  # revealed: Foo
 
 ### Metaclass `__call__` with specific parameters
 
-When the metaclass `__call__` has specific parameters (not just `*args, **kwargs`), we should check
-the metaclass `__call__` signature, even if the return type is the instance type.
+When the metaclass `__call__` has specific parameters (not just `*args, **kwargs`), we validate them
+even when the return type is an instance type. Here `__init__` accepts anything, so the errors must
+come from the metaclass `__call__`.
 
 ```py
-from typing import TypeVar
+from typing import Any, TypeVar
 
 T = TypeVar("T")
 
@@ -106,10 +107,10 @@ class Meta(type):
         return object.__new__(cls)
 
 class Foo(metaclass=Meta):
-    def __init__(self, x: int) -> None:
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
         pass
 
-# The metaclass __call__ has specific parameters, so we check them.
+# The metaclass `__call__` requires exactly one `int` argument.
 Foo("wrong")  # error: [invalid-argument-type]
 Foo()  # error: [missing-argument]
 reveal_type(Foo(1))  # revealed: Foo
@@ -193,8 +194,8 @@ reveal_type(Foo("wrong"))  # revealed: Any
 ### Overloaded metaclass `__call__` with mixed return types
 
 When a metaclass `__call__` is overloaded and some overloads return the class instance type while
-others return a different type, we should fall through to `__new__`/`__init__` since the metaclass
-isn't uniformly overriding normal construction.
+others return a different type, non-instance-returning overloads use the metaclass `__call__`
+directly, while instance-returning overloads are replaced by `__init__` validation.
 
 ```py
 from typing import Any, overload
@@ -211,10 +212,16 @@ class Foo(metaclass=Meta):
     def __init__(self, x: int) -> None:
         pass
 
-# Because one overload returns `Foo` (an instance), we fall through to check __init__.
-Foo("wrong")  # error: [invalid-argument-type]
-Foo()  # error: [missing-argument]
-reveal_type(Foo(1))  # revealed: Foo
+# The `int` overload from the metaclass `__call__` is selected; its return type
+# is not an instance of `Foo`, so it is used directly.
+reveal_type(Foo(1))  # revealed: int
+
+# The `str -> Foo` metaclass overload would return an instance, so `__init__` is
+# checked instead. `__init__` expects `x: int`, but got `str`.
+Foo("hello")  # error: [no-matching-overload]
+
+# No overload matches.
+Foo()  # error: [no-matching-overload]
 ```
 
 ### Overloaded metaclass `__call__` returning only non-instance types

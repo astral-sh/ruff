@@ -4848,6 +4848,18 @@ impl<'db> Type<'db> {
                 | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
         );
 
+        let is_non_instance_overload = |sig: &Signature<'db>| {
+            !sig.return_ty.has_typevar(db)
+                && ConstructorReturnDisposition::of(db, sig.return_ty, class).is_not_instance()
+        };
+
+        // For overloaded metaclass `__call__` with mixed return types, we save the
+        // non-instance overloads and combine them with `__init__` after lookup.
+        // For instance-returning metaclass `__call__`, we save the bindings to include
+        // in the union with `__new__`/`__init__` so its parameters also get validated.
+        let mut metaclass_mixed_non_instance_sigs = None;
+        let mut metaclass_instance_bindings: Option<(Bindings<'db>, Type<'db>)> = None;
+
         if let Place::Defined(DefinedPlace {
             ty: Type::BoundMethod(metaclass_call_method),
             ..
@@ -4855,19 +4867,35 @@ impl<'db> Type<'db> {
         {
             let signature = metaclass_call_method.function(db).signature(db);
 
-            // All overloads must return a non-instance type for us to treat the metaclass
-            // `__call__` as fully overriding `type.__call__`. If any overload returns the
-            // class instance type (or contains typevars), fall through to
-            // evaluate `__new__`/`__init__`.
-            let all_overloads_return_non_instance = !signature.overloads.is_empty()
-                && signature.overloads.iter().all(|sig| {
-                    !sig.return_ty.has_typevar(db)
-                        && ConstructorReturnDisposition::of(db, sig.return_ty, class)
-                            .is_not_instance()
-                });
+            let non_instance_sigs: SmallVec<[Signature<'db>; 4]> = signature
+                .overloads
+                .iter()
+                .filter(|sig| is_non_instance_overload(sig))
+                .cloned()
+                .collect();
 
-            if all_overloads_return_non_instance {
-                return Type::BoundMethod(metaclass_call_method).bindings(db);
+            if !non_instance_sigs.is_empty() {
+                if non_instance_sigs.len() == signature.overloads.len() {
+                    // All overloads return non-instance types: use metaclass `__call__` directly.
+                    return Type::BoundMethod(metaclass_call_method).bindings(db);
+                }
+
+                // Mixed: save non-instance overloads (pre-bound, removing `cls`) for
+                // later combination with `__init__` overloads.
+                let metaclass_self = metaclass_call_method.self_instance(db);
+                metaclass_mixed_non_instance_sigs = Some(
+                    non_instance_sigs
+                        .iter()
+                        .map(|sig| sig.bind_self(db, Some(metaclass_self)))
+                        .collect::<SmallVec<[Signature<'db>; 4]>>(),
+                );
+            } else {
+                // All overloads return instance/uncertain types. Save the metaclass
+                // `__call__` bindings so we can include them in the union with
+                // `__new__`/`__init__` — this ensures the metaclass parameters are validated.
+                let metaclass_call_ty = Type::BoundMethod(metaclass_call_method);
+                metaclass_instance_bindings =
+                    Some((metaclass_call_ty.bindings(db), metaclass_call_ty));
             }
         }
 
@@ -5029,23 +5057,78 @@ impl<'db> Type<'db> {
             (Place::Undefined, true) => None,
         };
 
+        // If the metaclass `__call__` had mixed return types (some non-instance, some instance),
+        // combine the non-instance metaclass overloads with `__init__` overloads into a single
+        // set of overloads. The overload resolution algorithm will then naturally select the
+        // metaclass overload for non-instance calls and `__init__` for instance-returning calls.
+        if let Some(non_instance_sigs) = metaclass_mixed_non_instance_sigs {
+            let mut combined_sigs = non_instance_sigs;
+
+            // Extract `__init__` signatures, pre-bind (removing `self`), set return type
+            // to the class instance type.
+            let init_method_ty = init_bindings.as_ref().map(|(_, ty)| *ty).or_else(|| {
+                // Fall back to `object.__init__` lookup if no custom `__init__` was found.
+                let init_with_object = lookup_init_ty.member_lookup_with_policy(
+                    db,
+                    "__init__".into(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                );
+                match init_with_object.place {
+                    Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
+                    Place::Undefined => None,
+                }
+            });
+
+            if let Some(Type::BoundMethod(init_bm)) = init_method_ty {
+                let init_self = init_bm.self_instance(db);
+                let init_sig = init_bm.function(db).signature(db);
+                for sig in &init_sig.overloads {
+                    let mut bound_sig = sig.bind_self(db, Some(init_self));
+                    bound_sig.return_ty = constructor_instance_ty;
+                    combined_sigs.push(bound_sig);
+                }
+            } else {
+                // Can't extract raw `__init__` signatures (e.g., union type).
+                // Fall back to a gradual signature for the instance-returning overloads.
+                combined_sigs.push(Signature::new(
+                    Parameters::gradual_form(),
+                    constructor_instance_ty,
+                ));
+            }
+
+            let bindings: Bindings<'db> =
+                CallableBinding::from_overloads(self, combined_sigs).into();
+            return bindings.with_generic_context(db, class_generic_context);
+        }
+
         let bindings = if let Some(bindings) = missing_init_bindings {
             bindings
         } else {
-            match (new_bindings, init_bindings) {
-                (Some((new_bindings, new_callable)), Some((init_bindings, init_callable))) => {
-                    let callable_type = UnionBuilder::new(db)
-                        .add(new_callable)
-                        .add(init_callable)
-                        .build();
-                    // Use both `__new__` and `__init__` bindings so argument inference/checking
-                    // happens under the combined constructor-call type context.
-                    // In ty unions of callables are checked as "all must accept".
-                    Bindings::from_union(callable_type, [new_bindings, init_bindings])
+            // Collect all bindings that must accept the constructor call.
+            // This may include `__new__`, `__init__`, and/or a metaclass `__call__`.
+            let mut all_bindings: SmallVec<[Bindings<'db>; 3]> = SmallVec::new();
+            let mut callable_type_builder = UnionBuilder::new(db);
+
+            if let Some((metaclass_bindings, metaclass_ty)) = metaclass_instance_bindings {
+                all_bindings.push(metaclass_bindings);
+                callable_type_builder = callable_type_builder.add(metaclass_ty);
+            }
+            if let Some((new_bindings, new_callable)) = new_bindings {
+                all_bindings.push(new_bindings);
+                callable_type_builder = callable_type_builder.add(new_callable);
+            }
+            if let Some((init_bindings, init_callable)) = init_bindings {
+                all_bindings.push(init_bindings);
+                callable_type_builder = callable_type_builder.add(init_callable);
+            }
+
+            match all_bindings.len() {
+                0 => return fallback_bindings(),
+                1 => all_bindings.into_iter().next().unwrap(),
+                _ => {
+                    let callable_type = callable_type_builder.build();
+                    Bindings::from_union(callable_type, all_bindings)
                 }
-                (Some((new_bindings, _)), None) => new_bindings,
-                (None, Some((init_bindings, _))) => init_bindings,
-                (None, None) => return fallback_bindings(),
             }
         };
 
