@@ -136,6 +136,38 @@ Foo("wrong")  # error: [invalid-argument-type]
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
+### Metaclass `__call__` returning a specific class affects subclasses
+
+When a metaclass `__call__` returns a specific class (e.g., `-> Foo`), this is an instance type for
+`Foo` itself, so `__init__` is checked. But for a subclass `Bar(Foo)`, the return type `Foo` is NOT
+an instance of `Bar`, so the metaclass `__call__` is used directly and `Bar.__init__` is skipped.
+
+```py
+from typing import Any
+
+class Meta(type):
+    def __call__(cls, *args: Any, **kwargs: Any) -> "Foo":
+        return super().__call__(*args, **kwargs)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+class Bar(Foo):
+    def __init__(self, y: str) -> None:
+        pass
+
+# For Foo: return type `Foo` IS an instance of `Foo`, so `__init__` is checked.
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+
+# For Bar: return type `Foo` is NOT an instance of `Bar`, so `__init__` is
+# skipped and the metaclass `__call__` (which accepts `*args, **kwargs`) is
+# used directly.
+reveal_type(Bar())  # revealed: Foo
+reveal_type(Bar("hello"))  # revealed: Foo
+```
+
 ### Metaclass `__call__` returning bare `type`
 
 When the metaclass `__call__` is annotated as returning `type`, we use that return type. This is
