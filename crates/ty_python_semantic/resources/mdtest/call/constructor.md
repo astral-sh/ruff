@@ -24,7 +24,6 @@ Since every class has `object` in its MRO, the default implementations are `obje
 As of today there are a number of behaviors that we do not support:
 
 - `__new__` is assumed to return an instance of the class on which it is called
-- User defined `__call__` on metaclass is ignored
 
 ## Creating an instance of the `object` class itself
 
@@ -258,6 +257,27 @@ class Box(Generic[T]):
     def __init__(self, x: T) -> None: ...
 
 reveal_type(Box(1))  # revealed: Box[int]
+```
+
+## `__new__` with method-level type variables mapping to class specialization
+
+When `__new__` has its own type parameters that map to the class's type parameter through the return
+type, we should correctly infer the class specialization.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    x: T
+
+    def __new__[S](cls, x: S) -> "C[tuple[S, S]]":
+        return object.__new__(cls)
+
+reveal_type(C(1))  # revealed: C[tuple[int, int]]
+reveal_type(C("hello"))  # revealed: C[tuple[str, str]]
 ```
 
 ## Constructor calls through `type[T]` with a bound TypeVar

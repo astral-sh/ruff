@@ -334,6 +334,10 @@ impl<'db> Bindings<'db> {
             return Some(constructor_instance_type);
         };
         let class_context = class_specialization.generic_context(db);
+        let class_literal = constructor_instance_type
+            .as_nominal_instance()
+            .and_then(|inst| inst.class(db).static_class_literal(db))
+            .map(|(lit, _)| lit);
 
         let mut combined: Option<Specialization<'db>> = None;
         for binding in &self.elements {
@@ -342,10 +346,19 @@ impl<'db> Bindings<'db> {
             let Some((_, overload)) = binding.matching_overloads().next() else {
                 continue;
             };
-            let Some(specialization) = overload.specialization else {
-                continue;
-            };
-            let Some(specialization) = specialization.restrict(db, class_context) else {
+            // Prefer extracting the class specialization from the resolved return type
+            // (handles `__new__[S](cls, x: S) -> C[tuple[S, S]]` where method-level type
+            // variables map to the class specialization through the return type).
+            // Fall back to restricting the inferred specialization to class-level type
+            // variables.
+            let specialization = class_literal
+                .and_then(|lit| overload.return_ty.specialization_of(db, lit))
+                .or_else(|| {
+                    overload
+                        .specialization
+                        .and_then(|s| s.restrict(db, class_context))
+                });
+            let Some(specialization) = specialization else {
                 continue;
             };
             combined = Some(match combined {
@@ -3378,7 +3391,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
+            let return_ty = self.return_ty;
 
             let mut combined_tcx = TypeContext::default();
             let mut variance_in_return = TypeVarVariance::Bivariant;
@@ -4024,9 +4037,27 @@ impl<'db> Binding<'db> {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
         // For constructor calls, return the constructed instance type (not `__init__`'s `None`).
-        self.return_ty = self
-            .constructor_instance_type
-            .unwrap_or(self.signature.return_ty);
+        // If `__new__` declares a return type that is a specialization of the class being
+        // constructed (e.g. `C[tuple[S, S]]`), prefer that over the generic constructor instance
+        // type (`C[T]`), so that method-level type variables are properly solved.
+        self.return_ty = if let Some(cit) = self.constructor_instance_type {
+            let sig_return_is_same_class = cit
+                .as_nominal_instance()
+                .and_then(|inst| inst.class(db).static_class_literal(db))
+                .is_some_and(|(lit, _)| {
+                    self.signature
+                        .return_ty
+                        .specialization_of(db, lit)
+                        .is_some()
+                });
+            if sig_return_is_same_class {
+                self.signature.return_ty
+            } else {
+                cit
+            }
+        } else {
+            self.signature.return_ty
+        };
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
