@@ -1997,18 +1997,17 @@ impl<'db> TupleSpecBuilder<'db> {
 
     /// Transitions from a Fixed builder to a Variable builder by setting
     /// the variable-length element. Existing fixed elements become the prefix.
+    ///
+    /// Callers must ensure this is only called once (i.e., on a `Fixed` builder).
+    /// Multiple unpacked variadic tuples are diagnosed at the call site.
     pub(crate) fn set_variable(self, variable: Type<'db>) -> Self {
-        match self {
-            TupleSpecBuilder::Fixed(prefix) => TupleSpecBuilder::Variable {
-                prefix,
-                variable,
-                suffix: Vec::new(),
-            },
-            TupleSpecBuilder::Variable { .. } => {
-                // Already variable — this shouldn't happen as we check for
-                // multiple unpacked variadic tuples. Keep the first one.
-                self
-            }
+        let TupleSpecBuilder::Fixed(prefix) = self else {
+            unreachable!("set_variable called on an already-variable builder")
+        };
+        TupleSpecBuilder::Variable {
+            prefix,
+            variable,
+            suffix: Vec::new(),
         }
     }
 

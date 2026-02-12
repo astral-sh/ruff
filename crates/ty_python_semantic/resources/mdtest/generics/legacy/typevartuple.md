@@ -198,6 +198,21 @@ VariadicAlias = tuple[T, *Ts]
 VariadicAlias[*Ts2]
 ```
 
+### Only tuples and TypeVarTuples can be unpacked in tuple types
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+# error: [invalid-type-form] "Only `TypeVarTuple` and `tuple` types can be unpacked in a `tuple` type expression"
+x: tuple[*int]
+
+# error: [invalid-type-form] "Only `TypeVarTuple` and `tuple` types can be unpacked in a `tuple` type expression"
+y: tuple[*list[str], int]
+```
+
 ### Mixed TypeVar and TypeVarTuple
 
 ```py

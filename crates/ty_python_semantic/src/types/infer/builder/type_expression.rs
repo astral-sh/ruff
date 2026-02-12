@@ -702,7 +702,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             //    both `KnownInstance(TypeVar(...))` and bound `TypeVar` forms
                             if starred_value_ty.is_typevartuple(self.db()) {
                                 report_too_many_unpacked_tuples();
-                                element_types = element_types.set_variable(element_ty);
+                                if let TupleSpecBuilder::Fixed(_) = &element_types {
+                                    element_types = element_types.set_variable(element_ty);
+                                }
                             } else if starred_value_ty
                                 == Type::Dynamic(DynamicType::TodoTypeVarTuple)
                                 || matches!(
@@ -717,7 +719,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 return_todo = true;
                                 report_too_many_unpacked_tuples();
                             } else {
-                                // TODO: emit a diagnostic
+                                self.report_invalid_type_expression(
+                                    element,
+                                    format_args!(
+                                        "Only `TypeVarTuple` and `tuple` types can be \
+                                            unpacked in a `tuple` type expression"
+                                    ),
+                                );
                             }
                         }
                     } else if element_ty.is_typevartuple(self.db()) {
@@ -744,8 +752,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                         } else {
                             first_unpacked_variadic_tuple = Some(element);
+                            element_types = element_types.set_variable(element_ty);
                         }
-                        element_types = element_types.set_variable(element_ty);
                     } else {
                         element_types.push(element_ty);
                     }
