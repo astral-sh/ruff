@@ -195,9 +195,7 @@
 
 use std::cmp::Ordering;
 
-use ruff_db::parsed::parsed_module;
 use ruff_index::{Idx, IndexVec};
-use ruff_python_ast as ast;
 use rustc_hash::FxHashMap;
 
 use crate::Db;
@@ -885,11 +883,11 @@ impl ReachabilityConstraints {
                     node: predicate.node,
                     is_positive: !predicate.is_positive,
                 };
+                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
 
-                // For predicates that don't narrow this place, try a static truthiness fast-path
-                // only for expressions that are likely const-expr.
-                // This avoids expensive analysis on dynamic predicates.
-                if pos_constraint.is_none() && Self::is_const_expression_predicate(db, predicate) {
+                // If this predicate does not narrow the current place and we can statically
+                // determine its truthiness, follow only the reachable branch.
+                if pos_constraint.is_none() && neg_constraint.is_none() {
                     match Self::analyze_single_cached(db, predicate, truthiness_memo) {
                         Truthiness::AlwaysTrue => {
                             return self.narrow_by_constraint_inner(
@@ -904,17 +902,13 @@ impl ReachabilityConstraints {
                             );
                         }
                         Truthiness::AlwaysFalse => {
-                            let neg_constraint =
-                                infer_narrowing_constraint(db, neg_predicate, place);
-                            let false_accumulated =
-                                accumulate_constraint(db, accumulated, neg_constraint);
                             return self.narrow_by_constraint_inner(
                                 db,
                                 predicates,
                                 node.if_false,
                                 base_ty,
                                 place,
-                                false_accumulated,
+                                accumulated,
                                 memo,
                                 truthiness_memo,
                             );
@@ -925,7 +919,6 @@ impl ReachabilityConstraints {
 
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
-                    let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
                     let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
@@ -969,7 +962,6 @@ impl ReachabilityConstraints {
                 );
 
                 // False branch: predicate doesn't hold → accumulate negative narrowing
-                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
                 let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                 let false_ty = self.narrow_by_constraint_inner(
                     db,
@@ -1237,48 +1229,5 @@ impl ReachabilityConstraints {
         let analyzed = Self::analyze_single(db, &predicate);
         memo.insert(predicate, analyzed);
         analyzed
-    }
-
-    /// Cheap syntactic filter for expression predicates where static truthiness is plausible.
-    ///
-    /// This is intentionally conservative and only accepts expressions composed from literals and
-    /// pure operators. It avoids calling expensive `analyze_single` for dynamic expressions where the
-    /// result is almost always ambiguous.
-    fn is_const_expression_predicate(db: &dyn Db, predicate: Predicate<'_>) -> bool {
-        fn is_const_expr(expr: &ast::Expr) -> bool {
-            match expr {
-                ast::Expr::BooleanLiteral(_)
-                | ast::Expr::NoneLiteral(_)
-                | ast::Expr::EllipsisLiteral(_)
-                | ast::Expr::NumberLiteral(_)
-                | ast::Expr::StringLiteral(_)
-                | ast::Expr::BytesLiteral(_) => true,
-                ast::Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_const_expr(operand),
-                ast::Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-                    is_const_expr(left) && is_const_expr(right)
-                }
-                ast::Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
-                    values.iter().all(is_const_expr)
-                }
-                ast::Expr::Compare(ast::ExprCompare {
-                    left, comparators, ..
-                }) => is_const_expr(left) && comparators.iter().all(is_const_expr),
-                ast::Expr::Tuple(ast::ExprTuple { elts, .. })
-                | ast::Expr::List(ast::ExprList { elts, .. })
-                | ast::Expr::Set(ast::ExprSet { elts, .. }) => elts.iter().all(is_const_expr),
-                ast::Expr::Dict(ast::ExprDict { items, .. }) => items.iter().all(|item| {
-                    item.key.as_ref().is_none_or(is_const_expr) && is_const_expr(&item.value)
-                }),
-                _ => false,
-            }
-        }
-
-        match predicate.node {
-            PredicateNode::Expression(expression) => {
-                let parsed = parsed_module(db, expression.file(db)).load(db);
-                is_const_expr(expression.node_ref(db, &parsed))
-            }
-            _ => false,
-        }
     }
 }
