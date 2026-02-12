@@ -542,6 +542,7 @@ pub(crate) mod tests {
     use ruff_db::files::{FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
+    use ruff_python_ast::PythonVersion;
     use ty_module_resolver::SearchPathSettings;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{
@@ -588,6 +589,13 @@ pub(crate) mod tests {
         }
 
         pub fn init_program(&mut self) -> anyhow::Result<()> {
+            self.init_program_with_python_version(PythonVersion::latest_ty())
+        }
+
+        pub fn init_program_with_python_version(
+            &mut self,
+            python_version: PythonVersion,
+        ) -> anyhow::Result<()> {
             let root = self.project().root(self);
 
             let search_paths = SearchPathSettings::new(vec![root.to_path_buf()])
@@ -597,7 +605,10 @@ pub(crate) mod tests {
             Program::from_settings(
                 self,
                 ProgramSettings {
-                    python_version: PythonVersionWithSource::default(),
+                    python_version: PythonVersionWithSource {
+                        source: ty_python_semantic::PythonVersionSource::Default,
+                        version: python_version,
+                    },
                     python_platform: PythonPlatform::default(),
                     search_paths,
                 },
