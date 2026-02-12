@@ -224,11 +224,16 @@ pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: Node<'db>,
     builder: &'c ConstraintSetBuilder<'db>,
+    _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
 }
 
 impl<'db, 'c> ConstraintSet<'db, 'c> {
     fn from_node(builder: &'c ConstraintSetBuilder<'db>, node: Node<'db>) -> Self {
-        Self { node, builder }
+        Self {
+            node,
+            builder,
+            _invariant: PhantomData,
+        }
     }
 
     fn never(builder: &'c ConstraintSetBuilder<'db>) -> Self {
