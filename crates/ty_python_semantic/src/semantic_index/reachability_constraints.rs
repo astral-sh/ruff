@@ -752,6 +752,12 @@ fn accumulate_constraint<'db>(
 }
 
 impl ReachabilityConstraints {
+    /// Returns the number of interior nodes in this scope's reduced TDD pool.
+    #[cfg(feature = "tdd-stats")]
+    pub(crate) fn pool_interior_node_count(&self) -> usize {
+        self.used_interiors.len()
+    }
+
     /// Look up an interior node by its constraint ID.
     fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
         debug_assert!(!id.is_terminal());

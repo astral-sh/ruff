@@ -443,10 +443,23 @@ impl<'db> UseDefMap<'db> {
             self.node_reachability.len() + estimated_narrowing_roots + estimated_snapshot_roots,
         );
         let mut seen_roots: FxHashSet<TddRootRef> = FxHashSet::default();
+        let mut tdd_pool_roots: FxHashSet<ScopedReachabilityConstraintId> = FxHashSet::default();
+        if self.end_of_scope_reachability != ScopedReachabilityConstraintId::ALWAYS_TRUE
+            && self.end_of_scope_reachability != ScopedReachabilityConstraintId::ALWAYS_FALSE
+            && self.end_of_scope_reachability != ScopedReachabilityConstraintId::AMBIGUOUS
+        {
+            tdd_pool_roots.insert(self.end_of_scope_reachability);
+        }
 
         let mut push_root = |root: TddRootRef| {
             if !seen_roots.insert(root) {
                 return;
+            }
+            if root.constraint != ScopedReachabilityConstraintId::ALWAYS_TRUE
+                && root.constraint != ScopedReachabilityConstraintId::ALWAYS_FALSE
+                && root.constraint != ScopedReachabilityConstraintId::AMBIGUOUS
+            {
+                tdd_pool_roots.insert(root.constraint);
             }
             roots.push(TddRootStat {
                 root,
@@ -456,6 +469,7 @@ impl<'db> UseDefMap<'db> {
                 max_depth: self.reachability_constraints.max_depth(root.constraint),
             });
         };
+
         for (&node, &constraint) in &self.node_reachability {
             push_root(TddRootRef {
                 kind: TddRootKind::NodeReachability,
@@ -563,7 +577,12 @@ impl<'db> UseDefMap<'db> {
         hot_nodes.shrink_to_fit();
         hot_nodes.sort();
 
-        TddStatsReport::from_roots(roots, hot_nodes)
+        TddStatsReport::from_roots(
+            roots,
+            hot_nodes,
+            self.reachability_constraints.pool_interior_node_count(),
+            tdd_pool_roots.len(),
+        )
     }
 
     pub(crate) fn end_of_scope_bindings(

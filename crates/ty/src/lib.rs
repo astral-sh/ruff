@@ -307,6 +307,8 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         .map(|summary| summary.max_interior_nodes)
         .max()
         .unwrap_or(0);
+    let tdd_pool_nodes: usize = summaries.iter().map(|summary| summary.tdd_pool_nodes).sum();
+    let tdd_pool_roots: usize = summaries.iter().map(|summary| summary.tdd_pool_roots).sum();
     let reachability_roots: usize = summaries
         .iter()
         .map(|summary| summary.reachability_roots)
@@ -339,6 +341,8 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
         verbose = mode.verbose(),
         files = summaries.len(),
         max_root_nodes,
+        tdd_pool_roots,
+        tdd_pool_nodes,
         reachability_roots,
         reachability_nodes = reachability_interior_nodes,
         reachability_max_depth,
@@ -360,6 +364,8 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
             target: "ty.tdd_stats",
             file = %summary.file_path,
             max_root_nodes = summary.max_interior_nodes,
+            tdd_pool_roots = summary.tdd_pool_roots,
+            tdd_pool_nodes = summary.tdd_pool_nodes,
             reachability_roots = summary.reachability_roots,
             reachability_nodes = summary.reachability_interior_nodes,
             reachability_max_depth = summary.reachability_max_depth,
@@ -387,6 +393,8 @@ fn write_tdd_stats_report(db: &ProjectDatabase, _printer: Printer) {
                     root_count = scope.root_count,
                     total_nodes = scope.total_interior_nodes,
                     max_root_nodes = scope.max_interior_nodes,
+                    tdd_pool_roots = scope.tdd_pool_roots,
+                    tdd_pool_nodes = scope.tdd_pool_nodes,
                     reachability_max_depth = scope.reachability_max_depth,
                     narrowing_max_depth = scope.narrowing_max_depth,
                     node_histogram = %histogram,

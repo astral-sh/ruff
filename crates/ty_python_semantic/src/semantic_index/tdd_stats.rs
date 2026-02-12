@@ -135,10 +135,17 @@ pub(crate) struct TddStatsReport {
     pub(crate) roots: Vec<TddRootStat>,
     pub(crate) histogram: Vec<TddHistogramBin>,
     pub(crate) hot_nodes: Vec<TddHotNodeStat>,
+    pub(crate) tdd_pool_nodes: usize,
+    pub(crate) tdd_pool_roots: usize,
 }
 
 impl TddStatsReport {
-    pub(crate) fn from_roots(roots: Vec<TddRootStat>, hot_nodes: Vec<TddHotNodeStat>) -> Self {
+    pub(crate) fn from_roots(
+        roots: Vec<TddRootStat>,
+        hot_nodes: Vec<TddHotNodeStat>,
+        tdd_pool_nodes: usize,
+        tdd_pool_roots: usize,
+    ) -> Self {
         let mut by_size: BTreeMap<usize, usize> = BTreeMap::new();
         for stat in &roots {
             *by_size.entry(stat.interior_nodes).or_default() += 1;
@@ -154,6 +161,8 @@ impl TddStatsReport {
             roots,
             histogram,
             hot_nodes,
+            tdd_pool_nodes,
+            tdd_pool_roots,
         }
     }
 }
@@ -178,6 +187,8 @@ pub struct FileTddStatsSummary {
     pub total_roots: usize,
     pub total_interior_nodes: usize,
     pub max_interior_nodes: usize,
+    pub tdd_pool_nodes: usize,
+    pub tdd_pool_roots: usize,
     pub reachability_roots: usize,
     pub reachability_interior_nodes: usize,
     pub reachability_max_depth: usize,
@@ -193,6 +204,8 @@ pub struct ScopeTddStatsSummary {
     pub root_count: usize,
     pub total_interior_nodes: usize,
     pub max_interior_nodes: usize,
+    pub tdd_pool_nodes: usize,
+    pub tdd_pool_roots: usize,
     pub reachability_roots: usize,
     pub reachability_interior_nodes: usize,
     pub reachability_max_depth: usize,
@@ -237,6 +250,8 @@ impl Ord for ScopeTddStatsSummary {
             .total_interior_nodes
             .cmp(&self.total_interior_nodes)
             .then_with(|| other.max_interior_nodes.cmp(&self.max_interior_nodes))
+            .then_with(|| other.tdd_pool_nodes.cmp(&self.tdd_pool_nodes))
+            .then_with(|| other.tdd_pool_roots.cmp(&self.tdd_pool_roots))
             .then_with(|| other.root_count.cmp(&self.root_count))
             .then_with(|| {
                 other
@@ -274,6 +289,8 @@ impl Ord for FileTddStatsSummary {
             .total_interior_nodes
             .cmp(&self.total_interior_nodes)
             .then_with(|| other.max_interior_nodes.cmp(&self.max_interior_nodes))
+            .then_with(|| other.tdd_pool_nodes.cmp(&self.tdd_pool_nodes))
+            .then_with(|| other.tdd_pool_roots.cmp(&self.tdd_pool_roots))
             .then_with(|| other.total_roots.cmp(&self.total_roots))
             .then_with(|| {
                 other

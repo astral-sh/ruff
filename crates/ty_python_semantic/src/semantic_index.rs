@@ -207,6 +207,8 @@ pub fn tdd_stats_for_file(
             root_count,
             total_interior_nodes,
             max_interior_nodes,
+            tdd_pool_nodes: report.tdd_pool_nodes,
+            tdd_pool_roots: report.tdd_pool_roots,
             reachability_roots,
             reachability_interior_nodes,
             reachability_max_depth,
@@ -231,6 +233,8 @@ pub fn tdd_stats_for_file(
         .iter()
         .map(|scope| scope.narrowing_interior_nodes)
         .sum();
+    let tdd_pool_nodes = scopes.iter().map(|scope| scope.tdd_pool_nodes).sum();
+    let tdd_pool_roots = scopes.iter().map(|scope| scope.tdd_pool_roots).sum();
     let reachability_max_depth = scopes
         .iter()
         .map(|scope| scope.reachability_max_depth)
@@ -253,6 +257,8 @@ pub fn tdd_stats_for_file(
         total_roots,
         total_interior_nodes,
         max_interior_nodes,
+        tdd_pool_nodes,
+        tdd_pool_roots,
         reachability_roots,
         reachability_interior_nodes,
         reachability_max_depth,
