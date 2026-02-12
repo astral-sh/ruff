@@ -2756,9 +2756,7 @@ impl<'db> Type<'db> {
         tracing::trace!(
             "try_call_dunder_get: {}, {}, {}",
             self.display(db),
-            instance
-                .map(|i| i.display(db).to_string())
-                .unwrap_or_else(|| "None".to_string()),
+            instance.unwrap_or_else(|| Type::none(db)).display(db),
             owner.display(db)
         );
         match self {
