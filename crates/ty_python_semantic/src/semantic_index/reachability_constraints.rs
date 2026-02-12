@@ -850,14 +850,42 @@ impl ReachabilityConstraints {
 
                 // Check if this predicate narrows the variable we're interested in.
                 let pos_constraint = infer_narrowing_constraint(db, predicate, place);
+                let neg_predicate = Predicate {
+                    node: predicate.node,
+                    is_positive: !predicate.is_positive,
+                };
+                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
+
+                // If this predicate does not narrow the current place and we can statically
+                // determine its truthiness, follow only the reachable branch.
+                if pos_constraint.is_none() && neg_constraint.is_none() {
+                    match Self::analyze_single(db, &predicate) {
+                        Truthiness::AlwaysTrue => {
+                            return self.narrow_by_constraint_inner(
+                                db,
+                                predicates,
+                                node.if_true,
+                                base_ty,
+                                place,
+                                accumulated,
+                            );
+                        }
+                        Truthiness::AlwaysFalse => {
+                            return self.narrow_by_constraint_inner(
+                                db,
+                                predicates,
+                                node.if_false,
+                                base_ty,
+                                place,
+                                accumulated,
+                            );
+                        }
+                        Truthiness::Ambiguous => {}
+                    }
+                }
 
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
-                    let neg_predicate = Predicate {
-                        node: predicate.node,
-                        is_positive: !predicate.is_positive,
-                    };
-                    let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
                     let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
@@ -895,11 +923,6 @@ impl ReachabilityConstraints {
                 );
 
                 // False branch: predicate doesn't hold → accumulate negative narrowing
-                let neg_predicate = Predicate {
-                    node: predicate.node,
-                    is_positive: !predicate.is_positive,
-                };
-                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
                 let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                 let false_ty = self.narrow_by_constraint_inner(
                     db,
