@@ -4870,6 +4870,76 @@ impl<'db> StaticClassLiteral<'db> {
                 .unwrap_or_else(|| class_name.end()),
         )
     }
+
+    /// Extract the names of attributes defined in `__slots__` as a set of strings.
+    /// Returns `None` if `__slots__` is not defined, empty, or dynamic.
+    fn slots_members(self, db: &'db dyn Db) -> Option<FxHashSet<String>> {
+        let Place::Defined(DefinedPlace {
+            ty: slots_ty,
+            definedness,
+            ..
+        }) = self
+            .own_class_member(db, self.generic_context(db), None, "__slots__")
+            .inner
+            .place
+        else {
+            return None;
+        };
+
+        if matches!(definedness, Definedness::PossiblyUndefined) {
+            return None;
+        }
+
+        match slots_ty {
+            // __slots__ = ("a", "b")
+            Type::NominalInstance(nominal) => {
+                let mut slots = FxHashSet::default();
+                let tuple_spec = nominal.tuple_spec(db)?;
+                for &element in tuple_spec.all_elements() {
+                    if let Type::StringLiteral(string_literal) = element {
+                        slots.insert(string_literal.value(db).to_string());
+                    } else {
+                        return None;
+                    }
+                }
+                Some(slots)
+            }
+
+            // __slots__ = "abc"  # A single slot named "abc"
+            Type::StringLiteral(string_literal) => {
+                let mut slots = FxHashSet::default();
+                slots.insert(string_literal.value(db).to_string());
+                Some(slots)
+            }
+
+            _ => None,
+        }
+    }
+
+    /// Apply `__slots__` constraints to attribute access.
+    fn apply_slots_constraints(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        result: PlaceAndQualifiers<'db>,
+    ) -> Member<'db> {
+        if let Some(slots) = self.slots_members(db) {
+            if slots.contains(name) {
+                if result.place.is_undefined() {
+                    return Member {
+                        inner: Place::Defined(
+                            DefinedPlace::new(Type::unknown())
+                                .with_definedness(Definedness::PossiblyUndefined),
+                        )
+                        .into(),
+                    };
+                }
+                return Member { inner: result };
+            }
+            return Member::unbound();
+        }
+        Member { inner: result }
+    }
 }
 
 #[salsa::tracked]
@@ -8320,81 +8390,6 @@ impl SlotsKind {
 
             _ => Self::Dynamic,
         }
-    }
-}
-
-/// Helper functions for __slots__ support
-impl<'db> StaticClassLiteral<'db> {
-    /// Extract the names of attributes defined in __slots__ as a set of strings.
-    /// Returns None if __slots__ is not defined, empty, or dynamic.
-    fn slots_members(self, db: &'db dyn Db) -> Option<FxHashSet<String>> {
-        let Place::Defined(DefinedPlace {
-            ty: slots_ty,
-            definedness,
-            ..
-        }) = self
-            .own_class_member(db, self.generic_context(db), None, "__slots__")
-            .inner
-            .place
-        else {
-            return None;
-        };
-
-        if matches!(definedness, Definedness::PossiblyUndefined) {
-            return None;
-        }
-
-        match slots_ty {
-            // __slots__ = ("a", "b")
-            Type::NominalInstance(nominal) => {
-                let mut slots = FxHashSet::default();
-                let tuple_spec = nominal.tuple_spec(db)?;
-                for &element in tuple_spec.all_elements() {
-                    if let Type::StringLiteral(string_literal) = element {
-                        slots.insert(string_literal.value(db).to_string());
-                    } else {
-                        return None;
-                    }
-                }
-                Some(slots)
-            }
-
-            // __slots__ = "abc"  # Expands to slots "a", "b", "c"
-            Type::StringLiteral(string_literal) => {
-                let mut slots = FxHashSet::default();
-                for ch in string_literal.value(db).chars() {
-                    slots.insert(ch.to_string());
-                }
-                Some(slots)
-            }
-
-            _ => None,
-        }
-    }
-
-    /// Apply __slots__ constraints to attribute access.
-    fn apply_slots_constraints(
-        self,
-        db: &'db dyn Db,
-        name: &str,
-        result: PlaceAndQualifiers<'db>,
-    ) -> Member<'db> {
-        if let Some(slots) = self.slots_members(db) {
-            if slots.contains(name) {
-                if result.place.is_undefined() {
-                    return Member {
-                        inner: Place::Defined(
-                            DefinedPlace::new(Type::unknown())
-                                .with_definedness(Definedness::PossiblyUndefined),
-                        )
-                        .into(),
-                    };
-                }
-                return Member { inner: result };
-            }
-            return Member::unbound();
-        }
-        Member { inner: result }
     }
 }
 

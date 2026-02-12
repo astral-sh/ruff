@@ -49,14 +49,17 @@ a.y = 2  # error: [unresolved-attribute]
 
 ## Multi-character string
 
+Python treats `__slots__ = "xyz"` as a single slot named `"xyz"`, not three individual character
+slots.
+
 ```py
 class A:
     __slots__ = "xyz"
 
 a = A()
-a.x = 1  # error: [possibly-missing-attribute]
-a.y = 2  # error: [possibly-missing-attribute]
-a.z = 3  # error: [possibly-missing-attribute]
-a.xyz = 4  # error: [unresolved-attribute]
+a.xyz = 1  # error: [possibly-missing-attribute]
+a.x = 2  # error: [unresolved-attribute]
+a.y = 3  # error: [unresolved-attribute]
+a.z = 4  # error: [unresolved-attribute]
 a.q = 5  # error: [unresolved-attribute]
 ```
