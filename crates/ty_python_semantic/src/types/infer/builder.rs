@@ -139,7 +139,10 @@ use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
-use crate::blender_property::{as_blender_property, is_dynamic_blender_property_target_attr, is_in_register_scope, BLENDER_PROPERTY_OUTSIDE_REGISTER};
+use crate::blender_property::{
+    BLENDER_PROPERTY_OUTSIDE_REGISTER, as_blender_property,
+    is_dynamic_blender_property_target_attr, is_in_register_scope, lookup_blender_operator,
+};
 
 mod annotation_expression;
 mod type_expression;
@@ -6010,8 +6013,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                             // Attribute is declared or bound on instance. Forbid access from the class object
                             // unless this is a dynamic Blender property assignment in register() scope
-                            if emit_diagnostics
-                                && !is_dynamic_blender_property_target_attr(target)
+                            if emit_diagnostics && !is_dynamic_blender_property_target_attr(target)
                             {
                                 if attribute_is_bound_on_instance {
                                     if let Some(builder) =
@@ -6041,8 +6043,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 && is_dynamic_blender_property_target_attr(target)
                                 && !is_in_register_scope(db, self.file(), target.range())
                             {
-                                if let Some(builder) =
-                                    self.context.report_lint(&BLENDER_PROPERTY_OUTSIDE_REGISTER, target)
+                                if let Some(builder) = self
+                                    .context
+                                    .report_lint(&BLENDER_PROPERTY_OUTSIDE_REGISTER, target)
                                 {
                                     builder.into_diagnostic(
                                         "Blender properties can only be registered from the `register()` function or functions it calls in the project root `__init__.py`"
@@ -12682,6 +12685,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 assigned_type = Some(ty);
             }
         }
+
+        // Check for Blender operator: bpy.ops.<module>.<op_name>
+        if let Some(op_type) = self.try_resolve_blender_operator(attribute) {
+            return op_type;
+        }
+
         let mut fallback_place = value_type.member(db, &attr.id);
         // Exclude non-definitely-bound places for purposes of reachability
         // analysis. We currently do not perform boundness analysis for implicit
@@ -12801,9 +12810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // When `bound_on_instance` is true, the property is registered via
                     // lookup_blender_dynamic_property, so accessing it on the class (e.g.,
                     // in register()/unregister()) should not produce unresolved-attribute errors.
-                    if bound_on_instance
-                        && is_dynamic_blender_property_target_attr(attribute)
-                    {
+                    if bound_on_instance && is_dynamic_blender_property_target_attr(attribute) {
                         return fallback();
                     }
 
@@ -12904,6 +12911,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Even if we can obtain the attribute type based on the assignments, we still perform default type inference
         // (to report errors).
         assigned_type.unwrap_or(resolved_type)
+    }
+
+    /// Tries to resolve a Blender operator call expression like `bpy.ops.wm.mouse_position`.
+    /// Pattern matches the AST to detect `<root>.ops.<module>.<operator_name>` and looks up
+    /// the operator in the registry to return a synthesized callable type.
+    fn try_resolve_blender_operator(&self, attribute: &ast::ExprAttribute) -> Option<Type<'db>> {
+        let value = &attribute.value;
+        let op_name = attribute.attr.as_str();
+
+        // Match: value = ExprAttribute { attr: MODULE, value: ExprAttribute { attr: "ops", value: ExprName(_) } }
+        let inner_attr = value.as_attribute_expr()?;
+        let ops_module = inner_attr.attr.as_str();
+
+        let ops_attr = inner_attr.value.as_attribute_expr()?;
+        if ops_attr.attr.as_str() != "ops" {
+            return None;
+        }
+        if !ops_attr.value.is_name_expr() {
+            return None;
+        }
+
+        lookup_blender_operator(self.db(), ops_module, op_name)
     }
 
     fn infer_attribute_expression(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {

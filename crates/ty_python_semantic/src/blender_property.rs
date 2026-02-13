@@ -5,7 +5,8 @@ use crate::declare_lint;
 use crate::lint::{Level, LintStatus};
 use crate::place::{ConsideredDefinitions, RequiresExplicitReExport, place_by_id};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::place::PlaceExpr;
+use crate::semantic_index::place::{PlaceExpr, ScopedPlaceId};
+use crate::semantic_index::scope::ScopeKind;
 use crate::semantic_index::{place_table, semantic_index, use_def_map};
 use crate::types::StaticClassLiteral;
 use crate::types::Type;
@@ -139,7 +140,7 @@ struct PropertyLocation {
 /// Maps (class_name, prop_name) to the location(s) where they are defined.
 /// Cached by Salsa via `blender_property_registry()`.
 #[derive(Debug, PartialEq, Eq)]
-struct BlenderPropertyRegistry {
+pub(crate) struct BlenderPropertyRegistry {
     properties: HashMap<(String, String), Vec<PropertyLocation>>,
     /// Secondary index for O(1) `contains()` lookups by (file, range).
     all_locations: HashSet<(File, TextRange)>,
@@ -169,6 +170,69 @@ impl BlenderPropertyRegistry {
     fn contains(&self, file: File, range: TextRange) -> bool {
         self.all_locations.contains(&(file, range))
     }
+}
+
+/// Information about a single property on a Blender operator.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct OperatorPropertyInfo {
+    /// The name of the property (e.g., "x", "y").
+    name: String,
+}
+
+/// Information about a registered Blender operator class.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct BlenderOperatorInfo {
+    /// The ops module part from bl_idname (e.g., "wm" from "wm.mouse_position").
+    ops_module: String,
+    /// The operator name part from bl_idname (e.g., "mouse_position" from "wm.mouse_position").
+    op_name: String,
+    /// The file where the operator class was defined.
+    file: File,
+    /// The class name (e.g., "SimpleMouseOperator").
+    class_name: String,
+    /// The operator's properties extracted from class annotations.
+    properties: Vec<OperatorPropertyInfo>,
+}
+
+/// Registry of all Blender operator registrations reachable from register().
+/// Maps (ops_module, op_name) to operator info.
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) struct BlenderOperatorRegistry {
+    operators: HashMap<(String, String), BlenderOperatorInfo>,
+    /// Set of all ops module names for quick lookup (e.g., {"wm", "mesh"}).
+    ops_modules: HashSet<String>,
+}
+
+impl BlenderOperatorRegistry {
+    fn new() -> Self {
+        Self {
+            operators: HashMap::new(),
+            ops_modules: HashSet::new(),
+        }
+    }
+
+    fn add(&mut self, info: BlenderOperatorInfo) {
+        self.ops_modules.insert(info.ops_module.clone());
+        self.operators
+            .insert((info.ops_module.clone(), info.op_name.clone()), info);
+    }
+
+    fn get(&self, ops_module: &str, op_name: &str) -> Option<&BlenderOperatorInfo> {
+        self.operators
+            .get(&(ops_module.to_string(), op_name.to_string()))
+    }
+
+    fn has_module(&self, module_name: &str) -> bool {
+        self.ops_modules.contains(module_name)
+    }
+}
+
+/// Combined registries for both dynamic properties and operators,
+/// built from a single walk of the register() function.
+#[derive(Debug, PartialEq, Eq)]
+struct BlenderRegistries {
+    properties: BlenderPropertyRegistry,
+    operators: BlenderOperatorRegistry,
 }
 
 /// Collects assignments from a statement list (within a function body),
@@ -472,17 +536,179 @@ fn find_function_def<'a>(stmts: &'a [ast::Stmt], name: &str) -> Option<&'a ast::
     None
 }
 
-/// Builds the Blender property registry by walking from register() in the root __init__.py
-/// and transitively following function calls.
+/// Finds a top-level class definition by name in a list of statements.
+fn find_class_def<'a>(stmts: &'a [ast::Stmt], name: &str) -> Option<&'a ast::StmtClassDef> {
+    for stmt in stmts {
+        if let ast::Stmt::ClassDef(class_def) = stmt {
+            if class_def.name.as_str() == name {
+                return Some(class_def);
+            }
+        }
+    }
+    None
+}
+
+/// Collects class names passed to `bpy.utils.register_class(ClassName)` calls
+/// within a statement body, handling nested control flow.
+fn collect_register_class_calls_in_body<'a>(stmts: &'a [ast::Stmt]) -> Vec<&'a str> {
+    let mut class_names = Vec::new();
+
+    for stmt in stmts {
+        match stmt {
+            ast::Stmt::Expr(expr_stmt) => {
+                if let Some(call) = expr_stmt.value.as_call_expr() {
+                    if is_register_class_call(&call.func) {
+                        if let Some(first_arg) = call.arguments.args.first() {
+                            if let Some(name) = first_arg.as_name_expr() {
+                                class_names.push(name.id.as_str());
+                            }
+                        }
+                    }
+                }
+            }
+            ast::Stmt::If(if_stmt) => {
+                class_names.extend(collect_register_class_calls_in_body(&if_stmt.body));
+                for elif in &if_stmt.elif_else_clauses {
+                    class_names.extend(collect_register_class_calls_in_body(&elif.body));
+                }
+            }
+            ast::Stmt::With(with_stmt) => {
+                class_names.extend(collect_register_class_calls_in_body(&with_stmt.body));
+            }
+            ast::Stmt::Match(match_stmt) => {
+                for case in &match_stmt.cases {
+                    class_names.extend(collect_register_class_calls_in_body(&case.body));
+                }
+            }
+            ast::Stmt::For(for_stmt) => {
+                class_names.extend(collect_register_class_calls_in_body(&for_stmt.body));
+                class_names.extend(collect_register_class_calls_in_body(&for_stmt.orelse));
+            }
+            ast::Stmt::While(while_stmt) => {
+                class_names.extend(collect_register_class_calls_in_body(&while_stmt.body));
+                class_names.extend(collect_register_class_calls_in_body(&while_stmt.orelse));
+            }
+            ast::Stmt::Try(try_stmt) => {
+                class_names.extend(collect_register_class_calls_in_body(&try_stmt.body));
+                for handler in &try_stmt.handlers {
+                    let ast::ExceptHandler::ExceptHandler(handler_inner) = handler;
+                    class_names.extend(collect_register_class_calls_in_body(&handler_inner.body));
+                }
+                class_names.extend(collect_register_class_calls_in_body(&try_stmt.orelse));
+                class_names.extend(collect_register_class_calls_in_body(&try_stmt.finalbody));
+            }
+            _ => {}
+        }
+    }
+
+    class_names
+}
+
+/// Checks if a call expression matches the `bpy.utils.register_class` or
+/// `<alias>.utils.register_class` pattern.
+fn is_register_class_call(func: &Expr) -> bool {
+    // Check for *.utils.register_class pattern
+    if let Some(outer_attr) = func.as_attribute_expr() {
+        if outer_attr.attr.as_str() != "register_class" {
+            return false;
+        }
+        if let Some(inner_attr) = outer_attr.value.as_attribute_expr() {
+            if inner_attr.attr.as_str() == "utils" && inner_attr.value.is_name_expr() {
+                return true;
+            }
+        }
+    }
+    // Also check for simple register_class(X) calls (when imported)
+    if let Some(name) = func.as_name_expr() {
+        if name.id.as_str() == "register_class" {
+            return true;
+        }
+    }
+    false
+}
+
+/// Extracts operator info from a class definition if it has a `bl_idname` attribute.
+/// Returns None if the class doesn't have a valid bl_idname.
+fn extract_operator_info(
+    class_def: &ast::StmtClassDef,
+    file: File,
+) -> Option<BlenderOperatorInfo> {
+    let mut bl_idname: Option<String> = None;
+    let mut properties = Vec::new();
+
+    for stmt in &class_def.body {
+        match stmt {
+            // Check for bl_idname = "module.op_name"
+            ast::Stmt::Assign(assign) => {
+                if assign.targets.len() == 1 {
+                    if let Some(name_expr) = assign.targets[0].as_name_expr() {
+                        if name_expr.id.as_str() == "bl_idname" {
+                            if let Some(string_lit) = assign.value.as_string_literal_expr() {
+                                bl_idname = Some(string_lit.value.to_str().to_string());
+                            }
+                        }
+                    }
+                }
+            }
+            // Check for annotated properties: x: bpy.props.IntProperty()
+            ast::Stmt::AnnAssign(ann_assign) => {
+                if let Some(name_expr) = ann_assign.target.as_name_expr() {
+                    let prop_name = name_expr.id.as_str();
+                    // Check bl_idname as annotated assignment: bl_idname: str = "module.op_name"
+                    if prop_name == "bl_idname" {
+                        if let Some(ref value) = ann_assign.value {
+                            if let Some(string_lit) = value.as_string_literal_expr() {
+                                bl_idname = Some(string_lit.value.to_str().to_string());
+                            }
+                        }
+                        continue;
+                    }
+                    // Skip known Blender class-level attributes
+                    if matches!(
+                        prop_name,
+                        "bl_label" | "bl_description" | "bl_options" | "bl_translation_context"
+                    ) {
+                        continue;
+                    }
+                    // Check if annotation is a Blender property call
+                    if as_blender_property(&ann_assign.annotation).is_some() {
+                        properties.push(OperatorPropertyInfo {
+                            name: prop_name.to_string(),
+                        });
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Parse bl_idname: "wm.mouse_position" -> ("wm", "mouse_position")
+    let bl_idname = bl_idname?;
+    let (ops_module, op_name) = bl_idname.split_once('.')?;
+
+    Some(BlenderOperatorInfo {
+        ops_module: ops_module.to_string(),
+        op_name: op_name.to_string(),
+        file,
+        class_name: class_def.name.to_string(),
+        properties,
+    })
+}
+
+/// Builds both the property and operator registries by walking from register()
+/// in the root __init__.py and transitively following function calls.
 /// Cached by Salsa — only re-evaluated when the root init file or called functions change.
 #[salsa::tracked(returns(ref), no_eq)]
-pub(crate) fn blender_property_registry(db: &dyn Db) -> BlenderPropertyRegistry {
-    let mut registry = BlenderPropertyRegistry::new();
+fn blender_registries(db: &dyn Db) -> BlenderRegistries {
+    let mut registries = BlenderRegistries {
+        properties: BlenderPropertyRegistry::new(),
+        operators: BlenderOperatorRegistry::new(),
+    };
 
     // Find the root __init__.py (first-party package with no dots in module name)
     let root_file = find_root_init_file(db);
     let Some(root_file) = root_file else {
-        return registry;
+        return registries;
     };
 
     let parsed = parsed_module(db, root_file).load(db);
@@ -490,7 +716,7 @@ pub(crate) fn blender_property_registry(db: &dyn Db) -> BlenderPropertyRegistry 
 
     // Find register() function
     let Some(register_func) = find_function_def(stmts, "register") else {
-        return registry;
+        return registries;
     };
 
     // Walk register() and all functions it calls
@@ -500,11 +726,21 @@ pub(crate) fn blender_property_registry(db: &dyn Db) -> BlenderPropertyRegistry 
         root_file,
         stmts,
         &register_func.body,
-        &mut registry,
+        &mut registries,
         &mut visited,
     );
 
-    registry
+    registries
+}
+
+/// Returns the property registry (delegating to the combined registries).
+pub(crate) fn blender_property_registry(db: &dyn Db) -> &BlenderPropertyRegistry {
+    &blender_registries(db).properties
+}
+
+/// Returns the operator registry.
+pub(crate) fn blender_operator_registry(db: &dyn Db) -> &BlenderOperatorRegistry {
+    &blender_registries(db).operators
 }
 
 /// Finds the root __init__.py file (first-party package at the top level).
@@ -533,13 +769,13 @@ pub(crate) fn find_root_init_file(db: &dyn Db) -> Option<File> {
 }
 
 /// Recursively walks a function body and all functions it calls, collecting
-/// Blender property assignments into the registry.
+/// Blender property assignments and operator registrations into the registries.
 fn walk_function_for_properties(
     db: &dyn Db,
     file: File,
     file_stmts: &[ast::Stmt],
     body: &[ast::Stmt],
-    registry: &mut BlenderPropertyRegistry,
+    registries: &mut BlenderRegistries,
     visited: &mut HashSet<FunctionTarget>,
 ) {
     // Collect property assignments in this function body
@@ -553,7 +789,20 @@ fn walk_function_for_properties(
             continue;
         };
         if as_blender_property(&assign.value).is_some() {
-            registry.add(class_name, prop_name, file, target.range());
+            registries
+                .properties
+                .add(class_name, prop_name, file, target.range());
+        }
+    }
+
+    // Collect register_class calls and extract operator info
+    let register_calls = collect_register_class_calls_in_body(body);
+    for class_name in &register_calls {
+        // Look up the class definition in the current file
+        if let Some(class_def) = find_class_def(file_stmts, class_name) {
+            if let Some(op_info) = extract_operator_info(class_def, file) {
+                registries.operators.add(op_info);
+            }
         }
     }
 
@@ -574,7 +823,7 @@ fn walk_function_for_properties(
                     file,
                     file_stmts,
                     &local_func.body,
-                    registry,
+                    registries,
                     visited,
                 );
             }
@@ -606,7 +855,7 @@ fn walk_function_for_properties(
                         target_file,
                         target_stmts,
                         &func_def.body,
-                        registry,
+                        registries,
                         visited,
                     );
                 }
@@ -643,7 +892,7 @@ fn walk_function_for_properties(
                         target_file,
                         target_stmts,
                         &func_def.body,
-                        registry,
+                        registries,
                         visited,
                     );
                 }
@@ -898,4 +1147,132 @@ fn find_assignment_target_at_range(stmts: &[ast::Stmt], range: TextRange) -> Opt
         }
     }
     None
+}
+
+/// Resolves the type of a property defined in a Blender operator class body
+/// by looking up the declared type through the semantic index.
+/// This delegates type inference to the stub files (e.g., `bpy.props.IntProperty() -> int`).
+fn resolve_operator_property_type<'db>(
+    db: &'db dyn Db,
+    file: File,
+    class_name: &str,
+    prop_name: &str,
+) -> Option<Type<'db>> {
+    let parsed = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    // Find the class body scope by iterating file scopes and matching the class name
+    for scope_id in index.scope_ids() {
+        let file_scope_id = scope_id.file_scope_id(db);
+        let scope = index.scope(file_scope_id);
+
+        if scope.kind() != ScopeKind::Class {
+            continue;
+        }
+
+        // Check if this is the right class by comparing names
+        let Some(class_ref) = scope.node().as_class() else {
+            continue;
+        };
+        if class_ref.node(&parsed).name.as_str() != class_name {
+            continue;
+        }
+
+        // Look up the property symbol in the class body scope
+        let table = place_table(db, scope_id);
+        let Some(symbol_id) = table.symbol_id(prop_name) else {
+            continue;
+        };
+
+        let place_id = ScopedPlaceId::Symbol(symbol_id);
+        let result = place_by_id(
+            db,
+            scope_id,
+            place_id,
+            RequiresExplicitReExport::No,
+            ConsideredDefinitions::EndOfScope,
+        );
+
+        if let Some(ty) = result.place.ignore_possibly_undefined() {
+            return Some(ty);
+        }
+    }
+
+    None
+}
+
+/// Synthesizes a callable type for a Blender operator.
+/// The signature is:
+///   (execution_context: int | str | None = None, undo: bool | None = None, /,
+///    *, prop1: T1 | None = None, ...) -> set[str]
+/// Property types are inferred from the property function return type via the semantic index,
+/// delegating to the stub file annotations (e.g., `IntProperty() -> int`).
+fn synthesize_operator_callable_type<'db>(
+    db: &'db dyn Db,
+    info: &BlenderOperatorInfo,
+) -> Type<'db> {
+    use crate::types::{CallableType, KnownClass, Parameter, Parameters, Signature, UnionType};
+    use ruff_python_ast::name::Name;
+
+    let none_ty = Type::none(db);
+
+    // Positional-only: execution_context: int | str | None = None
+    let exec_ctx_type = UnionType::from_elements(db, [
+        KnownClass::Int.to_instance(db),
+        KnownClass::Str.to_instance(db),
+        none_ty,
+    ]);
+
+    // Positional-only: undo: bool | None = None
+    let undo_type = UnionType::from_elements(db, [
+        KnownClass::Bool.to_instance(db),
+        none_ty,
+    ]);
+
+    let mut params = vec![
+        Parameter::positional_only(Some(Name::new_static("execution_context")))
+            .with_annotated_type(exec_ctx_type)
+            .with_default_type(none_ty),
+        Parameter::positional_only(Some(Name::new_static("undo")))
+            .with_annotated_type(undo_type)
+            .with_default_type(none_ty),
+    ];
+
+    // Keyword-only parameters from operator properties
+    for prop in &info.properties {
+        let prop_type = resolve_operator_property_type(db, info.file, &info.class_name, &prop.name)
+            .unwrap_or(Type::unknown());
+        let param_type = UnionType::from_elements(db, [prop_type, none_ty]);
+        params.push(
+            Parameter::keyword_only(Name::new(&prop.name))
+                .with_annotated_type(param_type)
+                .with_default_type(none_ty),
+        );
+    }
+
+    // Return type: set[str]
+    let return_type = KnownClass::Set.to_specialized_instance(db, &[
+        KnownClass::Str.to_instance(db),
+    ]);
+
+    let parameters = Parameters::new(db, params);
+    let signature = Signature::new(parameters, return_type);
+    Type::Callable(CallableType::single(db, signature))
+}
+
+/// Looks up a Blender operator by ops module and name, returning its synthesized callable type.
+pub(crate) fn lookup_blender_operator<'db>(
+    db: &'db dyn Db,
+    ops_module: &str,
+    op_name: &str,
+) -> Option<Type<'db>> {
+    let registry = blender_operator_registry(db);
+    let info = registry.get(ops_module, op_name)?;
+    Some(synthesize_operator_callable_type(db, info))
+}
+
+/// Checks if there are any registered Blender operators for the given ops module name.
+pub(crate) fn has_blender_ops_module(db: &dyn Db, module_name: &str) -> bool {
+    let registry = blender_operator_registry(db);
+    registry.has_module(module_name)
 }

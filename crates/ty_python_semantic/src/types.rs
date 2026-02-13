@@ -11709,6 +11709,14 @@ impl<'db> ModuleLiteralType<'db> {
 
         // If the normal lookup failed, try to call the module's `__getattr__` function
         if place_and_qualifiers.place.is_undefined() {
+            // Check for bpy.ops.<module> operator submodule
+            let module_name = self.module(db).name(db);
+            if module_name.as_str() == "bpy.ops"
+                && crate::blender_property::has_blender_ops_module(db, name)
+            {
+                return Place::bound(todo_type!("bpy.ops submodule")).into();
+            }
+
             return self.try_module_getattr(db, name);
         }
 
