@@ -79,10 +79,6 @@ pub(crate) struct CheckCommand {
     ///
     /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
     ///
-    /// Note that this option does not accept paths to `bin/` directories: pass
-    /// the path to the Python interpreter directly, or the root of the
-    /// virtual environment.
-    ///
     /// If you're using a project management tool such as uv or you have an activated Conda or virtual
     /// environment, you should not generally need to specify this option.
     ///

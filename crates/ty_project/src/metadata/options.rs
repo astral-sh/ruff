@@ -689,10 +689,6 @@ pub struct EnvironmentOptions {
     /// - A Python interpreter, e.g. `.venv/bin/python3`
     /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
     ///
-    /// Note that this option does not accept paths to `bin/` directories: pass
-    /// the path to the Python interpreter directly, or the root of the
-    /// virtual environment.
-    ///
     /// Passing a path to a dynamic executable (such as a shim) is not currently supported.
     ///
     /// If you're using a project management tool such as uv, you should not generally need to

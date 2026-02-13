@@ -87,7 +87,6 @@ over all configuration files.</p>
 <p>A system Python <a href="https://docs.python.org/3/library/sys.html#sys.prefix"><code>sys.prefix</code></a> directory, e.g. <code>/usr</code></p>
 </li>
 </ul>
-<p>Note that this option does not accept paths to <code>bin/</code> directories: pass the path to the Python interpreter directly, or the root of the virtual environment.</p>
 <p>If you're using a project management tool such as uv or you have an activated Conda or virtual environment, you should not generally need to specify this option.</p>
 
 </dd><dt id="ty-check--python-platform"><a href="#ty-check--python-platform"><code>--python-platform</code></a>, <code>--platform</code> <i>platform</i></dt><dd><p>Target platform to assume when resolving types.</p>
