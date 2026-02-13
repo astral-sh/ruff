@@ -5,6 +5,8 @@ use std::path::Path;
 use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
+use ruff_db::diagnostic::SecondaryCode;
+
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -88,7 +90,7 @@ pub(crate) fn check_noqa(
             {
                 let suppressed = match &directive_line.directive {
                     Directive::All(_) => {
-                        let Ok(rule) = Rule::from_code(code) else {
+                        let Some(rule) = resolve_rule_for_noqa(code, settings) else {
                             debug_assert!(false, "Invalid secondary code `{code}`");
                             continue;
                         };
@@ -98,7 +100,7 @@ pub(crate) fn check_noqa(
                     }
                     Directive::Codes(directive) => {
                         if directive.includes(code) {
-                            let Ok(rule) = Rule::from_code(code) else {
+                            let Some(rule) = resolve_rule_for_noqa(code, settings) else {
                                 debug_assert!(false, "Invalid secondary code `{code}`");
                                 continue;
                             };
@@ -277,4 +279,20 @@ pub(crate) fn check_noqa(
 
     ignored_diagnostics.sort_unstable();
     ignored_diagnostics
+}
+
+fn resolve_rule_for_noqa(code: &SecondaryCode, settings: &LinterSettings) -> Option<Rule> {
+    if let Ok(rule) = Rule::from_code(code.as_str()) {
+        return Some(rule);
+    }
+
+    if settings
+        .external
+        .iter()
+        .any(|external| code.as_str().starts_with(external))
+    {
+        return Some(Rule::ExternalLinter);
+    }
+
+    None
 }
