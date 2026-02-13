@@ -691,13 +691,7 @@ impl<'db> BoundSuperType<'db> {
             // Also, invoking a descriptor on a dynamic attribute is meaningless, so we don't handle this.
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(_) => Some(
-                Type::try_call_dunder_get_on_attribute(
-                    db,
-                    attribute,
-                    Type::none(db),
-                    owner.owner_type(db),
-                )
-                .0,
+                Type::try_call_dunder_get_on_attribute(db, attribute, None, owner.owner_type(db)).0,
             ),
             SuperOwnerKind::Instance(_) | SuperOwnerKind::InstanceTypeVar(..) => {
                 let owner_type = owner.owner_type(db);
@@ -705,7 +699,7 @@ impl<'db> BoundSuperType<'db> {
                     Type::try_call_dunder_get_on_attribute(
                         db,
                         attribute,
-                        owner_type,
+                        Some(owner_type),
                         owner_type.to_meta_type(db),
                     )
                     .0,
@@ -713,15 +707,7 @@ impl<'db> BoundSuperType<'db> {
             }
             SuperOwnerKind::ClassTypeVar(..) => {
                 let owner_type = owner.owner_type(db);
-                Some(
-                    Type::try_call_dunder_get_on_attribute(
-                        db,
-                        attribute,
-                        Type::none(db),
-                        owner_type,
-                    )
-                    .0,
-                )
+                Some(Type::try_call_dunder_get_on_attribute(db, attribute, None, owner_type).0)
             }
         }
     }

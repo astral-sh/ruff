@@ -3266,7 +3266,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                         if let Some(ref mut default_ty) = default_ty {
                             *default_ty = default_ty
-                                .try_call_dunder_get(db, Type::none(db), Type::from(self))
+                                .try_call_dunder_get(db, None, Type::from(self))
                                 .map(|(return_ty, _)| return_ty)
                                 .unwrap_or_else(Type::unknown);
                         }
@@ -6111,9 +6111,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     // Skip over these very special class bases that aren't really classes.
                 }
                 ClassBase::Dynamic(_) => {
-                    return InstanceMemberResult::Done(PlaceAndQualifiers::todo(
-                        "instance attribute on class with dynamic base",
-                    ));
+                    // We already return the dynamic type for class member lookup, so we can
+                    // just return unbound here (to avoid having to build a union of the
+                    // dynamic type with itself).
+                    return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
                     if let member @ PlaceAndQualifiers {

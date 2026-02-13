@@ -390,15 +390,13 @@ jobs:
           args: --release --locked --out dist --compatibility pypi
       - name: "Test wheel"
         if: matrix.target == 'x86_64-unknown-linux-musl'
-        uses: addnab/docker-run-action@4f65fabd2431ebc8d299f8e5a018d79a769ae185 # v3
-        with:
-          image: alpine:latest
-          options: -v ${{ github.workspace }}:/io -w /io
-          run: |
-            apk add python3
-            python -m venv .venv
-            .venv/bin/pip3 install ${{ env.PACKAGE_NAME }} --no-index --find-links dist/ --force-reinstall
-            .venv/bin/${{ env.MODULE_NAME }} --help
+        run: |
+          docker run --rm -v ${{ github.workspace }}:/io -w /io --env MODULE_NAME --env PACKAGE_NAME alpine:latest sh -c "
+            apk add python3;
+            python -m venv .venv;
+            .venv/bin/pip3 install ${PACKAGE_NAME} --no-index --find-links dist/ --force-reinstall;
+            .venv/bin/${MODULE_NAME} --help;
+            "
       - name: "Upload wheels"
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:

@@ -1,5 +1,91 @@
 # Changelog
 
+## 0.15.1
+
+Released on 2026-02-12.
+
+### Preview features
+
+- \[`airflow`\] Add ruff rules to catch deprecated Airflow imports for Airflow 3.1 (`AIR321`) ([#22376](https://github.com/astral-sh/ruff/pull/22376))
+- \[`airflow`\] Third positional parameter not named `ti_key` should be flagged for `BaseOperatorLink.get_link` (`AIR303`) ([#22828](https://github.com/astral-sh/ruff/pull/22828))
+- \[`flake8-gettext`\] Fix false negatives for plural argument of `ngettext` (`INT001`, `INT002`, `INT003`) ([#21078](https://github.com/astral-sh/ruff/pull/21078))
+- \[`pyflakes`\] Fix infinite loop in preview fix for `unused-import` (`F401`) ([#23038](https://github.com/astral-sh/ruff/pull/23038))
+- \[`pygrep-hooks`\] Detect non-existent mock methods in standalone expressions (`PGH005`) ([#22830](https://github.com/astral-sh/ruff/pull/22830))
+- \[`pylint`\] Allow dunder submodules and improve diagnostic range (`PLC2701`) ([#22804](https://github.com/astral-sh/ruff/pull/22804))
+- \[`pyupgrade`\] Improve diagnostic range for tuples (`UP024`) ([#23013](https://github.com/astral-sh/ruff/pull/23013))
+- \[`refurb`\] Check subscripts in tuple do not use lambda parameters in `reimplemented-operator` (`FURB118`) ([#23079](https://github.com/astral-sh/ruff/pull/23079))
+- \[`ruff`\] Detect mutable defaults in `field` calls (`RUF008`) ([#23046](https://github.com/astral-sh/ruff/pull/23046))
+- \[`ruff`\] Ignore std `cmath.inf` (`RUF069`) ([#23120](https://github.com/astral-sh/ruff/pull/23120))
+- \[`ruff`\] New rule `float-equality-comparison` (`RUF069`) ([#20585](https://github.com/astral-sh/ruff/pull/20585))
+- Don't format unlabeled Markdown code blocks ([#23106](https://github.com/astral-sh/ruff/pull/23106))
+- Markdown formatting support in LSP ([#23063](https://github.com/astral-sh/ruff/pull/23063))
+- Support Quarto Markdown language markers ([#22947](https://github.com/astral-sh/ruff/pull/22947))
+- Support formatting `pycon` Markdown code blocks ([#23112](https://github.com/astral-sh/ruff/pull/23112))
+- Use extension mapping to select Markdown code block language ([#22934](https://github.com/astral-sh/ruff/pull/22934))
+
+### Bug fixes
+
+- Avoid false positive for undefined variables in `FAST001` ([#23224](https://github.com/astral-sh/ruff/pull/23224))
+- Avoid introducing syntax errors for `FAST003` autofix ([#23227](https://github.com/astral-sh/ruff/pull/23227))
+- Avoid suggesting `InitVar` for `__post_init__` that references PEP 695 type parameters ([#23226](https://github.com/astral-sh/ruff/pull/23226))
+- Deduplicate type variables in generic functions ([#23225](https://github.com/astral-sh/ruff/pull/23225))
+- Fix exception handler parenthesis removal for Python 3.14+ ([#23126](https://github.com/astral-sh/ruff/pull/23126))
+- Fix f-string middle panic when parsing t-strings ([#23232](https://github.com/astral-sh/ruff/pull/23232))
+- Wrap `RUF020` target for multiline fixes ([#23210](https://github.com/astral-sh/ruff/pull/23210))
+- Wrap `UP007` target for multiline fixes ([#23208](https://github.com/astral-sh/ruff/pull/23208))
+- Fix missing diagnostics for last range suppression in file ([#23242](https://github.com/astral-sh/ruff/pull/23242))
+- \[`pyupgrade`\] Fix syntax error on string with newline escape and comment (`UP037`) ([#22968](https://github.com/astral-sh/ruff/pull/22968))
+
+### Rule changes
+
+- Use `ruff` instead of `Ruff` as the program name in GitHub output format ([#23240](https://github.com/astral-sh/ruff/pull/23240))
+- \[`PT006`\] Fix syntax error when unpacking nested tuples in `parametrize` fixes (#22441) ([#22464](https://github.com/astral-sh/ruff/pull/22464))
+- \[`airflow`\] Catch deprecated attribute access from context key for Airflow 3.0 (`AIR301`) ([#22850](https://github.com/astral-sh/ruff/pull/22850))
+- \[`airflow`\] Capture deprecated arguments and a decorator (`AIR301`) ([#23170](https://github.com/astral-sh/ruff/pull/23170))
+- \[`flake8-boolean-trap`\] Add `multiprocessing.Value` to excluded functions for `FBT003` ([#23010](https://github.com/astral-sh/ruff/pull/23010))
+- \[`flake8-bugbear`\] Add a secondary annotation showing the previous occurrence (`B033`) ([#22634](https://github.com/astral-sh/ruff/pull/22634))
+- \[`flake8-type-checking`\] Add sub-diagnostic showing the runtime use of an annotation (`TC004`) ([#23091](https://github.com/astral-sh/ruff/pull/23091))
+- \[`isort`\] Support configurable import section heading comments ([#23151](https://github.com/astral-sh/ruff/pull/23151))
+- \[`ruff`\] Improve the diagnostic for `RUF012` ([#23202](https://github.com/astral-sh/ruff/pull/23202))
+
+### Formatter
+
+- Suppress diagnostic output for `format --check --silent` ([#17736](https://github.com/astral-sh/ruff/pull/17736))
+
+### Documentation
+
+- Add tabbed shell completion documentation ([#23169](https://github.com/astral-sh/ruff/pull/23169))
+- Explain how to enable Markdown formatting for pre-commit hook ([#23077](https://github.com/astral-sh/ruff/pull/23077))
+- Fixed import in `runtime-evaluated-decorators` example ([#23187](https://github.com/astral-sh/ruff/pull/23187))
+- Update ruff server contributing guide ([#23060](https://github.com/astral-sh/ruff/pull/23060))
+
+### Other changes
+
+- Exclude WASM artifacts from GitHub releases ([#23221](https://github.com/astral-sh/ruff/pull/23221))
+
+### Contributors
+
+- [@mkniewallner](https://github.com/mkniewallner)
+- [@bxff](https://github.com/bxff)
+- [@dylwil3](https://github.com/dylwil3)
+- [@Avasam](https://github.com/Avasam)
+- [@amyreese](https://github.com/amyreese)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@Alex-ley-scrub](https://github.com/Alex-ley-scrub)
+- [@Kalmaegi](https://github.com/Kalmaegi)
+- [@danparizher](https://github.com/danparizher)
+- [@AiyionPrime](https://github.com/AiyionPrime)
+- [@eureka928](https://github.com/eureka928)
+- [@11happy](https://github.com/11happy)
+- [@Jkhall81](https://github.com/Jkhall81)
+- [@chirizxc](https://github.com/chirizxc)
+- [@leandrobbraga](https://github.com/leandrobbraga)
+- [@tvatter](https://github.com/tvatter)
+- [@anishgirianish](https://github.com/anishgirianish)
+- [@shaanmajid](https://github.com/shaanmajid)
+- [@ntBre](https://github.com/ntBre)
+- [@sjyangkevin](https://github.com/sjyangkevin)
+
 ## 0.15.0
 
 Released on 2026-02-03.

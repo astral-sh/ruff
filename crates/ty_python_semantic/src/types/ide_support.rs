@@ -1529,7 +1529,8 @@ mod resolve_definition {
             | DefinitionKind::ExceptHandler(_)
             | DefinitionKind::TypeVar(_)
             | DefinitionKind::ParamSpec(_)
-            | DefinitionKind::TypeVarTuple(_) => {
+            | DefinitionKind::TypeVarTuple(_)
+            | DefinitionKind::LoopHeader(_) => {
                 // Not yet implemented
                 return Err(());
             }

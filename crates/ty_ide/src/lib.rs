@@ -355,11 +355,12 @@ mod tests {
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
     use ruff_db::parsed::{ParsedModuleRef, parsed_module};
     use ruff_db::source::{SourceText, source_text};
-    use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
     use ty_project::ProjectMetadata;
+    use ty_python_semantic::{PythonPlatform, PythonVersionWithSource};
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -504,40 +505,196 @@ mod tests {
             path: impl Into<SystemPathBuf>,
             contents: impl AsRef<str>,
         ) -> &mut CursorTestBuilder {
-            const MARKER: &str = "<CURSOR>";
+            add_source(&mut self.sources, path, contents);
+            self
+        }
 
-            let path = path.into();
-            let contents = dedent(contents.as_ref()).into_owned();
-            let Some(cursor_offset) = contents.find(MARKER) else {
-                self.sources.push(Source {
-                    path,
-                    contents,
-                    cursor_offset: None,
-                });
-                return self;
-            };
+        /// Convert to a builder that supports site-packages (third-party dependencies).
+        pub(super) fn with_site_packages(self) -> SitePackagesCursorTestBuilder {
+            SitePackagesCursorTestBuilder {
+                sources: self.sources,
+                site_packages_sources: Vec::new(),
+            }
+        }
+    }
 
-            if let Some(source) = self.sources.iter().find(|src| src.cursor_offset.is_some()) {
-                panic!(
-                    "cursor tests must contain exactly one file \
-                     with a `<CURSOR>` marker, but found a marker \
-                     in both `{path1}` and `{path2}`",
-                    path1 = source.path,
-                    path2 = path,
-                );
+    /// A cursor test builder that supports site-packages (third-party
+    /// dependencies).
+    ///
+    /// Use `CursorTestBuilder::builder().with_site_packages()` to
+    /// create one.
+    ///
+    /// Unlike `CursorTest`, first party source files go in `/src` and
+    /// third party sources go in `/site-packages`.
+    ///
+    /// TODO: Ideally this would be rolled into `CursorTestBuilder`
+    /// so that we don't have two of these somewhat similar helpers.
+    pub(super) struct SitePackagesCursorTestBuilder {
+        sources: Vec<Source>,
+        site_packages_sources: Vec<Source>,
+    }
+
+    impl SitePackagesCursorTestBuilder {
+        pub(super) fn build(&self) -> CursorTest {
+            use ty_module_resolver::SearchPathSettings;
+            use ty_python_semantic::{Program, ProgramSettings};
+
+            let project_root = SystemPathBuf::from("/src");
+            let site_packages_path = SystemPathBuf::from("/site-packages");
+
+            let mut db =
+                ty_project::TestDb::new(ProjectMetadata::new("test".into(), project_root.clone()));
+
+            // Write site-packages files first (before init)
+            for Source {
+                path,
+                contents,
+                cursor_offset: _,
+            } in &self.site_packages_sources
+            {
+                let full_path = site_packages_path.join(path);
+                db.write_file(&full_path, contents)
+                    .expect("write to memory file system to be successful");
             }
 
-            let mut without_cursor_marker = contents[..cursor_offset].to_string();
-            without_cursor_marker.push_str(&contents[cursor_offset + MARKER.len()..]);
-            let cursor_offset =
-                TextSize::try_from(cursor_offset).expect("source to be smaller than 4GB");
-            self.sources.push(Source {
+            // Create /src directory for first-party code
+            db.memory_file_system()
+                .create_directory_all(&project_root)
+                .expect("create /src directory");
+
+            // Configure search paths with site-packages
+            let search_paths = SearchPathSettings {
+                src_roots: vec![project_root.clone()],
+                site_packages_paths: vec![site_packages_path.clone()],
+                ..SearchPathSettings::empty()
+            }
+            .to_search_paths(db.system(), db.vendored())
+            .expect("valid search paths");
+
+            Program::from_settings(
+                &db,
+                ProgramSettings {
+                    python_version: PythonVersionWithSource::default(),
+                    python_platform: PythonPlatform::default(),
+                    search_paths,
+                },
+            );
+
+            db.files()
+                .try_add_root(&db, &project_root, FileRootKind::Project);
+            db.files()
+                .try_add_root(&db, &site_packages_path, FileRootKind::LibrarySearchPath);
+
+            let mut cursor: Option<Cursor> = None;
+            for &Source {
+                ref path,
+                ref contents,
+                cursor_offset,
+            } in &self.sources
+            {
+                let path = project_root.join(path);
+
+                db.write_file(&path, contents)
+                    .expect("write to memory file system to be successful");
+
+                let file = system_path_to_file(&db, &path).expect("newly written file to existing");
+
+                if let Some(offset) = cursor_offset {
+                    assert!(
+                        cursor.is_none(),
+                        "found more than one source that contains `<CURSOR>`"
+                    );
+                    let source = source_text(&db, file);
+                    let parsed = parsed_module(&db, file).load(&db);
+                    let stylist =
+                        Stylist::from_tokens(parsed.tokens(), source.as_str()).into_owned();
+                    cursor = Some(Cursor {
+                        file,
+                        offset,
+                        parsed,
+                        source,
+                        stylist,
+                    });
+                }
+            }
+
+            let mut insta_settings = insta::Settings::clone_current();
+            insta_settings.add_filter(r#"\\(\w\w|\.|")"#, "/$1");
+            insta_settings.add_filter(r"@Todo\(.+\)", "@Todo");
+
+            let insta_settings_guard = insta_settings.bind_to_scope();
+
+            CursorTest {
+                db,
+                cursor: cursor.expect("at least one source to contain `<CURSOR>`"),
+                _insta_settings_guard: insta_settings_guard,
+            }
+        }
+
+        pub(super) fn source(
+            &mut self,
+            path: impl Into<SystemPathBuf>,
+            contents: impl AsRef<str>,
+        ) -> &mut SitePackagesCursorTestBuilder {
+            add_source(&mut self.sources, path, contents);
+            self
+        }
+
+        /// Add a file to site-packages (simulating a third-party dependency).
+        /// The path should be relative to site-packages root (e.g., "numpy/__init__.py").
+        pub(super) fn site_packages(
+            &mut self,
+            path: impl Into<SystemPathBuf>,
+            contents: impl AsRef<str>,
+        ) -> &mut SitePackagesCursorTestBuilder {
+            let path = path.into();
+            let contents = dedent(contents.as_ref()).into_owned();
+            self.site_packages_sources.push(Source {
                 path,
-                contents: without_cursor_marker,
-                cursor_offset: Some(cursor_offset),
+                contents,
+                cursor_offset: None,
             });
             self
         }
+    }
+
+    fn add_source(
+        sources: &mut Vec<Source>,
+        path: impl Into<SystemPathBuf>,
+        contents: impl AsRef<str>,
+    ) {
+        const MARKER: &str = "<CURSOR>";
+
+        let path = path.into();
+        let contents = dedent(contents.as_ref()).into_owned();
+        let Some(cursor_offset) = contents.find(MARKER) else {
+            sources.push(Source {
+                path,
+                contents,
+                cursor_offset: None,
+            });
+            return;
+        };
+
+        if let Some(source) = sources.iter().find(|src| src.cursor_offset.is_some()) {
+            panic!(
+                "cursor tests must contain exactly one file \
+                 with a `<CURSOR>` marker, but found a marker \
+                 in both `{path1}` and `{path2}`",
+                path1 = source.path,
+                path2 = path,
+            );
+        }
+
+        let mut without_cursor_marker = contents[..cursor_offset].to_string();
+        without_cursor_marker.push_str(&contents[cursor_offset + MARKER.len()..]);
+        let cursor_offset =
+            TextSize::try_from(cursor_offset).expect("source to be smaller than 4GB");
+        sources.push(Source {
+            path,
+            contents: without_cursor_marker,
+            cursor_offset: Some(cursor_offset),
+        });
     }
 
     struct Source {

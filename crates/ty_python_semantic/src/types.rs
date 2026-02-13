@@ -2750,13 +2750,13 @@ impl<'db> Type<'db> {
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
-        instance: Type<'db>,
+        instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Option<(Type<'db>, AttributeKind)> {
         tracing::trace!(
             "try_call_dunder_get: {}, {}, {}",
             self.display(db),
-            instance.display(db),
+            instance.unwrap_or_else(|| Type::none(db)).display(db),
             owner.display(db)
         );
         match self {
@@ -2776,21 +2776,35 @@ impl<'db> Type<'db> {
                 // method of these synthesized functions. The method-wrapper would then be returned from
                 // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
                 // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-                return if instance.is_none(db) && callable.is_function_like(db) {
+                return if instance.is_none() && callable.is_function_like(db) {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
-                    // For classmethod-like callables, bind to the owner class. For function-like callables, bind to the instance.
-                    let self_type = if callable.is_classmethod_like(db) && instance.is_none(db) {
+                    let self_type = instance.unwrap_or_else(|| {
+                        // For classmethod-like callables, bind to the owner class.
                         owner.to_instance(db).unwrap_or(owner)
-                    } else {
-                        instance
-                    };
+                    });
 
                     Some((
                         Type::Callable(callable.bind_self(db, Some(self_type))),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
+            }
+            Type::FunctionLiteral(function)
+                if instance.is_some_and(|ty| ty.is_none(db))
+                    && !function.is_staticmethod(db)
+                    && !function.is_classmethod(db) =>
+            {
+                // When the instance is of type `None` (`NoneType`), we must handle
+                // `FunctionType.__get__` here rather than falling through to the generic
+                // `__get__` path. The stubs for `FunctionType.__get__` use an overload
+                // with `instance: None` to indicate class-level access (returning the
+                // unbound function). This incorrectly matches when the instance is actually
+                // an instance of `None`
+                return Some((
+                    Type::BoundMethod(BoundMethodType::new(db, function, instance.unwrap())),
+                    AttributeKind::NormalOrNonDataDescriptor,
+                ));
             }
             _ => {}
         }
@@ -2803,8 +2817,9 @@ impl<'db> Type<'db> {
             ..
         }) = descr_get
         {
+            let instance_ty = instance.unwrap_or_else(|| Type::none(db));
             let return_ty = descr_get
-                .try_call(db, &CallArguments::positional([self, instance, owner]))
+                .try_call(db, &CallArguments::positional([self, instance_ty, owner]))
                 .map(|bindings| {
                     if descr_get_boundness == Definedness::AlwaysDefined {
                         bindings.return_type(db)
@@ -2834,7 +2849,7 @@ impl<'db> Type<'db> {
     fn try_call_dunder_get_on_attribute(
         db: &'db dyn Db,
         attribute: PlaceAndQualifiers<'db>,
-        instance: Type<'db>,
+        instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> (PlaceAndQualifiers<'db>, AttributeKind) {
         match attribute {
@@ -3023,7 +3038,7 @@ impl<'db> Type<'db> {
         ) = Self::try_call_dunder_get_on_attribute(
             db,
             self.class_member_with_policy(db, name.into(), member_policy),
-            self,
+            Some(self),
             self.to_meta_type(db),
         );
 
@@ -3498,13 +3513,8 @@ impl<'db> Type<'db> {
                 let class_attr_plain =
                     class_attr_plain.map_type(|ty| ty.bind_self_typevars(db, self_instance));
 
-                let class_attr_fallback = Self::try_call_dunder_get_on_attribute(
-                    db,
-                    class_attr_plain,
-                    Type::none(db),
-                    self,
-                )
-                .0;
+                let class_attr_fallback =
+                    Self::try_call_dunder_get_on_attribute(db, class_attr_plain, None, self).0;
 
                 let result = self.invoke_descriptor_protocol(
                     db,
@@ -12285,19 +12295,15 @@ impl<'db> UnionType<'db> {
         self.try_map(db, |element| element.to_instance(db))
     }
 
-    pub(crate) fn filter(
-        self,
-        db: &'db dyn Db,
-        mut f: impl FnMut(&Type<'db>) -> bool,
-    ) -> Type<'db> {
-        self.elements(db)
-            .iter()
-            .filter(|ty| f(ty))
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(*element)
-            })
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+    pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
+        let current = self.elements(db);
+        let new: Box<[Type<'db>]> = current.iter().copied().filter(f).collect();
+        match &*new {
+            [] => Type::Never,
+            [single] => *single,
+            _ if new.len() == current.len() => Type::Union(self),
+            _ => Type::Union(UnionType::new(db, new, self.recursively_defined(db))),
+        }
     }
 
     pub(crate) fn map_with_boundness(
@@ -13466,24 +13472,30 @@ pub(crate) mod tests {
         assert!(!div.is_redundant_with(&db, Type::unknown()));
         assert!(!Type::unknown().is_redundant_with(&db, div));
 
-        let truthy_div = IntersectionBuilder::new(&db)
+        // `Divergent & T` and `Divergent & ~T` both simplify to `Divergent`, except for the
+        // specific case of `Divergent & Never`, which simplifies to `Never`.
+        let divergent_intersection = IntersectionBuilder::new(&db)
             .add_positive(div)
-            .add_negative(Type::AlwaysFalsy)
+            .add_positive(todo_type!("2"))
+            .add_negative(todo_type!("3"))
             .build();
-
-        let union = UnionType::from_elements(&db, [Type::unknown(), truthy_div]);
-        assert!(!truthy_div.is_redundant_with(&db, Type::unknown()));
-        assert_eq!(
-            union.display(&db).to_string(),
-            "Unknown | (Divergent & ~AlwaysFalsy)"
-        );
-
-        let union = UnionType::from_elements(&db, [truthy_div, Type::unknown()]);
-        assert!(!Type::unknown().is_redundant_with(&db, truthy_div));
-        assert_eq!(
-            union.display(&db).to_string(),
-            "(Divergent & ~AlwaysFalsy) | Unknown"
-        );
+        assert_eq!(divergent_intersection, div);
+        let divergent_intersection = IntersectionBuilder::new(&db)
+            .add_positive(todo_type!("2"))
+            .add_negative(todo_type!("3"))
+            .add_positive(div)
+            .build();
+        assert_eq!(divergent_intersection, div);
+        let divergent_never_intersection = IntersectionBuilder::new(&db)
+            .add_positive(div)
+            .add_positive(Type::Never)
+            .build();
+        assert_eq!(divergent_never_intersection, Type::Never);
+        let divergent_never_intersection = IntersectionBuilder::new(&db)
+            .add_positive(Type::Never)
+            .add_positive(div)
+            .build();
+        assert_eq!(divergent_never_intersection, Type::Never);
 
         // The `object` type has a good convergence property, that is, its union with all other types is `object`.
         // (e.g. `object | tuple[Divergent] == object`, `object | tuple[object] == object`)

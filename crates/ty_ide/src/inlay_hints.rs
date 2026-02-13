@@ -102,6 +102,8 @@ impl InlayHint {
                         let module_name = module.name(db).as_str();
 
                         dynamic_importer.import_symbol(
+                            db,
+                            ty,
                             module_name,
                             definition_name,
                             &details.label[start..end],
@@ -652,6 +654,8 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
     /// If the symbol in the text edit needs to be qualified, we return the qualified symbol text.
     fn import_symbol(
         &mut self,
+        db: &dyn Db,
+        ty: &Type,
         module_name: &str,
         symbol_name: &str,
         label_text: &str,
@@ -664,12 +668,19 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
                 .members_in_scope_at(self.scope_node, self.scope_offset)
         });
 
-        if members.contains_symbol(symbol_name) {
-            return None;
-        }
-
         // Check if the label is like `foo.A`
-        let is_possibly_qualified_name = label_text.contains('.');
+        let mut is_possibly_qualified_name = label_text.contains('.');
+
+        if let Some(member) = members.find_member(symbol_name) {
+            if member.ty.definition(db) == ty.definition(db) {
+                return None;
+            }
+
+            // There is another member in scope with the same name,
+            // so we need to qualify this so we don't reference the
+            // in scope member.
+            is_possibly_qualified_name = true;
+        }
 
         let key = DynamicallyImportedMember {
             module: module_name.to_string(),
@@ -8527,6 +8538,96 @@ mod tests {
 
         a: bar.A | baz.A | list[bar.A | baz.A] = foo()
         "#);
+    }
+
+    /// Tests that if we have an inlay hint containing a symbol that is referenced
+    /// in another module, that we qualify the inlay hint symbol with the module name,
+    /// so we don't accidentally reference the in scope symbol.
+    #[test]
+    fn test_auto_import_symbol_in_scope_same_name() {
+        let mut test = inlay_hint_test(
+            r#"
+                from dataclasses import dataclass
+                import foo
+
+                class A: ...
+
+                @dataclass
+                class B[T]:
+                    x: T
+
+                b = B(foo.A())
+               "#,
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            r#"
+            class A: ...
+           "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @"
+
+        from dataclasses import dataclass
+        import foo
+
+        class A: ...
+
+        @dataclass
+        class B[T]:
+            x: T
+
+        b[: B[A]] = B([x=]foo.A())
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:8:7
+          |
+        7 | @dataclass
+        8 | class B[T]:
+          |       ^
+        9 |     x: T
+          |
+        info: Source
+          --> main2.py:11:5
+           |
+         9 |     x: T
+        10 |
+        11 | b[: B[A]] = B([x=]foo.A())
+           |     ^
+           |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:2:19
+          |
+        2 |             class A: ...
+          |                   ^
+          |
+        info: Source
+          --> main2.py:11:7
+           |
+         9 |     x: T
+        10 |
+        11 | b[: B[A]] = B([x=]foo.A())
+           |       ^
+           |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from dataclasses import dataclass
+        import foo
+
+        class A: ...
+
+        @dataclass
+        class B[T]:
+            x: T
+
+        b: B[foo.A] = B(foo.A())
+        ");
     }
 
     struct InlayHintLocationDiagnostic {

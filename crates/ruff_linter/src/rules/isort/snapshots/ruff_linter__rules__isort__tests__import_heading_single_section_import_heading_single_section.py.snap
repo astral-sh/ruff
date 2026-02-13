@@ -1,0 +1,15 @@
+---
+source: crates/ruff_linter/src/rules/isort/mod.rs
+---
+I001 [*] Import block is un-sorted or un-formatted
+ --> import_heading_single_section.py:1:1
+  |
+1 | / import requests
+2 | | import pandas
+  | |_____________^
+  |
+help: Organize imports
+  - import requests
+1 + # Third party imports
+2 | import pandas
+3 + import requests
