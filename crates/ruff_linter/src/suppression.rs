@@ -14,7 +14,7 @@ use ruff_python_trivia::{Cursor, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
-use crate::checkers::ast::LintContext;
+use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::rule_redirects::get_redirect_target;
@@ -231,7 +231,7 @@ impl Suppressions {
                     && key.is_none_or(|key| key != *group_key)
                 {
                     if group.any_invalid() {
-                        Suppressions::report_suppression_codes(
+                        if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
                             context,
                             locator,
                             group.suppression,
@@ -243,7 +243,12 @@ impl Suppressions {
                                 whole_comment: group.suppression.codes().len()
                                     == group.invalid_codes.len(),
                             },
-                        );
+                        ) {
+                            diagnostic.help(
+                                "If this is a non-Ruff rule code, \
+                                consider using the `lint.external` configuration option",
+                            );
+                        }
                     }
                     if group.any_unused() {
                         let mut codes = group.disabled_codes.clone();
@@ -367,14 +372,14 @@ impl Suppressions {
         }
     }
 
-    fn report_suppression_codes<T: Violation>(
-        context: &LintContext,
+    fn report_suppression_codes<'a, 'b, T: Violation>(
+        context: &'a LintContext<'b>,
         locator: &Locator,
         suppression: &Suppression,
         remove_codes: &[&str],
         highlight_only_code: bool,
         kind: T,
-    ) {
+    ) -> Option<DiagnosticGuard<'a, 'b>> {
         let disable_comment = suppression.comments.disable_comment();
         let (range, edit) = Suppressions::delete_codes_or_comment(
             locator,
@@ -382,7 +387,7 @@ impl Suppressions {
             remove_codes,
             highlight_only_code,
         );
-        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(kind, range) {
+        if let Some(mut diagnostic) = context.report_custom_diagnostic_if_enabled(kind, range) {
             if let Some(enable_comment) = suppression.comments.enable_comment() {
                 let (enable_range, enable_range_edit) = Suppressions::delete_codes_or_comment(
                     locator,
@@ -395,7 +400,9 @@ impl Suppressions {
             } else {
                 diagnostic.set_fix(Fix::safe_edit(edit));
             }
+            return Some(diagnostic);
         }
+        None
     }
 
     fn delete_codes_or_comment(
