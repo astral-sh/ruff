@@ -689,8 +689,6 @@ pub struct EnvironmentOptions {
     /// - A Python interpreter, e.g. `.venv/bin/python3`
     /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
     ///
-    /// Passing a path to a dynamic executable (such as a shim) is not currently supported.
-    ///
     /// If you're using a project management tool such as uv, you should not generally need to
     /// specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment
     /// variable to point to your project's virtual environment. ty can also infer the location of
