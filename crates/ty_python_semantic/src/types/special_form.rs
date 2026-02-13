@@ -3,12 +3,12 @@
 
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
-use crate::module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{FileScopeId, place_table, use_def_map};
 use crate::types::TypeDefinition;
 use ruff_db::files::File;
 use std::str::FromStr;
+use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.

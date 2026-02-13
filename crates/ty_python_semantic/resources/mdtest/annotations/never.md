@@ -59,7 +59,7 @@ python-version = "3.11"
 ```py
 from typing import Never
 
-reveal_type(Never)  # revealed: <special form 'typing.Never'>
+reveal_type(Never)  # revealed: <special-form 'typing.Never'>
 ```
 
 ### Python 3.10

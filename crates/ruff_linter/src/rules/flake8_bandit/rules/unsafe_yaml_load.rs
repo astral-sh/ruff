@@ -75,6 +75,7 @@ pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
                         qualified_name.segments(),
                         ["yaml", "SafeLoader" | "CSafeLoader"]
                             | ["yaml", "loader", "SafeLoader" | "CSafeLoader"]
+                            | ["yaml", "cyaml", "CSafeLoader"]
                     )
                 })
             {

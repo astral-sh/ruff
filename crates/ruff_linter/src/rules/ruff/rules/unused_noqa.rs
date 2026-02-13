@@ -4,12 +4,27 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 
 use crate::AlwaysFixableViolation;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Default)]
 pub(crate) struct UnusedCodes {
     pub disabled: Vec<String>,
     pub duplicated: Vec<String>,
     pub unknown: Vec<String>,
     pub unmatched: Vec<String>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum UnusedNOQAKind {
+    Noqa,
+    Suppression,
+}
+
+impl UnusedNOQAKind {
+    fn as_str(&self) -> &str {
+        match self {
+            UnusedNOQAKind::Noqa => "`noqa` directive",
+            UnusedNOQAKind::Suppression => "suppression",
+        }
+    }
 }
 
 /// ## What it does
@@ -37,6 +52,25 @@ pub(crate) struct UnusedCodes {
 ///     foo.bar()
 /// ```
 ///
+/// ## Conflict with other linters
+/// When using `RUF100` with the `--fix` option, Ruff may remove trailing comments
+/// that follow a `# noqa` directive on the same line, as it interprets the
+/// remainder of the line as a description for the suppression.
+///
+/// To prevent Ruff from removing suppressions for other tools (like `pylint`
+/// or `mypy`), separate them with a second `#` character:
+///
+/// ```python
+/// # Bad: Ruff --fix will remove the pylint comment
+/// def visit_ImportFrom(self, node):  # noqa: N802, pylint: disable=invalid-name
+///     pass
+///
+///
+/// # Good: Ruff will preserve the pylint comment
+/// def visit_ImportFrom(self, node):  # noqa: N802 # pylint: disable=invalid-name
+///     pass
+/// ```
+///
 /// ## Options
 /// - `lint.external`
 ///
@@ -46,6 +80,7 @@ pub(crate) struct UnusedCodes {
 #[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UnusedNOQA {
     pub codes: Option<UnusedCodes>,
+    pub kind: UnusedNOQAKind,
 }
 
 impl AlwaysFixableViolation for UnusedNOQA {
@@ -95,16 +130,20 @@ impl AlwaysFixableViolation for UnusedNOQA {
                     ));
                 }
                 if codes_by_reason.is_empty() {
-                    "Unused `noqa` directive".to_string()
+                    format!("Unused {}", self.kind.as_str())
                 } else {
-                    format!("Unused `noqa` directive ({})", codes_by_reason.join("; "))
+                    format!(
+                        "Unused {} ({})",
+                        self.kind.as_str(),
+                        codes_by_reason.join("; ")
+                    )
                 }
             }
-            None => "Unused blanket `noqa` directive".to_string(),
+            None => format!("Unused blanket {}", self.kind.as_str()),
         }
     }
 
     fn fix_title(&self) -> String {
-        "Remove unused `noqa` directive".to_string()
+        format!("Remove unused {}", self.kind.as_str())
     }
 }

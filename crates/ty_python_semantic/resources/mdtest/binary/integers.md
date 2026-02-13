@@ -13,7 +13,7 @@ reveal_type(3 | 4)  # revealed: Literal[7]
 reveal_type(5 & 6)  # revealed: Literal[4]
 reveal_type(7 ^ 2)  # revealed: Literal[5]
 
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `Literal[2]` and `Literal["f"]`"
+# error: [unsupported-operator] "Operator `+` is not supported between objects of type `Literal[2]` and `Literal["f"]`"
 reveal_type(2 + "f")  # revealed: Unknown
 
 def lhs(x: int):

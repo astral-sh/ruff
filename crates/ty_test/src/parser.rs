@@ -445,6 +445,10 @@ struct Parser<'s> {
 
     /// Whether or not the current section has a config block.
     current_section_has_config: bool,
+
+    /// Whether or not any section in the file has external dependencies.
+    /// Only one section per file is allowed to have dependencies (for lockfile support).
+    file_has_dependencies: bool,
 }
 
 impl<'s> Parser<'s> {
@@ -467,6 +471,7 @@ impl<'s> Parser<'s> {
             stack: SectionStack::new(root_section_id),
             current_section_files: FxHashMap::default(),
             current_section_has_config: false,
+            file_has_dependencies: false,
         }
     }
 
@@ -836,8 +841,20 @@ impl<'s> Parser<'s> {
             bail!("Multiple TOML configuration blocks in the same section are not allowed.");
         }
 
+        let config = MarkdownTestConfig::from_str(code)?;
+
+        if config.dependencies().is_some() {
+            if self.file_has_dependencies {
+                bail!(
+                    "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+                     External dependencies must be specified in a single top-level configuration block."
+                );
+            }
+            self.file_has_dependencies = true;
+        }
+
         let current_section = &mut self.sections[self.stack.top()];
-        current_section.config = MarkdownTestConfig::from_str(code)?;
+        current_section.config = config;
 
         self.current_section_has_config = true;
 
@@ -2060,5 +2077,40 @@ mod tests {
         );
         let parse_result = super::parse("file.md", &source);
         assert!(parse_result.is_ok(), "{parse_result:?}");
+    }
+
+    #[test]
+    fn multiple_sections_with_dependencies_not_allowed() {
+        let source = dedent(
+            r#"
+            # First section
+
+            ```toml
+            [project]
+            dependencies = ["pydantic==2.12.2"]
+            ```
+
+            ```py
+            x = 1
+            ```
+
+            # Second section
+
+            ```toml
+            [project]
+            dependencies = ["numpy==2.0.0"]
+            ```
+
+            ```py
+            y = 2
+            ```
+            "#,
+        );
+        let err = super::parse("file.md", &source).expect_err("Should fail to parse");
+        assert_eq!(
+            err.to_string(),
+            "Multiple sections with `[project]` dependencies in the same file are not allowed. \
+             External dependencies must be specified in a single top-level configuration block."
+        );
     }
 }

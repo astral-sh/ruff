@@ -591,9 +591,9 @@ try:
             reveal_type(x)  # revealed: B | D
         reveal_type(x)  # revealed: B | D
     x = foo
-    reveal_type(x)  # revealed: def foo(param=A) -> Unknown
+    reveal_type(x)  # revealed: def foo(param=...) -> Unknown
 except:
-    reveal_type(x)  # revealed: Literal[1] | (def foo(param=A) -> Unknown)
+    reveal_type(x)  # revealed: Literal[1] | (def foo(param=...) -> Unknown)
 
     class Bar:
         x = could_raise_returns_E()
@@ -603,9 +603,9 @@ except:
     reveal_type(x)  # revealed: <class 'Bar'>
 finally:
     # TODO: should be `Literal[1] | <class 'foo'> | <class 'Bar'>`
-    reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | <class 'Bar'>
+    reveal_type(x)  # revealed: (def foo(param=...) -> Unknown) | <class 'Bar'>
 
-reveal_type(x)  # revealed: (def foo(param=A) -> Unknown) | <class 'Bar'>
+reveal_type(x)  # revealed: (def foo(param=...) -> Unknown) | <class 'Bar'>
 ```
 
 [1]: https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d

@@ -147,8 +147,9 @@ impl ProjectDatabase {
 
                     if self.system().is_file(&path) {
                         if project.is_file_included(self, &path) {
-                            // Add the parent directory because `walkdir` always visits explicitly passed files
-                            // even if they match an exclude filter.
+                            // Add the parent directory because `walkdir`
+                            // always visits explicitly passed files even if
+                            // they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
                         }
                     } else if project.is_directory_included(self, &path) {
@@ -245,7 +246,9 @@ impl ProjectDatabase {
 
         if result.project_changed {
             let new_project_metadata = match config_file_override {
-                Some(config_file) => ProjectMetadata::from_config_file(config_file, self.system()),
+                Some(config_file) => {
+                    ProjectMetadata::from_config_file(config_file, &project_root, self.system())
+                }
                 None => ProjectMetadata::discover(&project_root, self.system()),
             };
             match new_project_metadata {

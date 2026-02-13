@@ -34,8 +34,9 @@ bitflags::bitflags! {
         const RELATIVE_FILE_WATCHER_SUPPORT = 1 << 13;
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
         const WORKSPACE_CONFIGURATION = 1 << 15;
-        const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
-        const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 17;
+        const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 16;
+        const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
+        const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
     }
 }
 
@@ -163,14 +164,19 @@ impl ResolvedClientCapabilities {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
     }
 
-    /// Returns `true` if the client supports dynamic registration for rename capabilities.
-    pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
-        self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
+    /// Returns `true` if the client has related information support for diagnostics.
+    pub(crate) const fn supports_diagnostic_related_information(self) -> bool {
+        self.contains(Self::DIAGNOSTIC_RELATED_INFORMATION)
     }
 
     /// Returns `true` if the client supports "label details" in completion items.
     pub(crate) const fn supports_completion_item_label_details(self) -> bool {
         self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
+    }
+
+    /// Returns `true` if the client prefers Markdown over plain text in completion items.
+    pub(crate) const fn prefers_markdown_in_completion(self) -> bool {
+        self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -211,15 +217,22 @@ impl ResolvedClientCapabilities {
             }
         }
 
-        if text_document.is_some_and(|text_document| text_document.diagnostic.is_some()) {
+        if let Some(diagnostic) =
+            text_document.and_then(|text_document| text_document.diagnostic.as_ref())
+        {
             flags |= Self::PULL_DIAGNOSTICS;
+
+            if diagnostic.dynamic_registration == Some(true) {
+                flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
+            }
         }
 
-        if text_document
-            .and_then(|text_document| text_document.diagnostic.as_ref()?.dynamic_registration)
-            .unwrap_or_default()
+        if let Some(publish_diagnostics) =
+            text_document.and_then(|text_document| text_document.publish_diagnostics.as_ref())
         {
-            flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
+            if publish_diagnostics.related_information == Some(true) {
+                flags |= Self::DIAGNOSTIC_RELATED_INFORMATION;
+            }
         }
 
         if text_document
@@ -257,6 +270,24 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::PREFER_MARKDOWN_IN_HOVER;
+        }
+
+        if text_document
+            .and_then(|text_document| {
+                Some(
+                    text_document
+                        .completion
+                        .as_ref()?
+                        .completion_item
+                        .as_ref()?
+                        .documentation_format
+                        .as_ref()?
+                        .contains(&MarkupKind::Markdown),
+                )
+            })
+            .unwrap_or_default()
+        {
+            flags |= Self::PREFER_MARKDOWN_IN_COMPLETION;
         }
 
         if text_document
@@ -313,13 +344,6 @@ impl ResolvedClientCapabilities {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
-        if text_document
-            .and_then(|text_document| text_document.rename.as_ref()?.dynamic_registration)
-            .unwrap_or_default()
-        {
-            flags |= Self::RENAME_DYNAMIC_REGISTRATION;
-        }
-
         if client_capabilities
             .window
             .as_ref()
@@ -354,21 +378,11 @@ pub(crate) fn server_capabilities(
             // capabilities dynamically based on the `ty.diagnosticMode` setting.
             None
         } else {
-            // Otherwise, we always advertise support for workspace diagnostics.
+            // Otherwise, we always advertise support for workspace and pull diagnostics.
             Some(DiagnosticServerCapabilities::Options(
                 server_diagnostic_options(true),
             ))
         };
-
-    let rename_provider = if resolved_client_capabilities.supports_rename_dynamic_registration() {
-        // If the client supports dynamic registration, we will register the rename capabilities
-        // dynamically based on the `ty.experimental.rename` setting.
-        None
-    } else {
-        // Otherwise, we always register the rename provider and bail out in `prepareRename` if
-        // the feature is disabled.
-        Some(OneOf::Right(server_rename_options()))
-    };
 
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
@@ -400,7 +414,7 @@ pub(crate) fn server_capabilities(
         definition_provider: Some(OneOf::Left(true)),
         declaration_provider: Some(DeclarationCapability::Simple(true)),
         references_provider: Some(OneOf::Left(true)),
-        rename_provider,
+        rename_provider: Some(OneOf::Right(server_rename_options())),
         document_highlight_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         signature_help_provider: Some(SignatureHelpOptions {
@@ -445,6 +459,15 @@ pub(crate) fn server_capabilities(
             }]
             .to_vec(),
         })),
+        workspace: Some(lsp_types::WorkspaceServerCapabilities {
+            workspace_folders: Some(lsp_types::WorkspaceFoldersServerCapabilities {
+                // N.B. It seems this is purely informational:
+                // https://github.com/microsoft/language-server-protocol/issues/1720#issuecomment-1514732305
+                supported: Some(true),
+                change_notifications: Some(OneOf::Left(true)),
+            }),
+            ..Default::default()
+        }),
         ..Default::default()
     }
 }

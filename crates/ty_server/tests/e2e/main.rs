@@ -29,11 +29,17 @@
 
 mod code_actions;
 mod commands;
+mod completions;
+mod configuration;
 mod initialize;
 mod inlay_hints;
 mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
+mod rename;
+mod semantic_tokens;
+mod signature_help;
+mod workspace_folders;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::num::NonZeroUsize;
@@ -47,30 +53,32 @@ use crossbeam::channel::RecvTimeoutError;
 use insta::internals::SettingsBindDropGuard;
 use lsp_server::{Connection, Message, RequestId, Response, ResponseError};
 use lsp_types::notification::{
-    DidChangeTextDocument, DidChangeWatchedFiles, DidCloseTextDocument, DidOpenTextDocument, Exit,
-    Initialized, Notification,
+    DidChangeTextDocument, DidChangeWatchedFiles, DidChangeWorkspaceFolders, DidCloseTextDocument,
+    DidOpenTextDocument, Exit, Initialized, Notification,
 };
 use lsp_types::request::{
-    DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request, Shutdown,
-    WorkspaceConfiguration, WorkspaceDiagnosticRequest,
+    Completion, DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest,
+    PrepareRenameRequest, Request, Shutdown, SignatureHelpRequest, WorkspaceConfiguration,
+    WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
-    ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
+    ClientCapabilities, CompletionItem, CompletionParams, CompletionResponse,
+    CompletionTriggerKind, ConfigurationParams, DiagnosticClientCapabilities,
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
-    DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
-    DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
-    InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
+    DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
+    DidOpenTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent,
+    Hover, HoverParams, InitializeParams, InitializeResult, InitializedParams, InlayHint,
+    InlayHintClientCapabilities, InlayHintParams, NumberOrString, PartialResultParams, Position,
+    PreviousResultId, PublishDiagnosticsClientCapabilities, Range, SemanticTokensResult,
+    SignatureHelp, SignatureHelpParams, SignatureHelpTriggerKind, TextDocumentClientCapabilities,
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
     TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
     WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceFolder,
+    WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
-
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
@@ -205,6 +213,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
+        env_vars: Vec<(String, Option<String>)>,
     ) -> Self {
         setup_tracing();
 
@@ -215,11 +224,21 @@ impl TestServer {
         // Create OS system with the test directory as cwd
         let os_system = OsSystem::new(test_context.root());
 
+        // Create test system and set environment variable overrides
+        let test_system = Arc::new(TestSystem::new(os_system));
+        for (name, value) in env_vars {
+            match value {
+                Some(value) => {
+                    test_system.set_env_var(name, value);
+                }
+                None => test_system.remove_env_var(name),
+            }
+        }
+
         // Start the server in a separate thread
         let server_thread = std::thread::spawn(move || {
             // TODO: This should probably be configurable to test concurrency issues
             let worker_threads = NonZeroUsize::new(1).unwrap();
-            let test_system = Arc::new(TestSystem::new(os_system));
 
             match Server::new(worker_threads, server_connection, test_system, true) {
                 Ok(server) => {
@@ -240,7 +259,7 @@ impl TestServer {
 
         let workspace_configurations = workspaces
             .into_iter()
-            .filter_map(|(folder, options)| Some((folder.uri, options?)))
+            .map(|(folder, options)| (folder.uri, options.unwrap_or_default()))
             .collect::<HashMap<_, _>>();
 
         Self {
@@ -418,6 +437,16 @@ impl TestServer {
             .unwrap_or_else(|err| panic!("Failed to receive response for request {id}: {err}"))
     }
 
+    #[track_caller]
+    pub(crate) fn send_request_await<R>(&mut self, params: R::Params) -> R::Result
+    where
+        R: Request,
+    {
+        let id = self.send_request::<R>(params);
+        self.try_await_response::<R>(&id, None)
+            .unwrap_or_else(|err| panic!("Failed to receive response for request {id}: {err}"))
+    }
+
     /// Wait for a server response corresponding to the given request ID.
     ///
     /// This should only be called if a request was already sent to the server via [`send_request`]
@@ -487,8 +516,12 @@ impl TestServer {
     /// a panic-free alternative.
     #[track_caller]
     pub(crate) fn await_notification<N: Notification>(&mut self) -> N::Params {
-        self.try_await_notification::<N>(None)
-            .unwrap_or_else(|err| panic!("Failed to receive notification `{}`: {err}", N::METHOD))
+        match self.try_await_notification::<N>(None) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to receive notification `{}`: {err}", N::METHOD)
+            }
+        }
     }
 
     /// Wait for a notification of the specified type from the server and return its parameters.
@@ -568,8 +601,12 @@ impl TestServer {
     /// If receiving the request fails.
     #[track_caller]
     pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
-        self.try_await_request::<R>(None)
-            .unwrap_or_else(|err| panic!("Failed to receive server request `{}`: {err}", R::METHOD))
+        match self.try_await_request::<R>(None) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to receive server request `{}`: {err}", R::METHOD)
+            }
+        }
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and
@@ -685,9 +722,9 @@ impl TestServer {
 
     /// Handle workspace configuration requests from the server.
     ///
-    /// Use the [`get_request`] method to wait for the server to send this request.
+    /// Use the [`await_request`] method to wait for the server to send this request.
     ///
-    /// [`get_request`]: TestServer::get_request
+    /// [`await_request`]: TestServer::await_request
     #[track_caller]
     fn handle_workspace_configuration_request(
         &mut self,
@@ -749,6 +786,21 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
+    #[expect(dead_code)]
+    pub(crate) fn write_file(
+        &self,
+        path: impl AsRef<SystemPath>,
+        content: impl AsRef<str>,
+    ) -> Result<()> {
+        let file_path = self.file_path(path);
+        // Ensure parent directories exists
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent.as_std_path())?;
+        }
+        fs::write(file_path.as_std_path(), content.as_ref())?;
+        Ok(())
+    }
+
     /// Send a `textDocument/didOpen` notification
     pub(crate) fn open_text_document(
         &mut self,
@@ -785,7 +837,6 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didClose` notification
-    #[expect(dead_code)]
     pub(crate) fn close_text_document(&mut self, path: impl AsRef<SystemPath>) {
         let params = DidCloseTextDocumentParams {
             text_document: TextDocumentIdentifier {
@@ -799,6 +850,67 @@ impl TestServer {
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
         self.send_notification::<DidChangeWatchedFiles>(params);
+    }
+
+    /// Send a `workspace/didChangeWorkspaceFolders` notification with the given added/removed
+    /// workspace folders. The paths provided should be paths to the root of the workspace folder.
+    pub(crate) fn change_workspace_folders<P: AsRef<SystemPath>>(
+        &mut self,
+        added: impl IntoIterator<Item = P>,
+        removed: impl IntoIterator<Item = P>,
+    ) {
+        let path_to_workspace_folder = |path: &SystemPath| -> WorkspaceFolder {
+            let uri = self.file_uri(path);
+            WorkspaceFolder {
+                uri,
+                name: path.file_name().unwrap_or("").to_string(),
+            }
+        };
+        let params = DidChangeWorkspaceFoldersParams {
+            event: WorkspaceFoldersChangeEvent {
+                added: added
+                    .into_iter()
+                    .map(|path| path_to_workspace_folder(path.as_ref()))
+                    .collect(),
+                removed: removed
+                    .into_iter()
+                    .map(|path| path_to_workspace_folder(path.as_ref()))
+                    .collect(),
+            },
+        };
+        self.send_notification::<DidChangeWorkspaceFolders>(params);
+    }
+
+    pub(crate) fn rename(
+        &mut self,
+        document: &Url,
+        position: lsp_types::Position,
+        new_name: &str,
+    ) -> Result<Option<WorkspaceEdit>, ()> {
+        if self
+            .send_request_await::<PrepareRenameRequest>(lsp_types::TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: document.clone(),
+                },
+                position,
+            })
+            .is_none()
+        {
+            return Err(());
+        }
+
+        Ok(
+            self.send_request_await::<lsp_types::request::Rename>(lsp_types::RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: document.clone(),
+                    },
+                    position,
+                },
+                new_name: new_name.to_string(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            }),
+        )
     }
 
     /// Send a `textDocument/diagnostic` request for the document at the given path.
@@ -871,6 +983,91 @@ impl TestServer {
         };
         let id = self.send_request::<InlayHintRequest>(params);
         self.await_response::<InlayHintRequest>(&id)
+    }
+
+    /// Sends a `textDocument/completion` request for the document at the given URL and position.
+    pub(crate) fn completion_request(
+        &mut self,
+        uri: &Url,
+        position: Position,
+    ) -> Vec<CompletionItem> {
+        let completions_id = self.send_request::<Completion>(CompletionParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
+            context: Some(lsp_types::CompletionContext {
+                trigger_kind: CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS,
+                trigger_character: None,
+            }),
+        });
+        match self.await_response::<lsp_types::request::Completion>(&completions_id) {
+            Some(CompletionResponse::Array(array)) => array,
+            Some(CompletionResponse::List(lsp_types::CompletionList { items, .. })) => items,
+            None => vec![],
+        }
+    }
+
+    /// Sends a `textDocument/signatureHelp` request for the document at the given URL and position.
+    pub(crate) fn signature_help_request(
+        &mut self,
+        uri: &Url,
+        position: Position,
+    ) -> Option<SignatureHelp> {
+        let signature_help_id = self.send_request::<SignatureHelpRequest>(SignatureHelpParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+            context: Some(lsp_types::SignatureHelpContext {
+                trigger_kind: SignatureHelpTriggerKind::INVOKED,
+                trigger_character: None,
+                is_retrigger: false,
+                active_signature_help: None,
+            }),
+        });
+        self.await_response::<SignatureHelpRequest>(&signature_help_id)
+    }
+
+    pub(crate) fn semantic_tokens_full_request(
+        &mut self,
+        uri: &Url,
+    ) -> Option<SemanticTokensResult> {
+        self.send_request_await::<lsp_types::request::SemanticTokensFullRequest>(
+            lsp_types::SemanticTokensParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            },
+        )
+    }
+
+    /// Adds a workspace folder configuration to this wrapper's state.
+    ///
+    /// This is meant to roughly model VS Code's "Add Folder to Workspace"
+    /// functionality.
+    ///
+    /// This doesn't actually correspond to any communication with an LSP
+    /// server. To do that, you'll want `change_workspace_folders`.
+    ///
+    /// # Errors
+    ///
+    /// This can return an error when there is a problem converting the
+    /// given workspace folder root path to a URL.
+    pub(crate) fn add_workspace_folder(
+        &mut self,
+        path: &SystemPath,
+        options: Option<ClientOptions>,
+    ) -> Result<()> {
+        let path = self.test_context.root().join(path);
+        let url = Url::from_file_path(path.as_std_path())
+            .map_err(|()| anyhow!("Failed to convert workspace path to URL: {path}"))?;
+        self.workspace_configurations
+            .insert(url, options.unwrap_or_default());
+        Ok(())
     }
 }
 
@@ -960,6 +1157,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
     initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
+    env_vars: Vec<(String, Option<String>)>,
 }
 
 impl TestServerBuilder {
@@ -990,12 +1188,27 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
+            env_vars: vec![
+                ("HOME".into(), None),
+                ("PATH".into(), None),
+                ("VIRTUAL_ENV".into(), None),
+            ],
         })
     }
 
     /// Set the initial client options for the test server
     pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
         self.initialization_options = Some(options);
+        self
+    }
+
+    /// Set an environment variable for the test server's system.
+    pub(crate) fn with_env_var(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.env_vars.push((name.into(), Some(value.into())));
         self
     }
 
@@ -1011,11 +1224,6 @@ impl TestServerBuilder {
         workspace_root: &SystemPath,
         options: Option<ClientOptions>,
     ) -> Result<Self> {
-        // TODO: Support multiple workspaces in the test server
-        if self.workspaces.len() == 1 {
-            anyhow::bail!("Test server doesn't support multiple workspaces yet");
-        }
-
         let workspace_path = self.test_context.root().join(workspace_root);
         fs::create_dir_all(workspace_path.as_std_path())?;
 
@@ -1051,17 +1259,6 @@ impl TestServerBuilder {
             .text_document
             .get_or_insert_default()
             .diagnostic
-            .get_or_insert_default()
-            .dynamic_registration = Some(enabled);
-        self
-    }
-
-    /// Enable or disable dynamic registration of rename capability
-    pub(crate) fn enable_rename_dynamic_registration(mut self, enabled: bool) -> Self {
-        self.client_capabilities
-            .text_document
-            .get_or_insert_default()
-            .rename
             .get_or_insert_default()
             .dynamic_registration = Some(enabled);
         self
@@ -1103,11 +1300,35 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn enable_diagnostic_related_information(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .publish_diagnostics
+            .get_or_insert_default()
+            .related_information = Some(enabled);
+        self
+    }
+
+    pub(crate) fn enable_multiline_token_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .semantic_tokens
+            .get_or_insert_default()
+            .multiline_token_support = Some(enabled);
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
         self.client_capabilities = capabilities;
         self
+    }
+
+    pub(crate) fn file_path(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+        self.test_context.root().join(path)
     }
 
     /// Write a file to the test directory
@@ -1116,7 +1337,7 @@ impl TestServerBuilder {
         path: impl AsRef<SystemPath>,
         content: impl AsRef<str>,
     ) -> Result<Self> {
-        let file_path = self.test_context.root().join(path.as_ref());
+        let file_path = self.file_path(path);
         // Ensure parent directories exists
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent.as_std_path())?;
@@ -1146,6 +1367,7 @@ impl TestServerBuilder {
             self.test_context,
             self.client_capabilities,
             self.initialization_options,
+            self.env_vars,
         )
     }
 }
@@ -1187,15 +1409,10 @@ impl TestContext {
         })?;
 
         let mut settings = insta::Settings::clone_current();
+        let project_dir_url = Url::from_file_path(project_dir.as_std_path())
+            .map_err(|()| anyhow!("Failed to convert root directory to url"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
-        settings.add_filter(
-            &tempdir_filter(
-                Url::from_file_path(project_dir.as_std_path())
-                    .map_err(|()| anyhow!("Failed to convert root directory to url"))?
-                    .path(),
-            ),
-            "<temp_dir>/",
-        );
+        settings.add_filter(&tempdir_filter(project_dir_url.path()), "<temp_dir>/");
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         settings.add_filter(
             r#"The system cannot find the file specified."#,

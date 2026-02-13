@@ -24,8 +24,7 @@ expression: code_actions
           "href": "https://ty.dev/rules#possibly-missing-attribute"
         },
         "source": "ty",
-        "message": "Submodule `parser` may not be available as an attribute on module `html`",
-        "relatedInformation": []
+        "message": "Submodule `parser` may not be available as an attribute on module `html`"
       }
     ],
     "edit": {

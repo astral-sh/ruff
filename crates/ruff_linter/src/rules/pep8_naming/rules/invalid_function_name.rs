@@ -130,10 +130,16 @@ pub(crate) fn invalid_function_name(
         return;
     }
 
-    checker.report_diagnostic(
+    let mut diagnostic = checker.report_diagnostic(
         InvalidFunctionName {
             name: name.to_string(),
         },
         stmt.identifier(),
     );
+    if parent_class.is_some() {
+        diagnostic.help(
+            "Consider adding `@typing.override` if this method \
+            overrides a method from a superclass",
+        );
+    }
 }

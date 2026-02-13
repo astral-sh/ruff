@@ -9,6 +9,7 @@ use crate::walk::{ProjectFilesFilter, ProjectFilesWalker};
 pub use db::tests::TestDb;
 pub use db::{ChangeResult, CheckMode, Db, ProjectDatabase, SalsaMemoryDump};
 use files::{Index, Indexed, IndexedFiles};
+pub use fixes::suppress_all_diagnostics;
 use metadata::settings::Settings;
 pub use metadata::{ProjectMetadata, ProjectMetadataError};
 use ruff_db::diagnostic::{
@@ -27,14 +28,14 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::error;
 use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
 
 mod db;
 mod files;
-mod glob;
+mod fixes;
+pub mod glob;
 pub mod metadata;
 mod walk;
 pub mod watch;
@@ -116,6 +117,10 @@ pub struct Project {
 
     #[default]
     verbose_flag: bool,
+
+    /// Whether to enforce exclusion rules even to files explicitly passed to ty on the command line.
+    #[default]
+    force_exclude_flag: bool,
 }
 
 /// A progress reporter.
@@ -211,15 +216,19 @@ impl Project {
     /// This means, that this method is an over-approximation of `Self::files` and may return `true` for paths
     /// that won't be included when checking the project because they're ignored in a `.gitignore` file.
     pub fn is_file_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        ProjectFilesFilter::from_project(db, self)
-            .is_file_included(path, GlobFilterCheckMode::Adhoc)
-            == IncludeResult::Included
+        matches!(
+            ProjectFilesFilter::from_project(db, self)
+                .is_file_included(path, GlobFilterCheckMode::Adhoc),
+            IncludeResult::Included { .. }
+        )
     }
 
     pub fn is_directory_included(self, db: &dyn Db, path: &SystemPath) -> bool {
-        ProjectFilesFilter::from_project(db, self)
-            .is_directory_included(path, GlobFilterCheckMode::Adhoc)
-            == IncludeResult::Included
+        matches!(
+            ProjectFilesFilter::from_project(db, self)
+                .is_directory_included(path, GlobFilterCheckMode::Adhoc),
+            IncludeResult::Included { .. }
+        )
     }
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
@@ -381,6 +390,16 @@ impl Project {
         self.verbose_flag(db)
     }
 
+    pub fn set_force_exclude(self, db: &mut dyn Db, force: bool) {
+        if self.force_exclude_flag(db) != force {
+            self.set_force_exclude_flag(db).to(force);
+        }
+    }
+
+    pub fn force_exclude(self, db: &dyn Db) -> bool {
+        self.force_exclude_flag(db)
+    }
+
     /// Returns the paths that should be checked.
     ///
     /// The default is to check the entire project in which case this method returns
@@ -444,7 +463,22 @@ impl Project {
             CheckMode::OpenFiles => self.open_files(db).contains(&file),
             CheckMode::AllFiles => {
                 // Virtual files are always checked.
-                path.is_system_virtual_path() || self.files(db).contains(&file)
+                //
+                // We also check the open file set. In theory, we
+                // shouldn't need to do this since it is accounted for
+                // by the virtual file check (for the case when a file
+                // wants to be checked but isn't saved to disk yet).
+                // However, not all clients follow the LSP convention
+                // that URIs for documents not on disk yet use the
+                // `untitled://...` scheme. That is, we assume that a
+                // `file://...` scheme corresponds to a saved file on
+                // disk, and anything else is "virtual." For example,
+                // neovim uses `file://...` even for an open buffer
+                // that does not correspond to a file saved to disk
+                // yet.
+                path.is_system_virtual_path()
+                    || self.files(db).contains(&file)
+                    || self.open_files(db).contains(&file)
             }
         }
     }
@@ -681,38 +715,7 @@ where
         Err(error) => {
             let message = error.to_diagnostic_message(Some(file.path(db)));
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                "This indicates a bug in ty.",
-            ));
-
-            let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!";
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                report_message,
-            ));
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!(
-                    "Platform: {os} {arch}",
-                    os = std::env::consts::OS,
-                    arch = std::env::consts::ARCH
-                ),
-            ));
-            if let Some(version) = ruff_db::program_version() {
-                diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    format!("Version: {version}"),
-                ));
-            }
-
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!(
-                    "Args: {args:?}",
-                    args = std::env::args().collect::<Vec<_>>()
-                ),
-            ));
+            diagnostic.add_bug_sub_diagnostics("%5Bpanic%5D");
 
             if let Some(backtrace) = error.backtrace {
                 match backtrace.status() {

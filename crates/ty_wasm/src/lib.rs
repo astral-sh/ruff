@@ -26,7 +26,7 @@ use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::Program;
+use ty_python_semantic::{MisconfigurationMode, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -58,8 +58,6 @@ pub fn before_main() {}
 
 #[wasm_bindgen(start)]
 pub fn run() {
-    use log::Level;
-
     before_main();
 
     ruff_db::set_program_version(version()).unwrap();
@@ -72,8 +70,38 @@ pub fn run() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
 
-    console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+/// Initializes the logger with the given log level.
+///
+/// ## Panics
+/// If this function is called more than once.
+#[wasm_bindgen(js_name = "initLogging")]
+pub fn init_logging(level: LogLevel) {
+    console_log::init_with_level(level.into())
+        .expect("`initLogging` to only be called at most once.");
+}
+
+#[derive(Copy, Clone, Debug)]
+#[wasm_bindgen]
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
+        }
+    }
 }
 
 #[wasm_bindgen]
@@ -99,8 +127,13 @@ impl Workspace {
 
         let system = WasmSystem::new(SystemPath::new(root));
 
-        let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
-            .map_err(into_error)?;
+        let project = ProjectMetadata::from_options(
+            options,
+            SystemPathBuf::from(root),
+            None,
+            MisconfigurationMode::Fail,
+        )
+        .map_err(into_error)?;
 
         let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
 
@@ -127,6 +160,7 @@ impl Workspace {
             options,
             self.db.project().root(&self.db).to_path_buf(),
             None,
+            MisconfigurationMode::Fail,
         )
         .map_err(into_error)?;
 
@@ -422,7 +456,8 @@ impl Workspace {
         Ok(completions
             .into_iter()
             .map(|comp| {
-                let kind = comp.kind(&self.db).map(CompletionKind::from);
+                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let kind = comp.kind.map(CompletionKind::from);
                 let type_display = comp.ty.map(|ty| ty.display(&self.db).to_string());
                 let import_edit = comp.import.as_ref().map(|edit| {
                     let range = Range::from_text_range(
@@ -437,7 +472,7 @@ impl Workspace {
                     }
                 });
                 Completion {
-                    name: comp.name.into(),
+                    name,
                     kind,
                     detail: type_display,
                     module_name: comp.module_name.map(ToString::to_string),
@@ -785,7 +820,7 @@ impl Diagnostic {
 
     #[wasm_bindgen]
     pub fn display(&self, workspace: &Workspace) -> JsString {
-        let config = DisplayDiagnosticConfig::default().color(false);
+        let config = DisplayDiagnosticConfig::new("ty").color(false);
         self.inner
             .display(&workspace.db, &config)
             .to_string()
@@ -1365,6 +1400,12 @@ impl System for WasmSystem {
 
     fn case_sensitivity(&self) -> CaseSensitivity {
         CaseSensitivity::CaseSensitive
+    }
+
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        // Since permissions of all files is 755,
+        // it follows that every file is executable.
+        self.is_file(path)
     }
 
     fn current_directory(&self) -> &SystemPath {

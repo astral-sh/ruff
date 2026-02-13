@@ -10,6 +10,7 @@ TC004 [*] Move import `foo.Foo` out of type-checking block. Import is used for m
   |                     ^^^
 7 |
 8 | a: TypeAlias = Foo | None  # OK
+  |                --- Used at runtime here
   |
 help: Move out of type-checking block
 2 | from __future__ import annotations

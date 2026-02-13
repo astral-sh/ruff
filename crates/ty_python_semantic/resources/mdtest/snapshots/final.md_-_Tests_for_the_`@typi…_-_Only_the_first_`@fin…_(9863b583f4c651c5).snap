@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - Only the first `@final` violation is reported
 mdtest path: crates/ty_python_semantic/resources/mdtest/final.md

@@ -367,7 +367,7 @@ def f_wrong(c: Callable[[], None]):
     # error: [unresolved-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
     c.__qualname__
 
-    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."
+    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`"
     c.__qualname__ = "my_callable"
 ```
 
@@ -405,6 +405,24 @@ def f_okay(c: Callable[[], None]):
         reveal_type(result)  # revealed: property
         if isinstance(result, property) and result.fset:
             c.__qualname__ = "my_callable"  # okay
+```
+
+## From a class
+
+### Subclasses should return themselves, not superclass
+
+```py
+from ty_extensions import into_callable
+
+class Base:
+    def __init__(self) -> None:
+        pass
+
+class A(Base):
+    pass
+
+# revealed: () -> A
+reveal_type(into_callable(A))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

@@ -58,6 +58,12 @@ expression: initialization_result
       ],
       "workDoneProgress": false
     },
+    "workspace": {
+      "workspaceFolders": {
+        "supported": true,
+        "changeNotifications": true
+      }
+    },
     "semanticTokensProvider": {
       "legend": {
         "tokenTypes": [
@@ -80,7 +86,8 @@ expression: initialization_result
         "tokenModifiers": [
           "definition",
           "readonly",
-          "async"
+          "async",
+          "documentation"
         ]
       },
       "range": true,

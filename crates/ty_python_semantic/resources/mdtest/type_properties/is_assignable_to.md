@@ -113,6 +113,29 @@ static_assert(not is_assignable_to(str, Literal["foo"]))
 static_assert(not is_assignable_to(str, LiteralString))
 ```
 
+### String literals and Sequence
+
+String literals are assignable to `Sequence[Literal[chars...]]` because strings are sequences of
+their characters.
+
+```py
+from typing import Literal, Sequence, Iterable, Collection, Reversible
+from ty_extensions import is_assignable_to, static_assert
+
+static_assert(is_assignable_to(Literal["abba"], Sequence[Literal["a", "b"]]))
+static_assert(is_assignable_to(Literal["abb"], Iterable[Literal["a", "b"]]))
+static_assert(is_assignable_to(Literal["abb"], Collection[Literal["a", "b"]]))
+static_assert(is_assignable_to(Literal["abb"], Reversible[Literal["a", "b"]]))
+static_assert(is_assignable_to(Literal["aaa"], Sequence[Literal["a"]]))
+static_assert(is_assignable_to(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
+static_assert(is_assignable_to(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  # subset of allowed chars
+
+# String literals are NOT assignable when they contain chars outside the allowed set
+static_assert(not is_assignable_to(Literal["abc"], Sequence[Literal["a", "b"]]))  # 'c' not allowed
+static_assert(not is_assignable_to(Literal["x"], Sequence[Literal["a", "b"]]))  # 'x' not allowed
+static_assert(not is_assignable_to(Literal["aa"], Sequence[Literal[""]]))
+```
+
 ### Byte literals
 
 ```py
@@ -736,6 +759,29 @@ static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal[""]]], No
 static_assert(is_assignable_to(Intersection[LiteralString, Not[Literal["", "a"]]], Not[AlwaysFalsy]))
 ```
 
+## Callable types with Unknown/missing return type
+
+See <https://github.com/astral-sh/ty/issues/2363>, a property test failure involving
+`~type & ~((...) -> Unknown)` not being assignable to `~type`. Since `~type & ~Callable` is a subset
+of `~type`, the intersection should be assignable to `~type`.
+
+The root cause was that we failed to properly materialize a `Callable[..., Unknown]` type when the
+`Unknown` return type originated from a missing annotation.
+
+```py
+from ty_extensions import static_assert, is_assignable_to, Intersection, Not, Unknown, CallableTypeOf
+from typing import Callable
+
+# `Callable[..., Unknown]` has explicit Unknown return type
+static_assert(is_assignable_to(Intersection[Not[type], Not[Callable[..., Unknown]]], Not[type]))
+
+# Function with no return annotation (has implicit Unknown return type internally)
+def no_return_annotation(*args, **kwargs): ...
+
+# `CallableTypeOf[no_return_annotation]` has `returns: None` internally (no annotation)
+static_assert(is_assignable_to(Intersection[Not[type], Not[CallableTypeOf[no_return_annotation]]], Not[type]))
+```
+
 ## Intersections with non-fully-static negated elements
 
 A type can be _assignable_ to an intersection containing negated elements only if the _bottom_
@@ -1338,6 +1384,40 @@ def g3(obj: Foo[tuple[A]]):
     f3(obj)
 ```
 
+## Generic aliases
+
+```py
+from typing import final
+from ty_extensions import static_assert, is_assignable_to, TypeOf
+
+class GenericClass[T]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass]))
+static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass]))
+static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass[int]]))
+static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericClass[str]], type[GenericClass[int]]))
+
+class GenericClassIntBound[T: int]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
+
+@final
+class GenericFinalClass[T]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
+```
+
 ## `TypeGuard` and `TypeIs`
 
 `TypeGuard[...]` and `TypeIs[...]` are always assignable to `bool`.
@@ -1349,8 +1429,7 @@ from typing_extensions import Any, TypeGuard, TypeIs
 static_assert(is_assignable_to(TypeGuard[Unknown], bool))
 static_assert(is_assignable_to(TypeIs[Any], bool))
 
-# TODO no error
-static_assert(not is_assignable_to(TypeGuard[Unknown], str))  # error: [static-assert-error]
+static_assert(not is_assignable_to(TypeGuard[Unknown], str))
 static_assert(not is_assignable_to(TypeIs[Any], str))
 ```
 

@@ -24,8 +24,7 @@ expression: code_actions
           "href": "https://ty.dev/rules#unresolved-reference"
         },
         "source": "ty",
-        "message": "Name `foobar` used when not defined",
-        "relatedInformation": []
+        "message": "Name `foobar` used when not defined"
       }
     ],
     "edit": {

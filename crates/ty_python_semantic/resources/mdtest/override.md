@@ -183,9 +183,12 @@ class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     def my_property1(self) -> int: ...
 
+    # TODO: This maybe shouldn't be a Liskov violation? Whether called on the type or
+    # on an instance, it will behave the same from the caller's perspective. The only difference
+    # is whether the method body gets access to `cls`, which is not a concern of Liskov.
     @staticmethod
     @override
-    def class_method1() -> int: ...
+    def class_method1() -> int: ...  # error: [invalid-method-override]
 
     @classmethod
     @override
@@ -412,23 +415,23 @@ class Spam:
 
     @overload
     @override
+    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
     def bar(self, x: str) -> str: ...
     @overload
     @override
+    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
     def bar(self, x: int) -> int: ...
     @override
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
     # error: [invalid-explicit-override]
     def bar(self, x: str | int) -> str | int:
         return x
 
     @overload
     @override
+    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
     def baz(self, x: str) -> str: ...
     @overload
     def baz(self, x: int) -> int: ...
-    # error: [invalid-overload] "`@override` decorator should be applied only to the overload implementation"
     # error: [invalid-explicit-override]
     def baz(self, x: str | int) -> str | int:
         return x
@@ -547,10 +550,8 @@ class MyNamedTupleChild(MyNamedTupleParent):
 class MyTypedDict(TypedDict):
     x: int
 
+    # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
     @override
-    # TODO: it's invalid to define a method on a `TypedDict` class,
-    # so we should emit a diagnostic here.
-    # It shouldn't be an `invalid-explicit-override` diagnostic, however.
     def copy(self) -> Self: ...
 
 class Grandparent(Any): ...

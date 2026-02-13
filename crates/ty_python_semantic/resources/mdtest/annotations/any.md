@@ -169,13 +169,13 @@ def f(x: Any[int]):
 `Any` cannot be called (this leads to a `TypeError` at runtime):
 
 ```py
-Any()  # error: [call-non-callable] "Object of type `<special form 'typing.Any'>` is not callable"
+Any()  # error: [call-non-callable] "Object of type `<special-form 'typing.Any'>` is not callable"
 ```
 
 `Any` also cannot be used as a metaclass (under the hood, this leads to an implicit call to `Any`):
 
 ```py
-class F(metaclass=Any): ...  # error: [invalid-metaclass] "Metaclass type `<special form 'typing.Any'>` is not callable"
+class F(metaclass=Any): ...  # error: [invalid-metaclass] "Metaclass type `<special-form 'typing.Any'>` is not callable"
 ```
 
 And `Any` cannot be used in `isinstance()` checks:

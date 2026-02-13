@@ -19,7 +19,6 @@ help: Remove `super()` parameters
 18 |         super(Child, self).method  # wrong
 19 |         super(
 20 |             Child,
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:18:14
@@ -40,7 +39,6 @@ help: Remove `super()` parameters
 19 |         super(
 20 |             Child,
 21 |             self,
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:19:14
@@ -66,7 +64,6 @@ help: Remove `super()` parameters
 20 | 
 21 | 
 22 | class BaseClass:
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:36:14
@@ -86,7 +83,6 @@ help: Remove `super()` parameters
 37 |         super().f()
 38 | 
 39 |     def different_argument(self, other):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:50:18
@@ -105,7 +101,6 @@ help: Remove `super()` parameters
 51 |             super().f()
 52 | 
 53 |         outer_argument()
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:74:14
@@ -125,7 +120,6 @@ help: Remove `super()` parameters
 75 |         super().f()  # OK
 76 | 
 77 | 
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
   --> UP008.py:92:14
@@ -144,7 +138,6 @@ help: Remove `super()` parameters
 93 | 
 94 | 
 95 | # see: https://github.com/astral-sh/ruff/issues/18684
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:113:14
@@ -287,7 +280,6 @@ help: Remove `super()` parameters
 144 | 
 145 | # See: https://github.com/astral-sh/ruff/issues/19357
 146 | # Must be detected
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:154:23
@@ -308,7 +300,6 @@ help: Remove `super()` parameters
 155 | 
 156 | class ChildD2(ParentD):
 157 |     def f(self):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:159:23
@@ -329,7 +320,6 @@ help: Remove `super()` parameters
 160 | 
 161 | class ChildD3(ParentD):
 162 |     def f(self):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:163:23
@@ -349,7 +339,6 @@ help: Remove `super()` parameters
 164 |         super # Python injects __class__ into scope
 165 | 
 166 | import builtins as builtins_alias
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:169:29
@@ -369,7 +358,6 @@ help: Remove `super()` parameters
 170 |         super # Python injects __class__ into scope
 171 | 
 172 | class ChildD5(ParentD):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:176:23
@@ -390,7 +378,6 @@ help: Remove `super()` parameters
 177 | 
 178 | class ChildD6(ParentD):
 179 |     def f(self):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:182:23
@@ -411,7 +398,6 @@ help: Remove `super()` parameters
 183 | 
 184 | class ChildD7(ParentD):
 185 |     def f(self):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:188:23
@@ -432,7 +418,6 @@ help: Remove `super()` parameters
 189 | 
 190 | class ChildD8(ParentD):
 191 |     def f(self):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:195:23
@@ -453,7 +438,6 @@ help: Remove `super()` parameters
 196 | 
 197 | class ChildD9(ParentD):
 198 |     def f(self):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:202:23
@@ -474,7 +458,6 @@ help: Remove `super()` parameters
 203 | 
 204 | class ChildD10(ParentD):
 205 |     def f(self):
-note: This is an unsafe fix and may change runtime behavior
 
 UP008 [*] Use `super()` instead of `super(__class__, self)`
    --> UP008.py:209:23
@@ -493,4 +476,3 @@ help: Remove `super()` parameters
 210 | 
 211 | 
 212 | # Must be ignored
-note: This is an unsafe fix and may change runtime behavior

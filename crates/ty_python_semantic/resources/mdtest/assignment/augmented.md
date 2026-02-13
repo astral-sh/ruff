@@ -38,13 +38,15 @@ reveal_type(x)  # revealed: int
 
 ## Unsupported types
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class C:
     def __isub__(self, other: str) -> int:
         return 42
 
 x = C()
-# error: [unsupported-operator] "Operator `-=` is unsupported between objects of type `C` and `Literal[1]`"
+# error: [unsupported-operator] "Operator `-=` is not supported between objects of type `C` and `Literal[1]`"
 x -= 1
 
 reveal_type(x)  # revealed: int
@@ -79,7 +81,7 @@ def _(flag: bool):
 
     f = Foo()
 
-    # error: [unsupported-operator] "Operator `+=` is unsupported between objects of type `Foo` and `Literal["Hello, world!"]`"
+    # error: [unsupported-operator] "Operator `+=` is not supported between objects of type `Foo` and `Literal["Hello, world!"]`"
     f += "Hello, world!"
 
     reveal_type(f)  # revealed: int | Unknown

@@ -55,6 +55,10 @@ use crate::checkers::ast::Checker;
 /// ## Notebook behavior
 /// This rule is ignored for Jupyter Notebooks.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -138,6 +142,10 @@ impl Violation for UndocumentedPublicModule {
 ///     def add_points(self, points: int) -> None:
 ///         self.points += points
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -366,6 +374,10 @@ impl Violation for UndocumentedPublicFunction {
 /// __all__ = ["player", "game"]
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -479,6 +491,10 @@ impl Violation for UndocumentedMagicMethod {
 /// bar = Foo.Bar()
 /// bar.__doc__  # "Class Bar."
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)

@@ -188,7 +188,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
-                            checker.comment_ranges(),
+                            checker.tokens(),
                         )
                         .map(Fix::safe_edit)
                     });
@@ -206,7 +206,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
-                            checker.comment_ranges(),
+                            checker.tokens(),
                         )
                         .map(Fix::safe_edit)
                     });
@@ -231,7 +231,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
-                            checker.comment_ranges(),
+                            checker.tokens(),
                         )
                         .map(Fix::safe_edit)
                     });
@@ -249,7 +249,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             &call.arguments,
                             Parentheses::Preserve,
                             checker.locator().contents(),
-                            checker.comment_ranges(),
+                            checker.tokens(),
                         )
                         .map(Fix::safe_edit)
                     });

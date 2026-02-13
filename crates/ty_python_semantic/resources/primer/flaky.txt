@@ -1,0 +1,8 @@
+Expression
+materialize
+porcupine
+prefect
+pydantic
+scikit-build-core
+setuptools
+sympy

@@ -3,13 +3,14 @@ use std::path::Path;
 
 use rustc_hash::FxHashMap;
 
-use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
-use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
+use crate::token::Tokens;
+use crate::token::parenthesized_range;
 use crate::visitor::Visitor;
 use crate::{
     self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,
@@ -1474,7 +1475,7 @@ pub fn generate_comparison(
     ops: &[CmpOp],
     comparators: &[Expr],
     parent: AnyNodeRef,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
     source: &str,
 ) -> String {
     let start = left.start();
@@ -1483,8 +1484,7 @@ pub fn generate_comparison(
 
     // Add the left side of the comparison.
     contents.push_str(
-        &source[parenthesized_range(left.into(), parent, comment_ranges, source)
-            .unwrap_or(left.range())],
+        &source[parenthesized_range(left.into(), parent, tokens).unwrap_or(left.range())],
     );
 
     for (op, comparator) in ops.iter().zip(comparators) {
@@ -1504,7 +1504,7 @@ pub fn generate_comparison(
 
         // Add the right side of the comparison.
         contents.push_str(
-            &source[parenthesized_range(comparator.into(), parent, comment_ranges, source)
+            &source[parenthesized_range(comparator.into(), parent, tokens)
                 .unwrap_or(comparator.range())],
         );
     }

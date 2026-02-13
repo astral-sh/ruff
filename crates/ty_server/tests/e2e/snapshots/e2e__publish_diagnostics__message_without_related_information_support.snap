@@ -1,0 +1,70 @@
+---
+source: crates/ty_server/tests/e2e/publish_diagnostics.rs
+expression: diagnostics
+---
+PublishDiagnosticsParams {
+    uri: Url {
+        scheme: "file",
+        cannot_be_a_base: false,
+        username: "",
+        password: None,
+        host: None,
+        port: None,
+        path: "<temp_dir>/src/foo.py",
+        query: None,
+        fragment: None,
+    },
+    diagnostics: [
+        Diagnostic {
+            range: Range {
+                start: Position {
+                    line: 3,
+                    character: 0,
+                },
+                end: Position {
+                    line: 3,
+                    character: 30,
+                },
+            },
+            severity: Some(
+                Error,
+            ),
+            code: Some(
+                String(
+                    "type-assertion-failure",
+                ),
+            ),
+            code_description: Some(
+                CodeDescription {
+                    href: Url {
+                        scheme: "https",
+                        cannot_be_a_base: false,
+                        username: "",
+                        password: None,
+                        host: Some(
+                            Domain(
+                                "ty.dev",
+                            ),
+                        ),
+                        port: None,
+                        path: "/rules",
+                        query: None,
+                        fragment: Some(
+                            "type-assertion-failure",
+                        ),
+                    },
+                },
+            ),
+            source: Some(
+                "ty",
+            ),
+            message: "Type `list[str]` does not match asserted type `Literal[/"test/"]`",
+            related_information: None,
+            tags: None,
+            data: None,
+        },
+    ],
+    version: Some(
+        1,
+    ),
+}

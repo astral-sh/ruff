@@ -12,7 +12,7 @@ python-version = "3.12"
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
+reveal_type(IntOrStr)  # revealed: TypeAliasType
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
 x: IntOrStr = 1
@@ -205,7 +205,7 @@ from typing_extensions import TypeAliasType, Union
 
 IntOrStr = TypeAliasType("IntOrStr", Union[int, str])
 
-reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
+reveal_type(IntOrStr)  # revealed: TypeAliasType
 
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
@@ -452,4 +452,18 @@ type Y = X | str | dict[str, Y]
 def _(y: Y):
     if isinstance(y, dict):
         reveal_type(y)  # revealed: dict[str, X] | dict[str, Y]
+```
+
+### Recursive alias with tuple - stack overflow test (issue 2470)
+
+This test case used to cause a stack overflow. The returned type `list[int]` is not assignable to
+`RecursiveT = int | tuple[RecursiveT, ...]`, so we get an error.
+
+```py
+type RecursiveT = int | tuple[RecursiveT, ...]
+
+def foo(a: int, b: int) -> RecursiveT:
+    some_intermediate_var = (a, b)
+    # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
+    return list(some_intermediate_var)
 ```

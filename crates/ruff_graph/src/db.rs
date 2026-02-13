@@ -3,15 +3,12 @@ use std::sync::Arc;
 use zip::CompressionMethod;
 
 use ruff_db::Db as SourceDb;
-use ruff_db::files::{File, Files};
+use ruff_db::files::Files;
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_python_ast::PythonVersion;
-use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{
-    Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
-};
+use ty_module_resolver::{SearchPathSettings, SearchPaths};
+use ty_site_packages::{PythonEnvironment, SysPrefixPathOrigin};
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
     let mut builder = VendoredFileSystemBuilder::new(CompressionMethod::Stored);
@@ -20,12 +17,13 @@ static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::Lazy
 });
 
 #[salsa::db]
-#[derive(Default, Clone)]
+#[derive(Clone)]
 pub struct ModuleDb {
     storage: salsa::Storage<Self>,
     files: Files,
     system: OsSystem,
-    rule_selection: Arc<RuleSelection>,
+    search_paths: Arc<SearchPaths>,
+    python_version: PythonVersion,
 }
 
 impl ModuleDb {
@@ -35,32 +33,31 @@ impl ModuleDb {
         python_version: PythonVersion,
         venv_path: Option<SystemPathBuf>,
     ) -> Result<Self> {
-        let db = Self::default();
-        let mut search_paths = SearchPathSettings::new(src_roots);
+        let system = OsSystem::default();
+        let mut search_path_settings = SearchPathSettings::new(src_roots);
         // TODO: Consider calling `PythonEnvironment::discover` if the `venv_path` is not provided.
         if let Some(venv_path) = venv_path {
             let environment =
-                PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, db.system())?;
-            search_paths.site_packages_paths = environment
-                .site_packages_paths(db.system())
+                PythonEnvironment::new(venv_path, SysPrefixPathOrigin::PythonCliFlag, &system)?;
+            search_path_settings.site_packages_paths = environment
+                .site_packages_paths(&system)
                 .context("Failed to discover the site-packages directory")?
                 .into_vec();
         }
-        let search_paths = search_paths
-            .to_search_paths(db.system(), db.vendored())
+        let search_paths = search_path_settings
+            .to_search_paths(&system, &EMPTY_VENDORED)
             .context("Invalid search path settings")?;
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: python_version,
-                    source: PythonVersionSource::default(),
-                },
-                python_platform: PythonPlatform::default(),
-                search_paths,
-            },
-        );
+        let db = Self {
+            storage: salsa::Storage::new(None),
+            files: Files::default(),
+            system,
+            search_paths: Arc::new(search_paths),
+            python_version,
+        };
+
+        // Register the static roots for salsa durability
+        db.search_paths.try_register_static_roots(&db);
 
         Ok(db)
     }
@@ -81,26 +78,14 @@ impl SourceDb for ModuleDb {
     }
 
     fn python_version(&self) -> PythonVersion {
-        Program::get(self).python_version(self)
+        self.python_version
     }
 }
 
 #[salsa::db]
-impl Db for ModuleDb {
-    fn should_check_file(&self, file: File) -> bool {
-        !file.path(self).is_vendored_path()
-    }
-
-    fn rule_selection(&self, _file: File) -> &RuleSelection {
-        &self.rule_selection
-    }
-
-    fn lint_registry(&self) -> &LintRegistry {
-        default_lint_registry()
-    }
-
-    fn verbose(&self) -> bool {
-        false
+impl ty_module_resolver::Db for ModuleDb {
+    fn search_paths(&self) -> &SearchPaths {
+        &self.search_paths
     }
 }
 

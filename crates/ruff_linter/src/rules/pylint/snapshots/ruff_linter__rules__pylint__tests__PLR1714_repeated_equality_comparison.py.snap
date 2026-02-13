@@ -436,6 +436,7 @@ help: Merge multiple comparisons
 73 + foo in {False, 0} # Different types, same hashed value
 74 | 
 75 | foo == 0.0 or foo == 0j # Different types, same hashed value
+76 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PLR1714 [*] Consider merging multiple comparisons: `foo in {0.0, 0j}`.
@@ -445,6 +446,8 @@ PLR1714 [*] Consider merging multiple comparisons: `foo in {0.0, 0j}`.
 74 |
 75 | foo == 0.0 or foo == 0j # Different types, same hashed value
    | ^^^^^^^^^^^^^^^^^^^^^^^
+76 |
+77 | foo == "bar" or foo == "bar" # All members identical
    |
 help: Merge multiple comparisons
 72 | 
@@ -452,4 +455,23 @@ help: Merge multiple comparisons
 74 | 
    - foo == 0.0 or foo == 0j # Different types, same hashed value
 75 + foo in {0.0, 0j} # Different types, same hashed value
+76 | 
+77 | foo == "bar" or foo == "bar" # All members identical
+78 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PLR1714 [*] Consider merging multiple comparisons: `foo in {"bar", "bar", "buzz"}`.
+  --> repeated_equality_comparison.py:79:1
+   |
+77 | foo == "bar" or foo == "bar" # All members identical
+78 |
+79 | foo == "bar" or foo == "bar" or foo == "buzz" # All but one members identical
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Merge multiple comparisons
+76 | 
+77 | foo == "bar" or foo == "bar" # All members identical
+78 | 
+   - foo == "bar" or foo == "bar" or foo == "buzz" # All but one members identical
+79 + foo in {"bar", "bar", "buzz"} # All but one members identical
 note: This is an unsafe fix and may change runtime behavior

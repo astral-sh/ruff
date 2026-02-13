@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 
+use ruff_python_ast::SourceType;
 use rustc_hash::FxHashMap;
 
 use crate::{
@@ -53,7 +54,9 @@ pub(crate) fn fix_all(
         None
     };
 
-    let source_type = query.source_type();
+    let SourceType::Python(source_type) = query.source_type() else {
+        return Ok(Fixes::default());
+    };
 
     // We need to iteratively apply all safe fixes onto a single file and then
     // create a diff between the modified file and the original source to use as a single workspace

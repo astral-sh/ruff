@@ -10,6 +10,10 @@ documentation = { workspace = true }
 repository = { workspace = true }
 license = { workspace = true }
 
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
+
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_index = { workspace = true }
@@ -28,12 +32,8 @@ smallvec = { workspace = true }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["filters", "json", "redactions"] }
-test-case = { workspace = true }
 ruff_python_parser = { workspace = true }
+test-case = { workspace = true }
 
 [lints]
 workspace = true
-
-[package.metadata.cargo-shear]
-# Used via `CacheKey` macro expansion.
-ignored = ["ruff_cache"]

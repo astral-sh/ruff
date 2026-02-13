@@ -1,5 +1,6 @@
 //! Access to the Ruff linting API for the LSP
 
+use ruff_python_ast::SourceType;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 
@@ -20,6 +21,7 @@ use ruff_linter::{
     packaging::detect_package_root,
     settings::flags,
     source_kind::SourceKind,
+    suppression::Suppressions,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
@@ -94,7 +96,9 @@ pub(crate) fn check(
         None
     };
 
-    let source_type = query.source_type();
+    let SourceType::Python(source_type) = query.source_type() else {
+        return DiagnosticsMap::default();
+    };
 
     let target_version = settings.linter.resolve_target_version(&document_path);
 
@@ -118,6 +122,9 @@ pub(crate) fn check(
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
+    // Parse range suppression comments
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+
     // Generate checks.
     let diagnostics = check_path(
         &document_path,
@@ -132,6 +139,7 @@ pub(crate) fn check(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     let noqa_edits = generate_noqa_edits(
@@ -142,6 +150,7 @@ pub(crate) fn check(
         &settings.linter.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
+        &suppressions,
     );
 
     let mut diagnostics_map = DiagnosticsMap::default();
@@ -236,7 +245,7 @@ fn to_lsp_diagnostic(
 ) -> (usize, lsp_types::Diagnostic) {
     let diagnostic_range = diagnostic.range().unwrap_or_default();
     let name = diagnostic.name();
-    let body = diagnostic.body().to_string();
+    let body = diagnostic.concise_message().to_string();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.first_help_text();
     let code = diagnostic.secondary_code();

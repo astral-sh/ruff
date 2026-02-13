@@ -32,6 +32,12 @@ mod tests {
     #[test_case(Path::new("EXE005_2.py"))]
     #[test_case(Path::new("EXE005_3.py"))]
     fn rules(path: &Path) -> Result<()> {
+        if is_wsl::is_wsl() {
+            // these rules are always ignored on WSL, so skip testing them in a WSL environment
+            // see https://github.com/astral-sh/ruff/pull/21724 for latest discussion
+            return Ok(());
+        }
+
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_executable").join(path).as_path(),

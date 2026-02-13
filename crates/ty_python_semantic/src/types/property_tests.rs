@@ -81,7 +81,7 @@ macro_rules! type_property_test {
 
 mod stable {
     use super::union;
-    use crate::types::{CallableType, KnownClass, Type};
+    use crate::types::{CallableType, IntersectionBuilder, KnownClass, Type};
 
     // Reflexivity: `T` is equivalent to itself.
     type_property_test!(
@@ -234,8 +234,15 @@ mod stable {
     // the Liskov violation). All you need to do is to create a class that subclasses
     // `Iterable` but assigns `__iter__ = None` in the class body (or similar).
     type_property_test!(
-        all_type_assignable_to_iterable_are_iterable, db,
-        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, [Type::object()])) => t.try_iterate(db).is_ok()
+        all_types_assignable_to_iterable_are_iterable, db,
+        forall types t. t.is_assignable_to(db, KnownClass::Iterable.to_specialized_instance(db, &[Type::object()])) => t.try_iterate(db).is_ok()
+    );
+
+    // Our optimized `Type::negate()` function should always produce the exact same type
+    // as going "the long way" via the `IntersectionBuilder`.
+    type_property_test!(
+        all_negated_types_identical_to_intersection_with_single_negated_element, db,
+        forall types t. t.negate(db) == IntersectionBuilder::new(db).add_negative(t).build()
     );
 }
 
@@ -340,7 +347,7 @@ mod flaky {
 
     // Similarly, `T'`, the bottom materialization of `T`, should also be assignable to `T`.
     type_property_test!(
-        bottom_materialization_of_type_is_assigneble_to_type, db,
+        bottom_materialization_of_type_is_assignable_to_type, db,
         forall types t. t.bottom_materialization(db).is_assignable_to(db, t)
     );
 }

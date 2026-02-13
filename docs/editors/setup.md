@@ -375,7 +375,7 @@ Starting with version 2025.3, PyCharm supports Ruff out of the box:
 
 1. Select which options should be enabled.
 
-For more information, refer to [PyCharm documentation](https://www.jetbrains.com/help/pycharm/2025.3/lsp-tools.html#ruff).
+For more information, refer to [PyCharm documentation](https://www.jetbrains.com/help/pycharm/lsp-tools.html#ruff).
 
 ### Via External Tool
 

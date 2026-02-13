@@ -567,5 +567,64 @@ PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
 138 |
 139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^^^^^^^
+140 |
+141 | # See: https://github.com/astral-sh/ruff/issues/21794
     |
 help: Replace with `Path(...).samefile()`
+
+PTH104 `os.rename()` should be replaced by `Path.rename()`
+   --> full_name.py:144:4
+    |
+142 | import sys
+143 |
+144 | if os.rename("pth1.py", "pth1.py.bak"):
+    |    ^^^^^^^^^
+145 |     print("rename: truthy")
+146 | else:
+    |
+help: Replace with `Path(...).rename(...)`
+
+PTH105 `os.replace()` should be replaced by `Path.replace()`
+   --> full_name.py:149:4
+    |
+147 |     print("rename: falsey")
+148 |
+149 | if os.replace("pth1.py.bak", "pth1.py"):
+    |    ^^^^^^^^^^
+150 |     print("replace: truthy")
+151 | else:
+    |
+help: Replace with `Path(...).replace(...)`
+
+PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:155:14
+    |
+154 | try:
+155 |     for _ in os.getcwd():
+    |              ^^^^^^^^^
+156 |         print("getcwd: iterable")
+157 |         break
+    |
+help: Replace with `Path.cwd()`
+
+PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:162:14
+    |
+161 | try:
+162 |     for _ in os.getcwdb():
+    |              ^^^^^^^^^^
+163 |         print("getcwdb: iterable")
+164 |         break
+    |
+help: Replace with `Path.cwd()`
+
+PTH115 `os.readlink()` should be replaced by `Path.readlink()`
+   --> full_name.py:169:14
+    |
+168 | try:
+169 |     for _ in os.readlink(sys.executable):
+    |              ^^^^^^^^^^^
+170 |         print("readlink: iterable")
+171 |         break
+    |
+help: Replace with `Path(...).readlink()`

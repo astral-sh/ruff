@@ -7,10 +7,10 @@ use crate::Violation;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for membership tests on empty collections (such as `list`, `tuple`, `set` or `dict`).
+/// Checks for membership tests on empty collections (such as `list`, `tuple`, `set`, or `dict`).
 ///
 /// ## Why is this bad?
-/// If the collection is always empty, the check is unnecessary, and can be removed.
+/// If the collection is always empty, the check is unnecessary and can be removed.
 ///
 /// ## Example
 ///
@@ -25,7 +25,7 @@ use crate::checkers::ast::Checker;
 /// print("got it!")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.11.9")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct InEmptyCollection;
 
 impl Violation for InEmptyCollection {

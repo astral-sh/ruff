@@ -132,10 +132,7 @@ x: Literal[1] = 1
 ";
 
     let ty_toml = SystemPath::new("ty.toml");
-    let ty_toml_content = "\
-[rules]
-unused-ignore-comment = \"warn\"
-";
+    let ty_toml_content = "";
 
     let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?

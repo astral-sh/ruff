@@ -33,7 +33,7 @@ pub struct LintMetadata {
     pub line: u32,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -615,4 +615,7 @@ pub enum LintSource {
 
     /// The rule was enabled in a configuration file.
     File,
+
+    /// The rule was enabled from the configuration in the editor.
+    Editor,
 }

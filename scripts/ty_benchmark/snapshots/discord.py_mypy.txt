@@ -698,9 +698,9 @@ discord/abc.py:687: error: Incompatible types in assignment (expression has type
 discord/abc.py:694: error: Incompatible return value type (got "Dict[Optional[Role], PermissionOverwrite]", expected "Dict[Union[Role, Member, Object], PermissionOverwrite]")  [return-value]
 discord/abc.py:1031: error: Argument 5 to "edit_channel_permissions" of "HTTPClient" has incompatible type "int"; expected "Literal[0, 1]"  [arg-type]
 discord/abc.py:1269: error: Unexpected keyword argument "parent_id" for "update" of "TypedDict"  [call-arg]
-<TMPDIR>_/venv/lib/python3.8/site-packages/mypy/typeshed/stdlib/typing.pyi:960: note: "update" of "TypedDict" defined here
+venv/lib/python3.8/site-packages/mypy/typeshed/stdlib/typing.pyi:960: note: "update" of "TypedDict" defined here
 discord/abc.py:1269: error: Unexpected keyword argument "lock_permissions" for "update" of "TypedDict"  [call-arg]
-<TMPDIR>_/venv/lib/python3.8/site-packages/mypy/typeshed/stdlib/typing.pyi:960: note: "update" of "TypedDict" defined here
+venv/lib/python3.8/site-packages/mypy/typeshed/stdlib/typing.pyi:960: note: "update" of "TypedDict" defined here
 discord/abc.py:1815: error: Incompatible types in assignment (expression has type "reversed[MessagePin]", variable has type "List[MessagePin]")  [assignment]
 discord/abc.py:1821: error: Incompatible types in "yield" (actual type "Message", expected type "PinnedMessage")  [misc]
 discord/abc.py:2035: error: Incompatible types in assignment (expression has type "Callable[[Arg(int, 'retrieve'), Arg(Optional[Snowflake], 'after'), Arg(Optional[int], 'limit')], Coroutine[Any, Any, Any]]", variable has type "Callable[[Arg(int, 'retrieve'), Arg(Optional[Snowflake], 'around'), Arg(Optional[int], 'limit')], Coroutine[Any, Any, Any]]")  [assignment]

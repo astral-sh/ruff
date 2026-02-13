@@ -58,6 +58,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// This fix will always change the behavior of the program and, despite the precautions detailed
 /// above, this may be undesired. As such the fix is always marked as unsafe.
 ///
+/// ## Options
+///
+/// - `lint.logger-objects`
+///
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html
 /// [FastAPI path]: https://fastapi.tiangolo.com/tutorial/path-params/

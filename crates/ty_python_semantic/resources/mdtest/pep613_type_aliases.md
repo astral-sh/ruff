@@ -46,6 +46,36 @@ except MyExc as e:
     reveal_type(e)  # revealed: Exception
 ```
 
+## Can be (partially) stringified
+
+```py
+from typing import TypeAlias, Optional, TypeVar, Generic
+
+class A: ...
+
+OptionalA1: TypeAlias = Optional[A]
+OptionalA2: TypeAlias = Optional["A"]
+OptionalA3: TypeAlias = "Optional[A]"
+
+def _(a: OptionalA1, b: OptionalA2, c: OptionalA3) -> None:
+    reveal_type(a)  # revealed: A | None
+    reveal_type(b)  # revealed: A | None
+    reveal_type(c)  # revealed: A | None
+
+T = TypeVar("T")
+
+class MyGenericClass(Generic[T]): ...
+
+MyGenericAlias1: TypeAlias = MyGenericClass[A]
+MyGenericAlias2: TypeAlias = MyGenericClass["A"]
+MyGenericAlias3: TypeAlias = "MyGenericClass[A]"
+
+def _(a: MyGenericAlias1, b: MyGenericAlias2, c: MyGenericAlias3) -> None:
+    reveal_type(a)  # revealed: MyGenericClass[A]
+    reveal_type(b)  # revealed: MyGenericClass[A]
+    reveal_type(c)  # revealed: MyGenericClass[A]
+```
+
 ## Can inherit from an alias
 
 ```py
@@ -113,7 +143,7 @@ MyList: TypeAlias = list[T]
 ListOrSet: TypeAlias = list[T] | set[T]
 
 reveal_type(MyList)  # revealed: <class 'list[T]'>
-reveal_type(ListOrSet)  # revealed: <types.UnionType special form 'list[T] | set[T]'>
+reveal_type(ListOrSet)  # revealed: <types.UnionType special-form 'list[T] | set[T]'>
 
 def _(list_of_int: MyList[int], list_or_set_of_str: ListOrSet[str]):
     reveal_type(list_of_int)  # revealed: list[int]
@@ -293,7 +323,7 @@ def _(rec: RecursiveHomogeneousTuple):
     reveal_type(rec)  # revealed: tuple[Divergent, ...]
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-reveal_type(ClassInfo)  # revealed: <types.UnionType special form 'type | UnionType | tuple[Divergent, ...]'>
+reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
     # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
@@ -394,4 +424,39 @@ from typing import TypeAlias
 
 # error: [invalid-type-form]
 Empty: TypeAlias
+```
+
+## Simple syntactic validation
+
+We don't yet do full validation for the right-hand side of a `TypeAlias` assignment, but we do
+simple syntactic validation:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing_extensions import Annotated, Literal, TypeAlias
+
+GoodTypeAlias: TypeAlias = Annotated[int, (1, 3.14, lambda x: x)]
+GoodTypeAlias: TypeAlias = tuple[int, *tuple[str, ...]]
+
+BadTypeAlias1: TypeAlias = eval("".join(map(chr, [105, 110, 116])))  # error: [invalid-type-form]
+BadTypeAlias2: TypeAlias = [int, str]  # error: [invalid-type-form]
+BadTypeAlias3: TypeAlias = ((int, str),)  # error: [invalid-type-form]
+BadTypeAlias4: TypeAlias = [int for i in range(1)]  # error: [invalid-type-form]
+BadTypeAlias5: TypeAlias = {"a": "b"}  # error: [invalid-type-form]
+BadTypeAlias6: TypeAlias = (lambda: int)()  # error: [invalid-type-form]
+BadTypeAlias7: TypeAlias = [int][0]  # error: [invalid-type-form]
+BadTypeAlias8: TypeAlias = int if 1 < 3 else str  # error: [invalid-type-form]
+BadTypeAlias10: TypeAlias = True  # error: [invalid-type-form]
+BadTypeAlias11: TypeAlias = 1  # error: [invalid-type-form]
+BadTypeAlias12: TypeAlias = list or set  # error: [invalid-type-form]
+BadTypeAlias13: TypeAlias = f"{'int'}"  # error: [invalid-type-form]
+BadTypeAlias14: TypeAlias = Literal[-3.14]  # error: [invalid-type-form]
+
+# error: [invalid-type-form]
+# error: [invalid-type-form]
+BadTypeAlias14: TypeAlias = Literal[3.14]
 ```

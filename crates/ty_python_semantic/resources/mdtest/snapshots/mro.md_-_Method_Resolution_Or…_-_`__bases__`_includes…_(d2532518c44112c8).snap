@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: mro.md - Method Resolution Order tests - `__bases__` includes a `Union`
 mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
@@ -31,21 +32,44 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 17 | class Foo(x): ...
 18 | 
 19 | reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+20 | 
+21 | def f():
+22 |     if returns_bool():
+23 |         class C: ...
+24 |     else:
+25 |         class C: ...
+26 | 
+27 |     class D(C): ...  # error: [unsupported-base]
 ```
 
 # Diagnostics
 
 ```
-warning[unsupported-base]: Unsupported class base with type `<class 'A'> | <class 'B'>`
+warning[unsupported-base]: Unsupported class base
   --> src/mdtest_snippet.py:17:11
    |
 16 | # error: 11 [unsupported-base] "Unsupported class base with type `<class 'A'> | <class 'B'>`"
 17 | class Foo(x): ...
-   |           ^
+   |           ^ Has type `<class 'A'> | <class 'B'>`
 18 |
 19 | reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
    |
-info: ty cannot resolve a consistent MRO for class `Foo` due to this base
+info: ty cannot resolve a consistent method resolution order (MRO) for class `Foo` due to this base
+info: Only class objects or `Any` are supported as class bases
+info: rule `unsupported-base` is enabled by default
+
+```
+
+```
+warning[unsupported-base]: Unsupported class base
+  --> src/mdtest_snippet.py:27:13
+   |
+25 |         class C: ...
+26 |
+27 |     class D(C): ...  # error: [unsupported-base]
+   |             ^ Has type `<class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:23:15'> | <class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:25:15'>`
+   |
+info: ty cannot resolve a consistent method resolution order (MRO) for class `D` due to this base
 info: Only class objects or `Any` are supported as class bases
 info: rule `unsupported-base` is enabled by default
 

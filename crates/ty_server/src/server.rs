@@ -3,7 +3,7 @@
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
 use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
-use crate::session::{InitializationOptions, Session};
+use crate::session::{ClientName, InitializationOptions, Session, warn_about_unknown_options};
 use anyhow::Context;
 use lsp_server::Connection;
 use lsp_types::{ClientCapabilities, InitializeParams, MessageType, Url};
@@ -47,6 +47,7 @@ impl Server {
             initialization_options,
             capabilities: client_capabilities,
             workspace_folders,
+            client_info,
             ..
         } = serde_json::from_value(init_value)
             .context("Failed to deserialize initialization parameters")?;
@@ -65,6 +66,7 @@ impl Server {
             tracing::error!("Failed to deserialize initialization options: {error}");
         }
 
+        tracing::debug!("Client info: {client_info:#?}");
         tracing::debug!("Initialization options: {initialization_options:#?}");
 
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
@@ -96,29 +98,7 @@ impl Server {
 
         let unknown_options = &initialization_options.options.unknown;
         if !unknown_options.is_empty() {
-            // HACK: Old versions of the ty VS Code extension used a custom schema for settings
-            // which was changed in version 2025.35.0. This is to ensure that users don't receive
-            // unnecessary warnings when using an older version of the extension. This should be
-            // removed after a few releases.
-            if !unknown_options.contains_key("settings")
-                || !unknown_options.contains_key("globalSettings")
-            {
-                tracing::warn!(
-                    "Received unknown options during initialization: {}",
-                    serde_json::to_string_pretty(&unknown_options)
-                        .unwrap_or_else(|_| format!("{unknown_options:?}"))
-                );
-
-                client.show_warning_message(format_args!(
-                    "Received unknown options during initialization: '{}'. \
-                    Refer to the logs for more details",
-                    unknown_options
-                        .keys()
-                        .map(String::as_str)
-                        .collect::<Vec<_>>()
-                        .join("', '")
-                ));
-            }
+            warn_about_unknown_options(&client, None, unknown_options);
         }
 
         // Get workspace URLs without settings - settings will come from workspace/configuration
@@ -151,21 +131,6 @@ impl Server {
                 )
             })?;
 
-        let workspace_urls = if workspace_urls.len() > 1 {
-            let first_workspace = workspace_urls.into_iter().next().unwrap();
-            tracing::warn!(
-                "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace
-            );
-            client.show_warning_message(format_args!(
-                "Multiple workspaces are not yet supported, using the first workspace: {}",
-                &first_workspace,
-            ));
-            vec![first_workspace]
-        } else {
-            workspace_urls
-        };
-
         Ok(Self {
             connection,
             worker_threads,
@@ -177,6 +142,7 @@ impl Server {
                 workspace_urls,
                 initialization_options,
                 native_system,
+                ClientName::from(client_info),
                 in_test,
             )?,
         })

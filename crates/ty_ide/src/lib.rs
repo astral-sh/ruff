@@ -8,7 +8,6 @@ mod completion;
 mod doc_highlights;
 mod docstring;
 mod document_symbols;
-mod find_node;
 mod find_references;
 mod goto;
 mod goto_declaration;
@@ -230,6 +229,11 @@ impl NavigationTargets {
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl IntoIterator for NavigationTargets {
@@ -393,7 +397,7 @@ mod tests {
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::default()
+            let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
                 .format(DiagnosticFormat::Full);
             for diagnostic in diagnostics {
