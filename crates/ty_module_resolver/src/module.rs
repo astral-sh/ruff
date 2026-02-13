@@ -347,6 +347,7 @@ pub enum KnownModule {
     PydanticFunctionalSerializers,
 }
 
+#[derive(Debug)]
 enum KnownModuleSearchPathKind {
     StandardLibrary,
     ThirdParty,

@@ -2329,13 +2329,14 @@ pub(crate) mod tests {
                 KnownFunction::TotalOrdering => KnownModule::Functools,
                 KnownFunction::Unpack => KnownModule::Struct,
 
-                KnownFunction::FieldValidator | KnownFunction::ModelValidator => {
-                    KnownModule::Pydantic
-                }
-                KnownFunction::FieldSerializer => KnownModule::Pydantic,
+                KnownFunction::FieldValidator
+                | KnownFunction::ModelValidator
+                | KnownFunction::FieldSerializer => KnownModule::Pydantic,
             };
 
-            // Third-party modules are not available in the test DB
+            // Third-party modules aren't in the test DB (no site-packages path).
+            // The `is_in_module()` mapping for these is validated by external
+            // mdtests instead (e.g., `mdtest/external/pydantic.md`).
             if module.is_third_party_module() {
                 continue;
             }

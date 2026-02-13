@@ -74,6 +74,25 @@ class User(BaseModel):
         return v.upper()
 ```
 
+## `model_validator` with `mode="after"` (known limitation)
+
+`@model_validator(mode="after")` receives the model *instance*, not the class, so it should not be
+treated as a classmethod. ty currently treats all `@model_validator` calls as implicit classmethods
+regardless of the `mode` argument.
+
+```py
+from pydantic import BaseModel, model_validator
+
+class Order(BaseModel):
+    total: float
+
+    @model_validator(mode="after")
+    def validate_order(self) -> "Order":
+        # TODO: should be `Order`, not `type[Self@validate_order]`
+        reveal_type(self)  # revealed: type[Self@validate_order]
+        return self  # error: [invalid-return-type]
+```
+
 ## Validator decorators imported from submodule
 
 ```py
