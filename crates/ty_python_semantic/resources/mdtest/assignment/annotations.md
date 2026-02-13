@@ -399,7 +399,7 @@ reveal_type(x)  # revealed: Foo
 
 ```pyi
 x: int = 1
-reveal_type(x) # revealed: Literal[1]
+reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Annotations influence generic call inference

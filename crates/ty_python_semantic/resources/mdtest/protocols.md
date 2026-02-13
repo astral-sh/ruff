@@ -588,6 +588,7 @@ class Foo(Protocol):
         a: int
         b = 42
         def c(self) -> None: ...
+
     else:
         d: int
         e = 56  # error: [ambiguous-protocol-member]

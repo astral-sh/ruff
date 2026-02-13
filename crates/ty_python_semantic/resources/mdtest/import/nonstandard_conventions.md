@@ -551,6 +551,7 @@ decision that mostly fell out of the implementation details and can be changed!)
 
 ```pyi
 from . import imported
+
 Z: int = 17
 ```
 
@@ -719,6 +720,7 @@ re-export from `submodule`.
 
 ```pyi
 from . import fails
+
 X: int = 42
 ```
 

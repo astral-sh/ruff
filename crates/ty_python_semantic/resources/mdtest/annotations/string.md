@@ -87,7 +87,7 @@ def f1(
     h: """int""",
     # error: [byte-string-type-annotation] "Type expressions cannot use bytes literal"
     i: "b'int'",
-):
+):  # fmt:skip
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
@@ -104,7 +104,7 @@ def f1(
 ```py
 from typing import Literal
 
-def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]):
+def f(v: Literal["a", r"b", b"c", "d" "e", "\N{LATIN SMALL LETTER F}", "\x67", """h"""]):  # fmt:skip
     reveal_type(v)  # revealed: Literal["a", "b", "de", "f", "g", "h", b"c"]
 ```
 

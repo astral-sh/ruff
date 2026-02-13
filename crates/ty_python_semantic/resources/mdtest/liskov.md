@@ -72,7 +72,7 @@ class Sub8(Super):
     def method(self, x: int, *args, **kwargs): ...  # fine
 
 class Sub9(Super):
-    def method(self, x: int, extra_positional_arg=42, /): ... # fine
+    def method(self, x: int, extra_positional_arg=42, /): ...  # fine
 
 class Sub10(Super):
     def method(self, x: int, extra_pos_or_kw_arg=42): ...  # fine
@@ -415,6 +415,7 @@ from dataclasses import dataclass, InitVar
 from typing_extensions import Self
 
 class Grandparent: ...
+
 class Parent(Grandparent):
     def __new__(cls, x: int) -> Self: ...
     def __init__(self, x: int) -> None: ...

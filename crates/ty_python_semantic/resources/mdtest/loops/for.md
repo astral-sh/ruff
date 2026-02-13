@@ -512,6 +512,7 @@ def _(flag: bool):
         if flag:
             def __call__(self, *args, **kwargs) -> Iterator:
                 return Iterator()
+
         else:
             __call__: None = None
 
@@ -522,6 +523,7 @@ def _(flag: bool):
         if flag:
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         else:
             __iter__: None = None
 
@@ -713,6 +715,7 @@ def _(flag: bool):
         if flag:
             def __call__(self, *args, **kwargs) -> int:
                 return 42
+
         else:
             __call__: None = None
 
@@ -723,6 +726,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, key: int) -> int:
                 return 42
+
         else:
             __getitem__: None = None
 
@@ -790,6 +794,7 @@ def _(flag: bool):
         if flag:
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         else:
             def __iter__(self, invalid_extra_arg) -> Iterator:
                 return Iterator()
@@ -802,6 +807,7 @@ def _(flag: bool):
         if flag:
             def __iter__(self) -> Iterator:
                 return Iterator()
+
         else:
             __iter__: None = None
 
@@ -821,6 +827,7 @@ def _(flag: bool):
         if flag:
             def __next__(self) -> int:
                 return 42
+
         else:
             def __next__(self, invalid_extra_arg) -> str:
                 return "foo"
@@ -829,6 +836,7 @@ def _(flag: bool):
         if flag:
             def __next__(self) -> int:
                 return 42
+
         else:
             __next__: None = None
 
@@ -860,6 +868,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, item: int) -> str:
                 return "foo"
+
         else:
             __getitem__: None = None
 
@@ -867,6 +876,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, item: int) -> str:
                 return "foo"
+
         else:
             def __getitem__(self, item: str) -> int:
                 return 42
@@ -895,6 +905,7 @@ def _(flag: bool, flag2: bool):
         if flag:
             def __getitem__(self, item: int) -> str:
                 return "foo"
+
         else:
             __getitem__: None = None
 
@@ -906,6 +917,7 @@ def _(flag: bool, flag2: bool):
         if flag:
             def __getitem__(self, item: int) -> str:
                 return "foo"
+
         else:
             def __getitem__(self, item: str) -> int:
                 return 42
