@@ -55,7 +55,7 @@ reveal_type(y)  # revealed: Any
 reveal_type(pkg)  # revealed: Any
 ```
 
-## Globe Pattern
+## Glob Pattern
 
 ```toml
 [analysis]
