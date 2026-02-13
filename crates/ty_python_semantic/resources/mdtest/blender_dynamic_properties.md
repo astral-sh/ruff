@@ -262,3 +262,79 @@ import bpy
 def use_scene(scene: bpy.types.Scene) -> None:
     reveal_type(scene.reg_prop)  # revealed: str
 ```
+
+## Properties registered via relative imports from register()
+
+Properties can be registered from helper functions imported with relative imports,
+both `from . import module` and `from .module import func` patterns.
+
+```toml
+[environment]
+extra-paths = ["/stubs"]
+```
+
+`/stubs/bpy/__init__.pyi`:
+
+```pyi
+from bpy import props as props
+from bpy import types as types
+```
+
+`/stubs/bpy/types.pyi`:
+
+```pyi
+class Scene:
+    pass
+```
+
+`/stubs/bpy/props.pyi`:
+
+```pyi
+def StringProperty() -> str: ...
+def IntProperty() -> int: ...
+def FloatProperty() -> float: ...
+```
+
+`my_addon/helpers.py`:
+
+```py
+import bpy
+
+def add_string_prop():
+    bpy.types.Scene.rel_string = bpy.props.StringProperty()
+
+def add_int_prop():
+    bpy.types.Scene.rel_int = bpy.props.IntProperty()
+
+def add_float_prop():
+    bpy.types.Scene.rel_float = bpy.props.FloatProperty()
+```
+
+`my_addon/__init__.py`:
+
+```py
+import bpy
+from . import helpers
+from .helpers import add_float_prop
+
+def register():
+    helpers.add_string_prop()
+    helpers.add_int_prop()
+    add_float_prop()
+
+def unregister():
+    del bpy.types.Scene.rel_string
+    del bpy.types.Scene.rel_int
+    del bpy.types.Scene.rel_float
+```
+
+`use_props.py`:
+
+```py
+import bpy
+
+def use_scene(scene: bpy.types.Scene) -> None:
+    reveal_type(scene.rel_string)  # revealed: str
+    reveal_type(scene.rel_int)  # revealed: int
+    reveal_type(scene.rel_float)  # revealed: int | float
+```

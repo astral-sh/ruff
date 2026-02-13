@@ -332,19 +332,83 @@ struct FunctionTarget {
     func_name: String,
 }
 
+/// Resolves a relative import to an absolute module name string.
+/// For `from .helpers import func` (level=1, module=Some("helpers")), returns the absolute
+/// module name like "my_addon.helpers".
+/// For `from . import helpers` (level=1, module=None), returns the package name like "my_addon".
+fn resolve_relative_module_name(
+    db: &dyn Db,
+    file: File,
+    level: u32,
+    import_module: Option<&str>,
+) -> Option<String> {
+    if level == 0 {
+        return import_module.map(|m| m.to_string());
+    }
+
+    let current_module = file_to_module(db, file)?;
+    let current_name = current_module.name(db);
+
+    // For __init__.py (Package), the current package is the module itself.
+    // For regular files (Module), the current package is the parent.
+    let mut base = if current_module.kind(db).is_package() {
+        Some(current_name.clone())
+    } else {
+        current_name.parent()
+    };
+
+    // Go up (level - 1) more levels
+    for _ in 1..level {
+        base = base?.parent();
+    }
+
+    match (base, import_module) {
+        (Some(base_name), Some(module)) => {
+            let mut result = base_name.as_str().to_string();
+            result.push('.');
+            result.push_str(module);
+            Some(result)
+        }
+        (Some(base_name), None) => Some(base_name.as_str().to_string()),
+        (None, Some(module)) => Some(module.to_string()),
+        (None, None) => None,
+    }
+}
+
 /// Builds a map of imported names to their source (module_name, func_name) from a file's
-/// `from X import Y` statements.
-fn build_import_map(stmts: &[ast::Stmt]) -> HashMap<String, (String, String)> {
+/// `from X import Y` statements, including relative imports like `from .X import Y`.
+fn build_import_map(
+    db: &dyn Db,
+    file: File,
+    stmts: &[ast::Stmt],
+) -> HashMap<String, (String, String)> {
     let mut imports = HashMap::new();
 
     for stmt in stmts {
         if let ast::Stmt::ImportFrom(import_from) = stmt {
-            if let Some(module) = &import_from.module {
-                let module_name = module.to_string();
-                for alias in &import_from.names {
-                    let local_name = alias.asname.as_ref().unwrap_or(&alias.name).to_string();
-                    let original_name = alias.name.to_string();
-                    imports.insert(local_name, (module_name.clone(), original_name));
+            let resolved_module = if import_from.level > 0 {
+                // Relative import: resolve to absolute module name
+                resolve_relative_module_name(
+                    db,
+                    file,
+                    import_from.level,
+                    import_from.module.as_ref().map(|m| m.as_str()),
+                )
+            } else {
+                import_from.module.as_ref().map(|m| m.to_string())
+            };
+
+            if let Some(module_name) = resolved_module {
+                // Only process imports that have a module part (e.g., `from .helpers import func`,
+                // not `from . import helpers` which imports modules, handled by
+                // build_module_import_map).
+                if import_from.module.is_some() || import_from.level == 0 {
+                    for alias in &import_from.names {
+                        let local_name =
+                            alias.asname.as_ref().unwrap_or(&alias.name).to_string();
+                        let original_name = alias.name.to_string();
+                        imports.insert(local_name, (module_name.clone(), original_name));
+                    }
                 }
             }
         }
@@ -353,18 +417,43 @@ fn build_import_map(stmts: &[ast::Stmt]) -> HashMap<String, (String, String)> {
     imports
 }
 
-/// Builds a map of module aliases to their module names from `import X` and `import X as Y`
-/// statements. Maps local_name -> module_name.
-fn build_module_import_map(stmts: &[ast::Stmt]) -> HashMap<String, String> {
+/// Builds a map of module aliases to their module names from `import X`, `import X as Y`,
+/// and `from . import X` statements. Maps local_name -> module_name.
+fn build_module_import_map(
+    db: &dyn Db,
+    file: File,
+    stmts: &[ast::Stmt],
+) -> HashMap<String, String> {
     let mut imports = HashMap::new();
 
     for stmt in stmts {
-        if let ast::Stmt::Import(import_stmt) = stmt {
-            for alias in &import_stmt.names {
-                let local_name = alias.asname.as_ref().unwrap_or(&alias.name).to_string();
-                let module_name = alias.name.to_string();
-                imports.insert(local_name, module_name);
+        match stmt {
+            ast::Stmt::Import(import_stmt) => {
+                for alias in &import_stmt.names {
+                    let local_name = alias.asname.as_ref().unwrap_or(&alias.name).to_string();
+                    let module_name = alias.name.to_string();
+                    imports.insert(local_name, module_name);
+                }
             }
+            ast::Stmt::ImportFrom(import_from) => {
+                // Handle `from . import X` (level > 0, no module name) which imports submodules
+                if import_from.level > 0 && import_from.module.is_none() {
+                    for alias in &import_from.names {
+                        let local_name =
+                            alias.asname.as_ref().unwrap_or(&alias.name).to_string();
+                        // Resolve the full module path for each imported name
+                        if let Some(resolved) = resolve_relative_module_name(
+                            db,
+                            file,
+                            import_from.level,
+                            Some(alias.name.as_str()),
+                        ) {
+                            imports.insert(local_name, resolved);
+                        }
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
@@ -470,7 +559,7 @@ fn walk_function_for_properties(
 
     // Collect function calls and follow them
     let calls = collect_function_calls_in_body(body);
-    let import_map = build_import_map(file_stmts);
+    let import_map = build_import_map(db, file, file_stmts);
 
     for call_name in &calls {
         // Check if this is a local function in the same file
@@ -527,7 +616,7 @@ fn walk_function_for_properties(
 
     // Collect qualified calls like `module.func()` and follow them
     let qualified_calls = collect_qualified_calls_in_body(body);
-    let module_import_map = build_module_import_map(file_stmts);
+    let module_import_map = build_module_import_map(db, file, file_stmts);
 
     for (qualifier, func_name) in &qualified_calls {
         if let Some(module_name_str) = module_import_map.get(qualifier) {
