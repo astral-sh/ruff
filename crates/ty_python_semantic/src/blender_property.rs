@@ -271,6 +271,60 @@ fn collect_function_calls_in_body(stmts: &[ast::Stmt]) -> Vec<String> {
     calls
 }
 
+/// Collects all qualified/attribute function calls from a statement list.
+/// Collects calls like `module.func()` and returns (qualifier, func_name) pairs.
+fn collect_qualified_calls_in_body(stmts: &[ast::Stmt]) -> Vec<(String, String)> {
+    let mut calls = Vec::new();
+
+    for stmt in stmts {
+        match stmt {
+            ast::Stmt::Expr(expr_stmt) => {
+                if let Some(call) = expr_stmt.value.as_call_expr() {
+                    if let Some(attr) = call.func.as_attribute_expr() {
+                        if let Some(name) = attr.value.as_name_expr() {
+                            calls.push((name.id.to_string(), attr.attr.to_string()));
+                        }
+                    }
+                }
+            }
+            ast::Stmt::If(if_stmt) => {
+                calls.extend(collect_qualified_calls_in_body(&if_stmt.body));
+                for elif in &if_stmt.elif_else_clauses {
+                    calls.extend(collect_qualified_calls_in_body(&elif.body));
+                }
+            }
+            ast::Stmt::With(with_stmt) => {
+                calls.extend(collect_qualified_calls_in_body(&with_stmt.body));
+            }
+            ast::Stmt::Match(match_stmt) => {
+                for case in &match_stmt.cases {
+                    calls.extend(collect_qualified_calls_in_body(&case.body));
+                }
+            }
+            ast::Stmt::For(for_stmt) => {
+                calls.extend(collect_qualified_calls_in_body(&for_stmt.body));
+                calls.extend(collect_qualified_calls_in_body(&for_stmt.orelse));
+            }
+            ast::Stmt::While(while_stmt) => {
+                calls.extend(collect_qualified_calls_in_body(&while_stmt.body));
+                calls.extend(collect_qualified_calls_in_body(&while_stmt.orelse));
+            }
+            ast::Stmt::Try(try_stmt) => {
+                calls.extend(collect_qualified_calls_in_body(&try_stmt.body));
+                for handler in &try_stmt.handlers {
+                    let ast::ExceptHandler::ExceptHandler(handler_inner) = handler;
+                    calls.extend(collect_qualified_calls_in_body(&handler_inner.body));
+                }
+                calls.extend(collect_qualified_calls_in_body(&try_stmt.orelse));
+                calls.extend(collect_qualified_calls_in_body(&try_stmt.finalbody));
+            }
+            _ => {}
+        }
+    }
+
+    calls
+}
+
 /// Represents where to find a function: which file and what name.
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 struct FunctionTarget {
@@ -278,23 +332,39 @@ struct FunctionTarget {
     func_name: String,
 }
 
-/// Builds a map of imported names to their source (module_name, func_name) from a file's imports.
+/// Builds a map of imported names to their source (module_name, func_name) from a file's
+/// `from X import Y` statements.
 fn build_import_map(stmts: &[ast::Stmt]) -> HashMap<String, (String, String)> {
     let mut imports = HashMap::new();
 
     for stmt in stmts {
-        match stmt {
-            ast::Stmt::ImportFrom(import_from) => {
-                if let Some(module) = &import_from.module {
-                    let module_name = module.to_string();
-                    for alias in &import_from.names {
-                        let local_name = alias.asname.as_ref().unwrap_or(&alias.name).to_string();
-                        let original_name = alias.name.to_string();
-                        imports.insert(local_name, (module_name.clone(), original_name));
-                    }
+        if let ast::Stmt::ImportFrom(import_from) = stmt {
+            if let Some(module) = &import_from.module {
+                let module_name = module.to_string();
+                for alias in &import_from.names {
+                    let local_name = alias.asname.as_ref().unwrap_or(&alias.name).to_string();
+                    let original_name = alias.name.to_string();
+                    imports.insert(local_name, (module_name.clone(), original_name));
                 }
             }
-            _ => {}
+        }
+    }
+
+    imports
+}
+
+/// Builds a map of module aliases to their module names from `import X` and `import X as Y`
+/// statements. Maps local_name -> module_name.
+fn build_module_import_map(stmts: &[ast::Stmt]) -> HashMap<String, String> {
+    let mut imports = HashMap::new();
+
+    for stmt in stmts {
+        if let ast::Stmt::Import(import_stmt) = stmt {
+            for alias in &import_stmt.names {
+                let local_name = alias.asname.as_ref().unwrap_or(&alias.name).to_string();
+                let module_name = alias.name.to_string();
+                imports.insert(local_name, module_name);
+            }
         }
     }
 
@@ -442,6 +512,43 @@ fn walk_function_for_properties(
                 let target_parsed = parsed_module(db, target_file).load(db);
                 let target_stmts = target_parsed.suite();
                 if let Some(func_def) = find_function_def(target_stmts, original_name) {
+                    walk_function_for_properties(
+                        db,
+                        target_file,
+                        target_stmts,
+                        &func_def.body,
+                        registry,
+                        visited,
+                    );
+                }
+            }
+        }
+    }
+
+    // Collect qualified calls like `module.func()` and follow them
+    let qualified_calls = collect_qualified_calls_in_body(body);
+    let module_import_map = build_module_import_map(file_stmts);
+
+    for (qualifier, func_name) in &qualified_calls {
+        if let Some(module_name_str) = module_import_map.get(qualifier) {
+            let Some(module_name) = ModuleName::new(module_name_str) else {
+                continue;
+            };
+            let Some(target_module) = resolve_module(db, file, &module_name) else {
+                continue;
+            };
+            let Some(target_file) = target_module.file(db) else {
+                continue;
+            };
+
+            let target = FunctionTarget {
+                file: target_file,
+                func_name: func_name.clone(),
+            };
+            if visited.insert(target) {
+                let target_parsed = parsed_module(db, target_file).load(db);
+                let target_stmts = target_parsed.suite();
+                if let Some(func_def) = find_function_def(target_stmts, func_name) {
                     walk_function_for_properties(
                         db,
                         target_file,

@@ -200,3 +200,65 @@ import bpy
 # error: [blender-property-outside-register] "Blender properties can only be registered from the `register()` function or functions it calls in the project root `__init__.py`"
 bpy.types.Scene.my_invalid = bpy.props.IntProperty()
 ```
+
+## Properties registered via module-qualified calls from register()
+
+Properties can be registered from helper functions called via `module.func()` syntax,
+where the module is imported with `import module` (not `from module import func`).
+
+```toml
+[environment]
+extra-paths = ["/stubs"]
+```
+
+`/stubs/bpy/__init__.pyi`:
+
+```pyi
+from bpy import props as props
+from bpy import types as types
+```
+
+`/stubs/bpy/types.pyi`:
+
+```pyi
+class Scene:
+    pass
+```
+
+`/stubs/bpy/props.pyi`:
+
+```pyi
+def StringProperty() -> str: ...
+def IntProperty() -> int: ...
+```
+
+`register_helpers.py`:
+
+```py
+import bpy
+
+def add_prop():
+    bpy.types.Scene.reg_prop = bpy.props.StringProperty()
+```
+
+`my_addon/__init__.py`:
+
+```py
+import bpy
+import register_helpers
+
+def register():
+    register_helpers.add_prop()
+
+def unregister():
+    del bpy.types.Scene.reg_prop
+```
+
+`use_props.py`:
+
+```py
+import bpy
+
+def use_scene(scene: bpy.types.Scene) -> None:
+    reveal_type(scene.reg_prop)  # revealed: str
+```
