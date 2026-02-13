@@ -827,196 +827,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // be exhaustive. More complex expressions will still evaluate to the
         // correct value during type-checking.
         fn resolve_to_literal(node: &ast::Expr) -> Option<bool> {
-            #[derive(Copy, Clone)]
-            enum ConstExpr {
-                Bool(bool),
-                Int(i64),
-                None,
-                Ellipsis,
+            match node {
+                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
+                ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => Some(true),
+                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                    value: ast::Number::Int(n),
+                    ..
+                }) => Some(*n != 0),
+                ast::Expr::EllipsisLiteral(_) => Some(true),
+                ast::Expr::NoneLiteral(_) => Some(false),
+                ast::Expr::UnaryOp(ast::ExprUnaryOp {
+                    op: ast::UnaryOp::Not,
+                    operand,
+                    ..
+                }) => Some(!resolve_to_literal(operand)?),
+                _ => None,
             }
-
-            impl ConstExpr {
-                fn truthiness(self) -> bool {
-                    match self {
-                        ConstExpr::Bool(value) => value,
-                        ConstExpr::Int(value) => value != 0,
-                        ConstExpr::None => false,
-                        ConstExpr::Ellipsis => true,
-                    }
-                }
-
-                fn as_int(self) -> Option<i64> {
-                    match self {
-                        ConstExpr::Int(value) => Some(value),
-                        ConstExpr::Bool(value) => Some(i64::from(value)),
-                        _ => None,
-                    }
-                }
-            }
-
-            fn resolve_const_expr(node: &ast::Expr) -> Option<ConstExpr> {
-                match node {
-                    ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
-                        Some(ConstExpr::Bool(*value))
-                    }
-                    ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => {
-                        Some(ConstExpr::Bool(true))
-                    }
-                    ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                        value: ast::Number::Int(n),
-                        ..
-                    }) => n.as_i64().map(ConstExpr::Int),
-                    ast::Expr::EllipsisLiteral(_) => Some(ConstExpr::Ellipsis),
-                    ast::Expr::NoneLiteral(_) => Some(ConstExpr::None),
-                    ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => {
-                        let operand = resolve_const_expr(operand)?;
-                        match op {
-                            ast::UnaryOp::Not => Some(ConstExpr::Bool(!operand.truthiness())),
-                            ast::UnaryOp::UAdd => Some(ConstExpr::Int(operand.as_int()?)),
-                            ast::UnaryOp::USub => {
-                                Some(ConstExpr::Int(operand.as_int()?.checked_neg()?))
-                            }
-                            ast::UnaryOp::Invert => Some(ConstExpr::Int(!operand.as_int()?)),
-                        }
-                    }
-                    ast::Expr::BinOp(ast::ExprBinOp {
-                        left, op, right, ..
-                    }) => {
-                        let left = resolve_const_expr(left)?.as_int()?;
-                        let right = resolve_const_expr(right)?.as_int()?;
-                        let value = match op {
-                            ast::Operator::Add => left.checked_add(right)?,
-                            ast::Operator::Sub => left.checked_sub(right)?,
-                            ast::Operator::Mult => left.checked_mul(right)?,
-                            ast::Operator::FloorDiv => {
-                                if right == 0 {
-                                    return None;
-                                }
-                                left.div_euclid(right)
-                            }
-                            ast::Operator::Mod => {
-                                if right == 0 {
-                                    return None;
-                                }
-                                left.rem_euclid(right)
-                            }
-                            ast::Operator::BitAnd => left & right,
-                            ast::Operator::BitOr => left | right,
-                            ast::Operator::BitXor => left ^ right,
-                            ast::Operator::LShift => {
-                                let shift = u32::try_from(right).ok()?;
-                                left.checked_shl(shift)?
-                            }
-                            ast::Operator::RShift => {
-                                let shift = u32::try_from(right).ok()?;
-                                left.checked_shr(shift)?
-                            }
-                            ast::Operator::Pow => {
-                                let exp = u32::try_from(right).ok()?;
-                                left.checked_pow(exp)?
-                            }
-                            ast::Operator::Div | ast::Operator::MatMult => return None,
-                        };
-                        Some(ConstExpr::Int(value))
-                    }
-                    ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
-                        let value = match op {
-                            ast::BoolOp::And => {
-                                let mut all_true = true;
-                                for expr in values {
-                                    if !resolve_const_expr(expr)?.truthiness() {
-                                        all_true = false;
-                                        break;
-                                    }
-                                }
-                                all_true
-                            }
-                            ast::BoolOp::Or => {
-                                let mut any_true = false;
-                                for expr in values {
-                                    if resolve_const_expr(expr)?.truthiness() {
-                                        any_true = true;
-                                        break;
-                                    }
-                                }
-                                any_true
-                            }
-                        };
-                        Some(ConstExpr::Bool(value))
-                    }
-                    ast::Expr::Compare(ast::ExprCompare {
-                        left,
-                        ops,
-                        comparators,
-                        ..
-                    }) => {
-                        let mut left_value = resolve_const_expr(left)?;
-                        for (op, comparator) in ops.iter().zip(comparators.iter()) {
-                            let right_value = resolve_const_expr(comparator)?;
-                            let eq = |left: ConstExpr, right: ConstExpr| match (
-                                left.as_int(),
-                                right.as_int(),
-                            ) {
-                                (Some(left), Some(right)) => Some(left == right),
-                                _ => match (left, right) {
-                                    (ConstExpr::None, ConstExpr::None)
-                                    | (ConstExpr::Ellipsis, ConstExpr::Ellipsis) => Some(true),
-                                    (ConstExpr::None | ConstExpr::Ellipsis, _)
-                                    | (_, ConstExpr::None | ConstExpr::Ellipsis) => Some(false),
-                                    _ => None,
-                                },
-                            };
-                            let result = match op {
-                                ast::CmpOp::Eq => eq(left_value, right_value)?,
-                                ast::CmpOp::NotEq => !eq(left_value, right_value)?,
-                                ast::CmpOp::Lt => left_value.as_int()? < right_value.as_int()?,
-                                ast::CmpOp::LtE => left_value.as_int()? <= right_value.as_int()?,
-                                ast::CmpOp::Gt => left_value.as_int()? > right_value.as_int()?,
-                                ast::CmpOp::GtE => left_value.as_int()? >= right_value.as_int()?,
-                                ast::CmpOp::Is => match (left_value, right_value) {
-                                    (ConstExpr::None, ConstExpr::None)
-                                    | (ConstExpr::Ellipsis, ConstExpr::Ellipsis)
-                                    | (ConstExpr::Bool(true), ConstExpr::Bool(true))
-                                    | (ConstExpr::Bool(false), ConstExpr::Bool(false)) => true,
-                                    (
-                                        ConstExpr::None | ConstExpr::Ellipsis | ConstExpr::Bool(_),
-                                        _,
-                                    )
-                                    | (
-                                        _,
-                                        ConstExpr::None | ConstExpr::Ellipsis | ConstExpr::Bool(_),
-                                    ) => false,
-                                    _ => return None,
-                                },
-                                ast::CmpOp::IsNot => match (left_value, right_value) {
-                                    (ConstExpr::None, ConstExpr::None)
-                                    | (ConstExpr::Ellipsis, ConstExpr::Ellipsis)
-                                    | (ConstExpr::Bool(true), ConstExpr::Bool(true))
-                                    | (ConstExpr::Bool(false), ConstExpr::Bool(false)) => false,
-                                    (
-                                        ConstExpr::None | ConstExpr::Ellipsis | ConstExpr::Bool(_),
-                                        _,
-                                    )
-                                    | (
-                                        _,
-                                        ConstExpr::None | ConstExpr::Ellipsis | ConstExpr::Bool(_),
-                                    ) => true,
-                                    _ => return None,
-                                },
-                                ast::CmpOp::In | ast::CmpOp::NotIn => return None,
-                            };
-                            if !result {
-                                return Some(ConstExpr::Bool(false));
-                            }
-                            left_value = right_value;
-                        }
-                        Some(ConstExpr::Bool(true))
-                    }
-                    _ => None,
-                }
-            }
-
-            Some(resolve_const_expr(node)?.truthiness())
         }
 
         let expression = self.add_standalone_expression(predicate_node);
