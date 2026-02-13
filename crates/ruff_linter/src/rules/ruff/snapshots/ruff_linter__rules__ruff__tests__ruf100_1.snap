@@ -30,6 +30,7 @@ RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |                    ^^^^^^^^^^^^
 53 |     )
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 49 | def f():
 50 |     # This should ignore the error, but the inner noqa should be marked as unused.
@@ -49,6 +50,7 @@ RUF100 [*] Unused `noqa` directive (unused: `F401`)
    |                    ^^^^^^^^^^^^
 60 |     )
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 56 | def f():
 57 |     # This should ignore the error, but the inner noqa should be marked as unused.
@@ -68,6 +70,7 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
    |                ^^^^^^^^^^^^
 67 |     )
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 63 | def f():
 64 |     # This should ignore the error, but mark F501 as unused.
@@ -88,6 +91,7 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
 73 |         Tuple,  # noqa: F401
 74 |     )
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 69 | 
 70 | def f():
@@ -136,6 +140,7 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F501`)
 89 |     from typing import Awaitable, AwaitableGenerator  # noqa: F501
    |                                                       ^^^^^^^^^^^^
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 86 | 
 87 | def f():

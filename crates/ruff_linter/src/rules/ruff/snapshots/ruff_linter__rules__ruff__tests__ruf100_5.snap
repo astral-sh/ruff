@@ -46,6 +46,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
 12 |
 13 | def f():
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 8  | }
 9  | 
@@ -66,6 +67,7 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `RET504`)
 17 |
 18 | def f():
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 13 | def f():
 14 |     data = 1
@@ -84,6 +86,7 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `RET504`)
 21 |     return data  # noqa: RET504 - intentional incorrect noqa, will be removed
    |                  ^^^^^^^^^^^^^^
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 18 | def f():
 19 |     data = 1

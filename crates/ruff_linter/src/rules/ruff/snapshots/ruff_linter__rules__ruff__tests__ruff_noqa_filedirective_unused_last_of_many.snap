@@ -8,6 +8,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 2 | # ruff: noqa: E701, F541 -- unused followed by used code
   |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
   - # flake8: noqa: F841, E501 -- used followed by unused code
 1 + # flake8: noqa: F841 -- used followed by unused code
@@ -22,6 +23,7 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `E701`)
 2 | # ruff: noqa: E701, F541 -- unused followed by used code
   | ^^^^^^^^^^^^^^^^^^^^^^^^
   |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 1 | # flake8: noqa: F841, E501 -- used followed by unused code
   - # ruff: noqa: E701, F541 -- unused followed by used code

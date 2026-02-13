@@ -7,6 +7,7 @@ RUF100 [*] Unused `noqa` directive (non-enabled: `F401`)
 1 | import itertools  # noqa: F401
   |                   ^^^^^^^^^^^^
   |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
   - import itertools  # noqa: F401
 1 + import itertools

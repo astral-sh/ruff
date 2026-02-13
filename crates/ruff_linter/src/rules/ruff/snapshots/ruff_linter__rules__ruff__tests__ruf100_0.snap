@@ -9,6 +9,7 @@ RUF100 [*] Unused blanket `noqa` directive
    |            ^^^^^^
 10 |     print(c)
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 6  |     b = 2  # noqa: F841
 7  | 
@@ -28,6 +29,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
 14 |
 15 |     # Invalid
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 10 |     print(c)
 11 | 
@@ -47,6 +49,7 @@ RUF100 [*] Unused `noqa` directive (unused: `F841`, `E501`)
 17 |
 18 |     # Invalid (and unimplemented or not enabled)
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 13 |     d = 1  # noqa: E501
 14 | 
@@ -66,6 +69,7 @@ RUF100 [*] Unused `noqa` directive (unused: `F841`, `W191`; non-enabled: `F821`)
 20 |
 21 |     # Invalid (but external)
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 16 |     d = 1  # noqa: F841, E501
 17 | 
@@ -85,6 +89,7 @@ RUF100 [*] Unused `noqa` directive (unused: `F841`)
 23 |
 24 |     # Invalid (but external)
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 19 |     d = 1  # noqa: F841, W191, F821
 20 | 
@@ -104,6 +109,7 @@ RUF100 [*] Unused `noqa` directive (unknown: `V500`)
 26 |
 27 |     # fmt: off
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 22 |     d = 1  # noqa: F841, V101
 23 | 
@@ -124,6 +130,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
 30 |
 31 |     # Invalid - many spaces before #
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 26 | 
 27 |     # fmt: off
@@ -160,6 +167,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |            ^^^^^^^^^^^^
 33 |     # fmt: on
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 29 |     d = 1  # noqa: E501
 30 | 
@@ -179,6 +187,7 @@ RUF100 [*] Unused `noqa` directive (unused: `F841`)
 59 |
 60 | # Invalid
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 55 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
 56 | 
@@ -198,6 +207,7 @@ RUF100 [*] Unused `noqa` directive (unused: `E501`)
 67 |
 68 | # Invalid
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 63 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
 64 | 
@@ -217,6 +227,7 @@ RUF100 [*] Unused blanket `noqa` directive
 75 |
 76 | # Valid
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 71 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
 72 | 
@@ -262,6 +273,7 @@ RUF100 [*] Unused `noqa` directive (unused: `F401`)
 93 | "shape:  (6,)\nSeries: '' [duration[μs]]\n[\n\t0µs\n\t1µs\n\t2µs\n\t3µs\n\t4µs\n\t5µs\n]"  # noqa: F401
    |                                                                                            ^^^^^^^^^^^^
    |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 90 | 
 91 | print(sys.path)
@@ -281,6 +293,7 @@ RUF100 [*] Unused `noqa` directive (unknown: `E50`)
     |            ^^^^^^^^^^^^^^^^^
 108 |     e = 1  # noqa: E50
     |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 104 | 
 105 | def f():
@@ -317,6 +330,7 @@ RUF100 [*] Unused `noqa` directive (unknown: `E50`)
 108 |     e = 1  # noqa: E50
     |            ^^^^^^^^^^^
     |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 105 | def f():
 106 |     # Invalid - nonexistent error code with multibyte character
@@ -337,6 +351,7 @@ RUF100 [*] Unused `noqa` directive (duplicated: `F841`; unknown: `X200`)
 119 |
 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
     |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 115 | 
 116 | # Check duplicate code detection
@@ -357,6 +372,7 @@ RUF100 [*] Unused `noqa` directive (duplicated: `SIM300`, `SIM300`)
 121 |
 122 |     z = 2  # noqa: F841 F841  F841, F841, F841
     |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 117 | def f():
 118 |     x = 2  # noqa: F841, F841, X200
@@ -377,6 +393,7 @@ RUF100 [*] Unused `noqa` directive (duplicated: `F841`, `F841`, `F841`, `F841`)
 123 |
 124 |     return
     |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 119 | 
 120 |     y = 2 == bar  # noqa: SIM300, F841, SIM300, SIM300
@@ -397,6 +414,7 @@ RUF100 [*] Unused `noqa` directive (duplicated: `S307`, `S307`, `S307`)
 130 | x = eval(command)  # noqa: PGH001, S307, PGH001
 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 126 | 
 127 | # Allow code redirects
@@ -415,6 +433,7 @@ RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`)
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 127 | # Allow code redirects
 128 | x = eval(command)  # noqa: PGH001, S307
@@ -431,6 +450,7 @@ RUF100 [*] Unused `noqa` directive (duplicated: `PGH001`, `S307`)
 131 | x = eval(command)  # noqa: PGH001, S307, PGH001, S307
     |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
+help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
 help: Remove unused `noqa` directive
 128 | x = eval(command)  # noqa: PGH001, S307
 129 | x = eval(command)  # noqa: S307, PGH001, S307, S307, S307
