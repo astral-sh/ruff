@@ -927,7 +927,7 @@ def _(a: int | None):
 
 Regression test for [#1611](https://github.com/astral-sh/ty/issues/1611).
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
@@ -935,4 +935,4 @@ Regression test for [#1611](https://github.com/astral-sh/ty/issues/1611).
 a:'
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
