@@ -1835,7 +1835,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         });
 
         // Only create a constraint if we actually narrowed something.
-        if filtered != rhs_type {
+        if filtered != Type::Union(union) {
             let place = self.expect_place(&subscript_place_expr);
             Some((place, NarrowingConstraint::replacement(filtered)))
         } else {
