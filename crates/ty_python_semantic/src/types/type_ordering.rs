@@ -2,7 +2,10 @@ use std::cmp::Ordering;
 
 use salsa::plumbing::AsId;
 
-use crate::{db::Db, types::bound_super::SuperOwnerKind};
+use crate::{
+    db::Db,
+    types::{EnumLiteralType, bound_super::SuperOwnerKind},
+};
 
 use super::{
     DynamicType, TodoType, Type, TypeGuardLike, TypeGuardType, TypeIsType, class_base::ClassBase,
@@ -66,7 +69,16 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BytesLiteral(_), _) => Ordering::Less,
         (_, Type::BytesLiteral(_)) => Ordering::Greater,
 
-        (Type::EnumLiteral(left), Type::EnumLiteral(right)) => left.cmp(right),
+        (
+            Type::EnumLiteral(EnumLiteralType {
+                enum_class: class_1,
+                index: index_1,
+            }),
+            Type::EnumLiteral(EnumLiteralType {
+                enum_class: class_2,
+                index: index_2,
+            }),
+        ) => class_1.cmp(class_2).then_with(|| index_1.cmp(index_2)),
         (Type::EnumLiteral(_), _) => Ordering::Less,
         (_, Type::EnumLiteral(_)) => Ordering::Greater,
 

@@ -424,7 +424,9 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 };
             }
 
-            if let Some(enum_members) = enum_member_literals(db, class.class_literal(db), None) {
+            if let Some(static_class) = class.class_literal(db).as_static()
+                && let Some(enum_members) = enum_member_literals(db, static_class, None)
+            {
                 return Some(enum_members.collect());
             }
 

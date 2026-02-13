@@ -504,7 +504,7 @@ impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
             Type::EnumLiteral(literal) => {
-                self.record_class(db, literal.enum_class(db));
+                self.record_class(db, ClassLiteral::Static(literal.enum_class));
             }
             Type::GenericAlias(alias) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
@@ -1165,8 +1165,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 )
             }
             Type::EnumLiteral(enum_literal) => {
-                enum_literal
-                    .enum_class(self.db)
+                ClassLiteral::Static(enum_literal.enum_class)
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f)?;
                 write!(f, ".{}", enum_literal.name(self.db))

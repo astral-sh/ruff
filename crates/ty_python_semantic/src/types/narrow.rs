@@ -800,9 +800,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     Type::NominalInstance(instance)
                         if enum_metadata(db, instance.class_literal(db)).is_some() =>
                     {
+                        let class = instance
+                            .class_literal(db)
+                            .as_static()
+                            .expect("enums cannot be constructed dynamically using `type()`");
                         UnionType::from_elements(
                             db,
-                            enum_member_literals(db, instance.class_literal(db), None)
+                            enum_member_literals(db, class, None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )

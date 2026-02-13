@@ -1793,7 +1793,7 @@ impl<'db> Type<'db> {
             }),
             Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
             Type::EnumLiteral(enum_literal)
-                if is_single_member_enum(db, enum_literal.enum_class(db)) =>
+                if is_single_member_enum(db, enum_literal.enum_class) =>
             {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
                 enum_literal.enum_class_instance(db)
@@ -3399,7 +3399,7 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(enum_literal)
                 if matches!(name_str, "name" | "_name_")
-                    && Type::ClassLiteral(enum_literal.enum_class(db))
+                    && Type::ClassLiteral(ClassLiteral::Static(enum_literal.enum_class))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
             {
                 Place::bound(Type::string_literal(db, enum_literal.name(db))).into()
@@ -3407,10 +3407,10 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(enum_literal)
                 if matches!(name_str, "value" | "_value_")
-                    && Type::ClassLiteral(enum_literal.enum_class(db))
+                    && Type::ClassLiteral(ClassLiteral::Static(enum_literal.enum_class))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
             {
-                enum_metadata(db, enum_literal.enum_class(db))
+                enum_metadata(db, enum_literal.enum_class)
                     .and_then(|metadata| metadata.members.get(enum_literal.name(db)))
                     .map_or_else(|| Place::Undefined, Place::bound)
                     .into()
@@ -3431,9 +3431,15 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance)
                 if matches!(name_str, "value" | "_value_")
-                    && is_single_member_enum(db, instance.class_literal(db)) =>
+                    && instance
+                        .class_literal(db)
+                        .as_static()
+                        .is_some_and(|class| is_single_member_enum(db, class)) =>
             {
-                enum_metadata(db, instance.class_literal(db))
+                instance
+                    .class_literal(db)
+                    .as_static()
+                    .and_then(|class| enum_metadata(db, class))
                     .and_then(|metadata| {
                         let (_, ty) = metadata.members.get_index(0)?;
                         Some(Place::bound(*ty))
@@ -3491,16 +3497,12 @@ impl<'db> Type<'db> {
                         .map(|class| class.class_literal(db)),
                     _ => None,
                 };
-                if let Some(enum_class) = enum_class
+                if let Some(ClassLiteral::Static(enum_class)) = enum_class
                     && let Some(metadata) = enum_metadata(db, enum_class)
-                    && let Some(resolved_name) = metadata.resolve_member(&name)
+                    && let Some(index) = metadata.resolve_member(&name)
                 {
-                    return Place::bound(Type::EnumLiteral(EnumLiteralType::new(
-                        db,
-                        enum_class,
-                        resolved_name,
-                    )))
-                    .into();
+                    return Place::bound(Type::EnumLiteral(EnumLiteralType { enum_class, index }))
+                        .into();
                 }
 
                 let class_attr_plain = self.find_name_in_mro_with_policy(db, name_str, policy).expect(
@@ -6106,7 +6108,9 @@ impl<'db> Type<'db> {
             }
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
-            Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
+            Type::EnumLiteral(enum_literal) => {
+                Type::ClassLiteral(ClassLiteral::Static(enum_literal.enum_class))
+            }
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::KnownBoundMethod(method) => method.class().to_class_literal(db),
@@ -6816,7 +6820,7 @@ impl<'db> Type<'db> {
                 db,
                 &format!(
                     "{enum_class}.{name}",
-                    enum_class = enum_literal.enum_class(db).name(db),
+                    enum_class = enum_literal.enum_class.name(db),
                     name = enum_literal.name(db)
                 ),
             ),
@@ -13117,22 +13121,27 @@ impl<'db> BytesLiteralType<'db> {
 ///     NO = 0
 ///     YES = 1
 /// ```
-#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+#[repr(C)]
 pub struct EnumLiteralType<'db> {
     /// A reference to the enum class this literal belongs to
-    enum_class: ClassLiteral<'db>,
-    /// The name of the enum member
-    #[returns(ref)]
-    name: Name,
+    enum_class: StaticClassLiteral<'db>,
+    /// The index of the enum member
+    index: u16,
 }
 
-// The Salsa heap is tracked separately.
-impl get_size2::GetSize for EnumLiteralType<'_> {}
-
 impl<'db> EnumLiteralType<'db> {
-    pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
-        self.enum_class(db).to_non_generic_instance(db)
+    pub(crate) fn enum_class_instance(&self, db: &'db dyn Db) -> Type<'db> {
+        self.enum_class.to_non_generic_instance(db)
+    }
+
+    pub(crate) fn name(&self, db: &'db dyn Db) -> &'db Name {
+        enum_metadata(db, self.enum_class)
+            .expect("Class of enum should be an enum class")
+            .members
+            .get_index(usize::from(self.index))
+            .expect("Index should be in the bounds of the member map")
+            .0
     }
 }
 

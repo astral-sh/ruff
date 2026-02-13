@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::db::tests::TestDb;
 use crate::place::{builtins_symbol, known_module_symbol};
-use crate::types::enums::is_single_member_enum;
+use crate::types::enums::{enum_metadata, is_single_member_enum};
 use crate::types::tuple::TupleType;
 use crate::types::{
     BoundMethodType, EnumLiteralType, IntersectionBuilder, IntersectionType, KnownClass, Parameter,
@@ -142,14 +142,18 @@ impl Ty {
             Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
             Ty::LiteralString => Type::LiteralString,
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::EnumLiteral(name) => Type::EnumLiteral(EnumLiteralType::new(
-                db,
-                known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
+            Ty::EnumLiteral(name) => {
+                let enum_class = known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
                     .place
                     .expect_type()
-                    .expect_class_literal(),
-                Name::new(name),
-            )),
+                    .expect_class_literal();
+                let metadata = enum_metadata(db, enum_class).unwrap();
+                let index = metadata.resolve_member(name).unwrap();
+                Type::EnumLiteral(EnumLiteralType {
+                    enum_class: enum_class.as_static().unwrap(),
+                    index,
+                })
+            }
             Ty::SingleMemberEnumLiteral => {
                 let ty = known_module_symbol(db, KnownModule::Dataclasses, "MISSING")
                     .place

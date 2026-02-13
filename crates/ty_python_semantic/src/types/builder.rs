@@ -39,8 +39,8 @@
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
-    BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
-    NegativeIntersectionElements, StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, EnumLiteralType, IntersectionType, KnownClass, NegativeIntersectionElements,
+    StaticClassLiteral, StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
@@ -50,7 +50,7 @@ enum LiteralKind<'db> {
     Int,
     String,
     Bytes,
-    Enum { enum_class: ClassLiteral<'db> },
+    Enum { enum_class: StaticClassLiteral<'db> },
 }
 
 impl<'db> Type<'db> {
@@ -73,7 +73,7 @@ impl<'db> Type<'db> {
             (Type::BytesLiteral(_), LiteralKind::Bytes) => true,
             (Type::IntLiteral(_), LiteralKind::Int) => true,
             (Type::EnumLiteral(enum_literal), LiteralKind::Enum { enum_class }) => {
-                enum_literal.enum_class(db) == enum_class
+                enum_literal.enum_class == enum_class
             }
             (Type::Intersection(intersection), _) => {
                 intersection
@@ -100,7 +100,7 @@ enum UnionElement<'db> {
     StringLiterals(FxOrderSet<StringLiteralType<'db>>),
     BytesLiterals(FxOrderSet<BytesLiteralType<'db>>),
     EnumLiterals {
-        enum_class: ClassLiteral<'db>,
+        enum_class: StaticClassLiteral<'db>,
         literals: FxOrderSet<EnumLiteralType<'db>>,
     },
     Type(Type<'db>),
@@ -524,7 +524,7 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             Type::EnumLiteral(enum_member_to_add) => {
-                let enum_class = enum_member_to_add.enum_class(self.db);
+                let enum_class = enum_member_to_add.enum_class;
                 let metadata =
                     enum_metadata(self.db, enum_class).expect("Class of enum literal is an enum");
 
@@ -842,10 +842,14 @@ impl<'db> IntersectionBuilder<'db> {
                     // `UnionBuilder` because we would simplify the union to just the enum instance
                     // and end up in this branch again.
                     let db = self.db;
+                    let class = instance
+                        .class_literal(db)
+                        .as_static()
+                        .expect("ty doesn't support enums constructed dynamically using `type()`");
                     self.add_positive_impl(
                         Type::Union(UnionType::new(
                             db,
-                            enum_member_literals(db, instance.class_literal(db), None)
+                            enum_member_literals(db, class, None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .collect::<Box<[_]>>(),
                             RecursivelyDefined::No,
@@ -957,7 +961,7 @@ impl<'db> IntersectionBuilder<'db> {
                         db,
                         enum_member_literals(
                             db,
-                            enum_literal.enum_class(db),
+                            enum_literal.enum_class,
                             Some(enum_literal.name(db)),
                         )
                         .expect("Calling `enum_member_literals` on an enum class"),
@@ -1541,9 +1545,13 @@ mod tests {
             .ignore_possibly_undefined()
             .unwrap();
 
-        let literals = enum_member_literals(&db, safe_uuid_class.expect_class_literal(), None)
-            .unwrap()
-            .collect::<Vec<_>>();
+        let literals = enum_member_literals(
+            &db,
+            safe_uuid_class.expect_class_literal().as_static().unwrap(),
+            None,
+        )
+        .unwrap()
+        .collect::<Vec<_>>();
         assert_eq!(literals.len(), 3);
 
         // SafeUUID.safe

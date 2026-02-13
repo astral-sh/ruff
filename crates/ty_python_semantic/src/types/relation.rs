@@ -1141,10 +1141,7 @@ impl<'db> Type<'db> {
                     return ConstraintSet::from(false);
                 }
 
-                ConstraintSet::from(is_single_member_enum(
-                    db,
-                    target_enum_literal.enum_class(db),
-                ))
+                ConstraintSet::from(is_single_member_enum(db, target_enum_literal.enum_class))
             }
 
             // Except for the special `LiteralString` and `StringLiteral` cases above,
