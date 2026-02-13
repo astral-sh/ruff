@@ -321,6 +321,12 @@ pub(crate) struct UseDefMap<'db> {
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, InternedBindingsId>,
 
+    /// [`Bindings`] for each member reaching a [`ScopedUseId`].
+    ///
+    /// This is only used for kwargs expressions, whose corresponding `bindings_by_use` entry
+    /// is empty.
+    multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
+
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
     node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
 
@@ -395,6 +401,21 @@ impl<'db> UseDefMap<'db> {
             &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
+    }
+
+    pub(crate) fn member_bindings_at_use(
+        &self,
+        use_id: ScopedUseId,
+    ) -> impl Iterator<Item = BindingWithConstraintsIterator<'_, 'db>> {
+        self.multi_bindings_by_use
+            .get(&use_id)
+            .map(|member_bindings| {
+                member_bindings.iter().map(|bindings| {
+                    self.bindings_iterator(bindings, BoundnessAnalysis::BasedOnUnboundVisibility)
+                })
+            })
+            .into_iter()
+            .flatten()
     }
 
     pub(crate) fn applicable_constraints(
@@ -890,6 +911,13 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
+    /// Live bindings associated with each so-far-recorded use.
+    ///
+    /// Unlike `bindings_by_use`, this field supports associating multiple bindings with a
+    /// single use. This is only used for kwargs expressions, whose corresponding `bindings_by_use`
+    /// entry is empty.
+    multi_bindings_by_use: FxHashMap<ScopedUseId, Vec<Bindings>>,
+
     /// Tracks whether or not the current point in control flow is reachable from the
     /// start of the scope.
     pub(super) reachability: ScopedReachabilityConstraintId,
@@ -928,6 +956,7 @@ impl<'db> UseDefMapBuilder<'db> {
             predicates: PredicatesBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
+            multi_bindings_by_use: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
@@ -1346,12 +1375,39 @@ impl<'db> UseDefMapBuilder<'db> {
         node_key: NodeKey,
     ) {
         let bindings = match place {
-            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol].bindings(),
-            ScopedPlaceId::Member(member) => &mut self.member_states[member].bindings(),
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
         };
+
+        self.record_use_bindings(bindings.clone(), use_id, node_key);
+    }
+
+    pub(super) fn record_multi_use(
+        &mut self,
+        places: impl Iterator<Item = ScopedPlaceId>,
+        use_id: ScopedUseId,
+        node_key: NodeKey,
+    ) {
+        for place in places {
+            let bindings = match place {
+                ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+                ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+            };
+
+            self.multi_bindings_by_use
+                .entry(use_id)
+                .or_default()
+                .push(bindings.clone());
+        }
+
+        // Record a placeholder use of the parent expression to preserve the indices of `bindings_by_use`.
+        self.record_use_bindings(Bindings::default(), use_id, node_key);
+    }
+
+    fn record_use_bindings(&mut self, bindings: Bindings, use_id: ScopedUseId, node_key: NodeKey) {
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
-        let new_use = self.bindings_by_use.push(bindings.clone());
+        let new_use = self.bindings_by_use.push(bindings);
         debug_assert_eq!(use_id, new_use);
 
         // Track reachability of all uses of places to silence `unresolved-reference`
@@ -1521,6 +1577,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachable_symbol_definitions.shrink_to_fit();
         self.reachable_member_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
+        self.multi_bindings_by_use.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_definition.shrink_to_fit();
@@ -1572,6 +1629,9 @@ impl<'db> UseDefMapBuilder<'db> {
         for declarations in &mut interned_declarations {
             declarations.finish(&mut self.reachability_constraints);
         }
+        for bindings in self.multi_bindings_by_use.values_mut().flatten() {
+            bindings.finish(&mut self.reachability_constraints);
+        }
         for constraint in self.node_reachability.values() {
             self.reachability_constraints.mark_used(*constraint);
         }
@@ -1609,6 +1669,7 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_bindings,
             interned_declarations,
             bindings_by_use,
+            multi_bindings_by_use: self.multi_bindings_by_use,
             node_reachability: self.node_reachability,
             end_of_scope_symbols: self.symbol_states,
             end_of_scope_members,

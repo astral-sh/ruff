@@ -52,9 +52,9 @@ use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
     DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
     IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType,
-    TypeContext, TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
+    enums, list_members,
 };
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -3531,43 +3531,32 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 );
             }
         } else {
-            let dunder_getitem_return_type = |ty: Type<'db>| match ty
-                .member_lookup_with_policy(
-                    db,
-                    Name::new_static("__getitem__"),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                )
-                .place
-            {
-                Place::Defined(DefinedPlace {
-                    ty: getitem_method,
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }) => getitem_method
-                    .try_call(db, &CallArguments::positional([Type::unknown()]))
-                    .ok()
-                    .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
-                _ => Type::unknown(),
-            };
-
-            let value_type = match argument_type {
-                Some(argument_type) => argument_type
-                    .as_paramspec_typevar(db)
-                    .unwrap_or_else(|| dunder_getitem_return_type(argument_type)),
-                None => Type::unknown(),
-            };
-
             for (parameter_index, parameter) in self.parameters.iter().enumerate() {
                 if self.parameter_info[parameter_index].matched && !parameter.is_keyword_variadic()
                 {
                     continue;
                 }
+
                 if matches!(
                     parameter.kind(),
                     ParameterKind::PositionalOnly { .. } | ParameterKind::Variadic { .. }
                 ) {
                     continue;
                 }
+
+                let parameter_name = self.parameters[parameter_index]
+                    .keyword_name()
+                    .map(Name::as_str);
+
+                let value_type = match argument_type {
+                    Some(argument_type) => argument_type
+                        .as_paramspec_typevar(db)
+                        .or_else(|| argument_type.getitem_dunder_call(db, parameter_name))
+                        .unwrap_or(Type::unknown()),
+
+                    None => Type::unknown(),
+                };
+
                 self.assign_argument(
                     argument_index,
                     Argument::Keywords,
@@ -4261,9 +4250,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     *parameter_index,
                 );
             }
-        } else {
-            let mut value_type_fallback = |argument_type: Type<'db>| {
-                let (key_type, value_type) = argument_type.unpack_keys_and_items(self.db)?;
+
+            return;
+        }
+
+        let value_type_paramspec =
+            if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
+                Some(paramspec)
+            } else {
+                let Some((key_type, _)) = argument_type.unpack_keys_and_items(self.db) else {
+                    return;
+                };
 
                 if !key_type
                     .when_assignable_to(
@@ -4280,31 +4277,30 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     });
                 }
 
-                Some(value_type)
+                None
             };
 
-            let value_type = if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
-                Some(paramspec)
+        for parameter_index in &self.argument_matches[argument_index].parameters {
+            let value_type = if let Some(value_type) = value_type_paramspec {
+                value_type
             } else {
-                value_type_fallback(argument_type)
+                let parameter_name = self.signature.parameters()[*parameter_index]
+                    .keyword_name()
+                    .map(Name::as_str);
+
+                argument_type
+                    .getitem_dunder_call(self.db, parameter_name)
+                    .unwrap_or(Type::unknown())
             };
 
-            let Some(value_type) = value_type else {
-                return;
-            };
-
-            for (argument_type, parameter_index) in
-                std::iter::repeat(value_type).zip(&self.argument_matches[argument_index].parameters)
-            {
-                self.check_argument_type(
-                    constraints,
-                    argument_index,
-                    adjusted_argument_index,
-                    Argument::Keywords,
-                    argument_type,
-                    *parameter_index,
-                );
-            }
+            self.check_argument_type(
+                constraints,
+                argument_index,
+                adjusted_argument_index,
+                Argument::Keywords,
+                value_type,
+                *parameter_index,
+            );
         }
     }
 
