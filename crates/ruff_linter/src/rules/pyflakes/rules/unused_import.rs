@@ -424,7 +424,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     && (!is_refined_submodule_import_match_enabled(checker.settings())||!symbol_used_in_dunder_all(checker.semantic(), &binding))
                     && isort::categorize::same_package(
                         checker.package(),
-                        &binding.import.source_name()[0],
+                        binding.import.source_name()[0],
                     )
                 {
                     UnusedImportContext::DunderInitSamePackage {
