@@ -1,0 +1,43 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP045 [*] Use `X | None` for type annotations
+ --> UP045_future.py:5:10
+  |
+5 | def f(x: Optional[str]) -> None:
+  |          ^^^^^^^^^^^^^
+6 |     ...
+  |
+help: Convert to `X | None`
+1 + from __future__ import annotations
+2 | import typing
+3 | from typing import Optional
+4 | 
+5 | 
+  - def f(x: Optional[str]) -> None:
+6 + def f(x: str | None) -> None:
+7 |     ...
+8 | 
+9 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_future.py:9:10
+   |
+ 9 | def f(x: typing.Optional[str]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^
+10 |     ...
+   |
+help: Convert to `X | None`
+1  + from __future__ import annotations
+2  | import typing
+3  | from typing import Optional
+4  | 
+--------------------------------------------------------------------------------
+7  |     ...
+8  | 
+9  | 
+   - def f(x: typing.Optional[str]) -> None:
+10 + def f(x: str | None) -> None:
+11 |     ...
+note: This is an unsafe fix and may change runtime behavior
