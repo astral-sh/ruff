@@ -117,3 +117,61 @@ reveal_type(x5["b"])  # revealed: dict[str, int | TD]
 reveal_type(x5["b"]["c"])  # revealed: Literal[2]
 reveal_type(x5["b"]["d"])  # revealed: TD
 ```
+
+## Dict unpacking in function calls
+
+When a dict literal is unpacked in a function call via `**`, per-key type narrowing is used to
+construct a synthesized TypedDict so that argument types are checked precisely.
+
+### Narrowed dict literals
+
+```py
+x = {"x": 1, "y": "a"}
+
+def f(x: int, y: str) -> None: ...
+
+f(**x)  # no error - per-key types match
+
+def g(x: int) -> None: ...
+
+# error: [unknown-argument] "Argument `y` does not match any known parameter of function `g`"
+g(**x)
+
+def h(x: int, y: str, z: float) -> None: ...
+
+# error: [missing-argument] "No argument provided for required parameter `z`"
+h(**x)
+
+x["z"] = 1.0
+h(**x)
+```
+
+### Non-narrowed dicts (parameter types)
+
+Non-narrowed dicts (e.g. parameters) should use the general dict value type for checking, not be
+converted to an empty TypedDict.
+
+```py
+from typing import Any
+
+def takes_any_dict(x: dict[str, Any]):
+    def g(a: int, b: str) -> None: ...
+    g(**x)  # no error - Any is assignable to int/str
+
+def takes_int_dict(x: dict[str, int]):
+    def g(a: str) -> None: ...
+    # error: [invalid-argument-type]
+    g(**x)
+```
+
+### Dicts with tracked keys but not from a literal
+
+A dict parameter with tracked key assignments should not be converted to a TypedDict.
+
+```py
+def mutated_dict(x: dict[str, int | str]):
+    x["a"] = 1
+    def g(a: int) -> None: ...
+    # error: [invalid-argument-type]
+    g(**x)
+```

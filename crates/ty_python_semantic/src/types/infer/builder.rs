@@ -34,10 +34,10 @@ use crate::diagnostic::format_enumeration;
 use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
-    TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, global_symbol, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    TypeOrigin, all_places_from_bindings, builtins_module_scope, builtins_symbol,
+    class_body_implicit_symbol, explicit_global_symbol, global_symbol,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
@@ -54,8 +54,8 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, attribute_assignments,
-    place_table,
+    ApplicableConstraints, BindingWithConstraints, EnclosingSnapshotResult, SemanticIndex,
+    attribute_assignments, place_table,
 };
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
@@ -120,7 +120,8 @@ use crate::types::subclass_of::SubclassOfInner;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{
-    TypedDictAssignmentKind, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
+    SynthesizedTypedDictType, TypedDictAssignmentKind, TypedDictField, TypedDictFieldBuilder,
+    TypedDictSchema, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
     validate_typed_dict_key_assignment,
 };
 use crate::types::{
@@ -2775,7 +2776,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let previous_deferred_state =
                 std::mem::replace(&mut self.deferred_state, in_stub.into());
             let mut call_arguments =
-                CallArguments::from_arguments(arguments, |argument, splatted_value| {
+                CallArguments::from_arguments(arguments, |_, argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value, TypeContext::default());
                     if let Some(argument) = argument {
                         self.store_expression_type(argument, ty);
@@ -11823,6 +11824,89 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::function_like_callable(self.db(), Signature::new(parameters, Type::unknown()))
     }
 
+    /// For each `**kwargs` argument that is a `dict` instance assigned from a dict literal,
+    /// replace the argument type with a synthesized `TypedDict` built from per-key place
+    /// narrowing. This allows the existing `TypedDict` matching/checking to work automatically.
+    fn try_narrow_dict_kwargs(
+        &self,
+        argument_type: Type<'db>,
+        argument: &'ast ast::ArgOrKeyword,
+        splatted_value: &'ast ast::Expr,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let file_scope_id = self.scope().file_scope_id(db);
+        let use_def = self.index.use_def_map(file_scope_id);
+
+        let Some(keyword) = argument.as_variadic() else {
+            return None;
+        };
+
+        if !argument_type
+            .as_nominal_instance()?
+            .has_known_class(db, KnownClass::Dict)
+        {
+            return None;
+        }
+
+        // Verify the variable was assigned from a dict literal.
+        let name_expr = splatted_value.as_name_expr()?;
+        let name_use_id = name_expr.scoped_use_id(db, self.scope());
+
+        match use_def.bindings_at_use(name_use_id).exactly_one() {
+            Ok(BindingWithConstraints {
+                binding: DefinitionState::Defined(definition),
+                ..
+            }) if matches!(
+                definition.kind(db).value(self.module()),
+                Some(ast::Expr::Dict(_))
+            ) => {}
+
+            _ => return None,
+        }
+
+        // Collect per-key types from place narrowing.
+        let mut fields: Vec<(Name, TypedDictField<'db>)> = Vec::new();
+
+        let keyword_use_id = keyword.scoped_use_id(db, self.scope());
+        for place in all_places_from_bindings(db, use_def.bindings_at_use(keyword_use_id)) {
+            let Some(definition) = place.first_definition else {
+                continue;
+            };
+
+            let key = match definition.kind(db) {
+                DefinitionKind::DictKeyAssignment(assignment) => assignment.key(self.module()),
+                DefinitionKind::Assignment(assignment) => match assignment.target(self.module()) {
+                    ast::Expr::Subscript(ast::ExprSubscript { slice, .. }) => slice.as_ref(),
+                    _ => continue,
+                },
+                DefinitionKind::AnnotatedAssignment(assignment) => {
+                    match assignment.target(self.module()) {
+                        ast::Expr::Subscript(ast::ExprSubscript { slice, .. }) => slice.as_ref(),
+                        _ => continue,
+                    }
+                }
+                _ => continue,
+            };
+
+            let Some(key) = key.as_string_literal_expr() else {
+                continue;
+            };
+
+            match place.place {
+                Place::Defined(DefinedPlace { ty: field_ty, .. }) => {
+                    let field = TypedDictFieldBuilder::new(field_ty).required(true).build();
+                    fields.push((Name::new(key.value.to_str()), field));
+                }
+
+                _ => continue,
+            }
+        }
+
+        let schema = TypedDictSchema::from_iter(fields);
+        let synthesized = SynthesizedTypedDictType::new(db, schema);
+        Some(Type::TypedDict(TypedDictType::Synthesized(synthesized)))
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -11930,11 +12014,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments =
-            CallArguments::from_arguments(arguments, |argument, splatted_value| {
+            CallArguments::from_arguments(arguments, |arg_or_keyword, argument, splatted_value| {
                 let ty = self.infer_expression(splatted_value, TypeContext::default());
                 if let Some(argument) = argument {
                     self.store_expression_type(argument, ty);
+                } else if let Some(ty) =
+                    // Try narrowing a splatted dict argument into a synthesized `TypedDict`.
+                    self.try_narrow_dict_kwargs(ty, arg_or_keyword, splatted_value)
+                {
+                    return ty;
                 }
+
                 ty
             });
 

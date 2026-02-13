@@ -1253,12 +1253,48 @@ impl<'db> UseDefMapBuilder<'db> {
         node_key: NodeKey,
     ) {
         let bindings = match place {
-            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol].bindings(),
-            ScopedPlaceId::Member(member) => &mut self.member_states[member].bindings(),
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
         };
         // We have a use of a place; clone the current bindings for that place, and record them
         // as the live bindings for this use.
         let new_use = self.bindings_by_use.push(bindings.clone());
+        debug_assert_eq!(use_id, new_use);
+
+        // Track reachability of all uses of places to silence `unresolved-reference`
+        // diagnostics in unreachable code.
+        self.record_node_reachability(node_key);
+    }
+
+    pub(super) fn record_all_use(
+        &mut self,
+        places: impl Iterator<Item = ScopedPlaceId>,
+        use_id: ScopedUseId,
+        node_key: NodeKey,
+    ) {
+        let mut bindings: Option<Bindings> = None;
+        for place in places {
+            let next_bindings = match place {
+                ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+                ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+            };
+
+            match bindings {
+                Some(ref mut bindings) => bindings.merge(
+                    next_bindings.clone(),
+                    &mut self.narrowing_constraints,
+                    &mut self.reachability_constraints,
+                ),
+
+                None => bindings = Some(next_bindings.clone()),
+            }
+        }
+
+        // We have a use of a place; clone the current bindings for that place, and record them
+        // as the live bindings for this use.
+        let new_use = self
+            .bindings_by_use
+            .push(bindings.expect("must record at least one binding"));
         debug_assert_eq!(use_id, new_use);
 
         // Track reachability of all uses of places to silence `unresolved-reference`

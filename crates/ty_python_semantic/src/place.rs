@@ -597,6 +597,17 @@ pub(super) fn place_from_bindings<'db>(
     place_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
 }
 
+/// Infer the combined type from an iterator of bindings, and return it
+/// together with boundness information in a [`Place`].
+///
+/// The type will be a union if there are multiple bindings with different types.
+pub(super) fn all_places_from_bindings<'db>(
+    db: &'db dyn Db,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+) -> Vec<PlaceWithDefinition<'db>> {
+    all_places_from_bindings_impl(db, bindings_with_constraints, RequiresExplicitReExport::No)
+}
+
 /// Build a declared type from a [`DeclarationsIterator`].
 ///
 /// If there is only one declaration, or all declarations declare the same type, returns
@@ -1341,6 +1352,157 @@ fn place_from_bindings_impl<'db>(
         place,
         first_definition,
     }
+}
+
+/// ## Implementation Note
+/// This function gets called cross-module. It, therefore, shouldn't
+/// access any AST nodes from the file containing the declarations.
+fn all_places_from_bindings_impl<'db>(
+    db: &'db dyn Db,
+    bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
+    requires_explicit_reexport: RequiresExplicitReExport,
+) -> Vec<PlaceWithDefinition<'db>> {
+    let predicates = bindings_with_constraints.predicates;
+    let reachability_constraints = bindings_with_constraints.reachability_constraints;
+    let boundness_analysis = bindings_with_constraints.boundness_analysis;
+    let mut bindings_with_constraints = bindings_with_constraints.peekable();
+
+    let is_non_exported = |binding: Definition<'db>| {
+        requires_explicit_reexport.is_yes() && !is_reexported(db, binding)
+    };
+
+    let unbound_reachability_constraint = match bindings_with_constraints.peek() {
+        Some(BindingWithConstraints {
+            binding,
+            reachability_constraint,
+            narrowing_constraint: _,
+        }) if binding.is_undefined_or(is_non_exported) => Some(*reachability_constraint),
+        _ => None,
+    };
+    let mut deleted_reachability = Truthiness::AlwaysFalse;
+
+    // Evaluate this lazily because we don't always need it (for example, if there are no visible
+    // bindings at all, we don't need it), and it can cause us to evaluate reachability constraint
+    // expressions, which is extra work and can lead to cycles.
+    let unbound_visibility = || {
+        unbound_reachability_constraint.map(|reachability_constraint| {
+            reachability_constraints.evaluate(db, predicates, reachability_constraint)
+        })
+    };
+
+    let mut first_definition = None;
+
+    bindings_with_constraints
+        .filter_map(
+            |BindingWithConstraints {
+                 binding,
+                 narrowing_constraint,
+                 reachability_constraint,
+             }| {
+                let binding = match binding {
+                    DefinitionState::Defined(binding) => binding,
+                    DefinitionState::Undefined => {
+                        return None;
+                    }
+                    DefinitionState::Deleted => {
+                        deleted_reachability = deleted_reachability.or(reachability_constraints
+                            .evaluate(db, predicates, reachability_constraint));
+                        return None;
+                    }
+                };
+
+                if is_non_exported(binding) {
+                    return None;
+                }
+
+                let static_reachability =
+                    reachability_constraints.evaluate(db, predicates, reachability_constraint);
+
+                let ty = if static_reachability.is_always_false() {
+                    // If the static reachability evaluates to false, the binding is either not reachable
+                    // from the start of the scope, or there is no control flow path from that binding to
+                    // the use of the place that we are investigating. There are three interesting cases
+                    // to consider:
+                    //
+                    // ```py
+                    // def f1():
+                    //     if False:
+                    //         x = 1
+                    //     use(x)
+                    //
+                    // def f2():
+                    //     y = 1
+                    //     return
+                    //     use(y)
+                    //
+                    // def f3(flag: bool):
+                    //     if flag:
+                    //         z = 1
+                    //     else:
+                    //         z = 2
+                    //         return
+                    //     use(z)
+                    // ```
+                    //
+                    // In the first case, there is a single binding for `x`, but it is not reachable from
+                    // the start of the scope. However, the use of `x` is reachable (`unbound_reachability`
+                    // is not always-false). This means that `x` is unbound and we should return `None`.
+                    //
+                    // In the second case, the binding of `y` is reachable, but there is no control flow
+                    // path from the beginning of the scope, through that binding, to the use of `y` that
+                    // we are investigating. There is also no control flow path from the start of the
+                    // scope, through the implicit `y = <unbound>` binding, to the use of `y`. This means
+                    // that `unbound_reachability` is always false. Since there are no other bindings, no
+                    // control flow path can reach this use of `y`, implying that we are in unreachable
+                    // section of code. We return `Never` in order to silence the `unresolve-reference`
+                    // diagnostic that would otherwise be emitted at the use of `y`.
+                    //
+                    // In the third case, we have two bindings for `z`. The first one is visible (there
+                    // is a path of control flow from the start of the scope, through that binding, to
+                    // the use of `z`). So we consider the case that we now encounter the second binding
+                    // `z = 2`, which is not visible due to the early return. The `z = <unbound>` binding
+                    // is not live (shadowed by the other bindings), so `unbound_reachability` is `None`.
+                    // Here, we are *not* in an unreachable section of code. However, it is still okay to
+                    // return `Never` in this case, because we will union the types of all bindings, and
+                    // `Never` will be eliminated automatically.
+
+                    if unbound_visibility().is_none_or(Truthiness::is_always_false) {
+                        Type::Never
+                    } else {
+                        return None;
+                    }
+                } else {
+                    first_definition.get_or_insert(binding);
+                    let binding_ty = binding_type(db, binding);
+                    narrowing_constraint.narrow(db, binding_ty, binding.place(db))
+                };
+
+                let boundness = match boundness_analysis {
+                    BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
+                    BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
+                        Some(Truthiness::AlwaysTrue) => Definedness::PossiblyUndefined,
+                        Some(Truthiness::AlwaysFalse) | None => Definedness::AlwaysDefined,
+                        Some(Truthiness::Ambiguous) => Definedness::PossiblyUndefined,
+                    },
+                };
+
+                let place = match deleted_reachability {
+                    Truthiness::AlwaysFalse => {
+                        Place::Defined(DefinedPlace::new(ty).with_definedness(boundness))
+                    }
+                    Truthiness::AlwaysTrue => Place::Undefined,
+                    Truthiness::Ambiguous => Place::Defined(
+                        DefinedPlace::new(ty).with_definedness(Definedness::PossiblyUndefined),
+                    ),
+                };
+
+                Some(PlaceWithDefinition {
+                    place,
+                    first_definition: Some(binding),
+                })
+            },
+        )
+        .collect()
 }
 
 pub(super) struct PlaceWithDefinition<'db> {

@@ -637,7 +637,7 @@ pub fn call_signature_details<'db>(
         .map(|callables| callables.into_type(db))
     {
         let call_arguments =
-            CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
+            CallArguments::from_arguments(&call_expr.arguments, |_, _, splatted_value| {
                 splatted_value
                     .inferred_type(model)
                     .unwrap_or(Type::unknown())

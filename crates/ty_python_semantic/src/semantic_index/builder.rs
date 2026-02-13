@@ -9,7 +9,7 @@ use ruff_db::parsed::ParsedModuleRef;
 use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_keyword, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
@@ -2541,6 +2541,38 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 walk_stmt(self, stmt);
             }
         }
+    }
+
+    fn visit_keyword(&mut self, keyword: &'ast ast::Keyword) {
+        // self.scopes_by_expression
+        //     .record_expression(expr, self.current_scope());
+
+        if let Some(value_place_expr) = PlaceExpr::try_from_expr(&keyword.value) {
+            if let Some(value_place_id) = self
+                .current_place_table()
+                .place_id((&value_place_expr).into())
+            {
+                let current_scope = self.current_scope();
+
+                let member_places =
+                    self.place_tables[current_scope].associated_place_ids(value_place_id);
+
+                if !member_places.is_empty() {
+                    let member_places = member_places
+                        .iter()
+                        .map(|member_id| ScopedPlaceId::from(*member_id));
+
+                    let use_id = self.ast_ids[current_scope].record_use(keyword);
+                    self.use_def_maps[current_scope].record_all_use(
+                        member_places,
+                        use_id,
+                        NodeKey::from_node(keyword),
+                    );
+                }
+            }
+        }
+
+        walk_keyword(self, keyword);
     }
 
     fn visit_expr(&mut self, expr: &'ast ast::Expr) {
