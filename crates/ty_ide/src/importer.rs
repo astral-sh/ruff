@@ -374,7 +374,7 @@ impl<'ast> MembersInScope<'ast> {
 #[derive(Debug)]
 pub(crate) struct MemberInScope<'ast> {
     pub(crate) ty: Type<'ast>,
-    pub(crate) kind: MemberImportKind<'ast>,
+    kind: MemberImportKind<'ast>,
 }
 
 impl<'ast> MemberInScope<'ast> {
