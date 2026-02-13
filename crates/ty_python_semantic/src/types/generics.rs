@@ -1926,8 +1926,10 @@ impl<'db> SpecializationBuilder<'db> {
                 self.add_type_mappings_from_constraint_set(formal, when, &mut *f)?;
             } else {
                 // An overloaded actual callable is compatible with the formal signature if at
-                // least one of its overloads is. We collect type mappings from all satisfiable
-                // overloads, and only report an error if none of them are satisfiable.
+                // least one of its overloads is. We use type mappings only from the first
+                // satisfiable overload to avoid unioning type variable assignments across
+                // overloads: combining e.g. `S=str` and `S=bytes` into `S=str | bytes` would
+                // create an unsatisfiable expected type for contravariant type variables.
                 let mut any_satisfiable = false;
                 for actual_signature in &actual_callable.signatures(self.db).overloads {
                     let when = actual_signature.when_constraint_set_assignable_to_signatures(
@@ -1940,6 +1942,7 @@ impl<'db> SpecializationBuilder<'db> {
                         .is_ok()
                     {
                         any_satisfiable = true;
+                        break;
                     }
                 }
                 if !any_satisfiable {
