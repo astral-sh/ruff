@@ -174,6 +174,9 @@ fn generate_quote_union_fix(
     union_expr: &Expr,
 ) -> Option<Fix> {
     let mut union_text = checker.locator().slice(union_expr.range()).to_string();
+    if union_text.contains('\n') {
+        return None;
+    }
     let mut unquoted: Vec<_> = strings
         .iter()
         .filter_map(|string_expr| {

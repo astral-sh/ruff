@@ -24,3 +24,10 @@ j = TypeVar('j', """int""" | str, float)
 k = TypeVar('k', '''str''' | bool, int)
 
 l = TypeVar('l', "Literal['a\"b']" | None, str)
+
+m = TypeVar('m', (
+    'int'
+    | 'str'
+), object)
+
+n = TypeVar('n', b'bytes' | str, bytes)

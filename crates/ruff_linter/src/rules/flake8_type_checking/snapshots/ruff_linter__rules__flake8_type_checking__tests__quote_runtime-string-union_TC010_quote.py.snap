@@ -317,6 +317,7 @@ help: Quote entire union
 24 + k = TypeVar('k', "str | bool", int)
 25 | 
 26 | l = TypeVar('l', "Literal['a\"b']" | None, str)
+27 | 
 
 TC010 Invalid string member in `X | Y`-style union type
   --> TC010_quote.py:26:18
@@ -325,5 +326,39 @@ TC010 Invalid string member in `X | Y`-style union type
 25 |
 26 | l = TypeVar('l', "Literal['a\"b']" | None, str)
    |                  ^^^^^^^^^^^^^^^^^
+27 |
+28 | m = TypeVar('m', (
+   |
+help: Quote entire union
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:29:5
+   |
+28 | m = TypeVar('m', (
+29 |     'int'
+   |     ^^^^^
+30 |     | 'str'
+31 | ), object)
+   |
+help: Quote entire union
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:30:7
+   |
+28 | m = TypeVar('m', (
+29 |     'int'
+30 |     | 'str'
+   |       ^^^^^
+31 | ), object)
+   |
+help: Quote entire union
+
+TC010 Invalid string member in `X | Y`-style union type
+  --> TC010_quote.py:33:18
+   |
+31 | ), object)
+32 |
+33 | n = TypeVar('n', b'bytes' | str, bytes)
+   |                  ^^^^^^^^
    |
 help: Quote entire union
