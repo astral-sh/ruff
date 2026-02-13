@@ -134,7 +134,7 @@ a<b<c and c<d
 # more involved examples (all should error and fix)
 a < ( # sneaky comment
 	b
-  # more comments 
+  # more comments
 ) and b < c
 
 (
@@ -146,3 +146,27 @@ a < ( # sneaky comment
 )
 
 a < (b) and (((b)) < c)
+
+# ----------------------------------------------------------
+# examples where the expression could be simplified, but
+# only by changing the order of the expressions or replacing
+# '<' with '>' and vice-versa
+# ----------------------------------------------------------
+
+a = int(input())
+b = int(input())
+c = int(input())
+if b > a and c >= b:  # [boolean-chained-comparison]
+    pass
+
+a = int(input())
+b = int(input())
+c = int(input())
+if a < b and c >= b:  # [boolean-chained-comparison]
+    pass
+
+a = int(input())
+b = int(input())
+c = int(input())
+if b >= a and b <= c:  # [boolean-chained-comparison]
+    pass
