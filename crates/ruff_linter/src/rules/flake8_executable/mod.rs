@@ -17,21 +17,7 @@ mod tests {
     #[test_case(Path::new("EXE001_1.py"))]
     #[test_case(Path::new("EXE001_2.py"))]
     #[test_case(Path::new("EXE001_3.py"))]
-    #[test_case(Path::new("EXE002_1.py"))]
-    #[test_case(Path::new("EXE002_2.py"))]
-    #[test_case(Path::new("EXE002_3.py"))]
-    #[test_case(Path::new("EXE003.py"))]
-    #[test_case(Path::new("EXE003_uv.py"))]
-    #[test_case(Path::new("EXE003_uv_tool.py"))]
-    #[test_case(Path::new("EXE003_uvx.py"))]
-    #[test_case(Path::new("EXE004_1.py"))]
-    #[test_case(Path::new("EXE004_2.py"))]
-    #[test_case(Path::new("EXE004_3.py"))]
-    #[test_case(Path::new("EXE004_4.py"))]
-    #[test_case(Path::new("EXE005_1.py"))]
-    #[test_case(Path::new("EXE005_2.py"))]
-    #[test_case(Path::new("EXE005_3.py"))]
-    fn rules(path: &Path) -> Result<()> {
+    fn rules_exe001(path: &Path) -> Result<()> {
         if is_wsl::is_wsl() {
             // these rules are always ignored on WSL, so skip testing them in a WSL environment
             // see https://github.com/astral-sh/ruff/pull/21724 for latest discussion
@@ -41,13 +27,85 @@ mod tests {
         let snapshot = path.to_string_lossy().into_owned();
         let diagnostics = test_path(
             Path::new("flake8_executable").join(path).as_path(),
-            &settings::LinterSettings::for_rules(vec![
-                Rule::ShebangNotExecutable,
-                Rule::ShebangMissingExecutableFile,
-                Rule::ShebangLeadingWhitespace,
-                Rule::ShebangNotFirstLine,
-                Rule::ShebangMissingPython,
-            ]),
+            &settings::LinterSettings::for_rules(vec![Rule::ShebangNotExecutable]),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("EXE002_1.py"))]
+    #[test_case(Path::new("EXE002_2.py"))]
+    #[test_case(Path::new("EXE002_3.py"))]
+    fn rules_exe002(path: &Path) -> Result<()> {
+        if is_wsl::is_wsl() {
+            // these rules are always ignored on WSL, so skip testing them in a WSL environment
+            // see https://github.com/astral-sh/ruff/pull/21724 for latest discussion
+            return Ok(());
+        }
+
+        let snapshot = path.to_string_lossy().into_owned();
+        let diagnostics = test_path(
+            Path::new("flake8_executable").join(path).as_path(),
+            &settings::LinterSettings::for_rules(vec![Rule::ShebangMissingExecutableFile]),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("EXE003.py"))]
+    #[test_case(Path::new("EXE003_uv.py"))]
+    #[test_case(Path::new("EXE003_uv_tool.py"))]
+    #[test_case(Path::new("EXE003_uvx.py"))]
+    fn rules_exe003(path: &Path) -> Result<()> {
+        if is_wsl::is_wsl() {
+            // these rules are always ignored on WSL, so skip testing them in a WSL environment
+            // see https://github.com/astral-sh/ruff/pull/21724 for latest discussion
+            return Ok(());
+        }
+
+        let snapshot = path.to_string_lossy().into_owned();
+        let diagnostics = test_path(
+            Path::new("flake8_executable").join(path).as_path(),
+            &settings::LinterSettings::for_rules(vec![Rule::ShebangMissingPython]),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("EXE004_1.py"))]
+    #[test_case(Path::new("EXE004_2.py"))]
+    #[test_case(Path::new("EXE004_3.py"))]
+    #[test_case(Path::new("EXE004_4.py"))]
+    fn rules_exe004(path: &Path) -> Result<()> {
+        if is_wsl::is_wsl() {
+            // these rules are always ignored on WSL, so skip testing them in a WSL environment
+            // see https://github.com/astral-sh/ruff/pull/21724 for latest discussion
+            return Ok(());
+        }
+
+        let snapshot = path.to_string_lossy().into_owned();
+        let diagnostics = test_path(
+            Path::new("flake8_executable").join(path).as_path(),
+            &settings::LinterSettings::for_rules(vec![Rule::ShebangLeadingWhitespace]),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("EXE005_1.py"))]
+    #[test_case(Path::new("EXE005_2.py"))]
+    #[test_case(Path::new("EXE005_3.py"))]
+    fn rules_exe005(path: &Path) -> Result<()> {
+        if is_wsl::is_wsl() {
+            // these rules are always ignored on WSL, so skip testing them in a WSL environment
+            // see https://github.com/astral-sh/ruff/pull/21724 for latest discussion
+            return Ok(());
+        }
+
+        let snapshot = path.to_string_lossy().into_owned();
+        let diagnostics = test_path(
+            Path::new("flake8_executable").join(path).as_path(),
+            &settings::LinterSettings::for_rules(vec![Rule::ShebangNotFirstLine]),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
