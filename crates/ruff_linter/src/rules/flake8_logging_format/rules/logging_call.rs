@@ -14,6 +14,26 @@ use crate::rules::flake8_logging_format::violations::{
 };
 use crate::{Edit, Fix};
 
+/// Escape control characters and quotes for use in a Python string literal.
+/// Escapes newlines, tabs, carriage returns, backslashes, and quotes that match the quote style.
+fn escape_string_for_literal(text: &str, quote_char: char) -> String {
+    let mut escaped = String::with_capacity(text.len() * 2);
+    for ch in text.chars() {
+        match ch {
+            '\n' => escaped.push_str("\\n"),
+            '\t' => escaped.push_str("\\t"),
+            '\r' => escaped.push_str("\\r"),
+            '\\' => escaped.push_str("\\\\"),
+            ch if ch == quote_char => {
+                escaped.push('\\');
+                escaped.push(ch);
+            }
+            _ => escaped.push(ch),
+        }
+    }
+    escaped
+}
+
 fn logging_f_string(
     checker: &Checker,
     msg: &Expr,
@@ -50,6 +70,9 @@ fn logging_f_string(
         .next()
         .unwrap_or("\"");
 
+    // Extract the quote character for escaping
+    let quote_char = quote_str.chars().next().unwrap_or('"');
+
     for part in &f_string.value {
         match part {
             ast::FStringPart::Literal(literal) => {
@@ -57,7 +80,7 @@ fn logging_f_string(
                 if literal_text.contains('%') {
                     return;
                 }
-                format_string.push_str(literal_text);
+                format_string.push_str(&escape_string_for_literal(literal_text, quote_char));
             }
             ast::FStringPart::FString(f) => {
                 for element in &f.elements {
@@ -69,7 +92,10 @@ fn logging_f_string(
                             if lit.value.as_ref().contains('%') {
                                 return;
                             }
-                            format_string.push_str(lit.value.as_ref());
+                            format_string.push_str(&escape_string_for_literal(
+                                lit.value.as_ref(),
+                                quote_char,
+                            ));
                         }
                         InterpolatedStringElement::Interpolation(interpolated) => {
                             if interpolated.format_spec.is_some()
