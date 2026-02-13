@@ -151,9 +151,6 @@ pub(crate) fn check_noqa(
                         );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
-                        diagnostic.help(
-                            "If this is a non-Ruff rule code, consider using the `lint.external` configuration option",
-                        );
                     }
                 }
                 Directive::Codes(directive) => {
@@ -252,9 +249,6 @@ pub(crate) fn check_noqa(
                         );
                         diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
-                        diagnostic.help(
-                            "If this is a non-Ruff rule code, consider using the `lint.external` configuration option",
-                        );
                     }
                 }
             }
