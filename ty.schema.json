@@ -485,6 +485,16 @@
             }
           ]
         },
+        "dataclass-non-literal-alias": {
+          "title": "detects non-literal values for the `alias` parameter of a dataclass field specifier",
+          "description": "## What it does\nChecks for non-literal values passed to the `alias` parameter of a\ndataclass field specifier.\n\n## Why is this bad?\nThe `alias` parameter must be a string literal so that the type checker\ncan determine the alternative parameter name for the synthesized `__init__`\nmethod. Non-literal values (e.g., a variable of type `str`) cannot be\nresolved statically, and the alias will be silently ignored.",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "deprecated": {
           "title": "detects uses of deprecated items",
           "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",

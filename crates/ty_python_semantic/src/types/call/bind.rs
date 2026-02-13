@@ -27,10 +27,10 @@ use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
-    INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
-    POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
-    note_numbers_module_not_supported,
+    CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, DATACLASS_NON_LITERAL_ALIAS,
+    INVALID_ARGUMENT_TYPE, INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
+    PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS,
+    UNKNOWN_ARGUMENT, note_numbers_module_not_supported,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -845,9 +845,27 @@ impl<'db> Bindings<'db> {
                             None
                         };
 
-                        let alias = alias
-                            .and_then(Type::as_string_literal)
-                            .map(|literal| Box::from(literal.value(db)));
+                        let alias = if let Some(alias_ty) = alias {
+                            if let Some(literal) = alias_ty.as_string_literal() {
+                                Some(Box::from(literal.value(db)))
+                            } else {
+                                if !alias_ty.is_none(db) {
+                                    let alias_argument_index = argument_types
+                                        .iter()
+                                        .enumerate()
+                                        .find_map(|(i, (arg, _))| {
+                                            matches!(arg, Argument::Keyword("alias")).then_some(i)
+                                        });
+                                    overload.errors.push(BindingError::NonLiteralFieldAlias {
+                                        argument_index: alias_argument_index,
+                                        provided_ty: alias_ty,
+                                    });
+                                }
+                                None
+                            }
+                        } else {
+                            None
+                        };
 
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the
                         // default value directly. At runtime, however, this function returns an
@@ -4475,6 +4493,11 @@ pub(crate) enum BindingError<'db> {
     CalledTopCallable(Type<'db>),
     /// The `@dataclass` decorator was applied to an invalid target.
     InvalidDataclassApplication(InvalidDataclassTarget),
+    /// A non-literal value was passed as the `alias` argument to a field specifier.
+    NonLiteralFieldAlias {
+        argument_index: Option<usize>,
+        provided_ty: Type<'db>,
+    },
 }
 
 impl BindingError<'_> {
@@ -4498,7 +4521,8 @@ impl BindingError<'_> {
             | BindingError::UnknownArgument { argument_index, .. }
             | BindingError::PositionalOnlyParameterAsKwarg { argument_index, .. }
             | BindingError::ParameterAlreadyAssigned { argument_index, .. }
-            | BindingError::SpecializationError { argument_index, .. } => {
+            | BindingError::SpecializationError { argument_index, .. }
+            | BindingError::NonLiteralFieldAlias { argument_index, .. } => {
                 if let Some(argument_index) = argument_index {
                     *argument_index += offset;
                 }
@@ -4565,6 +4589,7 @@ impl<'db> BindingError<'db> {
         match self {
             // Semantic errors: the overload matched, but the usage is invalid
             Self::InvalidDataclassApplication(_)
+            | Self::NonLiteralFieldAlias { .. }
             | Self::PropertyHasNoSetter(_)
             | Self::CalledTopCallable(_)
             | Self::InternalCallError(_) => false,
@@ -5053,6 +5078,22 @@ impl<'db> BindingError<'db> {
                     if let Some(union_diag) = union_diag {
                         union_diag.add_union_context(context.db(), &mut diag);
                     }
+                }
+            }
+
+            Self::NonLiteralFieldAlias {
+                argument_index,
+                provided_ty,
+            } => {
+                let range = Self::get_node(node, *argument_index);
+                if let Some(builder) = context.report_lint(&DATACLASS_NON_LITERAL_ALIAS, range) {
+                    let mut diag = builder.into_diagnostic(
+                        "Non-literal value for `alias` parameter of field specifier",
+                    );
+                    diag.set_primary_message(format_args!(
+                        "Expected a string literal, found `{}`",
+                        provided_ty.display(context.db())
+                    ));
                 }
             }
 

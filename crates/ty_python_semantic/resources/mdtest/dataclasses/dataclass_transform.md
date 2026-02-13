@@ -860,6 +860,27 @@ Trying to use the actual attribute names in the constructor results in an error:
 p = Person(name="Alice", internal_age=30)
 ```
 
+### Non-literal alias
+
+When a non-literal value is passed as the `alias` parameter, a diagnostic is emitted:
+
+```py
+from typing_extensions import dataclass_transform, Any
+
+def field_with_alias(*, alias: str | None = None, kw_only: bool = False) -> Any: ...
+@dataclass_transform(field_specifiers=(field_with_alias,))
+def model[T](cls: type[T]) -> type[T]:
+    return cls
+
+def _(alias: str):
+    @model
+    class Person:
+        # error: [dataclass-non-literal-alias] "Non-literal value for `alias` parameter of field specifier"
+        internal_name: str = field_with_alias(alias=alias)
+
+    reveal_type(Person.__init__)  # revealed: (self: Person, internal_name: str) -> None
+```
+
 ### With overloaded field specifiers
 
 ```py

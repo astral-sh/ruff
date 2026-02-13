@@ -70,6 +70,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&DUPLICATE_BASE);
     registry.register_lint(&DUPLICATE_KW_ONLY);
     registry.register_lint(&DATACLASS_FIELD_ORDER);
+    registry.register_lint(&DATACLASS_NON_LITERAL_ALIAS);
     registry.register_lint(&EMPTY_BODY);
     registry.register_lint(&INSTANCE_LAYOUT_CONFLICT);
     registry.register_lint(&INCONSISTENT_MRO);
@@ -473,6 +474,23 @@ declare_lint! {
         summary: "detects dataclass definitions with required fields after fields with default values",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for non-literal values passed to the `alias` parameter of a
+    /// dataclass field specifier.
+    ///
+    /// ## Why is this bad?
+    /// The `alias` parameter must be a string literal so that the type checker
+    /// can determine the alternative parameter name for the synthesized `__init__`
+    /// method. Non-literal values (e.g., a variable of type `str`) cannot be
+    /// resolved statically, and the alias will be silently ignored.
+    pub(crate) static DATACLASS_NON_LITERAL_ALIAS = {
+        summary: "detects non-literal values for the `alias` parameter of a dataclass field specifier",
+        status: LintStatus::preview("1.0.0"),
+        default_level: Level::Warn,
     }
 }
 
