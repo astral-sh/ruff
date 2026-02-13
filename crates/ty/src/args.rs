@@ -71,10 +71,22 @@ pub(crate) struct CheckCommand {
     ///
     /// ty uses your Python environment to resolve third-party imports in your code.
     ///
+    /// This can be a path to:
+    ///
+    /// - A virtual environment directory, e.g. `.venv`
+    ///
+    /// - A Python interpreter, e.g. `.venv/bin/python3`
+    ///
+    /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
+    ///
+    /// Note that this option does not accept paths to `bin/` directories: pass
+    /// the path to the Python interpreter directly, or the root of the
+    /// virtual environment.
+    ///
     /// If you're using a project management tool such as uv or you have an activated Conda or virtual
     /// environment, you should not generally need to specify this option.
     ///
-    /// This option can be used to point to virtual or system Python environments.
+    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[arg(long, value_name = "PATH", alias = "venv")]
     pub(crate) python: Option<SystemPathBuf>,
 

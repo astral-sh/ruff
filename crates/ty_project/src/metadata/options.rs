@@ -683,6 +683,18 @@ pub struct EnvironmentOptions {
     /// ty uses the `site-packages` directory of your project's Python environment
     /// to resolve third-party (and, in some cases, first-party) imports in your code.
     ///
+    /// This can be a path to:
+    ///
+    /// - A virtual environment directory, e.g. `.venv`
+    /// - A Python interpreter, e.g. `.venv/bin/python3`
+    /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
+    ///
+    /// Note that this option does not accept paths to `bin/` directories: pass
+    /// the path to the Python interpreter directly, or the root of the
+    /// virtual environment.
+    ///
+    /// Passing a path to a dynamic executable (such as a shim) is not currently supported.
+    ///
     /// If you're using a project management tool such as uv, you should not generally need to
     /// specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment
     /// variable to point to your project's virtual environment. ty can also infer the location of
@@ -690,10 +702,7 @@ pub struct EnvironmentOptions {
     /// in the project root if none of the above apply. Failing that, ty will look for a `python3`
     /// or `python` binary available in `PATH`.
     ///
-    /// Passing a path to a Python executable is supported, but passing a path to a dynamic executable
-    /// (such as a shim) is not currently supported.
-    ///
-    /// This option can be used to point to virtual or system Python environments.
+    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
