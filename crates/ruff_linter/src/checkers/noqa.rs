@@ -142,7 +142,7 @@ pub(crate) fn check_noqa(
                 Directive::All(directive) => {
                     if matches.is_empty() {
                         let edit = delete_comment(directive.range(), locator);
-                        let mut diagnostic = context.report_custom_diagnostic(
+                        let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: None,
                                 kind: ruff::rules::UnusedNOQAKind::Noqa,
@@ -223,7 +223,7 @@ pub(crate) fn check_noqa(
                                 directive.range(),
                             )
                         };
-                        let mut diagnostic = context.report_custom_diagnostic(
+                        let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: Some(UnusedCodes {
                                     disabled: disabled_codes
