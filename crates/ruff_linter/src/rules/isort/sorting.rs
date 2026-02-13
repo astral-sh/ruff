@@ -39,11 +39,18 @@ fn member_type(name: &str, settings: &Settings) -> MemberType {
 }
 
 #[derive(Eq, PartialEq, Debug)]
-pub(crate) struct NatOrdStr<'a>(Cow<'a, str>);
+pub(crate) struct NatOrdStr<'a> {
+    inner: Cow<'a, str>,
+    lexicographical: bool,
+}
 
 impl Ord for NatOrdStr<'_> {
     fn cmp(&self, other: &Self) -> Ordering {
-        natord::compare(&self.0, &other.0)
+        if self.lexicographical || other.lexicographical {
+            self.inner.cmp(&other.inner)
+        } else {
+            natord::compare(&self.inner, &other.inner)
+        }
     }
 }
 
@@ -53,15 +60,12 @@ impl PartialOrd for NatOrdStr<'_> {
     }
 }
 
-impl<'a> From<&'a str> for NatOrdStr<'a> {
-    fn from(s: &'a str) -> Self {
-        NatOrdStr(Cow::Borrowed(s))
-    }
-}
-
-impl From<String> for NatOrdStr<'_> {
-    fn from(s: String) -> Self {
-        NatOrdStr(Cow::Owned(s))
+impl<'a> NatOrdStr<'a> {
+    fn new(inner: Cow<'a, str>, lexicographical: bool) -> Self {
+        Self {
+            inner,
+            lexicographical,
+        }
     }
 }
 
@@ -121,12 +125,17 @@ impl<'a> ModuleKey<'a> {
         };
 
         let maybe_lowercase_name = name.and_then(|name| {
-            (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)))
+            (!settings.case_sensitive).then_some(NatOrdStr::new(
+                maybe_lowercase(name),
+                settings.lexicographical,
+            ))
         });
 
-        let module_name = name.map(NatOrdStr::from);
+        let module_name =
+            name.map(|name| NatOrdStr::new(Cow::Borrowed(name), settings.lexicographical));
 
-        let asname = asname.map(NatOrdStr::from);
+        let asname =
+            asname.map(|name| NatOrdStr::new(Cow::Borrowed(name), settings.lexicographical));
 
         let first_alias =
             first_alias.map(|(name, asname)| MemberKey::from_member(name, asname, settings));
@@ -164,10 +173,13 @@ impl<'a> MemberKey<'a> {
         let maybe_length = settings
             .length_sort
             .then(|| name.chars().map(|c| c.width().unwrap_or(0)).sum());
-        let maybe_lowercase_name =
-            (!settings.case_sensitive).then_some(NatOrdStr(maybe_lowercase(name)));
-        let module_name = NatOrdStr::from(name);
-        let asname = asname.map(NatOrdStr::from);
+        let maybe_lowercase_name = (!settings.case_sensitive).then_some(NatOrdStr::new(
+            maybe_lowercase(name),
+            settings.lexicographical,
+        ));
+        let module_name = NatOrdStr::new(Cow::Borrowed(name), settings.lexicographical);
+        let asname =
+            asname.map(|name| NatOrdStr::new(Cow::Borrowed(name), settings.lexicographical));
 
         Self {
             not_star_import,
