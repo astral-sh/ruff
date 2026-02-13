@@ -112,6 +112,8 @@ pub(crate) struct Analysis {
     pub(crate) respect_type_ignore_comments: Option<bool>,
 
     pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
+
+    pub(crate) replace_imports_with_any: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]
