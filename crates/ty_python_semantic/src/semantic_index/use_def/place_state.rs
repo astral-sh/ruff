@@ -657,6 +657,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_FALSE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
 
         let mut sym4b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
@@ -665,6 +666,7 @@ mod tests {
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
             false,
             true,
+            PreviousDefinitions::AreShadowed,
         );
         let atom4 = reachability_constraints.add_atom(ScopedPredicateId::new(4));
         sym4b.record_narrowing_constraint(&mut reachability_constraints, atom4);
