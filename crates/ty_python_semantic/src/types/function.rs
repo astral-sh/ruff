@@ -1396,7 +1396,6 @@ fn is_instance_truthiness<'db>(
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
         | Type::BoundSuper(..)
-        | Type::PartialCallable(..)
         | Type::TypeIs(..)
         | Type::TypeGuard(..)
         | Type::Callable(..)

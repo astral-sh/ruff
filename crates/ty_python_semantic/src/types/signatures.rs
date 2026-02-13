@@ -19,7 +19,10 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, semantic_index};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
+use crate::types::generics::{
+    ApplySpecialization, GenericContext, InferableTypeVars, SpecializationBuilder,
+    walk_generic_context,
+};
 use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
@@ -1714,6 +1717,112 @@ impl<'db> Signature<'db> {
     /// Create a new signature with the given definition.
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         Self { definition, ..self }
+    }
+
+    /// Specialize a generic signature by inferring type variables from bound arguments.
+    ///
+    /// Returns the specialized signature (with all parameters intact) or a clone
+    /// if the signature is not generic.
+    pub(crate) fn specialize_from_bound_args(
+        &self,
+        db: &'db dyn Db,
+        bound_positional: &[Type<'db>],
+        bound_keywords: &[(&str, Type<'db>)],
+    ) -> Signature<'db> {
+        let Some(generic_context) = self.generic_context else {
+            return self.clone();
+        };
+
+        let inferable = generic_context.inferable_typevars(db);
+        let mut builder = SpecializationBuilder::new(db, inferable);
+        let params = self.parameters().as_slice();
+        let mut positional_consumed = 0usize;
+
+        // Infer type variable assignments from bound positional arguments.
+        for param in params {
+            if param.is_positional() && positional_consumed < bound_positional.len() {
+                let _ = builder.infer(
+                    param.annotated_type(),
+                    bound_positional[positional_consumed],
+                );
+                positional_consumed += 1;
+            }
+        }
+
+        // Infer type variable assignments from bound keyword arguments.
+        for param in params {
+            if let Some(name) = param.name() {
+                if let Some(&(_, arg_ty)) =
+                    bound_keywords.iter().find(|(kw, _)| *kw == name.as_str())
+                {
+                    let _ = builder.infer(param.annotated_type(), arg_ty);
+                }
+            }
+        }
+
+        // Promote literal types (e.g., `Literal[1]` to `int`) in inferred type
+        // variable assignments, since `partial()` creates a reusable callable.
+        let mut builder = builder.mapped(generic_context, |_, ty| {
+            ty.promote_literals(db, TypeContext::default())
+        });
+        let specialization = builder.build(generic_context);
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
+        self.apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
+    /// Remove bound parameters from an already-specialized signature, returning
+    /// the remaining signature.
+    ///
+    /// Positionally-bound parameters are removed. Keyword-bound parameters are
+    /// kept with a default value (since `partial` allows overriding keyword
+    /// arguments at call time).
+    pub(crate) fn remove_bound_params(
+        &self,
+        db: &'db dyn Db,
+        bound_positional: &[Type<'db>],
+        bound_keywords: &[(&str, Type<'db>)],
+    ) -> Signature<'db> {
+        let params = self.parameters().as_slice();
+        let return_ty = self.return_ty;
+        let bound_positional_count = bound_positional.len();
+
+        let mut remaining = Vec::new();
+        let mut positional_consumed = 0usize;
+
+        for param in params {
+            if param.is_variadic() || param.is_keyword_variadic() {
+                remaining.push(param.clone());
+            } else if param.is_positional() {
+                if positional_consumed < bound_positional_count {
+                    positional_consumed += 1;
+                } else if !param.is_positional_only()
+                    && let Some(name) = param.name()
+                    && let Some(&(_, bound_ty)) =
+                        bound_keywords.iter().find(|(k, _)| *k == name.as_str())
+                {
+                    remaining.push(param.clone().with_default_type(bound_ty));
+                } else {
+                    remaining.push(param.clone());
+                }
+            } else if param.is_keyword_only() {
+                if let Some(name) = param.name()
+                    && let Some(&(_, bound_ty)) =
+                        bound_keywords.iter().find(|(k, _)| *k == name.as_str())
+                {
+                    remaining.push(param.clone().with_default_type(bound_ty));
+                } else {
+                    remaining.push(param.clone());
+                }
+            }
+        }
+
+        Signature::new(Parameters::new(db, remaining), return_ty)
     }
 }
 

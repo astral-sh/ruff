@@ -592,9 +592,6 @@ impl<'db> BoundSuperType<'db> {
                 return delegate_to(enum_literal_type.enum_class_instance(db));
             }
             Type::BoundSuper(_) => return delegate_to(KnownClass::Super.to_instance(db)),
-            Type::PartialCallable(partial) => {
-                return delegate_to(Type::NominalInstance(partial.instance(db)));
-            }
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
                 // but here it seems like it's probably sound?

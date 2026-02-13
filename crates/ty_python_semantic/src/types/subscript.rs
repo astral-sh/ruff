@@ -639,7 +639,6 @@ impl<'db> Type<'db> {
                 | Type::PropertyInstance(_)
                 | Type::EnumLiteral(_)
                 | Type::BoundSuper(_)
-                | Type::PartialCallable(_)
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)

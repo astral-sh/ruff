@@ -208,10 +208,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundSuper(_), _) => Ordering::Less,
         (_, Type::BoundSuper(_)) => Ordering::Greater,
 
-        (Type::PartialCallable(left), Type::PartialCallable(right)) => left.cmp(right),
-        (Type::PartialCallable(_), _) => Ordering::Less,
-        (_, Type::PartialCallable(_)) => Ordering::Greater,
-
         (Type::SpecialForm(left), Type::SpecialForm(right)) => left.cmp(right),
         (Type::SpecialForm(_), _) => Ordering::Less,
         (_, Type::SpecialForm(_)) => Ordering::Greater,

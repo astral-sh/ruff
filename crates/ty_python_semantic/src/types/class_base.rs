@@ -176,7 +176,6 @@ impl<'db> ClassBase<'db> {
             | Type::ModuleLiteral(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
-            | Type::PartialCallable(_)
             | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -202,7 +201,8 @@ impl<'db> ClassBase<'db> {
                 // A class inheriting from a newtype would make intuitive sense, but newtype
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
-                | KnownInstanceType::NewType(_) => None,
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::FunctoolsPartial(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }

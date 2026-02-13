@@ -5,14 +5,13 @@ use crate::{
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
         IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
-        PartialCallableType, PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type,
-        TypeAliasType, TypeGuardType, TypeIsType, TypeVarInstance, TypedDictType, UnionType,
+        PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
+        TypeGuardType, TypeIsType, TypeVarInstance, TypedDictType, UnionType,
         bound_super::walk_bound_super_type,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
         newtype::{NewType, walk_newtype_instance_type},
-        partial_callable::walk_partial_callable_type,
         subclass_of::walk_subclass_of_type,
         walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
         walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
@@ -77,10 +76,6 @@ pub(crate) trait TypeVisitor<'db> {
         walk_bound_super_type(db, bound_super, self);
     }
 
-    fn visit_partial_callable_type(&self, db: &'db dyn Db, partial: PartialCallableType<'db>) {
-        walk_partial_callable_type(db, partial, self);
-    }
-
     fn visit_nominal_instance_type(&self, db: &'db dyn Db, nominal: NominalInstanceType<'db>) {
         walk_nominal_instance_type(db, nominal, self);
     }
@@ -130,7 +125,6 @@ pub(super) enum NonAtomicType<'db> {
     FunctionLiteral(FunctionType<'db>),
     BoundMethod(BoundMethodType<'db>),
     BoundSuper(BoundSuperType<'db>),
-    PartialCallable(PartialCallableType<'db>),
     MethodWrapper(KnownBoundMethodType<'db>),
     Callable(CallableType<'db>),
     GenericAlias(GenericAlias<'db>),
@@ -184,9 +178,6 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::BoundSuper(bound_super) => {
                 TypeKind::NonAtomic(NonAtomicType::BoundSuper(bound_super))
             }
-            Type::PartialCallable(partial) => {
-                TypeKind::NonAtomic(NonAtomicType::PartialCallable(partial))
-            }
             Type::KnownBoundMethod(method_wrapper) => {
                 TypeKind::NonAtomic(NonAtomicType::MethodWrapper(method_wrapper))
             }
@@ -238,9 +229,6 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::Union(union) => visitor.visit_union_type(db, union),
         NonAtomicType::BoundMethod(method) => visitor.visit_bound_method_type(db, method),
         NonAtomicType::BoundSuper(bound_super) => visitor.visit_bound_super_type(db, bound_super),
-        NonAtomicType::PartialCallable(partial) => {
-            visitor.visit_partial_callable_type(db, partial);
-        }
         NonAtomicType::MethodWrapper(method_wrapper) => {
             visitor.visit_method_wrapper_type(db, method_wrapper);
         }

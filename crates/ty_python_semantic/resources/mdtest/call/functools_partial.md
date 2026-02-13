@@ -618,6 +618,29 @@ def returns_partial() -> partial[bool]:
     return p  # OK -- partial[(b: str) -> bool] is assignable to partial[bool]
 ```
 
+## Assignability to protocol
+
+A `partial` result is assignable to a `Protocol` with a matching `__call__` signature. Extra
+keyword-only parameters with defaults in the `partial` are allowed, since they don't need to be
+provided by the caller:
+
+```py
+from functools import partial
+from typing import Protocol
+
+class Callback(Protocol):
+    def __call__(self, *, x: int) -> None: ...
+
+def f(*, x: int, y: str) -> None: ...
+
+p = partial(f, y="hello")
+reveal_type(p)  # revealed: partial[(*, x: int, y: str = "hello") -> None]
+
+def takes_callback(cb: Callback) -> None: ...
+
+takes_callback(p)  # OK — extra `y` with default is fine
+```
+
 ## Accessing `__call__` directly
 
 `__call__` on a `partial` result should reflect the refined callable signature, not the broad

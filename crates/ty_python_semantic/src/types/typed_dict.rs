@@ -844,7 +844,6 @@ fn extract_typed_dict_keys<'db>(
         | Type::BytesLiteral(_)
         | Type::TypeVar(_)
         | Type::BoundSuper(_)
-        | Type::PartialCallable(_)
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
         | Type::NewTypeInstance(_) => None,

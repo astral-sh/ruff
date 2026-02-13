@@ -2,44 +2,41 @@ use ruff_python_ast as ast;
 
 use super::TypeInferenceBuilder;
 use crate::Db;
+use crate::types::Type;
 use crate::types::diagnostic::{INVALID_ARGUMENT_TYPE, TOO_MANY_POSITIONAL_ARGUMENTS};
-use crate::types::generics::{ApplySpecialization, SpecializationBuilder};
 use crate::types::signatures::{Parameter, Signature};
-use crate::types::{
-    ApplyTypeMappingVisitor, CallableSignature, CallableType, CallableTypeKind, Parameters, Type,
-    TypeContext, TypeMapping,
-};
 
-/// `functools.partial` inference.
+/// `functools.partial` error checking.
 impl<'db> TypeInferenceBuilder<'db, '_> {
-    /// Try to infer a precise callable type for a `functools.partial(func, ...)` call.
-    ///
-    /// Returns `Some(callable_type)` if we can compute the remaining signature after
-    /// binding some arguments, or `None` to fall back to the default `partial[T]` type.
-    pub(super) fn infer_functools_partial_call(
-        &self,
-        arguments: &ast::Arguments,
-    ) -> Option<CallableType<'db>> {
+    /// Check that bound arguments to a `functools.partial(func, ...)` call are
+    /// compatible with the wrapped function's parameter types, and emit
+    /// diagnostics for mismatches.
+    pub(super) fn check_functools_partial_call(&self, arguments: &ast::Arguments) {
         let db = self.db();
 
         // We need at least one positional argument (the wrapped function).
-        let func_expr = arguments.args.first()?;
+        let Some(func_expr) = arguments.args.first() else {
+            return;
+        };
 
-        // If the first positional arg is starred (e.g. `partial(*args)`), we
-        // can't statically determine the wrapped function; fall back.
+        // If the first positional arg is starred, we can't determine the wrapped function.
         if func_expr.is_starred_expr() {
-            return None;
+            return;
         }
 
         let func_ty = self.expression_type(func_expr);
 
-        let callable = func_ty.try_upcast_to_callable(db)?.exactly_one()?;
+        let Some(callable) = func_ty.try_upcast_to_callable(db) else {
+            return;
+        };
+        let Some(callable) = callable.exactly_one() else {
+            return;
+        };
         let overloads = &callable.signatures(db).overloads;
 
         // Collect bound positional argument types, skipping the first argument.
         let mut bound_positional: Vec<Type<'db>> = Vec::new();
         for arg in &arguments.args[1..] {
-            // Starred arguments with fixed-length tuple types are unpacked inline.
             if let Some(starred) = arg.as_starred_expr() {
                 let iterable_ty = self.expression_type(&starred.value);
                 if let Type::NominalInstance(nominal) = iterable_ty
@@ -48,7 +45,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 {
                     bound_positional.extend(fixed.all_elements().iter().copied());
                 } else {
-                    return None;
+                    return;
                 }
             } else {
                 bound_positional.push(self.expression_type(arg));
@@ -62,13 +59,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 bound_keywords.push((id.as_str(), self.expression_type(&kw.value)));
             } else {
                 let splat_ty = self.expression_type(&kw.value);
-                // `**kwargs` splats with `TypedDict` types are unpacked inline.
                 if let Some(typed_dict) = splat_ty.as_typed_dict() {
                     for (name, field) in typed_dict.items(db) {
                         bound_keywords.push((name.as_str(), field.declared_ty));
                     }
                 } else {
-                    return None;
+                    return;
                 }
             }
         }
@@ -76,35 +72,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // Specialize each overload (inferring type variables from bound args).
         let specialized: Vec<_> = overloads
             .iter()
-            .map(|sig| {
-                specialize_signature_from_bound_args(db, sig, &bound_positional, &bound_keywords)
-            })
+            .map(|sig| sig.specialize_from_bound_args(db, &bound_positional, &bound_keywords))
             .collect();
 
-        // Type-check bound args against the wrapped function's parameter types.
-        // For overloaded functions, only report if no overload matches.
         self.check_partial_bound_args(arguments, &specialized, &bound_positional, &bound_keywords);
-
-        // Remove bound params from the specialized signatures.
-        let new_overloads: Vec<_> = specialized
-            .iter()
-            .map(|sig| remove_bound_params(db, sig, &bound_positional, &bound_keywords))
-            .collect();
-
-        let new_callable_sig = CallableSignature::from_overloads(new_overloads);
-        Some(CallableType::new(
-            db,
-            new_callable_sig,
-            CallableTypeKind::Regular,
-        ))
     }
 
-    /// Check that bound arguments to `partial()` are compatible with the wrapped
-    /// function's parameter types, and emit diagnostics for mismatches.
+    /// Check that bound arguments are compatible with the wrapped function's
+    /// parameter types, and emit diagnostics for mismatches.
     ///
     /// For overloaded functions, diagnostics are only emitted when no overload
-    /// accepts the bound arguments. `specialized` should contain already-specialized
-    /// signatures (one per overload).
+    /// accepts the bound arguments.
     fn check_partial_bound_args(
         &self,
         arguments: &ast::Arguments,
@@ -254,112 +232,4 @@ fn bound_args_match_params<'db>(
     }
 
     true
-}
-
-/// Specialize a generic signature by inferring type variables from bound arguments.
-///
-/// Returns the specialized signature (with all parameters intact) or a clone
-/// if the signature is not generic.
-fn specialize_signature_from_bound_args<'db>(
-    db: &'db dyn Db,
-    signature: &Signature<'db>,
-    bound_positional: &[Type<'db>],
-    bound_keywords: &[(&str, Type<'db>)],
-) -> Signature<'db> {
-    let Some(generic_context) = signature.generic_context else {
-        return signature.clone();
-    };
-
-    let inferable = generic_context.inferable_typevars(db);
-    let mut builder = SpecializationBuilder::new(db, inferable);
-    let params = signature.parameters().as_slice();
-    let mut positional_consumed = 0usize;
-
-    // Infer type variable assignments from bound positional arguments.
-    for param in params {
-        if param.is_positional() && positional_consumed < bound_positional.len() {
-            let _ = builder.infer(
-                param.annotated_type(),
-                bound_positional[positional_consumed],
-            );
-            positional_consumed += 1;
-        }
-    }
-
-    // Infer type variable assignments from bound keyword arguments.
-    for param in params {
-        if let Some(name) = param.name() {
-            if let Some(&(_, arg_ty)) = bound_keywords.iter().find(|(kw, _)| *kw == name.as_str()) {
-                let _ = builder.infer(param.annotated_type(), arg_ty);
-            }
-        }
-    }
-
-    // Promote literal types (e.g., `Literal[1]` to `int`) in inferred type
-    // variable assignments, since `partial()` creates a reusable callable.
-    let mut builder = builder.mapped(generic_context, |_, ty| {
-        ty.promote_literals(db, TypeContext::default())
-    });
-    let specialization = builder.build(generic_context);
-    let type_mapping =
-        TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
-    signature.apply_type_mapping_impl(
-        db,
-        &type_mapping,
-        TypeContext::default(),
-        &ApplyTypeMappingVisitor::default(),
-    )
-}
-
-/// Remove bound parameters from an already-specialized signature, returning
-/// the remaining signature.
-///
-/// Positionally-bound parameters are removed. Keyword-bound parameters are
-/// kept with a default value (since `partial` allows overriding keyword
-/// arguments at call time).
-fn remove_bound_params<'db>(
-    db: &'db dyn Db,
-    signature: &Signature<'db>,
-    bound_positional: &[Type<'db>],
-    bound_keywords: &[(&str, Type<'db>)],
-) -> Signature<'db> {
-    let params = signature.parameters().as_slice();
-    let return_ty = signature.return_ty;
-    let bound_positional_count = bound_positional.len();
-
-    let mut remaining = Vec::new();
-    let mut positional_consumed = 0usize;
-
-    for param in params {
-        if param.is_variadic() || param.is_keyword_variadic() {
-            remaining.push(param.clone());
-        } else if param.is_positional() {
-            if positional_consumed < bound_positional_count {
-                // Consumed by a bound positional argument (and thus cannot be overridden).
-                positional_consumed += 1;
-            } else if !param.is_positional_only()
-                && let Some(name) = param.name()
-                && let Some(&(_, bound_ty)) =
-                    bound_keywords.iter().find(|(k, _)| *k == name.as_str())
-            {
-                // Bound by keyword, but `partial` allows overriding keyword
-                // arguments at call time, so keep the parameter with a default.
-                remaining.push(param.clone().with_default_type(bound_ty));
-            } else {
-                remaining.push(param.clone());
-            }
-        } else if param.is_keyword_only() {
-            if let Some(name) = param.name()
-                && let Some(&(_, bound_ty)) =
-                    bound_keywords.iter().find(|(k, _)| *k == name.as_str())
-            {
-                // Bound by keyword, but can be overridden at call time.
-                remaining.push(param.clone().with_default_type(bound_ty));
-            } else {
-                remaining.push(param.clone());
-            }
-        }
-    }
-
-    Signature::new(Parameters::new(db, remaining), return_ty)
 }

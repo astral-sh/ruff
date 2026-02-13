@@ -245,7 +245,6 @@ impl ClassInfoConstraintFunction {
             | Type::BooleanLiteral(_)
             | Type::BoundMethod(_)
             | Type::BoundSuper(_)
-            | Type::PartialCallable(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_)
             | Type::Callable(_)
@@ -1888,7 +1887,6 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::BytesLiteral(_)
         | Type::TypeVar(_)
         | Type::BoundSuper(_)
-        | Type::PartialCallable(_)
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
         | Type::NewTypeInstance(_) => false,
@@ -1978,7 +1976,6 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         | Type::BytesLiteral(_)
         | Type::TypeVar(_)
         | Type::BoundSuper(_)
-        | Type::PartialCallable(_)
         | Type::TypeIs(_)
         | Type::TypeGuard(_)
         | Type::NewTypeInstance(_) => {
