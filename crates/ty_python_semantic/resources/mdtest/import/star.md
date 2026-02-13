@@ -1485,7 +1485,7 @@ _Z: bool = True
 
 `b.py`:
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 from a import *, _Y  # error: [invalid-syntax]
@@ -1509,6 +1509,6 @@ from a import *, _Y as fooo  # error: [invalid-syntax]
 from a import *, *, _Y  # error: [invalid-syntax]
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 [python language reference for import statements]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement
