@@ -121,8 +121,8 @@ use crate::types::subclass_of::SubclassOfInner;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{
-    TypedDictAssignmentKind, validate_typed_dict_constructor, validate_typed_dict_dict_literal,
-    validate_typed_dict_key_assignment,
+    TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
+    validate_typed_dict_dict_literal,
 };
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
@@ -5402,18 +5402,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 for key in keys {
-                    valid &= validate_typed_dict_key_assignment(
-                        &self.context,
+                    valid &= TypedDictKeyAssignment {
+                        context: &self.context,
                         typed_dict,
                         full_object_ty,
                         key,
-                        rhs_value_ty,
-                        target.value.as_ref(),
-                        target.slice.as_ref(),
-                        rhs_value_node,
-                        TypedDictAssignmentKind::Subscript,
+                        value_ty: rhs_value_ty,
+                        typed_dict_node: target.value.as_ref().into(),
+                        key_node: target.slice.as_ref().into(),
+                        value_node: rhs_value_node.into(),
+                        assignment_kind: TypedDictAssignmentKind::Subscript,
                         emit_diagnostic,
-                    );
+                    }
+                    .validate();
                 }
 
                 valid
@@ -5488,18 +5489,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(typed_dict) = object_ty.as_typed_dict() {
                                     if let Some(key) = slice_ty.as_string_literal() {
                                         let key = key.value(db);
-                                        validate_typed_dict_key_assignment(
-                                            &self.context,
+                                        TypedDictKeyAssignment {
+                                            context: &self.context,
                                             typed_dict,
                                             full_object_ty,
                                             key,
-                                            *rhs_value_ty,
-                                            target.value.as_ref(),
-                                            target.slice.as_ref(),
-                                            rhs_value_node,
-                                            TypedDictAssignmentKind::Subscript,
-                                            true,
-                                        );
+                                            value_ty: *rhs_value_ty,
+                                            typed_dict_node: target.value.as_ref().into(),
+                                            key_node: target.slice.as_ref().into(),
+                                            value_node: rhs_value_node.into(),
+                                            assignment_kind: TypedDictAssignmentKind::Subscript,
+                                            emit_diagnostic: true,
+                                        }
+                                        .validate();
                                     }
                                 } else {
                                     if emit_diagnostic
