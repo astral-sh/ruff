@@ -1,0 +1,14 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC304 Class docstring has an argument/parameter section
+ --> DOC304_google.py:7:5
+  |
+5 |     Docstring of the class
+6 |
+7 |     Args:
+  |     ^^^^
+8 |         a (int): Some integer.
+9 |         b (int): Another integer.
+  |
+help: Please put arguments/parameter section in the __init__() docstring
