@@ -3414,6 +3414,13 @@ impl<'a> ArgOrKeyword<'a> {
             ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
         }
     }
+
+    pub const fn as_variadic(self) -> Option<&'a Keyword> {
+        match self {
+            ArgOrKeyword::Keyword(keyword) if keyword.arg.is_none() => Some(keyword),
+            _ => None,
+        }
+    }
 }
 
 impl<'a> From<&'a Expr> for ArgOrKeyword<'a> {
