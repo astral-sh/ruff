@@ -1602,6 +1602,14 @@ pub enum KnownFunction {
     RevealMro,
     /// `struct.unpack`
     Unpack,
+
+    // Pydantic decorators that implicitly wrap the decorated function as a classmethod
+    /// `pydantic.field_validator`
+    FieldValidator,
+    /// `pydantic.model_validator`
+    ModelValidator,
+    /// `pydantic.field_serializer`
+    FieldSerializer,
 }
 
 impl KnownFunction {
@@ -1689,7 +1697,30 @@ impl KnownFunction {
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
             Self::NamedTuple => matches!(module, KnownModule::Collections),
+
+            Self::FieldValidator | Self::ModelValidator => {
+                matches!(
+                    module,
+                    KnownModule::Pydantic | KnownModule::PydanticFunctionalValidators
+                )
+            }
+            Self::FieldSerializer => {
+                matches!(
+                    module,
+                    KnownModule::Pydantic | KnownModule::PydanticFunctionalSerializers
+                )
+            }
         }
+    }
+
+    /// Returns `true` if this is a pydantic decorator that implicitly wraps the
+    /// decorated function as a classmethod (`@field_validator`, `@model_validator`,
+    /// `@field_serializer`).
+    pub(crate) const fn is_pydantic_implicit_classmethod_decorator(self) -> bool {
+        matches!(
+            self,
+            Self::FieldValidator | Self::ModelValidator | Self::FieldSerializer
+        )
     }
 
     /// Evaluate a call to this known function, and emit any diagnostics that are necessary
@@ -2297,7 +2328,17 @@ pub(crate) mod tests {
                 KnownFunction::NamedTuple => KnownModule::Collections,
                 KnownFunction::TotalOrdering => KnownModule::Functools,
                 KnownFunction::Unpack => KnownModule::Struct,
+
+                KnownFunction::FieldValidator | KnownFunction::ModelValidator => {
+                    KnownModule::Pydantic
+                }
+                KnownFunction::FieldSerializer => KnownModule::Pydantic,
             };
+
+            // Third-party modules are not available in the test DB
+            if module.is_third_party_module() {
+                continue;
+            }
 
             let function_definition = known_module_symbol(&db, module, function_name)
                 .place

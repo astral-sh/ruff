@@ -3536,6 +3536,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 is_classmethod |= known_class == KnownClass::Classmethod;
             }
+
+            // Pydantic decorators like `@field_validator("name")` are call expressions
+            // that implicitly wrap the decorated function as a classmethod.
+            if let ast::Expr::Call(call_expr) = &decorator.expression {
+                let callee_ty = inference.expression_type(&call_expr.func);
+                if let Some(known_function) =
+                    callee_ty.as_function_literal().and_then(|f| f.known(db))
+                {
+                    is_classmethod |= known_function.is_pydantic_implicit_classmethod_decorator();
+                }
+            }
         }
 
         let class_definition = self.index.expect_single_definition(class);

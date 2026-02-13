@@ -337,6 +337,19 @@ pub enum KnownModule {
     Numbers,
     #[strum(serialize = "struct", serialize = "_struct")]
     Struct,
+
+    // Third-party modules
+    #[strum(serialize = "pydantic")]
+    Pydantic,
+    #[strum(serialize = "pydantic.functional_validators")]
+    PydanticFunctionalValidators,
+    #[strum(serialize = "pydantic.functional_serializers")]
+    PydanticFunctionalSerializers,
+}
+
+enum KnownModuleSearchPathKind {
+    StandardLibrary,
+    ThirdParty,
 }
 
 impl KnownModule {
@@ -367,6 +380,9 @@ impl KnownModule {
             Self::Templatelib => "string.templatelib",
             Self::Numbers => "numbers",
             Self::Struct => "struct",
+            Self::Pydantic => "pydantic",
+            Self::PydanticFunctionalValidators => "pydantic.functional_validators",
+            Self::PydanticFunctionalSerializers => "pydantic.functional_serializers",
         }
     }
 
@@ -376,11 +392,28 @@ impl KnownModule {
     }
 
     fn try_from_search_path_and_name(search_path: &SearchPath, name: &ModuleName) -> Option<Self> {
-        if search_path.is_standard_library() {
-            Self::from_str(name.as_str()).ok()
-        } else {
-            None
+        let candidate = Self::from_str(name.as_str()).ok()?;
+        let matches = match candidate.expected_search_path_kind() {
+            KnownModuleSearchPathKind::StandardLibrary => search_path.is_standard_library(),
+            KnownModuleSearchPathKind::ThirdParty => search_path.is_third_party(),
+        };
+        matches.then_some(candidate)
+    }
+
+    const fn expected_search_path_kind(self) -> KnownModuleSearchPathKind {
+        match self {
+            Self::Pydantic
+            | Self::PydanticFunctionalValidators
+            | Self::PydanticFunctionalSerializers => KnownModuleSearchPathKind::ThirdParty,
+            _ => KnownModuleSearchPathKind::StandardLibrary,
         }
+    }
+
+    pub const fn is_third_party_module(self) -> bool {
+        matches!(
+            self.expected_search_path_kind(),
+            KnownModuleSearchPathKind::ThirdParty
+        )
     }
 
     pub const fn is_builtins(self) -> bool {
@@ -426,11 +459,19 @@ mod tests {
         for module in KnownModule::iter() {
             let module_name = module.name();
 
-            assert_eq!(
-                KnownModule::try_from_search_path_and_name(&stdlib_search_path, &module_name),
-                Some(module),
-                "The strum `EnumString` implementation appears to be incorrect for `{module_name}`"
-            );
+            if module.is_third_party_module() {
+                assert_eq!(
+                    KnownModule::try_from_search_path_and_name(&stdlib_search_path, &module_name),
+                    None,
+                    "Third-party module `{module_name}` should not be resolved from the stdlib search path"
+                );
+            } else {
+                assert_eq!(
+                    KnownModule::try_from_search_path_and_name(&stdlib_search_path, &module_name),
+                    Some(module),
+                    "The strum `EnumString` implementation appears to be incorrect for `{module_name}`"
+                );
+            }
         }
     }
 }
