@@ -359,7 +359,9 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
+    use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     /// A way to create a simple single-file (named `main.py`) cursor test.
     ///
@@ -427,6 +429,8 @@ mod tests {
         /// A list of source files, corresponding to the
         /// file's path and its contents.
         sources: Vec<Source>,
+        /// Extra search paths for library stubs (not first-party).
+        extra_search_paths: Vec<SystemPathBuf>,
     }
 
     impl CursorTestBuilder {
@@ -436,7 +440,41 @@ mod tests {
                 SystemPathBuf::from("/"),
             ));
 
-            db.init_program().unwrap();
+            // Write all files first so directories exist before search path setup.
+            for source in &self.sources {
+                db.write_file(&source.path, &source.contents)
+                    .expect("write to memory file system to be successful");
+            }
+
+            if self.extra_search_paths.is_empty() {
+                db.init_program().unwrap();
+            } else {
+                // Initialize program with extra search paths for library stubs.
+                let root = SystemPathBuf::from("/");
+                let mut settings = SearchPathSettings::new(vec![root]);
+                settings.extra_paths.clone_from(&self.extra_search_paths);
+
+                let search_paths = settings
+                    .to_search_paths(db.system(), db.vendored())
+                    .expect("Valid search path settings");
+
+                Program::from_settings(
+                    &db,
+                    ProgramSettings {
+                        python_version: PythonVersionWithSource::default(),
+                        python_platform: PythonPlatform::default(),
+                        search_paths,
+                    },
+                );
+
+                db.files()
+                    .try_add_root(&db, SystemPath::new("/"), FileRootKind::Project);
+
+                for extra_path in &self.extra_search_paths {
+                    db.files()
+                        .try_add_root(&db, extra_path, FileRootKind::LibrarySearchPath);
+                }
+            }
 
             let mut cursor: Option<Cursor> = None;
             for &Source {
@@ -445,8 +483,7 @@ mod tests {
                 cursor_offset,
             } in &self.sources
             {
-                db.write_file(path, contents)
-                    .expect("write to memory file system to be successful");
+                let _ = contents;
 
                 // Add a root for the top-most component.
                 let top = path.components().find_map(|c| match c {
@@ -536,6 +573,14 @@ mod tests {
                 contents: without_cursor_marker,
                 cursor_offset: Some(cursor_offset),
             });
+            self
+        }
+
+        pub(super) fn extra_search_path(
+            &mut self,
+            path: impl Into<SystemPathBuf>,
+        ) -> &mut CursorTestBuilder {
+            self.extra_search_paths.push(path.into());
             self
         }
     }

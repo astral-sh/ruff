@@ -5004,36 +5004,38 @@ def function():
     #[test]
     fn hover_blender_dynamic_property() {
         let test = CursorTest::builder()
+            .extra_search_path("/stubs")
             .source(
-                "bpy/__init__.pyi",
+                "stubs/bpy/__init__.pyi",
                 r#"
 from bpy import props as props
 from bpy import types as types
 "#,
             )
             .source(
-                "bpy/types/__init__.pyi",
+                "stubs/bpy/types/__init__.pyi",
                 r#"
 class Scene:
     pass
 "#,
             )
             .source(
-                "bpy/props/__init__.pyi",
+                "stubs/bpy/props/__init__.pyi",
                 r#"
 def StringProperty() -> str: ...
 "#,
             )
             .source(
-                "register_props.py",
+                "my_addon/__init__.py",
                 r#"
 import bpy
 
-bpy.types.Scene.my_string = bpy.props.StringProperty()
+def register():
+    bpy.types.Scene.my_string = bpy.props.StringProperty()
 "#,
             )
             .source(
-                "use_props.py",
+                "my_addon/use_props.py",
                 r#"
 import bpy
 
@@ -5060,7 +5062,7 @@ def use_scene(scene: bpy.types.Scene) -> None:
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> use_props.py:5:11
+         --> my_addon/use_props.py:5:11
           |
         4 | def use_scene(scene: bpy.types.Scene) -> None:
         5 |     scene.my_string
@@ -5075,33 +5077,44 @@ def use_scene(scene: bpy.types.Scene) -> None:
     #[test]
     fn hover_blender_dynamic_property_with_existing_class_members() {
         let test = CursorTest::builder()
+            .extra_search_path("/stubs")
             .source(
-                "bpy/__init__.pyi",
+                "stubs/bpy/__init__.pyi",
                 r#"
 from bpy import props as props
 from bpy import types as types
 "#,
             )
             .source(
-                "bpy/types/__init__.pyi",
+                "stubs/bpy/types/__init__.pyi",
                 r#"
 class Scene:
     existing_python_var: int
-    existing_prop: bpy.props.StringProperty()
 "#,
             )
             .source(
-                "bpy/props/__init__.pyi",
+                "stubs/bpy/props/__init__.pyi",
                 r#"
 def StringProperty() -> str: ...
 "#,
             )
             .source(
-                "register_props.py",
+                "register_helpers.py",
                 r#"
 import bpy
 
-bpy.types.Scene.my_string = bpy.props.StringProperty()
+def create_props():
+    bpy.types.Scene.my_string = bpy.props.StringProperty()
+"#,
+            )
+            .source(
+                "my_addon/__init__.py",
+                r#"
+import bpy
+from register_helpers import create_props
+
+def register():
+    create_props()
 "#,
             )
             .source(
