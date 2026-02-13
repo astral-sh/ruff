@@ -77,15 +77,7 @@ over all configuration files.</p>
 <p>ty uses your Python environment to resolve third-party imports in your code.</p>
 <p>This can be a path to:</p>
 <ul>
-<li>
-<p>A virtual environment directory, e.g. <code>.venv</code></p>
-</li>
-<li>
-<p>A Python interpreter, e.g. <code>.venv/bin/python3</code></p>
-</li>
-<li>
-<p>A system Python <a href="https://docs.python.org/3/library/sys.html#sys.prefix"><code>sys.prefix</code></a> directory, e.g. <code>/usr</code></p>
-</li>
+<li>A Python interpreter, e.g. <code>.venv/bin/python3</code> - A virtual environment directory, e.g. <code>.venv</code> - A system Python <a href="https://docs.python.org/3/library/sys.html#sys.prefix"><code>sys.prefix</code></a> directory, e.g. <code>/usr</code></li>
 </ul>
 <p>If you're using a project management tool such as uv or you have an activated Conda or virtual environment, you should not generally need to specify this option.</p>
 

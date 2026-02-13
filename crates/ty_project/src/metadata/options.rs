@@ -685,8 +685,8 @@ pub struct EnvironmentOptions {
     ///
     /// This can be a path to:
     ///
-    /// - A virtual environment directory, e.g. `.venv`
     /// - A Python interpreter, e.g. `.venv/bin/python3`
+    /// - A virtual environment directory, e.g. `.venv`
     /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
     ///
     /// If you're using a project management tool such as uv, you should not generally need to
