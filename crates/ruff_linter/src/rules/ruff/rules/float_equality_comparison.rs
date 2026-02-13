@@ -136,8 +136,8 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
             }
 
             if let (Some(left_), Some(right_)) = (
-                float_literal(left, semantic, checker.locator()),
-                float_literal(right, semantic, checker.locator()),
+                float_or_complex_literal(left, semantic, checker.locator()),
+                float_or_complex_literal(right, semantic, checker.locator()),
             ) {
                 if left_ == right_ {
                     return false;
@@ -240,23 +240,35 @@ fn should_skip_comparison(expr: &Expr, semantic: &SemanticModel) -> bool {
     }
 }
 
-fn float_literal(expr: &Expr, semantic: &SemanticModel, locator: &Locator) -> Option<String> {
+fn float_or_complex_literal(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    locator: &Locator,
+) -> Option<String> {
     match expr {
         Expr::NumberLiteral(_) => Some(locator.slice(expr.range()).to_owned()),
         Expr::Call(ast::ExprCall {
             func, arguments, ..
-        }) if arguments.args.len() == 1 && arguments.keywords.is_empty() => semantic
-            .match_builtin_expr(func, "float")
-            .then(|| match &arguments.args[0] {
-                Expr::NumberLiteral(_) => Some(locator.slice(arguments.args[0].range()).to_owned()),
-                Expr::StringLiteral(s) => s
-                    .value
-                    .to_str()
-                    .parse::<f64>()
-                    .ok()
-                    .map(|_| s.value.to_str().to_owned()),
-                _ => None,
-            })?,
+        }) if arguments.args.len() == 1 && arguments.keywords.is_empty() => {
+            if semantic.match_builtin_expr(func, "float") {
+                match &arguments.args[0] {
+                    Expr::NumberLiteral(_) => {
+                        Some(locator.slice(arguments.args[0].range()).to_owned())
+                    }
+                    Expr::StringLiteral(s) => s
+                        .value
+                        .to_str()
+                        .parse::<f64>()
+                        .ok()
+                        .map(|_| s.value.to_str().to_owned()),
+                    _ => None,
+                }
+            } else if semantic.match_builtin_expr(func, "complex") {
+                Some(locator.slice(expr.range()).to_owned())
+            } else {
+                None
+            }
+        }
         _ => None,
     }
 }
