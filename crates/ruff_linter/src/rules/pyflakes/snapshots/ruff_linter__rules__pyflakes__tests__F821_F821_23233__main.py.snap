@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F821 Undefined name `foo`
+ --> main.py:2:7
+  |
+1 | from .foo import Bar
+2 | print(foo.Bar)
+  |       ^^^
+  |
