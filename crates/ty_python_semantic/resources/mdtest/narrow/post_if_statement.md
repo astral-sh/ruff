@@ -180,8 +180,21 @@ def _(x: int | None):
 ```
 
 ```py
+from typing import Final
+
 def _(x: int | None):
     if 1 + 1 == 2:
+        if x is None:
+            return
+        reveal_type(x)  # revealed: int
+
+    reveal_type(x)  # revealed: int
+
+# non-constant but always-true condition
+needs_inference: Final = True
+
+def _(x: int | None):
+    if needs_inference:
         if x is None:
             return
         reveal_type(x)  # revealed: int
@@ -195,6 +208,13 @@ This also works when the always-true condition is nested inside a narrowing bran
 def _(x: int | None):
     if x is None:
         if 1 + 1 == 2:
+            return
+
+    reveal_type(x)  # revealed: int
+
+def _(x: int | None):
+    if x is None:
+        if needs_inference:
             return
 
     reveal_type(x)  # revealed: int
