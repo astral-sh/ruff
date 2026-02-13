@@ -61,16 +61,6 @@ RUF069 Unreliable floating point equality comparison `x == 3.0`
 22 | print(1.0 == x == 2)
    |
 
-RUF069 Unreliable floating point equality comparison `3.0 == 3.0`
-  --> RUF069.py:21:12
-   |
-19 |     return a == b - 0.1
-20 |
-21 | print(x == 3.0 == 3.0)
-   |            ^^^^^^^^^^
-22 | print(1.0 == x == 2)
-   |
-
 RUF069 Unreliable floating point equality comparison `1.0 == x`
   --> RUF069.py:22:7
    |
