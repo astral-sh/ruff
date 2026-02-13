@@ -139,7 +139,7 @@ use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
-use crate::blender_property::{as_blender_property, is_dynamic_blender_property_target_attr};
+use crate::blender_property::{as_blender_property, is_dynamic_blender_property_target_attr, is_in_register_scope, BLENDER_PROPERTY_OUTSIDE_REGISTER};
 
 mod annotation_expression;
 mod type_expression;
@@ -6009,7 +6009,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 });
 
                             // Attribute is declared or bound on instance. Forbid access from the class object
-                            // unless this is a dynamic Blender property assignment pattern
+                            // unless this is a dynamic Blender property assignment in register() scope
                             if emit_diagnostics
                                 && !is_dynamic_blender_property_target_attr(target)
                             {
@@ -6033,6 +6033,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             object_ty.display(db)
                                         ));
                                     }
+                                }
+                            }
+
+                            // Emit error for Blender property assignments outside register() scope
+                            if emit_diagnostics
+                                && is_dynamic_blender_property_target_attr(target)
+                                && !is_in_register_scope(db, self.file(), target.range())
+                            {
+                                if let Some(builder) =
+                                    self.context.report_lint(&BLENDER_PROPERTY_OUTSIDE_REGISTER, target)
+                                {
+                                    builder.into_diagnostic(
+                                        "Blender properties can only be registered from the `register()` function or functions it calls in the project root `__init__.py`"
+                                    );
                                 }
                             }
 
@@ -12783,7 +12797,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return fallback();
                     }
 
-                    // Suppress diagnostics for dynamic Blender property patterns on class objects
+                    // Suppress diagnostics for dynamic Blender property patterns on class objects.
+                    // When `bound_on_instance` is true, the property is registered via
+                    // lookup_blender_dynamic_property, so accessing it on the class (e.g.,
+                    // in register()/unregister()) should not produce unresolved-attribute errors.
                     if bound_on_instance
                         && is_dynamic_blender_property_target_attr(attribute)
                     {

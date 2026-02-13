@@ -148,6 +148,9 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TOTAL_ORDERING);
     registry.register_lint(&INVALID_LEGACY_POSITIONAL_PARAMETER);
 
+    // Blender properties
+    registry.register_lint(&crate::blender_property::BLENDER_PROPERTY_OUTSIDE_REGISTER);
+
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
     registry.register_lint(&ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION);
