@@ -48,14 +48,15 @@ impl<'db> EnumMetadata<'db> {
     /// Priority: explicit `_value_` annotation, then `__init__` → `Any`,
     /// then the inferred member value type.
     pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
-        let inferred = self.members.get(member_name).copied()?;
         if let Some(annotation) = self.value_annotation {
-            return Some(annotation);
+            // Check the member exists, but use the declared annotation type.
+            self.members.contains_key(member_name).then_some(annotation)
+        } else {
+            match self.value_sunder_type {
+                Type::Dynamic(DynamicType::Unknown) => self.members.get(member_name).copied(),
+                declared => self.members.contains_key(member_name).then_some(declared),
+            }
         }
-        Some(match self.value_sunder_type {
-            Type::Dynamic(DynamicType::Unknown) => inferred,
-            declared => declared,
-        })
     }
 
     pub(crate) fn resolve_member<'a>(&'a self, name: &'a Name) -> Option<&'a Name> {
