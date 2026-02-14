@@ -3151,14 +3151,14 @@ We give special diagnostics for this common case too:
 import foo
 
 # snapshot: possibly-missing-submodule
-reveal_type(foo.bar)  # revealed: Unknown
+reveal_type(foo.bar)  # revealed: <module 'foo.bar'> & Any
 ```
 
 ```snapshot
 warning[possibly-missing-submodule]: Submodule `bar` might not have been imported
  --> src/foo_importer.py:4:13
   |
-4 | reveal_type(foo.bar)  # revealed: Unknown
+4 | reveal_type(foo.bar)  # revealed: <module 'foo.bar'> & Any
   |             ^^^^^^^
   |
 help: Consider explicitly importing `foo.bar`
@@ -3170,14 +3170,14 @@ help: Consider explicitly importing `foo.bar`
 import baz
 
 # snapshot: possibly-missing-submodule
-reveal_type(baz.bar)  # revealed: Unknown
+reveal_type(baz.bar)  # revealed: <module 'baz.bar'> & Any
 ```
 
 ```snapshot
 warning[possibly-missing-submodule]: Submodule `bar` might not have been imported
  --> src/baz_importer.py:4:13
   |
-4 | reveal_type(baz.bar)  # revealed: Unknown
+4 | reveal_type(baz.bar)  # revealed: <module 'baz.bar'> & Any
   |             ^^^^^^^
   |
 help: Consider explicitly importing `baz.bar`
