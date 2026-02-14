@@ -3442,6 +3442,20 @@ impl<'a> LintContext<'a> {
         guard
     }
 
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred, if the
+    /// corresponding rule is enabled.
+    ///
+    /// Prefer [`LintContext::report_diagnostic_if_enabled`] unless you need to attach
+    /// sub-diagnostics before the fix title. See its documentation for more details.
+    pub(crate) fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        self.is_rule_enabled(T::rule())
+            .then(|| self.report_custom_diagnostic(kind, range))
+    }
+
     #[inline]
     pub(crate) const fn is_rule_enabled(&self, rule: Rule) -> bool {
         self.rules.enabled(rule)

@@ -46,6 +46,11 @@ impl InvalidRuleCodeKind {
 /// ```
 ///
 /// ## Options
+///
+/// This rule will flag rule codes that are unknown to Ruff, even if they are
+/// valid for other tools. You can tell Ruff to ignore such codes by configuring
+/// the list of known "external" rule codes with the following option:
+///
 /// - `lint.external`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.15.0")]
@@ -118,20 +123,22 @@ fn all_codes_invalid_diagnostic(
     invalid_codes: Vec<&Code<'_>>,
     context: &LintContext,
 ) {
-    context
-        .report_diagnostic(
-            InvalidRuleCode {
-                rule_code: invalid_codes
-                    .into_iter()
-                    .map(Code::as_str)
-                    .collect::<Vec<_>>()
-                    .join(", "),
-                kind: InvalidRuleCodeKind::Noqa,
-                whole_comment: true,
-            },
-            directive.range(),
-        )
-        .set_fix(Fix::safe_edit(Edit::range_deletion(directive.range())));
+    let mut diagnostic = context.report_custom_diagnostic(
+        InvalidRuleCode {
+            rule_code: invalid_codes
+                .into_iter()
+                .map(Code::as_str)
+                .collect::<Vec<_>>()
+                .join(", "),
+            kind: InvalidRuleCodeKind::Noqa,
+            whole_comment: true,
+        },
+        directive.range(),
+    );
+    diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(directive.range())));
+    diagnostic.help(
+        "If this is a non-Ruff rule code, consider using the `lint.external` configuration option",
+    );
 }
 
 fn some_codes_are_invalid_diagnostic(
@@ -140,20 +147,22 @@ fn some_codes_are_invalid_diagnostic(
     locator: &Locator,
     context: &LintContext,
 ) {
-    context
-        .report_diagnostic(
-            InvalidRuleCode {
-                rule_code: invalid_code.to_string(),
-                kind: InvalidRuleCodeKind::Noqa,
-                whole_comment: false,
-            },
-            invalid_code.range(),
-        )
-        .set_fix(Fix::safe_edit(remove_invalid_noqa(
-            codes,
-            invalid_code,
-            locator,
-        )));
+    let mut diagnostic = context.report_custom_diagnostic(
+        InvalidRuleCode {
+            rule_code: invalid_code.to_string(),
+            kind: InvalidRuleCodeKind::Noqa,
+            whole_comment: false,
+        },
+        invalid_code.range(),
+    );
+    diagnostic.set_fix(Fix::safe_edit(remove_invalid_noqa(
+        codes,
+        invalid_code,
+        locator,
+    )));
+    diagnostic.help(
+        "If this is a non-Ruff rule code, consider using the `lint.external` configuration option",
+    );
 }
 
 fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) -> Edit {
