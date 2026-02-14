@@ -342,7 +342,6 @@ impl Bindings {
                         == ScopedNarrowingConstraint::ALWAYS_TRUE
                         && b.narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
                     {
-                        // short-circuit: if both sides are ALWAYS_TRUE, the result is ALWAYS_TRUE without needing to create a new TDD node.
                         ScopedNarrowingConstraint::ALWAYS_TRUE
                     } else {
                         // A branch contributes narrowing only when it is reachable.

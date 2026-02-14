@@ -883,13 +883,11 @@ impl ReachabilityConstraints {
                     node: predicate.node,
                     is_positive: !predicate.is_positive,
                 };
+                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
 
                 // If this predicate does not narrow the current place and we can statically
                 // determine its truthiness, follow only the reachable branch.
-                if pos_constraint.is_none()
-                // Defer inference for `neg_predicate` whenever possible.
-                && infer_narrowing_constraint(db, neg_predicate, place).is_none()
-                {
+                if pos_constraint.is_none() && neg_constraint.is_none() {
                     match Self::analyze_single_cached(db, predicate, truthiness_memo) {
                         Truthiness::AlwaysTrue => {
                             return self.narrow_by_constraint_inner(
@@ -921,7 +919,6 @@ impl ReachabilityConstraints {
 
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
-                    let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
                     let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
@@ -965,7 +962,6 @@ impl ReachabilityConstraints {
                 );
 
                 // False branch: predicate doesn't hold → accumulate negative narrowing
-                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
                 let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                 let false_ty = self.narrow_by_constraint_inner(
                     db,
