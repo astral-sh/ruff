@@ -145,6 +145,7 @@ use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{AnalysisSettings, Db, FxIndexSet, FxOrderSet, Program};
 
 mod annotation_expression;
+mod functools_partial;
 mod type_expression;
 
 /// Whether the intersection type is on the left or right side of the comparison.
@@ -6058,7 +6059,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 false
             }
-
             Type::Dynamic(..) | Type::Never => {
                 infer_value_ty(self, TypeContext::default());
                 true
@@ -7641,7 +7641,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer a call to `builtins.type()`.
     ///
-    /// `builtins.type` has two overloads: a single-argument overload (e.g. `type("foo")`,
+    /// `builtins.type` has two overloads: a single-argument overload (e.g. `type("foo")`),
     /// and a 3-argument `type(name, bases, dict)` overload. Both are handled here.
     /// The `definition` parameter should be `Some()` if this call to `builtins.type()`
     /// occurs on the right-hand side of an assignment statement that has a [`Definition`]
@@ -12523,6 +12523,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 overload,
                                 call_expression,
                             );
+                        }
+                        if class.is_known(self.db(), KnownClass::FunctoolsPartial) {
+                            self.check_functools_partial_call(arguments);
                         }
                     }
                     _ => {}

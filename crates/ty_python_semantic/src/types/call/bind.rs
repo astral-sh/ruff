@@ -1588,6 +1588,98 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownClass::FunctoolsPartial) => {
+                            // partial.__new__(cls, func, /, *args, **kwargs)
+                            // After bind_self strips cls: 0=func, 1=*args, 2=**kwargs
+                            let func_ty = match overload.parameter_types() {
+                                [Some(func_ty), ..] => *func_ty,
+                                _ => continue,
+                            };
+
+                            let Some(callable) = func_ty.try_upcast_to_callable(db) else {
+                                continue;
+                            };
+                            let Some(callable) = callable.exactly_one() else {
+                                continue;
+                            };
+                            let overloads = &callable.signatures(db).overloads;
+
+                            // Collect bound positional args from the *args parameter (index 1).
+                            // Variadic arguments (starred) with fixed-length tuple types are
+                            // unpacked; variable-length tuples cause a bail-out.
+                            let mut bound_positional: Vec<Type<'db>> = Vec::new();
+                            let mut bail = false;
+                            for (arg, ty) in overload.arguments_for_parameter(argument_types, 1) {
+                                match arg {
+                                    Argument::Variadic => {
+                                        if let Type::NominalInstance(nominal) = ty
+                                            && let Some(tuple_spec) = nominal.tuple_spec(db)
+                                            && let Some(fixed) = tuple_spec.as_fixed_length()
+                                        {
+                                            bound_positional
+                                                .extend(fixed.all_elements().iter().copied());
+                                        } else {
+                                            bail = true;
+                                            break;
+                                        }
+                                    }
+                                    _ => bound_positional.push(ty),
+                                }
+                            }
+                            if bail {
+                                continue;
+                            }
+
+                            // Collect bound keyword args from the **kwargs parameter (index 2).
+                            // Keywords splats with TypedDict types are unpacked; other splats
+                            // cause a bail-out.
+                            let mut bound_keywords: Vec<(&str, Type<'db>)> = Vec::new();
+                            for (arg, ty) in overload.arguments_for_parameter(argument_types, 2) {
+                                match arg {
+                                    Argument::Keyword(name) => {
+                                        bound_keywords.push((name, ty));
+                                    }
+                                    Argument::Keywords => {
+                                        if let Some(typed_dict) = ty.as_typed_dict() {
+                                            for (name, field) in typed_dict.items(db) {
+                                                bound_keywords
+                                                    .push((name.as_str(), field.declared_ty));
+                                            }
+                                        } else {
+                                            bail = true;
+                                            break;
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                            if bail {
+                                continue;
+                            }
+
+                            // Specialize each overload (inferring type variables from bound args)
+                            // and remove bound params from the specialized signatures.
+                            let new_overloads: Vec<_> =
+                                overloads
+                                    .iter()
+                                    .map(|sig| {
+                                        sig.specialize_from_bound_args(
+                                            db,
+                                            &bound_positional,
+                                            &bound_keywords,
+                                        )
+                                        .remove_bound_params(db, &bound_positional, &bound_keywords)
+                                    })
+                                    .collect();
+
+                            let new_callable_sig = CallableSignature::from_overloads(new_overloads);
+                            let callable =
+                                CallableType::new(db, new_callable_sig, CallableTypeKind::Regular);
+                            overload.set_return_type(Type::KnownInstance(
+                                KnownInstanceType::FunctoolsPartial(callable),
+                            ));
+                        }
+
                         Some(KnownClass::Tuple) if overload_index == 1 => {
                             // `tuple(range(42))` => `tuple[int, ...]`
                             // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
