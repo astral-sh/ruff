@@ -27,7 +27,7 @@ use crate::types::relation::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, SelfBinding, TypeContext, TypeMapping, VarianceInferable,
+    ParamSpecAttrKind, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
     infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -504,17 +504,133 @@ impl<'db> CallableSignature<'db> {
             }
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
-            (_, [_]) => self_signatures.iter().when_any(db, |self_signature| {
-                Self::has_relation_to_inner(
-                    db,
-                    std::slice::from_ref(self_signature),
-                    other_signatures,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+            (_, [other_signature]) => {
+                if relation.is_assignability() || relation.is_constraint_set_assignability() {
+                    // Fast path for unary callable assignability: compare overload sets by
+                    // aggregating overlapping parameter domains and return types. If either side
+                    // is outside this shape, fall back to the per-overload relation logic below.
+                    let single_required_positional = |signature: &Signature<'db>| {
+                        if signature.parameters().len() != 1 {
+                            return None;
+                        }
+                        let parameter = signature.parameters().get(0)?;
+
+                        match parameter.kind() {
+                            ParameterKind::PositionalOnly {
+                                default_type: None, ..
+                            }
+                            | ParameterKind::PositionalOrKeyword {
+                                default_type: None, ..
+                            } => Some(parameter.annotated_type()),
+                            _ => None,
+                        }
+                    };
+
+                    if let Some(other_parameter_type) = single_required_positional(other_signature)
+                    {
+                        let other_has_typevar = other_parameter_type
+                            .has_typevar_or_typevar_instance(db)
+                            || other_signature
+                                .return_ty
+                                .has_typevar_or_typevar_instance(db);
+
+                        let mut unary_signatures =
+                            SmallVec::<[(Type<'db>, Type<'db>); 1]>::with_capacity(
+                                self_signatures.len(),
+                            );
+
+                        for self_signature in self_signatures {
+                            let Some(self_parameter_type) =
+                                single_required_positional(self_signature)
+                            else {
+                                unary_signatures.clear();
+                                break;
+                            };
+                            unary_signatures.push((self_parameter_type, self_signature.return_ty));
+                        }
+
+                        if unary_signatures.len() == self_signatures.len() {
+                            let mut parameter_type_union = UnionBuilder::new(db);
+                            let mut return_type_union = UnionBuilder::new(db);
+                            let mut has_overlapping_domain = false;
+
+                            for &(self_parameter_type, self_return_type) in &unary_signatures {
+                                let signatures_are_disjoint = self_parameter_type
+                                    .is_disjoint_from_impl(
+                                        db,
+                                        other_parameter_type,
+                                        inferable,
+                                        disjointness_visitor,
+                                        relation_visitor,
+                                    )
+                                    .is_always_satisfied(db);
+
+                                if signatures_are_disjoint {
+                                    continue;
+                                }
+
+                                has_overlapping_domain = true;
+                                parameter_type_union =
+                                    parameter_type_union.add(self_parameter_type);
+                                return_type_union = return_type_union.add(self_return_type);
+                            }
+
+                            if has_overlapping_domain {
+                                let aggregate_has_typevar = other_has_typevar
+                                    || unary_signatures.iter().any(
+                                        |(self_parameter_type, self_return_type)| {
+                                            self_parameter_type.has_typevar_or_typevar_instance(db)
+                                                || self_return_type
+                                                    .has_typevar_or_typevar_instance(db)
+                                        },
+                                    );
+                                // For aggregated unary overload checks involving typevars, plain
+                                // assignability can recurse through deferred inference cycles.
+                                // Use constraint-set assignability for this aggregate relation to
+                                // preserve the aggregate semantics without reintroducing that loop.
+                                let aggregate_relation =
+                                    if relation.is_assignability() && aggregate_has_typevar {
+                                        TypeRelation::ConstraintSetAssignability
+                                    } else {
+                                        relation
+                                    };
+                                // Function assignability here is parameter-contravariant and return-covariant.
+                                let parameters_cover_target = other_parameter_type
+                                    .has_relation_to_impl(
+                                        db,
+                                        parameter_type_union.build(),
+                                        inferable,
+                                        aggregate_relation,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    );
+                                let returns_match_target =
+                                    return_type_union.build().has_relation_to_impl(
+                                        db,
+                                        other_signature.return_ty,
+                                        inferable,
+                                        aggregate_relation,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    );
+                                return parameters_cover_target.and(db, || returns_match_target);
+                            }
+                        }
+                    }
+                }
+
+                self_signatures.iter().when_any(db, |self_signature| {
+                    Self::has_relation_to_inner(
+                        db,
+                        std::slice::from_ref(self_signature),
+                        other_signatures,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+            }
 
             // `self` is definitely not overloaded while `other` is possibly overloaded.
             ([_], _) => other_signatures.iter().when_all(db, |other_signature| {

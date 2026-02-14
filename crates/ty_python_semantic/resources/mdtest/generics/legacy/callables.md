@@ -245,3 +245,97 @@ reveal_type(generic_context(outside_callable(int_identity)))
 # error: [invalid-argument-type]
 outside_callable(int_identity)("string")
 ```
+
+## Overloaded callable assignability
+
+An overloaded callable should be assignable to a non-overloaded callable type when the overload set
+as a whole is compatible with the target callable.
+
+```py
+from typing import Callable, overload
+
+@overload
+def foo(x: int) -> str: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> str:
+    return str(x)
+
+def expects(c: Callable[[int | str], str]) -> None:
+    pass
+
+expects(foo)
+```
+
+```py
+from typing import overload
+
+@overload
+def foo(x: int) -> str: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> str:
+    return str(x)
+
+def errors() -> None:
+    for x in map(foo, range(1, 10)):
+        print(x)
+```
+
+```py
+from typing import Callable, overload
+
+@overload
+def converter(x: int) -> str: ...
+@overload
+def converter(x: bytes) -> bytes: ...
+def converter(x: int | bytes) -> str | bytes:
+    if isinstance(x, int):
+        return str(x)
+    return x
+
+def expects_int_str(c: Callable[[int], str]) -> None:
+    pass
+
+expects_int_str(converter)
+```
+
+```py
+from typing import Callable, overload
+
+@overload
+def converter(x: int) -> str: ...
+@overload
+def converter(x: str) -> str: ...
+def converter(x: int | str) -> str:
+    return str(x)
+
+def expects_int_str(c: Callable[[int], str]) -> None:
+    pass
+
+expects_int_str(converter)
+```
+
+## Overloaded callable as generic `Callable` argument
+
+The type variable should be inferred from the first matching overload, rather than unioning
+parameter types across all overloads (which would create an unsatisfiable expected type for
+contravariant type variables).
+
+```py
+from typing import Callable, TypeVar, overload
+
+T = TypeVar("T")
+
+def accepts_callable(converter: Callable[[T], None]) -> None:
+    raise NotImplementedError
+
+@overload
+def f(val: str) -> None: ...
+@overload
+def f(val: bytes) -> None: ...
+def f(val: str | bytes) -> None:
+    pass
+
+accepts_callable(f)  # fine
+```
