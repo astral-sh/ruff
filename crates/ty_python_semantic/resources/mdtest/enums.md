@@ -116,8 +116,25 @@ class Color(Enum):
     YELLOW = None  # error: [invalid-assignment]
 ```
 
-If `__init__` is defined, any explicit `_value_` annotation is ignored and the deferred `_value_`
-type comes from the initializer signature.
+When `_value_` is annotated, `.value` and `._value_` are inferred as the declared type:
+
+```py
+from enum import Enum
+
+class Color2(Enum):
+    _value_: int
+    RED = 1
+    GREEN = 2
+
+reveal_type(Color2.RED.value)  # revealed: int
+reveal_type(Color2.RED._value_)  # revealed: int
+```
+
+### `_value_` annotation with `__init__`
+
+When `__init__` is defined, member values are passed through `__init__` rather than directly
+assigned to `_value_`, so we fall back to `Any` for member value validation. The `_value_`
+annotation still constrains assignments to `self._value_` inside `__init__`:
 
 ```py
 from enum import Enum
@@ -129,7 +146,30 @@ class Planet(Enum):
         self._value_ = value  # error: [invalid-assignment]
 
     MERCURY = (1, 3.303e23, 2.4397e6)
-    SATURN = "saturn"  # error: [invalid-assignment]
+    SATURN = "saturn"
+
+reveal_type(Planet.MERCURY.value)  # revealed: str
+reveal_type(Planet.MERCURY._value_)  # revealed: str
+```
+
+### `__init__` without `_value_` annotation
+
+When `__init__` is defined but no explicit `_value_` annotation exists, we also fall back to `Any`
+for member value validation:
+
+```py
+from enum import Enum
+
+class Planet2(Enum):
+    def __init__(self, mass: float, radius: float):
+        self.mass = mass
+        self.radius = radius
+
+    MERCURY = (3.303e23, 2.4397e6)
+    VENUS = (4.869e24, 6.0518e6)
+
+reveal_type(Planet2.MERCURY.value)  # revealed: Any
+reveal_type(Planet2.MERCURY._value_)  # revealed: Any
 ```
 
 ### Non-member attributes with disallowed type
