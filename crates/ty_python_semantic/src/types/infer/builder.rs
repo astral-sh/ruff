@@ -7281,15 +7281,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let known_class = func_ty
             .as_class_literal()
             .and_then(|cls| cls.known(self.db()));
-        if known_class == Some(KnownClass::NewType) {
-            self.infer_newtype_assignment_deferred(arguments);
-            return;
-        }
-        if let Some(KnownClass::Type) = known_class
-            && let InferenceRegion::Deferred(definition) = self.region
-        {
-            self.infer_builtins_type_deferred(definition, value);
-            return;
+        match (known_class, self.region) {
+            (Some(KnownClass::NewType), _) => {
+                self.infer_newtype_assignment_deferred(arguments);
+                return;
+            }
+            (Some(KnownClass::Type), InferenceRegion::Deferred(definition)) => {
+                self.infer_builtins_type_deferred(definition, value);
+                return;
+            }
+            _ => {}
         }
         let mut constraint_tys = Vec::new();
         for arg in arguments.args.iter().skip(1) {
