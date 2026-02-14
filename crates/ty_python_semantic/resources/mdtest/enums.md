@@ -116,8 +116,8 @@ class Color(Enum):
     YELLOW = None  # error: [invalid-assignment]
 ```
 
-An explicit `_value_` annotation always takes priority, even if `__init__` is defined. If `__init__`
-is defined but no `_value_` annotation exists, we fall back to `Any`:
+If `__init__` is defined, any explicit `_value_` annotation is ignored and the deferred `_value_`
+type comes from the initializer signature.
 
 ```py
 from enum import Enum
@@ -128,8 +128,8 @@ class Planet(Enum):
     def __init__(self, value: int, mass: float, radius: float):
         self._value_ = value  # error: [invalid-assignment]
 
-    MERCURY = (1, 3.303e23, 2.4397e6)  # error: [invalid-assignment]
-    SATURN = "saturn"
+    MERCURY = (1, 3.303e23, 2.4397e6)
+    SATURN = "saturn"  # error: [invalid-assignment]
 ```
 
 ### Non-member attributes with disallowed type
