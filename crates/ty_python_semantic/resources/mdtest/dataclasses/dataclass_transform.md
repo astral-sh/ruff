@@ -894,6 +894,46 @@ class Person:
 reveal_type(Person.__init__)  # revealed: (self: Person, name: str, *, age: int | None) -> None
 ```
 
+### Converter field specifier with overloaded callables
+
+```py
+from typing import Callable, TypeVar, overload
+from typing_extensions import dataclass_transform
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+def model_field(*, converter: Callable[[S], T], default: S | None = None) -> T:
+    raise NotImplementedError
+
+@dataclass_transform(field_specifiers=(model_field,))
+class ModelBase: ...
+
+@overload
+def overloaded_converter(s: str) -> int: ...
+@overload
+def overloaded_converter(s: list[str]) -> int: ...
+def overloaded_converter(s: str | list[str], *args: str) -> int | str:
+    return 0
+
+class ConverterClass:
+    @overload
+    def __init__(self, val: str) -> None: ...
+    @overload
+    def __init__(self, val: bytes) -> None: ...
+    def __init__(self, val: str | bytes) -> None:
+        pass
+
+class Model(ModelBase):
+    field3: ConverterClass = model_field(converter=ConverterClass)
+    field4: int = model_field(converter=overloaded_converter)
+    # TODO: This should be accepted once overloaded class callables with richer signatures are
+    # modeled in callable assignability.
+    # error: [invalid-assignment]
+    # error: [invalid-argument-type]
+    field5: dict[str, str] = model_field(converter=dict, default=())
+```
+
 ### Nested dataclass-transformers
 
 Make sure that models are only affected by the field specifiers of their own transformer:
