@@ -8701,11 +8701,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Get AST nodes for base expressions (for diagnostics).
         let bases_tuple_elts = bases_node.as_tuple_expr().map(|t| t.elts.as_slice());
 
-        // We use a placeholder class literal for `try_from_type` (the subclass parameter is only
-        // used for Protocol/TypedDict detection which doesn't apply here).
-        let placeholder_class: ClassLiteral<'db> =
-            KnownClass::Object.try_to_class_literal(db).unwrap().into();
-
         let mut disjoint_bases = IncompatibleBases::default();
 
         // Check each base for special cases that are not allowed for dynamic classes.
@@ -8715,13 +8710,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or(bases_node);
 
             // Try to convert to ClassBase to check for special cases.
-            let Some(class_base) = ClassBase::try_from_type(db, *base, placeholder_class) else {
+            let Some(class_base) = ClassBase::try_from_type(db, *base, None) else {
                 // Can't convert; will be handled by `InvalidBases` error from `try_mro`.
                 continue;
             };
 
             // Check for special bases that are not allowed for dynamic classes.
             // Dynamic classes can't be generic, protocols, TypedDicts, or enums.
+            // (`NamedTuple` is rejected earlier: `try_from_type` returns `None`
+            // without a concrete subclass, so it's reported as an `InvalidBases` MRO error.)
             match class_base {
                 ClassBase::Generic | ClassBase::TypedDict => {
                     if let Some(builder) = self.context.report_lint(&INVALID_BASE, diagnostic_node)

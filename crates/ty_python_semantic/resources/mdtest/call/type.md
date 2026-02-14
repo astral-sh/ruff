@@ -1010,7 +1010,7 @@ Dynamic classes cannot directly inherit from `Generic`, `Protocol`, or `TypedDic
 forms require class syntax for their semantics to be properly applied:
 
 ```py
-from typing import Generic, Protocol, TypeVar
+from typing import Generic, NamedTuple, Protocol, TypeVar
 from typing_extensions import TypedDict
 
 T = TypeVar("T")
@@ -1023,6 +1023,19 @@ ProtocolClass = type("ProtocolClass", (Protocol,), {})
 
 # error: [invalid-base] "Invalid base for class created via `type()`"
 TypedDictClass = type("TypedDictClass", (TypedDict,), {})
+
+# error: [invalid-base] "Invalid class base with type `<special-form 'typing.NamedTuple'>`"
+NamedTupleClass = type("NamedTupleClass", (NamedTuple,), {"x": int})
+```
+
+`NamedTuple` is also not allowed as a base for dynamic classes, since creating a NamedTuple requires
+class syntax for the field declarations to be properly processed:
+
+```py
+from typing import NamedTuple
+
+# error: [invalid-base] "Invalid class base with type `<special-form 'typing.NamedTuple'>`"
+NT = type("NT", (NamedTuple,), {})
 ```
 
 ### Protocol bases

@@ -8,7 +8,7 @@ use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{
-    ClassLiteral, ClassType, DynamicClassLiteral, KnownClass, KnownInstanceType, SpecialFormType,
+    ClassLiteral, ClassType, DynamicClassLiteral, KnownInstanceType, SpecialFormType,
     StaticClassLiteral, Type,
 };
 
@@ -141,25 +141,29 @@ impl<'db> Mro<'db> {
                             )
                     ) =>
             {
-                ClassBase::try_from_type(db, *single_base, ClassLiteral::Static(class_literal))
-                    .map_or_else(
-                        || {
-                            Err(StaticMroErrorKind::InvalidBases(Box::from([(
-                                0,
-                                *single_base,
-                            )])))
-                        },
-                        |single_base| {
-                            if single_base.has_cyclic_mro(db) {
-                                Err(StaticMroErrorKind::InheritanceCycle)
-                            } else {
-                                Ok(std::iter::once(ClassBase::Class(class))
-                                    .chain(single_base.mro(db, specialization))
-                                    .collect())
-                            }
-                        },
-                    )
-                    .map_err(|err| err.into_mro_error(db, class))
+                ClassBase::try_from_type(
+                    db,
+                    *single_base,
+                    Some(ClassLiteral::Static(class_literal)),
+                )
+                .map_or_else(
+                    || {
+                        Err(StaticMroErrorKind::InvalidBases(Box::from([(
+                            0,
+                            *single_base,
+                        )])))
+                    },
+                    |single_base| {
+                        if single_base.has_cyclic_mro(db) {
+                            Err(StaticMroErrorKind::InheritanceCycle)
+                        } else {
+                            Ok(std::iter::once(ClassBase::Class(class))
+                                .chain(single_base.mro(db, specialization))
+                                .collect())
+                        }
+                    },
+                )
+                .map_err(|err| err.into_mro_error(db, class))
             }
 
             // The class has multiple explicit bases.
@@ -186,7 +190,7 @@ impl<'db> Mro<'db> {
                         match ClassBase::try_from_type(
                             db,
                             *base,
-                            ClassLiteral::Static(class_literal),
+                            Some(ClassLiteral::Static(class_literal)),
                         ) {
                             Some(valid_base) => resolved_bases.push(valid_base),
                             None => invalid_bases.push((i, *base)),
@@ -261,7 +265,7 @@ impl<'db> Mro<'db> {
                         let Some(base) = ClassBase::try_from_type(
                             db,
                             *base,
-                            ClassLiteral::Static(class_literal),
+                            Some(ClassLiteral::Static(class_literal)),
                         ) else {
                             continue;
                         };
@@ -336,17 +340,12 @@ impl<'db> Mro<'db> {
     ) -> Result<Self, DynamicMroError<'db>> {
         let original_bases = dynamic.explicit_bases(db);
 
-        // Use a placeholder class literal for try_from_type (the subclass parameter is only
-        // used for NamedTuple subclasses, which doesn't apply here).
-        let placeholder_class: ClassLiteral<'db> =
-            KnownClass::Object.try_to_class_literal(db).unwrap().into();
-
         // Convert Types to ClassBases, tracking any that fail conversion.
         let mut resolved_bases = Vec::with_capacity(original_bases.len());
         let mut invalid_bases = Vec::new();
 
         for (i, base_type) in original_bases.iter().enumerate() {
-            match ClassBase::try_from_type(db, *base_type, placeholder_class) {
+            match ClassBase::try_from_type(db, *base_type, None) {
                 Some(class_base) => resolved_bases.push(class_base),
                 None => invalid_bases.push((i, *base_type)),
             }
@@ -429,14 +428,10 @@ impl<'db> Mro<'db> {
         let mut seen = FxHashSet::default();
         seen.insert(self_base);
 
-        // Use a placeholder class literal for `try_from_type`.
-        let placeholder_class: ClassLiteral<'db> =
-            KnownClass::Object.try_to_class_literal(db).unwrap().into();
-
         for base_type in dynamic.explicit_bases(db) {
             // Convert `Type` to `ClassBase`, falling back to `Unknown` if conversion fails.
-            let base = ClassBase::try_from_type(db, *base_type, placeholder_class)
-                .unwrap_or_else(ClassBase::unknown);
+            let base =
+                ClassBase::try_from_type(db, *base_type, None).unwrap_or_else(ClassBase::unknown);
 
             for item in base.mro(db, None) {
                 if seen.insert(item) {
