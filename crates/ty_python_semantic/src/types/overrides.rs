@@ -186,7 +186,10 @@ fn check_class_declaration<'db>(
     // Check for invalid Enum member values.
     if let Some(enum_info) = enum_info {
         if member.name != "_value_"
-            && let DefinitionKind::Assignment(_) = first_reachable_definition.kind(db)
+            && matches!(
+                first_reachable_definition.kind(db),
+                DefinitionKind::Assignment(_)
+            )
         {
             let is_enum_member = enum_info.resolve_member(&member.name).is_some();
             if is_enum_member {

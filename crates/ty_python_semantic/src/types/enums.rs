@@ -299,7 +299,7 @@ pub(crate) fn enum_metadata<'db>(
                 .ignore_conflicting_declarations()
                 .ignore_possibly_undefined()
         })
-        .or_else(|| extract_init_member_type(db, class, scope_id))
+        .or_else(|| extract_init_member_type(db, scope_id))
         .unwrap_or(Type::Dynamic(DynamicType::Unknown));
 
     Some(EnumMetadata {
@@ -310,11 +310,7 @@ pub(crate) fn enum_metadata<'db>(
 }
 
 // Extracts the expected enum member type from `__init__` method parameters.
-fn extract_init_member_type<'db>(
-    db: &'db dyn Db,
-    _class: StaticClassLiteral<'db>,
-    scope: ScopeId<'db>,
-) -> Option<Type<'db>> {
+fn extract_init_member_type<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<Type<'db>> {
     let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
     let init_declarations = use_def_map(db, scope).end_of_scope_symbol_declarations(init_symbol_id);
 
