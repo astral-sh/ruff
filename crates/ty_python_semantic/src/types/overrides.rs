@@ -27,11 +27,12 @@ use crate::{
         class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
-            INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE,
-            INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
-            report_invalid_method_override, report_overridden_final_method,
-            report_overridden_final_variable,
+            INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
+            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD,
+            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
+            report_overridden_final_method, report_overridden_final_variable,
         },
+        enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
     },
@@ -66,15 +67,24 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     let class_specialized = class.identity_specialization(db);
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+    let enum_info = enum_metadata(db, class.into());
 
     for member in own_class_members {
-        check_class_declaration(context, configuration, class_specialized, scope, &member);
+        check_class_declaration(
+            context,
+            configuration,
+            enum_info,
+            class_specialized,
+            scope,
+            &member,
+        );
     }
 }
 
 fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
     configuration: OverrideRulesConfig,
+    enum_info: Option<&EnumMetadata<'db>>,
     class: ClassType<'db>,
     class_scope: ScopeId<'db>,
     member: &MemberWithDefinition<'db>,
@@ -171,6 +181,54 @@ fn check_class_declaration<'db>(
             policy,
         ),
         Some(CodeGeneratorKind::TypedDict) | None => {}
+    }
+
+    // Check for invalid Enum member values.
+    if let Some(enum_info) = enum_info {
+        if member.name != "_value_"
+            && matches!(
+                first_reachable_definition.kind(db),
+                DefinitionKind::Assignment(_)
+            )
+        {
+            let is_enum_member = enum_info.resolve_member(&member.name).is_some();
+            if is_enum_member {
+                let member_value_type = member.ty;
+
+                // TODO ideally this would be a syntactic check that only matches on literal `...`
+                // in the source, rather than matching on the type. But this would require storing
+                // additional information in `EnumMetadata`.
+                let is_ellipsis = matches!(
+                    member_value_type,
+                    Type::NominalInstance(nominal_instance)
+                        if nominal_instance.has_known_class(db, KnownClass::EllipsisType)
+                );
+                let skip_type_check = context.in_stub() && is_ellipsis;
+
+                if !skip_type_check {
+                    // Determine the expected type for the member
+                    let expected_type = enum_info.value_sunder_type;
+                    if !member_value_type.is_assignable_to(db, expected_type) {
+                        if let Some(builder) = context.report_lint(
+                            &INVALID_ASSIGNMENT,
+                            first_reachable_definition.focus_range(db, context.module()),
+                        ) {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Enum member `{}` value is not assignable to expected type",
+                                &member.name
+                            ));
+                            diagnostic.info(format_args!(
+                                "Expected `{}`, got `{}`",
+                                expected_type.display(db),
+                                member_value_type.display(db)
+                            ));
+                            // TODO we could also point to the source of our `_value_` type
+                            // expectations (`_value_` annotation or `__init__` method)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     let mut subclass_overrides_superclass_declaration = false;
