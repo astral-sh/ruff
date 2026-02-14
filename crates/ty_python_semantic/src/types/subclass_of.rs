@@ -400,13 +400,6 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
-        match self {
-            Self::Class(_) | Self::TypeVar(_) => None,
-            Self::Dynamic(dynamic) => Some(dynamic),
-        }
-    }
-
     pub(crate) const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
         match self {
             Self::Class(_) | Self::Dynamic(_) => None,
