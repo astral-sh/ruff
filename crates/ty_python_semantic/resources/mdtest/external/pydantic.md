@@ -46,3 +46,64 @@ reveal_type(product.id)  # revealed: int
 reveal_type(product.name)  # revealed: str
 reveal_type(product.internal_price_cent)  # revealed: int
 ```
+
+## Validator decorators
+
+Pydantic validator decorators are implicitly classmethods. The first parameter should be typed as
+`type[Self]`, not `Self`.
+
+```py
+from pydantic import BaseModel, field_validator, model_validator, field_serializer
+
+class User(BaseModel):
+    name: str
+
+    @field_validator("name")
+    def validate_name(cls, v: str) -> str:
+        reveal_type(cls)  # revealed: type[Self@validate_name]
+        return v.strip()
+
+    @model_validator(mode="before")
+    def validate_model(cls, values: dict) -> dict:
+        reveal_type(cls)  # revealed: type[Self@validate_model]
+        return values
+
+    @field_serializer("name")
+    def serialize_name(cls, v: str) -> str:
+        reveal_type(cls)  # revealed: type[Self@serialize_name]
+        return v.upper()
+```
+
+## `model_validator` with `mode="after"` (known limitation)
+
+`@model_validator(mode="after")` receives the model *instance*, not the class, so it should not be
+treated as a classmethod. ty currently treats all `@model_validator` calls as implicit classmethods
+regardless of the `mode` argument.
+
+```py
+from pydantic import BaseModel, model_validator
+
+class Order(BaseModel):
+    total: float
+
+    @model_validator(mode="after")
+    def validate_order(self) -> "Order":
+        # TODO: should be `Order`, not `type[Self@validate_order]`
+        reveal_type(self)  # revealed: type[Self@validate_order]
+        return self  # error: [invalid-return-type]
+```
+
+## Validator decorators imported from submodule
+
+```py
+from pydantic import BaseModel
+from pydantic.functional_validators import field_validator
+
+class Item(BaseModel):
+    name: str
+
+    @field_validator("name")
+    def validate_name(cls, v: str) -> str:
+        reveal_type(cls)  # revealed: type[Self@validate_name]
+        return v
+```
