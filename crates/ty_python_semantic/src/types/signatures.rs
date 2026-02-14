@@ -528,58 +528,69 @@ impl<'db> CallableSignature<'db> {
 
                     if let Some(other_parameter_type) = single_required_positional(other_signature)
                     {
-                        let mut parameter_type_union = UnionBuilder::new(db);
-                        let mut return_type_union = UnionBuilder::new(db);
-                        let mut has_overlapping_domain = false;
-                        let mut all_signatures_supported = true;
+                        let mut unary_signatures =
+                            SmallVec::<[(Type<'db>, Type<'db>); 1]>::with_capacity(
+                                self_signatures.len(),
+                            );
 
                         for self_signature in self_signatures {
                             let Some(self_parameter_type) =
                                 single_required_positional(self_signature)
                             else {
-                                all_signatures_supported = false;
+                                unary_signatures.clear();
                                 break;
                             };
-                            let signatures_are_disjoint = self_parameter_type
-                                .is_disjoint_from_impl(
-                                    db,
-                                    other_parameter_type,
-                                    inferable,
-                                    disjointness_visitor,
-                                    relation_visitor,
-                                )
-                                .is_always_satisfied(db);
-
-                            if signatures_are_disjoint {
-                                continue;
-                            }
-
-                            has_overlapping_domain = true;
-                            parameter_type_union = parameter_type_union.add(self_parameter_type);
-                            return_type_union = return_type_union.add(self_signature.return_ty);
+                            unary_signatures.push((self_parameter_type, self_signature.return_ty));
                         }
 
-                        if all_signatures_supported && has_overlapping_domain {
-                            // Function assignability here is parameter-contravariant and return-covariant.
-                            let parameters_cover_target = other_parameter_type
-                                .has_relation_to_impl(
-                                    db,
-                                    parameter_type_union.build(),
-                                    inferable,
-                                    relation,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                );
-                            let returns_match_target =
-                                return_type_union.build().has_relation_to_impl(
-                                    db,
-                                    other_signature.return_ty,
-                                    inferable,
-                                    relation,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                );
-                            return parameters_cover_target.and(db, || returns_match_target);
+                        if unary_signatures.len() == self_signatures.len() {
+                            let mut parameter_type_union = UnionBuilder::new(db);
+                            let mut return_type_union = UnionBuilder::new(db);
+                            let mut has_overlapping_domain = false;
+
+                            for (self_parameter_type, self_return_type) in unary_signatures {
+                                let signatures_are_disjoint = self_parameter_type
+                                    .is_disjoint_from_impl(
+                                        db,
+                                        other_parameter_type,
+                                        inferable,
+                                        disjointness_visitor,
+                                        relation_visitor,
+                                    )
+                                    .is_always_satisfied(db);
+
+                                if signatures_are_disjoint {
+                                    continue;
+                                }
+
+                                has_overlapping_domain = true;
+                                parameter_type_union =
+                                    parameter_type_union.add(self_parameter_type);
+                                return_type_union = return_type_union.add(self_return_type);
+                            }
+
+                            if has_overlapping_domain {
+                                // Function assignability here is parameter-contravariant and return-covariant.
+                                let parameters_cover_target = other_parameter_type
+                                    .has_relation_to_impl(
+                                        db,
+                                        parameter_type_union.build(),
+                                        inferable,
+                                        relation,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    );
+                                let returns_match_target =
+                                    return_type_union.build().has_relation_to_impl(
+                                        db,
+                                        other_signature.return_ty,
+                                        inferable,
+                                        relation,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    );
+                                return parameters_cover_target.and(db, || returns_match_target);
+                            }
                         }
                     }
                 }
