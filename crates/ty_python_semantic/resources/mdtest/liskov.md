@@ -511,37 +511,26 @@ from typing import NamedTuple
 class Foo:
     x: int
 
-class Bar(Foo):
+class Bar(Foo):  # error: [subclass-of-dataclass-with-order]
     def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
 
-# TODO: specifying `order=True` on the subclass means that a `__lt__` method is
-# generated that is incompatible with the generated `__lt__` method on the superclass.
-# We could consider detecting this and emitting a diagnostic, though maybe it shouldn't
-# be `invalid-method-override` since we'd emit it on the class definition rather than
-# on any method definition. Note also that no other type checker complains about this
-# as of 2025-11-21.
+# Specifying `order=True` on the subclass means that a `__lt__` method is generated that
+# is incompatible with the generated `__lt__` method on the superclass. We don't emit the
+# `subclass-of-dataclass-with-order` diagnostic here because the child class overrides all
+# comparison methods.
+# TODO: We should also emit `invalid-method-override` diagnostics for each generated
+# comparison method since they have incompatible signatures.
 @dataclass(order=True)
 class Bar2(Foo):
     y: str
 
-# TODO: Although this class does not override any methods of `Foo`, the design of the
-# `order=True` stdlib dataclasses feature itself arguably violates the Liskov Substitution
+# Although this class does not override any methods of `Foo`, the design of the
+# `order=True` stdlib dataclasses feature itself violates the Liskov Substitution
 # Principle! Instances of `Bar3` cannot be substituted wherever an instance of `Foo` is
 # expected, because the generated `__lt__` method on `Foo` raises an error unless the r.h.s.
 # and `l.h.s.` have exactly the same `__class__` (it does not permit instances of `Foo` to
 # be compared with instances of subclasses of `Foo`).
-#
-# Many users would probably like their type checkers to alert them to cases where instances
-# of subclasses cannot be substituted for instances of superclasses, as this violates many
-# assumptions a type checker will make and makes it likely that a type checker will fail to
-# catch type errors elsewhere in the user's code. We could therefore consider treating all
-# `order=True` dataclasses as implicitly `@final` in order to enforce soundness. However,
-# this probably shouldn't be reported with the same error code as Liskov violations, since
-# the error does not stem from any method signatures written by the user. The example is
-# only included here for completeness.
-#
-# Note that no other type checker catches this error as of 2025-11-21.
-class Bar3(Foo): ...
+class Bar3(Foo): ...  # error: [subclass-of-dataclass-with-order]
 
 class Eggs:
     def __lt__(self, other: Eggs) -> bool: ...
