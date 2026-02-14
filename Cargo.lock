@@ -4575,6 +4575,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "shellexpand",
  "thiserror 2.0.18",
  "toml",
  "tracing",
