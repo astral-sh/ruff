@@ -5253,6 +5253,8 @@ impl<'db> DynamicClassLiteral<'db> {
         }
 
         // Convert Types to ClassBases for metaclass computation.
+        // All bases should convert successfully here: `try_mro()` above would have
+        // returned `Err(InvalidBases)` if any failed, causing us to return early.
         let placeholder_class: ClassLiteral<'db> =
             KnownClass::Object.try_to_class_literal(db).unwrap().into();
 
