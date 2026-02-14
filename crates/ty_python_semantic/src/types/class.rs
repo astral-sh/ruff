@@ -20,9 +20,7 @@ use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    CYCLIC_CLASS_DEFINITION, DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_BASE,
     INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
-    report_conflicting_metaclass_from_bases,
 };
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
@@ -36,7 +34,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
-use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
+use crate::types::mro::DynamicMroError;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
@@ -8190,89 +8188,10 @@ impl KnownClass {
                 )));
             }
 
+            // `type()` calls are handled by `infer_builtins_type_call` and never
+            // go through normal call inference, so this arm should be unreachable.
             KnownClass::Type => {
-                // Check for MRO and metaclass errors in three-argument type() calls.
-                if let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) =
-                    overload.return_type()
-                {
-                    // Check for MRO errors
-                    if let Err(error) = dynamic_class.try_mro(db) {
-                        match error.reason() {
-                            DynamicMroErrorKind::InvalidBases(invalid_bases) => {
-                                for (_, base_type) in invalid_bases {
-                                    if let Some(builder) =
-                                        context.report_lint(&INVALID_BASE, call_expression)
-                                    {
-                                        builder.into_diagnostic(format_args!(
-                                            "Invalid class base with type `{}`",
-                                            base_type.display(db)
-                                        ));
-                                    }
-                                }
-                            }
-                            DynamicMroErrorKind::InheritanceCycle => {
-                                if let Some(builder) =
-                                    context.report_lint(&CYCLIC_CLASS_DEFINITION, call_expression)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cyclic definition of `{}`",
-                                        dynamic_class.name(db)
-                                    ));
-                                }
-                            }
-                            DynamicMroErrorKind::DuplicateBases(duplicates) => {
-                                if let Some(builder) =
-                                    context.report_lint(&DUPLICATE_BASE, call_expression)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Duplicate base class{maybe_s} {dupes} in class `{class}`",
-                                        maybe_s = if duplicates.len() == 1 { "" } else { "es" },
-                                        dupes = duplicates
-                                            .iter()
-                                            .map(|base: &ClassBase<'_>| base.display(db))
-                                            .join(", "),
-                                        class = dynamic_class.name(db),
-                                    ));
-                                }
-                            }
-                            DynamicMroErrorKind::UnresolvableMro => {
-                                if let Some(builder) =
-                                    context.report_lint(&INCONSISTENT_MRO, call_expression)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot create a consistent method resolution order (MRO) \
-                                            for class `{}` with bases `[{}]`",
-                                        dynamic_class.name(db),
-                                        dynamic_class
-                                            .explicit_bases(db)
-                                            .iter()
-                                            .map(|base| base.display(db))
-                                            .join(", ")
-                                    ));
-                                }
-                            }
-                        }
-                    }
-
-                    // Check for metaclass conflicts
-                    if let Err(DynamicMetaclassConflict {
-                        metaclass1,
-                        base1,
-                        metaclass2,
-                        base2,
-                    }) = dynamic_class.try_metaclass(db)
-                    {
-                        report_conflicting_metaclass_from_bases(
-                            context,
-                            call_expression.into(),
-                            dynamic_class.name(db),
-                            metaclass1,
-                            base1.display(db),
-                            metaclass2,
-                            base2.display(db),
-                        );
-                    }
-                }
+                unreachable!("three-argument `type()` calls are handled before `check_call`")
             }
 
             _ => {}
