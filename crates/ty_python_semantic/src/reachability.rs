@@ -692,6 +692,7 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 return Truthiness::AlwaysFalse;
             }
 
+            // TODO: handle unions and intersections of tuple types here.
             if let Type::NominalInstance(instance) = subject_ty
                 && let Some(tuple_spec) = instance.tuple_spec(db)
             {
@@ -712,6 +713,8 @@ fn analyze_single_pattern_predicate_kind<'db>(
 
                         return truthiness;
                     }
+                    // TODO: this could be `AlwaysFalse` if the variable element type is
+                    // disjoint from at least one sub-pattern's expected type.
                     TupleSpec::Variable(_) => {}
                 }
             }
