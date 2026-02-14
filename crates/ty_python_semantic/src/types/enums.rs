@@ -287,17 +287,20 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    // _value_
-    let value_sunder_symbol = place_table(db, scope_id).symbol_id("_value_")?;
-    let value_sunder_declarations =
-        use_def_map.end_of_scope_symbol_declarations(value_sunder_symbol);
-
-    let inferred_value_sunder_type = place_from_declarations(db, value_sunder_declarations)
-        .ignore_conflicting_declarations()
-        .ignore_possibly_undefined()?;
-
-    let value_sunder_type =
-        extract_init_member_type(db, class, scope_id).unwrap_or(inferred_value_sunder_type);
+    // Determine the expected `_value_` type:
+    // (a) Always respect an explicit `_value_` annotation if present.
+    // (b) Otherwise, fall back to `Any` if the enum has an `__init__` method.
+    // (c) Otherwise, fall back to `Unknown` (no member value validation).
+    let value_sunder_type = place_table(db, scope_id)
+        .symbol_id("_value_")
+        .and_then(|symbol_id| {
+            let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+            place_from_declarations(db, declarations)
+                .ignore_conflicting_declarations()
+                .ignore_possibly_undefined()
+        })
+        .or_else(|| extract_init_member_type(db, class, scope_id))
+        .unwrap_or(Type::Dynamic(DynamicType::Unknown));
 
     Some(EnumMetadata {
         members,
