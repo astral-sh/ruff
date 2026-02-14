@@ -1200,9 +1200,9 @@ class Child2(FinalDerived): ...
 
 ## Calling `type` via unannotated parameter
 
-When `type` is captured as an unannotated parameter default (a common Python optimization
-pattern), the parameter type is inferred as `Unknown | type[type]`. This union bypasses the
-early-return guard for `type()` calls, but should not panic.
+When `type` is captured as an unannotated parameter default (a common Python optimization pattern),
+the parameter type is inferred as `Unknown | type[type]`. This union bypasses the early-return guard
+for `type()` calls, but should not panic.
 
 ```py
 def _check_type_strict(obj, t, type=type, tuple=tuple):
@@ -1210,4 +1210,22 @@ def _check_type_strict(obj, t, type=type, tuple=tuple):
         return type(obj) in t
     else:
         return type(obj) is t
+```
+
+## Three-argument `type()` in a union
+
+When `type` is one member of a union, three-argument `type()` calls go through normal call binding
+instead of the early-return path, so dynamic class creation is missed.
+
+```py
+def f(flag: bool):
+    if flag:
+        x = type
+    else:
+        x = int
+
+    # TODO: should be `type[MyClass] | int`, but the `type` arm misses dynamic class creation
+    # because the early-return guard only matches `ClassLiteral`, not union members.
+    MyClass = x("MyClass", (), {})  # error: [no-matching-overload]
+    reveal_type(MyClass)  # revealed: type | Unknown
 ```
