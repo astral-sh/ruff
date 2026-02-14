@@ -247,21 +247,45 @@ Here the loop condition forces `x` to be `False` at loop exit, because there is 
 def random() -> bool:
     return True
 
-x = random()
-reveal_type(x)  # revealed: bool
-while x:
-    pass
-reveal_type(x)  # revealed: Literal[False]
+def _(x: bool):
+    while x:
+        pass
+    reveal_type(x)  # revealed: Literal[False]
 ```
 
 However, we can't narrow `x` like this when there's a `break` in the loop:
 
 ```py
-x = random()
-while x:
-    if random():
+def _(x: bool):
+    while x:
+        if random():
+            break
+    reveal_type(x)  # revealed: bool
+
+def _(x: bool):
+    while x:
+        pass
+    reveal_type(x)  # revealed: Literal[False]
+
+    x = random()
+    while x:
+        if random():
+            break
+    reveal_type(x)  # revealed: bool
+
+def _(y: int | None):
+    x = 1
+    while True:
+        if x == 0:
+            break
+
+        if y is None:
+            y = 0
+            continue
+
         break
-reveal_type(x)  # revealed: bool
+
+    reveal_type(y)  # revealed: int
 ```
 
 ### Non-static loop conditions
