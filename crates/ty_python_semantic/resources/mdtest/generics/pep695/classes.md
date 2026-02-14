@@ -25,15 +25,13 @@ reveal_type(generic_context(SingleTypevar))
 # revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `TypeVarTuple` properly
-# (these should include the `TypeVarTuple`s in their generic contexts)
-# revealed: ty_extensions.GenericContext[P@SingleParamSpec]
+# revealed: ty_extensions.GenericContext[**P@SingleParamSpec]
 reveal_type(generic_context(SingleParamSpec))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
+# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec, **P@TypeVarAndParamSpec]
 reveal_type(generic_context(TypeVarAndParamSpec))
-# revealed: ty_extensions.GenericContext[]
+# revealed: ty_extensions.GenericContext[*Ts@SingleTypeVarTuple]
 reveal_type(generic_context(SingleTypeVarTuple))
-# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple, *Ts@TypeVarAndTypeVarTuple]
 reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
@@ -210,6 +208,25 @@ class WithDefault[T, U = int]: ...
 
 reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
 reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
+```
+
+TypeVarTuple specializations pack variadic arguments into a tuple:
+
+```py
+class Variadic[*Ts]: ...
+
+reveal_type(Variadic[int, str, bytes]())  # revealed: Variadic[tuple[int, str, bytes]]
+reveal_type(Variadic[int]())  # revealed: Variadic[tuple[int]]
+```
+
+When a TypeVarTuple appears alongside fixed type variables, leading and trailing arguments are
+matched with the fixed variables and the rest goes to the TypeVarTuple:
+
+```py
+class Mixed[T, *Ts]: ...
+
+reveal_type(Mixed[int, str, bytes]())  # revealed: Mixed[int, tuple[str, bytes]]
+reveal_type(Mixed[int]())  # revealed: Mixed[int, tuple[()]]
 ```
 
 ## Diagnostics for bad specializations

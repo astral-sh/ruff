@@ -42,8 +42,11 @@ y: Bar[int, str, bytes]  # fine
 
 class Baz[*Ts]: ...
 
-# TODO: false positive
-z: Baz[int, str, bytes]  # error: [not-subscriptable]
+z: Baz[int, str, bytes]  # fine
+
+def check(a: Foo[int, str, bytes], b: Baz[int, str, bytes]):
+    reveal_type(a)  # revealed: Foo[tuple[int, str, bytes]]
+    reveal_type(b)  # revealed: Baz[tuple[int, str, bytes]]
 ```
 
 And we also provide some basic validation in some cases:
