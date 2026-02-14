@@ -8189,12 +8189,6 @@ impl KnownClass {
                 )));
             }
 
-            // `type()` calls are handled by `infer_builtins_type_call` and never
-            // go through normal call inference, so this arm should be unreachable.
-            KnownClass::Type => {
-                unreachable!("three-argument `type()` calls are handled before `check_call`")
-            }
-
             _ => {}
         }
     }

@@ -1197,3 +1197,17 @@ FinalDerived = final(type("FinalDerived", (Base,), {}))
 
 class Child2(FinalDerived): ...
 ```
+
+## Calling `type` via unannotated parameter
+
+When `type` is captured as an unannotated parameter default (a common Python optimization
+pattern), the parameter type is inferred as `Unknown | type[type]`. This union bypasses the
+early-return guard for `type()` calls, but should not panic.
+
+```py
+def _check_type_strict(obj, t, type=type, tuple=tuple):
+    if type(t) is tuple:
+        return type(obj) in t
+    else:
+        return type(obj) is t
+```
