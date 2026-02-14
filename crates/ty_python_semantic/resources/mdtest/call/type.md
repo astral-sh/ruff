@@ -594,6 +594,17 @@ class Y(C, B): ...
 Conflict = type("Conflict", (X, Y), {})
 ```
 
+## Cyclic base class MRO
+
+A dynamic class inheriting from a static class with a cyclic MRO also produces an error:
+
+```pyi
+class Cyclic(Cyclic): ...  # error: [cyclic-class-definition]
+
+# error: [cyclic-class-definition]
+CyclicChild = type("CyclicChild", (Cyclic,), {})
+```
+
 ## `inconsistent-mro` errors with autofixes
 
 A common cause of "inconsistent MRO" errors is where a class inherits from `Generic[]`, but
