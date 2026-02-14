@@ -401,49 +401,68 @@ help: Add explicit `return` statement
 330 | 
 331 +     return None
 332 | 
-333 | 
-334 | # function return type annotation NoReturn
+333 | def test_match_non_exhaustive(y):
+334 |     match y:
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
-   --> RET503.py:398:1
+   --> RET503.py:332:1
     |
-398 | / def f():
-399 | |     if a:
-400 | |         return b
-401 | |     else:
-402 | |         with c:
-403 | |             d
+332 | / def test_match_non_exhaustive(y):
+333 | |     match y:
+334 | |         case 0:
+335 | |             return 1
+    | |____________________^
+    |
+help: Add explicit `return` statement
+333 |     match y:
+334 |         case 0:
+335 |             return 1
+336 +     return None
+337 | 
+338 | 
+339 | def test_match_wildcard(y):
+note: This is an unsafe fix and may change runtime behavior
+
+RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   --> RET503.py:419:1
+    |
+419 | / def f():
+420 | |     if a:
+421 | |         return b
+422 | |     else:
+423 | |         with c:
+424 | |             d
     | |_____________^
     |
 help: Add explicit `return` statement
-401 |     else:
-402 |         with c:
-403 |             d
-404 +     return None
-405 | 
-406 | 
-407 | 
+422 |     else:
+423 |         with c:
+424 |             d
+425 +     return None
+426 | 
+427 | 
+428 | 
 note: This is an unsafe fix and may change runtime behavior
 
 RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
-   --> RET503.py:413:1
+   --> RET503.py:434:1
     |
-411 |   # the semantic model hasn't yet seen `bar`'s declaration.
-412 |   # Supporting nested functions requires making this a deferred rule.
-413 | / def foo(x: int) -> int:
-414 | |     def bar() -> NoReturn:
-415 | |         abort()
-416 | |     if x == 5:
-417 | |         return 5
-418 | |     bar()
+432 |   # the semantic model hasn't yet seen `bar`'s declaration.
+433 |   # Supporting nested functions requires making this a deferred rule.
+434 | / def foo(x: int) -> int:
+435 | |     def bar() -> NoReturn:
+436 | |         abort()
+437 | |     if x == 5:
+438 | |         return 5
+439 | |     bar()
     | |_________^
     |
 help: Add explicit `return` statement
-415 |         abort()
-416 |     if x == 5:
-417 |         return 5
+436 |         abort()
+437 |     if x == 5:
+438 |         return 5
     -     bar()
-418 +     bar()
-419 +     return None
+439 +     bar()
+440 +     return None
 note: This is an unsafe fix and may change runtime behavior

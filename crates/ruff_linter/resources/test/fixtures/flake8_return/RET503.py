@@ -329,6 +329,27 @@ def end_of_file():
     x = 2 \
 
 
+def test_match_non_exhaustive(y):
+    match y:
+        case 0:
+            return 1
+
+
+def test_match_wildcard(y):
+    match y:
+        case 0:
+            return 1
+        case _:
+            return 2
+
+
+def test_match_capture(y):
+    match y:
+        case 0:
+            return 1
+        case val:
+            return val
+
 
 # function return type annotation NoReturn
 def bar_no_return_annotation() -> NoReturn:
