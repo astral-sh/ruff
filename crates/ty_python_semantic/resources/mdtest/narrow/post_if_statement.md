@@ -242,3 +242,15 @@ def bar():
     # v was reassigned, so any narrowing shouldn't apply
     reveal_type(v)  # revealed: int | None
 ```
+
+## Narrowing in global scope
+
+```py
+data: dict[str, str] = {}
+api_key = data.get("api_key")
+
+if not api_key:
+    exit(1)
+
+reveal_type(api_key)  # revealed: str & ~AlwaysFalsy
+```
