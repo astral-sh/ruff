@@ -1044,6 +1044,9 @@ impl ReachabilityConstraints {
                 .unwrap_or(Truthiness::AlwaysTrue),
             PatternPredicateKind::Sequence(patterns) => {
                 // Check if the subject is a tuple with matching length.
+                // TODO: handle unions (e.g. `tuple[int, str] | tuple[int]`) and
+                // intersections (e.g. a tuple type intersected with `~AlwaysFalse`)
+                // of tuple types, which are likely to come up in practice.
                 let tuple_spec = match subject_ty {
                     Type::NominalInstance(instance) => instance.tuple_spec(db),
                     _ => None,
@@ -1051,6 +1054,10 @@ impl ReachabilityConstraints {
 
                 let Some(tuple_spec) = tuple_spec else {
                     // Subject is not a tuple type; can't determine if it matches.
+                    // TODO: we could return `AlwaysFalse` for final types that can
+                    // never be sequences (e.g. some literals, final nominal types),
+                    // or for sequence types whose element type is disjoint with one
+                    // or more of the sub-patterns.
                     return Truthiness::Ambiguous;
                 };
 
@@ -1084,6 +1091,8 @@ impl ReachabilityConstraints {
                     }
                     TupleSpec::Variable(_) => {
                         // Variable-length tuples could match patterns of various lengths.
+                        // TODO: we could return `AlwaysFalse` if the variable element
+                        // type is disjoint with at least one sub-pattern's expected type.
                         Truthiness::Ambiguous
                     }
                 }

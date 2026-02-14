@@ -506,8 +506,19 @@ def _(subj: tuple[int | str | None, int | str | None]):
 def _(subj: tuple[tuple[int | str, int], int | str]):
     match subj:
         case ((str(), _), _):
-            # The inner tuple is narrowed by intersecting with the pattern's constraint
-            reveal_type(subj)  # revealed: tuple[tuple[int | str, int] & tuple[str, object], int | str]
+            reveal_type(subj)  # revealed: tuple[tuple[str, int], int | str]
+```
+
+## Sequence patterns with union of tuple and non-tuple
+
+Non-tuple union members can't be narrowed by sequence patterns, but they should be preserved in the
+result since they could still match at runtime.
+
+```py
+def _(subj: list[str] | tuple[int | str, int]):
+    match subj:
+        case (str(), _):
+            reveal_type(subj)  # revealed: list[str] | tuple[str, int]
 ```
 
 ## Sequence patterns with or patterns
