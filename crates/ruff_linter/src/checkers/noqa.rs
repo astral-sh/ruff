@@ -18,7 +18,7 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
-use crate::suppression::Suppressions;
+use crate::suppression::{Suppressions, is_suppression_diagnostic_code};
 use crate::{Edit, Fix, Locator};
 
 use super::ast::LintContext;
@@ -178,7 +178,8 @@ pub(crate) fn check_noqa(
                             } || settings
                                 .external
                                 .iter()
-                                .any(|external| code.starts_with(external));
+                                .any(|external| code.starts_with(external))
+                                || is_suppression_diagnostic_code(code);
 
                             if is_code_used {
                                 valid_codes.push(original_code);
