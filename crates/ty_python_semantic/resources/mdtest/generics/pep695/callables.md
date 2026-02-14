@@ -242,3 +242,49 @@ reveal_type(generic_context(outside_callable(int_identity)))
 # error: [invalid-argument-type]
 outside_callable(int_identity)("string")
 ```
+
+## Overloaded callable as generic `Callable` argument
+
+The type variable should be inferred from the first matching overload, rather than unioning
+parameter types across all overloads (which would create an unsatisfiable expected type for
+contravariant type variables).
+
+```py
+from typing import Callable, overload
+
+def accepts_callable[T](converter: Callable[[T], None]) -> None:
+    raise NotImplementedError
+
+@overload
+def f(val: str) -> None: ...
+@overload
+def f(val: bytes) -> None: ...
+def f(val: str | bytes) -> None:
+    pass
+
+accepts_callable(f)  # fine
+```
+
+When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
+as a whole to satisfy `Callable[[T], T]`.
+
+```py
+from typing import Callable, overload
+
+def apply_twice[T](converter: Callable[[T], T], left: T, right: T) -> tuple[T, T]:
+    return converter(left), converter(right)
+
+@overload
+def f(val: int) -> int: ...
+@overload
+def f(val: str) -> str: ...
+def f(val: int | str) -> int | str:
+    return val
+
+x: int | str = 1
+y: int | str = "a"
+
+result = apply_twice(f, x, y)
+# revealed: tuple[int | str, int | str]
+reveal_type(result)
+```

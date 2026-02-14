@@ -1248,6 +1248,10 @@ impl<'db> Type<'db> {
         })
     }
 
+    pub(crate) fn has_dynamic(self, db: &'db dyn Db) -> bool {
+        any_over_type(db, self, false, |ty| ty.is_dynamic())
+    }
+
     pub(crate) fn has_typevar_or_typevar_instance(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| {
             matches!(
