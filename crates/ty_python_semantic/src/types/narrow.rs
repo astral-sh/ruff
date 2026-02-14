@@ -3,8 +3,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode,
+    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, PredicateNode,
 };
 use crate::semantic_index::scope::ScopeId;
 use crate::subscript::PyIndex;
@@ -57,19 +56,20 @@ pub(crate) type PossiblyNarrowedPlaces = FxHashSet<ScopedPlaceId>;
 /// constraint is applied to that symbol, so we'd just return `None`.
 pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
-    predicate: Predicate<'db>,
+    predicate_node: PredicateNode<'db>,
+    is_positive: bool,
     place: ScopedPlaceId,
 ) -> Option<NarrowingConstraint<'db>> {
-    let constraints = match predicate.node {
+    let constraints = match predicate_node {
         PredicateNode::Expression(expression) => {
-            if predicate.is_positive {
+            if is_positive {
                 all_narrowing_constraints_for_expression(db, expression)
             } else {
                 all_negative_narrowing_constraints_for_expression(db, expression)
             }
         }
         PredicateNode::Pattern(pattern) => {
-            if predicate.is_positive {
+            if is_positive {
                 all_narrowing_constraints_for_pattern(db, pattern)
             } else {
                 all_negative_narrowing_constraints_for_pattern(db, pattern)

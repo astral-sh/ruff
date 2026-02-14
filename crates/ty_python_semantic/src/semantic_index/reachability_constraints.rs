@@ -848,17 +848,15 @@ impl ReachabilityConstraints {
                     };
                 }
 
-                // Check if this predicate narrows the variable we're interested in.
-                let pos_constraint = infer_narrowing_constraint(db, predicate, place);
+                // Check if this predicate narrows the variable we're interested in
+                // on the true and false branches.
+                let true_constraint = infer_narrowing_constraint(db, predicate.node, true, place);
+                let false_constraint = infer_narrowing_constraint(db, predicate.node, false, place);
 
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
-                    let neg_predicate = Predicate {
-                        node: predicate.node,
-                        is_positive: !predicate.is_positive,
-                    };
-                    let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                    let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                    let false_accumulated =
+                        accumulate_constraint(db, accumulated, false_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
                         predicates,
@@ -871,7 +869,7 @@ impl ReachabilityConstraints {
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
-                    let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
+                    let true_accumulated = accumulate_constraint(db, accumulated, true_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
                         predicates,
@@ -884,7 +882,7 @@ impl ReachabilityConstraints {
 
                 // True branch: predicate holds → accumulate positive narrowing
                 let true_accumulated =
-                    accumulate_constraint(db, accumulated.clone(), pos_constraint);
+                    accumulate_constraint(db, accumulated.clone(), true_constraint);
                 let true_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
@@ -895,12 +893,7 @@ impl ReachabilityConstraints {
                 );
 
                 // False branch: predicate doesn't hold → accumulate negative narrowing
-                let neg_predicate = Predicate {
-                    node: predicate.node,
-                    is_positive: !predicate.is_positive,
-                };
-                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(db, accumulated, false_constraint);
                 let false_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
@@ -1044,9 +1037,7 @@ impl ReachabilityConstraints {
 
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
-                infer_expression_type(db, test_expr, TypeContext::default())
-                    .bool(db)
-                    .negate_if(!predicate.is_positive)
+                infer_expression_type(db, test_expr, TypeContext::default()).bool(db)
             }
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,
@@ -1069,7 +1060,7 @@ impl ReachabilityConstraints {
                 // doesn't help much.
                 // See <https://github.com/astral-sh/ty/issues/968>.
                 if matches!(ty, Type::Dynamic(_)) {
-                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                    return Truthiness::AlwaysFalse;
                 }
 
                 let overloads_iterator = if let Some(callable) = ty
@@ -1078,7 +1069,7 @@ impl ReachabilityConstraints {
                 {
                     callable.signatures(db).overloads.iter()
                 } else {
-                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
+                    return Truthiness::AlwaysFalse;
                 };
 
                 let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
@@ -1104,7 +1095,6 @@ impl ReachabilityConstraints {
                         Truthiness::AlwaysFalse
                     }
                 }
-                .negate_if(!predicate.is_positive)
             }
             PredicateNode::Pattern(inner) => analyze_pattern_predicate(db, inner),
             PredicateNode::StarImportPlaceholder(star_import) => {
