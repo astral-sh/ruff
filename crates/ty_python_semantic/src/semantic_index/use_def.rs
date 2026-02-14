@@ -242,6 +242,8 @@
 
 use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
+use rustc_hash::FxHashSet;
+use smallvec::SmallVec;
 
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
@@ -268,7 +270,16 @@ use crate::types::{PossiblyNarrowedPlaces, Truthiness, Type};
 mod place_state;
 
 pub(super) use place_state::PreviousDefinitions;
-pub(crate) use place_state::{LiveBinding, ScopedDefinitionId};
+pub(crate) use place_state::{LiveBinding, PlaceVersion, ScopedDefinitionId};
+
+#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct PredicatePlaceVersionInfo {
+    pub(crate) versions: SmallVec<[PlaceVersion; 2]>,
+    pub(crate) allow_future_versions: bool,
+}
+
+pub(crate) type PredicatePlaceVersions =
+    FxHashMap<(ScopedPredicateId, ScopedPlaceId), PredicatePlaceVersionInfo>;
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -279,6 +290,9 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Array of predicates in this scope.
     predicates: Predicates<'db>,
+
+    /// Place versions to which a given predicate occurrence can apply for narrowing.
+    predicate_place_versions: PredicatePlaceVersions,
 
     /// Array of reachability constraints in this scope.
     reachability_constraints: ReachabilityConstraints,
@@ -373,7 +387,9 @@ impl<'db> UseDefMap<'db> {
                 ApplicableConstraints::UnboundBinding(NarrowingEvaluator {
                     constraint,
                     predicates: &self.predicates,
+                    predicate_place_versions: &self.predicate_place_versions,
                     reachability_constraints: &self.reachability_constraints,
+                    binding_place_version: None,
                 })
             }
             ConstraintKey::NestedScope(nested_scope) => {
@@ -413,7 +429,9 @@ impl<'db> UseDefMap<'db> {
         NarrowingEvaluator {
             constraint,
             predicates: &self.predicates,
+            predicate_place_versions: &self.predicate_place_versions,
             reachability_constraints: &self.reachability_constraints,
+            binding_place_version: None,
         }
     }
 
@@ -655,6 +673,7 @@ impl<'db> UseDefMap<'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
+            predicate_place_versions: &self.predicate_place_versions,
             reachability_constraints: &self.reachability_constraints,
             boundness_analysis,
             inner: bindings.iter(),
@@ -710,6 +729,7 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     pub(crate) all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
+    pub(crate) predicate_place_versions: &'map PredicatePlaceVersions,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
     pub(crate) boundness_analysis: BoundnessAnalysis,
     inner: LiveBindingsIterator<'map>,
@@ -720,6 +740,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let predicates = self.predicates;
+        let predicate_place_versions = self.predicate_place_versions;
         let reachability_constraints = self.reachability_constraints;
 
         self.inner
@@ -729,7 +750,9 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                 narrowing_constraint: NarrowingEvaluator {
                     constraint: live_binding.narrowing_constraint,
                     predicates,
+                    predicate_place_versions,
                     reachability_constraints,
+                    binding_place_version: Some(live_binding.place_version),
                 },
                 reachability_constraint: live_binding.reachability_constraint,
             })
@@ -747,7 +770,9 @@ pub(crate) struct BindingWithConstraints<'map, 'db> {
 pub(crate) struct NarrowingEvaluator<'map, 'db> {
     pub(crate) constraint: ScopedNarrowingConstraint,
     predicates: &'map Predicates<'db>,
+    predicate_place_versions: &'map PredicatePlaceVersions,
     reachability_constraints: &'map ReachabilityConstraints,
+    binding_place_version: Option<PlaceVersion>,
 }
 
 impl<'db> NarrowingEvaluator<'_, 'db> {
@@ -760,9 +785,11 @@ impl<'db> NarrowingEvaluator<'_, 'db> {
         self.reachability_constraints.narrow_by_constraint(
             db,
             self.predicates,
+            self.predicate_place_versions,
             self.constraint,
             base_ty,
             place,
+            self.binding_place_version,
         )
     }
 }
@@ -831,6 +858,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
 
+    /// Place versions to which a given predicate occurrence can apply for narrowing.
+    predicate_place_versions: PredicatePlaceVersions,
+
     /// Builder of reachability constraints.
     pub(super) reachability_constraints: ReachabilityConstraintsBuilder,
 
@@ -873,6 +903,7 @@ impl<'db> UseDefMapBuilder<'db> {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
             predicates: PredicatesBuilder::default(),
+            predicate_place_versions: PredicatePlaceVersions::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -1001,6 +1032,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         predicate: ScopedPredicateId,
         places: &PossiblyNarrowedPlaces,
+        allow_future_versions_for: &FxHashSet<ScopedPlaceId>,
     ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
@@ -1008,6 +1040,8 @@ impl<'db> UseDefMapBuilder<'db> {
             // No need to record a narrowing constraint for `True` or `False`.
             return;
         }
+
+        self.record_predicate_place_versions(predicate, places, allow_future_versions_for);
 
         let atom = self.reachability_constraints.add_atom(predicate);
         self.record_narrowing_constraint_node_for_places(atom, places);
@@ -1023,6 +1057,7 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         predicate: ScopedPredicateId,
         places: &PossiblyNarrowedPlaces,
+        allow_future_versions_for: &FxHashSet<ScopedPlaceId>,
     ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
@@ -1030,9 +1065,46 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
+        self.record_predicate_place_versions(predicate, places, allow_future_versions_for);
+
         let atom = self.reachability_constraints.add_atom(predicate);
         let negated = self.reachability_constraints.add_not_constraint(atom);
         self.record_narrowing_constraint_node_for_places(negated, places);
+    }
+
+    fn record_predicate_place_versions(
+        &mut self,
+        predicate: ScopedPredicateId,
+        places: &PossiblyNarrowedPlaces,
+        allow_future_versions_for: &FxHashSet<ScopedPlaceId>,
+    ) {
+        for place in places {
+            let bindings = match place {
+                ScopedPlaceId::Symbol(symbol_id) => {
+                    self.symbol_states.get(*symbol_id).map(PlaceState::bindings)
+                }
+                ScopedPlaceId::Member(member_id) => {
+                    self.member_states.get(*member_id).map(PlaceState::bindings)
+                }
+            };
+            let Some(bindings) = bindings else {
+                continue;
+            };
+
+            let entry = self
+                .predicate_place_versions
+                .entry((predicate, *place))
+                .or_default();
+            if allow_future_versions_for.contains(place) {
+                entry.allow_future_versions = true;
+            }
+            for version in bindings.place_versions() {
+                if !entry.versions.contains(&version) {
+                    entry.versions.push(version);
+                }
+            }
+            entry.versions.sort_unstable();
+        }
     }
 
     /// Records a TDD narrowing constraint node for the specified places.
@@ -1509,6 +1581,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachable_symbol_definitions.shrink_to_fit();
         self.reachable_member_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
+        self.predicate_place_versions.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_definition.shrink_to_fit();
@@ -1517,6 +1590,7 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             predicates: self.predicates.build(),
+            predicate_place_versions: self.predicate_place_versions,
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
