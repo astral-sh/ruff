@@ -280,6 +280,13 @@ impl Bindings {
         });
     }
 
+    /// Returns `true` if any live binding has a narrowing constraint applied.
+    pub(super) fn has_narrowing_constraints(&self) -> bool {
+        self.live_bindings
+            .iter()
+            .any(|b| b.narrowing_constraint != ScopedNarrowingConstraint::ALWAYS_TRUE)
+    }
+
     /// Add given constraint to all live bindings.
     pub(super) fn record_narrowing_constraint(
         &mut self,
@@ -390,6 +397,11 @@ impl PlaceState {
             is_place_name,
             previous_definitions,
         );
+    }
+
+    /// Returns `true` if any live binding has a narrowing constraint applied.
+    pub(super) fn has_narrowing_constraints(&self) -> bool {
+        self.bindings.has_narrowing_constraints()
     }
 
     /// Add given constraint to all live bindings.
