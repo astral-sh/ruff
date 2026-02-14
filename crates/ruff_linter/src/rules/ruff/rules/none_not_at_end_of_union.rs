@@ -38,11 +38,11 @@ impl Violation for NoneNotAtEndOfUnion {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`None` not at the end of the type annotation.".to_string()
+        "`None` not at the end of the type union.".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Move `None` to the end of the type annotation".to_string())
+        Some("Move `None` to the end of the type union".to_string())
     }
 }
 
@@ -122,30 +122,18 @@ fn generate_fix(
         Applicability::Safe
     };
 
-    let reordered: Vec<&Expr> = other_exprs
-        .iter()
-        .copied()
-        .chain(none_exprs.iter().copied())
-        .collect();
+    let reordered: Vec<&Expr> = [other_exprs, none_exprs].concat();
 
-    if is_pep604 {
-        Some(generate_pep604_fix(
-            checker,
-            reordered,
-            annotation,
-            applicability,
-        ))
+    let edit = if is_pep604 {
+        generate_pep604_fix(checker, reordered, annotation)
     } else {
-        generate_typing_union_fix(checker, reordered, annotation, applicability)
-    }
+        generate_typing_union_fix(checker, reordered, annotation)?
+    };
+
+    Some(Fix::applicable_edit(edit, applicability))
 }
 
-fn generate_pep604_fix(
-    checker: &Checker,
-    nodes: Vec<&Expr>,
-    annotation: &Expr,
-    applicability: Applicability,
-) -> Fix {
+fn generate_pep604_fix(checker: &Checker, nodes: Vec<&Expr>, annotation: &Expr) -> Edit {
     debug_assert!(nodes.len() >= 2, "At least two nodes required");
 
     let new_expr = nodes
@@ -165,18 +153,14 @@ fn generate_pep604_fix(
         })
         .unwrap();
 
-    Fix::applicable_edit(
-        Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
-        applicability,
-    )
+    Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range())
 }
 
 fn generate_typing_union_fix(
     checker: &Checker,
     nodes: Vec<&Expr>,
     annotation: &Expr,
-    applicability: Applicability,
-) -> Option<Fix> {
+) -> Option<Edit> {
     let Expr::Subscript(subscript) = annotation else {
         return None;
     };
@@ -195,8 +179,8 @@ fn generate_typing_union_fix(
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     });
 
-    Some(Fix::applicable_edit(
-        Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range()),
-        applicability,
+    Some(Edit::range_replacement(
+        checker.generator().expr(&new_expr),
+        annotation.range(),
     ))
 }
