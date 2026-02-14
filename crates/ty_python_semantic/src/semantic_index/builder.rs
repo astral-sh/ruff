@@ -1034,8 +1034,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Records that all remaining statements in the current block are unreachable.
-    fn mark_unreachable(&mut self) {
-        self.current_use_def_map_mut().mark_unreachable();
+    fn mark_transferred(&mut self) {
+        self.current_use_def_map_mut().mark_transferred();
     }
 
     /// Records a reachability constraint that always evaluates to "ambiguous".
@@ -2562,7 +2562,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
                 walk_stmt(self, stmt);
                 // Everything in the current block after a terminal statement is unreachable.
-                self.mark_unreachable();
+                self.mark_transferred();
             }
 
             ast::Stmt::Continue(_) => {
@@ -2571,7 +2571,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     current_loop.push_continue(snapshot);
                 }
                 // Everything in the current block after a terminal statement is unreachable.
-                self.mark_unreachable();
+                self.mark_transferred();
             }
 
             ast::Stmt::Break(_) => {
@@ -2580,7 +2580,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     current_loop.push_break(snapshot);
                 }
                 // Everything in the current block after a terminal statement is unreachable.
-                self.mark_unreachable();
+                self.mark_transferred();
             }
             ast::Stmt::Global(ast::StmtGlobal {
                 range: _,

@@ -28,7 +28,10 @@ use crate::semantic_index::scope::{
     NodeWithScopeKey, NodeWithScopeRef, Scope, ScopeId, ScopeKind, ScopeLaziness,
 };
 use crate::semantic_index::symbol::ScopedSymbolId;
-use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
+use crate::semantic_index::use_def::{
+    EnclosingSnapshotKey, ReferableBindingWithConstraintsIterator, ReferableDeclarationsIterator,
+    ScopedEnclosingSnapshotId, UseDefMap,
+};
 use crate::semantic_model::HasTrackedScope;
 
 pub mod ast_ids;
@@ -196,28 +199,12 @@ pub(crate) fn attribute_assignments<'db, 's>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
     name: &'s str,
-) -> impl Iterator<Item = (BindingWithConstraintsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
-    let file = class_body_scope.file(db);
-    let index = semantic_index(db, file);
-
-    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
-        let place_table = index.place_table(function_scope_id);
-        let member = place_table.member_id_by_instance_attribute_name(name)?;
-        let use_def = &index.use_def_maps[function_scope_id];
-        Some((use_def.reachable_member_bindings(member), function_scope_id))
-    })
-}
-
-/// Returns all attribute declarations (and their method scope IDs) with a symbol name matching
-/// the one given for a specific class body scope.
-///
-/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
-/// introduces a direct dependency on that file's AST.
-pub(crate) fn attribute_declarations<'db, 's>(
-    db: &'db dyn Db,
-    class_body_scope: ScopeId<'db>,
-    name: &'s str,
-) -> impl Iterator<Item = (DeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+) -> impl Iterator<
+    Item = (
+        ReferableBindingWithConstraintsIterator<'db, 'db>,
+        FileScopeId,
+    ),
+> + use<'s, 'db> {
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
 
@@ -226,7 +213,31 @@ pub(crate) fn attribute_declarations<'db, 's>(
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.reachable_member_declarations(member),
+            use_def.referable_member_bindings(db, member),
+            function_scope_id,
+        ))
+    })
+}
+
+/// Returns all referable attribute declarations (and their method scope IDs) with a symbol name matching
+/// the one given for a specific class body scope.
+///
+/// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
+/// introduces a direct dependency on that file's AST.
+pub(crate) fn attribute_declarations<'db, 's>(
+    db: &'db dyn Db,
+    class_body_scope: ScopeId<'db>,
+    name: &'s str,
+) -> impl Iterator<Item = (ReferableDeclarationsIterator<'db, 'db>, FileScopeId)> + use<'s, 'db> {
+    let file = class_body_scope.file(db);
+    let index = semantic_index(db, file);
+
+    attribute_scopes(db, class_body_scope).filter_map(|function_scope_id| {
+        let place_table = index.place_table(function_scope_id);
+        let member = place_table.member_id_by_instance_attribute_name(name)?;
+        let use_def = &index.use_def_maps[function_scope_id];
+        Some((
+            use_def.referable_member_declarations(db, member),
             function_scope_id,
         ))
     })
