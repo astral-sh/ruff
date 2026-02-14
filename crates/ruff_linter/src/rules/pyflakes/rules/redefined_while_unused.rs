@@ -1,14 +1,17 @@
+use rustc_hash::FxHashMap;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_semantic::analyze::visibility;
-use ruff_python_semantic::{BindingKind, Imported, Scope, ScopeId};
+use ruff_python_semantic::{
+    Binding, BindingKind, Imported, NodeId, Scope, ScopeId, ShadowedBinding,
+    analyze::{typing::is_type_checking_block, visibility},
+};
 use ruff_source_file::SourceRow;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
+use crate::preview::is_f811_shadowing_in_type_checking_enabled;
 use crate::{Fix, FixAvailability, Violation};
-
-use rustc_hash::FxHashMap;
 
 /// ## What it does
 /// Checks for variable definitions that redefine (or "shadow") unused
@@ -41,6 +44,7 @@ use rustc_hash::FxHashMap;
 pub(crate) struct RedefinedWhileUnused {
     pub name: String,
     pub row: SourceRow,
+    pub is_type_checking_duplicate: bool,
 }
 
 impl Violation for RedefinedWhileUnused {
@@ -48,20 +52,36 @@ impl Violation for RedefinedWhileUnused {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedWhileUnused { name, row } = self;
-        format!("Redefinition of unused `{name}` from {row}")
+        let RedefinedWhileUnused {
+            name,
+            row,
+            is_type_checking_duplicate,
+        } = self;
+        if *is_type_checking_duplicate {
+            format!("Import `{name}` is duplicated in `typing.TYPE_CHECKING` block")
+        } else {
+            format!("Redefinition of unused `{name}` from {row}")
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let RedefinedWhileUnused { name, .. } = self;
-        Some(format!("Remove definition: `{name}`"))
+        let RedefinedWhileUnused {
+            name,
+            is_type_checking_duplicate,
+            ..
+        } = self;
+        if *is_type_checking_duplicate {
+            Some(format!("Remove runtime `{name}` import"))
+        } else {
+            Some(format!("Remove definition: `{name}`"))
+        }
     }
 }
 
 /// F811
 pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     // Index the redefined bindings by statement.
-    let mut redefinitions = FxHashMap::default();
+    let mut redefinitions: FxHashMap<Option<NodeId>, Vec<EntryInfo<'_>>> = FxHashMap::default();
 
     for (name, binding_id) in scope.bindings() {
         for shadow in checker.semantic().shadowed_bindings(scope_id, binding_id) {
@@ -82,6 +102,23 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             // shadowed binding, abort.
             if !binding.redefines(shadowed) {
                 continue;
+            }
+
+            if !is_f811_shadowing_in_type_checking_enabled(checker.settings()) {
+                let shadowed_in_type_checking = shadowed
+                    .source
+                    .map(|source| is_in_type_checking_block(checker, source))
+                    .unwrap_or(false);
+                let binding_in_type_checking = binding
+                    .source
+                    .map(|source| is_in_type_checking_block(checker, source))
+                    .unwrap_or(false);
+
+                if (shadowed_in_type_checking || binding_in_type_checking)
+                    && !(shadowed_in_type_checking && binding_in_type_checking)
+                {
+                    continue;
+                }
             }
 
             if shadow.same_scope() {
@@ -132,44 +169,47 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             if shadowed.source.is_none_or(|left| {
                 binding
                     .source
-                    .is_none_or(|right| !checker.semantic().same_branch(left, right))
+                    .is_none_or(|right| bindings_in_different_forks(checker, &shadow, left, right))
             }) {
                 continue;
             }
 
             redefinitions
                 .entry(binding.source)
-                .or_insert_with(Vec::new)
-                .push((shadowed, binding));
+                .or_default()
+                .push(EntryInfo::new(shadowed, binding, checker));
         }
     }
 
     // Create a fix for each source statement.
     let mut fixes = FxHashMap::default();
     for (source, entries) in &redefinitions {
-        let Some(source) = source else {
+        let Some(_) = source else {
             continue;
         };
 
-        let member_names = entries
+        let has_type_checking_duplicate =
+            entries.iter().any(|info| info.is_type_checking_duplicate);
+
+        let Some(runtime_source) = entries.iter().find_map(|info| info.runtime_import) else {
+            continue;
+        };
+
+        let member_names: Vec<_> = entries
             .iter()
-            .filter_map(|(shadowed, binding)| {
-                if let Some(shadowed_import) = shadowed.as_any_import() {
-                    if let Some(import) = binding.as_any_import() {
-                        if shadowed_import.qualified_name() == import.qualified_name() {
-                            return Some(import.member_name());
-                        }
-                    }
-                }
-                None
+            .filter_map(|info| {
+                let shadowed_import = info.shadowed.as_any_import()?;
+                let import = info.binding.as_any_import()?;
+                (shadowed_import.qualified_name() == import.qualified_name())
+                    .then_some(import.member_name())
             })
-            .collect::<Vec<_>>();
+            .collect();
 
         if !member_names.is_empty() {
-            let statement = checker.semantic().statement(*source);
-            let parent = checker.semantic().parent_statement(*source);
+            let statement = checker.semantic().statement(runtime_source);
+            let parent = checker.semantic().parent_statement(runtime_source);
             let Ok(edit) = edits::remove_unused_imports(
-                member_names.iter().map(std::convert::AsRef::as_ref),
+                member_names.iter().map(AsRef::as_ref),
                 statement,
                 parent,
                 checker.locator(),
@@ -178,10 +218,19 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             ) else {
                 continue;
             };
+
+            let fix = if has_type_checking_duplicate {
+                // Mark fix always unsafe, because it can
+                // break behavior in projects like `mypy`
+                Fix::unsafe_edit(edit)
+            } else {
+                Fix::safe_edit(edit)
+            };
+
             fixes.insert(
-                *source,
-                Fix::safe_edit(edit).isolate(Checker::isolation(
-                    checker.semantic().parent_statement_id(*source),
+                runtime_source,
+                fix.isolate(Checker::isolation(
+                    checker.semantic().parent_statement_id(runtime_source),
                 )),
             );
         }
@@ -189,31 +238,123 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 
     // Create diagnostics for each statement.
     for (source, entries) in &redefinitions {
-        for (shadowed, binding) in entries {
-            let name = binding.name(checker.source());
+        let Some(_) = source else {
+            continue;
+        };
+
+        for info in entries {
+            let name = info.binding.name(checker.source());
+
             let mut diagnostic = checker.report_diagnostic(
                 RedefinedWhileUnused {
                     name: name.to_string(),
-                    row: checker.compute_source_row(shadowed.start()),
+                    row: checker.compute_source_row(info.shadowed.start()),
+                    is_type_checking_duplicate: info.is_type_checking_duplicate,
                 },
-                binding.range(),
+                info.binding.range(),
             );
             diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 
-            diagnostic.secondary_annotation(
-                format_args!("previous definition of `{name}` here"),
-                shadowed,
-            );
+            if info.is_type_checking_duplicate {
+                diagnostic.secondary_annotation(
+                    format_args!("runtime import of `{name}` here"),
+                    info.shadowed,
+                );
+            } else {
+                diagnostic.secondary_annotation(
+                    format_args!("previous definition of `{name}` here"),
+                    info.shadowed,
+                );
+            }
 
             diagnostic.set_primary_message(format_args!("`{name}` redefined here"));
 
-            if let Some(range) = binding.parent_range(checker.semantic()) {
+            if let Some(range) = info.binding.parent_range(checker.semantic()) {
                 diagnostic.set_parent(range.start());
             }
 
-            if let Some(fix) = source.as_ref().and_then(|source| fixes.get(source)) {
-                diagnostic.set_fix(fix.clone());
+            if let Some(runtime_source) = info.runtime_import {
+                if let Some(fix) = fixes.get(&runtime_source) {
+                    diagnostic.set_fix(fix.clone());
+                }
             }
         }
     }
+}
+
+struct EntryInfo<'a> {
+    shadowed: &'a Binding<'a>,
+    binding: &'a Binding<'a>,
+    is_type_checking_duplicate: bool,
+    runtime_import: Option<NodeId>,
+}
+
+impl<'a> EntryInfo<'a> {
+    fn new(shadowed: &'a Binding<'a>, binding: &'a Binding<'a>, checker: &Checker) -> Self {
+        let shadowed_in_type_checking = shadowed
+            .source
+            .map(|source| is_in_type_checking_block(checker, source))
+            .unwrap_or(false);
+
+        let binding_in_type_checking = binding
+            .source
+            .map(|source| is_in_type_checking_block(checker, source))
+            .unwrap_or(false);
+
+        let is_type_checking_duplicate = (shadowed_in_type_checking || binding_in_type_checking)
+            && !(shadowed_in_type_checking && binding_in_type_checking);
+
+        let runtime_import = match (shadowed_in_type_checking, binding_in_type_checking) {
+            (true, false) => binding.source,
+            (false, true) => shadowed.source,
+            _ => binding.source.or(shadowed.source),
+        };
+
+        Self {
+            shadowed,
+            binding,
+            is_type_checking_duplicate,
+            runtime_import,
+        }
+    }
+}
+
+fn bindings_in_different_forks(
+    checker: &Checker,
+    shadow: &ShadowedBinding,
+    left: NodeId,
+    right: NodeId,
+) -> bool {
+    let left_ = is_in_type_checking_block(checker, left);
+    let right_ = is_in_type_checking_block(checker, right);
+
+    if !is_f811_shadowing_in_type_checking_enabled(checker.settings())
+        && (left_ || right_)
+        && !(left_ && right_)
+    {
+        return !checker.semantic().same_branch(left, right);
+    }
+
+    if (left_ || right_) && !(left_ && right_) {
+        let left_binding = &checker.semantic().bindings[shadow.shadowed_id()];
+        let right_binding = &checker.semantic().bindings[shadow.binding_id()];
+
+        if let (Some(left_import), Some(right_import)) =
+            (left_binding.as_any_import(), right_binding.as_any_import())
+            && left_import.qualified_name() == right_import.qualified_name()
+        {
+            return false;
+        }
+    }
+
+    !checker.semantic().same_branch(left, right)
+}
+
+#[inline]
+fn is_in_type_checking_block(checker: &Checker, node_id: NodeId) -> bool {
+    checker.semantic().statements(node_id).any(|stmt| {
+        stmt.as_if_stmt()
+            .map(|if_stmt| is_type_checking_block(if_stmt, checker.semantic()))
+            .unwrap_or(false)
+    })
 }
