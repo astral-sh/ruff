@@ -116,8 +116,8 @@ class Color(Enum):
     YELLOW = None  # error: [invalid-assignment]
 ```
 
-Reassigning `_value_` inside `__init__` is allowed, but reassignment must still conform to the
-declared `_value_` type annotation:
+An explicit `_value_` annotation always takes priority, even if `__init__` is defined. If `__init__`
+is defined but no `_value_` annotation exists, we fall back to `Any`:
 
 ```py
 from enum import Enum
@@ -127,8 +127,8 @@ class Planet(Enum):
 
     def __init__(self, value: int, mass: float, radius: float):
         self._value_ = value  # error: [invalid-assignment]
-    MERCURY = (1, 3.303e23, 2.4397e6)
-    SATURN = "saturn"  # error: [invalid-assignment]
+    MERCURY = (1, 3.303e23, 2.4397e6)  # error: [invalid-assignment]
+    SATURN = "saturn"
 ```
 
 ### Non-member attributes with disallowed type
