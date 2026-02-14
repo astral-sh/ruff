@@ -5022,7 +5022,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 ///
 /// The type of `Foo` would be `<class 'Foo'>` where `Foo` is a `DynamicClassLiteral` with:
 /// - name: "Foo"
-/// - bases: [Base]
+/// - members: [("attr", int)]
 ///
 /// This is called "dynamic" because the class is created dynamically at runtime
 /// via a function call rather than a class statement.
