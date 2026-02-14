@@ -21,9 +21,9 @@ reveal_type(types.new_class("Bar", (Base,)))  # revealed: <class 'Bar'>
 reveal_type(types.new_class("Baz", (Base, Mixin)))  # revealed: <class 'Baz'>
 ```
 
-## Keyword argument for bases
+## Keyword arguments
 
-The `bases` argument can also be passed as a keyword argument.
+Arguments can be passed as keyword arguments.
 
 ```py
 import types
@@ -31,6 +31,8 @@ import types
 class Base: ...
 
 reveal_type(types.new_class("Foo", bases=(Base,)))  # revealed: <class 'Foo'>
+reveal_type(types.new_class(name="Bar"))  # revealed: <class 'Bar'>
+reveal_type(types.new_class(name="Baz", bases=(Base,)))  # revealed: <class 'Baz'>
 ```
 
 ## Assignability to base type
@@ -193,4 +195,66 @@ def f(x: type[Base]):
     reveal_mro(Child)  # revealed: (<class 'Child'>, Unknown, <class 'object'>)
     child = Child()
     reveal_type(child.base_attr)  # revealed: Unknown
+```
+
+`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed — the MRO
+being unknowable is inherent to `Any`/`Unknown`, not a ty limitation:
+
+```py
+import types
+from typing import Any
+
+def g(x: type[Any]):
+    # No diagnostic: `Any` base is fine as-is
+    Child = types.new_class("Child", (x,))
+    reveal_type(Child)  # revealed: <class 'Child'>
+```
+
+## Dynamic namespace via `exec_body`
+
+When `exec_body` is provided, it can populate the class namespace dynamically, so attribute access
+returns `Unknown`. Without `exec_body`, the namespace is empty and attribute access is an error:
+
+```py
+import types
+
+class Base:
+    base_attr: int = 1
+
+# Without exec_body: no dynamic namespace, so only base attributes are available
+NoBody = types.new_class("NoBody", (Base,))
+instance = NoBody()
+reveal_type(instance.base_attr)  # revealed: int
+
+# With exec_body=None: same as no exec_body
+NoBodyExplicit = types.new_class("NoBodyExplicit", (Base,), exec_body=None)
+instance_explicit = NoBodyExplicit()
+reveal_type(instance_explicit.base_attr)  # revealed: int
+
+# With exec_body=None passed positionally: same as no exec_body
+NoBodyPositional = types.new_class("NoBodyPositional", (Base,), None, None)
+instance_positional = NoBodyPositional()
+reveal_type(instance_positional.base_attr)  # revealed: int
+
+# With exec_body: namespace is dynamic, so any attribute access returns Unknown
+def body(ns):
+    ns["x"] = 1
+
+WithBody = types.new_class("WithBody", (Base,), exec_body=body)
+instance2 = WithBody()
+reveal_type(instance2.x)  # revealed: Unknown
+reveal_type(instance2.anything)  # revealed: Unknown
+```
+
+## Forward references via string annotations
+
+Forward references via subscript annotations on generic bases are supported:
+
+```py
+import types
+
+# Forward reference to X via subscript annotation in tuple base
+# (This fails at runtime, but we should handle it without panicking)
+X = types.new_class("X", (tuple["X | None"],))
+reveal_type(X)  # revealed: <class 'X'>
 ```
