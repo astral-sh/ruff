@@ -39,7 +39,8 @@ impl<'db> ScopeId<'db> {
     pub(crate) fn accepts_type_context(self, db: &dyn Db) -> bool {
         matches!(
             self.node(db),
-            NodeWithScopeKind::ListComprehension(_)
+            NodeWithScopeKind::Lambda(_)
+                | NodeWithScopeKind::ListComprehension(_)
                 | NodeWithScopeKind::SetComprehension(_)
                 | NodeWithScopeKind::DictComprehension(_)
         )
