@@ -528,6 +528,12 @@ impl<'db> CallableSignature<'db> {
 
                     if let Some(other_parameter_type) = single_required_positional(other_signature)
                     {
+                        let other_has_typevar = other_parameter_type
+                            .has_typevar_or_typevar_instance(db)
+                            || other_signature
+                                .return_ty
+                                .has_typevar_or_typevar_instance(db);
+
                         let mut unary_signatures =
                             SmallVec::<[(Type<'db>, Type<'db>); 1]>::with_capacity(
                                 self_signatures.len(),
@@ -548,7 +554,7 @@ impl<'db> CallableSignature<'db> {
                             let mut return_type_union = UnionBuilder::new(db);
                             let mut has_overlapping_domain = false;
 
-                            for (self_parameter_type, self_return_type) in unary_signatures {
+                            for &(self_parameter_type, self_return_type) in &unary_signatures {
                                 let signatures_are_disjoint = self_parameter_type
                                     .is_disjoint_from_impl(
                                         db,
@@ -570,13 +576,31 @@ impl<'db> CallableSignature<'db> {
                             }
 
                             if has_overlapping_domain {
+                                let aggregate_has_typevar = other_has_typevar
+                                    || unary_signatures.iter().any(
+                                        |(self_parameter_type, self_return_type)| {
+                                            self_parameter_type.has_typevar_or_typevar_instance(db)
+                                                || self_return_type
+                                                    .has_typevar_or_typevar_instance(db)
+                                        },
+                                    );
+                                // For aggregated unary overload checks involving typevars, plain
+                                // assignability can recurse through deferred inference cycles.
+                                // Use constraint-set assignability for this aggregate relation to
+                                // preserve the aggregate semantics without reintroducing that loop.
+                                let aggregate_relation =
+                                    if relation.is_assignability() && aggregate_has_typevar {
+                                        TypeRelation::ConstraintSetAssignability
+                                    } else {
+                                        relation
+                                    };
                                 // Function assignability here is parameter-contravariant and return-covariant.
                                 let parameters_cover_target = other_parameter_type
                                     .has_relation_to_impl(
                                         db,
                                         parameter_type_union.build(),
                                         inferable,
-                                        relation,
+                                        aggregate_relation,
                                         relation_visitor,
                                         disjointness_visitor,
                                     );
@@ -585,7 +609,7 @@ impl<'db> CallableSignature<'db> {
                                         db,
                                         other_signature.return_ty,
                                         inferable,
-                                        relation,
+                                        aggregate_relation,
                                         relation_visitor,
                                         disjointness_visitor,
                                     );
