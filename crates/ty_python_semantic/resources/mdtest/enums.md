@@ -127,6 +127,7 @@ class Planet(Enum):
 
     def __init__(self, value: int, mass: float, radius: float):
         self._value_ = value  # error: [invalid-assignment]
+
     MERCURY = (1, 3.303e23, 2.4397e6)  # error: [invalid-assignment]
     SATURN = "saturn"
 ```
