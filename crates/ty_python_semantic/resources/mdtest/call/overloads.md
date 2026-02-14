@@ -428,7 +428,6 @@ class SomeEnum(Enum):
     B = 2
     C = 3
 
-
 class A: ...
 class B: ...
 class C: ...
@@ -916,6 +915,33 @@ def _(a: int | None):
             a30=a,
         )
     )
+```
+
+### Optimization: Limit tuple element expansion size
+
+To prevent combinatorial explosion, ty limits the Cartesian product size when expanding tuple
+elements. A tuple like `tuple[A | B, A | B, ..., A | B]` with many union-typed elements would
+otherwise produce an exponential number of expanded types.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: tuple[int, ...]) -> int: ...
+@overload
+def f(x: tuple[str, ...]) -> str: ...
+```
+
+```py
+from overloaded import f
+
+def _(a: int | str) -> None:
+    # This tuple has too many expandable elements for the Cartesian product to be computed.
+    # ty skips the tuple expansion and falls through to the error case.
+    # error: [no-matching-overload]
+    f((a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a))
 ```
 
 ### Retry from parameter matching
@@ -1467,19 +1493,16 @@ class B: ...
 def f1(x: int) -> A: ...
 @overload
 def f1(x: Any, y: Any) -> A: ...
-
 @overload
 def f2(x: int) -> A: ...
 @overload
 def f2(x: Any, y: Any) -> B: ...
-
 @overload
 def f3(x: int) -> A: ...
 @overload
 def f3(x: Any, y: Any) -> A: ...
 @overload
 def f3(x: Any, y: Any, *, z: str) -> B: ...
-
 @overload
 def f4(x: int) -> A: ...
 @overload
@@ -1523,14 +1546,12 @@ def f1(x1: T1, x2: T2, /) -> tuple[T1, T2]: ...
 def f1(x1: T1, x2: T2, x3: T3, /) -> tuple[T1, T2, T3]: ...
 @overload
 def f1(*args: Any) -> tuple[Any, ...]: ...
-
 @overload
 def f2(x1: T1) -> tuple[T1]: ...
 @overload
 def f2(x1: T1, x2: T2) -> tuple[T1, T2]: ...
 @overload
 def f2(*args: Any, **kwargs: Any) -> tuple[Any, ...]: ...
-
 @overload
 def f3(x: T1) -> tuple[T1]: ...
 @overload

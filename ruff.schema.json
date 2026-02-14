@@ -1488,7 +1488,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nimport fastapi\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
           "type": [
             "array",
             "null"
@@ -1757,6 +1757,33 @@
             "boolean",
             "null"
           ]
+        },
+        "import-heading": {
+          "description": "A mapping from import section names to their heading comments.\n\nWhen set, a comment with the specified text will be added above imports\nin the corresponding section. If a heading comment already exists, it\nwill be replaced.\n\nCompatible with isort's `import_heading_{section_name}` settings.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "first-party": {
+              "type": "string"
+            },
+            "future": {
+              "type": "string"
+            },
+            "local-folder": {
+              "type": "string"
+            },
+            "standard-library": {
+              "type": "string"
+            },
+            "third-party": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they\ncan be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer\nto the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
@@ -2995,6 +3022,8 @@
         "AIR31",
         "AIR311",
         "AIR312",
+        "AIR32",
+        "AIR321",
         "ALL",
         "ANN",
         "ANN0",
@@ -4089,6 +4118,7 @@
         "RUF066",
         "RUF067",
         "RUF068",
+        "RUF069",
         "RUF1",
         "RUF10",
         "RUF100",

@@ -6,6 +6,7 @@
 use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
 use ruff_python_ast::name::Name;
+use ruff_python_stdlib::identifiers::is_mangled_private;
 use rustc_hash::FxHashSet;
 
 use crate::{
@@ -22,13 +23,14 @@ use crate::{
     },
     types::{
         CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type,
+        StaticClassLiteral, Type, TypeQualifiers,
         class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
             INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE,
-            INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD, report_invalid_method_override,
-            report_overridden_final_method,
+            INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
+            report_invalid_method_override, report_overridden_final_method,
+            report_overridden_final_variable,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
@@ -176,179 +178,209 @@ fn check_class_declaration<'db>(
     let mut has_typeddict_in_mro = false;
     let mut liskov_diagnostic_emitted = false;
     let mut overridden_final_method = None;
+    let mut overridden_final_variable: Option<(ClassType<'db>, Option<Definition<'db>>)> = None;
+    let is_private_member = is_mangled_private(member.name.as_str());
 
     // Track the first superclass that defines this method (the "immediate parent" for this method).
     // We need this to check if parent itself already has an LSP violation with an ancestor.
     // If so, we shouldn't report the same violation for the child class.
     let mut immediate_parent_method: Option<(ClassType<'db>, Type<'db>)> = None;
 
-    for class_base in class.iter_mro(db).skip(1) {
-        let superclass = match class_base {
-            ClassBase::Protocol | ClassBase::Generic => continue,
-            ClassBase::Dynamic(_) => {
-                has_dynamic_superclass = true;
+    if !is_private_member {
+        for class_base in class.iter_mro(db).skip(1) {
+            let superclass = match class_base {
+                ClassBase::Protocol | ClassBase::Generic => continue,
+                ClassBase::Dynamic(_) => {
+                    has_dynamic_superclass = true;
+                    continue;
+                }
+                ClassBase::TypedDict => {
+                    has_typeddict_in_mro = true;
+                    continue;
+                }
+                ClassBase::Class(class) => class,
+            };
+
+            let Some((superclass_literal, superclass_specialization)) =
+                superclass.static_class_literal(db)
+            else {
+                continue;
+            };
+            let superclass_scope = superclass_literal.body_scope(db);
+            let superclass_symbol_table = place_table(db, superclass_scope);
+            let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
+
+            let mut method_kind = MethodKind::default();
+
+            // If the member is not defined on the class itself, skip it
+            if let Some(id) = superclass_symbol_id {
+                let superclass_symbol = superclass_symbol_table.symbol(id);
+                if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
+                    continue;
+                }
+            } else {
+                if superclass_literal
+                    .own_synthesized_member(db, superclass_specialization, None, &member.name)
+                    .is_none()
+                {
+                    continue;
+                }
+                method_kind = CodeGeneratorKind::from_class(
+                    db,
+                    superclass_literal.into(),
+                    superclass_specialization,
+                )
+                .map(MethodKind::Synthesized)
+                .unwrap_or_default();
+            }
+
+            let Place::Defined(DefinedPlace {
+                ty: superclass_type,
+                ..
+            }) = Type::instance(db, superclass)
+                .member(db, &member.name)
+                .place
+            else {
+                // If not defined on any superclass, no point in continuing to walk up the MRO
+                break;
+            };
+
+            subclass_overrides_superclass_declaration = true;
+
+            // Record the first superclass that defines this method as the "immediate parent method"
+            if immediate_parent_method.is_none() {
+                immediate_parent_method = Some((superclass, superclass_type));
+            }
+
+            if (configuration.check_final_method_overridden() && overridden_final_method.is_none())
+                || (configuration.check_final_variable_overridden()
+                    && overridden_final_variable.is_none())
+            {
+                let own_class_member = superclass.own_class_member(db, None, &member.name);
+
+                if configuration.check_final_method_overridden() {
+                    overridden_final_method = overridden_final_method.or_else(|| {
+                        let superclass_symbol_id = superclass_symbol_id?;
+
+                        // TODO: `@final` should be more like a type qualifier:
+                        // we should also recognise `@final`-decorated methods that don't end up
+                        // as being function- or property-types (because they're wrapped by other
+                        // decorators that transform the type into something else).
+                        let underlying_functions = extract_underlying_functions(
+                            db,
+                            own_class_member.ignore_possibly_undefined()?,
+                        )?;
+
+                        if underlying_functions.iter().any(|function| {
+                            function.has_known_decorator(db, FunctionDecorators::FINAL)
+                        }) && is_function_definition(db, superclass_scope, superclass_symbol_id)
+                        {
+                            Some((superclass, underlying_functions))
+                        } else {
+                            None
+                        }
+                    });
+                }
+
+                if configuration.check_final_variable_overridden() {
+                    overridden_final_variable = overridden_final_variable.or_else(|| {
+                        if !own_class_member
+                            .qualifiers()
+                            .contains(TypeQualifiers::FINAL)
+                        {
+                            return None;
+                        }
+
+                        // Find the declaration definition in the superclass for the secondary
+                        // annotation.
+                        let superclass_definition = superclass_symbol_id.and_then(|id| {
+                            use_def_map(db, superclass_scope)
+                                .end_of_scope_symbol_declarations(id)
+                                .find_map(|decl| decl.declaration.definition())
+                        });
+
+                        Some((superclass, superclass_definition))
+                    });
+                }
+            }
+
+            // **********************************************************
+            // Everything below this point in the loop
+            // is about Liskov Substitution Principle checks
+            // **********************************************************
+
+            // Only one Liskov diagnostic should be emitted per each invalid override,
+            // even if it overrides multiple superclasses incorrectly!
+            if liskov_diagnostic_emitted {
                 continue;
             }
-            ClassBase::TypedDict => {
-                has_typeddict_in_mro = true;
+
+            if !configuration.check_method_liskov_violations() {
                 continue;
             }
-            ClassBase::Class(class) => class,
-        };
 
-        let Some((superclass_literal, superclass_specialization)) =
-            superclass.static_class_literal(db)
-        else {
-            continue;
-        };
-        let superclass_scope = superclass_literal.body_scope(db);
-        let superclass_symbol_table = place_table(db, superclass_scope);
-        let superclass_symbol_id = superclass_symbol_table.symbol_id(&member.name);
+            // TODO: Check Liskov on non-methods too
+            let Type::FunctionLiteral(subclass_function) = member.ty else {
+                continue;
+            };
 
-        let mut method_kind = MethodKind::default();
-
-        // If the member is not defined on the class itself, skip it
-        if let Some(id) = superclass_symbol_id {
-            let superclass_symbol = superclass_symbol_table.symbol(id);
-            if !(superclass_symbol.is_bound() || superclass_symbol.is_declared()) {
+            // Constructor methods are not checked for Liskov compliance
+            if matches!(
+                &*member.name,
+                "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
+            ) {
                 continue;
             }
-        } else {
-            if superclass_literal
-                .own_synthesized_member(db, superclass_specialization, None, &member.name)
-                .is_none()
+
+            // Synthesized `__replace__` methods on dataclasses are not checked
+            if &member.name == "__replace__"
+                && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
             {
                 continue;
             }
-            method_kind = CodeGeneratorKind::from_class(
-                db,
-                superclass_literal.into(),
-                superclass_specialization,
-            )
-            .map(MethodKind::Synthesized)
-            .unwrap_or_default();
-        }
 
-        let Place::Defined(DefinedPlace {
-            ty: superclass_type,
-            ..
-        }) = Type::instance(db, superclass)
-            .member(db, &member.name)
-            .place
-        else {
-            // If not defined on any superclass, no point in continuing to walk up the MRO
-            break;
-        };
+            let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db)
+            else {
+                continue;
+            };
 
-        subclass_overrides_superclass_declaration = true;
+            let superclass_type_as_type = superclass_type_as_callable.into_type(db);
 
-        // Record the first superclass that defines this method as the "immediate parent method"
-        if immediate_parent_method.is_none() {
-            immediate_parent_method = Some((superclass, superclass_type));
-        }
+            if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
+                continue;
+            }
 
-        if configuration.check_final_method_overridden() {
-            overridden_final_method = overridden_final_method.or_else(|| {
-                let superclass_symbol_id = superclass_symbol_id?;
-
-                // TODO: `@final` should be more like a type qualifier:
-                // we should also recognise `@final`-decorated methods that don't end up
-                // as being function- or property-types (because they're wrapped by other
-                // decorators that transform the type into something else).
-                let underlying_functions = extract_underlying_functions(
-                    db,
-                    superclass
-                        .own_class_member(db, None, &member.name)
-                        .ignore_possibly_undefined()?,
-                )?;
-
-                if underlying_functions
-                    .iter()
-                    .any(|function| function.has_known_decorator(db, FunctionDecorators::FINAL))
-                    && is_function_definition(db, superclass_scope, superclass_symbol_id)
-                {
-                    Some((superclass, underlying_functions))
-                } else {
-                    None
-                }
-            });
-        }
-
-        // **********************************************************
-        // Everything below this point in the loop
-        // is about Liskov Substitution Principle checks
-        // **********************************************************
-
-        // Only one Liskov diagnostic should be emitted per each invalid override,
-        // even if it overrides multiple superclasses incorrectly!
-        if liskov_diagnostic_emitted {
-            continue;
-        }
-
-        if !configuration.check_method_liskov_violations() {
-            continue;
-        }
-
-        // TODO: Check Liskov on non-methods too
-        let Type::FunctionLiteral(subclass_function) = member.ty else {
-            continue;
-        };
-
-        // Constructor methods are not checked for Liskov compliance
-        if matches!(
-            &*member.name,
-            "__init__" | "__new__" | "__post_init__" | "__init_subclass__"
-        ) {
-            continue;
-        }
-
-        // Synthesized `__replace__` methods on dataclasses are not checked
-        if &member.name == "__replace__"
-            && matches!(class_kind, Some(CodeGeneratorKind::DataclassLike(_)))
-        {
-            continue;
-        }
-
-        let Some(superclass_type_as_callable) = superclass_type.try_upcast_to_callable(db) else {
-            continue;
-        };
-
-        let superclass_type_as_type = superclass_type_as_callable.into_type(db);
-
-        if type_on_subclass_instance.is_assignable_to(db, superclass_type_as_type) {
-            continue;
-        }
-
-        // If this superclass is not the immediate parent for this method,
-        // check if the immediate parent itself already has an LSP violation with this ancestor.
-        // If so, don't report the same violation for the child class -- it would be a false positive
-        // since the child cannot fix the violation without contradicting its immediate parent's contract.
-        // See: https://github.com/astral-sh/ty/issues/2000
-        if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
-            if immediate_parent != superclass {
-                // The immediate parent already defines this method and is different from the
-                // current ancestor we're checking. Check if the immediate parent's method
-                // is also incompatible with this ancestor.
-                if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
-                    // The immediate parent already has an LSP violation with this ancestor.
-                    // Don't report the same violation for the child.
-                    continue;
+            // If this superclass is not the immediate parent for this method,
+            // check if the immediate parent itself already has an LSP violation with this ancestor.
+            // If so, don't report the same violation for the child class -- it would be a false positive
+            // since the child cannot fix the violation without contradicting its immediate parent's contract.
+            // See: https://github.com/astral-sh/ty/issues/2000
+            if let Some((immediate_parent, immediate_parent_type)) = immediate_parent_method {
+                if immediate_parent != superclass {
+                    // The immediate parent already defines this method and is different from the
+                    // current ancestor we're checking. Check if the immediate parent's method
+                    // is also incompatible with this ancestor.
+                    if !immediate_parent_type.is_assignable_to(db, superclass_type_as_type) {
+                        // The immediate parent already has an LSP violation with this ancestor.
+                        // Don't report the same violation for the child.
+                        continue;
+                    }
                 }
             }
+
+            report_invalid_method_override(
+                context,
+                &member.name,
+                class,
+                *first_reachable_definition,
+                subclass_function,
+                superclass,
+                superclass_type,
+                method_kind,
+            );
+
+            liskov_diagnostic_emitted = true;
         }
-
-        report_invalid_method_override(
-            context,
-            &member.name,
-            class,
-            *first_reachable_definition,
-            subclass_function,
-            superclass,
-            superclass_type,
-            method_kind,
-        );
-
-        liskov_diagnostic_emitted = true;
     }
 
     if !subclass_overrides_superclass_declaration && !has_dynamic_superclass {
@@ -393,6 +425,17 @@ fn check_class_declaration<'db>(
             &superclass_method,
         );
     }
+
+    if let Some((superclass, superclass_definition)) = overridden_final_variable {
+        report_overridden_final_variable(
+            context,
+            &member.name,
+            *first_reachable_definition,
+            superclass,
+            class,
+            superclass_definition,
+        );
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -411,6 +454,7 @@ bitflags! {
         const FINAL_METHOD_OVERRIDDEN = 1 << 2;
         const PROHIBITED_NAMED_TUPLE_ATTR = 1 << 3;
         const INVALID_DATACLASS = 1 << 4;
+        const FINAL_VARIABLE_OVERRIDDEN = 1 << 5;
     }
 }
 
@@ -436,6 +480,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         if rule_selection.is_enabled(LintId::of(&INVALID_DATACLASS)) {
             config |= OverrideRulesConfig::INVALID_DATACLASS;
         }
+        if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_VARIABLE)) {
+            config |= OverrideRulesConfig::FINAL_VARIABLE_OVERRIDDEN;
+        }
 
         config
     }
@@ -460,6 +507,10 @@ impl OverrideRulesConfig {
 
     const fn check_invalid_dataclasses(self) -> bool {
         self.contains(OverrideRulesConfig::INVALID_DATACLASS)
+    }
+
+    const fn check_final_variable_overridden(self) -> bool {
+        self.contains(OverrideRulesConfig::FINAL_VARIABLE_OVERRIDDEN)
     }
 }
 

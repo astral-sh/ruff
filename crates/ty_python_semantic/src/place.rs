@@ -5,17 +5,18 @@ use ty_module_resolver::{
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, get_loop_header,
+    place_table,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
     ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, MemberLookupPolicy,
     Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
-    declaration_type, todo_type,
+    declaration_type,
 };
 use crate::{Db, FxOrderSet, Program};
 
@@ -174,13 +175,6 @@ impl<'db> Place<'db> {
         Place::Defined(DefinedPlace::new(ty.into()).with_origin(TypeOrigin::Declared))
     }
 
-    /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
-    /// and definedness [`Definedness::AlwaysDefined`].
-    #[allow(unused_variables)] // Only unused in release builds
-    pub(crate) fn todo(message: &'static str) -> Self {
-        Place::Defined(DefinedPlace::new(todo_type!(message)))
-    }
-
     pub(crate) fn is_undefined(&self) -> bool {
         matches!(self, Place::Undefined)
     }
@@ -267,7 +261,7 @@ impl<'db> Place<'db> {
 
             Place::Defined(defined) => {
                 if let Some((dunder_get_return_ty, _)) =
-                    defined.ty.try_call_dunder_get(db, Type::none(db), owner)
+                    defined.ty.try_call_dunder_get(db, None, owner)
                 {
                     Place::Defined(DefinedPlace {
                         ty: dunder_get_return_ty,
@@ -675,17 +669,6 @@ pub(crate) struct PlaceAndQualifiers<'db> {
 }
 
 impl<'db> PlaceAndQualifiers<'db> {
-    /// Constructor that creates a [`PlaceAndQualifiers`] instance with a [`TodoType`] type
-    /// and no qualifiers.
-    ///
-    /// [`TodoType`]: crate::types::TodoType
-    pub(crate) fn todo(message: &'static str) -> Self {
-        Self {
-            place: Place::todo(message),
-            qualifiers: TypeQualifiers::empty(),
-        }
-    }
-
     pub(crate) fn unbound() -> Self {
         Self::default()
     }
@@ -1105,13 +1088,27 @@ fn symbol_impl<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
-    if name == "platform"
-        && file_to_module(db, scope.file(db))
-            .is_some_and(|module| module.is_known(db, KnownModule::Sys))
-    {
+    let is_known_module = |known_module| {
+        file_to_module(db, scope.file(db)).is_some_and(|module| module.is_known(db, known_module))
+    };
+
+    if name == "platform" && is_known_module(KnownModule::Sys) {
         match Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
                 return Place::bound(Type::string_literal(db, platform.as_str())).into();
+            }
+            crate::PythonPlatform::All => {
+                // Fall through to the looked up type
+            }
+        }
+    }
+
+    if name == "name" && is_known_module(KnownModule::Os) {
+        match Program::get(db).python_platform(db) {
+            crate::PythonPlatform::Identifier(platform) => {
+                // In CPython, `os.name` is `"nt"` on Windows and `"posix"` otherwise.
+                let os_name = if platform == "win32" { "nt" } else { "posix" };
+                return Place::bound(Type::string_literal(db, os_name)).into();
             }
             crate::PythonPlatform::All => {
                 // Fall through to the looked up type
@@ -1166,6 +1163,7 @@ fn place_from_bindings_impl<'db>(
     bindings_with_constraints: BindingWithConstraintsIterator<'_, 'db>,
     requires_explicit_reexport: RequiresExplicitReExport,
 ) -> PlaceWithDefinition<'db> {
+    let all_definitions = bindings_with_constraints.all_definitions;
     let predicates = bindings_with_constraints.predicates;
     let reachability_constraints = bindings_with_constraints.reachability_constraints;
     let boundness_analysis = bindings_with_constraints.boundness_analysis;
@@ -1195,6 +1193,7 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
+    let mut only_loop_header_bindings = true;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1276,6 +1275,57 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
+            // We need to "look through" loop header definitions to do boundness analysis. The
+            // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
+            // like all other bindings, so that it can participate in fixpoint iteration.
+            if let DefinitionKind::LoopHeader(loop_header_kind) = binding.kind(db) {
+                let loop_header = get_loop_header(db, loop_header_kind.loop_token());
+                let place = loop_header_kind.place();
+                let mut has_defined_bindings = false;
+                for loop_back in loop_header.bindings_for_place(place) {
+                    // Skip unreachable bindings.
+                    if reachability_constraints
+                        .evaluate(db, predicates, loop_back.reachability_constraint)
+                        .is_always_false()
+                    {
+                        continue;
+                    }
+
+                    // Resolve the definition state from the binding ID.
+                    let def_state = all_definitions[loop_back.binding];
+
+                    match def_state {
+                        DefinitionState::Defined(_) => {
+                            has_defined_bindings = true;
+                        }
+                        // `del` in the loop body is always visible to code after the loop via the
+                        // normal control flow merge. Updating `deleted_reachability` here is
+                        // necessary for prior uses in the loop to see it.
+                        DefinitionState::Deleted => {
+                            deleted_reachability =
+                                deleted_reachability.or(reachability_constraints.evaluate(
+                                    db,
+                                    predicates,
+                                    loop_back.reachability_constraint,
+                                ));
+                        }
+                        // If UNBOUND is visible at loop-back, then it was visible before the loop.
+                        // Loop header definitions don't shadow preexisting bindings, so we don't
+                        // need to do anything with this.
+                        DefinitionState::Undefined => {}
+                    }
+                }
+                // If all the bindings in the loop are in statically false branches, it might be
+                // that none of them loop-back. In that case short-circuit, so that we don't
+                // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
+                // possibility below.
+                if !has_defined_bindings {
+                    return None;
+                }
+            } else {
+                only_loop_header_bindings = false;
+            }
+
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
             Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
@@ -1300,6 +1350,12 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
+                Some(Truthiness::AlwaysTrue) if only_loop_header_bindings => {
+                    // Loop header definitions don't shadow prior bindings, so UNBOUND can still be
+                    // definitely-visible alongside a loop header binding. See "Use with loop
+                    // header and also `UNBOUND` definitely visible" in `while_loop.md`.
+                    Definedness::PossiblyUndefined
+                }
                 Some(Truthiness::AlwaysTrue) => {
                     unreachable!(
                         "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"

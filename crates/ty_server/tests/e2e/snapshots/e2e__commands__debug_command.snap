@@ -157,6 +157,10 @@ Settings: Settings {
             regex_set: RegexSet([]),
             globs: [],
         },
+        replace_imports_with_any: ModuleGlobSet {
+            regex_set: RegexSet([]),
+            globs: [],
+        },
     },
     overrides: [],
 }

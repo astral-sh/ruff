@@ -36,10 +36,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 21 | def f():
 22 |     if returns_bool():
 23 |         class C: ...
-24 |     else:
-25 |         class C: ...
-26 | 
-27 |     class D(C): ...  # error: [unsupported-base]
+24 | 
+25 |     else:
+26 |         class C: ...
+27 | 
+28 |     class D(C): ...  # error: [unsupported-base]
 ```
 
 # Diagnostics
@@ -62,12 +63,12 @@ info: rule `unsupported-base` is enabled by default
 
 ```
 warning[unsupported-base]: Unsupported class base
-  --> src/mdtest_snippet.py:27:13
+  --> src/mdtest_snippet.py:28:13
    |
-25 |         class C: ...
-26 |
-27 |     class D(C): ...  # error: [unsupported-base]
-   |             ^ Has type `<class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:23:15'> | <class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:25:15'>`
+26 |         class C: ...
+27 |
+28 |     class D(C): ...  # error: [unsupported-base]
+   |             ^ Has type `<class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:23:15'> | <class 'mdtest_snippet.<locals of function 'f'>.C @ src/mdtest_snippet.py:26:15'>`
    |
 info: ty cannot resolve a consistent method resolution order (MRO) for class `D` due to this base
 info: Only class objects or `Any` are supported as class bases

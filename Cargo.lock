@@ -466,9 +466,9 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.5.54"
+version = "4.5.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c6e6ff9dcd79cff5cd969a17a545d79e84ab086e444102a591e288a8aa3ce394"
+checksum = "a75ca66430e33a14957acc24c5077b503e7d374151b2b4b3a10c83b4ceb4be0e"
 dependencies = [
  "clap_builder",
  "clap_derive",
@@ -476,9 +476,9 @@ dependencies = [
 
 [[package]]
 name = "clap_builder"
-version = "4.5.54"
+version = "4.5.56"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fa42cf4d2b7a41bc8f663a7cab4031ebafa1bf3875705bfaf8466dc60ab52c00"
+checksum = "793207c7fa6300a0608d1080b858e5fdbe713cdc1c8db9fb17777d8a13e63df0"
 dependencies = [
  "anstream",
  "anstyle",
@@ -519,9 +519,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.5.49"
+version = "4.5.55"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a0b5487afeab2deb2ff4e03a807ad1a03ac532ff5a2cee5d86884440c7f7671"
+checksum = "a92793da1a46a5f2a02a6f4c46c6496b28c43638adea8306fcb0caa1634f24e5"
 dependencies = [
  "heck",
  "proc-macro2",
@@ -1125,7 +1125,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1647,9 +1647,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.46.1"
+version = "1.46.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "248b42847813a1550dafd15296fd9748c651d0c32194559dbc05d804d54b21e8"
+checksum = "38c91d64f9ad425e80200a50a0e8b8a641680b44e33ce832efe5b8bc65161b07"
 dependencies = [
  "console 0.15.11",
  "once_cell",
@@ -1740,6 +1740,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "is_executable"
+version = "1.0.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baabb8b4867b26294d818bf3f651a454b6901431711abb96e296245888d6e8c4"
+dependencies = [
+ "windows-sys 0.60.2",
+]
+
+[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1790,7 +1799,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -2918,7 +2927,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.14.14"
+version = "0.15.1"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3046,6 +3055,7 @@ dependencies = [
  "glob",
  "ignore",
  "insta",
+ "is_executable",
  "matchit",
  "path-slash",
  "pathdiff",
@@ -3073,6 +3083,7 @@ dependencies = [
  "tracing-subscriber",
  "ty_static",
  "web-time",
+ "which",
  "zip",
 ]
 
@@ -3179,7 +3190,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.14.14"
+version = "0.15.1"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -3259,9 +3270,12 @@ version = "0.0.0"
 dependencies = [
  "insta",
  "regex",
+ "ruff_linter",
  "ruff_python_ast",
  "ruff_python_formatter",
  "ruff_python_trivia",
+ "ruff_source_file",
+ "ruff_text_size",
  "ruff_workspace",
 ]
 
@@ -3506,6 +3520,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_formatter",
  "ruff_linter",
+ "ruff_markdown",
  "ruff_notebook",
  "ruff_python_ast",
  "ruff_python_codegen",
@@ -3549,7 +3564,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.14.14"
+version = "0.15.1"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3647,7 +3662,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -3664,8 +3679,8 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "salsa"
-version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
+version = "0.26.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=53421c2fff87426fa0bb51cab06632b87646de13#53421c2fff87426fa0bb51cab06632b87646de13"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3689,13 +3704,13 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
+version = "0.26.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=53421c2fff87426fa0bb51cab06632b87646de13#53421c2fff87426fa0bb51cab06632b87646de13"
 
 [[package]]
 name = "salsa-macros"
-version = "0.25.2"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95#0946cbd6478cf2bddfc9ac65b3c254c1f1b1bf95"
+version = "0.26.0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=53421c2fff87426fa0bb51cab06632b87646de13#53421c2fff87426fa0bb51cab06632b87646de13"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3714,9 +3729,9 @@ dependencies = [
 
 [[package]]
 name = "schemars"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54e910108742c57a770f492731f99be216a52fadd361b06c8fb59d74ccc267d2"
+checksum = "a2b42f36aa1cd011945615b92222f6bf73c599a102a300334cd7f8dbeec726cc"
 dependencies = [
  "dyn-clone",
  "ref-cast",
@@ -3727,9 +3742,9 @@ dependencies = [
 
 [[package]]
 name = "schemars_derive"
-version = "1.2.0"
+version = "1.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4908ad288c5035a8eb12cfdf0d49270def0a268ee162b75eeee0f85d155a7c45"
+checksum = "7d115b50f4aaeea07e79c1912f645c7513d81715d0420f8bc77a18c6260b307f"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -4049,7 +4064,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -4682,6 +4697,7 @@ dependencies = [
  "strum_macros",
  "tracing",
  "ty_static",
+ "which",
 ]
 
 [[package]]
@@ -5179,7 +5195,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.52.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]

@@ -2135,8 +2135,12 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             }
             ParametersKind::ParamSpec(typevar) => {
                 write!(f, "**{}", typevar.name(self.db))?;
-                if let Some(name) = typevar.binding_context(self.db).name(self.db) {
-                    write!(f, "@{name}")?;
+                let binding_context = typevar.binding_context(self.db);
+                if let Some(binding_context_name) = binding_context.name(self.db)
+                    && let Some(definition) = binding_context.definition()
+                    && !self.settings.active_scopes.contains(&definition)
+                {
+                    write!(f, "@{binding_context_name}")?;
                 }
             }
         }

@@ -27,6 +27,9 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 tracing = { workspace = true }
 
+[target.'cfg(not(target_family = "wasm"))'.dependencies]
+which = { workspace = true }
+
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
 

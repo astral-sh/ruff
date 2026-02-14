@@ -71,10 +71,16 @@ pub(crate) struct CheckCommand {
     ///
     /// ty uses your Python environment to resolve third-party imports in your code.
     ///
+    /// This can be a path to:
+    ///
+    /// - A Python interpreter, e.g. `.venv/bin/python3`
+    /// - A virtual environment directory, e.g. `.venv`
+    /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
+    ///
     /// If you're using a project management tool such as uv or you have an activated Conda or virtual
     /// environment, you should not generally need to specify this option.
     ///
-    /// This option can be used to point to virtual or system Python environments.
+    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[arg(long, value_name = "PATH", alias = "venv")]
     pub(crate) python: Option<SystemPathBuf>,
 
@@ -130,7 +136,7 @@ pub(crate) struct CheckCommand {
     pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.
-    #[arg(long)]
+    #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
     pub(crate) output_format: Option<OutputFormat>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
@@ -363,9 +369,12 @@ pub enum OutputFormat {
     /// Print diagnostics in the JSON format expected by GitLab Code Quality reports.
     #[value(name = "gitlab")]
     Gitlab,
-    #[value(name = "github")]
     /// Print diagnostics in the format used by GitHub Actions workflow error annotations.
+    #[value(name = "github")]
     Github,
+    /// Print diagnostics as a JUnit-style XML report.
+    #[value(name = "junit")]
+    Junit,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -375,6 +384,7 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
+            OutputFormat::Junit => Self::Junit,
         }
     }
 }

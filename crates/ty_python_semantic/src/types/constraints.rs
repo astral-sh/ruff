@@ -71,11 +71,13 @@ use std::cmp::Ordering;
 use std::fmt::Display;
 use std::ops::Range;
 
+use indexmap::map::Entry;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 
+use crate::types::class::GenericAlias;
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
@@ -245,6 +247,19 @@ impl<'db> ConstraintSet<'db> {
                 walk_bound_type_var_type(db, bound_typevar, self);
             }
 
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                // Override the default `walk_generic_alias` to skip walking the generic
+                // context. The generic context contains the typevar *definitions* for the
+                // specialization (the mapping keys), but those typevars are bound — they
+                // are not free occurrences in the type. Walking them here would cause false
+                // cycles: e.g. the constraint `list[int] ≤ _T@list` would appear cyclic
+                // because `_T@list` is found in the generic context of `list[int]`, even
+                // though `_T` is bound to `int` in that specialization.
+                for ty in alias.specialization(db).types(db) {
+                    self.visit_type(db, *ty);
+                }
+            }
+
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
                 walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
             }
@@ -342,18 +357,6 @@ impl<'db> ConstraintSet<'db> {
         self.node.satisfied_by_all_typevars(db, inferable)
     }
 
-    pub(crate) fn limit_to_valid_specializations(self, db: &'db dyn Db) -> Self {
-        let mut result = self.node;
-        let mut seen = FxHashSet::default();
-        self.node.for_each_constraint(db, &mut |constraint, _| {
-            let bound_typevar = constraint.typevar(db);
-            if seen.insert(bound_typevar) {
-                result = result.and_with_offset(db, bound_typevar.valid_specializations(db));
-            }
-        });
-        Self { node: result }
-    }
-
     /// Updates this constraint set to hold the union of itself and another constraint set.
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
@@ -437,8 +440,14 @@ impl<'db> ConstraintSet<'db> {
         Self { node }
     }
 
-    pub(crate) fn for_each_path(self, db: &'db dyn Db, f: impl FnMut(&PathAssignments<'db>)) {
-        self.node.for_each_path(db, f);
+    pub(crate) fn solutions(self, db: &'db dyn Db) -> Solutions<'db> {
+        // If the constraint set is cyclic, we'll hit an infinite expansion when trying to add type
+        // mappings for it.
+        if self.is_cyclic(db) {
+            return Solutions::Unsatisfiable;
+        }
+
+        self.node.solutions(db)
     }
 
     pub(crate) fn range(
@@ -755,9 +764,31 @@ impl<'db> ConstrainedTypeVar<'db> {
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
     fn intersect(self, db: &'db dyn Db, other: Self) -> IntersectionResult<'db> {
+        /// TODO: For now, we treat some upper bounds as unsimplifiable if they become "too big".
+        /// When intersecting constraints, the upper bounds are also intersected together. If the
+        /// lhs and rhs upper bounds are unions of intersections (e.g. `(a & b) | (c & d)`), then
+        /// intersecting them together will require distributing across every pair of union
+        /// elements. That can quickly balloon in size. We are looking at a better representation
+        /// that would let us model this case more directly, but for now, we punt.
+        const MAX_UPPER_BOUND_SIZE: usize = 4;
+
+        let self_upper = self.upper(db);
+        let other_upper = other.upper(db);
+        let estimated_upper_bound_size = self_upper
+            .union_size(db)
+            .saturating_mul(other_upper.union_size(db))
+            .saturating_mul(
+                self_upper
+                    .intersection_size(db)
+                    .saturating_add(other_upper.intersection_size(db)),
+            );
+        if estimated_upper_bound_size >= MAX_UPPER_BOUND_SIZE {
+            return IntersectionResult::CannotSimplify;
+        }
+
         // (s₁ ≤ α ≤ t₁) ∧ (s₂ ≤ α ≤ t₂) = (s₁ ∪ s₂) ≤ α ≤ (t₁ ∩ t₂))
         let lower = UnionType::from_elements(db, [self.lower(db), other.lower(db)]);
-        let upper = IntersectionType::from_elements(db, [self.upper(db), other.upper(db)]);
+        let upper = IntersectionType::from_elements(db, [self_upper, other_upper]);
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
@@ -765,6 +796,8 @@ impl<'db> ConstrainedTypeVar<'db> {
             return IntersectionResult::Disjoint;
         }
 
+        // We do not create lower bounds that are unions, or upper bounds that are intersections,
+        // since those can be broken apart into BDDs over simpler constraints.
         if lower.is_union() || upper.is_nontrivial_intersection(db) {
             return IntersectionResult::CannotSimplify;
         }
@@ -1110,6 +1143,14 @@ impl<'db> Node<'db> {
         }
     }
 
+    fn solutions(self, db: &'db dyn Db) -> Solutions<'db> {
+        match self {
+            Node::AlwaysTrue => Solutions::Unconstrained,
+            Node::AlwaysFalse => Solutions::Unsatisfiable,
+            Node::Interior(interior) => interior.solutions(db),
+        }
+    }
+
     /// Returns the negation of this BDD.
     fn negate(self, db: &'db dyn Db) -> Self {
         match self {
@@ -1186,7 +1227,7 @@ impl<'db> Node<'db> {
         db: &'db dyn Db,
         nodes: impl Iterator<Item = Self>,
         zero: Self,
-        one: Self,
+        is_one: impl Fn(Self, &'db dyn Db) -> bool,
         mut combine: impl FnMut(Self, &'db dyn Db, Self) -> Self,
     ) -> Self {
         // To implement the "linear" shape described above, we could collect the iterator elements
@@ -1215,8 +1256,8 @@ impl<'db> Node<'db> {
         // until the iterator passes 256 elements.
         let mut accumulator: SmallVec<[(Node<'db>, u8); 8]> = SmallVec::default();
         for node in nodes {
-            if node == one {
-                return one;
+            if is_one(node, db) {
+                return node;
             }
 
             let (mut node, mut depth) = (node, 0);
@@ -1226,8 +1267,8 @@ impl<'db> Node<'db> {
             {
                 let (existing, _) = accumulator.pop().expect("accumulator should not be empty");
                 node = combine(existing, db, node);
-                if node == one {
-                    return one;
+                if is_one(node, db) {
+                    return node;
                 }
                 depth += 1;
             }
@@ -1247,7 +1288,7 @@ impl<'db> Node<'db> {
             db,
             nodes,
             Node::AlwaysFalse,
-            Node::AlwaysTrue,
+            Self::is_always_satisfied,
             Self::or_with_offset,
         )
     }
@@ -1257,7 +1298,7 @@ impl<'db> Node<'db> {
             db,
             nodes,
             Node::AlwaysTrue,
-            Node::AlwaysFalse,
+            Self::is_never_satisfied,
             Self::and_with_offset,
         )
     }
@@ -2110,10 +2151,10 @@ impl<'db> InteriorNode<'db> {
                 if constraint.typevar(db).identity(db) == bound_typevar {
                     return true;
                 }
-                if any_over_type(db, constraint.lower(db), &mentions_typevar, false) {
+                if any_over_type(db, constraint.lower(db), false, mentions_typevar) {
                     return true;
                 }
-                if any_over_type(db, constraint.upper(db), &mentions_typevar, false) {
+                if any_over_type(db, constraint.upper(db), false, mentions_typevar) {
                     return true;
                 }
                 false
@@ -2278,6 +2319,176 @@ impl<'db> InteriorNode<'db> {
                 found_in_true || found_in_false,
             )
         }
+    }
+
+    fn solutions(self, db: &'db dyn Db) -> Solutions<'db> {
+        #[derive(Default)]
+        struct Bounds<'db> {
+            lower: FxIndexSet<Type<'db>>,
+            upper: FxIndexSet<Type<'db>>,
+        }
+
+        impl<'db> Bounds<'db> {
+            fn add_lower(&mut self, _db: &'db dyn Db, ty: Type<'db>) {
+                // Lower bounds are unioned. Our type representation is in DNF, so unioning a new
+                // element is typically cheap (in that it does not involve a combinatorial
+                // explosion from distributing the clause through an existing disjunction). So we
+                // don't need to be as clever here as in `add_upper`.
+                self.lower.insert(ty);
+            }
+
+            fn add_upper(&mut self, db: &'db dyn Db, ty: Type<'db>) {
+                // Upper bounds are intersectioned. If `ty` is a union, that involves distributing
+                // the union elements through the existing type. That makes it worth checking first
+                // whether any of the types in the upper bound are redundant.
+
+                // First check if there's an existing upper bound clause that is a subtype of the
+                // new type. If so, adding the new type does nothing to the intersection.
+                if self
+                    .upper
+                    .iter()
+                    .any(|existing| existing.is_redundant_with(db, ty))
+                {
+                    return;
+                }
+
+                // Otherwise remove any existing clauses that are a supertype of the new type,
+                // since the intersection will clip them to the new type.
+                self.upper
+                    .retain(|existing| !ty.is_redundant_with(db, *existing));
+                self.upper.insert(ty);
+            }
+        }
+
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn solutions_inner<'db>(
+            db: &'db dyn Db,
+            interior: InteriorNode<'db>,
+        ) -> Vec<Solution<'db>> {
+            // Sort the constraints in each path by their `source_order`s, to ensure that we construct
+            // any unions or intersections in our type mappings in a stable order. Constraints might
+            // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
+            // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
+            // retain that stable per-tie ordering.
+            let mut sorted_paths = Vec::new();
+            Node::Interior(interior).for_each_path(db, |path| {
+                let mut path: Vec<_> = path.positive_constraints().collect();
+                path.sort_by_key(|(_, source_order)| *source_order);
+                sorted_paths.push(path);
+            });
+            sorted_paths.sort_by(|path1, path2| {
+                let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
+                let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
+                source_orders1.cmp(source_orders2)
+            });
+
+            let mut solutions = Vec::with_capacity(sorted_paths.len());
+            let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, Bounds<'db>> =
+                FxHashMap::default();
+            'paths: for path in sorted_paths {
+                mappings.clear();
+                for (constraint, _) in path {
+                    let typevar = constraint.typevar(db);
+                    let lower = constraint.lower(db);
+                    let upper = constraint.upper(db);
+                    let bounds = mappings.entry(typevar).or_default();
+                    bounds.add_lower(db, lower);
+                    bounds.add_upper(db, upper);
+
+                    if let Type::TypeVar(lower_bound_typevar) = lower {
+                        let bounds = mappings.entry(lower_bound_typevar).or_default();
+                        bounds.add_upper(db, Type::TypeVar(typevar));
+                    }
+
+                    if let Type::TypeVar(upper_bound_typevar) = upper {
+                        let bounds = mappings.entry(upper_bound_typevar).or_default();
+                        bounds.add_lower(db, Type::TypeVar(typevar));
+                    }
+                }
+
+                let mut solution = Vec::with_capacity(mappings.len());
+                for (bound_typevar, bounds) in mappings.drain() {
+                    match bound_typevar.typevar(db).require_bound_or_constraints(db) {
+                        TypeVarBoundOrConstraints::UpperBound(bound) => {
+                            let bound = bound.top_materialization(db);
+                            let lower = UnionType::from_elements(db, bounds.lower);
+                            if !lower.is_assignable_to(db, bound) {
+                                // This path does not satisfy the typevar's upper bound, and is
+                                // therefore not a valid specialization.
+                                continue 'paths;
+                            }
+
+                            // Prefer the lower bound (often the concrete actual type seen) over the
+                            // upper bound (which may include TypeVar bounds/constraints). The upper bound
+                            // should only be used as a fallback when no concrete type was inferred.
+                            if !lower.is_never() {
+                                solution.push(TypeVarSolution {
+                                    bound_typevar,
+                                    solution: lower,
+                                });
+                                continue;
+                            }
+
+                            let upper = IntersectionType::from_elements(
+                                db,
+                                std::iter::chain(bounds.upper, [bound]),
+                            );
+                            if upper != bound {
+                                solution.push(TypeVarSolution {
+                                    bound_typevar,
+                                    solution: upper,
+                                });
+                            }
+                        }
+
+                        TypeVarBoundOrConstraints::Constraints(constraints) => {
+                            // Filter out the typevar constraints that aren't satisfied by this path.
+                            let lower = UnionType::from_elements(db, bounds.lower);
+                            let upper = IntersectionType::from_elements(db, bounds.upper);
+                            let compatible_constraints =
+                                constraints.elements(db).iter().filter(|constraint| {
+                                    let constraint_lower = constraint.bottom_materialization(db);
+                                    let constraint_upper = constraint.top_materialization(db);
+                                    lower.is_assignable_to(db, constraint_lower)
+                                        && constraint_upper.is_assignable_to(db, upper)
+                                });
+
+                            // If only one constraint remains, that's our specialization for this path.
+                            match compatible_constraints.at_most_one() {
+                                Ok(None) => {
+                                    // This path does not satisfy any of the constraints, and is
+                                    // therefore not a valid specialization.
+                                    continue 'paths;
+                                }
+
+                                Ok(Some(compatible_constraint)) => {
+                                    solution.push(TypeVarSolution {
+                                        bound_typevar,
+                                        solution: *compatible_constraint,
+                                    });
+                                }
+
+                                Err(_) => {
+                                    // This path satisfies multiple constraints. For now, don't
+                                    // prefer any of them, and fall back on the default
+                                    // specialization for this typevar.
+                                }
+                            }
+                        }
+                    }
+                }
+
+                solutions.push(solution);
+            }
+
+            solutions
+        }
+
+        let solutions = solutions_inner(db, self);
+        if solutions.is_empty() {
+            return Solutions::Unsatisfiable;
+        }
+        Solutions::Constrained(solutions)
     }
 
     fn path_assignments(self, db: &'db dyn Db) -> PathAssignments<'db> {
@@ -2698,6 +2909,21 @@ impl<'db> InteriorNode<'db> {
 
         simplified
     }
+}
+
+#[derive(Clone, Debug)]
+pub(crate) enum Solutions<'db> {
+    Unsatisfiable,
+    Unconstrained,
+    Constrained(&'db Vec<Solution<'db>>),
+}
+
+pub(crate) type Solution<'db> = Vec<TypeVarSolution<'db>>;
+
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+pub(crate) struct TypeVarSolution<'db> {
+    pub(crate) bound_typevar: BoundTypeVarInstance<'db>,
+    pub(crate) solution: Type<'db>,
 }
 
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
@@ -3553,9 +3779,11 @@ impl<'db> PathAssignments<'db> {
             );
             return Err(PathAssignmentConflict);
         }
-        if self.assignments.insert(assignment, source_order).is_some() {
-            return Ok(());
-        }
+
+        match self.assignments.entry(assignment) {
+            Entry::Vacant(entry) => entry.insert(source_order),
+            Entry::Occupied(_) => return Ok(()),
+        };
 
         // Then use our sequents to add additional facts that we know to be true. We currently
         // reuse the `source_order` of the "real" constraint passed into `walk_edge` when we add
@@ -3864,6 +4092,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// when this typevar is in inferable position, where we only need _some_ specialization to
     /// satisfy the constraint set.
     fn valid_specializations(self, db: &'db dyn Db) -> Node<'db> {
+        if self.paramspec_attr(db).is_some() {
+            // P.args and P.kwargs are variadic, and do not have an upper bound or constraints.
+            return Node::AlwaysTrue;
+        }
+
         // For gradual upper bounds and constraints, we are free to choose any materialization that
         // makes the check succeed. In inferable positions, it is most helpful to choose a
         // materialization that is as permissive as possible, since that maximizes the number of

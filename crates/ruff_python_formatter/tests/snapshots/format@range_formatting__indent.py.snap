@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/indent.py
 ---
 ## Input
 ```python
@@ -149,6 +148,7 @@ def test5 ():
 
 
 def test6 ():
+
     print("Format")
     print(3 + 4)
     print("Format to fix indentation" )
@@ -158,21 +158,6 @@ def test7 ():
     print("Format")
     print(3 + 4)
     print("Format to fix indentation" )
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -55,6 +55,7 @@
- 
- 
- def test6 ():
-+
-     print("Format")
-     print(3 + 4)
-     print("Format to fix indentation" )
 ```
 
 
@@ -249,6 +234,7 @@ def test5 ():
 
 
 def test6 ():
+
 	print("Format")
 	print(3 + 4)
 	print("Format to fix indentation")
@@ -258,21 +244,6 @@ def test7 ():
 	print("Format")
 	print(3 + 4)
 	print("Format to fix indentation")
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -55,6 +55,7 @@
- 
- 
- def test6 ():
-+
- 	print("Format")
- 	print(3 + 4)
- 	print("Format to fix indentation")
 ```
 
 
@@ -349,6 +320,7 @@ def test5 ():
 
 
 def test6 ():
+
   print("Format")
   print(3 + 4)
   print("Format to fix indentation")
@@ -358,19 +330,4 @@ def test7 ():
   print("Format")
   print(3 + 4)
   print("Format to fix indentation")
-```
-
-
-#### Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -55,6 +55,7 @@
- 
- 
- def test6 ():
-+
-   print("Format")
-   print(3 + 4)
-   print("Format to fix indentation")
 ```

@@ -27,8 +27,8 @@ use crate::types::relation::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, infer_complete_scope_types,
-    todo_type,
+    ParamSpecAttrKind, SelfBinding, TypeContext, TypeMapping, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -702,8 +702,19 @@ impl<'db> Signature<'db> {
             legacy_generic_context,
         );
 
+        // Look for any typevars bound by this function that are only mentioned in a Callable
+        // return type. (We do this after merging the legacy and PEP-695 contexts because we need
+        // to apply this heuristic to PEP-695 typevars as well.)
+        let (generic_context, return_ty) = GenericContext::remove_callable_only_typevars(
+            db,
+            full_generic_context,
+            &parameters,
+            return_ty,
+            definition,
+        );
+
         Self {
-            generic_context: full_generic_context,
+            generic_context,
             definition: Some(definition),
             parameters,
             return_ty,
@@ -923,10 +934,8 @@ impl<'db> Signature<'db> {
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type {
-            let self_mapping = TypeMapping::BindSelf {
-                self_type,
-                binding_context,
-            };
+            let self_mapping =
+                TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,
@@ -946,10 +955,11 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        let self_mapping = TypeMapping::BindSelf {
+        let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
+            db,
             self_type,
-            binding_context: self.definition.map(BindingContext::Definition),
-        };
+            self.definition.map(BindingContext::Definition),
+        ));
         let parameters = self.parameters.apply_type_mapping_impl(
             db,
             &self_mapping,
@@ -1615,12 +1625,14 @@ impl<'db> Signature<'db> {
                 ParameterKind::KeywordVariadic { .. } => {
                     self_keyword_variadic = Some(self_parameter.annotated_type());
                 }
-                ParameterKind::PositionalOnly { .. } => {
+                ParameterKind::PositionalOnly { default_type, .. } => {
                     // These are the unmatched positional-only parameters in `self` from the
                     // previous loop. They cannot be matched against any parameter in `other` which
-                    // only contains keyword-only and keyword-variadic parameters so the subtype
-                    // relation is invalid.
-                    return ConstraintSet::from(false);
+                    // only contains keyword-only and keyword-variadic parameters. However, if the
+                    // parameter has a default, it's valid because callers don't need to provide it.
+                    if default_type.is_none() {
+                        return ConstraintSet::from(false);
+                    }
                 }
                 ParameterKind::Variadic { .. } => {}
             }

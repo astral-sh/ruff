@@ -31,7 +31,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Fix safety
 ///
-/// There are two categories of fix, the first of which is where it looks like
+/// There are two categories of unsafe fixes, the first of which is where it looks like
 /// the author intended to use an octal literal but the `0o` prefix is missing:
 ///
 /// ```python
@@ -72,7 +72,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// A fix is only available if the integer literal matches a set of common modes.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.12.1")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct NonOctalPermissions;
 
 impl Violation for NonOctalPermissions {
@@ -111,7 +111,7 @@ pub(crate) fn non_octal_permissions(checker: &Checker, call: &ExprCall) {
         return;
     }
 
-    let mut diagnostic = checker.report_diagnostic(NonOctalPermissions, mode_arg.range());
+    let mut diagnostic = checker.report_custom_diagnostic(NonOctalPermissions, mode_arg.range());
 
     let Some(mode) = int.as_u16() else {
         return;

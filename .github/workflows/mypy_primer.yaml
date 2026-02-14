@@ -15,7 +15,6 @@ on:
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
       - ".github/workflows/mypy_primer.yaml"
-      - ".github/workflows/mypy_primer_comment.yaml"
       - "scripts/mypy_primer.sh"
       - "Cargo.lock"
       - "!**.md"
@@ -48,9 +47,9 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
         with:
-          version: "0.9.28"
+          version: "0.10.0"
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
@@ -77,46 +76,6 @@ jobs:
           name: mypy_primer_diff
           path: mypy_primer.diff
 
-  memory_usage:
-    name: Run memory statistics
-    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          path: ruff
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
-        with:
-          version: "0.9.28"
-
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-        with:
-          workspaces: "ruff"
-          shared-key: "mypy-primer"
-
-      - name: Install Rust toolchain
-        run: rustup show
-
-      - name: Run mypy_primer
-        env:
-          TY_MAX_PARALLELISM: 1 # for deterministic memory numbers
-          TY_MEMORY_REPORT: mypy_primer
-          PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/memory.txt
-          DIFF_FILE: mypy_primer_memory.diff
-        run: |
-          cd ruff
-          scripts/mypy_primer.sh
-
-      - name: Upload diff
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
-        with:
-          name: mypy_primer_memory_diff
-          path: mypy_primer_memory.diff
-
   # Runs mypy twice against the same ty version to catch any non-deterministic behavior (ideally).
   # The job is disabled for now because there are some non-deterministic diagnostics.
   mypy_primer_same_revision:
@@ -133,9 +92,9 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@803947b9bd8e9f986429fa0c5a41c367cd732b41 # v7.2.1
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
         with:
-          version: "0.9.28"
+          version: "0.10.0"
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:

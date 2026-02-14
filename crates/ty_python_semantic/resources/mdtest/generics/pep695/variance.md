@@ -468,7 +468,7 @@ class A: ...
 class B(A): ...
 
 class C[T]:
-    x: Final[T]
+    x: Final[T]  # error: [final-without-value]
 
 static_assert(is_subtype_of(C[B], C[A]))
 static_assert(not is_subtype_of(C[A], C[B]))

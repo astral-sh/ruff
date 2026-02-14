@@ -5,6 +5,7 @@
 
 Configures the enabled rules and their severity.
 
+The keys are either rule names or `all` to set a default severity for all rules.
 See [the rules documentation](https://ty.dev/rules) for a list of all available rules.
 
 Valid severities are:
@@ -16,7 +17,7 @@ Valid severities are:
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
 **Example usage**:
 
@@ -76,6 +77,47 @@ any module where the first component contains the substring `test`, use `*test*.
     [analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
+
+### `replace-imports-with-any`
+
+A list of module glob patterns whose imports should be replaced with `typing.Any`.
+
+Unlike `allowed-unresolved-imports`, this setting replaces the module's type information
+with `typing.Any` even if the module can be resolved. Import diagnostics are
+unconditionally suppressed for matching modules.
+
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+When multiple patterns match, later entries take precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
     ```
 
 ---
@@ -158,16 +200,20 @@ Path to your project's Python environment or interpreter.
 ty uses the `site-packages` directory of your project's Python environment
 to resolve third-party (and, in some cases, first-party) imports in your code.
 
-If you're using a project management tool such as uv, you should not generally need
-to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
-environment variable to point to your project's virtual environment. ty can also infer
-the location of your environment from an activated Conda environment, and will look for
-a `.venv` directory in the project root if none of the above apply.
+This can be a path to:
 
-Passing a path to a Python executable is supported, but passing a path to a dynamic executable
-(such as a shim) is not currently supported.
+- A Python interpreter, e.g. `.venv/bin/python3`
+- A virtual environment directory, e.g. `.venv`
+- A system Python [`sys.prefix`] directory, e.g. `/usr`
 
-This option can be used to point to virtual or system Python environments.
+If you're using a project management tool such as uv, you should not generally need to
+specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment
+variable to point to your project's virtual environment. ty can also infer the location of
+your environment from an activated Conda environment, and will look for a `.venv` directory
+in the project root if none of the above apply. Failing that, ty will look for a `python3`
+or `python` binary available in `PATH`.
+
+[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 
 **Default value**: `null`
 
@@ -277,14 +323,13 @@ The root paths of the project, used for finding first-party modules.
 
 Accepts a list of directory paths searched in priority order (first has highest priority).
 
-If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:
+If left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.
+The project root (`.`) is always included. Additionally, the following directories are included
+if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
 
-* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-* otherwise, default to `.` (flat layout)
-
-Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
-it will also be included in the first party search path.
+* `./src`
+* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+* `./python`
 
 **Default value**: `null`
 
@@ -458,7 +503,7 @@ severity levels or disable them entirely.
 
 **Default value**: `{...}`
 
-**Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
+**Type**: `dict[RuleName | "all", "ignore" | "warn" | "error"]`
 
 **Example usage**:
 
@@ -522,6 +567,47 @@ any module where the first component contains the substring `test`, use `*test*.
     [overrides.analysis]
     # Suppress errors for all `test` modules except `test.foo`
     allowed-unresolved-imports = ["test.**", "!test.foo"]
+    ```
+
+---
+
+#### `replace-imports-with-any`
+
+A list of module glob patterns whose imports should be replaced with `typing.Any`.
+
+Unlike `allowed-unresolved-imports`, this setting replaces the module's type information
+with `typing.Any` even if the module can be resolved. Import diagnostics are
+unconditionally suppressed for matching modules.
+
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+When multiple patterns match, later entries take precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
     ```
 
 ---
@@ -730,14 +816,13 @@ Enabled by default.
 
 The root of the project, used for finding first-party modules.
 
-If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:
+If left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.
+The project root (`.`) is always included. Additionally, the following directories are included
+if they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):
 
-* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)
-* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
-* otherwise, default to `.` (flat layout)
-
-Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
-it will also be included in the first party search path.
+* `./src`
+* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)
+* `./python`
 
 **Default value**: `null`
 
@@ -801,7 +886,7 @@ Defaults to `full`.
 
 **Default value**: `full`
 
-**Type**: `full | concise`
+**Type**: `full | concise | github | gitlab | junit`
 
 **Example usage**:
 

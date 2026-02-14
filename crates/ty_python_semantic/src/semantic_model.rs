@@ -1,5 +1,5 @@
 use ruff_db::files::{File, FilePath};
-use ruff_db::parsed::parsed_string_annotation;
+use ruff_db::parsed::{parsed_module, parsed_string_annotation};
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
@@ -13,10 +13,15 @@ use ty_module_resolver::{
 use crate::Db;
 use crate::place::implicit_globals::all_implicit_module_globals;
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::place_table;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
+use crate::semantic_index::symbol::Symbol;
+use crate::types::ide_support::{ImportAliasResolution, definition_for_name};
 use crate::types::list_members::{Member, all_members, all_reachable_members};
-use crate::types::{Type, binding_type, infer_complete_scope_types};
+use crate::types::{
+    Type, TypeQualifiers, binding_type, declaration_type, infer_complete_scope_types,
+};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -260,6 +265,17 @@ impl<'db> SemanticModel<'db> {
         completions
     }
 
+    /// Returns `true` if the given class definition's name was previously
+    /// bound in the same scope (i.e., the class definition is a re-assignment).
+    pub fn is_class_name_reassigned(&self, class_def: &ast::StmtClassDef) -> bool {
+        let index = semantic_index(self.db, self.file);
+        let definition = index.expect_single_definition(class_def);
+        let scope = definition.scope(self.db);
+        let table = place_table(self.db, scope);
+        let place = table.place(definition.place(self.db));
+        place.as_symbol().is_some_and(Symbol::is_reassigned)
+    }
+
     /// Returns the scope in which `node` is defined (handles string annotations).
     pub fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
         let index = semantic_index(self.db, self.file);
@@ -385,6 +401,42 @@ impl<'db> SemanticModel<'db> {
             )),
         };
         Some((ast, model))
+    }
+
+    /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for a given expression,
+    /// if the expression refers to a name or attribute with declared qualifiers.
+    pub fn type_qualifiers(&self, expr: ExprRef<'_>) -> TypeQualifiers {
+        match expr {
+            ExprRef::Name(name) => {
+                let Some(definition) =
+                    definition_for_name(self, name, ImportAliasResolution::ResolveAliases)
+                else {
+                    return TypeQualifiers::empty();
+                };
+                let module = parsed_module(self.db, self.file).load(self.db);
+                if !definition
+                    .kind(self.db)
+                    .category(self.file.is_stub(self.db), &module)
+                    .is_declaration()
+                {
+                    return TypeQualifiers::empty();
+                }
+                declaration_type(self.db, definition).qualifiers()
+            }
+            ExprRef::Attribute(attr) => {
+                let Some(value_ty) = attr.value.inferred_type(self) else {
+                    return TypeQualifiers::empty();
+                };
+                value_ty
+                    .member_lookup_with_policy(
+                        self.db,
+                        attr.attr.id.clone(),
+                        crate::types::MemberLookupPolicy::default(),
+                    )
+                    .qualifiers
+            }
+            _ => TypeQualifiers::empty(),
+        }
     }
 }
 

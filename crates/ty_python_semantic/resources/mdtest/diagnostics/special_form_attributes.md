@@ -21,6 +21,6 @@ X.aaaaooooooo  # error: [unresolved-attribute]
 Foo.X.startswith  # error: [unresolved-attribute]
 Foo.Bar().y.startswith  # error: [unresolved-attribute]
 
-# TODO: false positive (just testing the diagnostic in the meantime)
-Foo().b.a  # error: [unresolved-attribute]
+# `Foo().b` resolves `Self` to `Foo`, so `.a` is valid.
+Foo().b.a
 ```

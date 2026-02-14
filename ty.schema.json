@@ -36,7 +36,7 @@
       ]
     },
     "rules": {
-      "description": "Configures the enabled rules and their severity.\n\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n  ty will exit with a non-zero code if any error diagnostics are emitted.",
+      "description": "Configures the enabled rules and their severity.\n\nThe keys are either rule names or `all` to set a default severity for all rules.\nSee [the rules documentation](https://ty.dev/rules) for a list of all available rules.\n\nValid severities are:\n\n* `ignore`: Disable the rule.\n* `warn`: Enable the rule and create a warning diagnostic.\n* `error`: Enable the rule and create an error diagnostic.\n  ty will exit with a non-zero code if any error diagnostics are emitted.",
       "anyOf": [
         {
           "$ref": "#/definitions/Rules"
@@ -82,6 +82,16 @@
             "$ref": "#/definitions/string"
           }
         },
+        "replace-imports-with-any": {
+          "description": "A list of module glob patterns whose imports should be replaced with `typing.Any`.\n\nUnlike `allowed-unresolved-imports`, this setting replaces the module's type information\nwith `typing.Any` even if the module can be resolved. Import diagnostics are\nunconditionally suppressed for matching modules.\n\n- Prefix a pattern with `!` to exclude matching modules\n\nWhen multiple patterns match, later entries take precedence.\n\nGlob patterns can be used in combinations with each other. For example, to suppress errors for\nany module where the first component contains the substring `test`, use `*test*.**`.\n\nWhen multiple patterns match, later entries take precedence.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/string"
+          }
+        },
         "respect-type-ignore-comments": {
           "description": "Whether ty should respect `type: ignore` comments.\n\nWhen set to `false`, `type: ignore` comments are treated like any other normal\ncomment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).\n\nSetting this option can be useful when using ty alongside other type checkers or when\nyou prefer using `ty: ignore` over `type: ignore`.\n\nDefaults to `true`.",
           "type": [
@@ -112,7 +122,7 @@
           }
         },
         "python": {
-          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nIf you're using a project management tool such as uv, you should not generally need\nto specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`\nenvironment variable to point to your project's virtual environment. ty can also infer\nthe location of your environment from an activated Conda environment, and will look for\na `.venv` directory in the project root if none of the above apply.\n\nPassing a path to a Python executable is supported, but passing a path to a dynamic executable\n(such as a shim) is not currently supported.\n\nThis option can be used to point to virtual or system Python environments.",
+          "description": "Path to your project's Python environment or interpreter.\n\nty uses the `site-packages` directory of your project's Python environment\nto resolve third-party (and, in some cases, first-party) imports in your code.\n\nThis can be a path to:\n\n- A Python interpreter, e.g. `.venv/bin/python3`\n- A virtual environment directory, e.g. `.venv`\n- A system Python [`sys.prefix`] directory, e.g. `/usr`\n\nIf you're using a project management tool such as uv, you should not generally need to\nspecify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment\nvariable to point to your project's virtual environment. ty can also infer the location of\nyour environment from an activated Conda environment, and will look for a `.venv` directory\nin the project root if none of the above apply. Failing that, ty will look for a `python3`\nor `python` binary available in `PATH`.\n\n[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"
@@ -145,7 +155,7 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nAdditionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),\nit will also be included in the first party search path.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`",
           "type": [
             "array",
             "null"
@@ -212,6 +222,11 @@
           "description": "Print diagnostics in the format used by [GitHub Actions] workflow error annotations.\n\n[GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message",
           "type": "string",
           "const": "github"
+        },
+        {
+          "description": "Print diagnostics as a JUnit-style XML report.",
+          "type": "string",
+          "const": "junit"
         }
       ]
     },
@@ -390,6 +405,16 @@
             }
           ]
         },
+        "call-abstract-method": {
+          "title": "detects calls to abstract methods with trivial bodies on class objects",
+          "description": "## What it does\nChecks for calls to abstract `@classmethod`s or `@staticmethod`s\nwith \"trivial bodies\" when accessed on the class object itself.\n\n\"Trivial bodies\" are bodies that solely consist of `...`, `pass`,\na docstring, and/or `raise NotImplementedError`.\n\n## Why is this bad?\nAn abstract method with a trivial body has no concrete implementation\nto execute, so calling such a method directly on the class will probably\nnot have the desired effect.\n\nIt is also unsound to call these methods directly on the class. Unlike\nother methods, ty permits abstract methods with trivial bodies to have\nnon-`None` return types even though they always return `None` at runtime.\nThis is because it is expected that these methods will always be\noverridden rather than being called directly. As a result of this\nexception to the normal rule, ty may infer an incorrect type if one of\nthese methods is called directly, which may then mean that type errors\nelsewhere in your code go undetected by ty.\n\nCalling abstract classmethods or staticmethods via `type[X]` is allowed,\nsince the actual runtime type could be a concrete subclass with an implementation.\n\n## Example\n```python\nfrom abc import ABC, abstractmethod\n\nclass Foo(ABC):\n    @classmethod\n    @abstractmethod\n    def method(cls) -> int: ...\n\nFoo.method()  # Error: cannot call abstract classmethod\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "call-non-callable": {
           "title": "detects calls to non-callable objects",
           "description": "## What it does\nChecks for calls to non-callable objects.\n\n## Why is this bad?\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4()  # TypeError: 'int' object is not callable\n```",
@@ -460,6 +485,16 @@
             }
           ]
         },
+        "dataclass-field-order": {
+          "title": "detects dataclass definitions with required fields after fields with default values",
+          "description": "## What it does\nChecks for dataclass definitions where required fields are defined after\nfields with default values.\n\n## Why is this bad?\nIn dataclasses, all required fields (fields without default values) must be\ndefined before fields with default values. This is a Python requirement that\nwill raise a `TypeError` at runtime if violated.\n\n## Example\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass Example:\n    x: int = 1    # Field with default value\n    y: str        # Error: Required field after field with default\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "deprecated": {
           "title": "detects uses of deprecated items",
           "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",
@@ -513,6 +548,16 @@
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
           "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "final-without-value": {
+          "title": "detects `Final` declarations without a value",
+          "description": "## What it does\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\n\n## Examples\n```python\nfrom typing import Final\n\n# Error: `Final` symbol without a value\nMY_CONSTANT: Final[int]\n\n# OK: `Final` symbol with a value\nMY_CONSTANT: Final[int] = 1\n```",
           "default": "error",
           "oneOf": [
             {
@@ -980,6 +1025,16 @@
             }
           ]
         },
+        "invalid-type-variable-default": {
+          "title": "detects invalid type variable defaults",
+          "description": "## What it does\nChecks for [type variables] whose default type is not compatible with\nthe type variable's bound or constraints.\n\n## Why is this bad?\nIf a type variable has a bound, the default must be assignable to that\nbound (see: [bound rules]). If a type variable has constraints, the default\nmust be one of the constraints (see: [constraint rules]).\n\n## Examples\n```python\nT = TypeVar(\"T\", bound=str, default=int)  # error: [invalid-type-variable-default]\nU = TypeVar(\"U\", int, str, default=bytes)  # error: [invalid-type-variable-default]\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar\n[bound rules]: https://typing.python.org/en/latest/spec/generics.html#bound-rules\n[constraint rules]: https://typing.python.org/en/latest/spec/generics.html#constraint-rules",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-typed-dict-header": {
           "title": "detects invalid statements in `TypedDict` class headers",
           "description": "## What it does\nDetects errors in `TypedDict` class headers, such as unexpected arguments\nor invalid base classes.\n\n## Why is this bad?\nThe typing spec states that `TypedDict`s are not permitted to have\ncustom metaclasses. Using `**` unpacking in a `TypedDict` header\nis also prohibited by ty, as it means that ty cannot statically determine\nwhether keys in the `TypedDict` are intended to be required or optional.\n\n## Example\n```python\nfrom typing import TypedDict\n\nclass Foo(TypedDict, metaclass=whatever):  # error: [invalid-typed-dict-header]\n    ...\n\ndef f(x: dict):\n    class Bar(TypedDict, **x):  # error: [invalid-typed-dict-header]\n        ...\n```",
@@ -1073,6 +1128,16 @@
         "override-of-final-method": {
           "title": "detects overrides of final methods",
           "description": "## What it does\nChecks for methods on subclasses that override superclass methods decorated with `@final`.\n\n## Why is this bad?\nDecorating a method with `@final` declares to the type checker that it should not be\noverridden on any subclass.\n\n## Example\n\n```python\nfrom typing import final\n\nclass A:\n    @final\n    def foo(self): ...\n\nclass B(A):\n    def foo(self): ...  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "override-of-final-variable": {
+          "title": "detects overrides of Final class variables",
+          "description": "## What it does\nChecks for class variables on subclasses that override a superclass variable\nthat has been declared as `Final`.\n\n## Why is this bad?\nDeclaring a variable as `Final` indicates to the type checker that it should not be\noverridden on any subclass.\n\n## Example\n\n```python\nfrom typing import Final\n\nclass A:\n    X: Final[int] = 1\n\nclass B(A):\n    X = 2  # Error raised here\n```",
           "default": "error",
           "oneOf": [
             {
@@ -1398,7 +1463,7 @@
           ]
         },
         "root": {
-          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nAdditionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
+          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly.\nThe project root (`.`) is always included. Additionally, the following directories are included\nif they exist and are not packages (i.e. they do not contain `__init__.py` or `__init__.pyi` files):\n\n* `./src`\n* `./<project-name>` (if a `./<project-name>/<project-name>` directory exists)\n* `./python`",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"

@@ -95,6 +95,30 @@ fn test_quiet_output() -> anyhow::Result<()> {
 }
 
 #[test]
+fn test_output_format_env() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        print(x)     # [unresolved-reference]
+        print(4[1])  # [not-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
+        "#,
+    )?;
+    assert_cmd_snapshot!(case.command().env("TY_OUTPUT_FORMAT", "github").arg("--warn").arg("unresolved-reference"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn test_run_in_sub_directory() -> anyhow::Result<()> {
     let case = CliTest::with_files([("test.py", "~"), ("subdir/nothing", "")])?;
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("subdir")).arg(".."), @"

@@ -1,0 +1,43 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: variables.md - Legacy type variables - Type variables - Invalid defaults - An unbounded default TypeVar has an implicit `object` bound
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variables.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import Generic, TypeVar
+2 | 
+3 | T1 = TypeVar("T1")
+4 | 
+5 | # error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
+6 | S = TypeVar("S", default=T1, bound=int)
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: TypeVar default is not assignable to the TypeVar's upper bound
+ --> src/mdtest_snippet.py:3:1
+  |
+1 | from typing import Generic, TypeVar
+2 |
+3 | T1 = TypeVar("T1")
+  | ------------------ `T1` defined here
+4 |
+5 | # error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper b…
+6 | S = TypeVar("S", default=T1, bound=int)
+  |                          ^^        --- Upper bound of `S`
+  |                          |
+  |                          Upper bound `object` of default `T1` is not assignable to upper bound of `S`
+  |
+info: rule `invalid-type-variable-default` is enabled by default
+
+```

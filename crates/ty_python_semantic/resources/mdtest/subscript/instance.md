@@ -42,6 +42,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, index: int) -> int:
                 return index
+
         else:
             def __getitem__(self, index: int) -> str:
                 return str(index)

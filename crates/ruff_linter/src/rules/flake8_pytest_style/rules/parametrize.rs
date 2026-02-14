@@ -705,7 +705,8 @@ fn handle_single_name(checker: &Checker, argnames: &Expr, value: &Expr, argvalue
     //     assert isinstance(x, int)  # fails because `x` is a tuple, not an int
     // ```
     let argvalues_edits = unpack_single_element_items(checker, argvalues);
-    let argnames_edit = Edit::range_replacement(checker.generator().expr(value), argnames.range());
+    let argnames_edit =
+        Edit::range_replacement(unparse_expr_in_sequence(value, checker), argnames.range());
     let fix = if checker.comment_ranges().intersects(argnames_edit.range())
         || argvalues_edits
             .iter()
@@ -743,11 +744,21 @@ fn unpack_single_element_items(checker: &Checker, expr: &Expr) -> Vec<Edit> {
         }
 
         edits.push(Edit::range_replacement(
-            checker.generator().expr(elt),
+            unparse_expr_in_sequence(elt, checker),
             value.range(),
         ));
     }
     edits
+}
+
+fn unparse_expr_in_sequence(expr: &Expr, checker: &Checker) -> String {
+    let content = checker.locator().slice(expr);
+    if let Expr::Tuple(tuple) = expr {
+        if !tuple.is_empty() && !tuple.parenthesized {
+            return format!("({content})");
+        }
+    }
+    content.to_string()
 }
 
 fn handle_value_rows(

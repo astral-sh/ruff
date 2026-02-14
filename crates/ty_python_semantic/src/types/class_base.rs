@@ -65,6 +65,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => "Unknown",
+            ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(
                 DynamicType::Todo(_)
                 | DynamicType::TodoUnpack
@@ -93,7 +94,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(
         db: &'db dyn Db,
         ty: Type<'db>,
-        subclass: ClassLiteral<'db>,
+        subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
@@ -251,7 +252,7 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::Generic => Some(Self::Generic),
 
                 SpecialFormType::NamedTuple => {
-                    let class = subclass.as_static()?;
+                    let class = subclass?.as_static()?;
                     let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,

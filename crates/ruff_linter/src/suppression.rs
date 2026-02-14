@@ -17,13 +17,11 @@ use smallvec::{SmallVec, smallvec};
 use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
-use crate::preview::is_range_suppressions_enabled;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
-use crate::settings::LinterSettings;
 use crate::{Locator, Violation};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -185,18 +183,9 @@ impl<'a> SuppressionDiagnostic<'a> {
 }
 
 impl Suppressions {
-    pub fn from_tokens(
-        settings: &LinterSettings,
-        source: &str,
-        tokens: &Tokens,
-        indexer: &Indexer,
-    ) -> Suppressions {
-        if is_range_suppressions_enabled(settings) {
-            let builder = SuppressionsBuilder::new(source);
-            builder.load_from_tokens(tokens, indexer)
-        } else {
-            Suppressions::default()
-        }
+    pub fn from_tokens(source: &str, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
+        let builder = SuppressionsBuilder::new(source);
+        builder.load_from_tokens(tokens, indexer)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -233,60 +222,71 @@ impl Suppressions {
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
         let mut unmatched_ranges = FxHashSet::default();
+
+        let process_pending_diagnostics =
+            |key: Option<TextRange>,
+             grouped_diagnostic: &Option<(TextRange, SuppressionDiagnostic)>|
+             -> bool {
+                if let Some((group_key, group)) = grouped_diagnostic
+                    && key.is_none_or(|key| key != *group_key)
+                {
+                    if group.any_invalid() {
+                        Suppressions::report_suppression_codes(
+                            context,
+                            locator,
+                            group.suppression,
+                            &group.invalid_codes,
+                            true,
+                            InvalidRuleCode {
+                                rule_code: group.invalid_codes.iter().join(", "),
+                                kind: InvalidRuleCodeKind::Suppression,
+                                whole_comment: group.suppression.codes().len()
+                                    == group.invalid_codes.len(),
+                            },
+                        );
+                    }
+                    if group.any_unused() {
+                        let mut codes = group.disabled_codes.clone();
+                        codes.extend(group.unused_codes.clone());
+                        Suppressions::report_suppression_codes(
+                            context,
+                            locator,
+                            group.suppression,
+                            &codes,
+                            false,
+                            UnusedNOQA {
+                                codes: Some(UnusedCodes {
+                                    disabled: group
+                                        .disabled_codes
+                                        .iter()
+                                        .map(ToString::to_string)
+                                        .collect_vec(),
+                                    duplicated: group
+                                        .duplicated_codes
+                                        .iter()
+                                        .map(ToString::to_string)
+                                        .collect_vec(),
+                                    unmatched: group
+                                        .unused_codes
+                                        .iter()
+                                        .map(ToString::to_string)
+                                        .collect_vec(),
+                                    ..Default::default()
+                                }),
+                                kind: UnusedNOQAKind::Suppression,
+                            },
+                        );
+                    }
+                    true
+                } else {
+                    false
+                }
+            };
+
         for suppression in &self.valid {
             let key = suppression.comments.disable_comment().range;
 
-            // Process any pending grouped diagnostics
-            if let Some((group_key, ref group)) = grouped_diagnostic
-                && key != group_key
-            {
-                if group.any_invalid() {
-                    Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &group.invalid_codes,
-                        true,
-                        InvalidRuleCode {
-                            rule_code: group.invalid_codes.iter().join(", "),
-                            kind: InvalidRuleCodeKind::Suppression,
-                            whole_comment: group.suppression.codes().len()
-                                == group.invalid_codes.len(),
-                        },
-                    );
-                }
-                if group.any_unused() {
-                    let mut codes = group.disabled_codes.clone();
-                    codes.extend(group.unused_codes.clone());
-                    Suppressions::report_suppression_codes(
-                        context,
-                        locator,
-                        group.suppression,
-                        &codes,
-                        false,
-                        UnusedNOQA {
-                            codes: Some(UnusedCodes {
-                                disabled: group
-                                    .disabled_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                duplicated: group
-                                    .duplicated_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                unmatched: group
-                                    .unused_codes
-                                    .iter()
-                                    .map(ToString::to_string)
-                                    .collect_vec(),
-                                ..Default::default()
-                            }),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
-                    );
-                }
+            if process_pending_diagnostics(Some(key), &grouped_diagnostic) {
                 grouped_diagnostic = None;
             }
 
@@ -334,6 +334,8 @@ impl Suppressions {
                 }
             }
         }
+
+        process_pending_diagnostics(None, &grouped_diagnostic);
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {
@@ -845,12 +847,9 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
     use similar::DiffableStr;
 
-    use crate::{
-        settings::LinterSettings,
-        suppression::{
-            InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
-            SuppressionParser, Suppressions,
-        },
+    use crate::suppression::{
+        InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
+        SuppressionParser, Suppressions,
     };
 
     #[test]
@@ -1804,12 +1803,7 @@ def bar():
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
             let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
             let indexer = Indexer::from_tokens(parsed.tokens(), source);
-            let suppressions = Suppressions::from_tokens(
-                &LinterSettings::default().with_preview_mode(),
-                source,
-                parsed.tokens(),
-                &indexer,
-            );
+            let suppressions = Suppressions::from_tokens(source, parsed.tokens(), &indexer);
             DebugSuppressions {
                 source,
                 suppressions,

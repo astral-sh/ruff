@@ -820,7 +820,7 @@ impl Diagnostic {
 
     #[wasm_bindgen]
     pub fn display(&self, workspace: &Workspace) -> JsString {
-        let config = DisplayDiagnosticConfig::default().color(false);
+        let config = DisplayDiagnosticConfig::new("ty").color(false);
         self.inner
             .display(&workspace.db, &config)
             .to_string()
@@ -1400,6 +1400,12 @@ impl System for WasmSystem {
 
     fn case_sensitivity(&self) -> CaseSensitivity {
         CaseSensitivity::CaseSensitive
+    }
+
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        // Since permissions of all files is 755,
+        // it follows that every file is executable.
+        self.is_file(path)
     }
 
     fn current_directory(&self) -> &SystemPath {

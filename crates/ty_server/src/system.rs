@@ -228,6 +228,10 @@ impl System for LSPSystem {
         }
     }
 
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        self.native_system.is_executable(path)
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.native_system.current_directory()
     }

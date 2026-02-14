@@ -258,6 +258,8 @@ pub struct SymbolInfo<'a> {
     pub name: Cow<'a, str>,
     /// The kind of symbol (function, class, variable, etc.)
     pub kind: SymbolKind,
+    /// Whether this symbol has a `@deprecated` decorator.
+    pub deprecated: bool,
     /// Whether this symbol was imported from another module.
     ///
     /// And if so, this includes the name of that module.
@@ -273,6 +275,7 @@ impl SymbolInfo<'_> {
         SymbolInfo {
             name: Cow::Owned(self.name.to_string()),
             kind: self.kind,
+            deprecated: self.deprecated,
             imported_from: self.imported_from.clone(),
             name_range: self.name_range,
             full_range: self.full_range,
@@ -285,6 +288,7 @@ impl<'a> From<&'a SymbolTree> for SymbolInfo<'a> {
         SymbolInfo {
             name: Cow::Borrowed(&symbol.name),
             kind: symbol.kind,
+            deprecated: symbol.deprecated,
             // The clone here isn't great, but doing actual work here
             // probably isn't the super common case. Namely, most
             // imports aren't re-exports and get filtered out before
@@ -424,6 +428,7 @@ struct SymbolTree {
     parent: Option<SymbolId>,
     name: String,
     kind: SymbolKind,
+    deprecated: bool,
     name_range: TextRange,
     full_range: TextRange,
     imported_from: Option<ImportedFrom>,
@@ -838,6 +843,7 @@ impl<'db> SymbolVisitor<'db> {
             parent: None,
             name: name.id.to_string(),
             kind,
+            deprecated: false,
             name_range: name.range(),
             full_range: stmt.range(),
             imported_from: None,
@@ -872,6 +878,7 @@ impl<'db> SymbolVisitor<'db> {
             parent: None,
             name: name.id.to_string(),
             kind,
+            deprecated: false,
             name_range: name.range(),
             full_range,
             imported_from: Some(imported_from),
@@ -1094,12 +1101,30 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     /// Updates the origin of `__all__` in the current module.
-    ///
-    /// This will clear existing names if the origin is changed to
-    /// mimic the behavior of overriding `__all__` in the current
-    /// module.
     fn update_all_origin(&mut self, origin: DunderAllOrigin) {
-        if self.all_origin.is_some() {
+        // N.B. This used to clear `all_names` whenever there
+        // was *any* previous origin set. Now we skip clearing
+        // it if the previous origin and the new origin are
+        // both "current module." This tends to arise in situation
+        // like this:
+        //
+        //     if sys.version > ...:
+        //         __all__ = ['SomeFancyNewSymbol']
+        //     else:
+        //         __all__ = []
+        //
+        // Clearing is arguably correct here, but auto-import
+        // (unlike ty's own __all__ handling) doesn't yet know
+        // how to evaluate conditionals. So instead of over-writing
+        // __all__, we union it. This will produce incorrect
+        // results in some cases, but the failure mode will be
+        // "suggests symbol that doesn't exist" instead of
+        // "doesn't suggest symbol that does exist." The former
+        // seems preferable (until we know how to evaluate at
+        // least some rudimentary conditionals).
+        if !(matches!(self.all_origin, Some(DunderAllOrigin::CurrentModule))
+            && matches!(origin, DunderAllOrigin::CurrentModule))
+        {
             self.all_names.clear();
         }
         self.all_origin = Some(origin);
@@ -1123,6 +1148,17 @@ impl<'db> SymbolVisitor<'db> {
 
     fn is_constant_name(name: &str) -> bool {
         name.chars().all(|c| c.is_ascii_uppercase() || c == '_')
+    }
+
+    fn has_deprecated_decorator(decorator_list: &[ast::Decorator]) -> bool {
+        decorator_list.iter().any(|decorator| {
+            let expr = match &decorator.expression {
+                ast::Expr::Call(call) => &*call.func,
+                other => other,
+            };
+            UnqualifiedName::from_expr(expr)
+                .is_some_and(|name| name.segments().last() == Some(&"deprecated"))
+        })
     }
 
     /// This routine determines whether the given symbol should be
@@ -1197,6 +1233,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     parent: None,
                     name: func_def.name.to_string(),
                     kind,
+                    deprecated: Self::has_deprecated_decorator(&func_def.decorator_list),
                     name_range: func_def.name.range(),
                     full_range: stmt.range(),
                     imported_from: None,
@@ -1226,6 +1263,7 @@ impl<'db> SourceOrderVisitor<'db> for SymbolVisitor<'db> {
                     parent: None,
                     name: class_def.name.to_string(),
                     kind: SymbolKind::Class,
+                    deprecated: Self::has_deprecated_decorator(&class_def.decorator_list),
                     name_range: class_def.name.range(),
                     full_range: stmt.range(),
                     imported_from: None,
@@ -1428,6 +1466,7 @@ mod tests {
     use ruff_db::Db;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ty_project::{ProjectMetadata, TestDb};
 
@@ -2693,6 +2732,152 @@ class X:
         );
     }
 
+    /// Tests that a work-around which unions `__all__` values lets
+    /// us find conditionally exported symbols.
+    ///
+    /// However, this also means that we may suggest exported symbols
+    /// even when they aren't available. What we should ideally do is
+    /// evaluate the conditional like ty does, but this requires some
+    /// work. (And it's unlikely auto-import will ever get the full
+    /// evaluation capabilities as ty, so it's likely this sort of
+    /// union work-around will always be something we do in at least
+    /// some cases.)
+    #[test]
+    fn union_all_to_work_around_conditional_symbols_py311() {
+        let test = PublicTestBuilder::default()
+            .python_version(PythonVersion::PY311)
+            .source(
+                "test.py",
+                "
+                import sys
+                if sys.version_info >= (3, 11):
+                    ZQZQZQ = 1
+                else:
+                    ZYZYZY = 1
+
+                if sys.version_info >= (3, 11):
+                    __all__ = ['ZQZQZQ']
+                else:
+                    __all__ = ['ZYZYZY']
+                ",
+            )
+            .build();
+        // Ideally this would only have `ZQZQZQ`.
+        insta::assert_snapshot!(
+            test.exports(),
+            @r"
+        ZQZQZQ :: Constant
+        ZYZYZY :: Constant
+        ",
+        );
+    }
+
+    /// Like `union_all_to_work_around_conditional_symbols_py311`, but
+    /// sets the environment Python version to 3.10 so that the conditional
+    /// should evaluate to false.
+    #[test]
+    fn union_all_to_work_around_conditional_symbols_py310() {
+        let test = PublicTestBuilder::default()
+            .python_version(PythonVersion::PY310)
+            .source(
+                "test.py",
+                "
+                import sys
+                if sys.version_info >= (3, 11):
+                    ZQZQZQ = 1
+                else:
+                    ZYZYZY = 1
+
+                if sys.version_info >= (3, 11):
+                    __all__ = ['ZQZQZQ']
+                else:
+                    __all__ = ['ZYZYZY']
+                ",
+            )
+            .build();
+        // Ideally this would only have `ZYZYZY`.
+        insta::assert_snapshot!(
+            test.exports(),
+            @r"
+        ZQZQZQ :: Constant
+        ZYZYZY :: Constant
+        ",
+        );
+    }
+
+    #[test]
+    fn deprecated_function() {
+        let test = public_test(
+            "\
+@deprecated('use new_foo instead')
+def foo(): ...
+
+def bar(): ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, foo) = &syms[0];
+        assert_eq!(&*foo.name, "foo");
+        assert!(foo.deprecated);
+
+        let (_, bar) = &syms[1];
+        assert_eq!(&*bar.name, "bar");
+        assert!(!bar.deprecated);
+    }
+
+    #[test]
+    fn deprecated_class() {
+        let test = public_test(
+            "\
+@deprecated('use NewClass instead')
+class OldClass: ...
+
+class NewClass: ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, old) = &syms[0];
+        assert_eq!(&*old.name, "OldClass");
+        assert!(old.deprecated);
+
+        let (_, new) = &syms[1];
+        assert_eq!(&*new.name, "NewClass");
+        assert!(!new.deprecated);
+    }
+
+    #[test]
+    fn deprecated_bare_decorator() {
+        let test = public_test(
+            "\
+@deprecated
+def foo(): ...
+
+@deprecated
+class C: ...
+",
+        );
+        let symbols = test.exported_symbols();
+
+        let syms: Vec<_> = symbols.iter().collect();
+        assert_eq!(syms.len(), 2);
+
+        let (_, foo) = &syms[0];
+        assert_eq!(&*foo.name, "foo");
+        assert!(foo.deprecated);
+
+        let (_, c) = &syms[1];
+        assert_eq!(&*c.name, "C");
+        assert!(foo.deprecated);
+    }
+
     fn matches(query: &str, symbol: &str) -> bool {
         super::QueryPattern::fuzzy(query).is_match_symbol_name(symbol)
     }
@@ -2715,13 +2900,24 @@ class X:
             self.exports_for("test.py")
         }
 
+        /// Returns the [`FlatSymbols`] for `test.py`.
+        fn exported_symbols(&self) -> &super::FlatSymbols {
+            self.exported_symbols_for("test.py")
+        }
+
+        /// Returns the [`FlatSymbols`] for the module at the given path.
+        ///
+        /// The path given must have been written to this test's salsa DB.
+        fn exported_symbols_for(&self, path: impl AsRef<SystemPath>) -> &super::FlatSymbols {
+            let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
+            symbols_for_file_global_only(&self.db, file)
+        }
+
         /// Returns the exports from the module at the given path.
         ///
         /// The path given must have been written to this test's salsa DB.
         fn exports_for(&self, path: impl AsRef<SystemPath>) -> String {
-            let file = system_path_to_file(&self.db, path.as_ref()).unwrap();
-            let symbols = symbols_for_file_global_only(&self.db, file);
-            symbols
+            self.exported_symbols_for(path)
                 .iter()
                 .map(|(_, symbol)| {
                     let mut snapshot =
@@ -2744,16 +2940,17 @@ class X:
         /// A list of source files, corresponding to the
         /// file's path and its contents.
         sources: Vec<Source>,
+        /// The python version to use.
+        python_version: Option<PythonVersion>,
     }
 
     impl PublicTestBuilder {
         pub(super) fn build(&self) -> PublicTest {
-            let mut db = TestDb::new(ProjectMetadata::new(
-                "test".into(),
-                SystemPathBuf::from("/"),
-            ));
+            let metadata = ProjectMetadata::new("test".into(), SystemPathBuf::from("/"));
+            let mut db = TestDb::new(metadata);
 
-            db.init_program().unwrap();
+            db.init_program_with_python_version(self.python_version.unwrap_or_default())
+                .unwrap();
 
             for Source { path, contents } in &self.sources {
                 db.write_file(path, contents)
@@ -2791,6 +2988,11 @@ class X:
             let path = path.into();
             let contents = dedent(contents.as_ref()).into_owned();
             self.sources.push(Source { path, contents });
+            self
+        }
+
+        pub(super) fn python_version(&mut self, version: PythonVersion) -> &mut PublicTestBuilder {
+            self.python_version = Some(version);
             self
         }
     }

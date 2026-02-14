@@ -6,10 +6,9 @@ use itertools::Itertools;
 use ruff_python_ast as ast;
 
 use crate::Db;
-use crate::place::{DefinedPlace, Definedness, Place};
 use crate::subscript::{PyIndex, PySlice};
 
-use super::call::{Bindings, CallArguments, CallDunderError, CallError, CallErrorKind};
+use super::call::{Bindings, CallArguments, CallDunderError, CallErrorKind};
 use super::class::KnownClass;
 use super::class_base::ClassBase;
 use super::context::InferContext;
@@ -108,29 +107,18 @@ pub(crate) enum SubscriptErrorKind<'db> {
     SliceStepSizeZero,
     /// A non-generic PEP 695 type alias was subscripted.
     NonGenericTypeAlias { alias: TypeAliasType<'db> },
-    /// `__getitem__` exists but is possibly unbound.
+    /// `__getitem__` or `__class_getitem__` exists but is possibly unbound.
     DunderPossiblyUnbound {
         method: DunderMethod,
         value_ty: Type<'db>,
     },
-    /// `__getitem__` exists but can't be called with the given arguments.
+    /// `__getitem__` or `__class_getitem__` exists but can't be called with the given arguments.
     DunderCallError {
         method: DunderMethod,
         value_ty: Type<'db>,
         slice_ty: Type<'db>,
         kind: CallErrorKind,
         bindings: Box<Bindings<'db>>,
-    },
-    /// `__class_getitem__` exists but isn't callable.
-    CallNonCallable {
-        method: DunderMethod,
-        value_ty: Type<'db>,
-        bindings: Box<Bindings<'db>>,
-    },
-    /// `__class_getitem__` exists but may be missing at runtime.
-    PossiblyMissingImplicitCall {
-        method: DunderMethod,
-        value_ty: Type<'db>,
     },
     /// The type does not support subscripting via the expected dunder.
     NotSubscriptable {
@@ -288,29 +276,6 @@ impl<'db> SubscriptErrorKind<'db> {
                     }
                 }
             },
-            Self::CallNonCallable {
-                method,
-                value_ty,
-                bindings,
-            } => {
-                if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, value_node) {
-                    builder.into_diagnostic(format_args!(
-                        "Method `{method}` of type `{}` is not callable on object of type `{}`",
-                        bindings.callable_type().display(db),
-                        value_ty.display(db),
-                    ));
-                }
-            }
-            Self::PossiblyMissingImplicitCall { method, value_ty } => {
-                if let Some(builder) =
-                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "Method `{method}` of type `{}` may be missing",
-                        value_ty.display(db),
-                    ));
-                }
-            }
             Self::NotSubscriptable { value_ty, method } => {
                 report_not_subscriptable(context, subscript, *value_ty, method.as_str());
             }
@@ -742,41 +707,39 @@ impl<'db> Type<'db> {
         // despite the fact that there will be no corresponding `__class_getitem__`
         // method in these `sys.version_info` branches.
         if value_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)) {
-            let dunder_class_getitem_method = value_ty.member(db, "__class_getitem__").place;
-
-            match dunder_class_getitem_method {
-                Place::Undefined => {}
-                Place::Defined(DefinedPlace {
-                    ty,
-                    definedness: boundness,
-                    ..
-                }) => {
-                    let mut errors = Vec::new();
-                    if boundness == Definedness::PossiblyUndefined {
-                        errors.push(SubscriptErrorKind::PossiblyMissingImplicitCall {
+            let call_arguments = CallArguments::positional([slice_ty]);
+            match value_ty.try_call_dunder_on_class(
+                db,
+                "__class_getitem__",
+                &call_arguments,
+                TypeContext::default(),
+            ) {
+                Ok(bindings) => {
+                    return Ok(bindings.return_type(db));
+                }
+                Err(CallDunderError::PossiblyUnbound(bindings)) => {
+                    return Err(SubscriptError::new(
+                        bindings.return_type(db),
+                        SubscriptErrorKind::DunderPossiblyUnbound {
                             method: DunderMethod::ClassGetItem,
                             value_ty,
-                        });
-                    }
-
-                    match ty.try_call(db, &CallArguments::positional([slice_ty])) {
-                        Ok(bindings) => {
-                            let result_ty = bindings.return_type(db);
-                            if errors.is_empty() {
-                                return Ok(result_ty);
-                            }
-                            return Err(SubscriptError::with_errors(result_ty, errors));
-                        }
-                        Err(CallError(_, bindings)) => {
-                            let result_ty = bindings.return_type(db);
-                            errors.push(SubscriptErrorKind::CallNonCallable {
-                                method: DunderMethod::ClassGetItem,
-                                value_ty,
-                                bindings,
-                            });
-                            return Err(SubscriptError::with_errors(result_ty, errors));
-                        }
-                    }
+                        },
+                    ));
+                }
+                Err(CallDunderError::CallError(call_error_kind, bindings)) => {
+                    return Err(SubscriptError::new(
+                        bindings.return_type(db),
+                        SubscriptErrorKind::DunderCallError {
+                            method: DunderMethod::ClassGetItem,
+                            value_ty,
+                            slice_ty,
+                            kind: call_error_kind,
+                            bindings,
+                        },
+                    ));
+                }
+                Err(CallDunderError::MethodNotAvailable) => {
+                    // Fall through to the logic below
                 }
             }
 
