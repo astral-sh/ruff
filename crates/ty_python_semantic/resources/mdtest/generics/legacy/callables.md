@@ -245,3 +245,27 @@ reveal_type(generic_context(outside_callable(int_identity)))
 # error: [invalid-argument-type]
 outside_callable(int_identity)("string")
 ```
+
+## Overloaded callable as generic `Callable` argument
+
+The type variable should be inferred from the first matching overload, rather than unioning
+parameter types across all overloads (which would create an unsatisfiable expected type for
+contravariant type variables).
+
+```py
+from typing import Callable, TypeVar, overload
+
+T = TypeVar("T")
+
+def accepts_callable(converter: Callable[[T], None]) -> None:
+    raise NotImplementedError
+
+@overload
+def f(val: str) -> None: ...
+@overload
+def f(val: bytes) -> None: ...
+def f(val: str | bytes) -> None:
+    pass
+
+accepts_callable(f)  # fine
+```
