@@ -10,7 +10,7 @@ use crate::{
     semantic_index::{place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
-        Parameter, StaticClassLiteral, Type, TypeQualifiers,
+        Parameter, StaticClassLiteral, Type, TypeQualifiers, tuple::TupleType,
     },
 };
 
@@ -288,18 +288,20 @@ pub(crate) fn enum_metadata<'db>(
     }
 
     // Determine the expected `_value_` type:
-    // (a) Always respect an explicit `_value_` annotation if present.
-    // (b) Otherwise, fall back to `Any` if the enum has an `__init__` method.
-    // (c) Otherwise, fall back to `Unknown` (no member value validation).
-    let value_sunder_type = place_table(db, scope_id)
-        .symbol_id("_value_")
-        .and_then(|symbol_id| {
-            let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-            place_from_declarations(db, declarations)
-                .ignore_conflicting_declarations()
-                .ignore_possibly_undefined()
+    // (a) If `__init__` is defined, the deferred `_value_` type comes from the initializer signature.
+    // (b) Otherwise, respect an explicit `_value_` annotation if present.
+    // (c) If neither exists, fall back to `Unknown` (no member value validation).
+    let value_sunder_type = extract_init_member_type(db, scope_id)
+        .or_else(|| {
+            place_table(db, scope_id)
+                .symbol_id("_value_")
+                .and_then(|symbol_id| {
+                    let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+                    place_from_declarations(db, declarations)
+                        .ignore_conflicting_declarations()
+                        .ignore_possibly_undefined()
+                })
         })
-        .or_else(|| extract_init_member_type(db, scope_id))
         .unwrap_or(Type::Dynamic(DynamicType::Unknown));
 
     Some(EnumMetadata {
@@ -335,8 +337,12 @@ fn extract_init_member_type<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option
 
     match param_types.len() {
         0 => None,
-        // At this moment, we just infer any as type similar to other type checkers
-        _ => Some(Type::Dynamic(DynamicType::Any)),
+        // single-argument `__init__` – the value type is just that parameter.
+        1 => Some(param_types.into_iter().next().unwrap()),
+        // multiple parameters – the member value is constructed from a tuple of
+        // all arguments, so that `M = (a, b, c)` is valid when the signature is
+        // `def __init__(self, a: A, b: B, c: C)`.
+        _ => TupleType::heterogeneous(db, param_types).map(|tuple| Type::tuple(Some(tuple))),
     }
 }
 
