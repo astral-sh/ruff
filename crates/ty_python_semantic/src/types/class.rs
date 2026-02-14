@@ -5163,6 +5163,8 @@ impl<'db> DynamicClassLiteral<'db> {
             // determine the bases, so return Unknown.
             bases_type
                 .fixed_tuple_elements(db)
+                .map(Cow::into_owned)
+                .map(Into::into)
                 .unwrap_or_else(|| Box::from([Type::unknown()]))
         }
 

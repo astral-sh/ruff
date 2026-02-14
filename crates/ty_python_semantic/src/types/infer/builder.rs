@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{
     Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
@@ -8675,7 +8677,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 bases_type.display(db)
             ));
         }
-        bases_type.fixed_tuple_elements(db)
+        bases_type
+            .fixed_tuple_elements(db)
+            .map(Cow::into_owned)
+            .map(Into::into)
     }
 
     /// Validate base classes from the second argument of a `type()` call.

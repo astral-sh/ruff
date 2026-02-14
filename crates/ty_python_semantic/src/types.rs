@@ -1179,13 +1179,21 @@ impl<'db> Type<'db> {
             .and_then(|instance| instance.own_tuple_spec(db))
     }
 
-    /// If this type is a fixed-length tuple instance, returns a boxed slice of its element types.
+    /// If this type is a fixed-length tuple instance, returns a slice of its element types.
     ///
     /// Returns `None` if this is not a tuple instance, or if it's a variable-length tuple.
-    fn fixed_tuple_elements(&self, db: &'db dyn Db) -> Option<Box<[Type<'db>]>> {
+    fn fixed_tuple_elements(&self, db: &'db dyn Db) -> Option<Cow<'db, [Type<'db>]>> {
         let tuple_spec = self.tuple_instance_spec(db)?;
-        let fixed = tuple_spec.as_fixed_length()?;
-        Some(fixed.elements_slice().iter().copied().collect())
+        match tuple_spec {
+            Cow::Borrowed(spec) => {
+                let elements = spec.as_fixed_length()?.elements_slice();
+                Some(Cow::Borrowed(elements))
+            }
+            Cow::Owned(spec) => {
+                let elements = spec.as_fixed_length()?.elements_slice();
+                Some(Cow::Owned(elements.to_vec()))
+            }
+        }
     }
 
     /// Returns the materialization of this type depending on the given `variance`.
