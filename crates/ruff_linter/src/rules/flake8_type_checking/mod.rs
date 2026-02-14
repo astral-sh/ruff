@@ -78,6 +78,8 @@ mod tests {
     )]
     #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future.py"))]
     #[test_case(&[Rule::TypingOnlyFirstPartyImport], Path::new("TC001_future_present.py"))]
+    #[test_case(&[Rule::RuntimeStringUnion], Path::new("TC010_future_1.py"))]
+    #[test_case(&[Rule::RuntimeStringUnion], Path::new("TC010_future_2.py"))]
     fn add_future_import(rules: &[Rule], path: &Path) -> Result<()> {
         let name = rules.iter().map(Rule::noqa_code).join("-");
         let snapshot = format!("add_future_import__{}_{}", name, path.to_string_lossy());
@@ -156,6 +158,7 @@ mod tests {
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote2.py"))]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("quote3.py"))]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("quote3.py"))]
+    #[test_case(Rule::RuntimeStringUnion, Path::new("TC010_quote.py"))]
     fn quote(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("quote_{}_{}", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(
