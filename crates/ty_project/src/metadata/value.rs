@@ -399,7 +399,11 @@ impl RelativePathBuf {
             ValueSource::Cli | ValueSource::Editor => system.current_directory(),
         };
 
-        SystemPath::absolute(&self.0, relative_to)
+        // Expand tildes and environment variables in the path (e.g. `~/.cache/foo`).
+        let expanded = shellexpand::full(self.0.as_str());
+        let path = expanded.as_deref().unwrap_or(self.0.as_str());
+
+        SystemPath::absolute(SystemPath::new(path), relative_to)
     }
 }
 
