@@ -628,7 +628,7 @@ from module2 import imported as other_imported
 from ty_extensions import TypeOf, static_assert, is_equivalent_to
 
 # error: [possibly-missing-attribute]
-reveal_type(imported.abc)  # revealed: Unknown
+reveal_type(imported.abc)  # revealed: <module 'imported.abc'> & Any
 
 reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>
 
