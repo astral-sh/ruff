@@ -114,6 +114,8 @@ class Color(Enum):
     GREEN = "green"  # error: [invalid-assignment]
     BLUE = ...
     YELLOW = None  # error: [invalid-assignment]
+    # In stub files, `[]` is not exempt from type checking (only `...` is).
+    PURPLE = []  # error: [invalid-assignment]
 ```
 
 When `_value_` is annotated, `.value` and `._value_` are inferred as the declared type:
@@ -170,6 +172,24 @@ class Planet2(Enum):
 
 reveal_type(Planet2.MERCURY.value)  # revealed: Any
 reveal_type(Planet2.MERCURY._value_)  # revealed: Any
+```
+
+### Inherited `_value_` annotation
+
+A `_value_` annotation on a parent enum is not inherited by subclasses for the purpose of member
+value validation:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    _value_: int
+
+class Child(Base):
+    A = 1
+    B = "not checked against int"
+
+reveal_type(Child.A.value)  # revealed: Literal[1]
 ```
 
 ### Non-member attributes with disallowed type
