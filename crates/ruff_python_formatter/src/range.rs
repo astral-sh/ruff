@@ -1,3 +1,4 @@
+use rustc_hash::FxHashSet;
 use tracing::Level;
 
 use ruff_formatter::printer::SourceMapGeneration;
@@ -13,7 +14,7 @@ use ruff_python_trivia::{
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::comments::Comments;
-use crate::context::{IndentLevel, NodeLevel};
+use crate::context::{IndentLevel, NodeLevel, collect_import_aliases};
 use crate::prelude::*;
 use crate::statement::suite::{DocstringStmt, skip_range};
 use crate::verbatim::{ends_suppression, starts_suppression};
@@ -75,6 +76,11 @@ pub fn format_range(
     assert_valid_char_boundaries(range, source);
 
     let parsed = parse(source, ParseOptions::from(options.source_type()))?;
+    let import_aliases = if let Some(module) = parsed.syntax().as_module() {
+        collect_import_aliases(module.body.as_slice())
+    } else {
+        FxHashSet::default()
+    };
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
@@ -84,6 +90,7 @@ pub fn format_range(
         source,
         comments,
         parsed.tokens(),
+        import_aliases,
     );
 
     let (enclosing_node, base_indent) =

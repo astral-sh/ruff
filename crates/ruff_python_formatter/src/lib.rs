@@ -2,6 +2,7 @@ use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
+use rustc_hash::FxHashSet;
 use thiserror::Error;
 use tracing::Level;
 
@@ -17,6 +18,7 @@ use crate::comments::{
     Comments, SourceComment, has_skip_comment, leading_comments, trailing_comments,
 };
 pub use crate::context::PyFormatContext;
+use crate::context::collect_import_aliases;
 pub use crate::db::Db;
 pub use crate::options::{
     DocstringCode, DocstringCodeLineWidth, MagicTrailingComma, PreviewMode, PyFormatOptions,
@@ -165,9 +167,13 @@ where
 {
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
-
+    let import_aliases = if let Some(module) = parsed.syntax().into().mod_module() {
+        collect_import_aliases(module.body.as_slice())
+    } else {
+        FxHashSet::default()
+    };
     let formatted = format!(
-        PyFormatContext::new(options, source, comments, parsed.tokens()),
+        PyFormatContext::new(options, source, comments, parsed.tokens(), import_aliases),
         [parsed.syntax().format()]
     )?;
     formatted
