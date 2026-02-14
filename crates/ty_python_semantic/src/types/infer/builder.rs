@@ -7733,18 +7733,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let name_type = self.infer_expression(name_arg, TypeContext::default());
 
-        // For assigned `type()` calls, bases inference is deferred to handle forward references
-        // and recursive references (e.g., `X = type("X", (tuple["X | None"],), {})`).
-        // This avoids expensive Salsa fixpoint iteration by deferring inference until the
-        // class type is already bound.
-        let bases_type = if definition.is_some() {
-            // Don't infer bases eagerly for assigned calls; defer to later.
-            None
-        } else {
-            // For dangling calls, infer bases eagerly since they can't reference the class.
-            Some(self.infer_expression(bases_arg, TypeContext::default()))
-        };
-
         let namespace_type = self.infer_expression(namespace_arg, TypeContext::default());
 
         // TODO: validate other keywords against `__init_subclass__` methods of superclasses
@@ -7845,9 +7833,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let scope = self.scope();
 
-        // For dangling calls, extract bases eagerly (they'll be stored in the anchor
-        // and used for validation). Also validate that bases is a tuple type.
-        let explicit_bases = bases_type.and_then(|ty| self.extract_explicit_bases(bases_arg, ty));
+        // For assigned `type()` calls, bases inference is deferred to handle forward references
+        // and recursive references (e.g., `X = type("X", (tuple["X | None"],), {})`).
+        // This avoids expensive Salsa fixpoint iteration by deferring inference until the
+        // class type is already bound. For dangling calls, infer and extract bases eagerly
+        // (they'll be stored in the anchor and used for validation).
+        let explicit_bases = if definition.is_none() {
+            let bases_type = self.infer_expression(bases_arg, TypeContext::default());
+            self.extract_explicit_bases(bases_arg, bases_type)
+        } else {
+            None
+        };
 
         // Create the anchor for identifying this dynamic class.
         // - For assigned `type()` calls, the Definition uniquely identifies the class,
