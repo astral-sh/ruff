@@ -836,12 +836,7 @@ fn extract_typed_dict_keys<'db>(
         | Type::PropertyInstance(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
-        | Type::IntLiteral(_)
-        | Type::BooleanLiteral(_)
-        | Type::StringLiteral(_)
-        | Type::EnumLiteral(_)
-        | Type::LiteralString
-        | Type::BytesLiteral(_)
+        | Type::LiteralValue(_)
         | Type::TypeVar(_)
         | Type::BoundSuper(_)
         | Type::TypeIs(_)
@@ -1039,7 +1034,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     // Validate each key-value pair in the dictionary literal
     for item in &dict_expr.items {
         if let Some(key_expr) = &item.key
-            && let Type::StringLiteral(key_str) = expression_type_fn(key_expr)
+            && let Some(key_str) = expression_type_fn(key_expr).as_string_literal()
         {
             let key = key_str.value(context.db());
             provided_keys.insert(Name::new(key));

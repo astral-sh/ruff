@@ -9,8 +9,8 @@ use crate::{
     },
     semantic_index::{place_table, use_def_map},
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
-        StaticClassLiteral, Type, TypeQualifiers,
+        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
+        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
     },
 };
 
@@ -87,12 +87,12 @@ pub(crate) fn enum_metadata<'db>(
         let ignore_place = place_from_bindings(db, ignore_bindings).place;
 
         match ignore_place {
-            Place::Defined(DefinedPlace {
-                ty: Type::StringLiteral(ignored_names),
-                ..
-            }) => Some(ignored_names.value(db).split_ascii_whitespace().collect()),
+            Place::Defined(DefinedPlace { ty, .. }) => ty
+                .as_string_literal()
+                .map(|ignored_names| ignored_names.value(db).split_ascii_whitespace().collect()),
+
             // TODO: support the list-variant of `_ignore_`.
-            _ => None,
+            Place::Undefined => None,
         }
     } else {
         None
@@ -180,7 +180,7 @@ pub(crate) fn enum_metadata<'db>(
                                             custom_mixins.as_slice(),
                                             [] | [Some(KnownClass::Int)]
                                         ) {
-                                            Type::IntLiteral(auto_counter)
+                                            Type::int_literal(auto_counter)
                                         } else {
                                             Type::any()
                                         }
@@ -225,11 +225,13 @@ pub(crate) fn enum_metadata<'db>(
             // performed if we can infer a precise literal type for the enum member. If we only get `int`,
             // we don't know if it's a duplicate or not.
             if matches!(
-                value_ty,
-                Type::BooleanLiteral(_)
-                    | Type::IntLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::BytesLiteral(_)
+                value_ty.as_literal_value_kind(),
+                Some(
+                    LiteralValueTypeKind::Bool(_)
+                        | LiteralValueTypeKind::Int(_)
+                        | LiteralValueTypeKind::String(_)
+                        | LiteralValueTypeKind::Bytes(_)
+                )
             ) {
                 if let Some(canonical) = enum_values.get(&value_ty) {
                     // This is a duplicate value, create an alias to the canonical (first) member
@@ -298,7 +300,7 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
             .members
             .keys()
             .filter(move |name| Some(*name) != exclude_member)
-            .map(move |name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone())))
+            .map(move |name| Type::enum_literal(EnumLiteralType::new(db, class, name.clone())))
     })
 }
 

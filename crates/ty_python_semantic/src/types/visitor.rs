@@ -152,12 +152,7 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::Never
-            | Type::LiteralString
-            | Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
+            | Type::LiteralValue(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
             | Type::WrapperDescriptor(_)

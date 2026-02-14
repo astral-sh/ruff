@@ -137,12 +137,12 @@ impl Ty {
             Ty::Unknown => Type::unknown(),
             Ty::None => Type::none(db),
             Ty::Any => Type::any(),
-            Ty::IntLiteral(n) => Type::IntLiteral(n),
+            Ty::IntLiteral(n) => Type::int_literal(n),
             Ty::StringLiteral(s) => Type::string_literal(db, s),
-            Ty::BooleanLiteral(b) => Type::BooleanLiteral(b),
-            Ty::LiteralString => Type::LiteralString,
+            Ty::BooleanLiteral(b) => Type::bool_literal(b),
+            Ty::LiteralString => Type::literal_string(),
             Ty::BytesLiteral(s) => Type::bytes_literal(db, s.as_bytes()),
-            Ty::EnumLiteral(name) => Type::EnumLiteral(EnumLiteralType::new(
+            Ty::EnumLiteral(name) => Type::enum_literal(EnumLiteralType::new(
                 db,
                 known_module_symbol(db, KnownModule::Uuid, "SafeUUID")
                     .place
