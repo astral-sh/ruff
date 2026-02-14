@@ -414,7 +414,7 @@ If either method comes from a generic base class, we don't currently use its inf
 to specialize the class.
 
 ```py
-from typing_extensions import Generic, TypeVar
+from typing_extensions import Generic, TypeVar, Self
 from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
@@ -422,7 +422,7 @@ U = TypeVar("U")
 V = TypeVar("V")
 
 class C(Generic[T, U]):
-    def __new__(cls, *args, **kwargs) -> "C[T, U]":
+    def __new__(cls, *args, **kwargs) -> Self:
         return object.__new__(cls)
 
 class D(C[V, int]):

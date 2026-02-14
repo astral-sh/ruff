@@ -4791,7 +4791,6 @@ impl<'db> Type<'db> {
                 binding
             })
         }
-
         let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
         let class_generic_context = class_literal.generic_context(db);
 
@@ -4865,8 +4864,69 @@ impl<'db> Type<'db> {
             _ => self,
         };
 
-        // As of now we do not model custom `__call__` on meta-classes, so the code below
-        // only deals with interplay between `__new__` and `__init__` methods.
+        // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
+        // Per the spec: if the return type is not an instance of the class being constructed
+        // (or a subclass thereof), use the metaclass `__call__` directly and skip `__new__`/`__init__`.
+        // If the return type is dynamic/contains typevars, fall through to evaluate `__new__`/`__init__`.
+        let metaclass_dunder_call = self_type.member_lookup_with_policy(
+            db,
+            "__call__".into(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+        );
+
+        let is_non_instance_overload = |sig: &Signature<'db>| {
+            !sig.return_ty.has_typevar(db)
+                && ConstructorReturnDisposition::of(db, sig.return_ty, class).is_not_instance()
+        };
+
+        // For overloaded metaclass `__call__` with mixed return types, we save the
+        // non-instance overloads and combine them with `__init__` after lookup.
+        // For instance-returning metaclass `__call__`, we save the bindings to include
+        // in the union with `__new__`/`__init__` so its parameters also get validated.
+        let mut metaclass_mixed_non_instance_sigs = None;
+        let mut metaclass_instance_bindings: Option<(Bindings<'db>, Type<'db>)> = None;
+
+        if let Place::Defined(DefinedPlace {
+            ty: Type::BoundMethod(metaclass_call_method),
+            ..
+        }) = metaclass_dunder_call.place
+        {
+            let signature = metaclass_call_method.function(db).signature(db);
+
+            let non_instance_sigs: SmallVec<[Signature<'db>; 4]> = signature
+                .overloads
+                .iter()
+                .filter(|sig| is_non_instance_overload(sig))
+                .cloned()
+                .collect();
+
+            if !non_instance_sigs.is_empty() {
+                if non_instance_sigs.len() == signature.overloads.len() {
+                    // All overloads return non-instance types: use metaclass `__call__` directly.
+                    return Type::BoundMethod(metaclass_call_method).bindings(db);
+                }
+
+                // Mixed: save non-instance overloads (pre-bound, removing `cls`) for
+                // later combination with `__init__` overloads.
+                let metaclass_self = metaclass_call_method.self_instance(db);
+                metaclass_mixed_non_instance_sigs = Some(
+                    non_instance_sigs
+                        .iter()
+                        .map(|sig| sig.bind_self(db, Some(metaclass_self)))
+                        .collect::<SmallVec<[Signature<'db>; 4]>>(),
+                );
+            } else {
+                // All overloads return instance/uncertain types. Save the metaclass
+                // `__call__` bindings so we can include them in the union with
+                // `__new__`/`__init__` — this ensures the metaclass parameters are validated.
+                let metaclass_call_ty = Type::BoundMethod(metaclass_call_method);
+                metaclass_instance_bindings =
+                    Some((metaclass_call_ty.bindings(db), metaclass_call_ty));
+            }
+        }
+
+        // The code below deals with interplay between `__new__` and `__init__` methods.
         // The logic is roughly as follows:
         // 1. If `__new__` is defined anywhere in the MRO (except for `object`, since it is always
         //    present), we validate the constructor arguments against it. We then validate `__init__`,
@@ -4877,10 +4937,6 @@ impl<'db> Type<'db> {
         //    the way to `object` (single `self` argument call). This time it is correct to
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
-        //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
@@ -4926,6 +4982,52 @@ impl<'db> Type<'db> {
             },
             None => (None, false),
         };
+
+        // Per the spec: "If the evaluated return type of `__new__` is not the class being
+        // constructed (or a subclass thereof), a type checker should assume that the `__init__`
+        // method will not be called." Also: "an explicit return type of `Any` should be treated
+        // as a type that is not an instance of the class being constructed."
+        //
+        // Use a structural class-based check instead of full assignability/subtyping to avoid
+        // deep recursive relation checks on large codebases (for example static-frame).
+        let new_non_instance_return =
+            new_bindings
+                .as_ref()
+                .and_then(|(new_bindings, new_callable)| {
+                    let func = match *new_callable {
+                        Type::FunctionLiteral(func) => Some(func),
+                        Type::BoundMethod(method) => Some(method.function(db)),
+                        _ => None,
+                    }?;
+                    let enclosing_class = nearest_enclosing_class(
+                        db,
+                        semantic_index(db, func.file(db)),
+                        func.definition(db).scope(db),
+                    );
+                    if enclosing_class.is_some_and(|cls| {
+                        matches!(cls.known(db), Some(KnownClass::Type | KnownClass::Object))
+                    }) {
+                        return None;
+                    }
+
+                    new_bindings
+                        .iter()
+                        .flat_map(|callable_binding| callable_binding.overloads().iter())
+                        .map(|overload| overload.signature.return_ty)
+                        .find(|return_ty| {
+                            !return_ty.is_unknown()
+                                && !return_ty.has_typevar(db)
+                                && ConstructorReturnDisposition::of(db, *return_ty, class)
+                                    .is_not_instance()
+                        })
+                });
+
+        if let Some(new_return_ty) = new_non_instance_return {
+            let (new_bindings, _) = new_bindings.unwrap();
+            return new_bindings
+                .with_generic_context(db, class_generic_context)
+                .with_constructor_instance_type(new_return_ty);
+        }
 
         // Only fall back to `object.__init__` when `__new__` is absent.
         let init_bindings = match (&init_method_no_object.place, has_any_new) {
@@ -4982,23 +5084,78 @@ impl<'db> Type<'db> {
             (Place::Undefined, true) => None,
         };
 
+        // If the metaclass `__call__` had mixed return types (some non-instance, some instance),
+        // combine the non-instance metaclass overloads with `__init__` overloads into a single
+        // set of overloads. The overload resolution algorithm will then naturally select the
+        // metaclass overload for non-instance calls and `__init__` for instance-returning calls.
+        if let Some(non_instance_sigs) = metaclass_mixed_non_instance_sigs {
+            let mut combined_sigs = non_instance_sigs;
+
+            // Extract `__init__` signatures, pre-bind (removing `self`), set return type
+            // to the class instance type.
+            let init_method_ty = init_bindings.as_ref().map(|(_, ty)| *ty).or_else(|| {
+                // Fall back to `object.__init__` lookup if no custom `__init__` was found.
+                let init_with_object = lookup_init_ty.member_lookup_with_policy(
+                    db,
+                    "__init__".into(),
+                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
+                );
+                match init_with_object.place {
+                    Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
+                    Place::Undefined => None,
+                }
+            });
+
+            if let Some(Type::BoundMethod(init_bm)) = init_method_ty {
+                let init_self = init_bm.self_instance(db);
+                let init_sig = init_bm.function(db).signature(db);
+                for sig in &init_sig.overloads {
+                    let mut bound_sig = sig.bind_self(db, Some(init_self));
+                    bound_sig.return_ty = constructor_instance_ty;
+                    combined_sigs.push(bound_sig);
+                }
+            } else {
+                // Can't extract raw `__init__` signatures (e.g., union type).
+                // Fall back to a gradual signature for the instance-returning overloads.
+                combined_sigs.push(Signature::new(
+                    Parameters::gradual_form(),
+                    constructor_instance_ty,
+                ));
+            }
+
+            let bindings: Bindings<'db> =
+                CallableBinding::from_overloads(self, combined_sigs).into();
+            return bindings.with_generic_context(db, class_generic_context);
+        }
+
         let bindings = if let Some(bindings) = missing_init_bindings {
             bindings
         } else {
-            match (new_bindings, init_bindings) {
-                (Some((new_bindings, new_callable)), Some((init_bindings, init_callable))) => {
-                    let callable_type = UnionBuilder::new(db)
-                        .add(new_callable)
-                        .add(init_callable)
-                        .build();
-                    // Use both `__new__` and `__init__` bindings so argument inference/checking
-                    // happens under the combined constructor-call type context.
-                    // In ty unions of callables are checked as "all must accept".
-                    Bindings::from_union(callable_type, [new_bindings, init_bindings])
+            // Collect all bindings that must accept the constructor call.
+            // This may include `__new__`, `__init__`, and/or a metaclass `__call__`.
+            let mut all_bindings: SmallVec<[Bindings<'db>; 3]> = SmallVec::new();
+            let mut callable_type_builder = UnionBuilder::new(db);
+
+            if let Some((metaclass_bindings, metaclass_ty)) = metaclass_instance_bindings {
+                all_bindings.push(metaclass_bindings);
+                callable_type_builder = callable_type_builder.add(metaclass_ty);
+            }
+            if let Some((new_bindings, new_callable)) = new_bindings {
+                all_bindings.push(new_bindings);
+                callable_type_builder = callable_type_builder.add(new_callable);
+            }
+            if let Some((init_bindings, init_callable)) = init_bindings {
+                all_bindings.push(init_bindings);
+                callable_type_builder = callable_type_builder.add(init_callable);
+            }
+
+            match all_bindings.len() {
+                0 => return fallback_bindings(),
+                1 => all_bindings.into_iter().next().unwrap(),
+                _ => {
+                    let callable_type = callable_type_builder.build();
+                    Bindings::from_union(callable_type, all_bindings)
                 }
-                (Some((new_bindings, _)), None) => new_bindings,
-                (None, Some((init_bindings, _))) => init_bindings,
-                (None, None) => return fallback_bindings(),
             }
         };
 
@@ -7146,6 +7303,98 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             ty = self.display(db),
         );
         v
+    }
+}
+
+/// Whether a return type from `__new__` or metaclass `__call__` is an instance
+/// of the class being constructed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ConstructorReturnDisposition {
+    /// The return type is definitely an instance of the constructed class.
+    Instance,
+    /// The return type is definitely *not* an instance of the constructed class.
+    NotInstance,
+    /// Cannot be determined (e.g., contains type variables or `Unknown`).
+    Uncertain,
+}
+
+impl ConstructorReturnDisposition {
+    /// Determine whether `return_ty` is an instance of `constructor_class`.
+    fn of<'db>(db: &'db dyn Db, return_ty: Type<'db>, constructor_class: ClassType<'db>) -> Self {
+        match return_ty.resolve_type_alias(db) {
+            Type::Union(union) => {
+                let mut saw_uncertain = false;
+                for element in union.elements(db) {
+                    match Self::of(db, *element, constructor_class) {
+                        Self::NotInstance => return Self::NotInstance,
+                        Self::Instance => {}
+                        Self::Uncertain => saw_uncertain = true,
+                    }
+                }
+                if saw_uncertain {
+                    Self::Uncertain
+                } else {
+                    Self::Instance
+                }
+            }
+            Type::Dynamic(DynamicType::Any) => Self::NotInstance,
+            Type::Dynamic(_) | Type::TypeVar(_) => Self::Uncertain,
+            Type::Never => Self::Instance,
+            Type::NominalInstance(instance) => {
+                // Check origin class identity first, since `is_subclass_of` returns false
+                // for Generic vs NonGeneric variants of the same class.
+                if instance.class(db).class_literal(db) == constructor_class.class_literal(db)
+                    || instance.class(db).is_subclass_of(db, constructor_class)
+                {
+                    Self::Instance
+                } else {
+                    Self::NotInstance
+                }
+            }
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
+                Some(class) if class.is_subclass_of(db, constructor_class) => Self::Instance,
+                Some(_) => Self::NotInstance,
+                None => Self::Uncertain,
+            },
+            ty => {
+                // Fall back to checking the meta type for remaining concrete
+                // types (e.g., `Callable`, `FunctionLiteral`, literals, etc.).
+                // If the return type's class is not a subclass of the
+                // constructor class, the return type can't be an instance.
+                let meta = ty.to_meta_type(db);
+                match meta {
+                    Type::ClassLiteral(class_literal) => {
+                        if class_literal
+                            .default_specialization(db)
+                            .is_subclass_of(db, constructor_class)
+                        {
+                            Self::Instance
+                        } else {
+                            Self::NotInstance
+                        }
+                    }
+                    Type::GenericAlias(alias) => {
+                        if ClassType::from(alias).is_subclass_of(db, constructor_class) {
+                            Self::Instance
+                        } else {
+                            Self::NotInstance
+                        }
+                    }
+                    Type::NominalInstance(instance) => {
+                        if instance.class(db).is_subclass_of(db, constructor_class) {
+                            Self::Instance
+                        } else {
+                            Self::NotInstance
+                        }
+                    }
+                    _ => Self::Uncertain,
+                }
+            }
+        }
+    }
+
+    const fn is_not_instance(self) -> bool {
+        matches!(self, Self::NotInstance)
     }
 }
 
