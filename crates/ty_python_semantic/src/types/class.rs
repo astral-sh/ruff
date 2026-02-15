@@ -1098,7 +1098,7 @@ impl<'db> ClassType<'db> {
             let scope = class_literal.body_scope(db);
             let place_table = place_table(db, scope);
             for (symbol_id, bindings_iterator) in
-                use_def_map(db, class_literal.body_scope(db)).all_end_of_scope_symbol_bindings()
+                use_def_map(db, class_literal.body_scope(db)).all_end_of_scope_symbol_bindings(db)
             {
                 let name = place_table.symbol(symbol_id).name();
                 let place_and_definition = place_from_bindings(db, bindings_iterator);
@@ -3981,7 +3981,7 @@ impl<'db> StaticClassLiteral<'db> {
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);
         let use_def = use_def_map(db, class_body_scope);
-        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations(db) {
             let result = place_from_declarations(db, declarations.clone());
             let attr = result.ignore_conflicting_declarations();
             let symbol = table.symbol(symbol_id);
@@ -4067,7 +4067,7 @@ impl<'db> StaticClassLiteral<'db> {
         let typed_dict_params = self.typed_dict_params(db);
         let mut kw_only_sentinel_field_seen = false;
 
-        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations(db) {
             // Here, we exclude all declarations that are not annotated assignments. We need this because
             // things like function definitions and nested classes would otherwise be considered dataclass
             // fields. The check is too broad in the sense that it also excludes (weird) constructs where
@@ -4099,7 +4099,7 @@ impl<'db> StaticClassLiteral<'db> {
             }
 
             if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
-                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                let bindings = use_def.end_of_scope_symbol_bindings(db, symbol_id);
                 let mut default_ty = place_from_bindings(db, bindings)
                     .place
                     .ignore_possibly_undefined();
@@ -4413,7 +4413,7 @@ impl<'db> StaticClassLiteral<'db> {
                         .symbol_id(&method_def.node(&module).name)
                         .unwrap();
                     class_map
-                        .reachable_symbol_bindings(method_place)
+                        .reachable_symbol_bindings(db, method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
                                 .then(|| class_map.binding_reachability(db, &bind))
@@ -4604,7 +4604,7 @@ impl<'db> StaticClassLiteral<'db> {
         if let Some(symbol_id) = table.symbol_id(name) {
             let use_def = use_def_map(db, body_scope);
 
-            let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
+            let declarations = use_def.end_of_scope_symbol_declarations(db, symbol_id);
             let declared_and_qualifiers =
                 place_from_declarations(db, declarations).ignore_conflicting_declarations();
 
@@ -4645,7 +4645,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                     // The attribute is declared in the class body.
 
-                    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                    let bindings = use_def.end_of_scope_symbol_bindings(db, symbol_id);
                     let inferred = place_from_bindings(db, bindings).place;
                     let has_binding = !inferred.is_undefined();
 
@@ -4929,13 +4929,13 @@ impl<'db> VarianceInferable<'db> for StaticClassLiteral<'db> {
         let table = place_table(db, class_body_scope);
         let attribute_places_and_qualifiers =
             use_def_map
-                .all_end_of_scope_symbol_declarations()
+                .all_end_of_scope_symbol_declarations(db)
                 .map(|(symbol_id, declarations)| {
                     let place_and_qual =
                         place_from_declarations(db, declarations).ignore_conflicting_declarations();
                     (symbol_id, place_and_qual)
                 })
-                .chain(use_def_map.all_end_of_scope_symbol_bindings().map(
+                .chain(use_def_map.all_end_of_scope_symbol_bindings(db).map(
                     |(symbol_id, bindings)| {
                         (symbol_id, place_from_bindings(db, bindings).place.into())
                     },

@@ -109,7 +109,7 @@ fn check_class_declaration<'db>(
         symbol: ScopedSymbolId,
     ) -> bool {
         use_def_map(db, scope)
-            .end_of_scope_symbol_bindings(symbol)
+            .end_of_scope_symbol_bindings(db, symbol)
             .filter_map(|binding| binding.binding.definition())
             .any(|definition| definition.kind(db).is_function_def())
     }
@@ -147,7 +147,7 @@ fn check_class_declaration<'db>(
                 && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
                 && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
                 && let Some(bad_definition) = use_def_map(db, class_scope)
-                    .reachable_bindings(ScopedPlaceId::Symbol(symbol_id))
+                    .reachable_bindings(db, ScopedPlaceId::Symbol(symbol_id))
                     .filter_map(|binding| binding.binding.definition())
                     .find(|def| !matches!(def.kind(db), DefinitionKind::AnnotatedAssignment(_)))
                 && let Some(builder) = context.report_lint(
@@ -295,7 +295,7 @@ fn check_class_declaration<'db>(
                         // annotation.
                         let superclass_definition = superclass_symbol_id.and_then(|id| {
                             use_def_map(db, superclass_scope)
-                                .end_of_scope_symbol_declarations(id)
+                                .end_of_scope_symbol_declarations(db, id)
                                 .find_map(|decl| decl.declaration.definition())
                         });
 

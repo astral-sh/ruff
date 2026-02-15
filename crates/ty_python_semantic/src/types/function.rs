@@ -384,7 +384,7 @@ impl<'db> OverloadLiteral<'db> {
             ty: Type::FunctionLiteral(previous_type),
             definedness: Definedness::AlwaysDefined,
             ..
-        }) = place_from_bindings(db, use_def.bindings_at_use(use_id)).place
+        }) = place_from_bindings(db, use_def.bindings_at_use(db, use_id)).place
         else {
             return None;
         };

@@ -83,7 +83,7 @@ pub(crate) fn enum_metadata<'db>(
     let mut auto_counter = 0;
 
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
-        let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
+        let ignore_bindings = use_def_map.reachable_symbol_bindings(db, ignore);
         let ignore_place = place_from_bindings(db, ignore_bindings).place;
 
         match ignore_place {
@@ -101,7 +101,7 @@ pub(crate) fn enum_metadata<'db>(
     let mut aliases = FxHashMap::default();
 
     let members = use_def_map
-        .all_end_of_scope_symbol_bindings()
+        .all_end_of_scope_symbol_bindings(db)
         .filter_map(|(symbol_id, bindings)| {
             let name = table.symbol(symbol_id).name();
 
@@ -241,7 +241,7 @@ pub(crate) fn enum_metadata<'db>(
                 enum_values.insert(value_ty, name.clone());
             }
 
-            let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+            let declarations = use_def_map.end_of_scope_symbol_declarations(db, symbol_id);
             let declared =
                 place_from_declarations(db, declarations).ignore_conflicting_declarations();
 

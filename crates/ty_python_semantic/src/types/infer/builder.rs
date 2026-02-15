@@ -1555,7 +1555,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             continue;
                         };
                         for decl_with_constraints in
-                            use_def_map.end_of_scope_symbol_declarations(symbol_id)
+                            use_def_map.end_of_scope_symbol_declarations(self.db(), symbol_id)
                         {
                             let Some(definition) = decl_with_constraints.declaration.definition()
                             else {
@@ -1778,7 +1778,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let use_def = self.index.use_def_map(file_scope_id);
         let place_table = self.index.place_table(file_scope_id);
 
-        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations(db) {
             let result = place_from_declarations(db, declarations);
             let first_declaration = result.first_declaration;
             let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
@@ -1795,7 +1795,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Check if the symbol has any bindings in the current scope.
-            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+            let bindings = use_def.end_of_scope_symbol_bindings(db, symbol_id);
             let binding_place = place_from_bindings(db, bindings);
 
             if !binding_place.place.is_undefined() {
@@ -1836,7 +1836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         }
 
-        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations() {
+        for (symbol_id, declarations) in use_def.all_end_of_scope_symbol_declarations(db) {
             let result = place_from_declarations(db, declarations);
             let first_declaration = result.first_declaration;
             let (place_and_quals, _) = result.into_place_and_conflicting_declarations();
@@ -1846,7 +1846,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Check if the symbol has any bindings at class level.
-            let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+            let bindings = use_def.end_of_scope_symbol_bindings(db, symbol_id);
             let binding_place = place_from_bindings(db, bindings);
 
             if !binding_place.place.is_undefined() {
@@ -1935,7 +1935,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ..
             }) = place_from_bindings(
                 self.db(),
-                use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
+                use_def.end_of_scope_symbol_bindings(self.db(), place.as_symbol().unwrap()),
             )
             .place
             {
@@ -2468,12 +2468,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .symbol_id(symbol.name())
                 {
                     Some(id) => (
-                        global_use_def_map.end_of_scope_symbol_declarations(id),
+                        global_use_def_map.end_of_scope_symbol_declarations(db, id),
                         false,
                     ),
                     // This variable shows up in `global` declarations but doesn't have an explicit
                     // binding in the global scope.
-                    None => (use_def.declarations_at_binding(binding), true),
+                    None => (use_def.declarations_at_binding(db, binding), true),
                 }
             } else if self
                 .index
@@ -2482,7 +2482,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If we run out of ancestor scopes without finding a definition, we'll fall back to
                 // the local scope. This will also be a syntax error in `infer_nonlocal_statement` (no
                 // binding for `nonlocal` found), but ignore that here.
-                let mut declarations = use_def.declarations_at_binding(binding);
+                let mut declarations = use_def.declarations_at_binding(db, binding);
                 let mut is_local = true;
                 // Walk up parent scopes looking for the enclosing scope that has definition of this
                 // name. `ancestor_scopes` includes the current scope, so skip that one.
@@ -2516,16 +2516,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     declarations = self
                         .index
                         .use_def_map(enclosing_scope_file_id)
-                        .end_of_scope_symbol_declarations(enclosing_symbol_id);
+                        .end_of_scope_symbol_declarations(db, enclosing_symbol_id);
                     is_local = false;
                     break;
                 }
                 (declarations, is_local)
             } else {
-                (use_def.declarations_at_binding(binding), true)
+                (use_def.declarations_at_binding(db, binding), true)
             }
         } else {
-            (use_def.declarations_at_binding(binding), true)
+            (use_def.declarations_at_binding(db, binding), true)
         };
 
         let (mut place_and_quals, conflicting) = place_from_declarations(self.db(), declarations)
@@ -2632,7 +2632,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_declaration()
         );
         let use_def = self.index.use_def_map(declaration.file_scope(self.db()));
-        let prior_bindings = use_def.bindings_at_definition(declaration);
+        let prior_bindings = use_def.bindings_at_definition(self.db(), declaration);
         // unbound_ty is Never because for this check we don't care about unbound
         let inferred_ty = place_from_bindings(self.db(), prior_bindings)
             .place
@@ -12654,6 +12654,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let place = place_table.place_id(expr).unwrap();
 
             match use_def.applicable_constraints(
+                db,
                 *constraint_key,
                 *enclosing_scope_file_id,
                 expr,
@@ -12853,7 +12854,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                place_from_bindings(db, use_def.reachable_bindings(db, place_id)).place
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -12871,7 +12872,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
+            let place = place_from_bindings(db, use_def.bindings_at_use(db, use_id)).place;
 
             (place, Some(use_id))
         }
@@ -12994,6 +12995,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let mut eagerly_resolved_place = None;
                 if !self.is_deferred() {
                     match self.index.enclosing_snapshot(
+                        db,
                         enclosing_scope_file_id,
                         place_expr,
                         file_scope_id,
@@ -13140,6 +13142,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if !self.is_deferred() {
                         match self.index.enclosing_snapshot(
+                            db,
                             FileScopeId::global(),
                             place_expr,
                             file_scope_id,
@@ -17253,7 +17256,7 @@ impl<'db, 'ast> AddBinding<'db, 'ast> {
         let mut bound_ty = inferred_ty;
 
         if self.qualifiers.contains(TypeQualifiers::FINAL) {
-            let mut previous_bindings = use_def.bindings_at_definition(self.binding);
+            let mut previous_bindings = use_def.bindings_at_definition(db, self.binding);
 
             // An assignment to a local `Final`-qualified symbol is only an error if there are prior bindings
 

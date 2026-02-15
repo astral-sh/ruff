@@ -4953,7 +4953,7 @@ pub(super) fn report_invalid_method_override<'db>(
         MethodKind::NotSynthesized => {
             if let Some(superclass_symbol) = place_table(db, superclass_scope).symbol_id(member)
                 && let Some(binding) = use_def_map(db, superclass_scope)
-                    .end_of_scope_bindings(ScopedPlaceId::Symbol(superclass_symbol))
+                    .end_of_scope_bindings(db, ScopedPlaceId::Symbol(superclass_symbol))
                     .next()
                 && let Some(definition) = binding.binding.definition()
             {

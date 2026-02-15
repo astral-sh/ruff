@@ -289,7 +289,7 @@ fn unbound_symbol_no_reachability_constraint_check() {
 fn first_public_binding<'db>(db: &'db TestDb, file: File, name: &str) -> Definition<'db> {
     let scope = global_scope(db, file);
     use_def_map(db, scope)
-        .end_of_scope_symbol_bindings(place_table(db, scope).symbol_id(name).unwrap())
+        .end_of_scope_symbol_bindings(db, place_table(db, scope).symbol_id(name).unwrap())
         .find_map(|b| b.binding.definition())
         .expect("no binding found")
 }

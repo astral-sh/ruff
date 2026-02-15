@@ -97,7 +97,7 @@ impl<'db> ProtocolClass<'db> {
         let class_place_table = place_table(db, body_scope);
 
         for (symbol_id, mut bindings_iterator) in
-            use_def_map(db, body_scope).all_end_of_scope_symbol_bindings()
+            use_def_map(db, body_scope).all_end_of_scope_symbol_bindings(db)
         {
             let symbol_name = class_place_table.symbol(symbol_id).name();
 
@@ -121,8 +121,10 @@ impl<'db> ProtocolClass<'db> {
                         };
                         !place_from_declarations(
                             db,
-                            use_def_map(db, superclass_scope)
-                                .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
+                            use_def_map(db, superclass_scope).end_of_scope_declarations(
+                                db,
+                                ScopedPlaceId::Symbol(scoped_symbol_id),
+                            ),
                         )
                         .into_place_and_conflicting_declarations()
                         .0
@@ -949,7 +951,7 @@ fn cached_protocol_interface<'db>(
         // members at runtime, and it's important that we accurately understand
         // type narrowing that uses `isinstance()` or `issubclass()` with
         // runtime-checkable protocols.
-        for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
+        for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings(db) {
             let place_and_definition = place_from_bindings(db, bindings);
             let Some(ty) = place_and_definition.place.ignore_possibly_undefined() else {
                 continue;
@@ -965,7 +967,7 @@ fn cached_protocol_interface<'db>(
             );
         }
 
-        for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations() {
+        for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations(db) {
             let place_result = place_from_declarations(db, declarations);
             let first_declaration = place_result.first_declaration;
             let place = place_result.ignore_conflicting_declarations();

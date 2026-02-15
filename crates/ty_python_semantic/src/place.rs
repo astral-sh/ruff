@@ -877,16 +877,16 @@ pub(crate) fn place_by_id<'db>(
     // on inference from bindings.
 
     let declarations = match considered_definitions {
-        ConsideredDefinitions::EndOfScope => use_def.end_of_scope_declarations(place_id),
-        ConsideredDefinitions::AllReachable => use_def.reachable_declarations(place_id),
+        ConsideredDefinitions::EndOfScope => use_def.end_of_scope_declarations(db, place_id),
+        ConsideredDefinitions::AllReachable => use_def.reachable_declarations(db, place_id),
     };
 
     let declared = place_from_declarations_impl(db, declarations, requires_explicit_reexport)
         .ignore_conflicting_declarations();
 
     let all_considered_bindings = || match considered_definitions {
-        ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
-        ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
+        ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(db, place_id),
+        ConsideredDefinitions::AllReachable => use_def.reachable_bindings(db, place_id),
     };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
@@ -1685,7 +1685,7 @@ pub(crate) mod implicit_globals {
         };
         place_from_declarations(
             db,
-            use_def_map(db, module_type_scope).end_of_scope_symbol_declarations(symbol_id),
+            use_def_map(db, module_type_scope).end_of_scope_symbol_declarations(db, symbol_id),
         )
         .ignore_conflicting_declarations()
     }

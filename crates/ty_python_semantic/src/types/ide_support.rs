@@ -89,9 +89,9 @@ pub fn definitions_for_name<'db>(
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
                 let global_bindings =
-                    global_use_def_map.reachable_symbol_bindings(global_symbol_id);
+                    global_use_def_map.reachable_symbol_bindings(db, global_symbol_id);
                 let global_declarations =
-                    global_use_def_map.reachable_symbol_declarations(global_symbol_id);
+                    global_use_def_map.reachable_symbol_declarations(db, global_symbol_id);
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
@@ -117,8 +117,8 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
+        let bindings = use_def_map.reachable_symbol_bindings(db, symbol_id);
+        let declarations = use_def_map.reachable_symbol_declarations(db, symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
@@ -335,7 +335,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
             let use_def = use_def_map(db, class_scope);
 
             // Check declarations first
-            for decl in use_def.reachable_symbol_declarations(place_id) {
+            for decl in use_def.reachable_symbol_declarations(db, place_id) {
                 if let Some(def) = decl.declaration.definition() {
                     resolved.extend(resolve_definition(
                         db,
@@ -348,7 +348,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
             }
 
             // If no declarations found, check bindings
-            for binding in use_def.reachable_symbol_bindings(place_id) {
+            for binding in use_def.reachable_symbol_bindings(db, place_id) {
                 if let Some(def) = binding.binding.definition() {
                     resolved.extend(resolve_definition(
                         db,
@@ -373,7 +373,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 let use_def = index.use_def_map(function_scope_id);
 
                 // Check declarations first
-                for decl in use_def.reachable_member_declarations(place_id) {
+                for decl in use_def.reachable_member_declarations(db, place_id) {
                     if let Some(def) = decl.declaration.definition() {
                         resolved.extend(resolve_definition(
                             db,
@@ -386,7 +386,7 @@ fn definitions_for_attribute_in_class_hierarchy<'db>(
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.reachable_member_bindings(place_id) {
+                for binding in use_def.reachable_member_bindings(db, place_id) {
                     if let Some(def) = binding.binding.definition() {
                         resolved.extend(resolve_definition(
                             db,
@@ -1278,8 +1278,8 @@ mod resolve_definition {
         let mut definitions = IndexSet::new();
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
+        let bindings = use_def_map.reachable_symbol_bindings(db, symbol_id);
+        let declarations = use_def_map.reachable_symbol_declarations(db, symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {

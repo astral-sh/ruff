@@ -37,7 +37,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
     let table = place_table(db, scope_id);
 
     use_def_map
-        .all_end_of_scope_symbol_declarations()
+        .all_end_of_scope_symbol_declarations(db)
         .filter_map(move |(symbol_id, declarations)| {
             let place_result = place_from_declarations(db, declarations);
             let first_reachable_definition = place_result.first_declaration?;
@@ -55,7 +55,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 first_reachable_definition,
             })
         })
-        .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
+        .chain(use_def_map.all_end_of_scope_symbol_bindings(db).filter_map(
             move |(symbol_id, bindings)| {
                 let PlaceWithDefinition {
                     place,
@@ -88,7 +88,7 @@ pub(crate) fn all_reachable_members<'db>(
     let table = place_table(db, scope_id);
 
     use_def_map
-        .all_reachable_symbols()
+        .all_reachable_symbols(db)
         .flat_map(move |(symbol_id, declarations, bindings)| {
             let symbol = table.symbol(symbol_id);
 
@@ -387,7 +387,7 @@ impl<'db> AllMembers<'db> {
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
-                for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
+                for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations(db) {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(DefinedPlace { ty, .. }) =
                         imported_symbol(db, Some(file), symbol_name, None).place

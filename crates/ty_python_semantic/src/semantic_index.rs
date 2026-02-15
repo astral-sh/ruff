@@ -204,7 +204,10 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let place_table = index.place_table(function_scope_id);
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
-        Some((use_def.reachable_member_bindings(member), function_scope_id))
+        Some((
+            use_def.reachable_member_bindings(db, member),
+            function_scope_id,
+        ))
     })
 }
 
@@ -226,7 +229,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.reachable_member_declarations(member),
+            use_def.reachable_member_declarations(db, member),
             function_scope_id,
         ))
     })
@@ -646,6 +649,7 @@ impl<'db> SemanticIndex<'db> {
     /// * `NotFound` if the narrowing constraint / bindings do not exist in the nested scope.
     pub(crate) fn enclosing_snapshot(
         &self,
+        db: &'db dyn Db,
         enclosing_scope: FileScopeId,
         expr: PlaceExprRef,
         nested_scope: FileScopeId,
@@ -666,8 +670,11 @@ impl<'db> SemanticIndex<'db> {
                         nested_laziness: ScopeLaziness::Lazy,
                     };
                     if let Some(id) = self.enclosing_snapshots.get(&key) {
-                        return self.use_def_maps[enclosing_scope]
-                            .enclosing_snapshot(*id, key.nested_laziness);
+                        return self.use_def_maps[enclosing_scope].enclosing_snapshot(
+                            db,
+                            *id,
+                            key.nested_laziness,
+                        );
                     }
                 }
                 return EnclosingSnapshotResult::NoLongerInEagerContext;
@@ -685,7 +692,7 @@ impl<'db> SemanticIndex<'db> {
         let Some(id) = self.enclosing_snapshots.get(&key) else {
             return EnclosingSnapshotResult::NotFound;
         };
-        self.use_def_maps[enclosing_scope].enclosing_snapshot(*id, key.nested_laziness)
+        self.use_def_maps[enclosing_scope].enclosing_snapshot(db, *id, key.nested_laziness)
     }
 
     pub(crate) fn semantic_syntax_errors(&self) -> &[SemanticSyntaxError] {
@@ -881,21 +888,32 @@ mod tests {
     use crate::semantic_index::use_def::UseDefMap;
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
 
-    impl UseDefMap<'_> {
-        fn first_public_binding(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
-            self.end_of_scope_symbol_bindings(symbol)
+    impl<'db> UseDefMap<'db> {
+        fn first_public_binding(
+            &self,
+            db: &'db dyn Db,
+            symbol: ScopedSymbolId,
+        ) -> Option<Definition<'_>> {
+            self.end_of_scope_symbol_bindings(db, symbol)
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
 
-        fn first_public_declaration(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
-            self.end_of_scope_symbol_declarations(symbol)
-                .find_map(|declaration_with_constraint| {
-                    declaration_with_constraint.declaration.definition()
-                })
+        fn first_public_declaration(
+            &self,
+            db: &'db dyn Db,
+            symbol: ScopedSymbolId,
+        ) -> Option<Definition<'_>> {
+            self.end_of_scope_symbol_declarations(db, symbol).find_map(
+                |declaration_with_constraint| declaration_with_constraint.declaration.definition(),
+            )
         }
 
-        fn first_binding_at_use(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
-            self.bindings_at_use(use_id)
+        fn first_binding_at_use(
+            &self,
+            db: &'db dyn Db,
+            use_id: ScopedUseId,
+        ) -> Option<Definition<'_>> {
+            self.bindings_at_use(db, use_id)
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
     }
@@ -953,7 +971,7 @@ mod tests {
 
         let use_def = use_def_map(&db, scope);
         let declaration = use_def
-            .first_public_declaration(global_table.symbol_id("x").expect("symbol to exist"))
+            .first_public_declaration(&db, global_table.symbol_id("x").expect("symbol to exist"))
             .unwrap();
         assert!(matches!(
             declaration.kind(&db),
@@ -971,7 +989,7 @@ mod tests {
         let foo = global_table.symbol_id("foo").unwrap();
 
         let use_def = use_def_map(&db, scope);
-        let binding = use_def.first_public_binding(foo).unwrap();
+        let binding = use_def.first_public_binding(&db, foo).unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Import(_)));
     }
 
@@ -1007,7 +1025,7 @@ mod tests {
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.symbol_id("foo").expect("symbol to exist"))
+            .first_public_binding(&db, global_table.symbol_id("foo").expect("symbol to exist"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::ImportFrom(_)));
     }
@@ -1027,7 +1045,7 @@ mod tests {
         );
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.symbol_id("x").expect("symbol exists"))
+            .first_public_binding(&db, global_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -1042,7 +1060,7 @@ mod tests {
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.symbol_id("x").unwrap())
+            .first_public_binding(&db, global_table.symbol_id("x").unwrap())
             .unwrap();
 
         assert!(matches!(
@@ -1084,7 +1102,7 @@ y = 2
 
         let use_def = index.use_def_map(class_scope_id);
         let binding = use_def
-            .first_public_binding(class_table.symbol_id("x").expect("symbol exists"))
+            .first_public_binding(&db, class_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -1121,7 +1139,7 @@ y = 2
 
         let use_def = index.use_def_map(function_scope_id);
         let binding = use_def
-            .first_public_binding(function_table.symbol_id("x").expect("symbol exists"))
+            .first_public_binding(&db, function_table.symbol_id("x").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Assignment(_)));
     }
@@ -1156,19 +1174,25 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let use_def = index.use_def_map(function_scope_id);
         for name in ["a", "b", "c", "d"] {
             let binding = use_def
-                .first_public_binding(function_table.symbol_id(name).expect("symbol exists"))
+                .first_public_binding(&db, function_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
-            .first_public_binding(function_table.symbol_id("args").expect("symbol exists"))
+            .first_public_binding(
+                &db,
+                function_table.symbol_id("args").expect("symbol exists"),
+            )
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
             DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
-            .first_public_binding(function_table.symbol_id("kwargs").expect("symbol exists"))
+            .first_public_binding(
+                &db,
+                function_table.symbol_id("kwargs").expect("symbol exists"),
+            )
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
@@ -1201,19 +1225,22 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let use_def = index.use_def_map(lambda_scope_id);
         for name in ["a", "b", "c", "d"] {
             let binding = use_def
-                .first_public_binding(lambda_table.symbol_id(name).expect("symbol exists"))
+                .first_public_binding(&db, lambda_table.symbol_id(name).expect("symbol exists"))
                 .unwrap();
             assert!(matches!(binding.kind(&db), DefinitionKind::Parameter(_)));
         }
         let args_binding = use_def
-            .first_public_binding(lambda_table.symbol_id("args").expect("symbol exists"))
+            .first_public_binding(&db, lambda_table.symbol_id("args").expect("symbol exists"))
             .unwrap();
         assert!(matches!(
             args_binding.kind(&db),
             DefinitionKind::VariadicPositionalParameter(_)
         ));
         let kwargs_binding = use_def
-            .first_public_binding(lambda_table.symbol_id("kwargs").expect("symbol exists"))
+            .first_public_binding(
+                &db,
+                lambda_table.symbol_id("kwargs").expect("symbol exists"),
+            )
             .unwrap();
         assert!(matches!(
             kwargs_binding.kind(&db),
@@ -1260,6 +1287,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         for name in ["x", "y"] {
             let binding = use_def
                 .first_public_binding(
+                    &db,
                     comprehension_symbol_table
                         .symbol_id(name)
                         .expect("symbol exists"),
@@ -1306,7 +1334,7 @@ def f(a: str, /, b: str, c: int = 1, *args, d: int = 2, **kwargs):
         let element_use_id =
             element.scoped_use_id(&db, comprehension_scope_id.to_scope_id(&db, file));
 
-        let binding = use_def.first_binding_at_use(element_use_id).unwrap();
+        let binding = use_def.first_binding_at_use(&db, element_use_id).unwrap();
         let DefinitionKind::Comprehension(comprehension) = binding.kind(&db) else {
             panic!("expected generator definition")
         };
@@ -1390,7 +1418,7 @@ with item1 as x, item2 as y:
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
             let binding = use_def
-                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
+                .first_public_binding(&db, global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
         }
@@ -1413,7 +1441,7 @@ with context() as (x, y):
         let use_def = index.use_def_map(FileScopeId::global());
         for name in ["x", "y"] {
             let binding = use_def
-                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
+                .first_public_binding(&db, global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             assert!(matches!(binding.kind(&db), DefinitionKind::WithItem(_)));
         }
@@ -1463,7 +1491,7 @@ def func():
 
         let use_def = index.use_def_map(FileScopeId::global());
         let binding = use_def
-            .first_public_binding(global_table.symbol_id("func").expect("symbol exists"))
+            .first_public_binding(&db, global_table.symbol_id("func").expect("symbol exists"))
             .unwrap();
         assert!(matches!(binding.kind(&db), DefinitionKind::Function(_)));
     }
@@ -1576,7 +1604,7 @@ class C[T]:
         };
         let x_use_id = x_use_expr_name.scoped_use_id(&db, scope);
         let use_def = use_def_map(&db, scope);
-        let binding = use_def.first_binding_at_use(x_use_id).unwrap();
+        let binding = use_def.first_binding_at_use(&db, x_use_id).unwrap();
         let DefinitionKind::Assignment(assignment) = binding.kind(&db) else {
             panic!("should be an assignment definition")
         };
@@ -1712,7 +1740,7 @@ match subject:
             ("l", 1),
         ] {
             let binding = use_def
-                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
+                .first_public_binding(&db, global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
                 assert_eq!(pattern.index(), expected_index);
@@ -1742,7 +1770,7 @@ match 1:
         let use_def = use_def_map(&db, global_scope_id);
         for (name, expected_index) in [("first", 0), ("second", 0)] {
             let binding = use_def
-                .first_public_binding(global_table.symbol_id(name).expect("symbol exists"))
+                .first_public_binding(&db, global_table.symbol_id(name).expect("symbol exists"))
                 .expect("Expected with item definition for {name}");
             if let DefinitionKind::MatchPattern(pattern) = binding.kind(&db) {
                 assert_eq!(pattern.index(), expected_index);
@@ -1762,7 +1790,7 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.symbol_id("x").unwrap())
+            .first_public_binding(&db, global_table.symbol_id("x").unwrap())
             .unwrap();
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));
@@ -1778,10 +1806,10 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let x_binding = use_def
-            .first_public_binding(global_table.symbol_id("x").unwrap())
+            .first_public_binding(&db, global_table.symbol_id("x").unwrap())
             .unwrap();
         let y_binding = use_def
-            .first_public_binding(global_table.symbol_id("y").unwrap())
+            .first_public_binding(&db, global_table.symbol_id("y").unwrap())
             .unwrap();
 
         assert!(matches!(x_binding.kind(&db), DefinitionKind::For(_)));
@@ -1798,7 +1826,7 @@ match 1:
 
         let use_def = use_def_map(&db, scope);
         let binding = use_def
-            .first_public_binding(global_table.symbol_id("a").unwrap())
+            .first_public_binding(&db, global_table.symbol_id("a").unwrap())
             .unwrap();
 
         assert!(matches!(binding.kind(&db), DefinitionKind::For(_)));

@@ -548,7 +548,7 @@ impl SpecialFormType {
                 let symbol_id = place_table(db, scope).symbol_id(self.name())?;
 
                 use_def_map(db, scope)
-                    .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id))
+                    .end_of_scope_bindings(db, ScopedPlaceId::Symbol(symbol_id))
                     .next()?
                     .binding
                     .definition()
