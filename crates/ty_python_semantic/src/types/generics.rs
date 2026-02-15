@@ -2254,6 +2254,12 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
+            (_, Type::Union(actual_union)) => {
+                for actual_element in actual_union.elements(self.db) {
+                    self.infer_map_impl(formal, *actual_element, polarity, &mut f, seen)?;
+                }
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
