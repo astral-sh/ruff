@@ -1,6 +1,6 @@
 import ruffSchema from "../../../../ruff.schema.json";
 import { useCallback, useMemo, useRef, useState } from "react";
-import { Header, useTheme, setupMonaco } from "shared";
+import { Header, ShareButton, useTheme, setupMonaco } from "shared";
 import { persist, persistLocal, restore, stringify } from "./settings";
 import { default as Editor, Source } from "./Editor";
 import { loader } from "@monaco-editor/react";
@@ -81,12 +81,11 @@ export default function Chrome() {
   return (
     <main className="flex flex-col h-full bg-ayu-background dark:bg-ayu-background-dark">
       <Header
-        edit={revision}
         theme={theme}
         tool="ruff"
         version={`v${ruffVersion}`}
         onChangeTheme={setTheme}
-        onShare={handleShare}
+        shareContent={<ShareButton key={revision} onShare={handleShare} />}
         onReset={handleResetClicked}
       />
 
