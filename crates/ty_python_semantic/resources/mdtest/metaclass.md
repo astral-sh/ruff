@@ -35,7 +35,7 @@ reveal_type(Foo())  # revealed: int
 reveal_type(Foo(1, 2))  # revealed: int
 ```
 
-### Metaclass `__call__` takes precedence over `__init__`
+### Metaclass `__call__` takes precedence over `__init__` and `__new__`
 
 ```py
 class Meta(type):
@@ -43,6 +43,9 @@ class Meta(type):
         return "hello"
 
 class Foo(metaclass=Meta):
+    def __new__(cls, x: int) -> "Foo":
+        return object.__new__(cls)
+
     def __init__(self, x: int, y: int) -> None:
         pass
 
