@@ -870,21 +870,6 @@ impl ReachabilityConstraints {
                     };
                 }
 
-                // `ReturnsNever` predicates don't narrow any variable; they only
-                // affect reachability. Evaluate the predicate to determine which
-                // path(s) are reachable, rather than walking both branches.
-                // `ReturnsNever` always evaluates to `AlwaysTrue` or `AlwaysFalse`,
-                // never `Ambiguous`.
-                if matches!(predicate.node, PredicateNode::ReturnsNever(_)) {
-                    return match Self::analyze_single_cached(db, predicate, truthiness_memo) {
-                        Truthiness::AlwaysTrue => narrow!(node.if_true, accumulated),
-                        Truthiness::AlwaysFalse => narrow!(node.if_false, accumulated),
-                        Truthiness::Ambiguous => {
-                            unreachable!("ReturnsNever predicates should never be Ambiguous")
-                        }
-                    };
-                }
-
                 // Check if this predicate narrows the variable we're interested in.
                 let neg_predicate = Predicate {
                     node: predicate.node,
