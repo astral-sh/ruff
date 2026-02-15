@@ -234,6 +234,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_28__all_multiple/__init__.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_29__all_conditional/__init__.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("__init__.py"))]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_33.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
