@@ -276,6 +276,18 @@ pub(crate) use place_state::{LiveBinding, ScopedDefinitionId};
 #[derive(get_size2::GetSize)]
 struct ScopedBindingsId;
 
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+struct ScopedPlaceStateId;
+
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+struct ScopedReachableDefinitionsId;
+
+#[newtype_index]
+#[derive(get_size2::GetSize)]
+struct ScopedEnclosingSnapshotDataId;
+
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UseDefMap<'db> {
@@ -322,17 +334,20 @@ pub(crate) struct UseDefMap<'db> {
     end_of_scope_symbols: IndexVec<ScopedSymbolId, PlaceState>,
 
     /// [`PlaceState`] visible at end of scope for each member.
-    end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
+    interned_place_states: IndexVec<ScopedPlaceStateId, PlaceState>,
+    end_of_scope_members: IndexVec<ScopedMemberId, ScopedPlaceStateId>,
 
     /// All potentially reachable bindings and declarations, for each symbol.
     reachable_definitions_by_symbol: IndexVec<ScopedSymbolId, ReachableDefinitions>,
 
     /// All potentially reachable bindings and declarations, for each member.
-    reachable_definitions_by_member: IndexVec<ScopedMemberId, ReachableDefinitions>,
+    interned_reachable_definitions: IndexVec<ScopedReachableDefinitionsId, ReachableDefinitions>,
+    reachable_definitions_by_member: IndexVec<ScopedMemberId, ScopedReachableDefinitionsId>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// scope.
-    enclosing_snapshots: EnclosingSnapshots,
+    interned_enclosing_snapshots: IndexVec<ScopedEnclosingSnapshotDataId, EnclosingSnapshot>,
+    enclosing_snapshots: IndexVec<ScopedEnclosingSnapshotId, ScopedEnclosingSnapshotDataId>,
 
     /// Whether or not the end of the scope is reachable.
     ///
@@ -470,8 +485,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
+        let place_state_id = self.end_of_scope_members[member];
         self.bindings_iterator(
-            self.end_of_scope_members[member].bindings(),
+            self.interned_place_states[place_state_id].bindings(),
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -496,9 +512,10 @@ impl<'db> UseDefMap<'db> {
 
     pub(crate) fn reachable_member_bindings(
         &self,
-        symbol: ScopedMemberId,
+        member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings = &self.reachable_definitions_by_member[symbol].bindings;
+        let reachable_definitions_id = self.reachable_definitions_by_member[member];
+        let bindings = &self.interned_reachable_definitions[reachable_definitions_id].bindings;
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -513,14 +530,17 @@ impl<'db> UseDefMap<'db> {
             // TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
             BoundnessAnalysis::AssumeBound
         };
-        match self.enclosing_snapshots.get(snapshot_id) {
-            Some(EnclosingSnapshot::Constraint(constraint)) => {
+        let Some(snapshot_data_id) = self.enclosing_snapshots.get(snapshot_id) else {
+            return EnclosingSnapshotResult::NotFound;
+        };
+
+        match &self.interned_enclosing_snapshots[*snapshot_data_id] {
+            EnclosingSnapshot::Constraint(constraint) => {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
-            Some(EnclosingSnapshot::Bindings(bindings)) => EnclosingSnapshotResult::FoundBindings(
+            EnclosingSnapshot::Bindings(bindings) => EnclosingSnapshotResult::FoundBindings(
                 self.bindings_iterator(bindings, boundness_analysis),
             ),
-            None => EnclosingSnapshotResult::NotFound,
         }
     }
 
@@ -566,7 +586,8 @@ impl<'db> UseDefMap<'db> {
         &'map self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'map, 'db> {
-        let declarations = self.end_of_scope_members[member].declarations();
+        let place_state_id = self.end_of_scope_members[member];
+        let declarations = self.interned_place_states[place_state_id].declarations();
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
@@ -582,7 +603,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let declarations = &self.reachable_definitions_by_member[member].declarations;
+        let reachable_definitions_id = self.reachable_definitions_by_member[member];
+        let declarations =
+            &self.interned_reachable_definitions[reachable_definitions_id].declarations;
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
@@ -812,7 +835,7 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 
-#[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 struct ReachableDefinitions {
     bindings: Bindings,
     declarations: Declarations,
@@ -1526,6 +1549,12 @@ impl<'db> UseDefMapBuilder<'db> {
 
         let (interned_bindings, bindings_by_use) =
             Self::intern_bindings_by_use(self.bindings_by_use);
+        let (interned_place_states, end_of_scope_members) =
+            Self::intern_end_of_scope_members(self.member_states);
+        let (interned_reachable_definitions, reachable_definitions_by_member) =
+            Self::intern_reachable_definitions_by_member(self.reachable_member_definitions);
+        let (interned_enclosing_snapshots, enclosing_snapshots) =
+            Self::intern_enclosing_snapshots(self.enclosing_snapshots);
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -1535,12 +1564,15 @@ impl<'db> UseDefMapBuilder<'db> {
             bindings_by_use,
             node_reachability: self.node_reachability,
             end_of_scope_symbols: self.symbol_states,
-            end_of_scope_members: self.member_states,
+            interned_place_states,
+            end_of_scope_members,
             reachable_definitions_by_symbol: self.reachable_symbol_definitions,
-            reachable_definitions_by_member: self.reachable_member_definitions,
+            interned_reachable_definitions,
+            reachable_definitions_by_member,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_definition: self.bindings_by_definition,
-            enclosing_snapshots: self.enclosing_snapshots,
+            interned_enclosing_snapshots,
+            enclosing_snapshots,
             end_of_scope_reachability: self.reachability,
         }
     }
@@ -1571,5 +1603,106 @@ impl<'db> UseDefMapBuilder<'db> {
         interned_ids_by_use.shrink_to_fit();
 
         (interned_bindings, interned_ids_by_use)
+    }
+
+    fn intern_end_of_scope_members(
+        end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
+    ) -> (
+        IndexVec<ScopedPlaceStateId, PlaceState>,
+        IndexVec<ScopedMemberId, ScopedPlaceStateId>,
+    ) {
+        let mut interned_place_states: IndexVec<ScopedPlaceStateId, PlaceState> = IndexVec::new();
+        let mut interned_ids_by_member: IndexVec<ScopedMemberId, ScopedPlaceStateId> =
+            IndexVec::new();
+        let mut interned_ids_by_place_state: FxHashMap<PlaceState, ScopedPlaceStateId> =
+            FxHashMap::default();
+
+        for place_state in end_of_scope_members {
+            let interned_id =
+                if let Some(interned_id) = interned_ids_by_place_state.get(&place_state) {
+                    *interned_id
+                } else {
+                    let interned_id = interned_place_states.push(place_state.clone());
+                    interned_ids_by_place_state.insert(place_state, interned_id);
+                    interned_id
+                };
+            interned_ids_by_member.push(interned_id);
+        }
+
+        interned_place_states.shrink_to_fit();
+        interned_ids_by_member.shrink_to_fit();
+
+        (interned_place_states, interned_ids_by_member)
+    }
+
+    fn intern_reachable_definitions_by_member(
+        reachable_definitions_by_member: IndexVec<ScopedMemberId, ReachableDefinitions>,
+    ) -> (
+        IndexVec<ScopedReachableDefinitionsId, ReachableDefinitions>,
+        IndexVec<ScopedMemberId, ScopedReachableDefinitionsId>,
+    ) {
+        let mut interned_reachable_definitions: IndexVec<
+            ScopedReachableDefinitionsId,
+            ReachableDefinitions,
+        > = IndexVec::new();
+        let mut interned_ids_by_member: IndexVec<ScopedMemberId, ScopedReachableDefinitionsId> =
+            IndexVec::new();
+        let mut interned_ids_by_reachable_definitions: FxHashMap<
+            ReachableDefinitions,
+            ScopedReachableDefinitionsId,
+        > = FxHashMap::default();
+
+        for reachable_definitions in reachable_definitions_by_member {
+            let interned_id = if let Some(interned_id) =
+                interned_ids_by_reachable_definitions.get(&reachable_definitions)
+            {
+                *interned_id
+            } else {
+                let interned_id =
+                    interned_reachable_definitions.push(reachable_definitions.clone());
+                interned_ids_by_reachable_definitions.insert(reachable_definitions, interned_id);
+                interned_id
+            };
+            interned_ids_by_member.push(interned_id);
+        }
+
+        interned_reachable_definitions.shrink_to_fit();
+        interned_ids_by_member.shrink_to_fit();
+
+        (interned_reachable_definitions, interned_ids_by_member)
+    }
+
+    fn intern_enclosing_snapshots(
+        enclosing_snapshots: EnclosingSnapshots,
+    ) -> (
+        IndexVec<ScopedEnclosingSnapshotDataId, EnclosingSnapshot>,
+        IndexVec<ScopedEnclosingSnapshotId, ScopedEnclosingSnapshotDataId>,
+    ) {
+        let mut interned_snapshots: IndexVec<ScopedEnclosingSnapshotDataId, EnclosingSnapshot> =
+            IndexVec::new();
+        let mut interned_ids_by_snapshot_key: IndexVec<
+            ScopedEnclosingSnapshotId,
+            ScopedEnclosingSnapshotDataId,
+        > = IndexVec::new();
+        let mut interned_ids_by_snapshot: FxHashMap<
+            EnclosingSnapshot,
+            ScopedEnclosingSnapshotDataId,
+        > = FxHashMap::default();
+
+        for snapshot in enclosing_snapshots {
+            let interned_id = if let Some(interned_id) = interned_ids_by_snapshot.get(&snapshot) {
+                *interned_id
+            } else {
+                let interned_id = interned_snapshots.push(snapshot.clone());
+                interned_ids_by_snapshot.insert(snapshot, interned_id);
+                interned_id
+            };
+            interned_ids_by_snapshot_key.push(interned_id);
+        }
+
+        interned_snapshots.shrink_to_fit();
+        interned_ids_by_snapshot_key.shrink_to_fit();
+
+        (interned_snapshots, interned_ids_by_snapshot_key)
     }
 }

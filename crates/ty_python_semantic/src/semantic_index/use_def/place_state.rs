@@ -71,14 +71,14 @@ impl ScopedDefinitionId {
 
 /// Live declarations for a single place at some point in control flow, with their
 /// corresponding reachability constraints.
-#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) struct Declarations {
     /// A list of live declarations for this place, sorted by their `ScopedDefinitionId`
     live_declarations: SmallVec<[LiveDeclaration; 2]>,
 }
 
 /// One of the live declarations for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(super) struct LiveDeclaration {
     pub(super) declaration: ScopedDefinitionId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
@@ -184,7 +184,7 @@ impl Declarations {
 /// Even if it's a class scope (class variables are not visible to nested scopes) or there are no
 /// bindings, the current narrowing constraint is necessary for narrowing, so it's stored in
 /// `Constraint`.
-#[derive(Clone, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) enum EnclosingSnapshot {
     Constraint(ScopedNarrowingConstraint),
     Bindings(Bindings),
@@ -358,7 +358,7 @@ impl Bindings {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub(in crate::semantic_index) struct PlaceState {
     declarations: Declarations,
     bindings: Bindings,
