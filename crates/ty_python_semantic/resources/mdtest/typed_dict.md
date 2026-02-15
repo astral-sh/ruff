@@ -1395,7 +1395,7 @@ def _(person: Person):
     person["name"] = "Alice"
     person["age"] = 30
 
-    # error: [invalid-key] "Unknown key "naem" for TypedDict `Person` - did you mean "name"?"
+    # error: [invalid-key] "Unknown key "naem" for TypedDict `Person`"
     person["naem"] = "Alice"
 
 def _(person: Person):
@@ -1419,7 +1419,7 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "surname" for TypedDict `Animal` - did you mean "name"?"
+    # error: [invalid-key] "Unknown key "surname" for TypedDict `Animal`"
     being["surname"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):

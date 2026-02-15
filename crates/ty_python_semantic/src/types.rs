@@ -98,6 +98,7 @@ mod constraints;
 mod context;
 mod cyclic;
 mod diagnostic;
+pub(crate) use diagnostic::levenshtein;
 mod display;
 mod enums;
 mod function;
