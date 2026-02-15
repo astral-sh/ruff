@@ -12206,26 +12206,6 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
-    /// Create a union from a list of elements without checking for redundancy.
-    /// This can be called as an optimization when you are creating a large number of union types but ultimately consolidating them into one place,
-    /// in which case you only need to do a single redundancy check at the end using `from_elements`.
-    pub(crate) fn from_elements_without_redundancy_check<I, T>(
-        db: &'db dyn Db,
-        elements: I,
-    ) -> Type<'db>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        elements
-            .into_iter()
-            .fold(
-                UnionBuilder::new(db).check_redundancy(false),
-                |builder, element| builder.add(element.into()),
-            )
-            .build()
-    }
-
     fn from_elements_cycle_recovery<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
