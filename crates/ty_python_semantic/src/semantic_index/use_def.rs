@@ -292,6 +292,12 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of predicates in this scope.
     predicates: Predicates<'db>,
 
+    /// Place version associated with each definition ID.
+    ///
+    /// This stores the version once per definition instead of duplicating it in every `LiveBinding`
+    /// clone across `bindings_by_use` / snapshots.
+    definition_place_versions: IndexVec<ScopedDefinitionId, PlaceVersion>,
+
     /// Place versions to which a given predicate occurrence can apply for narrowing.
     predicate_place_versions: PredicatePlaceVersions,
 
@@ -673,6 +679,7 @@ impl<'db> UseDefMap<'db> {
     ) -> BindingWithConstraintsIterator<'map, 'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
+            definition_place_versions: &self.definition_place_versions,
             predicates: &self.predicates,
             predicate_place_versions: &self.predicate_place_versions,
             reachability_constraints: &self.reachability_constraints,
@@ -729,6 +736,7 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 #[derive(Clone, Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
     pub(crate) all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
+    definition_place_versions: &'map IndexVec<ScopedDefinitionId, PlaceVersion>,
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) predicate_place_versions: &'map PredicatePlaceVersions,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
@@ -753,7 +761,9 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                     predicates,
                     predicate_place_versions,
                     reachability_constraints,
-                    binding_place_version: Some(live_binding.place_version),
+                    binding_place_version: Some(
+                        self.definition_place_versions[live_binding.binding],
+                    ),
                 },
                 reachability_constraint: live_binding.reachability_constraint,
             })
@@ -856,6 +866,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`DefinitionState`].
     all_definitions: IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
 
+    /// Place version associated with each definition ID.
+    definition_place_versions: IndexVec<ScopedDefinitionId, PlaceVersion>,
+
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
 
@@ -903,6 +916,7 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn new(is_class_scope: bool) -> Self {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
+            definition_place_versions: IndexVec::from_iter([PlaceVersion::default()]),
             predicates: PredicatesBuilder::default(),
             predicate_place_versions: PredicatePlaceVersions::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
@@ -991,13 +1005,15 @@ impl<'db> UseDefMapBuilder<'db> {
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
 
-        place_state.record_binding(
+        let place_version = place_state.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
             previous_definitions,
         );
+        let version_id = self.definition_place_versions.push(place_version);
+        debug_assert_eq!(def_id, version_id);
 
         let bindings = match place {
             ScopedPlaceId::Symbol(symbol) => {
@@ -1092,6 +1108,10 @@ impl<'db> UseDefMapBuilder<'db> {
                 continue;
             };
 
+            let versions: SmallVec<[PlaceVersion; 2]> = bindings
+                .iter()
+                .map(|binding| self.definition_place_versions[binding.binding])
+                .collect();
             let entry = self
                 .predicate_place_versions
                 .entry((predicate, *place))
@@ -1099,7 +1119,7 @@ impl<'db> UseDefMapBuilder<'db> {
             if allow_future_versions_for.contains(place) {
                 entry.allow_future_versions = true;
             }
-            for version in bindings.place_versions() {
+            for version in versions {
                 if !entry.versions.contains(&version) {
                     entry.versions.push(version);
                     entry.max_version =
@@ -1276,6 +1296,8 @@ impl<'db> UseDefMapBuilder<'db> {
         let def_id = self
             .all_definitions
             .push(DefinitionState::Defined(declaration));
+        let version_id = self.definition_place_versions.push(PlaceVersion::default());
+        debug_assert_eq!(def_id, version_id);
 
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
@@ -1313,13 +1335,15 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
         };
         place_state.record_declaration(def_id, self.reachability);
-        place_state.record_binding(
+        let place_version = place_state.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreShadowed,
         );
+        let version_id = self.definition_place_versions.push(place_version);
+        debug_assert_eq!(def_id, version_id);
 
         let reachable_definitions = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
@@ -1346,14 +1370,15 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
         };
-
-        place_state.record_binding(
+        let place_version = place_state.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreShadowed,
         );
+        let version_id = self.definition_place_versions.push(place_version);
+        debug_assert_eq!(def_id, version_id);
     }
 
     pub(super) fn record_use(
@@ -1578,6 +1603,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.mark_reachability_constraints();
 
         self.all_definitions.shrink_to_fit();
+        self.definition_place_versions.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.member_states.shrink_to_fit();
         self.reachable_symbol_definitions.shrink_to_fit();
@@ -1592,6 +1618,7 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             predicates: self.predicates.build(),
+            definition_place_versions: self.definition_place_versions,
             predicate_place_versions: self.predicate_place_versions,
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,

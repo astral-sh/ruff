@@ -263,7 +263,6 @@ pub(crate) struct LiveBinding {
     pub(crate) binding: ScopedDefinitionId,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
-    pub(crate) place_version: PlaceVersion,
 }
 
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
@@ -274,7 +273,6 @@ impl Bindings {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-            place_version: PlaceVersion::default(),
         };
         Self {
             unbound_narrowing_constraint: None,
@@ -291,7 +289,7 @@ impl Bindings {
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
-    ) {
+    ) -> PlaceVersion {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
         if is_class_scope && is_place_name && self.live_bindings[0].binding.is_unbound() {
@@ -303,12 +301,13 @@ impl Bindings {
             self.live_bindings.clear();
             self.latest_place_version = self.latest_place_version.next();
         }
+        let place_version = self.latest_place_version;
         self.live_bindings.push(LiveBinding {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-            place_version: self.latest_place_version,
         });
+        place_version
     }
 
     /// Add given constraint to all live bindings.
@@ -338,12 +337,6 @@ impl Bindings {
     /// Iterate over currently live bindings for this place
     pub(super) fn iter(&self) -> LiveBindingsIterator<'_> {
         self.live_bindings.iter()
-    }
-
-    pub(super) fn place_versions(&self) -> impl Iterator<Item = PlaceVersion> + '_ {
-        self.live_bindings
-            .iter()
-            .map(|binding| binding.place_version)
     }
 
     pub(super) fn merge(
@@ -399,7 +392,6 @@ impl Bindings {
                         binding: a.binding,
                         narrowing_constraint,
                         reachability_constraint,
-                        place_version: a.place_version.max(b.place_version),
                     });
                 }
 
@@ -434,7 +426,7 @@ impl PlaceState {
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
-    ) {
+    ) -> PlaceVersion {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
         self.bindings.record_binding(
             binding_id,
@@ -442,7 +434,7 @@ impl PlaceState {
             is_class_scope,
             is_place_name,
             previous_definitions,
-        );
+        )
     }
 
     /// Add given constraint to all live bindings.
