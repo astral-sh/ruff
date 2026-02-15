@@ -674,6 +674,21 @@ def _(subj: tuple[int, str] | tuple[str, int]):
             reveal_type(subj)  # revealed: tuple[str, int]
 ```
 
+## Sequence patterns with type alias subjects
+
+Sequence patterns correctly narrow through type aliases.
+
+```py
+from typing import TypeAlias
+
+Alias: TypeAlias = tuple[int | str, int | str]
+
+def _(subj: Alias):
+    match subj:
+        case (int(), str()):
+            reveal_type(subj)  # revealed: tuple[int, str]
+```
+
 ## Sequence patterns with non-tuple subjects
 
 Sequence patterns on non-tuple subjects still don't produce tuple narrowing, but obviously

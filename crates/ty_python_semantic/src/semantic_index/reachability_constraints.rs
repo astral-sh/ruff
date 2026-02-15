@@ -1065,10 +1065,11 @@ impl ReachabilityConstraints {
                     return result.unwrap_or(Truthiness::Ambiguous);
                 }
 
-                // Handle intersections by checking each positive element. If any positive element is
-                // always false, then the intersection is always false. If any positive element is
-                // always true, then the intersection is always true.
+                // Handle intersections by checking each positive element. If any positive
+                // element is always false, the intersection can never match. We can only
+                // return `AlwaysTrue` if *all* positive elements agree.
                 if let Type::Intersection(intersection) = subject_ty {
+                    let mut all_always_true = true;
                     for positive in intersection.positive_elements_or_object(db) {
                         match Self::analyze_single_pattern_predicate_kind(
                             db,
@@ -1076,12 +1077,16 @@ impl ReachabilityConstraints {
                             positive,
                         ) {
                             Truthiness::AlwaysFalse => return Truthiness::AlwaysFalse,
-                            Truthiness::AlwaysTrue => return Truthiness::AlwaysTrue,
-                            Truthiness::Ambiguous => {}
+                            Truthiness::AlwaysTrue => {}
+                            Truthiness::Ambiguous => all_always_true = false,
                         }
                     }
 
-                    return Truthiness::Ambiguous;
+                    return if all_always_true {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::Ambiguous
+                    };
                 }
 
                 // Resolve aliases before checking tuple details.
@@ -1117,17 +1122,34 @@ impl ReachabilityConstraints {
                         return Truthiness::AlwaysFalse;
                     }
 
-                    // If the sequence has a known homogeneous element type, and any element pattern
-                    // requires a disjoint type, then this sequence pattern can never match.
-                    if let Some(element_ty) = subject_ty.sequence_homogeneous_element_type(db) {
+                    // Fast path: if we can extract the declared element type from
+                    // `Sequence[T]` in the MRO, check element-level disjointness
+                    // directly (avoids constructing `Sequence[R]` for each pattern).
+                    if let Some(sequence_element_ty) = subject_ty.sequence_element_type(db) {
                         for required_element_ty in patterns
                             .iter()
                             .map(|pattern| pattern_kind_to_type(db, pattern))
                             .filter(|required_element_ty| !required_element_ty.is_never())
                         {
-                            if element_ty.is_disjoint_from(db, required_element_ty) {
+                            if sequence_element_ty.is_disjoint_from(db, required_element_ty) {
                                 return Truthiness::AlwaysFalse;
                             }
+                        }
+                    }
+
+                    // Fallback: check if the subject is disjoint from `Sequence[R]`
+                    // for any required element type `R`. This catches cases where
+                    // `sequence_element_type` returns `None` (e.g., protocol instances
+                    // without a `Sequence` base).
+                    for required_element_ty in patterns
+                        .iter()
+                        .map(|pattern| pattern_kind_to_type(db, pattern))
+                        .filter(|required_element_ty| !required_element_ty.is_never())
+                    {
+                        let required_sequence = KnownClass::Sequence
+                            .to_specialized_instance(db, &[required_element_ty]);
+                        if subject_ty.is_disjoint_from(db, required_sequence) {
+                            return Truthiness::AlwaysFalse;
                         }
                     }
 

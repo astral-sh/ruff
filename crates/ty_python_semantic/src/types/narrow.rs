@@ -2015,6 +2015,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .collect();
                 Some(UnionType::from_elements(self.db, narrowed))
             }
+            Type::TypeAlias(alias) => {
+                self.narrow_tuple_by_sequence_pattern(alias.value_type(self.db), element_patterns)
+            }
             Type::NominalInstance(instance) => {
                 let tuple_spec = instance.tuple_spec(self.db)?;
                 Some(self.narrow_tuple_spec_by_sequence_pattern(&tuple_spec, element_patterns))
@@ -2102,9 +2105,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
 /// Returns `true` if any element pattern provides a narrowing constraint.
 fn has_any_narrowing_constraint(patterns: &[PatternPredicateKind]) -> bool {
-    patterns
-        .iter()
-        .any(|pattern| pattern_has_narrowing_constraint(pattern))
+    patterns.iter().any(pattern_has_narrowing_constraint)
 }
 
 /// Returns `true` if a single pattern provides a narrowing constraint.

@@ -5265,15 +5265,6 @@ impl<'db> Type<'db> {
         self.try_iterate_with_mode(db, EvaluationMode::Sync)
     }
 
-    /// Return the homogeneous element type for values produced by iterating over `self`, if known.
-    ///
-    /// This is best-effort and intentionally omits iteration diagnostics.
-    pub(crate) fn sequence_homogeneous_element_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
-        self.try_iterate(db)
-            .ok()
-            .map(|spec| spec.homogeneous_element_type(db))
-    }
-
     fn try_iterate_with_mode(
         self,
         db: &'db dyn Db,
@@ -5730,6 +5721,37 @@ impl<'db> Type<'db> {
             }
             Type::Union(union) => union.try_map(db, |ty| ty.generator_return_type(db)),
             ty @ (Type::Dynamic(_) | Type::Never) => Some(ty),
+            _ => None,
+        }
+    }
+
+    /// Return the element type if `self` is a `Sequence[T]` specialization (or subtype), if known.
+    pub(crate) fn sequence_element_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let from_class_base = |base: ClassBase<'db>| {
+            let class = base.into_class()?;
+            if class.is_known(db, KnownClass::Sequence)
+                && let Some((_, Some(specialization))) =
+                    class.static_class_literal_specialized(db, None)
+                && let [element_ty] = specialization.types(db)
+            {
+                Some(*element_ty)
+            } else {
+                None
+            }
+        };
+
+        match self {
+            Type::NominalInstance(instance) => {
+                instance.class(db).iter_mro(db).find_map(from_class_base)
+            }
+            Type::ProtocolInstance(instance) => {
+                if let Protocol::FromClass(class) = instance.inner {
+                    class.iter_mro(db).find_map(from_class_base)
+                } else {
+                    None
+                }
+            }
+            Type::TypeAlias(alias) => alias.value_type(db).sequence_element_type(db),
             _ => None,
         }
     }
