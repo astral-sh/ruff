@@ -971,9 +971,8 @@ impl ReachabilityConstraints {
                 info.versions.contains(&binding_place_version)
                     || info.allow_future_versions
                         && info
-                            .versions
-                            .last()
-                            .is_some_and(|max| binding_place_version > *max)
+                            .max_version
+                            .is_some_and(|max| binding_place_version > max)
             })
         })
     }
