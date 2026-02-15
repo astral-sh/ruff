@@ -123,11 +123,18 @@ impl<'db> BindingsElement<'db> {
             .unwrap_or(CallErrorKind::NotCallable))
     }
 
-    /// Filter bindings to keep only those that succeeded.
-    /// Only applies to intersections where at least one binding succeeded.
+    /// Filter bindings in an intersection once at least one binding succeeded.
+    ///
+    /// We keep successful bindings, and also keep top-callable failures. Top callables contribute
+    /// useful return-type information (e.g. `Awaitable[object]`) for narrowed intersections like
+    /// `f: KnownCallable & Top[Callable[..., Awaitable[object]]]`, even though the top-callable
+    /// call itself is unsafe.
     fn retain_successful(&mut self) {
         if self.is_intersection() && self.as_result().is_ok() {
-            self.bindings.retain(|b| b.as_result().is_ok());
+            self.bindings.retain(|binding| {
+                binding.as_result().is_ok()
+                    || binding.error_priority() == CallErrorPriority::TopCallable
+            });
         }
     }
 

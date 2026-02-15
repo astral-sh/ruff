@@ -228,6 +228,27 @@ async def test(x: Intersection[NotAwaitable1, NotAwaitable2]):
     await x
 ```
 
+When a callable is narrowed with `TypeIs[Top[Callable[..., Awaitable[...]]]]`, the narrowed
+intersection should contribute the top-callable return type to the call result, even though the
+top-callable itself cannot be safely called.
+
+```py
+from typing import Awaitable, Callable
+from typing_extensions import TypeIs
+from ty_extensions import Top
+
+def is_async_callable(x: object) -> TypeIs[Top[Callable[..., Awaitable[object]]]]:
+    return True
+
+async def f(fn: Callable[[int], int | Awaitable[int]]) -> None:
+    if is_async_callable(fn):
+        reveal_type(fn)  # revealed: ((int, /) -> int | Awaitable[int]) & Top[(...) -> Awaitable[object]]
+        result = fn(1)
+        # This includes `int & Awaitable[object]`: an `int` subtype could define `__await__`.
+        reveal_type(result)  # revealed: (int & Awaitable[object]) | Awaitable[int]
+        reveal_type(await result)  # revealed: object
+```
+
 ## Awaiting intersection types (Python 3.12 or lower)
 
 ```toml
