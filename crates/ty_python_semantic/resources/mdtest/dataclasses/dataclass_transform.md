@@ -1463,5 +1463,49 @@ User(id=1, name="Test")
 User()
 ```
 
+## Legacy `field_descriptors` compatibility
+
+Earlier versions of the dataclass-transform spec used the parameter name `field_descriptors`
+instead of `field_specifiers`. We should still recognize this shape for compatibility.
+
+```py
+from typing import Any, Callable, TypeVar
+
+T = TypeVar("T", bound=type)
+
+def __dataclass_transform__(
+    *,
+    eq_default: bool = True,
+    order_default: bool = False,
+    kw_only_default: bool = False,
+    field_descriptors: tuple[type | Callable[..., Any], ...] = (),
+) -> Callable[[T], T]:
+    def decorator(cls: T) -> T:
+        return cls
+    return decorator
+
+class FieldInfo:
+    def __init__(self, default: Any = None, **kwargs: Any) -> None: ...
+
+def Field(default: Any = None, **kwargs: Any) -> Any:
+    return FieldInfo(default=default, **kwargs)
+
+@__dataclass_transform__(kw_only_default=True, field_descriptors=(Field, FieldInfo))
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta):
+    def __init__(self, **data: Any) -> None: ...
+
+class User(ModelBase):
+    id: int
+    name: str
+
+reveal_type(User.__init__)  # revealed: (self: User, *, id: int, name: str) -> None
+User(id=1, name="Test")
+
+# error: [missing-argument]
+User()
+```
+
 [pyright's behavior]: https://github.com/microsoft/pyright/blob/1.1.396/packages/pyright-internal/src/analyzer/dataClasses.ts#L1024-L1033
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

@@ -946,6 +946,194 @@ def mixed(
     reveal_type(i4)  # revealed: Any
 ```
 
+## Calling intersection types
+
+When calling an intersection type, we try to call each positive element with the given arguments.
+Elements where the call fails (wrong arguments, not callable, etc.) are discarded. The return type
+is the intersection of return types from the elements where the call succeeded.
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class Foo:
+    pass
+
+def _(
+    x: Intersection[type[Foo], Callable[[], str]],
+) -> None:
+    # Both `type[Foo]` and `Callable[[], str]` are callable with no arguments.
+    # `type[Foo]()` returns `Foo`, `Callable[[], str]()` returns `str`.
+    # The return type is the intersection of `Foo` and `str`.
+    reveal_type(x())  # revealed: Foo & str
+```
+
+If one element accepts the call but another rejects it (e.g., due to incompatible arguments), the
+call still succeeds using only the element that accepts:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class Bar:
+    pass
+
+def _(
+    x: Intersection[type[Bar], Callable[[int], str]],
+) -> None:
+    # `type[Bar]()` accepts no arguments and returns `Bar`.
+    # `Callable[[int], str]` requires an int argument, so it fails for this call.
+    # We discard the failing element and use only `type[Bar]`.
+    reveal_type(x())  # revealed: Bar
+```
+
+If all elements are callable but all reject the specific call (e.g., incompatible arguments), we
+show errors for each failing element:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+def _(
+    x: Intersection[Callable[[int], str], Callable[[str], int]],
+) -> None:
+    # Both callables reject a `float` argument:
+    # - `Callable[[int], str]` expects `int`
+    # - `Callable[[str], int]` expects `str`
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    x(1.0)
+```
+
+When intersection elements fail with different error types, we use a priority hierarchy to determine
+which errors to show. More specific errors (like `invalid-argument-type`) take precedence over less
+specific ones (like `call-top-callable` or `call-non-callable`).
+
+A specific argument error takes priority over a top-callable error:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+def _(
+    x: Intersection[Callable[[int], str], Top[Callable[..., object]]],
+) -> None:
+    # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
+    # `Top[Callable[..., object]]` would fail with call-top-callable
+    # We only show the more specific invalid-argument-type error
+    # error: [invalid-argument-type]
+    x("hello")
+```
+
+A specific argument error takes priority over a not-callable error:
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class NotCallable: ...
+
+def _(
+    x: Intersection[Callable[[int], str], NotCallable],
+) -> None:
+    # `Callable[[int], str]` fails with invalid-argument-type (expects int, got str)
+    # `NotCallable` would fail with call-non-callable
+    # We only show the more specific invalid-argument-type error
+    # error: [invalid-argument-type]
+    x("hello")
+```
+
+A top-callable error takes priority over a not-callable error:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+class NotCallable: ...
+
+def _(
+    x: Intersection[Top[Callable[..., object]], NotCallable],
+) -> None:
+    # `Top[Callable[..., object]]` fails with call-top-callable
+    # `NotCallable` would fail with call-non-callable
+    # We only show the call-top-callable error (it's more specific)
+    # error: [call-top-callable]
+    x()
+```
+
+If no positive element is callable, the intersection is not callable:
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+def _(x: Intersection[A, B]) -> None:
+    # error: [call-non-callable] "Object of type `A & B` is not callable"
+    reveal_type(x())  # revealed: Unknown
+```
+
+## Unions containing intersections
+
+When a union contains intersection elements (e.g., from `callable()` narrowing), the type checker
+properly handles each union element. If an intersection element succeeds, it contributes to the
+result. If all elements within an intersection fail, the priority hierarchy is used for diagnostics:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+def _(
+    i: Intersection[Callable[[int], str], Top[Callable[..., object]]],
+    c: Callable[[str], int],
+    flag: bool,
+) -> None:
+    # Create a union of an intersection and a regular callable:
+    # (Callable[[int], str] & Top[...]) | Callable[[str], int]
+    if flag:
+        f = i
+    else:
+        f = c
+
+    # When called with a string argument:
+    # - The intersection element: Callable[[int], str] fails (wrong type),
+    #   Top[...] would fail with call-top-callable. Due to priority hierarchy,
+    #   only the invalid-argument-type error is shown for the intersection.
+    # - The Callable[[str], int] element succeeds.
+    # The return type includes both elements' return types:
+    # - intersection: str (from Callable[[int], str])
+    # - regular: int (from Callable[[str], int])
+    # error: [invalid-argument-type]
+    reveal_type(f("hello"))  # revealed: str | int
+```
+
+When all union elements fail (including intersection elements), errors are reported for each:
+
+```py
+from ty_extensions import Intersection, Top
+from typing import Callable
+
+def _(
+    i: Intersection[Callable[[int], str], Top[Callable[..., object]]],
+    c: Callable[[str], int],
+    flag: bool,
+) -> None:
+    if flag:
+        f = i
+    else:
+        f = c
+
+    # When called with no arguments:
+    # - The intersection element: Callable[[int], str] fails (missing argument),
+    #   Top[...] would fail with call-top-callable. Due to priority hierarchy,
+    #   only the missing-argument error is shown.
+    # - The Callable[[str], int] also fails (missing argument).
+    # error: [missing-argument]
+    # error: [missing-argument]
+    f()
+```
+
 ## Invalid
 
 ```py

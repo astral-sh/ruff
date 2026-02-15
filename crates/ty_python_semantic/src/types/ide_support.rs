@@ -648,9 +648,9 @@ pub fn call_signature_details<'db>(
 
         // Extract signature details from all callable bindings
         bindings
-            .into_iter()
+            .iter()
             .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(db, &binding))
+            .map(|binding| CallSignatureDetails::from_binding(db, binding))
             .collect()
     } else {
         // Type is not callable, return empty signatures
@@ -700,7 +700,7 @@ pub fn call_type_simplified_by_overloads(
         .check_types(db, &args, TypeContext::default(), &[])
         // Only use the Ok
         .iter()
-        .flatten()
+        .flat_map(super::call::bind::Bindings::iter)
         .flat_map(|binding| {
             binding.matching_overloads().map(|(_, overload)| {
                 overload
@@ -734,8 +734,8 @@ pub fn definitions_for_bin_op<'db>(
     let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
 
     let definitions: Vec<_> = bindings
-        .into_iter()
-        .flatten()
+        .iter()
+        .flat_map(IntoIterator::into_iter)
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
                 binding.signature.definition?,
@@ -792,8 +792,8 @@ pub fn definitions_for_unary_op<'db>(
     let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
 
     let definitions = bindings
-        .into_iter()
-        .flatten()
+        .iter()
+        .flat_map(IntoIterator::into_iter)
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
                 binding.signature.definition?,
