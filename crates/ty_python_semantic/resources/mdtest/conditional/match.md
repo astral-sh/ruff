@@ -544,3 +544,56 @@ def _(val, IntOrStr: type[int | str]):
         case IntOrStr():
             print(f"Matched as {IntOrStr}: {val!r}")
 ```
+
+## Sequence pattern reachability
+
+Sequence-pattern reachability should account for unions and intersections of tuple subjects, and for
+subjects that can never satisfy one or more sequence element patterns.
+
+```py
+def _(subject: tuple[int] | tuple[str]):
+    y = 0
+    match subject:
+        case (int(),):
+            y = 1
+        case (str(),):
+            y = 2
+        case _:
+            y = 3
+
+    reveal_type(y)  # revealed: Literal[1, 2]
+
+def _(subject: tuple[int, ...] | tuple[()]):
+    if subject:
+        y = 0
+        match subject:
+            case (str(),):
+                y = 1
+            case _:
+                y = 2
+        reveal_type(y)  # revealed: Literal[2]
+
+def _(subject: list[str]):
+    y = 0
+    match subject:
+        case [int(), str()]:
+            y = 1
+        case _:
+            y = 2
+    reveal_type(y)  # revealed: Literal[2]
+
+from typing import final
+
+@final
+class FinalNonSequence:
+    pass
+
+def _(subject: FinalNonSequence):
+    y = 0
+    match subject:
+        case [int()]:
+            y = 1
+        case _:
+            y = 2
+    reveal_type(y)  # revealed: Literal[2]
+```
