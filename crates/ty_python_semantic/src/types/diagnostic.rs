@@ -5,6 +5,7 @@ use super::{
     CallArguments, CallDunderError, ClassBase, ClassLiteral, KnownClass, StaticClassLiteral,
     add_inferred_python_version_hint_to_diagnostic,
 };
+use crate::diagnostic::did_you_mean;
 use crate::diagnostic::format_enumeration;
 use crate::lint::{Level, LintRegistryBuilder, LintStatus};
 use crate::place::{DefinedPlace, Place};
@@ -47,8 +48,6 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
 use ty_module_resolver::{KnownModule, Module, ModuleName, file_to_module};
-
-pub(crate) mod levenshtein;
 
 const RUNTIME_CHECKABLE_DOCS_URL: &str =
     "https://docs.python.org/3/library/typing.html#typing.runtime_checkable";
@@ -4522,12 +4521,8 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         .message(format_args!("TypedDict `{typed_dict_name}`"))
                 });
 
-                let existing_keys = items.keys().map(|name| -> &str { name });
-                if let Some(suggestion) = levenshtein::find_best_suggestion(
-                    existing_keys,
-                    key,
-                    levenshtein::HideUnderscoredSuggestions::No,
-                ) {
+                let existing_keys = items.keys();
+                if let Some(suggestion) = did_you_mean(existing_keys, key) {
                     if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
                         let quoted_suggestion = format!(
                             "{quote}{suggestion}{quote}",

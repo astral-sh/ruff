@@ -10,7 +10,7 @@ extend-exclude = [
     # of them actually words. So just ignore typos here.
     "crates/ty_ide/src/completion.rs",
     # Same for "Did you mean...?" levenshtein tests.
-    "crates/ty_python_semantic/src/types/diagnostic/levenshtein.rs",
+    "crates/ty_python_semantic/src/diagnostic/levenshtein.rs",
 ]
 
 [default.extend-words]

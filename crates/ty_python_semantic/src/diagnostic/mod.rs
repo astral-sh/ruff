@@ -1,6 +1,7 @@
 use crate::{
     Db, Program, PythonVersionWithSource, lint::lint_documentation_url, types::TypeCheckDiagnostics,
 };
+use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, SubDiagnostic, SubDiagnosticSeverity},
     files::File,
@@ -8,19 +9,19 @@ use ruff_db::{
 use std::cell::RefCell;
 use std::fmt::Write;
 
+pub(crate) mod levenshtein;
+
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
 pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
     existing_names: impl Iterator<Item = S>,
     wrong_name: T,
 ) -> Option<String> {
-    use crate::types::levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
-
     let names: Vec<String> = existing_names.map(|n| n.as_ref().to_string()).collect();
     let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
     find_best_suggestion(
         name_refs,
         wrong_name.as_ref(),
-        HideUnderscoredSuggestions::No,
+        HideUnderscoredSuggestions::Yes,
     )
     .map(str::to_string)
 }
