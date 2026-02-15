@@ -253,6 +253,7 @@ py_compile: 3.0-
 pyclbr: 3.0-
 pydoc: 3.0-
 pydoc_data: 3.0-
+pydoc_data.module_docs: 3.13-
 pyexpat: 3.0-
 queue: 3.0-
 quopri: 3.0-
