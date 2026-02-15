@@ -219,9 +219,9 @@ def in_parameter_position(callback: Callable[[Literal[1]], None]):
     reveal_type([callback])  # revealed: list[Unknown | ((Literal[1], /) -> None)]
 
 def double_negation(callback: Callable[[Callable[[Literal[1]], None]], None]):
-    reveal_type(callback)  # revealed: ((Literal[1], /) -> None, /) -> None
+    reveal_type(callback)  # revealed: (((Literal[1], /) -> None), /) -> None
 
-    reveal_type([callback])  # revealed: list[Unknown | (((int, /) -> None, /) -> None)]
+    reveal_type([callback])  # revealed: list[Unknown | ((((int, /) -> None), /) -> None)]
 ```
 
 Literal promotion should also not apply recursively to type arguments in contravariant/invariant

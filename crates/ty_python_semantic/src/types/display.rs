@@ -2010,9 +2010,18 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
 
         // Return type
         f.write_str(" -> ")?;
-        self.return_ty
-            .display_with(self.db, settings.singleline())
-            .fmt_detailed(&mut f)?;
+        let return_settings = settings.singleline();
+        if should_parenthesize_callable_type(self.return_ty, self.db) {
+            f.write_char('(')?;
+            self.return_ty
+                .display_with(self.db, return_settings)
+                .fmt_detailed(&mut f)?;
+            f.write_char(')')?;
+        } else {
+            self.return_ty
+                .display_with(self.db, return_settings)
+                .fmt_detailed(&mut f)?;
+        }
 
         if self.parameters.is_top() {
             f.write_str("]")?;
@@ -2185,9 +2194,17 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             if self.param.should_annotation_be_displayed() {
                 let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
-                annotated_type
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
+                if should_parenthesize_callable_type(annotated_type, self.db) {
+                    f.write_char('(')?;
+                    annotated_type
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    f.write_char(')')?;
+                } else {
+                    annotated_type
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                }
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_type) = self.param.default_type() {
@@ -2228,10 +2245,18 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             // This case is specifically for the `Callable` signature where name and default value
             // cannot be provided. For unnamed parameters we always display the type, to ensure we
             // have something visible in the parameter slot.
-            self.param
-                .annotated_type()
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f)?;
+            let annotated_type = self.param.annotated_type();
+            if should_parenthesize_callable_type(annotated_type, self.db) {
+                f.write_char('(')?;
+                annotated_type
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
+                f.write_char(')')?;
+            } else {
+                annotated_type
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
+            }
         }
         Ok(())
     }
@@ -2603,6 +2628,22 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeNegatedType<'db> {
 impl Display for DisplayMaybeNegatedType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
+}
+
+/// Returns `true` if the given type is a callable type that should be parenthesized
+/// when appearing as a parameter annotation or return type of another callable.
+///
+/// Callable types with arrow syntax like `(int, str) -> bool` are parenthesized to
+/// avoid ambiguity in nested callable displays. The exceptions are:
+/// - Overloaded callables, which display as `Overload[...]` (already unambiguous)
+/// - Callables with top-materialization parameters, which display as `Top[...]` (already unambiguous)
+fn should_parenthesize_callable_type(ty: Type<'_>, db: &dyn Db) -> bool {
+    if let Type::Callable(callable) = ty {
+        let overloads = &callable.signatures(db).overloads;
+        overloads.len() == 1 && !overloads[0].parameters().is_top()
+    } else {
+        false
     }
 }
 
