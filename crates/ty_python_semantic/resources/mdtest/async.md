@@ -184,6 +184,34 @@ async def test(x: Intersection[Coroutine[object, object, str], NotAwaitable]):
     reveal_type(y)  # revealed: str
 ```
 
+When an intersection includes `Any`, awaiting succeeds for both elements. `Any` is awaitable and
+returns `Any`:
+
+```py
+from typing import Coroutine, Any
+from ty_extensions import Intersection
+
+async def test(x: Intersection[Coroutine[object, object, int], Any]):
+    y = await x
+    reveal_type(y)  # revealed: int & Any
+```
+
+When an intersection has three or more elements, some awaitable and some not, the non-awaitable
+elements are skipped:
+
+```py
+from typing import Coroutine
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+class NotAwaitable: ...
+
+async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, object, B], NotAwaitable]):
+    y = await x
+    reveal_type(y)  # revealed: A & B
+```
+
 If all intersection elements fail to be awaitable, the await is invalid:
 
 ```py
