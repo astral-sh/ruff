@@ -958,14 +958,14 @@ is the intersection of return types from the elements where the call succeeded.
 from ty_extensions import Intersection
 from typing import Callable
 
-class Foo:
-    pass
+class Foo: ...
 
 def _(
     x: Intersection[type[Foo], Callable[[], str]],
 ) -> None:
     # Both `type[Foo]` and `Callable[[], str]` are callable with no arguments.
-    # `type[Foo]()` returns `Foo`, `Callable[[], str]()` returns `str`.
+    # `x()` returns `Foo` if `x` has type `type[Foo]`,
+    # and `str` if `x` has type `Callable[[], str]()`.
     # The return type is the intersection of `Foo` and `str`.
     reveal_type(x())  # revealed: Foo & str
 ```
@@ -979,13 +979,12 @@ call still succeeds using only the element that accepts:
 from ty_extensions import Intersection
 from typing import Callable
 
-class Bar:
-    pass
+class Bar: ...
 
 def _(
     x: Intersection[type[Bar], Callable[[int], str]],
 ) -> None:
-    # `type[Bar]()` accepts no arguments and returns `Bar`.
+    # `type[Bar]` accepts no arguments and returns `Bar`.
     # `Callable[[int], str]` requires an int argument, so it fails for this call.
     # We discard the failing element and use only `type[Bar]`.
     reveal_type(x())  # revealed: Bar
@@ -1203,9 +1202,9 @@ def _(x: Intersection[A, B]) -> None:
 
 ### Intersection element fails, union element succeeds
 
-When a union contains intersection elements (e.g., from `callable()` narrowing), the type checker
-properly handles each union element. If an intersection element succeeds, it contributes to the
-result. If all elements within an intersection fail, the priority hierarchy is used for diagnostics:
+When a union contains intersection elements, we properly handle each union element. If an
+intersection element succeeds, it contributes to the result. If all elements within an intersection
+fail, the priority hierarchy is used for diagnostics:
 
 ```py
 from ty_extensions import Intersection, Top
@@ -1216,12 +1215,8 @@ def _(
     c: Callable[[str], int],
     flag: bool,
 ) -> None:
-    # Create a union of an intersection and a regular callable:
-    # (Callable[[int], str] & Top[...]) | Callable[[str], int]
-    if flag:
-        f = i
-    else:
-        f = c
+    # Create a union of the intersection
+    f = i if flag else c
 
     # When called with a string argument:
     # - The intersection element: Callable[[int], str] fails (wrong type),
@@ -1256,12 +1251,8 @@ class ReturnsB:
         return B()
 
 def _(
-    i: Intersection[ReturnsA, ReturnsB],
-    c: Callable[[int], str],
-    flag: bool,
+    f: Intersection[ReturnsA, ReturnsB] | Callable[[int], str],
 ) -> None:
-    f = i if flag else c
-
     reveal_type(f(42))  # revealed: (A & B) | str
 ```
 

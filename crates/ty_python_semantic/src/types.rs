@@ -5069,8 +5069,10 @@ impl<'db> Type<'db> {
     ) -> Result<Bindings<'db>, CallDunderError<'db>> {
         // For intersection types, call the dunder on each element separately and combine
         // the results. This avoids intersecting bound methods (which often collapses to Never)
-        // and instead intersects the return types. TODO we might be able to remove this after
-        // fixing https://github.com/astral-sh/ty/issues/2428.
+        // and instead intersects the return types.
+        //
+        // TODO: we might be able to remove this after fixing
+        // https://github.com/astral-sh/ty/issues/2428.
         if let Type::Intersection(intersection) = self {
             let mut successful_bindings = Vec::new();
             let mut last_error = None;

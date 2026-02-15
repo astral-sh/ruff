@@ -1466,11 +1466,8 @@ from ty_extensions import Intersection
 class A: ...
 class B: ...
 
-def set_a(self: "DescA", instance: object, value: A) -> None:
-    pass
-
-def set_b(self: "DescB", instance: object, value: B) -> None:
-    pass
+def set_a(self: "DescA", instance: object, value: A) -> None: ...
+def set_b(self: "DescB", instance: object, value: B) -> None: ...
 
 class DescA:
     # We use callable attributes instead of regular methods here because regular methods currently

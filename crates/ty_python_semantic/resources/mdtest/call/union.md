@@ -909,8 +909,9 @@ def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
 python-version = "3.13"
 ```
 
-Calling through a union that includes a constrained callable typevar must preserve union semantics:
-all possible callable variants of the constrained typevar still need to accept the argument list.
+Calling through a union that includes a constrained callable `TypeVar` must preserve union
+semantics: all possible callable variants of the constrained `TypeVar` still need to accept the
+argument list.
 
 ```py
 from typing import Callable
@@ -927,7 +928,7 @@ def test[T: (Callable[[int], int], Callable[[str], str])](
 
 ```toml
 [environment]
-python-version = "3.13"
+python-version = "3.12"
 ```
 
 The same issue appears when the nested union comes from a callable type alias:

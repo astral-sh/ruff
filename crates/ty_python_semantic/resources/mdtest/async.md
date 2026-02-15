@@ -142,16 +142,17 @@ like `inspect.isawaitable()` which narrow types to intersections with `Awaitable
 
 ```py
 import inspect
+from typing import Any
 
-def get_unknown():
+def get_any() -> Any:
     pass
 
 async def test():
-    x = get_unknown()
+    x = get_any()
     if inspect.isawaitable(x):
-        reveal_type(x)  # revealed: Unknown & Awaitable[object]
+        reveal_type(x)  # revealed: Any & Awaitable[object]
         y = await x
-        reveal_type(y)  # revealed: Unknown
+        reveal_type(y)  # revealed: Any
 ```
 
 The return type of awaiting an intersection is the intersection of the return types of awaiting each
@@ -176,8 +177,7 @@ awaitable elements:
 from typing import Coroutine
 from ty_extensions import Intersection
 
-class NotAwaitable:
-    pass
+class NotAwaitable: ...
 
 async def test(x: Intersection[Coroutine[object, object, str], NotAwaitable]):
     y = await x
@@ -217,11 +217,8 @@ If all intersection elements fail to be awaitable, the await is invalid:
 ```py
 from ty_extensions import Intersection
 
-class NotAwaitable1:
-    pass
-
-class NotAwaitable2:
-    pass
+class NotAwaitable1: ...
+class NotAwaitable2: ...
 
 async def test(x: Intersection[NotAwaitable1, NotAwaitable2]):
     # error: [invalid-await]
