@@ -191,21 +191,12 @@ impl<'db> Bindings<'db> {
         let mut implicit_dunder_init_is_possibly_unbound = false;
         let mut elements_acc = SmallVec::new();
 
-        // Each input Bindings becomes a BindingsElement in the union.
-        // If the input has multiple bindings, they form an intersection element.
+        // Preserve each input's existing union/intersection structure.
         for set in bindings_iter {
             implicit_dunder_new_is_possibly_unbound |= set.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound |=
                 set.implicit_dunder_init_is_possibly_unbound;
-            // Flatten the inner elements into a single BindingsElement
-            let inner_bindings: SmallVec<_> = set
-                .elements
-                .into_iter()
-                .flat_map(|elem| elem.bindings)
-                .collect();
-            elements_acc.push(BindingsElement {
-                bindings: inner_bindings,
-            });
+            elements_acc.extend(set.elements);
         }
 
         let elements = elements_acc;

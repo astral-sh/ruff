@@ -1465,8 +1465,8 @@ User()
 
 ## Legacy `field_descriptors` compatibility
 
-Earlier versions of the dataclass-transform spec used the parameter name `field_descriptors`
-instead of `field_specifiers`. We should still recognize this shape for compatibility.
+Earlier versions of the dataclass-transform spec used the parameter name `field_descriptors` instead
+of `field_specifiers`. We should still recognize this shape for compatibility.
 
 ```py
 from typing import Any, Callable, TypeVar

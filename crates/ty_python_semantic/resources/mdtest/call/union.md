@@ -901,3 +901,44 @@ def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
     # error: [invalid-argument-type]
     f(None)
 ```
+
+## Union semantics with constrained callable typevars
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Calling through a union that includes a constrained callable typevar must preserve union semantics:
+all possible callable variants of the constrained typevar still need to accept the argument list.
+
+```py
+from typing import Callable
+
+def test[T: (Callable[[int], int], Callable[[str], str])](
+    f: T | Callable[[int], int],
+) -> None:
+    # `f` may be `Callable[[str], str]`, so this call is not safe.
+    # error: [invalid-argument-type]
+    f(1)
+```
+
+## Union semantics with callable aliases in outer unions
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+The same issue appears when the nested union comes from a callable type alias:
+
+```py
+from typing import Callable
+
+type Alias = Callable[[int], int] | Callable[[str], str]
+
+def test_alias(f: Alias | Callable[[int], int]) -> None:
+    # `f` may be `Callable[[str], str]`, so this call is not safe.
+    # error: [invalid-argument-type]
+    f(1)
+```
