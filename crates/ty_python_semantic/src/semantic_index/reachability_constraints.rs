@@ -875,17 +875,19 @@ impl ReachabilityConstraints {
                     node: predicate.node,
                     is_positive: !predicate.is_positive,
                 };
-                let place_version_info = predicate_place_versions.get(&(node.atom, place));
-                let (pos_constraint, neg_constraint) = if place_version_info.is_some() {
-                    (
-                        infer_narrowing_constraint(db, predicate, place),
-                        infer_narrowing_constraint(db, neg_predicate, place),
-                    )
-                } else {
-                    // No recorded place-version metadata means this predicate cannot narrow
-                    // this place, so skip the expensive narrowing-inference queries.
-                    (None, None)
-                };
+                let predicate_place_key = (node.atom, place);
+                let place_version_info = predicate_place_versions.get(predicate_place_key);
+                let (pos_constraint, neg_constraint) =
+                    if predicate_place_versions.contains(predicate_place_key) {
+                        (
+                            infer_narrowing_constraint(db, predicate, place),
+                            infer_narrowing_constraint(db, neg_predicate, place),
+                        )
+                    } else {
+                        // No recorded place-version metadata means this predicate cannot narrow
+                        // this place, so skip the expensive narrowing-inference queries.
+                        (None, None)
+                    };
 
                 // Only gate by place version if this predicate can narrow the current place.
                 // Predicates unrelated to `place` are still useful for reachability pruning.
@@ -952,7 +954,7 @@ impl ReachabilityConstraints {
         binding_place_version: Option<PlaceVersion>,
     ) -> bool {
         binding_place_version.is_none_or(|binding_place_version| {
-            place_version_info.is_some_and(|info| {
+            place_version_info.map_or(binding_place_version == PlaceVersion::default(), |info| {
                 info.versions.contains(&binding_place_version)
                     || info.allow_future_versions
                         && info
