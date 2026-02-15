@@ -389,6 +389,31 @@ def _(number_of_periods: int | None, interval: str):
     reveal_type(number_of_periods)  # revealed: int
 ```
 
+## Non-singleton value patterns do not narrow
+
+Value patterns are checked with `==`, and non-singleton values can implement arbitrary `__eq__`. So
+matching against a non-singleton value pattern should not narrow the subject type.
+
+```py
+class A:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class B:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class Holder:
+    TARGET = A()
+
+def _(x: A | B):
+    match x:
+        case Holder.TARGET:
+            reveal_type(x)  # revealed: A | B
+        case _:
+            reveal_type(x)  # revealed: A | B
+```
+
 ## Narrowing tagged unions of tuples
 
 Narrow unions of tuples based on literal tag elements in `match` statements:
@@ -528,6 +553,31 @@ def _(subj: tuple[int | str | bytes, int | str]):
     match subj:
         case (int() | str(), _):
             reveal_type(subj)  # revealed: tuple[int | str, int | str]
+```
+
+## Sequence patterns with non-singleton value patterns
+
+Value patterns in sequence elements are equality checks, so non-singleton value patterns should not
+narrow the element type.
+
+```py
+class EqA:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class EqB:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class Holder:
+    TARGET = EqA()
+
+def _(subj: tuple[EqA | EqB, int]):
+    match subj:
+        case (Holder.TARGET, _):
+            reveal_type(subj)  # revealed: tuple[EqA | EqB, int]
+        case _:
+            reveal_type(subj)  # revealed: tuple[EqA | EqB, int]
 ```
 
 ## Sequence patterns with wildcards
