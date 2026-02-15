@@ -2,7 +2,6 @@ import classNames from "classnames";
 import RepoButton from "./RepoButton";
 import ThemeButton from "./ThemeButton";
 import ShareButton from "./ShareButton";
-import CopyMarkdownButton from "./CopyMarkdownButton";
 import { Theme } from "./theme";
 import VersionTag from "./VersionTag";
 import AstralButton from "./AstralButton";
@@ -15,6 +14,7 @@ export default function Header({
   onChangeTheme,
   onReset,
   onShare,
+  onCopyMarkdownLink,
   onCopyMarkdown,
 }: {
   edit: number | null;
@@ -24,6 +24,7 @@ export default function Header({
   onChangeTheme: (theme: Theme) => void;
   onReset?(): void;
   onShare: () => Promise<void>;
+  onCopyMarkdownLink?: () => Promise<void>;
   onCopyMarkdown?: () => Promise<void>;
 }) {
   return (
@@ -54,14 +55,13 @@ export default function Header({
         <div className="max-sm:hidden flex">
           <ResetButton onClicked={onReset} />
         </div>
-        <div className="max-sm:hidden flex gap-2">
-          <ShareButton key={edit} onShare={onShare} />
-          {onCopyMarkdown != null && (
-            <CopyMarkdownButton
-              key={`md-${edit}`}
-              onCopyMarkdown={onCopyMarkdown}
-            />
-          )}
+        <div className="max-sm:hidden flex">
+          <ShareButton
+            key={edit}
+            onShare={onShare}
+            onCopyMarkdownLink={onCopyMarkdownLink}
+            onCopyMarkdown={onCopyMarkdown}
+          />
         </div>
         <Divider />
 
