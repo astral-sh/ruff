@@ -157,8 +157,6 @@ class MDTestRunner:
 
         results: set[Path] = set()
         for md_file in MDTEST_DIR.rglob("*.md"):
-            if md_file.is_relative_to(SNAPSHOTS_DIR):
-                continue
             if is_truncated:
                 if md_file.name.startswith(md_filename):
                     results.add(md_file.relative_to(MDTEST_DIR))
