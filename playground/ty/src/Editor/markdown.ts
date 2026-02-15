@@ -18,6 +18,16 @@ function getLanguageTag(filename: string): string {
 }
 
 /**
+ * Generate a markdown link to the playground.
+ *
+ * @param shareUrl - The shareable playground URL
+ * @returns Formatted markdown link string
+ */
+export function generatePlaygroundMarkdownLink(shareUrl: string): string {
+  return `Code sample in [ty playground](${shareUrl})`;
+}
+
+/**
  * Generate markdown representation of playground files with a shareable link.
  *
  * @param files - Object mapping filenames to their content
@@ -29,7 +39,7 @@ export function generatePlaygroundMarkdown(
   shareUrl: string,
 ): string {
   const parts: string[] = [];
-  parts.push(`Code sample in [ty playground](${shareUrl})`);
+  parts.push(generatePlaygroundMarkdownLink(shareUrl));
   parts.push("");
 
   // Add each file with a heading and code block

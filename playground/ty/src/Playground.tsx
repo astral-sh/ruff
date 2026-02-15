@@ -13,6 +13,7 @@ import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
 import { FileHandle, PositionEncoding, Workspace } from "ty_wasm";
 import {
   copyAsMarkdown,
+  copyAsMarkdownLink,
   persist,
   persistLocal,
   restore,
@@ -68,6 +69,14 @@ export default function Playground() {
 
     if (serialized != null) {
       await copyAsMarkdown(serialized);
+    }
+  }, [files]);
+
+  const handleCopyMarkdownLink = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      await copyAsMarkdownLink(serialized);
     }
   }, [files]);
 
@@ -194,6 +203,7 @@ export default function Playground() {
         version={version}
         onChangeTheme={setTheme}
         onShare={handleShare}
+        onCopyMarkdownLink={handleCopyMarkdownLink}
         onCopyMarkdown={handleCopyMarkdown}
         onReset={workspace == null ? undefined : handleReset}
       />
