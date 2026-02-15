@@ -279,92 +279,8 @@ pub(crate) struct PredicatePlaceVersionInfo {
     pub(crate) allow_future_versions: bool,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct PredicatePlaceVersions {
-    /// All `(predicate, place)` pairs for which narrowing may apply.
-    ///
-    /// Most pairs only ever need the default semantics (`version == 0`, no future versions).
-    /// Those are stored here only, without an auxiliary payload.
-    applicable_pairs: FxHashSet<(ScopedPredicateId, ScopedPlaceId)>,
-    /// Non-default version information for applicable pairs.
-    ///
-    /// If a key is absent here but present in `applicable_pairs`, the pair uses the implicit
-    /// default version info (`versions = [0]`, `allow_future_versions = false`).
-    non_default_info: FxHashMap<(ScopedPredicateId, ScopedPlaceId), PredicatePlaceVersionInfo>,
-}
-
-impl PredicatePlaceVersions {
-    pub(crate) fn contains(&self, key: (ScopedPredicateId, ScopedPlaceId)) -> bool {
-        self.applicable_pairs.contains(&key)
-    }
-
-    pub(crate) fn get(
-        &self,
-        key: (ScopedPredicateId, ScopedPlaceId),
-    ) -> Option<&PredicatePlaceVersionInfo> {
-        self.non_default_info.get(&key)
-    }
-
-    pub(crate) fn shrink_to_fit(&mut self) {
-        self.applicable_pairs.shrink_to_fit();
-        self.non_default_info.shrink_to_fit();
-    }
-
-    pub(crate) fn record(
-        &mut self,
-        key: (ScopedPredicateId, ScopedPlaceId),
-        versions: impl Iterator<Item = PlaceVersion>,
-        allow_future_versions: bool,
-    ) {
-        let default_version = PlaceVersion::default();
-        let had_implicit_default =
-            self.applicable_pairs.contains(&key) && !self.non_default_info.contains_key(&key);
-        self.applicable_pairs.insert(key);
-
-        let mut incoming_versions: SmallVec<[PlaceVersion; 2]> = SmallVec::new();
-        for version in versions {
-            if !incoming_versions.contains(&version) {
-                incoming_versions.push(version);
-            }
-        }
-
-        if !allow_future_versions
-            && !had_implicit_default
-            && !self.non_default_info.contains_key(&key)
-            && matches!(&*incoming_versions, [v] if *v == default_version)
-        {
-            // Keep the key only in `applicable_pairs`; no payload needed.
-            return;
-        }
-
-        let entry = self.non_default_info.entry(key).or_default();
-        if had_implicit_default && !entry.versions.contains(&default_version) {
-            entry.versions.push(default_version);
-            entry.max_version = Some(
-                entry
-                    .max_version
-                    .map_or(default_version, |m| m.max(default_version)),
-            );
-        }
-
-        if allow_future_versions {
-            entry.allow_future_versions = true;
-        }
-
-        for version in incoming_versions {
-            if !entry.versions.contains(&version) {
-                entry.versions.push(version);
-                entry.max_version = Some(entry.max_version.map_or(version, |max| max.max(version)));
-            }
-        }
-
-        let is_default = !entry.allow_future_versions
-            && matches!(&*entry.versions, [v] if *v == default_version);
-        if is_default {
-            self.non_default_info.remove(&key);
-        }
-    }
-}
+pub(crate) type PredicatePlaceVersions =
+    FxHashMap<(ScopedPredicateId, ScopedPlaceId), PredicatePlaceVersionInfo>;
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -1176,11 +1092,20 @@ impl<'db> UseDefMapBuilder<'db> {
                 continue;
             };
 
-            self.predicate_place_versions.record(
-                (predicate, *place),
-                bindings.place_versions(),
-                allow_future_versions_for.contains(place),
-            );
+            let entry = self
+                .predicate_place_versions
+                .entry((predicate, *place))
+                .or_default();
+            if allow_future_versions_for.contains(place) {
+                entry.allow_future_versions = true;
+            }
+            for version in bindings.place_versions() {
+                if !entry.versions.contains(&version) {
+                    entry.versions.push(version);
+                    entry.max_version =
+                        Some(entry.max_version.map_or(version, |max| max.max(version)));
+                }
+            }
         }
     }
 
