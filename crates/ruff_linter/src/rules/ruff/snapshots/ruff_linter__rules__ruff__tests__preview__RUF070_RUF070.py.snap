@@ -1,0 +1,176 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+ --> RUF070.py:7:11
+  |
+5 | def foo():
+6 |     x = 1
+7 |     yield x  # RUF070
+  |           ^
+8 |
+9 | def foo():
+  |
+help: Remove unnecessary assignment
+3 | ###
+4 | 
+5 | def foo():
+  -     x = 1
+  -     yield x  # RUF070
+6 +     yield 1
+7 | 
+8 | def foo():
+9 |     x = [1, 2, 3]
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
+  --> RUF070.py:11:16
+   |
+ 9 | def foo():
+10 |     x = [1, 2, 3]
+11 |     yield from x  # RUF070
+   |                ^
+12 |
+13 | def foo():
+   |
+help: Remove unnecessary assignment
+7  |     yield x  # RUF070
+8  | 
+9  | def foo():
+   -     x = [1, 2, 3]
+   -     yield from x  # RUF070
+10 +     yield from [1, 2, 3]
+11 | 
+12 | def foo():
+13 |     for i in range(10):
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:16:15
+   |
+14 |     for i in range(10):
+15 |         x = i * 2
+16 |         yield x  # RUF070
+   |               ^
+17 |
+18 | def foo():
+   |
+help: Remove unnecessary assignment
+12 | 
+13 | def foo():
+14 |     for i in range(10):
+   -         x = i * 2
+   -         yield x  # RUF070
+15 +         yield i * 2
+16 | 
+17 | def foo():
+18 |     if True:
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:21:15
+   |
+19 |     if True:
+20 |         x = 1
+21 |         yield x  # RUF070
+   |               ^
+22 |
+23 | def foo():
+   |
+help: Remove unnecessary assignment
+17 | 
+18 | def foo():
+19 |     if True:
+   -         x = 1
+   -         yield x  # RUF070
+20 +         yield 1
+21 | 
+22 | def foo():
+23 |     with open("foo.txt") as f:
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:26:15
+   |
+24 |     with open("foo.txt") as f:
+25 |         x = f.read()
+26 |         yield x  # RUF070
+   |               ^
+27 |
+28 | def foo():
+   |
+help: Remove unnecessary assignment
+22 | 
+23 | def foo():
+24 |     with open("foo.txt") as f:
+   -         x = f.read()
+   -         yield x  # RUF070
+25 +         yield f.read()
+26 | 
+27 | def foo():
+28 |     try:
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:31:15
+   |
+29 |     try:
+30 |         x = something()
+31 |         yield x  # RUF070
+   |               ^
+32 |     except Exception:
+33 |         pass
+   |
+help: Remove unnecessary assignment
+27 | 
+28 | def foo():
+29 |     try:
+   -         x = something()
+   -         yield x  # RUF070
+30 +         yield something()
+31 |     except Exception:
+32 |         pass
+33 | 
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:37:11
+   |
+35 | def foo():
+36 |     x = some_function()
+37 |     yield x  # RUF070
+   |           ^
+38 |
+39 | def foo():
+   |
+help: Remove unnecessary assignment
+33 |         pass
+34 | 
+35 | def foo():
+   -     x = some_function()
+   -     yield x  # RUF070
+36 +     yield some_function()
+37 | 
+38 | def foo():
+39 |     x = some_generator()
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
+  --> RUF070.py:41:16
+   |
+39 | def foo():
+40 |     x = some_generator()
+41 |     yield from x  # RUF070
+   |                ^
+   |
+help: Remove unnecessary assignment
+37 |     yield x  # RUF070
+38 | 
+39 | def foo():
+   -     x = some_generator()
+   -     yield from x  # RUF070
+40 +     yield from some_generator()
+41 | 
+42 | 
+43 | ###
+note: This is an unsafe fix and may change runtime behavior

@@ -1,0 +1,268 @@
+use anyhow::Context;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{self as ast, Expr, Identifier, Stmt};
+use ruff_python_trivia::is_python_whitespace;
+use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::FxHashSet;
+
+use crate::checkers::ast::Checker;
+use crate::fix::edits;
+use crate::{AlwaysFixableViolation, Edit, Fix};
+
+/// ## What it does
+/// Checks for variable assignments that immediately precede a `yield` (or
+/// `yield from`) of the assigned variable, where the variable is not
+/// referenced anywhere else.
+///
+/// ## Why is this bad?
+/// The variable assignment is not necessary, as the value can be yielded
+/// directly.
+///
+/// ## Example
+/// ```python
+/// def gen():
+///     x = 1
+///     yield x
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def gen():
+///     yield 1
+/// ```
+///
+/// ## Fix safety
+/// This fix is always marked as unsafe because, unlike `return`, `yield`
+/// does not exit the function. Removing the assignment could affect
+/// debugging or other subtle behavior.
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+pub(crate) struct UnnecessaryAssignBeforeYield {
+    name: String,
+    is_yield_from: bool,
+}
+
+impl AlwaysFixableViolation for UnnecessaryAssignBeforeYield {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let UnnecessaryAssignBeforeYield {
+            name,
+            is_yield_from,
+        } = self;
+        if *is_yield_from {
+            format!("Unnecessary assignment to `{name}` before `yield from` statement")
+        } else {
+            format!("Unnecessary assignment to `{name}` before `yield` statement")
+        }
+    }
+
+    fn fix_title(&self) -> String {
+        "Remove unnecessary assignment".to_string()
+    }
+}
+
+/// RUF070
+pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: &Stmt) {
+    let Stmt::FunctionDef(function_def) = function_stmt else {
+        return;
+    };
+
+    let Some(function_scope) = checker.semantic().function_scope(function_def) else {
+        return;
+    };
+
+    let stack = {
+        let mut visitor = YieldVisitor::new();
+        for stmt in &function_def.body {
+            visitor.visit_stmt(stmt);
+        }
+        visitor
+    };
+
+    for (assign, yield_expr, stmt) in &stack.assignment_yield {
+        // Identify, e.g., `yield x` or `yield from x`.
+        let (yielded_id, is_yield_from, yield_value_range) = match yield_expr {
+            Expr::Yield(expr_yield) => {
+                let Some(value) = expr_yield.value.as_ref() else {
+                    continue;
+                };
+                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
+                    continue;
+                };
+                (id, false, value.range())
+            }
+            Expr::YieldFrom(expr_yield_from) => {
+                let Expr::Name(ast::ExprName { id, .. }) = expr_yield_from.value.as_ref() else {
+                    continue;
+                };
+                (id, true, expr_yield_from.value.range())
+            }
+            _ => continue,
+        };
+
+        // Identify, e.g., `x = 1`.
+        if assign.targets.len() > 1 {
+            continue;
+        }
+
+        let Some(target) = assign.targets.first() else {
+            continue;
+        };
+
+        let Expr::Name(ast::ExprName {
+            id: assigned_id, ..
+        }) = target
+        else {
+            continue;
+        };
+
+        if yielded_id != assigned_id {
+            continue;
+        }
+
+        // Ignore variables that have an annotation defined elsewhere.
+        if stack.annotations.contains(assigned_id.as_str()) {
+            continue;
+        }
+
+        // Ignore `nonlocal` and `global` variables.
+        if stack.non_locals.contains(assigned_id.as_str()) {
+            continue;
+        }
+
+        let Some(assigned_binding) = function_scope
+            .get(assigned_id)
+            .map(|binding_id| checker.semantic().binding(binding_id))
+        else {
+            continue;
+        };
+
+        // Unlike `return`, `yield` doesn't exit the function, so the variable could be
+        // referenced elsewhere. Only flag if the binding has exactly one reference (the
+        // yield itself).
+        if assigned_binding.references().count() != 1 {
+            continue;
+        }
+
+        // Ignore references made in another scope, e.g., nested functions or comprehensions.
+        if assigned_binding
+            .references()
+            .map(|reference_id| checker.semantic().reference(reference_id))
+            .any(|reference| reference.scope_id() != assigned_binding.scope)
+        {
+            continue;
+        }
+
+        let mut diagnostic = checker.report_diagnostic(
+            UnnecessaryAssignBeforeYield {
+                name: assigned_id.to_string(),
+                is_yield_from,
+            },
+            yield_value_range,
+        );
+        diagnostic.try_set_fix(|| {
+            // Delete the `yield x` expression statement. There's no need to treat this as an
+            // isolated edit, since we're editing the preceding statement, so no conflicting
+            // edit would be allowed to remove that preceding statement.
+            let delete_yield = edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
+
+            let eq_token = checker
+                .tokens()
+                .before(assign.value.start())
+                .iter()
+                .rfind(|token| token.kind() == TokenKind::Equal)
+                .context("Expected an equals token")?;
+
+            let content = checker.source();
+            let keyword = if is_yield_from { "yield from" } else { "yield" };
+
+            // Replace the `x = expr` statement with `yield expr` or `yield from expr`.
+            let replace_assign = Edit::range_replacement(
+                if content[eq_token.end().to_usize()..]
+                    .chars()
+                    .next()
+                    .is_some_and(is_python_whitespace)
+                {
+                    keyword.to_string()
+                } else {
+                    format!("{keyword} ")
+                },
+                // Replace from the start of the assignment statement to the end of the equals
+                // sign.
+                TextRange::new(assign.start(), eq_token.range().end()),
+            );
+
+            Ok(Fix::unsafe_edits(replace_assign, [delete_yield]))
+        });
+    }
+}
+
+struct YieldVisitor<'a> {
+    /// The non-local variables in the current function.
+    non_locals: FxHashSet<&'a str>,
+    /// The annotated variables in the current function.
+    annotations: FxHashSet<&'a str>,
+    /// The `assignment`-to-`yield` statement pairs in the current function.
+    assignment_yield: Vec<(&'a ast::StmtAssign, &'a Expr, &'a Stmt)>,
+    /// The preceding sibling of the current node.
+    sibling: Option<&'a Stmt>,
+}
+
+impl YieldVisitor<'_> {
+    fn new() -> Self {
+        Self {
+            non_locals: FxHashSet::default(),
+            annotations: FxHashSet::default(),
+            assignment_yield: Vec::new(),
+            sibling: None,
+        }
+    }
+}
+
+impl<'a> Visitor<'a> for YieldVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match stmt {
+            Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {
+                // Do not recurse into nested class/function bodies.
+                self.sibling = Some(stmt);
+                return;
+            }
+            Stmt::Global(ast::StmtGlobal { names, .. })
+            | Stmt::Nonlocal(ast::StmtNonlocal { names, .. }) => {
+                self.non_locals.extend(names.iter().map(Identifier::as_str));
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+                // Ex) `x: int`
+                if value.is_none()
+                    && let Expr::Name(name) = target.as_ref()
+                {
+                    self.annotations.insert(name.id.as_str());
+                }
+            }
+            Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                // If the `yield` expression is preceded by an `assignment` statement, then
+                // the `assignment` statement may be redundant.
+                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
+                    && let Some(Stmt::Assign(stmt_assign)) = self.sibling
+                {
+                    self.assignment_yield
+                        .push((stmt_assign, value.as_ref(), stmt));
+                }
+            }
+            _ => {}
+        }
+
+        self.sibling = Some(stmt);
+        visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_body(&mut self, body: &'a [Stmt]) {
+        let sibling = self.sibling;
+        self.sibling = None;
+        visitor::walk_body(self, body);
+        self.sibling = sibling;
+    }
+}
