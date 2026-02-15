@@ -51,6 +51,13 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: Cache ecosystem project clones
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
+        with:
+          path: ~/.cache/ecosystem-analyzer
+          key: ecosystem-projects-${{ github.sha }}
+          restore-keys: ecosystem-projects-
+
       - name: Compute diagnostic diff
         shell: bash
         run: |
