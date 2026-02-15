@@ -3005,23 +3005,11 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                     // union types, length bounds, and variable element so that the rest of the
                     // matching logic handles unions correctly.
                     //
-                    // We restrict this to cases where all remaining positional parameters are
-                    // defaulted and there is no variadic parameter, because the per-position
-                    // union loses the correlation between element lengths and per-position types.
-                    // In overloaded contexts, this loss would prevent the expansion step from
-                    // correctly splitting the union into separate argument lists.
-                    //
-                    // TODO: This is overly conservative. We could also apply this when all
-                    // non-defaulted parameters are covered by the shortest union element,
-                    // e.g. `f(a: int, b: int = 0)` with `*x` where `x: tuple[int] | tuple[int, int]`.
-                    Type::Union(union)
-                        if self.parameters.variadic().is_none()
-                            && self
-                                .parameters
-                                .positional()
-                                .skip(self.next_positional)
-                                .all(|parameter| parameter.default_type().is_some()) =>
-                    {
+                    // The per-position union loses the correlation between element lengths and
+                    // per-position types, so we can only apply this when all parameters beyond
+                    // the guaranteed minimum length are defaulted. Otherwise we fall back to
+                    // the lossy `iterate()` path.
+                    Type::Union(union) if self.parameters.variadic().is_none() => {
                         let tuple_specs: Vec<_> =
                             union.elements(db).iter().map(|ty| ty.iterate(db)).collect();
 
@@ -3030,49 +3018,65 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                             .map(|s| s.len().minimum())
                             .min()
                             .unwrap_or(0);
-                        let any_variable = tuple_specs.iter().any(|s| s.len().is_variable());
-                        let max_elements = tuple_specs
-                            .iter()
-                            .map(|s| s.all_elements().len())
-                            .max()
-                            .unwrap_or(0);
 
-                        let variable_element = {
-                            let var_types: Vec<_> = tuple_specs
-                                .iter()
-                                .filter_map(|s| s.variable_element().copied())
-                                .collect();
-                            if var_types.is_empty() {
-                                None
-                            } else {
-                                Some(UnionType::from_elements_leave_aliases(db, var_types))
-                            }
-                        };
+                        // Parameters within the guaranteed minimum are always provided
+                        // by every union element. Parameters beyond that are only provided
+                        // by the longer elements, so they must have defaults.
+                        let all_optional_params_defaulted = self
+                            .parameters
+                            .positional()
+                            .skip(self.next_positional + min_len)
+                            .all(|parameter| parameter.default_type().is_some());
 
-                        let max_elements = i32::try_from(max_elements).unwrap_or(i32::MAX);
-                        let mut argument_types_vec = Vec::new();
-                        for index in 0..max_elements {
-                            let positional_types: Vec<_> = tuple_specs
-                                .iter()
-                                .filter_map(|s| s.py_index(db, index).ok())
-                                .collect();
-                            if positional_types.is_empty() {
-                                break;
-                            }
-                            argument_types_vec
-                                .push(UnionType::from_elements_leave_aliases(db, positional_types));
-                        }
-
-                        let length = if any_variable || argument_types_vec.len() > min_len {
-                            TupleLength::Variable(min_len, 0)
+                        if !all_optional_params_defaulted {
+                            VariadicArgumentType::Other(argument_type.iterate(db))
                         } else {
-                            TupleLength::Fixed(min_len)
-                        };
+                            let any_variable = tuple_specs.iter().any(|s| s.len().is_variable());
+                            let max_elements = tuple_specs
+                                .iter()
+                                .map(|s| s.all_elements().len())
+                                .max()
+                                .unwrap_or(0);
 
-                        VariadicArgumentType::Union {
-                            argument_types: argument_types_vec,
-                            length,
-                            variable_element,
+                            let variable_element = {
+                                let var_types: Vec<_> = tuple_specs
+                                    .iter()
+                                    .filter_map(|s| s.variable_element().copied())
+                                    .collect();
+                                if var_types.is_empty() {
+                                    None
+                                } else {
+                                    Some(UnionType::from_elements_leave_aliases(db, var_types))
+                                }
+                            };
+
+                            let max_elements = i32::try_from(max_elements).unwrap_or(i32::MAX);
+                            let mut argument_types_vec = Vec::new();
+                            for index in 0..max_elements {
+                                let positional_types: Vec<_> = tuple_specs
+                                    .iter()
+                                    .filter_map(|s| s.py_index(db, index).ok())
+                                    .collect();
+                                if positional_types.is_empty() {
+                                    break;
+                                }
+                                argument_types_vec.push(UnionType::from_elements_leave_aliases(
+                                    db,
+                                    positional_types,
+                                ));
+                            }
+
+                            let length = if any_variable || argument_types_vec.len() > min_len {
+                                TupleLength::Variable(min_len, 0)
+                            } else {
+                                TupleLength::Fixed(min_len)
+                            };
+
+                            VariadicArgumentType::Union {
+                                argument_types: argument_types_vec,
+                                length,
+                                variable_element,
+                            }
                         }
                     }
                     _ => VariadicArgumentType::Other(argument_type.iterate(db)),

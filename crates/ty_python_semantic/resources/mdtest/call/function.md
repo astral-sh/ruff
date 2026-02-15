@@ -813,14 +813,11 @@ def f15(profile: bool, line: str) -> None:
         timings = [[0.0], [1.0], [2.0], [3.0]]
     matcher(1, 2, line, *timings[:2])
 
-# TODO: Union variadic unpacking should also work when the non-defaulted parameters
-# are covered by all union elements, even if not all remaining parameters are defaulted.
-# Currently we only apply per-element iteration when all remaining positional parameters
-# have defaults, so this falls back to `iterate()` which produces `tuple[int, ...]` and
-# greedily matches `c: str` with `int`.
+# Union variadic unpacking also works when the non-defaulted parameters are covered by
+# the shortest union element, even if not all remaining parameters are defaulted.
 def f16(a: int, b: int = 0, c: str = "") -> None: ...
 def f17(x: tuple[int] | tuple[int, int]) -> None:
-    f16(*x)  # error: [invalid-argument-type]  # TODO: false positive
+    f16(*x)
 ```
 
 ### Mixed argument and parameter containing variadic
