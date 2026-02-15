@@ -471,6 +471,7 @@ def collect_ty_diagnostics(
             "--output-format=gitlab",
             "--ignore=assert-type-unspellable-subtype",
             "--error=invalid-legacy-positional-parameter",
+            "--error=deprecated",
             "--exit-zero",
             *extra_search_path_args,
             *map(str, test_files),
