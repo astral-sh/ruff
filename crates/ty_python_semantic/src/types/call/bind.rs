@@ -262,10 +262,8 @@ impl<'db> Bindings<'db> {
         if self.callable_type == before {
             self.callable_type = after;
         }
-        for element in &mut self.elements {
-            for binding in &mut element.bindings {
-                binding.replace_callable_type(before, after);
-            }
+        for binding in self.iter_mut() {
+            binding.replace_callable_type(before, after);
         }
     }
 
@@ -275,12 +273,10 @@ impl<'db> Bindings<'db> {
     ) -> Self {
         self.constructor_instance_type = Some(constructor_instance_type);
 
-        for element in &mut self.elements {
-            for binding in &mut element.bindings {
-                binding.constructor_instance_type = Some(constructor_instance_type);
-                for overload in &mut binding.overloads {
-                    overload.constructor_instance_type = Some(constructor_instance_type);
-                }
+        for binding in self.iter_mut() {
+            binding.constructor_instance_type = Some(constructor_instance_type);
+            for overload in &mut binding.overloads {
+                overload.constructor_instance_type = Some(constructor_instance_type);
             }
         }
 
@@ -295,25 +291,21 @@ impl<'db> Bindings<'db> {
         let Some(generic_context) = generic_context else {
             return self;
         };
-        for element in &mut self.elements {
-            for binding in &mut element.bindings {
-                for overload in &mut binding.overloads {
-                    overload.signature.generic_context = GenericContext::merge_optional(
-                        db,
-                        overload.signature.generic_context,
-                        Some(generic_context),
-                    );
-                }
+        for binding in self.iter_mut() {
+            for overload in &mut binding.overloads {
+                overload.signature.generic_context = GenericContext::merge_optional(
+                    db,
+                    overload.signature.generic_context,
+                    Some(generic_context),
+                );
             }
         }
         self
     }
 
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
-        for element in &mut self.elements {
-            for binding in &mut element.bindings {
-                binding.dunder_call_is_possibly_unbound = true;
-            }
+        for binding in self.iter_mut() {
+            binding.dunder_call_is_possibly_unbound = true;
         }
     }
 
@@ -386,10 +378,8 @@ impl<'db> Bindings<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
         let mut argument_forms = ArgumentForms::new(arguments.len());
-        for element in &mut self.elements {
-            for binding in &mut element.bindings {
-                binding.match_parameters(db, arguments, &mut argument_forms);
-            }
+        for binding in self.iter_mut() {
+            binding.match_parameters(db, arguments, &mut argument_forms);
         }
         argument_forms.shrink_to_fit();
         self.argument_forms = argument_forms;
@@ -522,24 +512,22 @@ impl<'db> Bindings<'db> {
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Specialization<'db>> = None;
-        for element in &self.elements {
-            for binding in &element.bindings {
-                // For constructors, use the first matching overload (declaration order) to avoid
-                // merging incompatible constructor specializations.
-                let Some((_, overload)) = binding.matching_overloads().next() else {
-                    continue;
-                };
-                let Some(specialization) = overload.specialization else {
-                    continue;
-                };
-                let Some(specialization) = specialization.restrict(db, class_context) else {
-                    continue;
-                };
-                combined = Some(match combined {
-                    None => specialization,
-                    Some(previous) => previous.combine(db, specialization),
-                });
-            }
+        for binding in self.iter() {
+            // For constructors, use the first matching overload (declaration order) to avoid
+            // merging incompatible constructor specializations.
+            let Some((_, overload)) = binding.matching_overloads().next() else {
+                continue;
+            };
+            let Some(specialization) = overload.specialization else {
+                continue;
+            };
+            let Some(specialization) = specialization.restrict(db, class_context) else {
+                continue;
+            };
+            combined = Some(match combined {
+                None => specialization,
+                Some(previous) => previous.combine(db, specialization),
+            });
         }
 
         // If constructor inference doesn't yield a specialization, fall back to the default
@@ -704,180 +692,176 @@ impl<'db> Bindings<'db> {
         };
 
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
-        for element in &mut self.elements {
-            for binding in &mut element.bindings {
-                let binding_type = binding.callable_type;
-                for (overload_index, overload) in binding.matching_overloads_mut() {
-                    match binding_type {
-                        Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
-                            function,
-                        )) => {
+        for binding in self.iter_mut() {
+            let binding_type = binding.callable_type;
+            for (overload_index, overload) in binding.matching_overloads_mut() {
+                match binding_type {
+                    Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(
+                        function,
+                    )) => {
+                        if function.is_classmethod(db) {
+                            match overload.parameter_types() {
+                                [_, Some(owner)] => {
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(db, function, *owner),
+                                    ));
+                                }
+                                [Some(instance), None] => {
+                                    overload.set_return_type(Type::BoundMethod(
+                                        BoundMethodType::new(
+                                            db,
+                                            function,
+                                            instance.to_meta_type(db),
+                                        ),
+                                    ));
+                                }
+                                _ => {}
+                            }
+                        } else if function.is_staticmethod(db) {
+                            overload.set_return_type(Type::FunctionLiteral(function));
+                        } else if let [Some(first), _] = overload.parameter_types() {
+                            if first.is_none(db) {
+                                overload.set_return_type(Type::FunctionLiteral(function));
+                            } else {
+                                overload.set_return_type(Type::BoundMethod(BoundMethodType::new(
+                                    db, function, *first,
+                                )));
+                            }
+                        }
+                    }
+
+                    Type::WrapperDescriptor(WrapperDescriptorKind::FunctionTypeDunderGet) => {
+                        if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
+                            overload.parameter_types()
+                        {
                             if function.is_classmethod(db) {
                                 match overload.parameter_types() {
-                                    [_, Some(owner)] => {
+                                    [_, _, Some(owner)] => {
                                         overload.set_return_type(Type::BoundMethod(
-                                            BoundMethodType::new(db, function, *owner),
+                                            BoundMethodType::new(db, *function, *owner),
                                         ));
                                     }
-                                    [Some(instance), None] => {
+
+                                    [_, Some(instance), None] => {
                                         overload.set_return_type(Type::BoundMethod(
                                             BoundMethodType::new(
                                                 db,
-                                                function,
+                                                *function,
                                                 instance.to_meta_type(db),
                                             ),
                                         ));
                                     }
+
                                     _ => {}
                                 }
                             } else if function.is_staticmethod(db) {
-                                overload.set_return_type(Type::FunctionLiteral(function));
-                            } else if let [Some(first), _] = overload.parameter_types() {
-                                if first.is_none(db) {
-                                    overload.set_return_type(Type::FunctionLiteral(function));
-                                } else {
-                                    overload.set_return_type(Type::BoundMethod(
-                                        BoundMethodType::new(db, function, *first),
-                                    ));
+                                overload.set_return_type(*function_ty);
+                            } else {
+                                match overload.parameter_types() {
+                                    [_, Some(instance), _] if instance.is_none(db) => {
+                                        overload.set_return_type(*function_ty);
+                                    }
+                                    [_, Some(instance), _] => {
+                                        overload.set_return_type(Type::BoundMethod(
+                                            BoundMethodType::new(db, *function, *instance),
+                                        ));
+                                    }
+
+                                    _ => {}
                                 }
                             }
                         }
+                    }
 
-                        Type::WrapperDescriptor(WrapperDescriptorKind::FunctionTypeDunderGet) => {
-                            if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
-                                overload.parameter_types()
+                    Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => {
+                        match overload.parameter_types() {
+                            [
+                                Some(property @ Type::PropertyInstance(_)),
+                                Some(instance),
+                                ..,
+                            ] if instance.is_none(db) => {
+                                overload.set_return_type(*property);
+                            }
+                            [
+                                Some(Type::PropertyInstance(property)),
+                                Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                    type_alias,
+                                ))),
+                                ..,
+                            ] if property.getter(db).is_some_and(|getter| {
+                                getter
+                                    .as_function_literal()
+                                    .is_some_and(|f| f.name(db) == "__name__")
+                            }) =>
                             {
-                                if function.is_classmethod(db) {
-                                    match overload.parameter_types() {
-                                        [_, _, Some(owner)] => {
-                                            overload.set_return_type(Type::BoundMethod(
-                                                BoundMethodType::new(db, *function, *owner),
-                                            ));
-                                        }
-
-                                        [_, Some(instance), None] => {
-                                            overload.set_return_type(Type::BoundMethod(
-                                                BoundMethodType::new(
-                                                    db,
-                                                    *function,
-                                                    instance.to_meta_type(db),
-                                                ),
-                                            ));
-                                        }
-
-                                        _ => {}
-                                    }
-                                } else if function.is_staticmethod(db) {
-                                    overload.set_return_type(*function_ty);
-                                } else {
-                                    match overload.parameter_types() {
-                                        [_, Some(instance), _] if instance.is_none(db) => {
-                                            overload.set_return_type(*function_ty);
-                                        }
-                                        [_, Some(instance), _] => {
-                                            overload.set_return_type(Type::BoundMethod(
-                                                BoundMethodType::new(db, *function, *instance),
-                                            ));
-                                        }
-
-                                        _ => {}
-                                    }
-                                }
+                                overload
+                                    .set_return_type(Type::string_literal(db, type_alias.name(db)));
                             }
-                        }
-
-                        Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderGet) => {
-                            match overload.parameter_types() {
-                                [
-                                    Some(property @ Type::PropertyInstance(_)),
-                                    Some(instance),
-                                    ..,
-                                ] if instance.is_none(db) => {
-                                    overload.set_return_type(*property);
-                                }
-                                [
-                                    Some(Type::PropertyInstance(property)),
-                                    Some(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                                        type_alias,
-                                    ))),
-                                    ..,
-                                ] if property.getter(db).is_some_and(|getter| {
-                                    getter
-                                        .as_function_literal()
-                                        .is_some_and(|f| f.name(db) == "__name__")
-                                }) =>
+                            [
+                                Some(Type::PropertyInstance(property)),
+                                Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
+                                ..,
+                            ] => {
+                                match property
+                                    .getter(db)
+                                    .and_then(Type::as_function_literal)
+                                    .map(|f| f.name(db).as_str())
                                 {
-                                    overload.set_return_type(Type::string_literal(
-                                        db,
-                                        type_alias.name(db),
-                                    ));
-                                }
-                                [
-                                    Some(Type::PropertyInstance(property)),
-                                    Some(Type::KnownInstance(KnownInstanceType::TypeVar(typevar))),
-                                    ..,
-                                ] => {
-                                    match property
-                                        .getter(db)
-                                        .and_then(Type::as_function_literal)
-                                        .map(|f| f.name(db).as_str())
-                                    {
-                                        Some("__name__") => {
-                                            overload.set_return_type(Type::string_literal(
-                                                db,
-                                                typevar.name(db),
-                                            ));
-                                        }
-                                        Some("__bound__") => {
-                                            overload.set_return_type(
-                                                typevar
-                                                    .upper_bound(db)
-                                                    .unwrap_or_else(|| Type::none(db)),
-                                            );
-                                        }
-                                        Some("__constraints__") => {
-                                            overload.set_return_type(Type::heterogeneous_tuple(
-                                                db,
-                                                typevar.constraints(db).into_iter().flatten(),
-                                            ));
-                                        }
-                                        Some("__default__") => {
-                                            overload.set_return_type(
-                                                typevar.default_type(db).unwrap_or_else(|| {
-                                                    KnownClass::NoDefaultType.to_instance(db)
-                                                }),
-                                            );
-                                        }
-                                        _ => {}
+                                    Some("__name__") => {
+                                        overload.set_return_type(Type::string_literal(
+                                            db,
+                                            typevar.name(db),
+                                        ));
                                     }
-                                }
-                                [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
-                                    if let Some(getter) = property.getter(db) {
-                                        if let Ok(return_ty) = getter
-                                            .try_call(db, &CallArguments::positional([*instance]))
-                                            .map(|binding| binding.return_type(db))
-                                        {
-                                            overload.set_return_type(return_ty);
-                                        } else {
-                                            overload.errors.push(BindingError::InternalCallError(
-                                                "calling the getter failed",
-                                            ));
-                                            overload.set_return_type(Type::unknown());
-                                        }
-                                    } else {
-                                        overload
-                                            .errors
-                                            .push(BindingError::PropertyHasNoSetter(*property));
-                                        overload.set_return_type(Type::Never);
+                                    Some("__bound__") => {
+                                        overload.set_return_type(
+                                            typevar
+                                                .upper_bound(db)
+                                                .unwrap_or_else(|| Type::none(db)),
+                                        );
                                     }
+                                    Some("__constraints__") => {
+                                        overload.set_return_type(Type::heterogeneous_tuple(
+                                            db,
+                                            typevar.constraints(db).into_iter().flatten(),
+                                        ));
+                                    }
+                                    Some("__default__") => {
+                                        overload.set_return_type(
+                                            typevar.default_type(db).unwrap_or_else(|| {
+                                                KnownClass::NoDefaultType.to_instance(db)
+                                            }),
+                                        );
+                                    }
+                                    _ => {}
                                 }
-                                _ => {}
                             }
+                            [Some(Type::PropertyInstance(property)), Some(instance), ..] => {
+                                if let Some(getter) = property.getter(db) {
+                                    if let Ok(return_ty) = getter
+                                        .try_call(db, &CallArguments::positional([*instance]))
+                                        .map(|binding| binding.return_type(db))
+                                    {
+                                        overload.set_return_type(return_ty);
+                                    } else {
+                                        overload.errors.push(BindingError::InternalCallError(
+                                            "calling the getter failed",
+                                        ));
+                                        overload.set_return_type(Type::unknown());
+                                    }
+                                } else {
+                                    overload
+                                        .errors
+                                        .push(BindingError::PropertyHasNoSetter(*property));
+                                    overload.set_return_type(Type::Never);
+                                }
+                            }
+                            _ => {}
                         }
+                    }
 
-                        Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(
-                            property,
-                        )) => match overload.parameter_types() {
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)) => {
+                        match overload.parameter_types() {
                             [Some(instance), ..] if instance.is_none(db) => {
                                 overload.set_return_type(Type::PropertyInstance(property));
                             }
@@ -902,1045 +886,1000 @@ impl<'db> Bindings<'db> {
                                 }
                             }
                             _ => {}
-                        },
+                        }
+                    }
 
-                        Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => {
+                    Type::WrapperDescriptor(WrapperDescriptorKind::PropertyDunderSet) => {
+                        if let [
+                            Some(Type::PropertyInstance(property)),
+                            Some(instance),
+                            Some(value),
+                            ..,
+                        ] = overload.parameter_types()
+                        {
+                            if let Some(setter) = property.setter(db) {
+                                if let Err(_call_error) = setter
+                                    .try_call(db, &CallArguments::positional([*instance, *value]))
+                                {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the setter failed",
+                                    ));
+                                }
+                            } else {
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoSetter(*property));
+                            }
+                        }
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(property)) => {
+                        if let [Some(instance), Some(value), ..] = overload.parameter_types() {
+                            if let Some(setter) = property.setter(db) {
+                                if let Err(_call_error) = setter
+                                    .try_call(db, &CallArguments::positional([*instance, *value]))
+                                {
+                                    overload.errors.push(BindingError::InternalCallError(
+                                        "calling the setter failed",
+                                    ));
+                                }
+                            } else {
+                                overload
+                                    .errors
+                                    .push(BindingError::PropertyHasNoSetter(property));
+                            }
+                        }
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)) => {
+                        if let [Some(Type::StringLiteral(prefix)), None, None] =
+                            overload.parameter_types()
+                        {
+                            overload.set_return_type(Type::BooleanLiteral(
+                                literal.value(db).starts_with(prefix.value(db)),
+                            ));
+                        }
+                    }
+
+                    Type::DataclassTransformer(params) => {
+                        if let [Some(Type::FunctionLiteral(function))] = overload.parameter_types()
+                        {
+                            overload.set_return_type(Type::FunctionLiteral(
+                                function.with_dataclass_transformer_params(db, params),
+                            ));
+                        }
+                    }
+
+                    Type::DataclassDecorator(params) => match overload.parameter_types() {
+                        [Some(Type::ClassLiteral(class_literal))] => {
+                            if let Some(target) = invalid_dataclass_target(db, class_literal) {
+                                overload
+                                    .errors
+                                    .push(BindingError::InvalidDataclassApplication(target));
+                            } else {
+                                overload.set_return_type(Type::from(
+                                    class_literal.with_dataclass_params(db, Some(params)),
+                                ));
+                            }
+                        }
+                        [Some(Type::GenericAlias(generic_alias))] => {
+                            let new_origin = generic_alias
+                                .origin(db)
+                                .with_dataclass_params(db, Some(params));
+                            overload.set_return_type(Type::GenericAlias(GenericAlias::new(
+                                db,
+                                new_origin,
+                                generic_alias.specialization(db),
+                            )));
+                        }
+                        _ => {}
+                    },
+
+                    Type::BoundMethod(bound_method)
+                        if bound_method.self_instance(db).is_property_instance() =>
+                    {
+                        match bound_method.function(db).name(db).as_str() {
+                            "setter" => {
+                                if let [Some(_), Some(setter)] = overload.parameter_types() {
+                                    let mut ty_property = bound_method.self_instance(db);
+                                    if let Type::PropertyInstance(property) = ty_property {
+                                        ty_property =
+                                            Type::PropertyInstance(PropertyInstanceType::new(
+                                                db,
+                                                property.getter(db),
+                                                Some(*setter),
+                                            ));
+                                    }
+                                    overload.set_return_type(ty_property);
+                                }
+                            }
+                            "getter" => {
+                                if let [Some(_), Some(getter)] = overload.parameter_types() {
+                                    let mut ty_property = bound_method.self_instance(db);
+                                    if let Type::PropertyInstance(property) = ty_property {
+                                        ty_property =
+                                            Type::PropertyInstance(PropertyInstanceType::new(
+                                                db,
+                                                Some(*getter),
+                                                property.setter(db),
+                                            ));
+                                    }
+                                    overload.set_return_type(ty_property);
+                                }
+                            }
+                            "deleter" => {
+                                // TODO: we do not store deleters yet
+                                let ty_property = bound_method.self_instance(db);
+                                overload.set_return_type(ty_property);
+                            }
+                            _ => {
+                                // Fall back to typeshed stubs for all other methods
+                            }
+                        }
+                    }
+
+                    // TODO: This branch can be removed once https://github.com/astral-sh/ty/issues/501 is resolved
+                    Type::BoundMethod(bound_method)
+                        if bound_method.function(db).name(db) == "__iter__"
+                            && is_enum_class(db, bound_method.self_instance(db)) =>
+                    {
+                        if let Some(enum_instance) = bound_method.self_instance(db).to_instance(db)
+                        {
+                            overload.set_return_type(
+                                KnownClass::Iterator.to_specialized_instance(db, &[enum_instance]),
+                            );
+                        }
+                    }
+
+                    function @ Type::FunctionLiteral(function_type)
+                        if dataclass_field_specifiers.contains(&function)
+                            || function_type.is_known(db, KnownFunction::Field) =>
+                    {
+                        // Helper to get the type of a keyword argument by name. We first try to get it from
+                        // the parameter binding (for explicit parameters), and then fall back to checking the
+                        // call site arguments (for field-specifier functions that use a `**kwargs` parameter,
+                        // instead of specifying `init`, `default` etc. explicitly).
+                        let get_argument_type = |name, fallback_to_default| -> Option<Type<'db>> {
+                            if let Ok(ty) =
+                                overload.parameter_type_by_name(name, fallback_to_default)
+                            {
+                                return ty;
+                            }
+                            argument_types.iter().find_map(|(arg, ty)| {
+                                if matches!(arg, Argument::Keyword(arg_name) if arg_name == name) {
+                                    ty
+                                } else {
+                                    None
+                                }
+                            })
+                        };
+
+                        let has_default_value = get_argument_type("default", false).is_some()
+                            || get_argument_type("default_factory", false).is_some()
+                            || get_argument_type("factory", false).is_some();
+
+                        let init = get_argument_type("init", true);
+                        let kw_only = get_argument_type("kw_only", true);
+                        let alias = get_argument_type("alias", true);
+
+                        // `dataclasses.field` and field-specifier functions of commonly used
+                        // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
+                        // the default type for the field (or `Any`) instead of an actual `Field`
+                        // instance, even if this is not what happens at runtime (see also below).
+                        // We still make use of this fact and pretend that all field specifiers
+                        // return the type of the default value:
+                        let default_ty = if has_default_value {
+                            Some(overload.return_ty)
+                        } else {
+                            None
+                        };
+
+                        let init = init
+                            .map(|init| !init.bool(db).is_always_false())
+                            .unwrap_or(true);
+
+                        let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
+                        {
+                            match kw_only {
+                                // We are more conservative here when turning the type for `kw_only`
+                                // into a bool, because a field specifier in a stub might use
+                                // `kw_only: bool = ...` and the truthiness of `...` is always true.
+                                // This is different from `init` above because may need to fall back
+                                // to `kw_only_default`, whereas `init_default` does not exist.
+                                Some(Type::BooleanLiteral(yes)) => Some(yes),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        };
+
+                        let alias = alias
+                            .and_then(Type::as_string_literal)
+                            .map(|literal| Box::from(literal.value(db)));
+
+                        // `typeshed` pretends that `dataclasses.field()` returns the type of the
+                        // default value directly. At runtime, however, this function returns an
+                        // instance of `dataclasses.Field`. We also model it this way and return
+                        // a known-instance type with information about the field. The drawback
+                        // of this approach is that we need to pretend that instances of `Field`
+                        // are assignable to `T` if the default type of the field is assignable
+                        // to `T`. Otherwise, we would error on `name: str = field(default="")`.
+                        overload.set_return_type(Type::KnownInstance(KnownInstanceType::Field(
+                            FieldInstance::new(db, default_ty, init, kw_only, alias),
+                        )));
+                    }
+
+                    Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                        Some(KnownFunction::IsEquivalentTo) => {
+                            if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let constraints =
+                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
+                                let tracked = InternedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
+                                ));
+                            }
+                        }
+
+                        Some(KnownFunction::IsSubtypeOf) => {
+                            if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let constraints =
+                                    ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::None);
+                                let tracked = InternedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
+                                ));
+                            }
+                        }
+
+                        Some(KnownFunction::IsAssignableTo) => {
+                            if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let constraints =
+                                    ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::None);
+                                let tracked = InternedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
+                                ));
+                            }
+                        }
+
+                        Some(KnownFunction::IsDisjointFrom) => {
+                            if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
+                                let constraints =
+                                    ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::None);
+                                let tracked = InternedConstraintSet::new(db, constraints);
+                                overload.set_return_type(Type::KnownInstance(
+                                    KnownInstanceType::ConstraintSet(tracked),
+                                ));
+                            }
+                        }
+
+                        Some(KnownFunction::IsSingleton) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
+                            }
+                        }
+
+                        Some(KnownFunction::IsSingleValued) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload
+                                    .set_return_type(Type::BooleanLiteral(ty.is_single_valued(db)));
+                            }
+                        }
+
+                        Some(KnownFunction::GenericContext) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                let wrap_generic_context = |generic_context| {
+                                    Type::KnownInstance(KnownInstanceType::GenericContext(
+                                        generic_context,
+                                    ))
+                                };
+
+                                let signature_generic_context =
+                                    |signature: &CallableSignature<'db>| {
+                                        UnionType::try_from_elements(
+                                            db,
+                                            signature.overloads.iter().map(|signature| {
+                                                signature.generic_context.map(wrap_generic_context)
+                                            }),
+                                        )
+                                    };
+
+                                let generic_context_for_simple_type = |ty: Type<'db>| match ty {
+                                    Type::ClassLiteral(class) => {
+                                        class.generic_context(db).map(wrap_generic_context)
+                                    }
+
+                                    Type::FunctionLiteral(function) => {
+                                        signature_generic_context(function.signature(db))
+                                    }
+
+                                    Type::BoundMethod(bound_method) => signature_generic_context(
+                                        bound_method.function(db).signature(db),
+                                    ),
+
+                                    Type::Callable(callable) => {
+                                        signature_generic_context(callable.signatures(db))
+                                    }
+
+                                    Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                        TypeAliasType::PEP695(alias),
+                                    )) => alias.generic_context(db).map(wrap_generic_context),
+
+                                    _ => None,
+                                };
+
+                                let generic_context = match ty {
+                                    Type::Union(union_type) => UnionType::try_from_elements(
+                                        db,
+                                        union_type
+                                            .elements(db)
+                                            .iter()
+                                            .map(|ty| generic_context_for_simple_type(*ty)),
+                                    ),
+                                    _ => generic_context_for_simple_type(*ty),
+                                };
+
+                                overload.set_return_type(
+                                    generic_context.unwrap_or_else(|| Type::none(db)),
+                                );
+                            }
+                        }
+
+                        Some(KnownFunction::IntoCallable) => {
+                            let [Some(ty)] = overload.parameter_types() else {
+                                continue;
+                            };
+                            let Some(callables) = ty.try_upcast_to_callable(db) else {
+                                continue;
+                            };
+                            overload.set_return_type(callables.into_type(db));
+                        }
+
+                        Some(KnownFunction::DunderAllNames) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(match ty {
+                                    Type::ModuleLiteral(module_literal) => {
+                                        let all_names = module_literal
+                                            .module(db)
+                                            .file(db)
+                                            .map(|file| dunder_all_names(db, file))
+                                            .unwrap_or_default();
+                                        match all_names {
+                                            Some(names) => {
+                                                let mut names = names.iter().collect::<Vec<_>>();
+                                                names.sort();
+                                                Type::heterogeneous_tuple(
+                                                    db,
+                                                    names.iter().map(|name| {
+                                                        Type::string_literal(db, name.as_str())
+                                                    }),
+                                                )
+                                            }
+                                            None => Type::none(db),
+                                        }
+                                    }
+                                    _ => Type::none(db),
+                                });
+                            }
+                        }
+
+                        Some(KnownFunction::EnumMembers) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                let return_ty = match ty {
+                                    Type::ClassLiteral(class) => {
+                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
+                                            Type::heterogeneous_tuple(
+                                                db,
+                                                metadata
+                                                    .members
+                                                    .keys()
+                                                    .map(|member| Type::string_literal(db, member)),
+                                            )
+                                        } else {
+                                            Type::unknown()
+                                        }
+                                    }
+                                    _ => Type::unknown(),
+                                };
+
+                                overload.set_return_type(return_ty);
+                            }
+                        }
+
+                        Some(KnownFunction::AllMembers) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                overload.set_return_type(Type::heterogeneous_tuple(
+                                    db,
+                                    list_members::all_members(db, *ty)
+                                        .into_iter()
+                                        .sorted()
+                                        .map(|member| Type::string_literal(db, &member.name)),
+                                ));
+                            }
+                        }
+
+                        Some(KnownFunction::Len) => {
+                            if let [Some(first_arg)] = overload.parameter_types() {
+                                if let Some(len_ty) = first_arg.len(db) {
+                                    overload.set_return_type(len_ty);
+                                }
+                            }
+                        }
+
+                        Some(KnownFunction::Repr) => {
+                            if let [Some(first_arg)] = overload.parameter_types() {
+                                overload.set_return_type(first_arg.repr(db));
+                            }
+                        }
+
+                        Some(KnownFunction::Cast) => {
+                            if let [Some(casted_ty), Some(_)] = overload.parameter_types() {
+                                overload.set_return_type(*casted_ty);
+                            }
+                        }
+
+                        // TODO: Remove this special handling once we have full support for
+                        // generic protocols in the solver.
+                        Some(KnownFunction::AsyncContextManager) => {
+                            if let [Some(callable)] = overload.parameter_types() {
+                                if let Some(return_ty) =
+                                    asynccontextmanager_return_type(db, *callable)
+                                {
+                                    overload.set_return_type(return_ty);
+                                }
+                            }
+                        }
+
+                        Some(KnownFunction::IsProtocol) => {
+                            if let [Some(ty)] = overload.parameter_types() {
+                                // We evaluate this to `Literal[True]` only if the runtime function `typing.is_protocol`
+                                // would return `True` for the given type. Internally we consider `SupportsAbs[int]` to
+                                // be a "(specialised) protocol class", but `typing.is_protocol(SupportsAbs[int])` returns
+                                // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
+                                overload.set_return_type(Type::BooleanLiteral(
+                                    ty.as_class_literal()
+                                        .is_some_and(|class| class.is_protocol(db)),
+                                ));
+                            }
+                        }
+
+                        Some(KnownFunction::GetProtocolMembers) => {
+                            // Similarly to `is_protocol`, we only evaluate to this a frozenset of literal strings if a
+                            // class-literal is passed in, not if a generic alias is passed in, to emulate the behaviour
+                            // of `typing.get_protocol_members` at runtime.
+                            if let [Some(Type::ClassLiteral(class))] = overload.parameter_types() {
+                                if let Some(protocol_class) = class.into_protocol_class(db) {
+                                    let member_names = protocol_class
+                                        .interface(db)
+                                        .members(db)
+                                        .map(|member| Type::string_literal(db, member.name()));
+                                    let specialization = UnionType::from_elements(db, member_names);
+                                    overload.set_return_type(
+                                        KnownClass::FrozenSet
+                                            .to_specialized_instance(db, &[specialization]),
+                                    );
+                                }
+                            }
+                        }
+
+                        Some(KnownFunction::GetattrStatic) => {
+                            let [Some(instance_ty), Some(attr_name), default] =
+                                overload.parameter_types()
+                            else {
+                                continue;
+                            };
+
+                            let Some(attr_name) = attr_name.as_string_literal() else {
+                                continue;
+                            };
+
+                            let default = if let Some(default) = default {
+                                *default
+                            } else {
+                                Type::Never
+                            };
+
+                            let union_with_default =
+                                |ty| UnionType::from_elements(db, [ty, default]);
+
+                            // TODO: we could emit a diagnostic here (if default is not set)
+                            overload.set_return_type(
+                                match instance_ty.static_member(db, attr_name.value(db)) {
+                                    Place::Defined(DefinedPlace {
+                                        ty,
+                                        definedness: Definedness::AlwaysDefined,
+                                        ..
+                                    }) => {
+                                        if ty.is_dynamic() {
+                                            // Here, we attempt to model the fact that an attribute lookup on
+                                            // a dynamic type could fail
+
+                                            union_with_default(ty)
+                                        } else {
+                                            ty
+                                        }
+                                    }
+                                    Place::Defined(DefinedPlace {
+                                        ty,
+                                        definedness: Definedness::PossiblyUndefined,
+                                        ..
+                                    }) => union_with_default(ty),
+                                    Place::Undefined => default,
+                                },
+                            );
+                        }
+
+                        Some(KnownFunction::Dataclass) => {
                             if let [
-                                Some(Type::PropertyInstance(property)),
-                                Some(instance),
-                                Some(value),
-                                ..,
+                                init,
+                                repr,
+                                eq,
+                                order,
+                                unsafe_hash,
+                                frozen,
+                                match_args,
+                                kw_only,
+                                slots,
+                                weakref_slot,
                             ] = overload.parameter_types()
                             {
-                                if let Some(setter) = property.setter(db) {
-                                    if let Err(_call_error) = setter.try_call(
-                                        db,
-                                        &CallArguments::positional([*instance, *value]),
-                                    ) {
-                                        overload.errors.push(BindingError::InternalCallError(
-                                            "calling the setter failed",
-                                        ));
-                                    }
-                                } else {
-                                    overload
-                                        .errors
-                                        .push(BindingError::PropertyHasNoSetter(*property));
-                                }
-                            }
-                        }
+                                let mut flags = DataclassFlags::empty();
 
-                        Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderSet(
-                            property,
-                        )) => {
-                            if let [Some(instance), Some(value), ..] = overload.parameter_types() {
-                                if let Some(setter) = property.setter(db) {
-                                    if let Err(_call_error) = setter.try_call(
-                                        db,
-                                        &CallArguments::positional([*instance, *value]),
-                                    ) {
-                                        overload.errors.push(BindingError::InternalCallError(
-                                            "calling the setter failed",
-                                        ));
-                                    }
-                                } else {
-                                    overload
-                                        .errors
-                                        .push(BindingError::PropertyHasNoSetter(property));
+                                if to_bool(init, true) {
+                                    flags |= DataclassFlags::INIT;
                                 }
-                            }
-                        }
+                                if to_bool(repr, true) {
+                                    flags |= DataclassFlags::REPR;
+                                }
+                                if to_bool(eq, true) {
+                                    flags |= DataclassFlags::EQ;
+                                }
+                                if to_bool(order, false) {
+                                    flags |= DataclassFlags::ORDER;
+                                }
+                                if to_bool(unsafe_hash, false) {
+                                    flags |= DataclassFlags::UNSAFE_HASH;
+                                }
+                                if to_bool(frozen, false) {
+                                    flags |= DataclassFlags::FROZEN;
+                                }
+                                if to_bool(match_args, true) {
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::MATCH_ARGS;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
+                                }
+                                if to_bool(kw_only, false) {
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::KW_ONLY;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
+                                }
+                                if to_bool(slots, false) {
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::SLOTS;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
+                                }
+                                if to_bool(weakref_slot, false) {
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                                        flags |= DataclassFlags::WEAKREF_SLOT;
+                                    } else {
+                                        // TODO: emit diagnostic
+                                    }
+                                }
 
-                        Type::KnownBoundMethod(KnownBoundMethodType::StrStartswith(literal)) => {
-                            if let [Some(Type::StringLiteral(prefix)), None, None] =
+                                let params = DataclassParams::from_flags(db, flags);
+
+                                overload.set_return_type(Type::DataclassDecorator(params));
+                            }
+
+                            // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`)
+                            if let [Some(Type::ClassLiteral(class_literal)), ..] =
                                 overload.parameter_types()
                             {
-                                overload.set_return_type(Type::BooleanLiteral(
-                                    literal.value(db).starts_with(prefix.value(db)),
-                                ));
-                            }
-                        }
-
-                        Type::DataclassTransformer(params) => {
-                            if let [Some(Type::FunctionLiteral(function))] =
-                                overload.parameter_types()
-                            {
-                                overload.set_return_type(Type::FunctionLiteral(
-                                    function.with_dataclass_transformer_params(db, params),
-                                ));
-                            }
-                        }
-
-                        Type::DataclassDecorator(params) => match overload.parameter_types() {
-                            [Some(Type::ClassLiteral(class_literal))] => {
                                 if let Some(target) = invalid_dataclass_target(db, class_literal) {
                                     overload
                                         .errors
                                         .push(BindingError::InvalidDataclassApplication(target));
                                 } else {
+                                    let params = DataclassParams::default_params(db);
                                     overload.set_return_type(Type::from(
                                         class_literal.with_dataclass_params(db, Some(params)),
                                     ));
                                 }
                             }
-                            [Some(Type::GenericAlias(generic_alias))] => {
-                                let new_origin = generic_alias
-                                    .origin(db)
-                                    .with_dataclass_params(db, Some(params));
-                                overload.set_return_type(Type::GenericAlias(GenericAlias::new(
-                                    db,
-                                    new_origin,
-                                    generic_alias.specialization(db),
-                                )));
+                        }
+
+                        Some(KnownFunction::DataclassTransform) => {
+                            // Use named parameter lookup to handle custom
+                            // `__dataclass_transform__` functions that follow older versions
+                            // of the spec.
+                            let mut flags = DataclassTransformerFlags::empty();
+
+                            let eq_default = overload
+                                .parameter_type_by_name("eq_default", false)
+                                .ok()
+                                .flatten();
+                            let order_default = overload
+                                .parameter_type_by_name("order_default", false)
+                                .ok()
+                                .flatten();
+                            let kw_only_default = overload
+                                .parameter_type_by_name("kw_only_default", false)
+                                .ok()
+                                .flatten();
+                            let frozen_default = overload
+                                .parameter_type_by_name("frozen_default", false)
+                                .ok()
+                                .flatten();
+
+                            if to_bool(&eq_default, true) {
+                                flags |= DataclassTransformerFlags::EQ_DEFAULT;
                             }
+                            if to_bool(&order_default, false) {
+                                flags |= DataclassTransformerFlags::ORDER_DEFAULT;
+                            }
+                            if to_bool(&kw_only_default, false) {
+                                flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
+                            }
+                            if to_bool(&frozen_default, false) {
+                                flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
+                            }
+
+                            // Accept both `field_specifiers` (current name) and
+                            // `field_descriptors` (legacy name).
+                            let field_specifiers_param = overload
+                                .parameter_type_by_name("field_specifiers", false)
+                                .ok()
+                                .flatten()
+                                .or_else(|| {
+                                    overload
+                                        .parameter_type_by_name("field_descriptors", false)
+                                        .ok()
+                                        .flatten()
+                                });
+
+                            let field_specifiers: Box<[Type<'db>]> = field_specifiers_param
+                                .map(|tuple_type| {
+                                    tuple_type
+                                        .exact_tuple_instance_spec(db)
+                                        .iter()
+                                        .flat_map(|tuple_spec| tuple_spec.fixed_elements())
+                                        .copied()
+                                        .collect::<Vec<_>>()
+                                        .into_boxed_slice()
+                                })
+                                .unwrap_or_default();
+
+                            let params =
+                                DataclassTransformerParams::new(db, flags, field_specifiers);
+
+                            overload.set_return_type(Type::DataclassTransformer(params));
+                        }
+
+                        Some(KnownFunction::Unpack) => {
+                            let [Some(format), Some(_buffer)] = overload.parameter_types() else {
+                                continue;
+                            };
+
+                            let Some(format_literal) = format.as_string_literal() else {
+                                continue;
+                            };
+
+                            let return_type = parse_struct_format(db, format_literal.value(db))
+                                .map(|elements| Type::heterogeneous_tuple(db, elements.into_iter()))
+                                .unwrap_or_else(|| Type::homogeneous_tuple(db, Type::unknown()));
+
+                            overload.set_return_type(return_type);
+                        }
+
+                        Some(KnownFunction::NamedTuple) => {
+                            overload
+                                .set_return_type(todo_type!("Support for functional `namedtuple`"));
+                        }
+
+                        _ => {
+                            // Ideally, either the implementation, or exactly one of the overloads
+                            // of the function can have the dataclass_transform decorator applied.
+                            // However, we do not yet enforce this, and in the case of multiple
+                            // applications of the decorator, we will only consider the last one.
+                            let transformer_params = function_type
+                                .iter_overloads_and_implementation(db)
+                                .rev()
+                                .find_map(|function_overload| {
+                                    function_overload.dataclass_transformer_params(db)
+                                });
+
+                            if let Some(params) = transformer_params {
+                                // If this function was called with a keyword argument like
+                                // `order=False`, we extract the argument type and overwrite
+                                // the corresponding flag in `dataclass_params`.
+                                let dataclass_params =
+                                    DataclassParams::from_transformer_params(db, params);
+                                let mut flags = dataclass_params.flags(db);
+
+                                for (param, flag) in DATACLASS_FLAGS {
+                                    if let Ok(Some(Type::BooleanLiteral(value))) =
+                                        overload.parameter_type_by_name(param, false)
+                                    {
+                                        flags.set(*flag, value);
+                                    }
+                                }
+
+                                let dataclass_params = DataclassParams::new(
+                                    db,
+                                    flags,
+                                    dataclass_params.field_specifiers(db),
+                                );
+
+                                // The dataclass_transform spec doesn't clarify how to tell whether
+                                // a decorated function is a decorator or a decorator factory. We
+                                // use heuristics based on the number and type of positional arguments:
+                                //
+                                // - Zero positional arguments: assume it's a decorator factory.
+                                // - More than one positional argument: assume it's a decorator factory.
+                                // - Exactly one positional argument that's a class: ambiguous, so check
+                                //   the return type to disambiguate (class-like means decorate directly).
+                                let mut positional_args = overload
+                                    .signature
+                                    .parameters()
+                                    .iter()
+                                    .zip(overload.parameter_types())
+                                    .filter(|(param, ty)| ty.is_some() && !param.is_keyword_only())
+                                    .map(|(_, ty)| ty);
+
+                                let first_positional = positional_args.next();
+                                let has_more = positional_args.next().is_some();
+
+                                // Only attempt direct decoration if exactly one positional argument.
+                                if !has_more {
+                                    // Helper to check if return type is class-like.
+                                    let returns_class = || {
+                                        matches!(
+                                            overload.return_type(),
+                                            Type::ClassLiteral(_)
+                                                | Type::GenericAlias(_)
+                                                | Type::SubclassOf(_)
+                                        )
+                                    };
+
+                                    match first_positional {
+                                        Some(Some(Type::ClassLiteral(class_literal)))
+                                            if returns_class() =>
+                                        {
+                                            overload.set_return_type(Type::from(
+                                                class_literal.with_dataclass_params(
+                                                    db,
+                                                    Some(dataclass_params),
+                                                ),
+                                            ));
+                                            continue;
+                                        }
+                                        Some(Some(Type::GenericAlias(generic_alias)))
+                                            if returns_class() =>
+                                        {
+                                            let new_origin = generic_alias
+                                                .origin(db)
+                                                .with_dataclass_params(db, Some(dataclass_params));
+                                            overload.set_return_type(Type::GenericAlias(
+                                                GenericAlias::new(
+                                                    db,
+                                                    new_origin,
+                                                    generic_alias.specialization(db),
+                                                ),
+                                            ));
+                                            continue;
+                                        }
+                                        _ => {}
+                                    }
+                                }
+
+                                // Zero or more than one positional argument, or the argument is
+                                // not a class: assume it's a decorator factory.
+                                overload
+                                    .set_return_type(Type::DataclassDecorator(dataclass_params));
+                            }
+                        }
+                    },
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
+                        let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] =
+                            overload.parameter_types()
+                        else {
+                            return;
+                        };
+                        let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
+                        let tracked = InternedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetAlways) => {
+                        if !overload.parameter_types().is_empty() {
+                            return;
+                        }
+                        let constraints = ConstraintSet::from(true);
+                        let tracked = InternedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
+                        if !overload.parameter_types().is_empty() {
+                            return;
+                        }
+                        let constraints = ConstraintSet::from(false);
+                        let tracked = InternedConstraintSet::new(db, constraints);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
+                    ) => {
+                        let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
+                            continue;
+                        };
+
+                        let result = ty_a.when_subtype_of_assuming(
+                            db,
+                            *ty_b,
+                            tracked.constraints(db),
+                            InferableTypeVars::None,
+                        );
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfies(
+                        tracked,
+                    )) => {
+                        let [Some(other)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(other)) = other
+                        else {
+                            continue;
+                        };
+
+                        let result = tracked
+                            .constraints(db)
+                            .implies(db, || other.constraints(db));
+                        let tracked = InternedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
+                    ) => {
+                        let extract_inferable = |instance: &NominalInstanceType<'db>| {
+                            if instance.has_known_class(db, KnownClass::NoneType) {
+                                // Caller explicitly passed None, so no typevars are inferable.
+                                return Some(FxHashSet::default());
+                            }
+                            instance
+                                .tuple_spec(db)?
+                                .fixed_elements()
+                                .map(|ty| {
+                                    ty.as_typevar()
+                                        .map(|bound_typevar| bound_typevar.identity(db))
+                                })
+                                .collect()
+                        };
+
+                        let inferable = match overload.parameter_types() {
+                            // Caller did not provide argument, so no typevars are inferable.
+                            [None] => FxHashSet::default(),
+                            [Some(Type::NominalInstance(instance))] => {
+                                match extract_inferable(instance) {
+                                    Some(inferable) => inferable,
+                                    None => continue,
+                                }
+                            }
+                            _ => continue,
+                        };
+
+                        let result = tracked
+                            .constraints(db)
+                            .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
+                        overload.set_return_type(Type::BooleanLiteral(result));
+                    }
+
+                    Type::KnownBoundMethod(
+                        KnownBoundMethodType::GenericContextSpecializeConstrained(generic_context),
+                    ) => {
+                        let [Some(constraints)] = overload.parameter_types() else {
+                            continue;
+                        };
+                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)) =
+                            constraints
+                        else {
+                            continue;
+                        };
+                        let specialization =
+                            generic_context.specialize_constrained(db, constraints.constraints(db));
+                        let result = match specialization {
+                            Ok(specialization) => Type::KnownInstance(
+                                KnownInstanceType::Specialization(specialization),
+                            ),
+                            Err(()) => Type::none(db),
+                        };
+                        overload.set_return_type(result);
+                    }
+
+                    Type::ClassLiteral(class) => match class.known(db) {
+                        Some(KnownClass::Bool) => match overload.parameter_types() {
+                            [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
+                            [None] => overload.set_return_type(Type::BooleanLiteral(false)),
                             _ => {}
                         },
 
-                        Type::BoundMethod(bound_method)
-                            if bound_method.self_instance(db).is_property_instance() =>
-                        {
-                            match bound_method.function(db).name(db).as_str() {
-                                "setter" => {
-                                    if let [Some(_), Some(setter)] = overload.parameter_types() {
-                                        let mut ty_property = bound_method.self_instance(db);
-                                        if let Type::PropertyInstance(property) = ty_property {
-                                            ty_property =
-                                                Type::PropertyInstance(PropertyInstanceType::new(
-                                                    db,
-                                                    property.getter(db),
-                                                    Some(*setter),
-                                                ));
-                                        }
-                                        overload.set_return_type(ty_property);
-                                    }
+                        Some(KnownClass::Str) if overload_index == 0 => {
+                            match overload.parameter_types() {
+                                [Some(arg)] => overload.set_return_type(arg.str(db)),
+                                [None] => {
+                                    overload.set_return_type(Type::string_literal(db, ""));
                                 }
-                                "getter" => {
-                                    if let [Some(_), Some(getter)] = overload.parameter_types() {
-                                        let mut ty_property = bound_method.self_instance(db);
-                                        if let Type::PropertyInstance(property) = ty_property {
-                                            ty_property =
-                                                Type::PropertyInstance(PropertyInstanceType::new(
-                                                    db,
-                                                    Some(*getter),
-                                                    property.setter(db),
-                                                ));
-                                        }
-                                        overload.set_return_type(ty_property);
-                                    }
-                                }
-                                "deleter" => {
-                                    // TODO: we do not store deleters yet
-                                    let ty_property = bound_method.self_instance(db);
-                                    overload.set_return_type(ty_property);
-                                }
-                                _ => {
-                                    // Fall back to typeshed stubs for all other methods
-                                }
+                                _ => {}
                             }
                         }
 
-                        // TODO: This branch can be removed once https://github.com/astral-sh/ty/issues/501 is resolved
-                        Type::BoundMethod(bound_method)
-                            if bound_method.function(db).name(db) == "__iter__"
-                                && is_enum_class(db, bound_method.self_instance(db)) =>
-                        {
-                            if let Some(enum_instance) =
-                                bound_method.self_instance(db).to_instance(db)
-                            {
-                                overload.set_return_type(
-                                    KnownClass::Iterator
-                                        .to_specialized_instance(db, &[enum_instance]),
-                                );
+                        Some(KnownClass::Type) if overload_index == 0 => {
+                            if let [Some(arg)] = overload.parameter_types() {
+                                overload.set_return_type(arg.dunder_class(db));
                             }
                         }
 
-                        function @ Type::FunctionLiteral(function_type)
-                            if dataclass_field_specifiers.contains(&function)
-                                || function_type.is_known(db, KnownFunction::Field) =>
-                        {
-                            // Helper to get the type of a keyword argument by name. We first try to get it from
-                            // the parameter binding (for explicit parameters), and then fall back to checking the
-                            // call site arguments (for field-specifier functions that use a `**kwargs` parameter,
-                            // instead of specifying `init`, `default` etc. explicitly).
-                            let get_argument_type =
-                                |name, fallback_to_default| -> Option<Type<'db>> {
-                                    if let Ok(ty) =
-                                        overload.parameter_type_by_name(name, fallback_to_default)
-                                    {
-                                        return ty;
-                                    }
-                                    argument_types.iter().find_map(|(arg, ty)| {
-                                    if matches!(arg, Argument::Keyword(arg_name) if arg_name == name) {
-                                        ty
-                                    } else {
-                                        None
-                                    }
-                                })
-                                };
-
-                            let has_default_value = get_argument_type("default", false).is_some()
-                                || get_argument_type("default_factory", false).is_some()
-                                || get_argument_type("factory", false).is_some();
-
-                            let init = get_argument_type("init", true);
-                            let kw_only = get_argument_type("kw_only", true);
-                            let alias = get_argument_type("alias", true);
-
-                            // `dataclasses.field` and field-specifier functions of commonly used
-                            // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
-                            // the default type for the field (or `Any`) instead of an actual `Field`
-                            // instance, even if this is not what happens at runtime (see also below).
-                            // We still make use of this fact and pretend that all field specifiers
-                            // return the type of the default value:
-                            let default_ty = if has_default_value {
-                                Some(overload.return_ty)
-                            } else {
-                                None
-                            };
-
-                            let init = init
-                                .map(|init| !init.bool(db).is_always_false())
-                                .unwrap_or(true);
-
-                            let kw_only =
-                                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
-                                    match kw_only {
-                                        // We are more conservative here when turning the type for `kw_only`
-                                        // into a bool, because a field specifier in a stub might use
-                                        // `kw_only: bool = ...` and the truthiness of `...` is always true.
-                                        // This is different from `init` above because may need to fall back
-                                        // to `kw_only_default`, whereas `init_default` does not exist.
-                                        Some(Type::BooleanLiteral(yes)) => Some(yes),
-                                        _ => None,
-                                    }
-                                } else {
-                                    None
-                                };
-
-                            let alias = alias
-                                .and_then(Type::as_string_literal)
-                                .map(|literal| Box::from(literal.value(db)));
-
-                            // `typeshed` pretends that `dataclasses.field()` returns the type of the
-                            // default value directly. At runtime, however, this function returns an
-                            // instance of `dataclasses.Field`. We also model it this way and return
-                            // a known-instance type with information about the field. The drawback
-                            // of this approach is that we need to pretend that instances of `Field`
-                            // are assignable to `T` if the default type of the field is assignable
-                            // to `T`. Otherwise, we would error on `name: str = field(default="")`.
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::Field(FieldInstance::new(
-                                    db, default_ty, init, kw_only, alias,
-                                )),
-                            ));
-                        }
-
-                        Type::FunctionLiteral(function_type) => match function_type.known(db) {
-                            Some(KnownFunction::IsEquivalentTo) => {
-                                if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                    let constraints =
-                                        ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
-                                    let tracked = InternedConstraintSet::new(db, constraints);
-                                    overload.set_return_type(Type::KnownInstance(
-                                        KnownInstanceType::ConstraintSet(tracked),
-                                    ));
-                                }
-                            }
-
-                            Some(KnownFunction::IsSubtypeOf) => {
-                                if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                    let constraints =
-                                        ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::None);
-                                    let tracked = InternedConstraintSet::new(db, constraints);
-                                    overload.set_return_type(Type::KnownInstance(
-                                        KnownInstanceType::ConstraintSet(tracked),
-                                    ));
-                                }
-                            }
-
-                            Some(KnownFunction::IsAssignableTo) => {
-                                if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                    let constraints =
-                                        ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::None);
-                                    let tracked = InternedConstraintSet::new(db, constraints);
-                                    overload.set_return_type(Type::KnownInstance(
-                                        KnownInstanceType::ConstraintSet(tracked),
-                                    ));
-                                }
-                            }
-
-                            Some(KnownFunction::IsDisjointFrom) => {
-                                if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                    let constraints =
-                                        ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::None);
-                                    let tracked = InternedConstraintSet::new(db, constraints);
-                                    overload.set_return_type(Type::KnownInstance(
-                                        KnownInstanceType::ConstraintSet(tracked),
-                                    ));
-                                }
-                            }
-
-                            Some(KnownFunction::IsSingleton) => {
-                                if let [Some(ty)] = overload.parameter_types() {
-                                    overload
-                                        .set_return_type(Type::BooleanLiteral(ty.is_singleton(db)));
-                                }
-                            }
-
-                            Some(KnownFunction::IsSingleValued) => {
-                                if let [Some(ty)] = overload.parameter_types() {
-                                    overload.set_return_type(Type::BooleanLiteral(
-                                        ty.is_single_valued(db),
-                                    ));
-                                }
-                            }
-
-                            Some(KnownFunction::GenericContext) => {
-                                if let [Some(ty)] = overload.parameter_types() {
-                                    let wrap_generic_context = |generic_context| {
-                                        Type::KnownInstance(KnownInstanceType::GenericContext(
-                                            generic_context,
-                                        ))
-                                    };
-
-                                    let signature_generic_context =
-                                        |signature: &CallableSignature<'db>| {
-                                            UnionType::try_from_elements(
-                                                db,
-                                                signature.overloads.iter().map(|signature| {
-                                                    signature
-                                                        .generic_context
-                                                        .map(wrap_generic_context)
-                                                }),
-                                            )
-                                        };
-
-                                    let generic_context_for_simple_type = |ty: Type<'db>| match ty {
-                                        Type::ClassLiteral(class) => {
-                                            class.generic_context(db).map(wrap_generic_context)
-                                        }
-
-                                        Type::FunctionLiteral(function) => {
-                                            signature_generic_context(function.signature(db))
-                                        }
-
-                                        Type::BoundMethod(bound_method) => {
-                                            signature_generic_context(
-                                                bound_method.function(db).signature(db),
-                                            )
-                                        }
-
-                                        Type::Callable(callable) => {
-                                            signature_generic_context(callable.signatures(db))
-                                        }
-
-                                        Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                                            TypeAliasType::PEP695(alias),
-                                        )) => alias.generic_context(db).map(wrap_generic_context),
-
-                                        _ => None,
-                                    };
-
-                                    let generic_context = match ty {
-                                        Type::Union(union_type) => UnionType::try_from_elements(
-                                            db,
-                                            union_type
-                                                .elements(db)
-                                                .iter()
-                                                .map(|ty| generic_context_for_simple_type(*ty)),
-                                        ),
-                                        _ => generic_context_for_simple_type(*ty),
-                                    };
-
-                                    overload.set_return_type(
-                                        generic_context.unwrap_or_else(|| Type::none(db)),
-                                    );
-                                }
-                            }
-
-                            Some(KnownFunction::IntoCallable) => {
-                                let [Some(ty)] = overload.parameter_types() else {
-                                    continue;
-                                };
-                                let Some(callables) = ty.try_upcast_to_callable(db) else {
-                                    continue;
-                                };
-                                overload.set_return_type(callables.into_type(db));
-                            }
-
-                            Some(KnownFunction::DunderAllNames) => {
-                                if let [Some(ty)] = overload.parameter_types() {
-                                    overload.set_return_type(match ty {
-                                        Type::ModuleLiteral(module_literal) => {
-                                            let all_names = module_literal
-                                                .module(db)
-                                                .file(db)
-                                                .map(|file| dunder_all_names(db, file))
-                                                .unwrap_or_default();
-                                            match all_names {
-                                                Some(names) => {
-                                                    let mut names =
-                                                        names.iter().collect::<Vec<_>>();
-                                                    names.sort();
-                                                    Type::heterogeneous_tuple(
-                                                        db,
-                                                        names.iter().map(|name| {
-                                                            Type::string_literal(db, name.as_str())
-                                                        }),
-                                                    )
-                                                }
-                                                None => Type::none(db),
-                                            }
-                                        }
-                                        _ => Type::none(db),
-                                    });
-                                }
-                            }
-
-                            Some(KnownFunction::EnumMembers) => {
-                                if let [Some(ty)] = overload.parameter_types() {
-                                    let return_ty = match ty {
-                                        Type::ClassLiteral(class) => {
-                                            if let Some(metadata) = enums::enum_metadata(db, *class)
-                                            {
-                                                Type::heterogeneous_tuple(
-                                                    db,
-                                                    metadata.members.keys().map(|member| {
-                                                        Type::string_literal(db, member)
-                                                    }),
-                                                )
-                                            } else {
-                                                Type::unknown()
-                                            }
-                                        }
-                                        _ => Type::unknown(),
-                                    };
-
-                                    overload.set_return_type(return_ty);
-                                }
-                            }
-
-                            Some(KnownFunction::AllMembers) => {
-                                if let [Some(ty)] = overload.parameter_types() {
-                                    overload.set_return_type(Type::heterogeneous_tuple(
-                                        db,
-                                        list_members::all_members(db, *ty)
-                                            .into_iter()
-                                            .sorted()
-                                            .map(|member| Type::string_literal(db, &member.name)),
-                                    ));
-                                }
-                            }
-
-                            Some(KnownFunction::Len) => {
-                                if let [Some(first_arg)] = overload.parameter_types() {
-                                    if let Some(len_ty) = first_arg.len(db) {
-                                        overload.set_return_type(len_ty);
-                                    }
-                                }
-                            }
-
-                            Some(KnownFunction::Repr) => {
-                                if let [Some(first_arg)] = overload.parameter_types() {
-                                    overload.set_return_type(first_arg.repr(db));
-                                }
-                            }
-
-                            Some(KnownFunction::Cast) => {
-                                if let [Some(casted_ty), Some(_)] = overload.parameter_types() {
-                                    overload.set_return_type(*casted_ty);
-                                }
-                            }
-
-                            // TODO: Remove this special handling once we have full support for
-                            // generic protocols in the solver.
-                            Some(KnownFunction::AsyncContextManager) => {
-                                if let [Some(callable)] = overload.parameter_types() {
-                                    if let Some(return_ty) =
-                                        asynccontextmanager_return_type(db, *callable)
-                                    {
-                                        overload.set_return_type(return_ty);
-                                    }
-                                }
-                            }
-
-                            Some(KnownFunction::IsProtocol) => {
-                                if let [Some(ty)] = overload.parameter_types() {
-                                    // We evaluate this to `Literal[True]` only if the runtime function `typing.is_protocol`
-                                    // would return `True` for the given type. Internally we consider `SupportsAbs[int]` to
-                                    // be a "(specialised) protocol class", but `typing.is_protocol(SupportsAbs[int])` returns
-                                    // `False` at runtime, so we do not set the return type to `Literal[True]` in this case.
-                                    overload.set_return_type(Type::BooleanLiteral(
-                                        ty.as_class_literal()
-                                            .is_some_and(|class| class.is_protocol(db)),
-                                    ));
-                                }
-                            }
-
-                            Some(KnownFunction::GetProtocolMembers) => {
-                                // Similarly to `is_protocol`, we only evaluate to this a frozenset of literal strings if a
-                                // class-literal is passed in, not if a generic alias is passed in, to emulate the behaviour
-                                // of `typing.get_protocol_members` at runtime.
-                                if let [Some(Type::ClassLiteral(class))] =
-                                    overload.parameter_types()
-                                {
-                                    if let Some(protocol_class) = class.into_protocol_class(db) {
-                                        let member_names = protocol_class
-                                            .interface(db)
-                                            .members(db)
-                                            .map(|member| Type::string_literal(db, member.name()));
-                                        let specialization =
-                                            UnionType::from_elements(db, member_names);
-                                        overload.set_return_type(
-                                            KnownClass::FrozenSet
-                                                .to_specialized_instance(db, &[specialization]),
-                                        );
-                                    }
-                                }
-                            }
-
-                            Some(KnownFunction::GetattrStatic) => {
-                                let [Some(instance_ty), Some(attr_name), default] =
-                                    overload.parameter_types()
-                                else {
-                                    continue;
-                                };
-
-                                let Some(attr_name) = attr_name.as_string_literal() else {
-                                    continue;
-                                };
-
-                                let default = if let Some(default) = default {
-                                    *default
-                                } else {
-                                    Type::Never
-                                };
-
-                                let union_with_default =
-                                    |ty| UnionType::from_elements(db, [ty, default]);
-
-                                // TODO: we could emit a diagnostic here (if default is not set)
-                                overload.set_return_type(
-                                    match instance_ty.static_member(db, attr_name.value(db)) {
-                                        Place::Defined(DefinedPlace {
-                                            ty,
-                                            definedness: Definedness::AlwaysDefined,
-                                            ..
-                                        }) => {
-                                            if ty.is_dynamic() {
-                                                // Here, we attempt to model the fact that an attribute lookup on
-                                                // a dynamic type could fail
-
-                                                union_with_default(ty)
-                                            } else {
-                                                ty
-                                            }
-                                        }
-                                        Place::Defined(DefinedPlace {
-                                            ty,
-                                            definedness: Definedness::PossiblyUndefined,
-                                            ..
-                                        }) => union_with_default(ty),
-                                        Place::Undefined => default,
-                                    },
-                                );
-                            }
-
-                            Some(KnownFunction::Dataclass) => {
-                                if let [
-                                    init,
-                                    repr,
-                                    eq,
-                                    order,
-                                    unsafe_hash,
-                                    frozen,
-                                    match_args,
-                                    kw_only,
-                                    slots,
-                                    weakref_slot,
-                                ] = overload.parameter_types()
-                                {
-                                    let mut flags = DataclassFlags::empty();
-
-                                    if to_bool(init, true) {
-                                        flags |= DataclassFlags::INIT;
-                                    }
-                                    if to_bool(repr, true) {
-                                        flags |= DataclassFlags::REPR;
-                                    }
-                                    if to_bool(eq, true) {
-                                        flags |= DataclassFlags::EQ;
-                                    }
-                                    if to_bool(order, false) {
-                                        flags |= DataclassFlags::ORDER;
-                                    }
-                                    if to_bool(unsafe_hash, false) {
-                                        flags |= DataclassFlags::UNSAFE_HASH;
-                                    }
-                                    if to_bool(frozen, false) {
-                                        flags |= DataclassFlags::FROZEN;
-                                    }
-                                    if to_bool(match_args, true) {
-                                        if Program::get(db).python_version(db)
-                                            >= PythonVersion::PY310
-                                        {
-                                            flags |= DataclassFlags::MATCH_ARGS;
-                                        } else {
-                                            // TODO: emit diagnostic
-                                        }
-                                    }
-                                    if to_bool(kw_only, false) {
-                                        if Program::get(db).python_version(db)
-                                            >= PythonVersion::PY310
-                                        {
-                                            flags |= DataclassFlags::KW_ONLY;
-                                        } else {
-                                            // TODO: emit diagnostic
-                                        }
-                                    }
-                                    if to_bool(slots, false) {
-                                        if Program::get(db).python_version(db)
-                                            >= PythonVersion::PY310
-                                        {
-                                            flags |= DataclassFlags::SLOTS;
-                                        } else {
-                                            // TODO: emit diagnostic
-                                        }
-                                    }
-                                    if to_bool(weakref_slot, false) {
-                                        if Program::get(db).python_version(db)
-                                            >= PythonVersion::PY311
-                                        {
-                                            flags |= DataclassFlags::WEAKREF_SLOT;
-                                        } else {
-                                            // TODO: emit diagnostic
-                                        }
-                                    }
-
-                                    let params = DataclassParams::from_flags(db, flags);
-
-                                    overload.set_return_type(Type::DataclassDecorator(params));
-                                }
-
-                                // `dataclass` being used as a non-decorator (i.e., `dataclass(SomeClass)`)
-                                if let [Some(Type::ClassLiteral(class_literal)), ..] =
-                                    overload.parameter_types()
-                                {
-                                    if let Some(target) =
-                                        invalid_dataclass_target(db, class_literal)
-                                    {
-                                        overload.errors.push(
-                                            BindingError::InvalidDataclassApplication(target),
-                                        );
-                                    } else {
-                                        let params = DataclassParams::default_params(db);
-                                        overload.set_return_type(Type::from(
-                                            class_literal.with_dataclass_params(db, Some(params)),
-                                        ));
-                                    }
-                                }
-                            }
-
-                            Some(KnownFunction::DataclassTransform) => {
-                                // Use named parameter lookup to handle custom
-                                // `__dataclass_transform__` functions that follow older versions
-                                // of the spec.
-                                let mut flags = DataclassTransformerFlags::empty();
-
-                                let eq_default = overload
-                                    .parameter_type_by_name("eq_default", false)
-                                    .ok()
-                                    .flatten();
-                                let order_default = overload
-                                    .parameter_type_by_name("order_default", false)
-                                    .ok()
-                                    .flatten();
-                                let kw_only_default = overload
-                                    .parameter_type_by_name("kw_only_default", false)
-                                    .ok()
-                                    .flatten();
-                                let frozen_default = overload
-                                    .parameter_type_by_name("frozen_default", false)
-                                    .ok()
-                                    .flatten();
-
-                                if to_bool(&eq_default, true) {
-                                    flags |= DataclassTransformerFlags::EQ_DEFAULT;
-                                }
-                                if to_bool(&order_default, false) {
-                                    flags |= DataclassTransformerFlags::ORDER_DEFAULT;
-                                }
-                                if to_bool(&kw_only_default, false) {
-                                    flags |= DataclassTransformerFlags::KW_ONLY_DEFAULT;
-                                }
-                                if to_bool(&frozen_default, false) {
-                                    flags |= DataclassTransformerFlags::FROZEN_DEFAULT;
-                                }
-
-                                // Accept both `field_specifiers` (current name) and
-                                // `field_descriptors` (legacy name).
-                                let field_specifiers_param = overload
-                                    .parameter_type_by_name("field_specifiers", false)
-                                    .ok()
-                                    .flatten()
-                                    .or_else(|| {
-                                        overload
-                                            .parameter_type_by_name("field_descriptors", false)
-                                            .ok()
-                                            .flatten()
-                                    });
-
-                                let field_specifiers: Box<[Type<'db>]> = field_specifiers_param
-                                    .map(|tuple_type| {
-                                        tuple_type
-                                            .exact_tuple_instance_spec(db)
-                                            .iter()
-                                            .flat_map(|tuple_spec| tuple_spec.fixed_elements())
-                                            .copied()
-                                            .collect::<Vec<_>>()
-                                            .into_boxed_slice()
-                                    })
-                                    .unwrap_or_default();
-
-                                let params =
-                                    DataclassTransformerParams::new(db, flags, field_specifiers);
-
-                                overload.set_return_type(Type::DataclassTransformer(params));
-                            }
-
-                            Some(KnownFunction::Unpack) => {
-                                let [Some(format), Some(_buffer)] = overload.parameter_types()
-                                else {
-                                    continue;
-                                };
-
-                                let Some(format_literal) = format.as_string_literal() else {
-                                    continue;
-                                };
-
-                                let return_type = parse_struct_format(db, format_literal.value(db))
-                                    .map(|elements| {
-                                        Type::heterogeneous_tuple(db, elements.into_iter())
-                                    })
-                                    .unwrap_or_else(|| {
-                                        Type::homogeneous_tuple(db, Type::unknown())
-                                    });
-
-                                overload.set_return_type(return_type);
-                            }
-
-                            Some(KnownFunction::NamedTuple) => {
-                                overload.set_return_type(todo_type!(
-                                    "Support for functional `namedtuple`"
+                        Some(KnownClass::Property) => {
+                            if let [getter, setter, ..] = overload.parameter_types() {
+                                overload.set_return_type(Type::PropertyInstance(
+                                    PropertyInstanceType::new(db, *getter, *setter),
                                 ));
                             }
-
-                            _ => {
-                                // Ideally, either the implementation, or exactly one of the overloads
-                                // of the function can have the dataclass_transform decorator applied.
-                                // However, we do not yet enforce this, and in the case of multiple
-                                // applications of the decorator, we will only consider the last one.
-                                let transformer_params = function_type
-                                    .iter_overloads_and_implementation(db)
-                                    .rev()
-                                    .find_map(|function_overload| {
-                                        function_overload.dataclass_transformer_params(db)
-                                    });
-
-                                if let Some(params) = transformer_params {
-                                    // If this function was called with a keyword argument like
-                                    // `order=False`, we extract the argument type and overwrite
-                                    // the corresponding flag in `dataclass_params`.
-                                    let dataclass_params =
-                                        DataclassParams::from_transformer_params(db, params);
-                                    let mut flags = dataclass_params.flags(db);
-
-                                    for (param, flag) in DATACLASS_FLAGS {
-                                        if let Ok(Some(Type::BooleanLiteral(value))) =
-                                            overload.parameter_type_by_name(param, false)
-                                        {
-                                            flags.set(*flag, value);
-                                        }
-                                    }
-
-                                    let dataclass_params = DataclassParams::new(
-                                        db,
-                                        flags,
-                                        dataclass_params.field_specifiers(db),
-                                    );
-
-                                    // The dataclass_transform spec doesn't clarify how to tell whether
-                                    // a decorated function is a decorator or a decorator factory. We
-                                    // use heuristics based on the number and type of positional arguments:
-                                    //
-                                    // - Zero positional arguments: assume it's a decorator factory.
-                                    // - More than one positional argument: assume it's a decorator factory.
-                                    // - Exactly one positional argument that's a class: ambiguous, so check
-                                    //   the return type to disambiguate (class-like means decorate directly).
-                                    let mut positional_args = overload
-                                        .signature
-                                        .parameters()
-                                        .iter()
-                                        .zip(overload.parameter_types())
-                                        .filter(|(param, ty)| {
-                                            ty.is_some() && !param.is_keyword_only()
-                                        })
-                                        .map(|(_, ty)| ty);
-
-                                    let first_positional = positional_args.next();
-                                    let has_more = positional_args.next().is_some();
-
-                                    // Only attempt direct decoration if exactly one positional argument.
-                                    if !has_more {
-                                        // Helper to check if return type is class-like.
-                                        let returns_class = || {
-                                            matches!(
-                                                overload.return_type(),
-                                                Type::ClassLiteral(_)
-                                                    | Type::GenericAlias(_)
-                                                    | Type::SubclassOf(_)
-                                            )
-                                        };
-
-                                        match first_positional {
-                                            Some(Some(Type::ClassLiteral(class_literal)))
-                                                if returns_class() =>
-                                            {
-                                                overload.set_return_type(Type::from(
-                                                    class_literal.with_dataclass_params(
-                                                        db,
-                                                        Some(dataclass_params),
-                                                    ),
-                                                ));
-                                                continue;
-                                            }
-                                            Some(Some(Type::GenericAlias(generic_alias)))
-                                                if returns_class() =>
-                                            {
-                                                let new_origin =
-                                                    generic_alias.origin(db).with_dataclass_params(
-                                                        db,
-                                                        Some(dataclass_params),
-                                                    );
-                                                overload.set_return_type(Type::GenericAlias(
-                                                    GenericAlias::new(
-                                                        db,
-                                                        new_origin,
-                                                        generic_alias.specialization(db),
-                                                    ),
-                                                ));
-                                                continue;
-                                            }
-                                            _ => {}
-                                        }
-                                    }
-
-                                    // Zero or more than one positional argument, or the argument is
-                                    // not a class: assume it's a decorator factory.
-                                    overload.set_return_type(Type::DataclassDecorator(
-                                        dataclass_params,
-                                    ));
-                                }
-                            }
-                        },
-
-                        Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRange) => {
-                            let [Some(lower), Some(Type::TypeVar(typevar)), Some(upper)] =
-                                overload.parameter_types()
-                            else {
-                                return;
-                            };
-                            let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
-                            let tracked = InternedConstraintSet::new(db, constraints);
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::ConstraintSet(tracked),
-                            ));
                         }
 
-                        Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetAlways) => {
-                            if !overload.parameter_types().is_empty() {
-                                return;
-                            }
-                            let constraints = ConstraintSet::from(true);
-                            let tracked = InternedConstraintSet::new(db, constraints);
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::ConstraintSet(tracked),
-                            ));
-                        }
-
-                        Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetNever) => {
-                            if !overload.parameter_types().is_empty() {
-                                return;
-                            }
-                            let constraints = ConstraintSet::from(false);
-                            let tracked = InternedConstraintSet::new(db, constraints);
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::ConstraintSet(tracked),
-                            ));
-                        }
-
-                        Type::KnownBoundMethod(
-                            KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
-                        ) => {
-                            let [Some(ty_a), Some(ty_b)] = overload.parameter_types() else {
-                                continue;
-                            };
-
-                            let result = ty_a.when_subtype_of_assuming(
-                                db,
-                                *ty_b,
-                                tracked.constraints(db),
-                                InferableTypeVars::None,
-                            );
-                            let tracked = InternedConstraintSet::new(db, result);
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::ConstraintSet(tracked),
-                            ));
-                        }
-
-                        Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfies(
-                            tracked,
-                        )) => {
-                            let [Some(other)] = overload.parameter_types() else {
-                                continue;
-                            };
-                            let Type::KnownInstance(KnownInstanceType::ConstraintSet(other)) =
-                                other
-                            else {
-                                continue;
-                            };
-
-                            let result = tracked
-                                .constraints(db)
-                                .implies(db, || other.constraints(db));
-                            let tracked = InternedConstraintSet::new(db, result);
-                            overload.set_return_type(Type::KnownInstance(
-                                KnownInstanceType::ConstraintSet(tracked),
-                            ));
-                        }
-
-                        Type::KnownBoundMethod(
-                            KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(tracked),
-                        ) => {
-                            let extract_inferable = |instance: &NominalInstanceType<'db>| {
-                                if instance.has_known_class(db, KnownClass::NoneType) {
-                                    // Caller explicitly passed None, so no typevars are inferable.
-                                    return Some(FxHashSet::default());
-                                }
-                                instance
-                                    .tuple_spec(db)?
-                                    .fixed_elements()
-                                    .map(|ty| {
-                                        ty.as_typevar()
-                                            .map(|bound_typevar| bound_typevar.identity(db))
+                        Some(KnownClass::Tuple) if overload_index == 1 => {
+                            // `tuple(range(42))` => `tuple[int, ...]`
+                            // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
+                            if let [Some(argument)] = overload.parameter_types() {
+                                // We deliberately use `.iterate()` here (falling back to `Unknown` if it isn't iterable)
+                                // rather than `.try_iterate().expect()`. Even though we know at this point that the input
+                                // type is assignable to `Iterable`, that doesn't mean that the input type is *actually*
+                                // iterable (it could be a Liskov-uncompliant subtype of the `Iterable` class that sets
+                                // `__iter__ = None`, for example). That would be badly written Python code, but we still
+                                // need to be able to handle it without crashing.
+                                let return_type = if let Type::Union(union) = argument {
+                                    union.map(db, |element| {
+                                        Type::tuple(TupleType::new(db, &element.iterate(db)))
                                     })
-                                    .collect()
-                            };
-
-                            let inferable = match overload.parameter_types() {
-                                // Caller did not provide argument, so no typevars are inferable.
-                                [None] => FxHashSet::default(),
-                                [Some(Type::NominalInstance(instance))] => {
-                                    match extract_inferable(instance) {
-                                        Some(inferable) => inferable,
-                                        None => continue,
-                                    }
-                                }
-                                _ => continue,
-                            };
-
-                            let result = tracked
-                                .constraints(db)
-                                .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
-                            overload.set_return_type(Type::BooleanLiteral(result));
+                                } else {
+                                    Type::tuple(TupleType::new(db, &argument.iterate(db)))
+                                };
+                                overload.set_return_type(return_type);
+                            }
                         }
 
-                        Type::KnownBoundMethod(
-                            KnownBoundMethodType::GenericContextSpecializeConstrained(
-                                generic_context,
-                            ),
-                        ) => {
-                            let [Some(constraints)] = overload.parameter_types() else {
-                                continue;
-                            };
-                            let Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)) =
-                                constraints
-                            else {
-                                continue;
-                            };
-                            let specialization = generic_context
-                                .specialize_constrained(db, constraints.constraints(db));
-                            let result = match specialization {
-                                Ok(specialization) => Type::KnownInstance(
-                                    KnownInstanceType::Specialization(specialization),
-                                ),
-                                Err(()) => Type::none(db),
-                            };
-                            overload.set_return_type(result);
-                        }
-
-                        Type::ClassLiteral(class) => match class.known(db) {
-                            Some(KnownClass::Bool) => match overload.parameter_types() {
-                                [Some(arg)] => overload.set_return_type(arg.bool(db).into_type(db)),
-                                [None] => overload.set_return_type(Type::BooleanLiteral(false)),
-                                _ => {}
-                            },
-
-                            Some(KnownClass::Str) if overload_index == 0 => {
-                                match overload.parameter_types() {
-                                    [Some(arg)] => overload.set_return_type(arg.str(db)),
-                                    [None] => {
-                                        overload.set_return_type(Type::string_literal(db, ""));
-                                    }
-                                    _ => {}
-                                }
-                            }
-
-                            Some(KnownClass::Type) if overload_index == 0 => {
-                                if let [Some(arg)] = overload.parameter_types() {
-                                    overload.set_return_type(arg.dunder_class(db));
-                                }
-                            }
-
-                            Some(KnownClass::Property) => {
-                                if let [getter, setter, ..] = overload.parameter_types() {
-                                    overload.set_return_type(Type::PropertyInstance(
-                                        PropertyInstanceType::new(db, *getter, *setter),
-                                    ));
-                                }
-                            }
-
-                            Some(KnownClass::Tuple) if overload_index == 1 => {
-                                // `tuple(range(42))` => `tuple[int, ...]`
-                                // BUT `tuple((1, 2))` => `tuple[Literal[1], Literal[2]]` rather than `tuple[Literal[1, 2], ...]`
-                                if let [Some(argument)] = overload.parameter_types() {
-                                    // We deliberately use `.iterate()` here (falling back to `Unknown` if it isn't iterable)
-                                    // rather than `.try_iterate().expect()`. Even though we know at this point that the input
-                                    // type is assignable to `Iterable`, that doesn't mean that the input type is *actually*
-                                    // iterable (it could be a Liskov-uncompliant subtype of the `Iterable` class that sets
-                                    // `__iter__ = None`, for example). That would be badly written Python code, but we still
-                                    // need to be able to handle it without crashing.
-                                    let return_type = if let Type::Union(union) = argument {
-                                        union.map(db, |element| {
-                                            Type::tuple(TupleType::new(db, &element.iterate(db)))
-                                        })
-                                    } else {
-                                        Type::tuple(TupleType::new(db, &argument.iterate(db)))
-                                    };
-                                    overload.set_return_type(return_type);
-                                }
-                            }
-
-                            _ => {}
-                        },
-
-                        Type::SpecialForm(SpecialFormType::TypedDict) => {
-                            overload
-                                .set_return_type(todo_type!("Support for functional `TypedDict`"));
-                        }
-
-                        // Not a special case
                         _ => {}
+                    },
+
+                    Type::SpecialForm(SpecialFormType::TypedDict) => {
+                        overload.set_return_type(todo_type!("Support for functional `TypedDict`"));
                     }
+
+                    // Not a special case
+                    _ => {}
                 }
             }
         }
