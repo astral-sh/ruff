@@ -1590,7 +1590,7 @@ def getfqdn(name: str = "") -> str:
 
 if sys.version_info >= (3, 11):
     def create_connection(
-        address: tuple[str | None, int],
+        address: tuple[str | None, bytes | str | int | None],
         timeout: float | None = ...,
         source_address: _Address | None = None,
         *,
