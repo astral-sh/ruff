@@ -5265,6 +5265,15 @@ impl<'db> Type<'db> {
         self.try_iterate_with_mode(db, EvaluationMode::Sync)
     }
 
+    /// Return the homogeneous element type for values produced by iterating over `self`, if known.
+    ///
+    /// This is best-effort and intentionally omits iteration diagnostics.
+    pub(crate) fn sequence_homogeneous_element_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        self.try_iterate(db)
+            .ok()
+            .map(|spec| spec.homogeneous_element_type(db))
+    }
+
     fn try_iterate_with_mode(
         self,
         db: &'db dyn Db,

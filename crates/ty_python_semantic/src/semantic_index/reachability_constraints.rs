@@ -209,8 +209,8 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, NarrowingConstraint, Truthiness, TupleSpec, Type,
-    TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+    CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, TupleSpec,
+    Type, TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -1043,21 +1043,94 @@ impl ReachabilityConstraints {
                 .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
                 .unwrap_or(Truthiness::AlwaysTrue),
             PatternPredicateKind::Sequence(patterns) => {
-                // Check if the subject is a tuple with matching length.
-                // TODO: handle unions (e.g. `tuple[int, str] | tuple[int]`) and
-                // intersections (e.g. a tuple type intersected with `~AlwaysFalse`)
-                // of tuple types, which are likely to come up in practice.
+                // Handle unions by checking all members independently.
+                if let Type::Union(union) = subject_ty {
+                    let mut result = None;
+                    for element in union.elements(db) {
+                        let element_result = Self::analyze_single_pattern_predicate_kind(
+                            db,
+                            predicate_kind,
+                            *element,
+                        );
+                        result = Some(match result {
+                            None => element_result,
+                            Some(previous) if previous == element_result => previous,
+                            Some(_) => Truthiness::Ambiguous,
+                        });
+
+                        if result == Some(Truthiness::Ambiguous) {
+                            break;
+                        }
+                    }
+                    return result.unwrap_or(Truthiness::Ambiguous);
+                }
+
+                // Handle intersections by checking each positive element. If any positive element is
+                // always false, then the intersection is always false. If any positive element is
+                // always true, then the intersection is always true.
+                if let Type::Intersection(intersection) = subject_ty {
+                    for positive in intersection.positive_elements_or_object(db) {
+                        match Self::analyze_single_pattern_predicate_kind(
+                            db,
+                            predicate_kind,
+                            positive,
+                        ) {
+                            Truthiness::AlwaysFalse => return Truthiness::AlwaysFalse,
+                            Truthiness::AlwaysTrue => return Truthiness::AlwaysTrue,
+                            Truthiness::Ambiguous => {}
+                        }
+                    }
+
+                    return Truthiness::Ambiguous;
+                }
+
+                // Resolve aliases before checking tuple details.
+                if let Type::TypeAlias(alias) = subject_ty {
+                    return Self::analyze_single_pattern_predicate_kind(
+                        db,
+                        predicate_kind,
+                        alias.value_type(db),
+                    );
+                }
+
                 let tuple_spec = match subject_ty {
                     Type::NominalInstance(instance) => instance.tuple_spec(db),
                     _ => None,
                 };
 
                 let Some(tuple_spec) = tuple_spec else {
-                    // Subject is not a tuple type; can't determine if it matches.
-                    // TODO: we could return `AlwaysFalse` for final types that can
-                    // never be sequences (e.g. some literals, final nominal types),
-                    // or for sequence types whose element type is disjoint with one
-                    // or more of the sub-patterns.
+                    // Sequence patterns never match `str`, `bytes`, or `bytearray`.
+                    if matches!(
+                        subject_ty,
+                        Type::StringLiteral(_) | Type::LiteralString | Type::BytesLiteral(_)
+                    ) || subject_ty.is_subtype_of(db, KnownClass::Str.to_instance(db))
+                        || subject_ty.is_subtype_of(db, KnownClass::Bytes.to_instance(db))
+                        || subject_ty.is_subtype_of(db, KnownClass::Bytearray.to_instance(db))
+                    {
+                        return Truthiness::AlwaysFalse;
+                    }
+
+                    // If this type can never be a sequence at all, the pattern can never match.
+                    let sequence_of_object =
+                        KnownClass::Sequence.to_specialized_instance(db, &[Type::object()]);
+                    if subject_ty.is_disjoint_from(db, sequence_of_object) {
+                        return Truthiness::AlwaysFalse;
+                    }
+
+                    // If the sequence has a known homogeneous element type, and any element pattern
+                    // requires a disjoint type, then this sequence pattern can never match.
+                    if let Some(element_ty) = subject_ty.sequence_homogeneous_element_type(db) {
+                        for required_element_ty in patterns
+                            .iter()
+                            .map(|pattern| pattern_kind_to_type(db, pattern))
+                            .filter(|required_element_ty| !required_element_ty.is_never())
+                        {
+                            if element_ty.is_disjoint_from(db, required_element_ty) {
+                                return Truthiness::AlwaysFalse;
+                            }
+                        }
+                    }
+
                     return Truthiness::Ambiguous;
                 };
 
@@ -1089,10 +1162,37 @@ impl ReachabilityConstraints {
 
                         result
                     }
-                    TupleSpec::Variable(_) => {
-                        // Variable-length tuples could match patterns of various lengths.
-                        // TODO: we could return `AlwaysFalse` if the variable element
-                        // type is disjoint with at least one sub-pattern's expected type.
+                    TupleSpec::Variable(variable) => {
+                        let pattern_len = patterns.len();
+                        let prefix_elements = variable.prefix_elements();
+                        let suffix_elements = variable.suffix_elements();
+                        let prefix_len = prefix_elements.len();
+                        let suffix_len = suffix_elements.len();
+
+                        // Variable tuples can't match patterns shorter than their fixed
+                        // prefix/suffix section.
+                        if pattern_len < prefix_len + suffix_len {
+                            return Truthiness::AlwaysFalse;
+                        }
+
+                        // Check each pattern against the element type at that position.
+                        for (index, pattern) in patterns.iter().enumerate() {
+                            let element_ty = if index < prefix_len {
+                                prefix_elements[index]
+                            } else if index >= pattern_len - suffix_len {
+                                suffix_elements[index - (pattern_len - suffix_len)]
+                            } else {
+                                variable.variable()
+                            };
+
+                            if Self::analyze_single_pattern_predicate_kind(db, pattern, element_ty)
+                                == Truthiness::AlwaysFalse
+                            {
+                                return Truthiness::AlwaysFalse;
+                            }
+                        }
+
+                        // Variable-length tuples could still fail due to a different runtime length.
                         Truthiness::Ambiguous
                     }
                 }

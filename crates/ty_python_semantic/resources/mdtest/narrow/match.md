@@ -676,11 +676,12 @@ def _(subj: tuple[int, str] | tuple[str, int]):
 
 ## Sequence patterns with non-tuple subjects
 
-Sequence patterns on non-tuple subjects don't narrow the type.
+Sequence patterns on non-tuple subjects still don't produce tuple narrowing, but obviously
+impossible element patterns can be recognized as unreachable.
 
 ```py
 def _(subj: list[int]):
     match subj:
         case [int(), str()]:
-            reveal_type(subj)  # revealed: list[int]
+            reveal_type(subj)  # revealed: Never
 ```
