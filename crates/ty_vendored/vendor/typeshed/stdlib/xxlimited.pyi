@@ -29,4 +29,5 @@ else:
     class Null:
         __hash__: ClassVar[None]  # type: ignore[assignment]
 
-    def roj(b: Any, /) -> None: ...
+    def roj(b: Any, /) -> None:
+        """roj(a,b) -> None"""
