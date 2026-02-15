@@ -707,19 +707,28 @@ fn analyze_single_pattern_predicate_kind<'db>(
             }
 
             if let Type::Intersection(intersection) = subject_ty {
+                let mut all_always_true = true;
                 for positive in intersection.positive_elements_or_object(db) {
                     match analyze_single_pattern_predicate_kind(db, predicate_kind, positive) {
                         Truthiness::AlwaysFalse => return Truthiness::AlwaysFalse,
-                        Truthiness::AlwaysTrue => return Truthiness::AlwaysTrue,
-                        Truthiness::Ambiguous => {}
+                        Truthiness::AlwaysTrue => {}
+                        Truthiness::Ambiguous => all_always_true = false,
                     }
                 }
 
-                return Truthiness::Ambiguous;
+                return if all_always_true {
+                    Truthiness::AlwaysTrue
+                } else {
+                    Truthiness::Ambiguous
+                };
             }
 
             if let Type::TypeAlias(alias) = subject_ty {
-                return analyze_single_pattern_predicate_kind(db, predicate_kind, alias.value_type(db));
+                return analyze_single_pattern_predicate_kind(
+                    db,
+                    predicate_kind,
+                    alias.value_type(db),
+                );
             }
 
             if subject_ty.is_disjoint_from(db, sequence_ty) {
@@ -776,30 +785,42 @@ fn analyze_single_pattern_predicate_kind<'db>(
                         return Truthiness::Ambiguous;
                     }
                 }
-            } else {
-                if subject_ty.is_subtype_of(db, KnownClass::Str.to_instance(db))
-                    || subject_ty.is_subtype_of(db, KnownClass::Bytes.to_instance(db))
-                    || subject_ty.is_subtype_of(db, KnownClass::Bytearray.to_instance(db))
+            }
+
+            if subject_ty.is_subtype_of(db, KnownClass::Str.to_instance(db))
+                || subject_ty.is_subtype_of(db, KnownClass::Bytes.to_instance(db))
+                || subject_ty.is_subtype_of(db, KnownClass::Bytearray.to_instance(db))
+            {
+                return Truthiness::AlwaysFalse;
+            }
+
+            let sequence_of_object =
+                KnownClass::Sequence.to_specialized_instance(db, &[Type::object()]);
+            if subject_ty.is_disjoint_from(db, sequence_of_object) {
+                return Truthiness::AlwaysFalse;
+            }
+
+            if let Some(sequence_element_ty) = subject_ty.sequence_element_type(db) {
+                for required_element_ty in patterns
+                    .iter()
+                    .map(|pattern| pattern_kind_to_type(db, pattern))
+                    .filter(|required_element_ty| !required_element_ty.is_never())
                 {
-                    return Truthiness::AlwaysFalse;
-                }
-
-                let sequence_of_object =
-                    KnownClass::Sequence.to_specialized_instance(db, &[Type::object()]);
-                if subject_ty.is_disjoint_from(db, sequence_of_object) {
-                    return Truthiness::AlwaysFalse;
-                }
-
-                if let Some(element_ty) = subject_ty.sequence_homogeneous_element_type(db) {
-                    for required_element_ty in patterns
-                        .iter()
-                        .map(|pattern| pattern_kind_to_type(db, pattern))
-                        .filter(|required_element_ty| !required_element_ty.is_never())
-                    {
-                        if element_ty.is_disjoint_from(db, required_element_ty) {
-                            return Truthiness::AlwaysFalse;
-                        }
+                    if sequence_element_ty.is_disjoint_from(db, required_element_ty) {
+                        return Truthiness::AlwaysFalse;
                     }
+                }
+            }
+
+            for required_element_ty in patterns
+                .iter()
+                .map(|pattern| pattern_kind_to_type(db, pattern))
+                .filter(|required_element_ty| !required_element_ty.is_never())
+            {
+                let required_sequence =
+                    KnownClass::Sequence.to_specialized_instance(db, &[required_element_ty]);
+                if subject_ty.is_disjoint_from(db, required_sequence) {
+                    return Truthiness::AlwaysFalse;
                 }
             }
 
