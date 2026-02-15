@@ -284,6 +284,34 @@ impl AttributeKind {
     }
 }
 
+#[expect(clippy::ref_option)]
+fn try_call_dunder_get_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &Option<(Type<'db>, AttributeKind)>,
+    current: Option<(Type<'db>, AttributeKind)>,
+    _ty: Type<'db>,
+    _instance: Option<Type<'db>>,
+    _owner: Type<'db>,
+) -> Option<(Type<'db>, AttributeKind)> {
+    match (previous, current) {
+        (Some((previous_ty, previous_kind)), Some((current_ty, current_kind))) => {
+            let kind = if current_kind == *previous_kind {
+                current_kind
+            } else {
+                AttributeKind::NormalOrNonDataDescriptor
+            };
+
+            Some((current_ty.cycle_normalized(db, *previous_ty, cycle), kind))
+        }
+        (None, Some((current_ty, current_kind))) => Some((
+            current_ty.recursive_type_normalized(db, cycle),
+            current_kind,
+        )),
+        (_, None) => None,
+    }
+}
+
 /// This enum is used to control the behavior of the descriptor protocol implementation.
 /// When invoked on a class object, the fallback type (a class attribute) can shadow a
 /// non-data descriptor of the meta-type (the class's metaclass). However, this is not
@@ -2763,7 +2791,16 @@ impl<'db> Type<'db> {
     /// that `self` represents: (1) a data descriptor or (2) a non-data descriptor / normal attribute.
     ///
     /// If `__get__` is not defined on the meta-type, this method returns `None`.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _, _| {
+            Some((
+                Type::divergent(id),
+                AttributeKind::NormalOrNonDataDescriptor,
+            ))
+        },
+        cycle_fn=try_call_dunder_get_cycle_recover,
+        heap_size=ruff_memory_usage::heap_size
+    )]
     pub(crate) fn try_call_dunder_get(
         self,
         db: &'db dyn Db,
