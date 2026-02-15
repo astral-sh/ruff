@@ -49,9 +49,7 @@ export default function Header({
         <div className="max-sm:hidden flex">
           <ResetButton onClicked={onReset} />
         </div>
-        <div className="max-sm:hidden flex">
-          {shareContent}
-        </div>
+        <div className="max-sm:hidden flex">{shareContent}</div>
         <Divider />
 
         <ThemeButton theme={theme} onChange={onChangeTheme} />
