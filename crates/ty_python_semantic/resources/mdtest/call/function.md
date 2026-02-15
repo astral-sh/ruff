@@ -823,14 +823,11 @@ def f18(x: int = 0, y: int = 0) -> None: ...
 def f19(args: tuple[int, ...] | tuple[int, int]) -> None:
     f18(*args)
 
-# TODO: Union variadic unpacking should also work when the non-defaulted parameters
-# are covered by all union elements, even if not all remaining parameters are defaulted.
-# Currently we only apply per-element iteration when all remaining positional parameters
-# have defaults, so this falls back to `iterate()` which produces `tuple[int, ...]` and
-# greedily matches `c: str` with `int`.
+# Union variadic unpacking also works when the non-defaulted parameters are covered by
+# the shortest union element, even if not all remaining parameters are defaulted.
 def f16(a: int, b: int = 0, c: str = "") -> None: ...
 def f17(x: tuple[int] | tuple[int, int]) -> None:
-    f16(*x)  # error: [invalid-argument-type]  # TODO: false positive
+    f16(*x)
 ```
 
 ### Mixed argument and parameter containing variadic
