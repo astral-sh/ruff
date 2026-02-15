@@ -5226,6 +5226,37 @@ impl<'db> Type<'db> {
             .and_then(|generator_types| generator_types.send_ty)
     }
 
+    /// Return the element type if `self` is a `Sequence[T]` specialization (or subtype), if known.
+    pub(crate) fn sequence_element_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let from_class_base = |base: ClassBase<'db>| {
+            let class = base.into_class()?;
+            if class.is_known(db, KnownClass::Sequence)
+                && let Some((_, Some(specialization))) =
+                    class.static_class_literal_specialized(db, None)
+                && let [element_ty] = specialization.types(db)
+            {
+                Some(*element_ty)
+            } else {
+                None
+            }
+        };
+
+        match self {
+            Type::NominalInstance(instance) => {
+                instance.class(db).iter_mro(db).find_map(from_class_base)
+            }
+            Type::ProtocolInstance(instance) => {
+                if let Protocol::FromClass(class) = instance.inner {
+                    class.iter_mro(db).find_map(from_class_base)
+                } else {
+                    None
+                }
+            }
+            Type::TypeAlias(alias) => alias.value_type(db).sequence_element_type(db),
+            _ => None,
+        }
+    }
+
     #[must_use]
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Option<Type<'db>> {
         match self {

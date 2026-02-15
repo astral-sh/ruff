@@ -2130,11 +2130,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     return None;
                 }
 
-                let class_type = infer_same_file_expression_type(
-                    self.db,
-                    *cls,
-                    TypeContext::default(),
-                );
+                let class_type =
+                    infer_same_file_expression_type(self.db, *cls, TypeContext::default());
                 let narrowed_class = match class_type {
                     Type::ClassLiteral(class) => {
                         Type::instance(self.db, class.top_materialization(self.db))
@@ -2149,26 +2146,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .add_positive(narrowed_class)
                     .build()
             }
-            PatternPredicateKind::Mapping(_) => {
-                if !is_positive {
-                    return None;
-                }
-
-                IntersectionBuilder::new(self.db)
-                    .add_positive(subject_ty)
-                    .add_positive(
-                        KnownClass::Mapping
-                            .to_instance(self.db)
-                            .top_materialization(self.db),
-                    )
-                    .build()
-            }
             PatternPredicateKind::Value(expr) => {
-                let value_ty = infer_same_file_expression_type(
-                    self.db,
-                    *expr,
-                    TypeContext::default(),
-                );
+                let value_ty =
+                    infer_same_file_expression_type(self.db, *expr, TypeContext::default());
                 let constraint_ty = self.evaluate_expr_compare_op(
                     subject_ty,
                     value_ty,
@@ -2213,6 +2193,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
                 self.narrow_tuple_by_sequence_pattern(subject_ty, element_patterns)?
             }
+            PatternPredicateKind::Mapping(kind) => {
+                if !kind.is_irrefutable() && !is_positive {
+                    return None;
+                }
+                let mapping_ty = KnownClass::Mapping
+                    .to_instance(self.db)
+                    .negate_if(self.db, !is_positive);
+                IntersectionBuilder::new(self.db)
+                    .add_positive(subject_ty)
+                    .add_positive(mapping_ty)
+                    .build()
+            }
             PatternPredicateKind::Unsupported => return None,
         };
 
@@ -2245,6 +2237,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     })
                     .collect();
                 Some(UnionType::from_elements(self.db, narrowed))
+            }
+            Type::TypeAlias(alias) => {
+                self.narrow_tuple_by_sequence_pattern(alias.value_type(self.db), element_patterns)
             }
             Type::NominalInstance(instance) => {
                 let tuple_spec = instance.tuple_spec(self.db)?;
@@ -2333,9 +2328,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
 /// Returns `true` if any element pattern provides a narrowing constraint.
 fn has_any_narrowing_constraint(patterns: &[PatternPredicateKind]) -> bool {
-    patterns
-        .iter()
-        .any(|pattern| pattern_has_narrowing_constraint(pattern))
+    patterns.iter().any(pattern_has_narrowing_constraint)
 }
 
 /// Returns `true` if a single pattern provides a narrowing constraint.
