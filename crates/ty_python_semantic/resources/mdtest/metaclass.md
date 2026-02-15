@@ -264,9 +264,9 @@ class Foo(metaclass=Meta):
 # is not an instance of `Foo`, so it is used directly.
 reveal_type(Foo(1))  # revealed: int
 
-# The `str -> Foo` metaclass overload would return an instance, so `__init__` is
-# checked instead. `__init__` expects `x: int`, but got `str`.
-Foo("hello")  # error: [no-matching-overload]
+# The `str -> Foo` metaclass overload matches and returns an instance, so `__init__`
+# is also validated. `__init__` expects `x: int`, but got `str`.
+Foo("hello")  # error: [invalid-argument-type]
 
 # No overload matches.
 Foo()  # error: [no-matching-overload]

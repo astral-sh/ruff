@@ -4693,6 +4693,7 @@ impl<'db> Type<'db> {
                 binding
             })
         }
+
         let (class_literal, class_specialization) = class.class_literal_and_specialization(db);
         let class_generic_context = class_literal.generic_context(db);
 
@@ -4777,6 +4778,10 @@ impl<'db> Type<'db> {
                 | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
         );
 
+        let Some(constructor_instance_ty) = self_type.to_instance(db) else {
+            return fallback_bindings();
+        };
+
         let is_non_instance_overload = |sig: &Signature<'db>| {
             !sig.return_ty.has_typevar(db)
                 && ConstructorReturnDisposition::of(db, sig.return_ty, class).is_not_instance()
@@ -4809,13 +4814,22 @@ impl<'db> Type<'db> {
                     return Type::BoundMethod(metaclass_call_method).bindings(db);
                 }
 
-                // Mixed: save non-instance overloads (pre-bound, removing `cls`) for
-                // later combination with `__init__` overloads.
+                // Mixed: save ALL overloads with correct per-overload return types.
+                // Non-instance overloads keep their return type; instance-returning
+                // overloads get `constructor_instance_ty`. We defer `__init__` validation
+                // to call checking time (only when the matched overload is instance-returning).
                 let metaclass_self = metaclass_call_method.self_instance(db);
                 metaclass_mixed_non_instance_sigs = Some(
-                    non_instance_sigs
+                    signature
+                        .overloads
                         .iter()
-                        .map(|sig| sig.bind_self(db, Some(metaclass_self)))
+                        .map(|sig| {
+                            let mut bound = sig.bind_self(db, Some(metaclass_self));
+                            if !is_non_instance_overload(sig) {
+                                bound.return_ty = constructor_instance_ty;
+                            }
+                            bound
+                        })
                         .collect::<SmallVec<[Signature<'db>; 4]>>(),
                 );
             } else {
@@ -4850,16 +4864,10 @@ impl<'db> Type<'db> {
         // constructor-call bindings.
         let new_method = self_type.lookup_dunder_new(db);
 
-        let Some(constructor_instance_ty) = self_type.to_instance(db) else {
-            return fallback_bindings();
-        };
-
         // Construct an instance type to look up `__init__`. We use `self_type` (possibly identity-
         // specialized) so the instance retains inferable class typevars during constructor checking.
         // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let Some(lookup_init_ty) = self_type.to_instance(db) else {
-            return fallback_bindings();
-        };
+        let lookup_init_ty = constructor_instance_ty;
 
         // Lookup the `__init__` instance method in the MRO, excluding `object` initially; we only
         // fall back to `object.__init__` in the `__new__`-absent case (see rules above).
@@ -4892,43 +4900,77 @@ impl<'db> Type<'db> {
         //
         // Use a structural class-based check instead of full assignability/subtyping to avoid
         // deep recursive relation checks on large codebases (for example static-frame).
-        let new_non_instance_return =
-            new_bindings
-                .as_ref()
-                .and_then(|(new_bindings, new_callable)| {
-                    let func = match *new_callable {
-                        Type::FunctionLiteral(func) => Some(func),
-                        Type::BoundMethod(method) => Some(method.function(db)),
-                        _ => None,
-                    }?;
-                    let enclosing_class = nearest_enclosing_class(
-                        db,
-                        semantic_index(db, func.file(db)),
-                        func.definition(db).scope(db),
-                    );
-                    if enclosing_class.is_some_and(|cls| {
-                        matches!(cls.known(db), Some(KnownClass::Type | KnownClass::Object))
-                    }) {
-                        return None;
-                    }
+        //
+        // For overloaded `__new__` with mixed return types (some instance, some not), we build
+        // combined overloads where non-instance overloads keep their return type and instance-
+        // returning overloads get `constructor_instance_ty` as their return type.
+        let mut new_mixed_non_instance_sigs = None;
 
-                    new_bindings
-                        .iter()
-                        .flat_map(|callable_binding| callable_binding.overloads().iter())
-                        .map(|overload| overload.signature.return_ty)
-                        .find(|return_ty| {
-                            !return_ty.is_unknown()
-                                && !return_ty.has_typevar(db)
-                                && ConstructorReturnDisposition::of(db, *return_ty, class)
-                                    .is_not_instance()
-                        })
+        if let Some((ref new_bindings_inner, ref new_callable)) = new_bindings {
+            let func = match *new_callable {
+                Type::FunctionLiteral(func) => Some(func),
+                Type::BoundMethod(method) => Some(method.function(db)),
+                _ => None,
+            };
+            if let Some(func) = func {
+                let enclosing_class = nearest_enclosing_class(
+                    db,
+                    semantic_index(db, func.file(db)),
+                    func.definition(db).scope(db),
+                );
+                let is_object_or_type = enclosing_class.is_some_and(|cls| {
+                    matches!(cls.known(db), Some(KnownClass::Type | KnownClass::Object))
                 });
 
-        if let Some(new_return_ty) = new_non_instance_return {
-            let (new_bindings, _) = new_bindings.unwrap();
-            return new_bindings
-                .with_generic_context(db, class_generic_context)
-                .with_constructor_instance_type(new_return_ty);
+                if !is_object_or_type {
+                    let signature = func.signature(db);
+
+                    let non_instance_sigs: SmallVec<[Signature<'db>; 4]> = signature
+                        .overloads
+                        .iter()
+                        .filter(|sig| is_non_instance_overload(sig))
+                        .cloned()
+                        .collect();
+
+                    if !non_instance_sigs.is_empty() {
+                        if non_instance_sigs.len() == signature.overloads.len() {
+                            // All overloads return non-instance types: use `__new__` directly.
+                            let new_return_ty = new_bindings_inner
+                                .iter()
+                                .flat_map(|cb| cb.overloads().iter())
+                                .map(|overload| overload.signature.return_ty)
+                                .find(|return_ty| {
+                                    !return_ty.is_unknown()
+                                        && !return_ty.has_typevar(db)
+                                        && ConstructorReturnDisposition::of(db, *return_ty, class)
+                                            .is_not_instance()
+                                })
+                                .unwrap_or(constructor_instance_ty);
+                            let (new_bindings, _) = new_bindings.unwrap();
+                            return new_bindings
+                                .with_generic_context(db, class_generic_context)
+                                .with_constructor_instance_type(new_return_ty);
+                        }
+
+                        // Mixed: save ALL overloads with correct per-overload return
+                        // types. Non-instance overloads keep their return type;
+                        // instance-returning overloads get `constructor_instance_ty`.
+                        new_mixed_non_instance_sigs = Some(
+                            signature
+                                .overloads
+                                .iter()
+                                .map(|sig| {
+                                    let mut bound = sig.bind_self(db, Some(self_type));
+                                    if !is_non_instance_overload(sig) {
+                                        bound.return_ty = constructor_instance_ty;
+                                    }
+                                    bound
+                                })
+                                .collect::<SmallVec<[Signature<'db>; 4]>>(),
+                        );
+                    }
+                }
+            }
         }
 
         // Only fall back to `object.__init__` when `__new__` is absent.
@@ -4986,47 +5028,33 @@ impl<'db> Type<'db> {
             (Place::Undefined, true) => None,
         };
 
-        // If the metaclass `__call__` had mixed return types (some non-instance, some instance),
-        // combine the non-instance metaclass overloads with `__init__` overloads into a single
-        // set of overloads. The overload resolution algorithm will then naturally select the
-        // metaclass overload for non-instance calls and `__init__` for instance-returning calls.
-        if let Some(non_instance_sigs) = metaclass_mixed_non_instance_sigs {
-            let mut combined_sigs = non_instance_sigs;
+        // If `__new__` had mixed return types (some non-instance, some instance), keep all
+        // `__new__` overloads with correct per-overload return types, and attach `__init__`
+        // bindings as deferred conditional validation. At call checking time, `__init__` is
+        // only validated when the matched `__new__` overload is instance-returning.
+        if let Some(combined_sigs) = new_mixed_non_instance_sigs {
+            let mut bindings: Bindings<'db> =
+                CallableBinding::from_overloads(self_type, combined_sigs).into();
 
-            // Extract `__init__` signatures, pre-bind (removing `self`), set return type
-            // to the class instance type.
-            let init_method_ty = init_bindings.as_ref().map(|(_, ty)| *ty).or_else(|| {
-                // Fall back to `object.__init__` lookup if no custom `__init__` was found.
-                let init_with_object = lookup_init_ty.member_lookup_with_policy(
-                    db,
-                    "__init__".into(),
-                    MemberLookupPolicy::NO_INSTANCE_FALLBACK,
-                );
-                match init_with_object.place {
-                    Place::Defined(DefinedPlace { ty, .. }) => Some(ty),
-                    Place::Undefined => None,
-                }
-            });
-
-            if let Some(Type::BoundMethod(init_bm)) = init_method_ty {
-                let init_self = init_bm.self_instance(db);
-                let init_sig = init_bm.function(db).signature(db);
-                for sig in &init_sig.overloads {
-                    let mut bound_sig = sig.bind_self(db, Some(init_self));
-                    bound_sig.return_ty = constructor_instance_ty;
-                    combined_sigs.push(bound_sig);
-                }
-            } else {
-                // Can't extract raw `__init__` signatures (e.g., union type).
-                // Fall back to a gradual signature for the instance-returning overloads.
-                combined_sigs.push(Signature::new(
-                    Parameters::gradual_form(),
-                    constructor_instance_ty,
-                ));
+            if let Some((init_bindings, _)) = init_bindings {
+                bindings.set_mixed_constructor_init(constructor_instance_ty, init_bindings);
             }
 
-            let bindings: Bindings<'db> =
+            return bindings.with_generic_context(db, class_generic_context);
+        }
+
+        // If the metaclass `__call__` had mixed return types (some non-instance, some instance),
+        // keep all overloads with per-overload return types, and attach `__init__` bindings as
+        // deferred conditional validation. At call checking time, `__init__` is only validated
+        // when the matched overload is instance-returning.
+        if let Some(combined_sigs) = metaclass_mixed_non_instance_sigs {
+            let mut bindings: Bindings<'db> =
                 CallableBinding::from_overloads(self, combined_sigs).into();
+
+            if let Some((init_bindings, _)) = init_bindings {
+                bindings.set_mixed_constructor_init(constructor_instance_ty, init_bindings);
+            }
+
             return bindings.with_generic_context(db, class_generic_context);
         }
 
