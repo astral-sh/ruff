@@ -5,6 +5,7 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
+    use std::fmt::Write as _;
     use std::path::Path;
 
     use anyhow::Result;
@@ -13,7 +14,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
-    use crate::test::test_path;
+    use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test_case(Rule::Assert, Path::new("S101.py"))]
@@ -206,5 +207,61 @@ mod tests {
         )?;
         assert_diagnostics!("S110_typed", diagnostics);
         Ok(())
+    }
+
+    #[test]
+    fn s103_exhaustive_literal_matrix() {
+        const DANGEROUS_MASK: u16 = 0o33;
+        const MAX_VALID_PERMISSION_MASK: u16 = 0o7777;
+
+        let mut source = String::from("import os\n");
+        for mode in 0..=MAX_VALID_PERMISSION_MASK {
+            writeln!(&mut source, "os.chmod('/tmp/file', {mode:#o})").expect("write to String");
+        }
+
+        let diagnostics = test_snippet(&source, &LinterSettings::for_rule(Rule::BadFilePermissions));
+
+        let expected = (0..=MAX_VALID_PERMISSION_MASK)
+            .filter(|mode| (mode & DANGEROUS_MASK) != 0)
+            .count();
+
+        assert_eq!(diagnostics.len(), expected);
+    }
+
+    #[test]
+    fn s103_exhaustive_bitwise_matrix() {
+        const DANGEROUS_MASK: u16 = 0o33;
+        const MAX_OPERAND: u16 = 0o177;
+
+        let mut source = String::from("import os\n");
+        let mut expected = 0usize;
+
+        for left in 0..=MAX_OPERAND {
+            for right in 0..=MAX_OPERAND {
+                writeln!(
+                    &mut source,
+                    "os.chmod('/tmp/file', {left:#o} | {right:#o})"
+                )
+                .expect("write to String");
+                expected += usize::from(((left | right) & DANGEROUS_MASK) != 0);
+
+                writeln!(
+                    &mut source,
+                    "os.chmod('/tmp/file', {left:#o} & {right:#o})"
+                )
+                .expect("write to String");
+                expected += usize::from(((left & right) & DANGEROUS_MASK) != 0);
+
+                writeln!(
+                    &mut source,
+                    "os.chmod('/tmp/file', {left:#o} ^ {right:#o})"
+                )
+                .expect("write to String");
+                expected += usize::from(((left ^ right) & DANGEROUS_MASK) != 0);
+            }
+        }
+
+        let diagnostics = test_snippet(&source, &LinterSettings::for_rule(Rule::BadFilePermissions));
+        assert_eq!(diagnostics.len(), expected);
     }
 }

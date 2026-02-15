@@ -57,7 +57,7 @@ impl Violation for BadFilePermissions {
 
 #[derive(Debug, PartialEq, Eq)]
 enum Reason {
-    Permissive(u16),
+    Permissive(u64),
     Invalid,
 }
 
@@ -73,15 +73,26 @@ pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
         .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "chmod"]))
     {
         if let Some(mode_arg) = call.arguments.find_argument_value("mode", 1) {
-            match parse_mask(mode_arg, checker.semantic()) {
-                // The mask couldn't be determined (e.g., it's dynamic).
-                Ok(None) => {}
-                // The mask is a valid integer value -- check for overly permissive permissions.
-                Ok(Some(mask)) => {
-                    if (mask & WRITE_WORLD > 0) || (mask & EXECUTE_GROUP > 0) {
+            match analyze_mask(mode_arg, checker.semantic()) {
+                Ok(analysis) => {
+                    if analysis.bits.must & DANGEROUS_MASK > 0 {
                         checker.report_diagnostic(
                             BadFilePermissions {
-                                reason: Reason::Permissive(mask),
+                                reason: Reason::Permissive(
+                                    analysis
+                                        .value
+                                        .unwrap_or(analysis.bits.must),
+                                ),
+                            },
+                            mode_arg.range(),
+                        );
+                    } else if analysis
+                        .value
+                        .is_some_and(|value| value > MAX_PERMISSION_MASK)
+                    {
+                        checker.report_diagnostic(
+                            BadFilePermissions {
+                                reason: Reason::Invalid,
                             },
                             mode_arg.range(),
                         );
@@ -101,10 +112,62 @@ pub(crate) fn bad_file_permissions(checker: &Checker, call: &ast::ExprCall) {
     }
 }
 
-const WRITE_WORLD: u16 = 0o2;
-const EXECUTE_GROUP: u16 = 0o10;
+const EXECUTE_WORLD: u64 = 0o1;
+const WRITE_WORLD: u64 = 0o2;
+const EXECUTE_GROUP: u64 = 0o10;
+const WRITE_GROUP: u64 = 0o20;
+const DANGEROUS_MASK: u64 = EXECUTE_WORLD | WRITE_WORLD | EXECUTE_GROUP | WRITE_GROUP;
+const MAX_PERMISSION_MASK: u64 = 0o7777;
 
-fn py_stat(qualified_name: &QualifiedName) -> Option<u16> {
+#[derive(Debug, Clone, Copy)]
+struct BitAnalysis {
+    /// Bits that are always set.
+    must: u64,
+    /// Bits that may be set.
+    may: u64,
+}
+
+impl BitAnalysis {
+    const fn known(value: u64) -> Self {
+        Self {
+            must: value,
+            may: value,
+        }
+    }
+
+    const fn unknown() -> Self {
+        Self {
+            must: 0,
+            may: u64::MAX,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MaskAnalysis {
+    /// Exact known mask value if it can be statically determined.
+    value: Option<u64>,
+    /// Bit analysis for partially-known expressions.
+    bits: BitAnalysis,
+}
+
+impl MaskAnalysis {
+    const fn known(value: u64) -> Self {
+        Self {
+            value: Some(value),
+            bits: BitAnalysis::known(value),
+        }
+    }
+
+    const fn unknown() -> Self {
+        Self {
+            value: None,
+            bits: BitAnalysis::unknown(),
+        }
+    }
+}
+
+fn py_stat(qualified_name: &QualifiedName) -> Option<u64> {
     match qualified_name.segments() {
         ["stat", "ST_MODE"] => Some(0o0),
         ["stat", "S_IFDOOR"] => Some(0o0),
@@ -147,21 +210,24 @@ fn py_stat(qualified_name: &QualifiedName) -> Option<u16> {
     }
 }
 
-/// Return the mask value as a `u16`, if it can be determined. Returns an error if the mask is
-/// an integer value, but that value is out of range.
-fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> Result<Option<u16>> {
+/// Return a partial or exact analysis of the mask expression.
+///
+/// For unknown expressions, this function returns [`MaskAnalysis::unknown`]. Returns an error if
+/// an integer literal exists but cannot be represented in a `u64`.
+fn analyze_mask(expr: &Expr, semantic: &SemanticModel) -> Result<MaskAnalysis> {
     match expr {
         Expr::NumberLiteral(ast::ExprNumberLiteral {
             value: ast::Number::Int(int),
             ..
-        }) => match int.as_u16() {
-            Some(value) => Ok(Some(value)),
+        }) => match int.as_u64() {
+            Some(value) => Ok(MaskAnalysis::known(value)),
             None => anyhow::bail!("int value out of range"),
         },
         Expr::Attribute(_) => Ok(semantic
             .resolve_qualified_name(expr)
             .as_ref()
-            .and_then(py_stat)),
+            .and_then(py_stat)
+            .map_or_else(MaskAnalysis::unknown, MaskAnalysis::known)),
         Expr::BinOp(ast::ExprBinOp {
             left,
             op,
@@ -169,19 +235,45 @@ fn parse_mask(expr: &Expr, semantic: &SemanticModel) -> Result<Option<u16>> {
             range: _,
             node_index: _,
         }) => {
-            let Some(left_value) = parse_mask(left, semantic)? else {
-                return Ok(None);
-            };
-            let Some(right_value) = parse_mask(right, semantic)? else {
-                return Ok(None);
-            };
+            let left_analysis = analyze_mask(left, semantic)?;
+            let right_analysis = analyze_mask(right, semantic)?;
+
             Ok(match op {
-                Operator::BitAnd => Some(left_value & right_value),
-                Operator::BitOr => Some(left_value | right_value),
-                Operator::BitXor => Some(left_value ^ right_value),
-                _ => None,
+                Operator::BitAnd => MaskAnalysis {
+                    value: left_analysis
+                        .value
+                        .zip(right_analysis.value)
+                        .map(|(left_value, right_value)| left_value & right_value),
+                    bits: BitAnalysis {
+                        must: left_analysis.bits.must & right_analysis.bits.must,
+                        may: left_analysis.bits.may & right_analysis.bits.may,
+                    },
+                },
+                Operator::BitOr => MaskAnalysis {
+                    value: left_analysis
+                        .value
+                        .zip(right_analysis.value)
+                        .map(|(left_value, right_value)| left_value | right_value),
+                    bits: BitAnalysis {
+                        must: left_analysis.bits.must | right_analysis.bits.must,
+                        may: left_analysis.bits.may | right_analysis.bits.may,
+                    },
+                },
+                Operator::BitXor => MaskAnalysis {
+                    value: left_analysis
+                        .value
+                        .zip(right_analysis.value)
+                        .map(|(left_value, right_value)| left_value ^ right_value),
+                    bits: BitAnalysis {
+                        must: (left_analysis.bits.must & !right_analysis.bits.may)
+                            | (!left_analysis.bits.may & right_analysis.bits.must),
+                        may: (left_analysis.bits.may & !right_analysis.bits.must)
+                            | (!left_analysis.bits.must & right_analysis.bits.may),
+                    },
+                },
+                _ => MaskAnalysis::unknown(),
             })
         }
-        _ => Ok(None),
+        _ => Ok(MaskAnalysis::unknown()),
     }
 }
