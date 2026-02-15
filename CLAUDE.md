@@ -86,4 +86,4 @@ When working on ty, PR titles should start with `[ty]` and be tagged with the `t
 - Prefer let chains (`if let` combined with `&&`) over nested `if let` statements to reduce indentation and improve readability.
 - If you *have* to suppress a Clippy lint, prefer to use `#[expect()]` over `[allow()]`, where possible.
 - Use comments purposefully. Don't use comments to narrate code, but do use them to explain invariants and why something unusual was done a particular way.
-- **Salsa incrementality (ty):** Any function or method that accesses `.node()` on a Salsa-tracked type must itself be decorated with `#[salsa::tracked]`. Without this, trivial AST changes in one module can unnecessarily invalidate queries across many other modules. Prefer using higher-level semantic APIs (e.g. methods on `FunctionLiteral`, `ClassLiteral`, etc.) over directly accessing raw AST nodes, as this preserves Salsa's caching and incrementality properties.
+- **Salsa incrementality (ty):** Any method that accesses `.node()` must be `#[salsa::tracked]`, or it will break incrementality. Prefer higher-level semantic APIs over raw AST access.
