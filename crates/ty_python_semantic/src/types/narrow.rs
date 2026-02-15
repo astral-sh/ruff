@@ -62,35 +62,109 @@ pub(crate) fn infer_narrowing_constraint<'db>(
 ) -> Option<NarrowingConstraint<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
-            if predicate.is_positive {
-                all_narrowing_constraints_for_expression(db, expression)
-            } else {
-                all_negative_narrowing_constraints_for_expression(db, expression)
-            }
+            all_narrowing_constraints_for_expression(db, expression)
         }
-        PredicateNode::Pattern(pattern) => {
-            if predicate.is_positive {
-                all_narrowing_constraints_for_pattern(db, pattern)
-            } else {
-                all_negative_narrowing_constraints_for_pattern(db, pattern)
-            }
-        }
+        PredicateNode::Pattern(pattern) => all_narrowing_constraints_for_pattern(db, pattern),
         PredicateNode::ReturnsNever(_) => return None,
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
 
-    constraints.and_then(|constraints| constraints.get(&place).cloned())
+    constraints.and_then(|constraints| constraints.get(place, predicate.is_positive).cloned())
 }
 
-#[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
-fn all_narrowing_constraints_for_pattern<'db>(
-    db: &'db dyn Db,
-    pattern: PatternPredicate<'db>,
-) -> Option<NarrowingConstraints<'db>> {
-    let module = parsed_module(db, pattern.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true).finish()
+#[derive(Default, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+struct PerPlaceDualNarrowingConstraint<'db> {
+    positive: Option<NarrowingConstraint<'db>>,
+    negative: Option<NarrowingConstraint<'db>>,
 }
 
+type DualNarrowingConstraintsMap<'db> =
+    FxHashMap<ScopedPlaceId, PerPlaceDualNarrowingConstraint<'db>>;
+
+#[derive(Default, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
+struct DualNarrowingConstraints<'db> {
+    by_place: DualNarrowingConstraintsMap<'db>,
+    has_positive: bool,
+    has_negative: bool,
+}
+
+impl<'db> DualNarrowingConstraints<'db> {
+    fn from_sides(
+        positive: Option<NarrowingConstraints<'db>>,
+        negative: Option<NarrowingConstraints<'db>>,
+    ) -> Self {
+        let mut by_place = DualNarrowingConstraintsMap::default();
+        let has_positive = positive.is_some();
+        let has_negative = negative.is_some();
+
+        if let Some(positive) = positive {
+            for (place, constraint) in positive {
+                by_place.entry(place).or_default().positive = Some(constraint);
+            }
+        }
+
+        if let Some(negative) = negative {
+            for (place, constraint) in negative {
+                by_place.entry(place).or_default().negative = Some(constraint);
+            }
+        }
+
+        Self {
+            by_place,
+            has_positive,
+            has_negative,
+        }
+    }
+
+    fn into_sides(
+        self,
+    ) -> (
+        Option<NarrowingConstraints<'db>>,
+        Option<NarrowingConstraints<'db>>,
+    ) {
+        let mut positive = self.has_positive.then(FxHashMap::default);
+        let mut negative = self.has_negative.then(FxHashMap::default);
+
+        for (place, constraints) in self.by_place {
+            if let (Some(positive), Some(constraint)) = (&mut positive, constraints.positive) {
+                positive.insert(place, constraint);
+            }
+            if let (Some(negative), Some(constraint)) = (&mut negative, constraints.negative) {
+                negative.insert(place, constraint);
+            }
+        }
+
+        (positive, negative)
+    }
+
+    fn get(&self, place: ScopedPlaceId, is_positive: bool) -> Option<&NarrowingConstraint<'db>> {
+        if is_positive && !self.has_positive || !is_positive && !self.has_negative {
+            return None;
+        }
+
+        self.by_place.get(&place).and_then(|constraints| {
+            if is_positive {
+                constraints.positive.as_ref()
+            } else {
+                constraints.negative.as_ref()
+            }
+        })
+    }
+
+    fn shrink_to_fit(&mut self) {
+        self.by_place.shrink_to_fit();
+    }
+
+    fn swap_polarity(mut self) -> Self {
+        std::mem::swap(&mut self.has_positive, &mut self.has_negative);
+        for constraints in self.by_place.values_mut() {
+            std::mem::swap(&mut constraints.positive, &mut constraints.negative);
+        }
+        self
+    }
+}
+
+#[allow(clippy::unnecessary_wraps)]
 #[salsa::tracked(
     returns(as_ref),
     cycle_initial=|_, _, _| None,
@@ -99,33 +173,22 @@ fn all_narrowing_constraints_for_pattern<'db>(
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<DualNarrowingConstraints<'db>> {
     let module = parsed_module(db, expression.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), true)
-        .finish()
+    Some(
+        NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression))
+            .finish(),
+    )
 }
 
-#[salsa::tracked(
-    returns(as_ref),
-    cycle_initial=|_, _, _| None,
-    heap_size=ruff_memory_usage::heap_size,
-)]
-fn all_negative_narrowing_constraints_for_expression<'db>(
-    db: &'db dyn Db,
-    expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
-    let module = parsed_module(db, expression.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), false)
-        .finish()
-}
-
+#[allow(clippy::unnecessary_wraps)]
 #[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
-fn all_negative_narrowing_constraints_for_pattern<'db>(
+fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<DualNarrowingConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
-    NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
+    Some(NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern)).finish())
 }
 
 /// Functions that can be used to narrow the type of a first argument using a "classinfo" second argument.
@@ -504,74 +567,94 @@ struct NarrowingConstraintsBuilder<'db, 'ast> {
     db: &'db dyn Db,
     module: &'ast ParsedModuleRef,
     predicate: PredicateNode<'db>,
-    is_positive: bool,
 }
 
 impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
-    fn new(
-        db: &'db dyn Db,
-        module: &'ast ParsedModuleRef,
-        predicate: PredicateNode<'db>,
-        is_positive: bool,
-    ) -> Self {
+    fn new(db: &'db dyn Db, module: &'ast ParsedModuleRef, predicate: PredicateNode<'db>) -> Self {
         Self {
             db,
             module,
             predicate,
-            is_positive,
         }
     }
 
-    fn finish(mut self) -> Option<NarrowingConstraints<'db>> {
-        let mut constraints: Option<NarrowingConstraints<'db>> = match self.predicate {
-            PredicateNode::Expression(expression) => {
-                self.evaluate_expression_predicate(expression, self.is_positive)
+    fn finish(mut self) -> DualNarrowingConstraints<'db> {
+        let mut constraints = match self.predicate {
+            PredicateNode::Expression(expression) => self.evaluate_expression_predicate(expression),
+            PredicateNode::Pattern(pattern) => self.evaluate_pattern_predicate(pattern),
+            PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                return DualNarrowingConstraints::default();
             }
-            PredicateNode::Pattern(pattern) => {
-                self.evaluate_pattern_predicate(pattern, self.is_positive)
-            }
-            PredicateNode::ReturnsNever(_) => return None,
-            PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
-        if let Some(ref mut constraints) = constraints {
-            constraints.shrink_to_fit();
-        }
+        constraints.shrink_to_fit();
 
         constraints
+    }
+
+    fn merge_constraints_and_sequence(
+        &self,
+        sub_constraints: Vec<Option<NarrowingConstraints<'db>>>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let mut aggregation: Option<NarrowingConstraints<'db>> = None;
+        for sub_constraint in sub_constraints.into_iter().flatten() {
+            if let Some(ref mut some_aggregation) = aggregation {
+                merge_constraints_and(some_aggregation, sub_constraint, self.db);
+            } else {
+                aggregation = Some(sub_constraint);
+            }
+        }
+        aggregation
+    }
+
+    fn merge_constraints_or_sequence(
+        &self,
+        sub_constraints: Vec<Option<NarrowingConstraints<'db>>>,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let (mut first, rest) = {
+            let mut it = sub_constraints.into_iter();
+            (it.next()?, it)
+        };
+
+        if let Some(ref mut first) = first {
+            for rest_constraint in rest {
+                if let Some(rest_constraint) = rest_constraint {
+                    merge_constraints_or(first, rest_constraint, self.db);
+                } else {
+                    return None;
+                }
+            }
+        }
+        first
     }
 
     fn evaluate_expression_predicate(
         &mut self,
         expression: Expression<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> DualNarrowingConstraints<'db> {
         let expression_node = expression.node_ref(self.db, self.module);
-        self.evaluate_expression_node_predicate(expression_node, expression, is_positive)
+        self.evaluate_expression_node_predicate(expression_node, expression)
     }
 
     fn evaluate_expression_node_predicate(
         &mut self,
         expression_node: &ruff_python_ast::Expr,
         expression: Expression<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> DualNarrowingConstraints<'db> {
         match expression_node {
             ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                self.evaluate_simple_expr(expression_node, is_positive)
+                self.evaluate_simple_expr(expression_node)
             }
             ast::Expr::Compare(expr_compare) => {
-                self.evaluate_expr_compare(expr_compare, expression, is_positive)
+                self.evaluate_expr_compare(expr_compare, expression)
             }
-            ast::Expr::Call(expr_call) => {
-                self.evaluate_expr_call(expr_call, expression, is_positive)
-            }
-            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => {
-                self.evaluate_expression_node_predicate(&unary_op.operand, expression, !is_positive)
-            }
-            ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression, is_positive),
-            ast::Expr::Named(expr_named) => self.evaluate_expr_named(expr_named, is_positive),
-            _ => None,
+            ast::Expr::Call(expr_call) => self.evaluate_expr_call(expr_call, expression),
+            ast::Expr::UnaryOp(unary_op) if unary_op.op == ast::UnaryOp::Not => self
+                .evaluate_expression_node_predicate(&unary_op.operand, expression)
+                .swap_polarity(),
+            ast::Expr::BoolOp(bool_op) => self.evaluate_bool_op(bool_op, expression),
+            ast::Expr::Named(expr_named) => self.evaluate_expr_named(expr_named),
+            _ => DualNarrowingConstraints::default(),
         }
     }
 
@@ -579,41 +662,35 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         pattern_predicate_kind: &PatternPredicateKind<'db>,
         subject: Expression<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> DualNarrowingConstraints<'db> {
         match pattern_predicate_kind {
             PatternPredicateKind::Singleton(singleton) => {
-                self.evaluate_match_pattern_singleton(subject, *singleton, is_positive)
+                self.evaluate_match_pattern_singleton(subject, *singleton)
             }
             PatternPredicateKind::Class(cls, kind) => {
-                self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive)
+                self.evaluate_match_pattern_class(subject, *cls, *kind)
             }
             PatternPredicateKind::Mapping(kind) => {
-                self.evaluate_match_pattern_mapping(subject, *kind, is_positive)
+                self.evaluate_match_pattern_mapping(subject, *kind)
             }
-            PatternPredicateKind::Value(expr) => {
-                self.evaluate_match_pattern_value(subject, *expr, is_positive)
-            }
+            PatternPredicateKind::Value(expr) => self.evaluate_match_pattern_value(subject, *expr),
             PatternPredicateKind::Or(predicates) => {
-                self.evaluate_match_pattern_or(subject, predicates, is_positive)
+                self.evaluate_match_pattern_or(subject, predicates)
             }
             PatternPredicateKind::As(pattern, _) => pattern
                 .as_deref()
-                .and_then(|p| self.evaluate_pattern_predicate_kind(p, subject, is_positive)),
-            PatternPredicateKind::Unsupported => None,
+                .map_or_else(DualNarrowingConstraints::default, |p| {
+                    self.evaluate_pattern_predicate_kind(p, subject)
+                }),
+            PatternPredicateKind::Unsupported => DualNarrowingConstraints::default(),
         }
     }
 
     fn evaluate_pattern_predicate(
         &mut self,
         pattern: PatternPredicate<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        self.evaluate_pattern_predicate_kind(
-            pattern.kind(self.db),
-            pattern.subject(self.db),
-            is_positive,
-        )
+    ) -> DualNarrowingConstraints<'db> {
+        self.evaluate_pattern_predicate_kind(pattern.kind(self.db), pattern.subject(self.db))
     }
 
     fn places(&self) -> &'db PlaceTable {
@@ -734,32 +811,29 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn evaluate_simple_expr(
-        &mut self,
-        expr: &ast::Expr,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        let target = PlaceExpr::try_from_expr(expr)?;
+    fn evaluate_simple_expr(&mut self, expr: &ast::Expr) -> DualNarrowingConstraints<'db> {
+        let Some(target) = PlaceExpr::try_from_expr(expr) else {
+            return DualNarrowingConstraints::default();
+        };
         let place = self.expect_place(&target);
 
-        let ty = if is_positive {
-            Type::AlwaysFalsy.negate(self.db)
-        } else {
-            Type::AlwaysTruthy.negate(self.db)
-        };
-
-        Some(NarrowingConstraints::from_iter([(
+        let positive = NarrowingConstraints::from_iter([(
             place,
-            NarrowingConstraint::intersection(ty),
-        )]))
+            NarrowingConstraint::intersection(Type::AlwaysFalsy.negate(self.db)),
+        )]);
+        let negative = NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::intersection(Type::AlwaysTruthy.negate(self.db)),
+        )]);
+
+        DualNarrowingConstraints::from_sides(Some(positive), Some(negative))
     }
 
     fn evaluate_expr_named(
         &mut self,
         expr_named: &ast::ExprNamed,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        self.evaluate_simple_expr(&expr_named.target, is_positive)
+    ) -> DualNarrowingConstraints<'db> {
+        self.evaluate_simple_expr(&expr_named.target)
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
@@ -975,10 +1049,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         lhs_ty: Type<'db>,
         rhs_ty: Type<'db>,
         op: ast::CmpOp,
-        is_positive: bool,
     ) -> Option<Type<'db>> {
-        let op = if is_positive { op } else { op.negate() };
-
         // `Divergent` shows up as an initial value in cycle recovery. If it appears on either side
         // of a potentially narrowing comparison, we don't want it to turn that comparison into a
         // no-op (e.g. because `Divergent` is not a singleton in the `IsNot` branch below), because
@@ -1023,6 +1094,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         expr_compare: &ast::ExprCompare,
         expression: Expression<'db>,
+    ) -> DualNarrowingConstraints<'db> {
+        let inference = infer_expression_types(self.db, expression, TypeContext::default());
+        DualNarrowingConstraints::from_sides(
+            self.evaluate_expr_compare_for_polarity(expr_compare, inference, true),
+            self.evaluate_expr_compare_for_polarity(expr_compare, inference, false),
+        )
+    }
+
+    fn evaluate_expr_compare_for_polarity(
+        &mut self,
+        expr_compare: &ast::ExprCompare,
+        inference: &ExpressionInference<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         fn is_narrowing_target_candidate(expr: &ast::Expr) -> bool {
@@ -1096,8 +1179,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // and that requires cross-symbol constraints, which we don't support yet.
             return None;
         }
-
-        let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
         let comparator_tuples = std::iter::once(&**left)
             .chain(comparators)
@@ -1303,13 +1384,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 // If this is `None`, it indicates that we cannot do `if type(x) is Y`
                 // narrowing: we can only do narrowing for `if type(x) is Y` and
                 // `if type(x) is not Y`, not for `if type(x) == Y` or `if type(x) != Y`.
-                let is_positive = match op {
+                let type_narrowing_is_positive = match op {
                     ast::CmpOp::Is => Some(is_positive),
                     ast::CmpOp::IsNot => Some(!is_positive),
                     _ => None,
                 };
 
-                if let Some(is_positive) = is_positive
+                if let Some(type_narrowing_is_positive) = type_narrowing_is_positive
                     && keywords.is_empty()
                     && let [single_argument] = &**args
                     && let Some(target) = PlaceExpr::try_from_expr(single_argument)
@@ -1318,14 +1399,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     && let Some(other_class) = find_underlying_class(self.db, other)
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
                     // if `Y` is a final class
-                    && (is_positive || other_class.is_final(self.db))
+                    && (type_narrowing_is_positive || other_class.is_final(self.db))
                 {
                     let place = self.expect_place(&target);
                     constraints.insert(
                         place,
                         NarrowingConstraint::intersection(
                             Type::instance(self.db, other_class.top_materialization(self.db))
-                                .negate_if(self.db, !is_positive),
+                                .negate_if(self.db, !type_narrowing_is_positive),
                         ),
                     );
                     last_rhs_ty = Some(rhs_ty);
@@ -1342,7 +1423,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // - `if x not in y`
             if narrowable_ast(left)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(left)
-                && let Some(ty) = self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
+                && let Some(ty) = self.evaluate_expr_compare_op(
+                    lhs_ty,
+                    rhs_ty,
+                    if is_positive { *op } else { op.negate() },
+                )
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -1364,7 +1449,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             if !matches!(op, ast::CmpOp::In | ast::CmpOp::NotIn)
                 && narrowable_ast(right)
                 && let Some(narrowable) = PlaceExpr::try_from_expr(right)
-                && let Some(ty) = self.evaluate_expr_compare_op(rhs_ty, lhs_ty, *op, is_positive)
+                && let Some(ty) = self.evaluate_expr_compare_op(
+                    rhs_ty,
+                    lhs_ty,
+                    if is_positive { *op } else { op.negate() },
+                )
             {
                 let place = self.expect_place(&narrowable);
                 let constraint = NarrowingConstraint::intersection(ty);
@@ -1388,17 +1477,37 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         expr_call: &ast::ExprCall,
         expression: Expression<'db>,
+    ) -> DualNarrowingConstraints<'db> {
+        let inference = infer_expression_types(self.db, expression, TypeContext::default());
+        let callable_ty = inference.expression_type(&*expr_call.func);
+
+        if let Type::ClassLiteral(class_type) = callable_ty
+            && expr_call.arguments.args.len() == 1
+            && expr_call.arguments.keywords.is_empty()
+            && class_type.is_known(self.db, KnownClass::Bool)
+        {
+            return self
+                .evaluate_expression_node_predicate(&expr_call.arguments.args[0], expression);
+        }
+
+        DualNarrowingConstraints::from_sides(
+            self.evaluate_expr_call_for_polarity(expr_call, inference, callable_ty, true),
+            self.evaluate_expr_call_for_polarity(expr_call, inference, callable_ty, false),
+        )
+    }
+
+    fn evaluate_expr_call_for_polarity(
+        &mut self,
+        expr_call: &ast::ExprCall,
+        inference: &ExpressionInference<'db>,
+        callable_ty: Type<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
-        let inference = infer_expression_types(self.db, expression, TypeContext::default());
-
         if let Some(type_guard_call_constraints) =
-            self.evaluate_type_guard_call(inference, expr_call, is_positive)
+            self.evaluate_type_guard_call_for_polarity(inference, expr_call, is_positive)
         {
             return Some(type_guard_call_constraints);
         }
-
-        let callable_ty = inference.expression_type(&*expr_call.func);
 
         match callable_ty {
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
@@ -1471,25 +1580,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         )])
                     })
             }
-            // for the expression `bool(E)`, we further narrow the type based on `E`
-            Type::ClassLiteral(class_type)
-                if expr_call.arguments.args.len() == 1
-                    && expr_call.arguments.keywords.is_empty()
-                    && class_type.is_known(self.db, KnownClass::Bool) =>
-            {
-                self.evaluate_expression_node_predicate(
-                    &expr_call.arguments.args[0],
-                    expression,
-                    is_positive,
-                )
-            }
             _ => None,
         }
     }
 
     // Helper to evaluate TypeGuard/TypeIs narrowing for a call expression.
     // This is based on the call expression's return type, so it applies to any callable type.
-    fn evaluate_type_guard_call(
+    fn evaluate_type_guard_call_for_polarity(
         &mut self,
         inference: &ExpressionInference<'db>,
         expr_call: &ast::ExprCall,
@@ -1527,6 +1624,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         singleton: ast::Singleton,
+    ) -> DualNarrowingConstraints<'db> {
+        DualNarrowingConstraints::from_sides(
+            self.evaluate_match_pattern_singleton_for_polarity(subject, singleton, true),
+            self.evaluate_match_pattern_singleton_for_polarity(subject, singleton, false),
+        )
+    }
+
+    fn evaluate_match_pattern_singleton_for_polarity(
+        &mut self,
+        subject: Expression<'db>,
+        singleton: ast::Singleton,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
@@ -1545,6 +1653,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_match_pattern_class(
+        &mut self,
+        subject: Expression<'db>,
+        cls: Expression<'db>,
+        kind: ClassPatternKind,
+    ) -> DualNarrowingConstraints<'db> {
+        DualNarrowingConstraints::from_sides(
+            self.evaluate_match_pattern_class_for_polarity(subject, cls, kind, true),
+            self.evaluate_match_pattern_class_for_polarity(subject, cls, kind, false),
+        )
+    }
+
+    fn evaluate_match_pattern_class_for_polarity(
         &mut self,
         subject: Expression<'db>,
         cls: Expression<'db>,
@@ -1583,6 +1703,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         kind: ClassPatternKind,
+    ) -> DualNarrowingConstraints<'db> {
+        DualNarrowingConstraints::from_sides(
+            self.evaluate_match_pattern_mapping_for_polarity(subject, kind, true),
+            self.evaluate_match_pattern_mapping_for_polarity(subject, kind, false),
+        )
+    }
+
+    fn evaluate_match_pattern_mapping_for_polarity(
+        &mut self,
+        subject: Expression<'db>,
+        kind: ClassPatternKind,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         if !kind.is_irrefutable() && !is_positive {
@@ -1606,6 +1737,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         value: Expression<'db>,
+    ) -> DualNarrowingConstraints<'db> {
+        DualNarrowingConstraints::from_sides(
+            self.evaluate_match_pattern_value_for_polarity(subject, value, true),
+            self.evaluate_match_pattern_value_for_polarity(subject, value, false),
+        )
+    }
+
+    fn evaluate_match_pattern_value_for_polarity(
+        &mut self,
+        subject: Expression<'db>,
+        value: Expression<'db>,
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         let subject_node = subject.node_ref(self.db, self.module);
@@ -1620,7 +1762,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
 
         let mut constraints = self
-            .evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
+            .evaluate_expr_compare_op(
+                subject_ty,
+                value_ty,
+                if is_positive {
+                    ast::CmpOp::Eq
+                } else {
+                    ast::CmpOp::NotEq
+                },
+            )
             .map(|ty| {
                 NarrowingConstraints::from_iter([(place, NarrowingConstraint::intersection(ty))])
             })
@@ -1668,39 +1818,45 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         &mut self,
         subject: Expression<'db>,
         predicates: &Vec<PatternPredicateKind<'db>>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
-        let db = self.db;
+    ) -> DualNarrowingConstraints<'db> {
+        let mut positive: Option<NarrowingConstraints<'db>> = None;
+        let mut negative: Option<NarrowingConstraints<'db>> = None;
 
-        // DeMorgan's law---if the overall `or` is negated, we need to `and` the negated sub-constraints.
-        let merge_constraints = if is_positive {
-            merge_constraints_or
-        } else {
-            merge_constraints_and
-        };
+        for predicate in predicates {
+            let (sub_positive, sub_negative) = self
+                .evaluate_pattern_predicate_kind(predicate, subject)
+                .into_sides();
 
-        predicates
-            .iter()
-            .filter_map(|predicate| {
-                self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
-            })
-            .reduce(|mut constraints, constraints_| {
-                merge_constraints(&mut constraints, constraints_, db);
-                constraints
-            })
+            if let Some(sub_positive) = sub_positive {
+                if let Some(ref mut aggregated) = positive {
+                    merge_constraints_or(aggregated, sub_positive, self.db);
+                } else {
+                    positive = Some(sub_positive);
+                }
+            }
+
+            if let Some(sub_negative) = sub_negative {
+                if let Some(ref mut aggregated) = negative {
+                    merge_constraints_and(aggregated, sub_negative, self.db);
+                } else {
+                    negative = Some(sub_negative);
+                }
+            }
+        }
+
+        DualNarrowingConstraints::from_sides(positive, negative)
     }
 
     fn evaluate_bool_op(
         &mut self,
         expr_bool_op: &ExprBoolOp,
         expression: Expression<'db>,
-        is_positive: bool,
-    ) -> Option<NarrowingConstraints<'db>> {
+    ) -> DualNarrowingConstraints<'db> {
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
         let sub_constraints = expr_bool_op
             .values
             .iter()
-            // filter our arms with statically known truthiness
+            // Filter out arms with statically known truthiness.
             .filter(|expr| {
                 inference.expression_type(*expr).bool(self.db)
                     != match expr_bool_op.op {
@@ -1708,40 +1864,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         BoolOp::Or => Truthiness::AlwaysFalse,
                     }
             })
-            .map(|sub_expr| {
-                self.evaluate_expression_node_predicate(sub_expr, expression, is_positive)
-            })
+            .map(|sub_expr| self.evaluate_expression_node_predicate(sub_expr, expression))
             .collect::<Vec<_>>();
-        match (expr_bool_op.op, is_positive) {
-            (BoolOp::And, true) | (BoolOp::Or, false) => {
-                let mut aggregation: Option<NarrowingConstraints> = None;
-                for sub_constraint in sub_constraints.into_iter().flatten() {
-                    if let Some(ref mut some_aggregation) = aggregation {
-                        merge_constraints_and(some_aggregation, sub_constraint, self.db);
-                    } else {
-                        aggregation = Some(sub_constraint);
-                    }
-                }
-                aggregation
-            }
-            (BoolOp::Or, true) | (BoolOp::And, false) => {
-                let (mut first, rest) = {
-                    let mut it = sub_constraints.into_iter();
-                    (it.next()?, it)
-                };
 
-                if let Some(ref mut first) = first {
-                    for rest_constraint in rest {
-                        if let Some(rest_constraint) = rest_constraint {
-                            merge_constraints_or(first, rest_constraint, self.db);
-                        } else {
-                            return None;
-                        }
-                    }
-                }
-                first
-            }
-        }
+        let (positive_sub_constraints, negative_sub_constraints): (Vec<_>, Vec<_>) =
+            sub_constraints
+                .into_iter()
+                .map(DualNarrowingConstraints::into_sides)
+                .unzip();
+
+        let (positive, negative) = match expr_bool_op.op {
+            BoolOp::And => (
+                self.merge_constraints_and_sequence(positive_sub_constraints),
+                self.merge_constraints_or_sequence(negative_sub_constraints),
+            ),
+            BoolOp::Or => (
+                self.merge_constraints_or_sequence(positive_sub_constraints),
+                self.merge_constraints_and_sequence(negative_sub_constraints),
+            ),
+        };
+
+        DualNarrowingConstraints::from_sides(positive, negative)
     }
 
     /// Narrow tagged unions of `TypedDict`s with `Literal` keys.
