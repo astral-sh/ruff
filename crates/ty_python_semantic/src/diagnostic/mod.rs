@@ -9,21 +9,15 @@ use ruff_db::{
 use std::cell::RefCell;
 use std::fmt::Write;
 
-pub(crate) mod levenshtein;
+mod levenshtein;
 
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
-pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
-    existing_names: impl Iterator<Item = S>,
-    wrong_name: T,
-) -> Option<String> {
-    let names: Vec<String> = existing_names.map(|n| n.as_ref().to_string()).collect();
-    let name_refs: Vec<&str> = names.iter().map(String::as_str).collect();
-    find_best_suggestion(
-        name_refs,
-        wrong_name.as_ref(),
-        HideUnderscoredSuggestions::Yes,
-    )
-    .map(str::to_string)
+pub(crate) fn did_you_mean<'a, O, I>(options: O, typo: &str) -> Option<&'a str>
+where
+    O: IntoIterator<IntoIter = I>,
+    I: ExactSizeIterator<Item = &'a str>,
+{
+    find_best_suggestion(options, typo, HideUnderscoredSuggestions::Yes)
 }
 
 /// Add a subdiagnostic to `diagnostic` that explains why a certain Python version was inferred.
