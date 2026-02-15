@@ -650,7 +650,7 @@ pub fn call_signature_details<'db>(
         bindings
             .iter()
             .flatten()
-            .map(|binding| CallSignatureDetails::from_binding(db, &binding))
+            .map(|binding| CallSignatureDetails::from_binding(db, binding))
             .collect()
     } else {
         // Type is not callable, return empty signatures

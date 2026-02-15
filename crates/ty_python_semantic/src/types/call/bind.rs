@@ -205,7 +205,7 @@ impl<'db> Bindings<'db> {
                 .collect();
             elements_acc.push(BindingsElement {
                 bindings: inner_bindings,
-            })
+            });
         }
 
         let elements = elements_acc;
@@ -1598,14 +1598,13 @@ impl<'db> Bindings<'db> {
                                     continue;
                                 };
 
-                                let return_type =
-                                    parse_struct_format(db, format_literal.value(db))
-                                        .map(|elements| {
-                                            Type::heterogeneous_tuple(db, elements.into_iter())
-                                        })
-                                        .unwrap_or_else(|| {
-                                            Type::homogeneous_tuple(db, Type::unknown())
-                                        });
+                                let return_type = parse_struct_format(db, format_literal.value(db))
+                                    .map(|elements| {
+                                        Type::heterogeneous_tuple(db, elements.into_iter())
+                                    })
+                                    .unwrap_or_else(|| {
+                                        Type::homogeneous_tuple(db, Type::unknown())
+                                    });
 
                                 overload.set_return_type(return_type);
                             }
