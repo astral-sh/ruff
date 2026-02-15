@@ -346,6 +346,33 @@ impl<'db> Bindings<'db> {
         self.elements.iter_mut().flat_map(|e| e.bindings.iter_mut())
     }
 
+    /// Maps each `CallableBinding` to a type and combines results while preserving
+    /// the union-of-intersections structure:
+    ///
+    /// - callable bindings inside an element are intersected
+    /// - elements are unioned
+    pub(crate) fn map_types(
+        &self,
+        db: &'db dyn Db,
+        mut map: impl FnMut(&CallableBinding<'db>) -> Option<Type<'db>>,
+    ) -> Type<'db> {
+        let mut element_types = Vec::new();
+        for element in &self.elements {
+            let mut binding_types = Vec::new();
+            for binding in &element.bindings {
+                if let Some(ty) = map(binding) {
+                    binding_types.push(ty);
+                }
+            }
+
+            if !binding_types.is_empty() {
+                element_types.push(IntersectionType::from_elements(db, binding_types));
+            }
+        }
+
+        UnionType::from_elements(db, element_types)
+    }
+
     pub(crate) fn map(self, f: impl Fn(CallableBinding<'db>) -> CallableBinding<'db>) -> Self {
         Self {
             callable_type: self.callable_type,
@@ -512,6 +539,10 @@ impl<'db> Bindings<'db> {
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Specialization<'db>> = None;
+
+        // TODO this loops over all bindings, flattening union/intersection
+        // shape. As we improve our constraint solver, there may be an
+        // improvement needed here.
         for binding in self.iter() {
             // For constructors, use the first matching overload (declaration order) to avoid
             // merging incompatible constructor specializations.
