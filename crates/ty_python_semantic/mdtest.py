@@ -237,7 +237,10 @@ class MDTestRunner:
 
                 # When a pending snapshot (.snap.new) is rejected in a separate
                 # process (e.g. `cargo insta review`), the file is deleted.
-                # Re-run only the tests for the .md file that produced it.
+                # A common reason for rejecting a snapshot is that it was stale
+                # (produced by an earlier test run and now outdated). Re-run the
+                # relevant tests so the snapshot is regenerated from the current
+                # state of the code.
                 if (
                     change == Change.deleted
                     and path.name.endswith(".snap.new")
