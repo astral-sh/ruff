@@ -23,8 +23,8 @@ class IsolatedAsyncioTestCase(TestCase):
         async def enterAsyncContext(self, cm: AbstractAsyncContextManager[_T]) -> _T:
             """Enters the supplied asynchronous context manager.
 
-If successful, also adds its __aexit__ method as a cleanup
-function and returns the result of the __aenter__ method.
-"""
+            If successful, also adds its __aexit__ method as a cleanup
+            function and returns the result of the __aenter__ method.
+            """
 
     def __del__(self) -> None: ...

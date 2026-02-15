@@ -6,6 +6,7 @@ bytes.transform() and bytes.untransform().
 Adapted by Raymond Hettinger from zlib_codec.py which was written
 by Marc-Andre Lemburg (mal@lemburg.com).
 """
+
 import codecs
 from _typeshed import ReadableBuffer
 from typing import ClassVar

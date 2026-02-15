@@ -3,4 +3,5 @@
 
 Don't import directly from third-party code; use the `locale` module instead!
 """
+
 def getpreferredencoding(do_setlocale: bool = True) -> str: ...

@@ -25,6 +25,7 @@ CAVEATS:
 
    this is currently not done.
 """
+
 from typing import ClassVar, Literal
 
 from .. import fixer_base

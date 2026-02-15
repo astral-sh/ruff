@@ -48,18 +48,24 @@ if sys.platform != "win32":
 
     def LOG_MASK(pri: int, /) -> int:
         """Calculates the mask for the individual priority pri."""
+
     def LOG_UPTO(pri: int, /) -> int:
         """Calculates the mask for all priorities up to and including pri."""
+
     def closelog() -> None:
         """Reset the syslog module values and call the system library closelog()."""
+
     def openlog(ident: str = ..., logoption: int = 0, facility: int = ...) -> None:
         """Set logging options of subsequent syslog() calls."""
+
     def setlogmask(maskpri: int, /) -> int:
         """Set the priority mask to maskpri and return the previous mask value."""
+
     @overload
     def syslog(priority: int, message: str) -> None:
         """syslog([priority=LOG_INFO,] message)
-Send the string message to the system logger.
-"""
+        Send the string message to the system logger.
+        """
+
     @overload
     def syslog(message: str) -> None: ...
