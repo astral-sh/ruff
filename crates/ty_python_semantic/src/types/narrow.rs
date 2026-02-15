@@ -2094,8 +2094,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Singleton(singleton) => {
                 let singleton_ty = match singleton {
                     ast::Singleton::None => Type::none(self.db),
-                    ast::Singleton::True => Type::BooleanLiteral(true),
-                    ast::Singleton::False => Type::BooleanLiteral(false),
+                    ast::Singleton::True => Type::bool_literal(true),
+                    ast::Singleton::False => Type::bool_literal(false),
                 };
                 IntersectionBuilder::new(self.db)
                     .add_positive(subject_ty)
@@ -2179,6 +2179,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
                 self.narrow_tuple_by_sequence_pattern(subject_ty, element_patterns)?
             }
+            PatternPredicateKind::Mapping(kind) => {
+                if !kind.is_irrefutable() && !is_positive {
+                    return None;
+                }
+                let mapping_ty = KnownClass::Mapping
+                    .to_instance(self.db)
+                    .negate_if(self.db, !is_positive);
+                IntersectionBuilder::new(self.db)
+                    .add_positive(subject_ty)
+                    .add_positive(mapping_ty)
+                    .build()
+            }
             PatternPredicateKind::Unsupported => return None,
         };
 
@@ -2211,6 +2223,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     })
                     .collect();
                 Some(UnionType::from_elements(self.db, narrowed))
+            }
+            Type::TypeAlias(alias) => {
+                self.narrow_tuple_by_sequence_pattern(alias.value_type(self.db), element_patterns)
             }
             Type::NominalInstance(instance) => {
                 let tuple_spec = instance.tuple_spec(self.db)?;
@@ -2299,9 +2314,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
 /// Returns `true` if any element pattern provides a narrowing constraint.
 fn has_any_narrowing_constraint(patterns: &[PatternPredicateKind]) -> bool {
-    patterns
-        .iter()
-        .any(|pattern| pattern_has_narrowing_constraint(pattern))
+    patterns.iter().any(pattern_has_narrowing_constraint)
 }
 
 /// Returns `true` if a single pattern provides a narrowing constraint.
@@ -2317,6 +2330,7 @@ fn pattern_has_narrowing_constraint(pattern: &PatternPredicateKind) -> bool {
         PatternPredicateKind::As(inner, _) => inner
             .as_deref()
             .is_some_and(|p| pattern_has_narrowing_constraint(p)),
+        PatternPredicateKind::Mapping(_) => true,
         PatternPredicateKind::Unsupported => false,
     }
 }

@@ -547,6 +547,7 @@ def _(subject: list[str]):
     reveal_type(y)  # revealed: Literal[2]
 
 from typing import final
+from collections.abc import Iterator
 
 @final
 class FinalNonSequence:
@@ -560,4 +561,17 @@ def _(subject: FinalNonSequence):
         case _:
             y = 2
     reveal_type(y)  # revealed: Literal[2]
+
+class WeirdSequence(list[object]):
+    def __iter__(self) -> Iterator[int]:
+        return iter((0,))
+
+def _(subject: WeirdSequence):
+    y = 0
+    match subject:
+        case [str()]:
+            y = 1
+        case _:
+            y = 2
+    reveal_type(y)  # revealed: Literal[1, 2]
 ```

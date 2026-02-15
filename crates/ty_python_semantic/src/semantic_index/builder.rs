@@ -1207,7 +1207,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     .collect();
                 PatternPredicateKind::Sequence(predicates)
             }
-            _ => PatternPredicateKind::Unsupported,
+            ast::Pattern::MatchStar(_) => PatternPredicateKind::Unsupported,
         }
     }
 
