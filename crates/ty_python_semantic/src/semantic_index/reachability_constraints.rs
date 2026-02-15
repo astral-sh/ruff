@@ -208,7 +208,9 @@ use crate::semantic_index::predicate::{
     CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
     Predicates, ScopedPredicateId,
 };
-use crate::semantic_index::use_def::{PlaceVersion, PredicatePlaceVersions};
+use crate::semantic_index::use_def::{
+    PlaceVersion, PredicatePlaceVersionInfo, PredicatePlaceVersions,
+};
 use crate::types::{
     CallableTypes, IntersectionBuilder, NarrowingConstraint, Truthiness, Type, TypeContext,
     UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
@@ -884,12 +886,21 @@ impl ReachabilityConstraints {
                 }
 
                 // Check if this predicate narrows the variable we're interested in.
-                let pos_constraint = infer_narrowing_constraint(db, predicate, place);
                 let neg_predicate = Predicate {
                     node: predicate.node,
                     is_positive: !predicate.is_positive,
                 };
-                let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
+                let place_version_info = predicate_place_versions.get(&(node.atom, place));
+                let (pos_constraint, neg_constraint) = if place_version_info.is_some() {
+                    (
+                        infer_narrowing_constraint(db, predicate, place),
+                        infer_narrowing_constraint(db, neg_predicate, place),
+                    )
+                } else {
+                    // No recorded place-version metadata means this predicate cannot narrow
+                    // this place, so skip the expensive narrowing-inference queries.
+                    (None, None)
+                };
 
                 // Only gate by place version if this predicate can narrow the current place.
                 // Predicates unrelated to `place` are still useful for reachability pruning.
@@ -897,9 +908,7 @@ impl ReachabilityConstraints {
                     pos_constraint.is_some() || neg_constraint.is_some();
                 if has_narrowing_constraints
                     && !Self::predicate_applies_to_place_version(
-                        predicate_place_versions,
-                        node.atom,
-                        place,
+                        place_version_info,
                         binding_place_version,
                     )
                 {
@@ -954,22 +963,18 @@ impl ReachabilityConstraints {
     }
 
     fn predicate_applies_to_place_version(
-        predicate_place_versions: &PredicatePlaceVersions,
-        predicate_id: ScopedPredicateId,
-        place: ScopedPlaceId,
+        place_version_info: Option<&PredicatePlaceVersionInfo>,
         binding_place_version: Option<PlaceVersion>,
     ) -> bool {
         binding_place_version.is_none_or(|binding_place_version| {
-            predicate_place_versions
-                .get(&(predicate_id, place))
-                .is_some_and(|info| {
-                    info.versions.contains(&binding_place_version)
-                        || info.allow_future_versions
-                            && info
-                                .versions
-                                .last()
-                                .is_some_and(|max| binding_place_version > *max)
-                })
+            place_version_info.is_some_and(|info| {
+                info.versions.contains(&binding_place_version)
+                    || info.allow_future_versions
+                        && info
+                            .versions
+                            .last()
+                            .is_some_and(|max| binding_place_version > *max)
+            })
         })
     }
 
