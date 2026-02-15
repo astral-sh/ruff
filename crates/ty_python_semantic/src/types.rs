@@ -5075,6 +5075,10 @@ impl<'db> Type<'db> {
             let mut successful_bindings = Vec::new();
             let mut last_error = None;
 
+            // Using `positive()` rather than `positive_elements_or_object()` is safe
+            // here because `object` does not define any of the dunders that are called
+            // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
+            // `__iter__`, `__enter__`, `__bool__`).
             for element in intersection.positive(db) {
                 match element.try_call_dunder_with_policy(
                     db,
@@ -5761,6 +5765,9 @@ impl<'db> Type<'db> {
             Type::Intersection(intersection) => {
                 let mut builder = IntersectionBuilder::new(db);
                 let mut any_success = false;
+                // Using `positive()` rather than `positive_elements_or_object()` is safe
+                // here because `object` is not a generator, so falling back to it would
+                // still return `None`.
                 for ty in intersection.positive(db) {
                     if let Some(return_ty) = ty.generator_return_type(db) {
                         builder = builder.add_positive(return_ty);
