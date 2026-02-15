@@ -1363,20 +1363,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
+        if let Some(type_guard_call_constraints) =
+            self.evaluate_type_guard_call(inference, expr_call, is_positive)
+        {
+            return Some(type_guard_call_constraints);
+        }
+
         let callable_ty = inference.expression_type(&*expr_call.func);
 
         match callable_ty {
-            Type::FunctionLiteral(function_type)
-                if matches!(
-                    function_type.known(self.db),
-                    None | Some(KnownFunction::RevealType)
-                ) =>
-            {
-                self.evaluate_type_guard_call(inference, expr_call, is_positive)
-            }
-            Type::BoundMethod(_) => {
-                self.evaluate_type_guard_call(inference, expr_call, is_positive)
-            }
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
             // (i.e., whether E is non-empty). We only narrow the parts of the type where we know
             // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
@@ -1464,7 +1459,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     // Helper to evaluate TypeGuard/TypeIs narrowing for a call expression.
-    // Used for both direct function calls and bound method calls.
+    // This is based on the call expression's return type, so it applies to any callable type.
     fn evaluate_type_guard_call(
         &mut self,
         inference: &ExpressionInference<'db>,
