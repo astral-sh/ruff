@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_todos/mod.rs
+assertion_line: 27
 ---
 TD003 Missing issue link for this TODO
   --> TD003.py:15:3
@@ -51,14 +52,14 @@ TD003 Missing issue link for this TODO
 41 | # TODO: A todo with a random number, 5431
    |   ^^^^
 42 |
-43 | # TODO: here's a TODO on the last line with no link
+43 | # TODO: JIRA-123 A todo with a Jira-style issue ID on the same line
    |
 
 TD003 Missing issue link for this TODO
-  --> TD003.py:43:3
+  --> TD003.py:49:3
    |
-41 | # TODO: A todo with a random number, 5431
-42 |
-43 | # TODO: here's a TODO on the last line with no link
+47 | # TODO: FOO-1 Minimum length Jira-style issue ID
+48 |
+49 | # TODO: here's a TODO on the last line with no link
    |   ^^^^
    |

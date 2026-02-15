@@ -40,4 +40,10 @@ def foo(x):
 
 # TODO: A todo with a random number, 5431
 
+# TODO: JIRA-123 A todo with a Jira-style issue ID on the same line
+
+# TODO: RFFU-6877 Another Jira-style issue ID
+
+# TODO: FOO-1 Minimum length Jira-style issue ID
+
 # TODO: here's a TODO on the last line with no link
