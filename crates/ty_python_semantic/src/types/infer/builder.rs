@@ -16843,6 +16843,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    pub(super) fn finish_function_decorators(mut self) -> FunctionDecorators {
+        let InferenceRegion::Definition(definition) = self.region else {
+            panic!("Expected Definition region");
+        };
+        let DefinitionKind::Function(func_ref) = definition.kind(self.db()) else {
+            let _ = self.context.finish();
+            return FunctionDecorators::empty();
+        };
+        let func = func_ref.node(self.module());
+        let mut decorators = FunctionDecorators::empty();
+        for decorator in &func.decorator_list {
+            let decorator_type = self.infer_decorator(decorator);
+            decorators |= FunctionDecorators::from_decorator_type(self.db(), decorator_type);
+        }
+        let _ = self.context.finish();
+        decorators
+    }
+
     pub(super) fn finish_definition(mut self) -> DefinitionInference<'db> {
         self.infer_region();
 

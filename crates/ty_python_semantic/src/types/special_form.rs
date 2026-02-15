@@ -5,14 +5,17 @@ use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{
-    FileScopeId, definition::{Definition, DefinitionKind}, place_table, scope::ScopeId,
+    FileScopeId,
+    definition::{Definition, DefinitionKind},
+    place_table,
+    scope::ScopeId,
     semantic_index, use_def_map,
 };
 use crate::types::IntersectionType;
 use crate::types::{
     CallableType, FunctionDecorators, InvalidTypeExpression, InvalidTypeExpressionError,
     TypeDefinition, TypeQualifiers, generics::typing_self,
-    infer::{infer_definition_types, nearest_enclosing_class},
+    infer::{function_known_decorators, nearest_enclosing_class},
 };
 use ruff_db::files::File;
 use strum_macros::EnumString;
@@ -672,8 +675,7 @@ impl SpecialFormType {
                     });
                 };
 
-                let typing_self =
-                    typing_self(db, scope_id, typevar_binding_context, class.into());
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into());
 
                 let in_staticmethod = typing_self.is_some_and(|typing_self| {
                     let Some(binding_definition) = typing_self.binding_context(db).definition()
@@ -681,19 +683,13 @@ impl SpecialFormType {
                         return false;
                     };
 
-                    let DefinitionKind::Function(_) = binding_definition.kind(db) else {
+                    if !matches!(binding_definition.kind(db), DefinitionKind::Function(_)) {
                         return false;
-                    };
+                    }
 
-                    infer_definition_types(db, binding_definition)
-                        .declaration_type(binding_definition)
-                        .inner_type()
-                        .as_function_literal()
-                        .is_some_and(|function| {
-                            function.name(db).as_str() != "__new__"
-                                && function
-                                    .has_known_decorator(db, FunctionDecorators::STATICMETHOD)
-                        })
+                    binding_definition.name(db).as_deref() != Some("__new__")
+                        && function_known_decorators(db, binding_definition)
+                            .contains(FunctionDecorators::STATICMETHOD)
                 });
                 if in_staticmethod {
                     return Err(InvalidTypeExpressionError {
@@ -717,7 +713,9 @@ impl SpecialFormType {
                     });
                 }
 
-                Ok(typing_self.map(Type::TypeVar).unwrap_or(Type::SpecialForm(self)))
+                Ok(typing_self
+                    .map(Type::TypeVar)
+                    .unwrap_or(Type::SpecialForm(self)))
             }
             // We ensure that `typing.TypeAlias` used in the expected position (annotating an
             // annotated assignment statement) doesn't reach here. Using it in any other type

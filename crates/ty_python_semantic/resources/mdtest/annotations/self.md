@@ -855,11 +855,9 @@ reveal_type(SubclassWithNew())  # revealed: SubclassWithNew
 When `@staticmethod` is stacked with other decorators, `Self` should still be invalid:
 
 ```py
-from typing import Self, Callable, TypeVar
+from typing import Self, Callable
 
-T = TypeVar("T")
-
-def identity(f: T) -> T:
+def identity[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     return f
 
 class StackedDecorators:
@@ -878,8 +876,7 @@ class StackedDecorators:
 
 ## Self usage in metaclasses
 
-`Self` cannot be used in a metaclass because the semantics are confusing: in a metaclass, `self`
-refers to a class (the metaclass instance), not a regular object instance.
+The spec [prohibits the use of `Self` in metaclasses][spec], so we emit a diagnostic for this.
 
 ```py
 from typing import Self
@@ -908,15 +905,13 @@ class MyMetaclass(type):
 
 ## Runtime use of `self` parameter in metaclass
 
-Using the `self` parameter as a runtime value (e.g. in `Union[self, other]`) should not be flagged,
-even in a metaclass. Only the literal `Self` type form should be disallowed.
+Using the `self` parameter as a runtime value should not be flagged, even in a metaclass. Only the
+literal `Self` type form should be disallowed.
 
 ```py
-from typing import Union
-
 class AnnotableMeta(type):
     def __or__(self, other):
-        return Union[self, other]  # No error: runtime use of `self`, not the `Self` type form
+        return self  # No error: runtime use of `self`, not the `Self` type form
 ```
 
 ## Indirect metaclass inheritance
@@ -1210,3 +1205,5 @@ class Child(Base):
 reveal_type(Child.attr)  # revealed: Child
 reveal_type(Child().attr)  # revealed: Child
 ```
+
+[spec]: https://typing.python.org/en/latest/spec/generics.html#valid-locations-for-self
