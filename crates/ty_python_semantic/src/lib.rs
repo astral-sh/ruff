@@ -4,6 +4,7 @@
 )]
 use std::hash::BuildHasherDefault;
 
+
 use crate::lint::{LintRegistry, LintRegistryBuilder};
 use crate::suppression::{
     IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
