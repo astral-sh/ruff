@@ -1609,11 +1609,6 @@ impl<'db> Bindings<'db> {
                             overload.set_return_type(return_type);
                         }
 
-                        Some(KnownFunction::NamedTuple) => {
-                            overload
-                                .set_return_type(todo_type!("Support for functional `namedtuple`"));
-                        }
-
                         _ => {
                             // Ideally, either the implementation, or exactly one of the overloads
                             // of the function can have the dataclass_transform decorator applied.
