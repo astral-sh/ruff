@@ -22,6 +22,9 @@ poit = "poit"
 BA = "BA" # acronym for "Bad Allowed", used in testing.
 jod = "jod" # e.g., `jod-thread`
 Numer = "Numer" # Library name 'NumerBlox' in "Who's Using Ruff?"
+Luch = "Luch" # Intentional misspelling in Levenshtein test data
+luch = "luch" # Intentional misspelling in Levenshtein test data
+pytho = "pytho" # Intentional misspelling in Levenshtein test data
 
 [default]
 extend-ignore-re = [

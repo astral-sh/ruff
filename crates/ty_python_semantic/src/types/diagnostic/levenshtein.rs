@@ -26,14 +26,14 @@ impl HideUnderscoredSuggestions {
 
 pub(crate) fn find_best_suggestion<'a, O, I>(
     options: O,
-    unresolved_member: &str,
+    typo: &str,
     hide_underscored_suggestions: HideUnderscoredSuggestions,
 ) -> Option<&'a str>
 where
     O: IntoIterator<IntoIter = I>,
     I: ExactSizeIterator<Item = &'a str>,
 {
-    if unresolved_member.is_empty() {
+    if typo.is_empty() {
         return None;
     }
 
@@ -45,36 +45,25 @@ where
         return None;
     }
 
-    // Filter out the unresolved member itself.
-    // Otherwise (due to our implementation of implicit instance attributes),
-    // we end up giving bogus suggestions like this:
-    //
-    // ```python
-    // class Foo:
-    //     _attribute = 42
-    //     def bar(self):
-    //         print(self.attribute)  # error: unresolved attribute `attribute`; did you mean `attribute`?
-    // ```
-    let options = options.filter(|name| *name != unresolved_member);
+    // Filter out the typo itself from the candidate list
+    // so we never suggest the exact same name as the one that failed to resolve.
+    let options = options.filter(|name| *name != typo);
 
     let options: BTreeSet<&'a str> =
-        if hide_underscored_suggestions.is_no() || unresolved_member.starts_with('_') {
+        if hide_underscored_suggestions.is_no() || typo.starts_with('_') {
             options.collect()
         } else {
             options.filter(|name| !name.starts_with('_')).collect()
         };
-    find_best_suggestion_impl(options, unresolved_member)
+    find_best_suggestion_impl(options, typo)
 }
 
-fn find_best_suggestion_impl<'a>(
-    options: BTreeSet<&'a str>,
-    unresolved_member: &str,
-) -> Option<&'a str> {
+fn find_best_suggestion_impl<'a>(options: BTreeSet<&'a str>, typo: &str) -> Option<&'a str> {
     let mut best_suggestion = None;
 
-    for member in options {
+    for candidate in options {
         let mut max_distance =
-            (member.chars().count() + unresolved_member.chars().count() + 3) * MOVE_COST / 6;
+            (candidate.chars().count() + typo.chars().count() + 3) * MOVE_COST / 6;
 
         if let Some((_, best_distance)) = best_suggestion {
             if best_distance > 0 {
@@ -82,7 +71,7 @@ fn find_best_suggestion_impl<'a>(
             }
         }
 
-        let current_distance = levenshtein_distance(unresolved_member, member, max_distance);
+        let current_distance = levenshtein_distance(typo, candidate, max_distance);
         if current_distance > max_distance {
             continue;
         }
@@ -91,7 +80,7 @@ fn find_best_suggestion_impl<'a>(
             .as_ref()
             .is_none_or(|(_, best_score)| &current_distance < best_score)
         {
-            best_suggestion = Some((member, current_distance));
+            best_suggestion = Some((candidate, current_distance));
         }
     }
 
@@ -289,7 +278,7 @@ mod tests {
 
     /// Test ported from <https://github.com/python/cpython/blob/6eb6c5dbfb528bd07d77b60fd71fd05d81d45c41/Lib/test/test_traceback.py#L4101-L4106>
     #[test]
-    fn test_no_suggestion_for_very_different_attribute() {
+    fn test_no_suggestion_for_very_different_name() {
         assert_eq!(
             find_best_suggestion(
                 ["blech"],
