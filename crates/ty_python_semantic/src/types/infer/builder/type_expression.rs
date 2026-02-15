@@ -1,12 +1,11 @@
 use itertools::Either;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
-use crate::FxOrderSet;
 use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
-    report_invalid_arguments_to_callable,
+    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, UNSUPPORTED_OPERATOR,
+    report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
 };
 use crate::types::generics::bind_typevar;
 use crate::types::infer::builder::InnerExpressionInferenceState;
@@ -20,6 +19,7 @@ use crate::types::{
     SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
     TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
+use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
 /// Type expressions
 impl<'db> TypeInferenceBuilder<'db, '_> {
@@ -142,6 +142,53 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     ast::Operator::BitOr => {
                         let left_ty = self.infer_type_expression(&binary.left);
                         let right_ty = self.infer_type_expression(&binary.right);
+
+                        // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
+                        //
+                        // TODO: this only detects the error if it's a string *literal*, not if it's an arbitrary string.
+                        // Ideally, our detection of this error would be more generalised.
+                        if let (
+                            ast::Expr::StringLiteral(string),
+                            _,
+                            _,
+                            Type::NominalInstance(_)
+                            | Type::ProtocolInstance(_)
+                            | Type::TypedDict(_),
+                        )
+                        | (
+                            _,
+                            ast::Expr::StringLiteral(string),
+                            Type::NominalInstance(_)
+                            | Type::ProtocolInstance(_)
+                            | Type::TypedDict(_),
+                            _,
+                        ) = (&*binary.left, &*binary.right, left_ty, right_ty)
+                            && !self.file().is_stub(self.db())
+                            && Program::get(self.db()).python_version(self.db())
+                                < PythonVersion::PY314
+                            && !self.index.has_future_annotations()
+                            && let Some(builder) =
+                                self.context.report_lint(&UNSUPPORTED_OPERATOR, binary)
+                        {
+                            let mut diagnostic = builder.into_diagnostic(
+                                "String annotations are not supported in PEP-604 unions on Python <3.14",
+                            );
+                            diagnostic.annotate(
+                                self.context
+                                    .secondary(string)
+                                    .message("Invalid string-literal element"),
+                            );
+                            diagnostic.info("This will raise `TypeError` at runtime");
+                            diagnostic.help(
+                                "Put quotes around the whole union rather than just one element",
+                            );
+                            add_inferred_python_version_hint_to_diagnostic(
+                                self.db(),
+                                &mut diagnostic,
+                                "inferring types",
+                            );
+                        }
+
                         UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
                     }
                     // anything else is an invalid annotation:

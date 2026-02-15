@@ -469,7 +469,7 @@ def f(x: A):
 #### With new-style union
 
 ```py
-type A = list["A" | str]
+type A = list["A | str"]
 
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]

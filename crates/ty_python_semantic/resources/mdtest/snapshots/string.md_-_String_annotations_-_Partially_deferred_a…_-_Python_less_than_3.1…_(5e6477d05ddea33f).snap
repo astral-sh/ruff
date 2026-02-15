@@ -1,0 +1,152 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: string.md - String annotations - Partially deferred annotations - Python less than 3.14
+mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypeVar, Callable, Protocol, TypedDict
+ 2 | 
+ 3 | class TD(TypedDict): ...
+ 4 | 
+ 5 | class P(Protocol):
+ 6 |     x: int
+ 7 | 
+ 8 | T = TypeVar("T")
+ 9 | 
+10 | # fmt: off
+11 | def f(
+12 |     # error: [unsupported-operator] "String annotations are not supported in PEP-604 unions on Python <3.14"
+13 |     a: int | "Foo",
+14 |     # error: [unsupported-operator]
+15 |     b: int | "memoryview" | bytes,
+16 |     # error: [unsupported-operator]
+17 |     c: "TD" | None,
+18 |     # error: [unsupported-operator]
+19 |     d: "P" | None,
+20 |     # fine: `TypeVar.__or__` accepts strings at runtime
+21 |     e: T | "Foo",
+22 |     # fine: _SpecialForm.__ror__` accepts strings at runtime
+23 |     f: "Foo" | Callable[..., None],
+24 | ):
+25 |     reveal_type(a)  # revealed: int | Foo
+26 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
+27 |     reveal_type(c)  # revealed: TD | None
+28 |     reveal_type(d)  # revealed: P | None
+29 |     reveal_type(e)  # revealed: T@f | Foo
+30 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
+31 | 
+32 | # fmt: on
+33 | 
+34 | class Foo: ...
+35 | 
+36 | # error: [unsupported-operator]
+37 | X = list["int" | None]
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+  --> src/mdtest_snippet.py:13:8
+   |
+11 | def f(
+12 |     # error: [unsupported-operator] "String annotations are not supported in PEP-604 unions on Python <3.14"
+13 |     a: int | "Foo",
+   |        ^^^^^^-----
+   |              |
+   |              Invalid string-literal element
+14 |     # error: [unsupported-operator]
+15 |     b: int | "memoryview" | bytes,
+   |
+info: This will raise `TypeError` at runtime
+help: Put quotes around the whole union rather than just one element
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+  --> src/mdtest_snippet.py:15:8
+   |
+13 |     a: int | "Foo",
+14 |     # error: [unsupported-operator]
+15 |     b: int | "memoryview" | bytes,
+   |        ^^^^^^------------
+   |              |
+   |              Invalid string-literal element
+16 |     # error: [unsupported-operator]
+17 |     c: "TD" | None,
+   |
+info: This will raise `TypeError` at runtime
+help: Put quotes around the whole union rather than just one element
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+  --> src/mdtest_snippet.py:17:8
+   |
+15 |     b: int | "memoryview" | bytes,
+16 |     # error: [unsupported-operator]
+17 |     c: "TD" | None,
+   |        ----^^^^^^^
+   |        |
+   |        Invalid string-literal element
+18 |     # error: [unsupported-operator]
+19 |     d: "P" | None,
+   |
+info: This will raise `TypeError` at runtime
+help: Put quotes around the whole union rather than just one element
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+  --> src/mdtest_snippet.py:19:8
+   |
+17 |     c: "TD" | None,
+18 |     # error: [unsupported-operator]
+19 |     d: "P" | None,
+   |        ---^^^^^^^
+   |        |
+   |        Invalid string-literal element
+20 |     # fine: `TypeVar.__or__` accepts strings at runtime
+21 |     e: T | "Foo",
+   |
+info: This will raise `TypeError` at runtime
+help: Put quotes around the whole union rather than just one element
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+  --> src/mdtest_snippet.py:37:10
+   |
+36 | # error: [unsupported-operator]
+37 | X = list["int" | None]
+   |          -----^^^^^^^
+   |          |
+   |          Invalid string-literal element
+   |
+info: This will raise `TypeError` at runtime
+help: Put quotes around the whole union rather than just one element
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```

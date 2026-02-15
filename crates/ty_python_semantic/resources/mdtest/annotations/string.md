@@ -46,13 +46,115 @@ def f(v: "Foo"):
     reveal_type(v)  # revealed: Unknown
 ```
 
-## Partial deferred
+## Partially deferred annotations
+
+### Python less than 3.14
+
+"Partially stringified" PEP-604 unions can raise `TypeError` on Python \<3.14; we try to detect this
+common runtime error:
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.13"
+```
 
 ```py
-def f(v: int | "Foo"):
+from typing import TypeVar, Callable, Protocol, TypedDict
+
+class TD(TypedDict): ...
+
+class P(Protocol):
+    x: int
+
+T = TypeVar("T")
+
+# fmt: off
+def f(
+    # error: [unsupported-operator] "String annotations are not supported in PEP-604 unions on Python <3.14"
+    a: int | "Foo",
+    # error: [unsupported-operator]
+    b: int | "memoryview" | bytes,
+    # error: [unsupported-operator]
+    c: "TD" | None,
+    # error: [unsupported-operator]
+    d: "P" | None,
+    # fine: `TypeVar.__or__` accepts strings at runtime
+    e: T | "Foo",
+    # fine: _SpecialForm.__ror__` accepts strings at runtime
+    f: "Foo" | Callable[..., None],
+):
+    reveal_type(a)  # revealed: int | Foo
+    reveal_type(b)  # revealed: int | memoryview[int] | bytes
+    reveal_type(c)  # revealed: TD | None
+    reveal_type(d)  # revealed: P | None
+    reveal_type(e)  # revealed: T@f | Foo
+    reveal_type(f)  # revealed: Foo | ((...) -> None)
+
+# fmt: on
+
+class Foo: ...
+
+# error: [unsupported-operator]
+X = list["int" | None]
+```
+
+### Python less than 3.14 in a stub file
+
+This error is never emitted on stub files, because they are never executed at runtime:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```pyi
+# fine
+def f(x: "int" | None): ...
+```
+
+### Python less than 3.14 with `__future__` annotations
+
+The errors can be avoided in some situations by using `__future__` annotations on Pythonn \<3.14:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from __future__ import annotations
+
+def f(v: int | "Foo"):  # fine
     reveal_type(v)  # revealed: int | Foo
 
 class Foo: ...
+
+# TODO: ideally we would emit `unsupported-operator` here;
+# it still fails at runtime despite `__future__.annotations`
+X = list["int" | None]
+```
+
+### Python >=3.14
+
+Runtime errors are also less common for partially stringified annotations if the Python version
+being used is >=3.14:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+def f(v: int | "Foo"):  # fine
+    reveal_type(v)  # revealed: int | Foo
+
+class Foo: ...
+
+# TODO: ideally we would emit `unsupported-operator` here;
+# it still fails at runtime even on Python 3.14+
+X = list["int" | None]
 ```
 
 ## `typing.Literal`
