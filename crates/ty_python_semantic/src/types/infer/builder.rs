@@ -13673,7 +13673,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
-            (ast::UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            (ast::UnaryOp::USub, Type::IntLiteral(value)) => value
+                .checked_neg()
+                .map(Type::IntLiteral)
+                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
             (ast::UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
 
             (ast::UnaryOp::UAdd, Type::BooleanLiteral(bool)) => Type::IntLiteral(i64::from(bool)),
@@ -14255,6 +14258,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::BitXor) => {
                 Some(Type::IntLiteral(n ^ m))
             }
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::LShift) => {
+                // An additional overflow check beyond `checked_shl` is necessary
+                // here, because `checked_shl` only rejects shift amounts >= 64;
+                // it does not detect when significant bits are shifted into (or
+                // past) the sign bit. For example, `1i64.checked_shl(63)` returns
+                // `Some(i64::MIN)`, but Python's `1 << 63` is a large positive int.
+                //
+                // We compute the "headroom": the number of redundant sign-extension
+                // bits minus one (for the sign bit itself). A shift is safe iff
+                // `m <= headroom`.
+                let headroom = if n >= 0 {
+                    n.leading_zeros().saturating_sub(1)
+                } else {
+                    n.leading_ones().saturating_sub(1)
+                };
+                Some(
+                    u32::try_from(m)
+                        .ok()
+                        .filter(|&m| m <= headroom)
+                        .and_then(|m| n.checked_shl(m))
+                        .map(Type::IntLiteral)
+                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
+                )
+            }
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::RShift) => Some(
+                u32::try_from(m)
+                    .ok()
+                    .map(|m| n >> m.clamp(0, 63))
+                    .map(Type::IntLiteral)
+                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
+            ),
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 let bytes = [lhs.value(self.db()), rhs.value(self.db())].concat();
