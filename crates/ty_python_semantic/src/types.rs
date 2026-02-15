@@ -7492,6 +7492,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             if let Some(default_ty) = field.default_type(db) {
                 visitor.visit_type(db, default_ty);
             }
+            if let Some(converter_ty) = field.converter_input_type(db) {
+                visitor.visit_type(db, converter_ty);
+            }
         }
         KnownInstanceType::UnionType(instance) => {
             if let Ok(union_type) = instance.union_type(db) {
@@ -8131,6 +8134,11 @@ pub struct FieldInstance<'db> {
 
     /// This name is used to provide an alternative parameter name in the synthesized `__init__` method.
     pub alias: Option<Box<str>>,
+
+    /// The type of the first positional parameter of the converter callable, if a `converter`
+    /// argument was provided. This overrides the field's declared type in the synthesized
+    /// `__init__` signature.
+    pub converter_input_type: Option<Type<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -8145,6 +8153,8 @@ impl<'db> FieldInstance<'db> {
             self.init(db),
             self.kw_only(db),
             self.alias(db),
+            self.converter_input_type(db)
+                .map(|ty| ty.normalized_impl(db, visitor)),
         )
     }
 
@@ -8163,12 +8173,21 @@ impl<'db> FieldInstance<'db> {
             ),
             None => None,
         };
+        let converter_input_type = match self.converter_input_type(db) {
+            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+            Some(ty) => Some(
+                ty.recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div),
+            ),
+            None => None,
+        };
         Some(FieldInstance::new(
             db,
             default_type,
             self.init(db),
             self.kw_only(db),
             self.alias(db),
+            converter_input_type,
         ))
     }
 }
