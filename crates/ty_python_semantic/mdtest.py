@@ -139,8 +139,8 @@ class MDTestRunner:
         )
 
     @staticmethod
-    def _md_files_for_snapshot(snapshot_path: Path) -> set[Path]:
-        """Given a deleted .snap.new path, find the source .md file(s) it belongs to.
+    def _md_file_for_snapshot(snapshot_path: Path) -> Path | None:
+        """Given a deleted .snap.new path, find the source .md file it belongs to.
 
         Snapshot filenames follow the pattern:
             <md_filename>_-_<Section_title>_-_…_(<hash>).snap.new
@@ -155,14 +155,13 @@ class MDTestRunner:
         if is_truncated:
             md_filename = md_filename[:-1]
 
-        results: set[Path] = set()
         for md_file in MDTEST_DIR.rglob("*.md"):
             if is_truncated:
                 if md_file.name.startswith(md_filename):
-                    results.add(md_file.relative_to(MDTEST_DIR))
+                    return md_file.relative_to(MDTEST_DIR)
             elif md_file.name == md_filename:
-                results.add(md_file.relative_to(MDTEST_DIR))
-        return results
+                return md_file.relative_to(MDTEST_DIR)
+        return None
 
     def _run_mdtests_for_file(self, markdown_file: Path) -> None:
         test_name = f"mdtest::{markdown_file}"
@@ -244,7 +243,9 @@ class MDTestRunner:
                     and path.name.endswith(".snap.new")
                     and path.is_relative_to(SNAPSHOTS_DIR)
                 ):
-                    rejected_snapshot_md_files |= self._md_files_for_snapshot(path)
+                    md_file = self._md_file_for_snapshot(path)
+                    if md_file is not None:
+                        rejected_snapshot_md_files.add(md_file)
                     continue
 
                 match path.suffix:
