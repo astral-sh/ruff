@@ -83,7 +83,6 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
     };
 
     for (assign, yield_expr, stmt) in &stack.assignment_yield {
-        // Identify, e.g., `yield x` or `yield from x`.
         let (yielded_id, is_yield_from, yield_value_range) = match yield_expr {
             Expr::Yield(expr_yield) => {
                 let Some(value) = expr_yield.value.as_ref() else {
@@ -103,7 +102,6 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
             _ => continue,
         };
 
-        // Identify, e.g., `x = 1`.
         if assign.targets.len() > 1 {
             continue;
         }
@@ -123,12 +121,10 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
             continue;
         }
 
-        // Ignore variables that have an annotation defined elsewhere.
         if stack.annotations.contains(assigned_id.as_str()) {
             continue;
         }
 
-        // Ignore `nonlocal` and `global` variables.
         if stack.non_locals.contains(assigned_id.as_str()) {
             continue;
         }
@@ -147,7 +143,6 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
             continue;
         }
 
-        // Ignore references made in another scope, e.g., nested functions or comprehensions.
         if assigned_binding
             .references()
             .map(|reference_id| checker.semantic().reference(reference_id))
@@ -179,7 +174,6 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
             let content = checker.source();
             let keyword = if is_yield_from { "yield from" } else { "yield" };
 
-            // Replace the `x = expr` statement with `yield expr` or `yield from expr`.
             let replace_assign = Edit::range_replacement(
                 if content[eq_token.end().to_usize()..]
                     .chars()
@@ -190,8 +184,6 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
                 } else {
                     format!("{keyword} ")
                 },
-                // Replace from the start of the assignment statement to the end of the equals
-                // sign.
                 TextRange::new(assign.start(), eq_token.range().end()),
             );
 
@@ -243,8 +235,6 @@ impl<'a> Visitor<'a> for YieldVisitor<'a> {
                 }
             }
             Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                // If the `yield` expression is preceded by an `assignment` statement, then
-                // the `assignment` statement may be redundant.
                 if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
                     && let Some(Stmt::Assign(stmt_assign)) = self.sibling
                 {
