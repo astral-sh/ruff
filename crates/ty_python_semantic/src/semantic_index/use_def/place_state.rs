@@ -238,8 +238,6 @@ pub(super) struct Bindings {
     /// A list of live bindings for this place, sorted by their `ScopedDefinitionId`
     #[expect(clippy::struct_field_names)]
     live_bindings: SmallVec<[LiveBinding; 2]>,
-    /// Latest place version seen for this place.
-    latest_place_version: PlaceVersion,
 }
 
 impl Bindings {
@@ -277,7 +275,6 @@ impl Bindings {
         Self {
             unbound_narrowing_constraint: None,
             live_bindings: smallvec![initial_binding],
-            latest_place_version: PlaceVersion::default(),
         }
     }
 
@@ -289,6 +286,7 @@ impl Bindings {
         is_class_scope: bool,
         is_place_name: bool,
         previous_definitions: PreviousDefinitions,
+        place_version: PlaceVersion,
     ) -> PlaceVersion {
         // If we are in a class scope, and the unbound name binding was previously visible, but we will
         // now replace it, record the narrowing constraints on it:
@@ -299,9 +297,7 @@ impl Bindings {
         // constraints.
         if previous_definitions.are_shadowed() {
             self.live_bindings.clear();
-            self.latest_place_version = self.latest_place_version.next();
         }
-        let place_version = self.latest_place_version;
         self.live_bindings.push(LiveBinding {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
@@ -345,7 +341,6 @@ impl Bindings {
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
         let a = std::mem::take(self);
-        self.latest_place_version = a.latest_place_version.max(b.latest_place_version);
 
         if let Some((a, b)) = a
             .unbound_narrowing_constraint
@@ -404,17 +399,19 @@ impl Bindings {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
-pub(in crate::semantic_index) struct PlaceState {
+pub(in crate::semantic_index) struct BuilderPlaceState {
     declarations: Declarations,
     bindings: Bindings,
+    latest_place_version: PlaceVersion,
 }
 
-impl PlaceState {
-    /// Return a new [`PlaceState`] representing an unbound, undeclared place.
+impl BuilderPlaceState {
+    /// Return a new [`BuilderPlaceState`] representing an unbound, undeclared place.
     pub(super) fn undefined(reachability: ScopedReachabilityConstraintId) -> Self {
         Self {
             declarations: Declarations::undeclared(reachability),
             bindings: Bindings::unbound(reachability),
+            latest_place_version: PlaceVersion::default(),
         }
     }
 
@@ -428,12 +425,17 @@ impl PlaceState {
         previous_definitions: PreviousDefinitions,
     ) -> PlaceVersion {
         debug_assert_ne!(binding_id, ScopedDefinitionId::UNBOUND);
+        if previous_definitions.are_shadowed() {
+            self.latest_place_version = self.latest_place_version.next();
+        }
+
         self.bindings.record_binding(
             binding_id,
             reachability_constraint,
             is_class_scope,
             is_place_name,
             previous_definitions,
+            self.latest_place_version,
         )
     }
 
@@ -472,12 +474,13 @@ impl PlaceState {
         );
     }
 
-    /// Merge another [`PlaceState`] into this one.
+    /// Merge another [`BuilderPlaceState`] into this one.
     pub(super) fn merge(
         &mut self,
-        b: PlaceState,
+        b: BuilderPlaceState,
         reachability_constraints: &mut ReachabilityConstraintsBuilder,
     ) {
+        self.latest_place_version = self.latest_place_version.max(b.latest_place_version);
         self.bindings.merge(b.bindings, reachability_constraints);
         self.declarations
             .merge(b.declarations, reachability_constraints);
@@ -495,6 +498,29 @@ impl PlaceState {
         self.declarations.finish(reachability_constraints);
         self.bindings.finish(reachability_constraints);
     }
+
+    pub(super) fn into_place_state(self) -> PlaceState {
+        PlaceState {
+            declarations: self.declarations,
+            bindings: self.bindings,
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(in crate::semantic_index) struct PlaceState {
+    declarations: Declarations,
+    bindings: Bindings,
+}
+
+impl PlaceState {
+    pub(super) fn bindings(&self) -> &Bindings {
+        &self.bindings
+    }
+
+    pub(super) fn declarations(&self) -> &Declarations {
+        &self.declarations
+    }
 }
 
 #[cfg(test)]
@@ -505,7 +531,7 @@ mod tests {
     use crate::semantic_index::predicate::ScopedPredicateId;
 
     #[track_caller]
-    fn assert_bindings(place: &PlaceState, expected: &[(u32, ScopedNarrowingConstraint)]) {
+    fn assert_bindings(place: &BuilderPlaceState, expected: &[(u32, ScopedNarrowingConstraint)]) {
         let actual: Vec<(u32, ScopedNarrowingConstraint)> = place
             .bindings()
             .iter()
@@ -520,7 +546,7 @@ mod tests {
     }
 
     #[track_caller]
-    pub(crate) fn assert_declarations(place: &PlaceState, expected: &[&str]) {
+    pub(crate) fn assert_declarations(place: &BuilderPlaceState, expected: &[&str]) {
         let actual = place
             .declarations()
             .iter()
@@ -542,14 +568,14 @@ mod tests {
 
     #[test]
     fn unbound() {
-        let sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let sym = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
 
         assert_bindings(&sym, &[(0, ScopedNarrowingConstraint::ALWAYS_TRUE)]);
     }
 
     #[test]
     fn with() {
-        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -564,7 +590,7 @@ mod tests {
     #[test]
     fn record_constraint() {
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
-        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -583,7 +609,7 @@ mod tests {
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
 
         // merging the same definition with the same constraint keeps the constraint
-        let mut sym1a = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym1a = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym1a.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -594,7 +620,7 @@ mod tests {
         let atom0 = reachability_constraints.add_atom(ScopedPredicateId::new(0));
         sym1a.record_narrowing_constraint(&mut reachability_constraints, atom0);
 
-        let mut sym1b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym1b = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym1b.record_binding(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -610,7 +636,7 @@ mod tests {
         assert_bindings(&sym1, &[(1, atom0)]);
 
         // merging the same definition with differing constraints produces OR (not empty)
-        let mut sym2a = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym2a = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym2a.record_binding(
             ScopedDefinitionId::from_u32(2),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -621,7 +647,7 @@ mod tests {
         let atom1 = reachability_constraints.add_atom(ScopedPredicateId::new(1));
         sym2a.record_narrowing_constraint(&mut reachability_constraints, atom1);
 
-        let mut sym1b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym1b = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym1b.record_binding(
             ScopedDefinitionId::from_u32(2),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -642,7 +668,7 @@ mod tests {
         assert_ne!(merged_constraint, atom2);
 
         // merging a constrained definition with unbound keeps both
-        let mut sym3a = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym3a = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym3a.record_binding(
             ScopedDefinitionId::from_u32(3),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -653,7 +679,7 @@ mod tests {
         let atom3 = reachability_constraints.add_atom(ScopedPredicateId::new(3));
         sym3a.record_narrowing_constraint(&mut reachability_constraints, atom3);
 
-        let sym2b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let sym2b = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
 
         sym3a.merge(sym2b, &mut reachability_constraints);
         let sym3 = sym3a;
@@ -683,7 +709,7 @@ mod tests {
         assert_eq!(bindings[2].1, atom3);
 
         // An unreachable branch should not dilute narrowing from the reachable branch.
-        let mut sym4a = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym4a = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym4a.record_binding(
             ScopedDefinitionId::from_u32(4),
             ScopedReachabilityConstraintId::ALWAYS_FALSE,
@@ -692,7 +718,7 @@ mod tests {
             PreviousDefinitions::AreShadowed,
         );
 
-        let mut sym4b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym4b = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym4b.record_binding(
             ScopedDefinitionId::from_u32(4),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -710,14 +736,14 @@ mod tests {
 
     #[test]
     fn no_declaration() {
-        let sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let sym = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
 
         assert_declarations(&sym, &["undeclared"]);
     }
 
     #[test]
     fn record_declaration() {
-        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -728,7 +754,7 @@ mod tests {
 
     #[test]
     fn record_declaration_override() {
-        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -744,13 +770,13 @@ mod tests {
     #[test]
     fn record_declaration_merge() {
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
-        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
         );
 
-        let mut sym2 = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym2 = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym2.record_declaration(
             ScopedDefinitionId::from_u32(2),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -764,13 +790,13 @@ mod tests {
     #[test]
     fn record_declaration_merge_partial_undeclared() {
         let mut reachability_constraints = ReachabilityConstraintsBuilder::default();
-        let mut sym = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let mut sym = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym.record_declaration(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
         );
 
-        let sym2 = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
+        let sym2 = BuilderPlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
 
         sym.merge(sym2, &mut reachability_constraints);
 
