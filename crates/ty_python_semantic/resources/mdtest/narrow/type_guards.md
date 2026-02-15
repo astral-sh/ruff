@@ -391,6 +391,18 @@ def _(a: Foo):
         reveal_type(a)  # revealed: Foo & Bar
 ```
 
+Type guard narrowing also works when the callee has a `Callable` type:
+
+```py
+from typing import Callable
+
+def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
+    if is_bar(x):
+        reveal_type(x)  # revealed: Bar
+    else:
+        reveal_type(x)  # revealed: Foo & ~Bar
+```
+
 For generics, we transform the argument passed into `TypeIs[]` from `X` to `Top[X]`. This helps
 especially when using various functions from typeshed that are annotated as returning
 `TypeIs[SomeCovariantGeneric[Any]]` to avoid false positives in other type checkers. For ty's
