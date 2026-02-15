@@ -27,9 +27,12 @@ class Meta(type):
 
 class Foo(metaclass=Meta): ...
 
-Foo("wrong")  # error: [invalid-argument-type]
-Foo()  # error: [missing-argument]
-Foo(1, 2)  # error: [too-many-positional-arguments]
+# error: [invalid-argument-type]
+reveal_type(Foo("wrong"))  # revealed: int
+# error: [missing-argument]
+reveal_type(Foo())  # revealed: int
+# error: [too-many-positional-arguments]
+reveal_type(Foo(1, 2))  # revealed: int
 ```
 
 ### Metaclass `__call__` takes precedence over `__init__`
