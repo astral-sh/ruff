@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use anyhow::{Context, anyhow};
 use ruff_db::Db;
 use ruff_db::files::{File, Files, system_path_to_file};
@@ -5,11 +7,12 @@ use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestS
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 
+use ty_module_resolver::SearchPathSettings;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings, default_lint_registry,
+    AnalysisSettings, Program, ProgramSettings, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, default_lint_registry,
 };
 
 use test_case::test_case;
@@ -79,8 +82,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     let root = SystemPathBuf::from("/src");
 
     let mut db = CorpusDb::new();
-    db.memory_file_system()
-        .create_directory_all(root.as_ref())?;
+    db.memory_file_system().create_directory_all(&root)?;
 
     let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
@@ -169,9 +171,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-    // Fails with too-many-cycle-iterations due to a self-referential
-    // type alias, see https://github.com/astral-sh/ty/issues/256
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
 ];
 
 #[salsa::db]
@@ -182,6 +181,7 @@ pub struct CorpusDb {
     rule_selection: RuleSelection,
     system: TestSystem,
     vendored: VendoredFileSystem,
+    analysis_settings: Arc<AnalysisSettings>,
 }
 
 impl CorpusDb {
@@ -193,6 +193,7 @@ impl CorpusDb {
             vendored: ty_vendored::file_system().clone(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()),
             files: Files::default(),
+            analysis_settings: Arc::new(AnalysisSettings::default()),
         };
 
         Program::from_settings(
@@ -243,6 +244,13 @@ impl ruff_db::Db for CorpusDb {
 }
 
 #[salsa::db]
+impl ty_module_resolver::Db for CorpusDb {
+    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
+        Program::get(self).search_paths(self)
+    }
+}
+
+#[salsa::db]
 impl ty_python_semantic::Db for CorpusDb {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
@@ -258,6 +266,10 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn verbose(&self) -> bool {
         false
+    }
+
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
+        &self.analysis_settings
     }
 }
 

@@ -25,8 +25,8 @@ memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
-unicode_names2 = { workspace = true }
 unicode-normalization = { workspace = true }
+unicode_names2 = { workspace = true }
 
 [dev-dependencies]
 ruff_annotate_snippets = { workspace = true }
@@ -34,10 +34,16 @@ ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
-insta = { workspace = true, features = ["glob"] }
+datatest-stable = { workspace = true }
+insta = { workspace = true }
+itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = { workspace = true }
+
+[[test]]
+name = "fixtures"
+harness = false
 
 [lints]
 workspace = true

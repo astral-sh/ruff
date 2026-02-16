@@ -3,13 +3,14 @@ use std::path::Path;
 
 use rustc_hash::FxHashMap;
 
-use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
-use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
+use crate::token::Tokens;
+use crate::token::parenthesized_range;
 use crate::visitor::Visitor;
 use crate::{
     self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,
@@ -1318,9 +1319,27 @@ impl Truthiness {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if arguments.args.len() == 1 && arguments.keywords.is_empty() {
+                        } else if let [argument] = &*arguments.args
+                            && arguments.keywords.is_empty()
+                        {
                             // Ex) `list([1, 2, 3])`
-                            Self::from_expr(&arguments.args[0], is_builtin)
+                            match argument {
+                                // Return Unknown for types with definite truthiness that might
+                                // result in empty iterables (t-strings and generators) or will
+                                // raise a type error (non-iterable types like numbers, booleans,
+                                // None, etc.).
+                                Expr::NumberLiteral(_)
+                                | Expr::BooleanLiteral(_)
+                                | Expr::NoneLiteral(_)
+                                | Expr::EllipsisLiteral(_)
+                                | Expr::TString(_)
+                                | Expr::Lambda(_)
+                                | Expr::Generator(_) => Self::Unknown,
+                                // Recurse for all other types - collections, comprehensions, variables, etc.
+                                // StringLiteral, FString, and BytesLiteral recurse because Self::from_expr
+                                // correctly handles their truthiness (checking if empty or not).
+                                _ => Self::from_expr(argument, is_builtin),
+                            }
                         } else {
                             Self::Unknown
                         }
@@ -1456,7 +1475,7 @@ pub fn generate_comparison(
     ops: &[CmpOp],
     comparators: &[Expr],
     parent: AnyNodeRef,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
     source: &str,
 ) -> String {
     let start = left.start();
@@ -1465,8 +1484,7 @@ pub fn generate_comparison(
 
     // Add the left side of the comparison.
     contents.push_str(
-        &source[parenthesized_range(left.into(), parent, comment_ranges, source)
-            .unwrap_or(left.range())],
+        &source[parenthesized_range(left.into(), parent, tokens).unwrap_or(left.range())],
     );
 
     for (op, comparator) in ops.iter().zip(comparators) {
@@ -1486,7 +1504,7 @@ pub fn generate_comparison(
 
         // Add the right side of the comparison.
         contents.push_str(
-            &source[parenthesized_range(comparator.into(), parent, comment_ranges, source)
+            &source[parenthesized_range(comparator.into(), parent, tokens)
                 .unwrap_or(comparator.range())],
         );
     }

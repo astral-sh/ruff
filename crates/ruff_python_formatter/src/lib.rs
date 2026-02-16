@@ -24,7 +24,6 @@ pub use crate::options::{
 };
 use crate::range::is_logical_line;
 pub use crate::shared_traits::{AsFormat, FormattedIter, FormattedIterExt, IntoFormat};
-use crate::verbatim::suppressed_node;
 
 pub(crate) mod builders;
 pub mod cli;
@@ -61,51 +60,39 @@ where
         let node_ref = AnyNodeRef::from(node);
         let node_comments = comments.leading_dangling_trailing(node_ref);
 
-        if self.is_suppressed(node_comments.trailing, f.context()) {
-            suppressed_node(node_ref).fmt(f)
-        } else {
-            leading_comments(node_comments.leading).fmt(f)?;
+        leading_comments(node_comments.leading).fmt(f)?;
 
-            // Emit source map information for nodes that are valid "narrowing" targets
-            // in range formatting. Never emit source map information if they're disabled
-            // for performance reasons.
-            let emit_source_position = (is_logical_line(node_ref) || node_ref.is_mod_module())
-                && f.options().source_map_generation().is_enabled();
+        // Emit source map information for nodes that are valid "narrowing" targets
+        // in range formatting. Never emit source map information if they're disabled
+        // for performance reasons.
+        let emit_source_position = (is_logical_line(node_ref) || node_ref.is_mod_module())
+            && f.options().source_map_generation().is_enabled();
 
-            emit_source_position
-                .then_some(source_position(node.start()))
-                .fmt(f)?;
+        emit_source_position
+            .then_some(source_position(node.start()))
+            .fmt(f)?;
 
-            self.fmt_fields(node, f)?;
+        self.fmt_fields(node, f)?;
 
-            debug_assert!(
-                node_comments
-                    .dangling
-                    .iter()
-                    .all(SourceComment::is_formatted),
-                "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields`."
-            );
+        debug_assert!(
+            node_comments
+                .dangling
+                .iter()
+                .all(SourceComment::is_formatted),
+            "The node has dangling comments that need to be formatted manually. Add the special dangling comments handling to `fmt_fields`."
+        );
 
-            write!(
-                f,
-                [
-                    emit_source_position.then_some(source_position(node.end())),
-                    trailing_comments(node_comments.trailing)
-                ]
-            )
-        }
+        write!(
+            f,
+            [
+                emit_source_position.then_some(source_position(node.end())),
+                trailing_comments(node_comments.trailing)
+            ]
+        )
     }
 
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
-
-    fn is_suppressed(
-        &self,
-        _trailing_comments: &[SourceComment],
-        _context: &PyFormatContext,
-    ) -> bool {
-        false
-    }
 }
 
 #[derive(Error, Debug, salsa::Update, PartialEq, Eq)]
@@ -334,7 +321,7 @@ class A: ...
         let options = PyFormatOptions::from_source_type(source_type);
         let printed = format_range(&source, TextRange::new(start, end), options).unwrap();
 
-        let mut formatted = source.to_string();
+        let mut formatted = source.clone();
         formatted.replace_range(
             std::ops::Range::<usize>::from(printed.source_range()),
             printed.as_code(),

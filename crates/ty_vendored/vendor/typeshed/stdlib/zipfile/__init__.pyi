@@ -175,6 +175,8 @@ class ZipFile:
     filename: str | None
     debug: int
     comment: bytes
+    """The comment text associated with the ZIP file."""
+
     filelist: list[ZipInfo]
     fp: IO[bytes] | None
     NameToInfo: dict[str, ZipInfo]
@@ -483,6 +485,15 @@ class ZipInfo:
         decide based upon the file_size and compress_size, if known,
         False otherwise.
         """
+    if sys.version_info >= (3, 14):
+        def _for_archive(self, archive: ZipFile) -> Self:
+            """Resolve suitable defaults from the archive.
+
+            Resolve the date_time, compression attributes, and external attributes
+            to suitable defaults as used by :method:`ZipFile.writestr`.
+
+            Return self.
+            """
 
 if sys.version_info >= (3, 12):
     from zipfile._path import CompleteDirs as CompleteDirs, Path as Path
@@ -625,8 +636,8 @@ else:
             encoding: str | None = None,
             errors: str | None = None,
             newline: str | None = None,
-            line_buffering: bool = ...,
-            write_through: bool = ...,
+            line_buffering: bool = False,
+            write_through: bool = False,
             *,
             pwd: bytes | None = None,
         ) -> TextIOWrapper:
@@ -649,11 +660,11 @@ else:
         def exists(self) -> bool: ...
         def read_text(
             self,
-            encoding: str | None = ...,
-            errors: str | None = ...,
-            newline: str | None = ...,
-            line_buffering: bool = ...,
-            write_through: bool = ...,
+            encoding: str | None = None,
+            errors: str | None = None,
+            newline: str | None = None,
+            line_buffering: bool = False,
+            write_through: bool = False,
         ) -> str: ...
         def read_bytes(self) -> bytes: ...
         if sys.version_info >= (3, 10):

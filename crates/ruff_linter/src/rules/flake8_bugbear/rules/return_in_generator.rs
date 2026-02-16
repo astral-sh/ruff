@@ -1,6 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::statement_visitor;
-use ruff_python_ast::statement_visitor::StatementVisitor;
+use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
 use ruff_text_size::TextRange;
 
@@ -96,6 +95,11 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
         return;
     }
 
+    // Async functions are flagged by the `ReturnInGenerator` semantic syntax error.
+    if function_def.is_async {
+        return;
+    }
+
     let mut visitor = ReturnInGeneratorVisitor::default();
     visitor.visit_body(&function_def.body);
 
@@ -112,15 +116,9 @@ struct ReturnInGeneratorVisitor {
     has_yield: bool,
 }
 
-impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
+impl Visitor<'_> for ReturnInGeneratorVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::Expr(ast::StmtExpr { value, .. }) => match **value {
-                Expr::Yield(_) | Expr::YieldFrom(_) => {
-                    self.has_yield = true;
-                }
-                _ => {}
-            },
             Stmt::FunctionDef(_) => {
                 // Do not recurse into nested functions; they're evaluated separately.
             }
@@ -130,8 +128,19 @@ impl StatementVisitor<'_> for ReturnInGeneratorVisitor {
                 node_index: _,
             }) => {
                 self.return_ = Some(*range);
+                walk_stmt(self, stmt);
             }
-            _ => statement_visitor::walk_stmt(self, stmt),
+            _ => walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_expr(&mut self, expr: &Expr) {
+        match expr {
+            Expr::Lambda(_) => {}
+            Expr::Yield(_) | Expr::YieldFrom(_) => {
+                self.has_yield = true;
+            }
+            _ => walk_expr(self, expr),
         }
     }
 }

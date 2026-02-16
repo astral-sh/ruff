@@ -61,7 +61,10 @@ class ZstdCompressor:
     FLUSH_BLOCK: Final = 1
     FLUSH_FRAME: Final = 2
     def __new__(
-        cls, level: int | None = None, options: Mapping[int, int] | None = None, zstd_dict: ZstdDict | None = None
+        cls,
+        level: int | None = None,
+        options: Mapping[int, int] | None = None,
+        zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
     ) -> Self: ...
     def compress(
         self, /, data: ReadableBuffer, mode: _ZstdCompressorContinue | _ZstdCompressorFlushBlock | _ZstdCompressorFlushFrame = 0
@@ -126,7 +129,9 @@ class ZstdDecompressor:
     function instead.
     """
 
-    def __new__(cls, zstd_dict: ZstdDict | None = None, options: Mapping[int, int] | None = None) -> Self: ...
+    def __new__(
+        cls, zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None, options: Mapping[int, int] | None = None
+    ) -> Self: ...
     def decompress(self, /, data: ReadableBuffer, max_length: int = -1) -> bytes:
         """Decompress *data*, returning uncompressed bytes if possible, or b'' otherwise.
 

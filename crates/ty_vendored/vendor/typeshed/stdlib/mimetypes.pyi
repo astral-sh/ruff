@@ -25,7 +25,7 @@ read_mime_types(file) -- parse one file, return a dictionary or None
 
 import sys
 from _typeshed import StrPath
-from collections.abc import Sequence
+from collections.abc import Iterable
 from typing import IO
 
 __all__ = [
@@ -93,8 +93,8 @@ def guess_extension(type: str, strict: bool = True) -> str | None:
     but non-standard types.
     """
 
-def init(files: Sequence[str] | None = None) -> None: ...
-def read_mime_types(file: str) -> dict[str, str] | None: ...
+def init(files: Iterable[StrPath] | None = None) -> None: ...
+def read_mime_types(file: StrPath) -> dict[str, str] | None: ...
 def add_type(type: str, ext: str, strict: bool = True) -> None:
     """Add a mapping between a type and an extension.
 
@@ -116,7 +116,7 @@ if sys.version_info >= (3, 13):
         """
 
 inited: bool
-knownfiles: list[str]
+knownfiles: list[StrPath]
 suffix_map: dict[str, str]
 encodings_map: dict[str, str]
 types_map: dict[str, str]
@@ -134,7 +134,7 @@ class MimeTypes:
     encodings_map: dict[str, str]
     types_map: tuple[dict[str, str], dict[str, str]]
     types_map_inv: tuple[dict[str, str], dict[str, str]]
-    def __init__(self, filenames: tuple[str, ...] = (), strict: bool = True) -> None: ...
+    def __init__(self, filenames: Iterable[StrPath] = (), strict: bool = True) -> None: ...
     def add_type(self, type: str, ext: str, strict: bool = True) -> None:
         """Add a mapping between a type and an extension.
 
@@ -196,7 +196,7 @@ class MimeTypes:
         but non-standard types.
         """
 
-    def read(self, filename: str, strict: bool = True) -> None:
+    def read(self, filename: StrPath, strict: bool = True) -> None:
         """
         Read a single mime.types-format file, specified by pathname.
 

@@ -15,7 +15,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::comments::Comments;
 use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
-use crate::statement::suite::DocstringStmt;
+use crate::statement::suite::{DocstringStmt, skip_range};
 use crate::verbatim::{ends_suppression, starts_suppression};
 use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 
@@ -23,7 +23,8 @@ use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 ///
 /// The returned formatted range guarantees to cover at least `range` (excluding whitespace), but the range might be larger.
 /// Some cases in which the returned range is larger than `range` are:
-/// * The logical lines in `range` use a indentation different from the configured [`IndentStyle`] and [`IndentWidth`].
+/// * The logical lines in `range` use a indentation different from the configured [`IndentStyle`]
+///   and [`IndentWidth`](ruff_formatter::IndentWidth).
 /// * `range` is smaller than a logical lines and the formatter needs to format the entire logical line.
 /// * `range` falls on a single line body.
 ///
@@ -129,16 +130,19 @@ pub fn format_range(
 /// b) formatting a sub-expression has fewer split points than formatting the entire expressions.
 ///
 /// ### Possible docstrings
-/// Strings that are suspected to be docstrings are excluded from the search to format the enclosing suite instead
-/// so that the formatter's docstring detection in [`FormatSuite`] correctly detects and formats the docstrings.
+/// Strings that are suspected to be docstrings are excluded from the search to format the enclosing
+/// suite instead so that the formatter's docstring detection in
+/// [`FormatSuite`](crate::statement::suite::FormatSuite) correctly detects and formats the
+/// docstrings.
 ///
 /// ### Compound statements with a simple statement body
 /// Don't include simple-statement bodies of compound statements `if True: pass` because the formatter
-/// must run [`FormatClauseBody`] to determine if the body should be collapsed or not.
+/// must run `FormatClauseBody` to determine if the body should be collapsed or not.
 ///
 /// ### Incorrectly indented code
-/// Code that uses indentations that don't match the configured [`IndentStyle`] and [`IndentWidth`] are excluded from the search,
-/// because formatting such nodes on their own can lead to indentation mismatch with its sibling nodes.
+/// Code that uses indentations that don't match the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search, because formatting
+/// such nodes on their own can lead to indentation mismatch with its sibling nodes.
 ///
 /// ## Suppression comments
 /// The search ends when `range` falls into a suppressed range because there's nothing to format. It also avoids that the
@@ -247,7 +251,29 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
         // We only visit statements that aren't suppressed that's why we don't need to track the suppression
         // state in a stack. Assert that this assumption is safe.
         debug_assert!(self.suppressed.is_no());
-        walk_body(self, body);
+
+        let mut iter = body.iter();
+
+        while let Some(stmt) = iter.next() {
+            // If the range intersects a skip range then we need to
+            // format the entire suite to properly handle the case
+            // where a `fmt: skip` affects multiple statements.
+            //
+            // For example, in the case
+            //
+            // ```
+            // <RANGE_START>x=1<RANGE_END>;x=2 # fmt: skip
+            // ```
+            //
+            // the statement `x=1` does not "know" that it is
+            // suppressed, but the suite does.
+            if let Some(verbatim_range) = skip_range(stmt, iter.as_slice(), self.context)
+                && verbatim_range.intersect(self.range).is_some()
+            {
+                break;
+            }
+            self.visit_stmt(stmt);
+        }
         self.suppressed = Suppressed::No;
     }
 }
@@ -279,13 +305,15 @@ enum EnclosingNode<'a> {
 ///
 /// ## Compound statements with simple statement bodies
 /// Similar to [`find_enclosing_node`], exclude the compound statement's body if it is a simple statement (not a suite) from the search to format the entire clause header
-/// with the body. This ensures that the formatter runs [`FormatClauseBody`] that determines if the body should be indented.s
+/// with the body. This ensures that the formatter runs `FormatClauseBody` that determines if the body should be indented.
 ///
 /// ## Non-standard indentation
-/// Node's that use an indentation that doesn't match the configured [`IndentStyle`] and [`IndentWidth`] are excluded from the search.
-/// This is because the formatter always uses the configured [`IndentStyle`] and [`IndentWidth`], resulting in the
-/// formatted nodes using a different indentation than the unformatted sibling nodes. This would be tolerable
-/// in non whitespace sensitive languages like JavaScript but results in lexical errors in Python.
+/// Nodes that use an indentation that doesn't match the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search. This is because the
+/// formatter always uses the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth), resulting in the formatted nodes using a different
+/// indentation than the unformatted sibling nodes. This would be tolerable in non whitespace
+/// sensitive languages like JavaScript but results in lexical errors in Python.
 ///
 /// ## Implementation
 /// It would probably be possible to merge this visitor with [`FindEnclosingNode`] but they are separate because
@@ -555,7 +583,7 @@ impl NarrowRange<'_> {
 }
 
 pub(crate) const fn is_logical_line(node: AnyNodeRef) -> bool {
-    // Make sure to update [`FormatEnclosingLine`] when changing this.
+    // Make sure to update [`FormatEnclosingNode`] when changing this.
     node.is_statement()
         || node.is_decorator()
         || node.is_except_handler()
@@ -713,9 +741,11 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
     }
 }
 
-/// Computes the level of indentation for `indentation` when using the configured [`IndentStyle`] and [`IndentWidth`].
+/// Computes the level of indentation for `indentation` when using the configured [`IndentStyle`]
+/// and [`IndentWidth`](ruff_formatter::IndentWidth).
 ///
-/// Returns `None` if the indentation doesn't conform to the configured [`IndentStyle`] and [`IndentWidth`].
+/// Returns `None` if the indentation doesn't conform to the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth).
 ///
 /// # Panics
 /// If `offset` is outside of `source`.

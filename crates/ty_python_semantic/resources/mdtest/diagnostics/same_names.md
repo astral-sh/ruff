@@ -86,7 +86,7 @@ class MyClass: ...
 def get_MyClass() -> MyClass:
     from . import make_MyClass
 
-    # error: [invalid-return-type] "Return type does not match returned value: expected `package.foo.MyClass @ src/package/foo.py:1`, found `package.foo.MyClass @ src/package/foo.pyi:1`"
+    # error: [invalid-return-type] "Return type does not match returned value: expected `package.foo.MyClass @ src/package/foo.py:1:7`, found `package.foo.MyClass @ src/package/foo.pyi:1:7`"
     return make_MyClass()
 ```
 
@@ -171,7 +171,7 @@ class Config:
 import generic_a
 import generic_b
 
-# TODO should be error: [invalid-assignment] "Object of type `<class 'generic_b.Container[int]'>` is not assignable to `type[generic_a.Container[int]]`"
+# error: [invalid-assignment] "Object of type `<class 'generic_b.Container[int]'>` is not assignable to `type[generic_a.Container[int]]`"
 container: type[generic_a.Container[int]] = generic_b.Container[int]
 ```
 
@@ -265,7 +265,7 @@ import dict_a
 import dict_b
 
 def _(b_person: dict_b.Person):
-    # TODO should be error: [invalid-assignment] "Object of type `dict_b.Person` is not assignable to `dict_a.Person`"
+    # error: [invalid-assignment] "Object of type `dict_b.Person` is not assignable to `dict_a.Person`"
     person_var: dict_a.Person = b_person
 ```
 

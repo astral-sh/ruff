@@ -14,25 +14,9 @@ pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
     context.is_preview()
 }
 
-/// Returns `true` if the [`no_chaperone_for_escaped_quote_in_triple_quoted_docstring`](https://github.com/astral-sh/ruff/pull/17216) preview style is enabled.
-pub(crate) const fn is_no_chaperone_for_escaped_quote_in_triple_quoted_docstring_enabled(
-    context: &PyFormatContext,
-) -> bool {
-    context.is_preview()
-}
-
-/// Returns `true` if the [`blank_line_before_decorated_class_in_stub`](https://github.com/astral-sh/ruff/issues/18865) preview style is enabled.
-pub(crate) const fn is_blank_line_before_decorated_class_in_stub_enabled(
-    context: &PyFormatContext,
-) -> bool {
-    context.is_preview()
-}
-
 /// Returns `true` if the
-/// [`remove_parens_around_except_types`](https://github.com/astral-sh/ruff/pull/20768) preview
+/// [`fluent_layout_split_first_call`](https://github.com/astral-sh/ruff/pull/21369) preview
 /// style is enabled.
-pub(crate) const fn is_remove_parens_around_except_types_enabled(
-    context: &PyFormatContext,
-) -> bool {
+pub(crate) const fn is_fluent_layout_split_first_call_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }

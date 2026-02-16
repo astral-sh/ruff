@@ -9,17 +9,13 @@ use ruff_macros::CacheKey;
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 #[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+#[derive(Default)]
 pub enum Quote {
     /// Use double quotes.
+    #[default]
     Double,
     /// Use single quotes.
     Single,
-}
-
-impl Default for Quote {
-    fn default() -> Self {
-        Self::Double
-    }
 }
 
 impl From<ruff_python_ast::str::Quote> for Quote {

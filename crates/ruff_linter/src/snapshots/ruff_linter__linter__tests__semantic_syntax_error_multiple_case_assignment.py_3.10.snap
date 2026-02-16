@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: multiple assignments to name `a` in pattern
+ --> resources/test/fixtures/semantic_errors/multiple_case_assignment.py:2:14
+  |
+1 | match x:
+2 |     case [a, a]:
+  |              ^
+3 |         pass
+4 |     case _:
+  |

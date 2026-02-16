@@ -12,6 +12,30 @@ def _(flag: bool):
         reveal_type(x)  # revealed: None
 ```
 
+## `None != x` (reversed operands)
+
+```py
+def _(flag: bool):
+    x = None if flag else 1
+
+    if None != x:
+        reveal_type(x)  # revealed: Literal[1]
+    else:
+        reveal_type(x)  # revealed: None
+```
+
+This also works for `==` with reversed operands:
+
+```py
+def _(flag: bool):
+    x = None if flag else 1
+
+    if None == x:
+        reveal_type(x)  # revealed: None
+    else:
+        reveal_type(x)  # revealed: Literal[1]
+```
+
 ## `!=` for other singleton types
 
 ### Bool
@@ -169,6 +193,24 @@ def _(flag1: bool, flag2: bool, a: int):
         reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
+## `==` / `!=` with two narrowable operands
+
+Both operands should be narrowed when both are narrowable expressions.
+
+```py
+from typing import Literal
+
+def _(x: Literal[1], y: Literal[1, 2]):
+    if x == y:
+        reveal_type(y)  # revealed: Literal[1]
+    if y == x:
+        reveal_type(y)  # revealed: Literal[1]
+    if x != y:
+        reveal_type(y)  # revealed: Literal[2]
+    if y != x:
+        reveal_type(y)  # revealed: Literal[2]
+```
+
 ## Assignment expressions
 
 ```py
@@ -237,4 +279,21 @@ def _(s: LiteralString | None, t: LiteralString | Any):
     if t == "foo":
         # TODO could be `Literal["foo"] | Any`
         reveal_type(t)  # revealed: LiteralString | Any
+```
+
+## Narrowing with tuple types
+
+We assume that tuple subclasses don't override `tuple.__eq__`, which only returns True for other
+tuples. So they are excluded from the narrowed type when comparing to non-tuple values.
+
+```py
+from typing import Literal
+
+def _(x: Literal["a", "b"] | tuple[int, int]):
+    if x == "a":
+        # tuple type is excluded because it's disjoint from the string literal
+        reveal_type(x)  # revealed: Literal["a"]
+    else:
+        # tuple type remains in the else branch
+        reveal_type(x)  # revealed: Literal["b"] | tuple[int, int]
 ```

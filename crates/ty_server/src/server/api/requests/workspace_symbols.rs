@@ -8,8 +8,6 @@ use crate::server::api::traits::{
 };
 use crate::session::SessionSnapshot;
 use crate::session::client::Client;
-use crate::system::file_to_url;
-use ruff_db::source::{line_index, source_text};
 
 pub(crate) struct WorkspaceSymbolRequestHandler;
 
@@ -41,23 +39,19 @@ impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
             for workspace_symbol_info in workspace_symbol_infos {
                 let WorkspaceSymbolInfo { symbol, file } = workspace_symbol_info;
 
-                // Get file information for URL conversion
-                let source = source_text(db, file);
-                let line_index = line_index(db, file);
-
-                // Convert file to URL
-                let Some(url) = file_to_url(db, file) else {
-                    tracing::debug!("Failed to convert file to URL at {}", file.path(db));
-                    continue;
-                };
-
                 // Get position encoding from session
                 let encoding = snapshot.position_encoding();
 
-                let lsp_symbol =
-                    convert_to_lsp_symbol_information(symbol, &url, &source, &line_index, encoding);
+                let Some(symbol) = convert_to_lsp_symbol_information(db, file, symbol, encoding)
+                else {
+                    tracing::debug!(
+                        "Failed to convert symbol '{}' to LSP symbol information",
+                        file.path(db)
+                    );
+                    continue;
+                };
 
-                all_symbols.push(lsp_symbol);
+                all_symbols.push(symbol);
             }
         }
 

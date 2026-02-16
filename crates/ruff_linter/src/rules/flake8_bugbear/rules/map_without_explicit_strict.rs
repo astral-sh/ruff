@@ -9,10 +9,11 @@ use crate::rules::flake8_bugbear::helpers::any_infinite_iterables;
 use crate::{AlwaysFixableViolation, Applicability, Fix};
 
 /// ## What it does
-/// Checks for `map` calls without an explicit `strict` parameter when called with two or more iterables, or any starred argument.
+/// Checks for `map` calls without an explicit `strict` parameter when called with two or more
+/// iterables, or any starred argument.
 ///
 /// This rule applies to Python 3.14 and later, where `map` accepts a `strict` keyword
-/// argument. For details, see: [What’s New in Python 3.14](https://docs.python.org/dev/whatsnew/3.14.html).
+/// argument. For details, see: [What’s New in Python 3.14].
 ///
 /// ## Why is this bad?
 /// By default, if the iterables passed to `map` are of different lengths, the
@@ -41,9 +42,11 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 ///
 /// ## References
 /// - [Python documentation: `map`](https://docs.python.org/3/library/functions.html#map)
-/// - [What’s New in Python 3.14](https://docs.python.org/dev/whatsnew/3.14.html)
+/// - [What’s New in Python 3.14]
+///
+/// [What's New in Python 3.14]: https://docs.python.org/dev/whatsnew/3.14.html
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.13.2")]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct MapWithoutExplicitStrict;
 
 impl AlwaysFixableViolation for MapWithoutExplicitStrict {
@@ -74,12 +77,7 @@ pub(crate) fn map_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
         checker
             .report_diagnostic(MapWithoutExplicitStrict, call.range())
             .set_fix(Fix::applicable_edit(
-                add_argument(
-                    "strict=False",
-                    &call.arguments,
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                ),
+                add_argument("strict=False", &call.arguments, checker.tokens()),
                 Applicability::Unsafe,
             ));
     }

@@ -6,11 +6,15 @@ on:
   pull_request:
     paths:
       - "crates/ty*/**"
+      - "!crates/ty_ide/**"
+      - "!crates/ty_server/**"
+      - "!crates/ty_test/**"
+      - "!crates/ty_completion_eval/**"
+      - "!crates/ty_wasm/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
       - ".github/workflows/mypy_primer.yaml"
-      - ".github/workflows/mypy_primer_comment.yaml"
       - "scripts/mypy_primer.sh"
       - "Cargo.lock"
       - "!**.md"
@@ -36,17 +40,20 @@ jobs:
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
-
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
         with:
+          version: "0.10.2"
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          shared-key: "mypy-primer"
           workspaces: "ruff"
 
       - name: Install Rust toolchain
@@ -55,57 +62,69 @@ jobs:
       - name: Run mypy_primer
         env:
           PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/good.txt
+          CLICOLOR_FORCE: "1"
           DIFF_FILE: mypy_primer.diff
         run: |
           cd ruff
           scripts/mypy_primer.sh
-          echo ${{ github.event.number }} > ../pr-number
 
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: mypy_primer_diff
           path: mypy_primer.diff
 
-      - name: Upload pr-number
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pr-number
-          path: pr-number
-
-  memory_usage:
-    name: Run memory statistics
+  # Runs mypy twice against the same ty version to catch any non-deterministic behavior (ideally).
+  # The job is disabled for now because there are some non-deterministic diagnostics.
+  mypy_primer_same_revision:
+    name: Run mypy_primer on same revision
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
+    # TODO: Enable once we fixed the non-deterministic diagnostics
+    if: false
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          version: "0.10.2"
 
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
+          shared-key: "mypy-primer"
 
       - name: Install Rust toolchain
         run: rustup show
 
-      - name: Run mypy_primer
+      - name: Run determinism check
         env:
-          TY_MAX_PARALLELISM: 1 # for deterministic memory numbers
-          TY_MEMORY_REPORT: mypy_primer
-          PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/memory.txt
-          DIFF_FILE: mypy_primer_memory.diff
+          BASE_REVISION: ${{ github.event.pull_request.head.sha }}
+          PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/good.txt
+          CLICOLOR_FORCE: "1"
+          DIFF_FILE: mypy_primer_determinism.diff
         run: |
           cd ruff
           scripts/mypy_primer.sh
 
-      - name: Upload diff
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: mypy_primer_memory_diff
-          path: mypy_primer_memory.diff
+      - name: Check for non-determinism
+        run: |
+          # Remove ANSI color codes for checking
+          sed -e 's/\x1b\[[0-9;]*m//g' mypy_primer_determinism.diff > mypy_primer_determinism_clean.diff
+
+          # Check if there are any differences (non-determinism)
+          if [ -s mypy_primer_determinism_clean.diff ]; then
+            echo "ERROR: Non-deterministic output detected!"
+            echo "The following differences were found when running ty twice on the same commit:"
+            cat mypy_primer_determinism_clean.diff
+            exit 1
+          else
+            echo "✓ Output is deterministic"
+          fi

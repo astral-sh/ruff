@@ -487,7 +487,7 @@ pub trait FormatElements {
 /// Represents the width by adding 1 to the actual width so that the width can be represented by a [`NonZeroU32`],
 /// allowing [`TextWidth`] or [`Option<Width>`] fit in 4 bytes rather than 8.
 ///
-/// This means that 2^32 can not be precisely represented and instead has the same value as 2^32-1.
+/// This means that 2^32 cannot be precisely represented and instead has the same value as 2^32-1.
 /// This imprecision shouldn't matter in practice because either text are longer than any configured line width
 /// and thus, the text should break.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]

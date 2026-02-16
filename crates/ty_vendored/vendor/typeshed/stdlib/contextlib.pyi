@@ -6,8 +6,8 @@ from _typeshed import FileDescriptorOrPath, Unused
 from abc import ABC, abstractmethod
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable, Generator, Iterator
 from types import TracebackType
-from typing import IO, Any, Generic, Protocol, TypeVar, overload, runtime_checkable, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias
+from typing import Any, Generic, Protocol, TypeVar, overload, runtime_checkable, type_check_only
+from typing_extensions import ParamSpec, Self, TypeAlias, deprecated
 
 __all__ = [
     "contextmanager",
@@ -32,7 +32,6 @@ if sys.version_info >= (3, 11):
 
 _T = TypeVar("_T")
 _T_co = TypeVar("_T_co", covariant=True)
-_T_io = TypeVar("_T_io", bound=IO[str] | None)
 _ExitT_co = TypeVar("_ExitT_co", covariant=True, bound=bool | None, default=bool | None)
 _F = TypeVar("_F", bound=Callable[..., Any])
 _G_co = TypeVar("_G_co", bound=Generator[Any, Any, Any] | AsyncGenerator[Any, Any], covariant=True)
@@ -115,7 +114,8 @@ class _GeneratorContextManager(
         self, typ: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
     ) -> bool | None: ...
 
-def contextmanager(func: Callable[_P, Iterator[_T_co]]) -> Callable[_P, _GeneratorContextManager[_T_co]]:
+@overload
+def contextmanager(func: Callable[_P, Generator[_T_co, None, object]]) -> Callable[_P, _GeneratorContextManager[_T_co]]:
     """@contextmanager decorator.
 
     Typical usage:
@@ -142,6 +142,12 @@ def contextmanager(func: Callable[_P, Iterator[_T_co]]) -> Callable[_P, _Generat
         finally:
             <cleanup>
     """
+
+@overload
+@deprecated(
+    "Annotating the return type as `-> Iterator[Foo]` with `@contextmanager` is deprecated. Use `-> Generator[Foo]` instead."
+)
+def contextmanager(func: Callable[_P, Iterator[_T_co]]) -> Callable[_P, _GeneratorContextManager[_T_co]]: ...
 
 if sys.version_info >= (3, 10):
     _AF = TypeVar("_AF", bound=Callable[..., Awaitable[Any]])
@@ -175,7 +181,8 @@ else:
             self, typ: type[BaseException] | None, value: BaseException | None, traceback: TracebackType | None
         ) -> bool | None: ...
 
-def asynccontextmanager(func: Callable[_P, AsyncIterator[_T_co]]) -> Callable[_P, _AsyncGeneratorContextManager[_T_co]]:
+@overload
+def asynccontextmanager(func: Callable[_P, AsyncGenerator[_T_co]]) -> Callable[_P, _AsyncGeneratorContextManager[_T_co]]:
     """@asynccontextmanager decorator.
 
     Typical usage:
@@ -203,6 +210,12 @@ def asynccontextmanager(func: Callable[_P, AsyncIterator[_T_co]]) -> Callable[_P
             <cleanup>
     """
 
+@overload
+@deprecated(
+    "Annotating the return type as `-> AsyncIterator[Foo]` with `@asynccontextmanager` is deprecated. "
+    "Use `-> AsyncGenerator[Foo]` instead."
+)
+def asynccontextmanager(func: Callable[_P, AsyncIterator[_T_co]]) -> Callable[_P, _AsyncGeneratorContextManager[_T_co]]: ...
 @type_check_only
 class _SupportsClose(Protocol):
     def close(self) -> object: ...
@@ -275,13 +288,23 @@ class suppress(AbstractContextManager[None, bool]):
         self, exctype: type[BaseException] | None, excinst: BaseException | None, exctb: TracebackType | None
     ) -> bool: ...
 
-class _RedirectStream(AbstractContextManager[_T_io, None]):
-    def __init__(self, new_target: _T_io) -> None: ...
+# This is trying to describe what is needed for (most?) uses
+# of `redirect_stdout` and `redirect_stderr`.
+# https://github.com/python/typeshed/issues/14903
+@type_check_only
+class _SupportsRedirect(Protocol):
+    def write(self, s: str, /) -> int: ...
+    def flush(self) -> None: ...
+
+_SupportsRedirectT = TypeVar("_SupportsRedirectT", bound=_SupportsRedirect | None)
+
+class _RedirectStream(AbstractContextManager[_SupportsRedirectT, None]):
+    def __init__(self, new_target: _SupportsRedirectT) -> None: ...
     def __exit__(
         self, exctype: type[BaseException] | None, excinst: BaseException | None, exctb: TracebackType | None
     ) -> None: ...
 
-class redirect_stdout(_RedirectStream[_T_io]):
+class redirect_stdout(_RedirectStream[_SupportsRedirectT]):
     """Context manager for temporarily redirecting stdout to another file.
 
     # How to send help() to stderr
@@ -294,7 +317,7 @@ class redirect_stdout(_RedirectStream[_T_io]):
             help(pow)
     """
 
-class redirect_stderr(_RedirectStream[_T_io]):
+class redirect_stderr(_RedirectStream[_SupportsRedirectT]):
     """Context manager for temporarily redirecting stderr to another file."""
 
 class _BaseExitStack(Generic[_ExitT_co]):

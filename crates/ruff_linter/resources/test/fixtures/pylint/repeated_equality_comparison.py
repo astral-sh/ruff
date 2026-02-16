@@ -73,3 +73,7 @@ foo == 1 or foo == 1.0 # Different types, same hashed value
 foo == False or foo == 0 # Different types, same hashed value
 
 foo == 0.0 or foo == 0j # Different types, same hashed value
+
+foo == "bar" or foo == "bar" # All members identical
+
+foo == "bar" or foo == "bar" or foo == "buzz" # All but one members identical

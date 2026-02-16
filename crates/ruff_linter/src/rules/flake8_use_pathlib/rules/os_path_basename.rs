@@ -82,6 +82,6 @@ pub(crate) fn os_path_basename(checker: &Checker, call: &ExprCall, segments: &[&
         "p",
         is_fix_os_path_basename_enabled(checker.settings()),
         OsPathBasename,
-        Some(Applicability::Unsafe),
+        Applicability::Unsafe,
     );
 }

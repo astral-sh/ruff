@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: name `a` is parameter and global
+ --> resources/test/fixtures/semantic_errors/global_parameter.py:2:12
+  |
+1 | def f(a):
+2 |     global a
+  |            ^
+3 |
+4 | def g(a):
+  |
+
+invalid-syntax: name `a` is parameter and global
+ --> resources/test/fixtures/semantic_errors/global_parameter.py:6:16
+  |
+4 | def g(a):
+5 |     if True:
+6 |         global a 
+  |                ^
+7 |
+8 | def h(a):
+  |
+
+invalid-syntax: name `a` is parameter and global
+  --> resources/test/fixtures/semantic_errors/global_parameter.py:14:16
+   |
+12 | def i(a):
+13 |     try:
+14 |         global a 
+   |                ^
+15 |     except Exception:
+16 |         pass
+   |
+
+invalid-syntax: name `a` is parameter and global
+  --> resources/test/fixtures/semantic_errors/global_parameter.py:20:12
+   |
+18 | def f(a):
+19 |     a = 1
+20 |     global a
+   |            ^
+21 |
+22 | def f(a):
+   |
+
+invalid-syntax: name `a` is parameter and global
+  --> resources/test/fixtures/semantic_errors/global_parameter.py:25:12
+   |
+23 |     a = 1
+24 |     a = 2
+25 |     global a
+   |            ^
+26 |
+27 | def f(a):
+   |

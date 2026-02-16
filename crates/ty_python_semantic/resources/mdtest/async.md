@@ -43,9 +43,7 @@ async def main():
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as pool:
         result = await loop.run_in_executor(pool, blocking_function)
-
-        # TODO: should be `int`
-        reveal_type(result)  # revealed: Unknown
+        reveal_type(result)  # revealed: int
 ```
 
 ### `asyncio.Task`
@@ -61,8 +59,7 @@ async def main():
 
     result = await task
 
-    # TODO: this should be `int`
-    reveal_type(result)  # revealed: Unknown
+    reveal_type(result)  # revealed: int
 ```
 
 ### `asyncio.gather`
@@ -74,14 +71,13 @@ async def task(name: str) -> int:
     return len(name)
 
 async def main():
-    (a, b) = await asyncio.gather(
+    a, b = await asyncio.gather(
         task("A"),
         task("B"),
     )
 
-    # TODO: these should be `int`
-    reveal_type(a)  # revealed: Unknown
-    reveal_type(b)  # revealed: Unknown
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: int
 ```
 
 ## Under the hood
@@ -120,4 +116,16 @@ from typing import Generator
 def _():
     result = yield from retrieve().__await__()
     reveal_type(result)  # revealed: int
+```
+
+## Un-annotated async functions
+
+An `async def` with no annotated return type is still known to return `CoroutineType` of `Unknown`,
+not just `Unknown`:
+
+```py
+async def f():
+    pass
+
+reveal_type(f())  # revealed: CoroutineType[Any, Any, Unknown]
 ```

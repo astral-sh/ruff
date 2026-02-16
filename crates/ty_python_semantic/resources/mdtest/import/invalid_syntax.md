@@ -14,7 +14,7 @@ TODO: This is correctly flagged as an error, but we could clean up the diagnosti
 
 ```py
 # TODO: No second diagnostic
-# error: [invalid-syntax] "Expected ',', found '.'"
+# error: [invalid-syntax] "Expected `,`, found `.`"
 # error: [unresolved-import] "Module `a` has no member `c`"
 from a import b.c
 

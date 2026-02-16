@@ -1,6 +1,6 @@
 # Tests for the `@typing(_extensions).final` decorator
 
-## Cannot subclass
+## Cannot subclass a class decorated with `@final`
 
 Don't do this:
 
@@ -28,4 +28,1255 @@ class H(
     A,  # error: [subclass-of-final-class]
     G,
 ): ...
+```
+
+## Cannot override a method decorated with `@final`
+
+<!-- snapshot-diagnostics -->
+
+```pyi
+from typing_extensions import final, Callable, TypeVar
+
+def lossy_decorator(fn: Callable) -> Callable: ...
+
+class Parent:
+    @final
+    def foo(self): ...
+    @final
+    @property
+    def my_property1(self) -> int: ...
+    @property
+    @final
+    def my_property2(self) -> int: ...
+    @property
+    @final
+    def my_property3(self) -> int: ...
+    @final
+    @classmethod
+    def class_method1(cls) -> int: ...
+    @classmethod
+    @final
+    def class_method2(cls) -> int: ...
+    @final
+    @staticmethod
+    def static_method1() -> int: ...
+    @staticmethod
+    @final
+    def static_method2() -> int: ...
+    @lossy_decorator
+    @final
+    def decorated_1(self): ...
+    @final
+    @lossy_decorator
+    def decorated_2(self): ...
+
+class Child(Parent):
+    # explicitly test the concise diagnostic message,
+    # which is different to the verbose diagnostic summary message:
+    #
+    # error: [override-of-final-method] "Cannot override final member `foo` from superclass `Parent`"
+    def foo(self): ...
+    @property
+    def my_property1(self) -> int: ...  # error: [override-of-final-method]
+    @property
+    def my_property2(self) -> int: ...  # error: [override-of-final-method]
+    @my_property2.setter
+    def my_property2(self, x: int) -> None: ...
+    @property
+    def my_property3(self) -> int: ...  # error: [override-of-final-method]
+    @my_property3.deleter
+    def my_proeprty3(self) -> None: ...
+    @classmethod
+    def class_method1(cls) -> int: ...  # error: [override-of-final-method]
+    @staticmethod
+    def static_method1() -> int: ...  # error: [override-of-final-method]
+    @classmethod
+    def class_method2(cls) -> int: ...  # error: [override-of-final-method]
+    @staticmethod
+    def static_method2() -> int: ...  # error: [override-of-final-method]
+    def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
+    @lossy_decorator
+    def decorated_2(self): ...  # TODO: should emit [override-of-final-method]
+
+class OtherChild(Parent): ...
+
+class Grandchild(OtherChild):
+    # TODO: The Liskov violation here maybe shouldn't be emitted? Whether called on the
+    # type or on an instance, it will behave the same from the caller's perspective. The only
+    # difference is whether the method body gets access to `self`, which is not a
+    # concern of Liskov.
+    @staticmethod
+    # error: [override-of-final-method]
+    # error: [invalid-method-override]
+    def foo(): ...
+    @property
+    # TODO: we should emit a Liskov violation here too
+    # error: [override-of-final-method]
+    def my_property1(self) -> str: ...
+    # TODO: we should emit a Liskov violation here too
+    # error: [override-of-final-method]
+    class_method1 = None
+
+# Diagnostic edge case: `final` is very far away from the method definition in the source code:
+
+T = TypeVar("T")
+
+def identity(x: T) -> T: ...
+
+class Foo:
+    @final
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    @identity
+    def bar(self): ...
+
+class Baz(Foo):
+    def bar(self): ...  # error: [override-of-final-method]
+```
+
+## Diagnostic edge case: superclass with `@final` method has the same name as the subclass
+
+<!-- snapshot-diagnostics -->
+
+`module1.py`:
+
+```py
+from typing import final
+
+class Foo:
+    @final
+    def f(self): ...
+```
+
+`module2.py`:
+
+```py
+import module1
+
+class Foo(module1.Foo):
+    def f(self): ...  # error: [override-of-final-method]
+```
+
+## Overloaded methods decorated with `@final`
+
+In a stub file, `@final` should be applied to the first overload. In a runtime file, `@final` should
+only be applied to the implementation function.
+
+<!-- snapshot-diagnostics -->
+
+`stub.pyi`:
+
+```pyi
+from typing import final, overload
+
+class Good:
+    @overload
+    @final
+    def bar(self, x: str) -> str: ...
+    @overload
+    def bar(self, x: int) -> int: ...
+    @final
+    @overload
+    def baz(self, x: str) -> str: ...
+    @overload
+    def baz(self, x: int) -> int: ...
+
+class ChildOfGood(Good):
+    @overload
+    def bar(self, x: str) -> str: ...
+    @overload
+    def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
+    @overload
+    def baz(self, x: str) -> str: ...
+    @overload
+    def baz(self, x: int) -> int: ...  # error: [override-of-final-method]
+
+class Bad:
+    @overload
+    def bar(self, x: str) -> str: ...
+    @overload
+    @final
+    # error: [invalid-overload]
+    def bar(self, x: int) -> int: ...
+    @overload
+    def baz(self, x: str) -> str: ...
+    @final
+    @overload
+    # error: [invalid-overload]
+    def baz(self, x: int) -> int: ...
+
+class ChildOfBad(Bad):
+    @overload
+    def bar(self, x: str) -> str: ...
+    @overload
+    def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
+    @overload
+    def baz(self, x: str) -> str: ...
+    @overload
+    def baz(self, x: int) -> int: ...  # error: [override-of-final-method]
+```
+
+`main.py`:
+
+```py
+from typing import overload, final
+
+class Good:
+    @overload
+    def f(self, x: str) -> str: ...
+    @overload
+    def f(self, x: int) -> int: ...
+    @final
+    def f(self, x: int | str) -> int | str:
+        return x
+
+class ChildOfGood(Good):
+    @overload
+    def f(self, x: str) -> str: ...
+    @overload
+    def f(self, x: int) -> int: ...
+
+    # error: [override-of-final-method]
+    def f(self, x: int | str) -> int | str:
+        return x
+
+class Bad:
+    @overload
+    @final
+    def f(self, x: str) -> str: ...  # error: [invalid-overload]
+    @overload
+    def f(self, x: int) -> int: ...
+    def f(self, x: int | str) -> int | str:
+        return x
+
+    @final
+    @overload
+    def g(self, x: str) -> str: ...  # error: [invalid-overload]
+    @overload
+    def g(self, x: int) -> int: ...
+    def g(self, x: int | str) -> int | str:
+        return x
+
+    @overload
+    def h(self, x: str) -> str: ...
+    @overload
+    @final
+    def h(self, x: int) -> int: ...  # error: [invalid-overload]
+    def h(self, x: int | str) -> int | str:
+        return x
+
+    @overload
+    def i(self, x: str) -> str: ...
+    @final
+    @overload
+    def i(self, x: int) -> int: ...  # error: [invalid-overload]
+    def i(self, x: int | str) -> int | str:
+        return x
+
+class ChildOfBad(Bad):
+    # TODO: these should all cause us to emit Liskov violations as well
+    f = None  # error: [override-of-final-method]
+    g = None  # error: [override-of-final-method]
+    h = None  # error: [override-of-final-method]
+    i = None  # error: [override-of-final-method]
+```
+
+## Edge case: the function is decorated with `@final` but originally defined elsewhere
+
+As of 2025-11-26, pyrefly emits a diagnostic on this, but mypy and pyright do not. For mypy and
+pyright to emit a diagnostic, the superclass definition decorated with `@final` must be a literal
+function definition: an assignment definition where the right-hand side of the assignment is a
+`@final-decorated` function is not sufficient for them to consider the superclass definition as
+being `@final`.
+
+For now, we choose to follow mypy's and pyright's behaviour here, in order to maximise compatibility
+with other type checkers. We may decide to change this in the future, however, as it would simplify
+our implementation. Mypy's and pyright's behaviour here is also arguably inconsistent with their
+treatment of other type qualifiers such as `Final`. As discussed in
+<https://discuss.python.org/t/imported-final-variable/82429>, both type checkers view the `Final`
+type qualifier as travelling *across* scopes.
+
+```py
+from typing import final
+
+class A:
+    @final
+    def method(self) -> None: ...
+
+class B:
+    method = A.method
+
+class C(B):
+    def method(self) -> None: ...  # no diagnostic here (see prose discussion above)
+```
+
+## Overriding a `@final` method by assigning a function to a class variable
+
+When a subclass overrides a `@final` method by assigning a function to a class variable, we emit a
+diagnostic but do not provide an autofix (since the function may be defined in a different file).
+
+<!-- snapshot-diagnostics -->
+
+`base.py`:
+
+```py
+from typing import final
+
+class Base:
+    @final
+    def method(self) -> None: ...
+```
+
+`other.py`:
+
+```py
+def replacement_method() -> None: ...
+```
+
+`derived.py`:
+
+```py
+from base import Base
+from other import replacement_method
+
+class Derived(Base):
+    method = replacement_method  # error: [override-of-final-method]
+```
+
+## Constructor methods are also checked
+
+```py
+from typing import final
+
+class A:
+    @final
+    def __init__(self) -> None: ...
+
+class B(A):
+    def __init__(self) -> None: ...  # error: [override-of-final-method]
+```
+
+## Only the first `@final` violation is reported
+
+(Don't do this.)
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import final
+
+class A:
+    @final
+    def f(self): ...
+
+class B(A):
+    @final
+    def f(self): ...  # error: [override-of-final-method]
+
+class C(B):
+    @final
+    # we only emit one error here, not two
+    def f(self): ...  # error: [override-of-final-method]
+```
+
+## For when you just really want to drive the point home
+
+```py
+from typing import final, Final
+
+@final
+@final
+@final
+@final
+@final
+@final
+class A:
+    @final
+    @final
+    @final
+    @final
+    @final
+    def method(self): ...
+
+@final
+@final
+@final
+@final
+@final
+class B:
+    method: Final = A.method
+
+class C(A):  # error: [subclass-of-final-class]
+    def method(self): ...  # error: [override-of-final-method]
+
+class D(B):  # error: [subclass-of-final-class]
+    def method(self): ...  # error: [override-of-final-variable]
+```
+
+## An `@final` method is overridden by an implicit instance attribute
+
+```py
+from typing import final, Any
+
+class Parent:
+    @final
+    def method(self) -> None: ...
+
+class Child(Parent):
+    def __init__(self) -> None:
+        self.method: Any = 42  # TODO: we should emit `[override-of-final-method]` here
+```
+
+## A possibly-undefined `@final` method is overridden
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import final
+
+def coinflip() -> bool:
+    return False
+
+class A:
+    if coinflip():
+        @final
+        def method1(self) -> None: ...
+
+    else:
+        def method1(self) -> None: ...
+
+    if coinflip():
+        def method2(self) -> None: ...
+
+    else:
+        @final
+        def method2(self) -> None: ...
+
+    if coinflip():
+        @final
+        def method3(self) -> None: ...
+
+    else:
+        @final
+        def method3(self) -> None: ...
+
+    if coinflip():
+        def method4(self) -> None: ...
+
+    elif coinflip():
+        @final
+        def method4(self) -> None: ...
+
+    else:
+        def method4(self) -> None: ...
+
+class B(A):
+    def method1(self) -> None: ...  # error: [override-of-final-method]
+    def method2(self) -> None: ...  # error: [override-of-final-method]
+    def method3(self) -> None: ...  # error: [override-of-final-method]
+
+    # check that autofixes don't introduce invalid syntax
+    # if there are multiple statements on one line
+    #
+    # TODO: we should emit a Liskov violation here too
+    # error: [override-of-final-method]
+    method4 = 42
+    unrelated = 56  # fmt: skip
+
+# Possible overrides of possibly `@final` methods...
+class C(A):
+    if coinflip():
+        def method1(self) -> None: ...  # error: [override-of-final-method]
+
+    else:
+        pass
+
+    if coinflip():
+        def method2(self) -> None: ...  # error: [override-of-final-method]
+
+    else:
+        def method2(self) -> None: ...
+
+    if coinflip():
+        def method3(self) -> None: ...  # error: [override-of-final-method]
+
+    # TODO: we should emit Liskov violations here too:
+    if coinflip():
+        method4 = 42  # error: [override-of-final-method]
+    else:
+        method4 = 56
+```
+
+## Definitions in statically known branches
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from typing_extensions import final
+
+class Parent:
+    if sys.version_info >= (3, 10):
+        @final
+        def foo(self) -> None: ...
+        @final
+        def foooo(self) -> None: ...
+        @final
+        def baaaaar(self) -> None: ...
+
+    else:
+        @final
+        def bar(self) -> None: ...
+        @final
+        def baz(self) -> None: ...
+        @final
+        def spam(self) -> None: ...
+
+class Child(Parent):
+    def foo(self) -> None: ...  # error: [override-of-final-method]
+
+    # The declaration on `Parent` is not reachable,
+    # so this is fine
+    def bar(self) -> None: ...
+
+    if sys.version_info >= (3, 10):
+        def foooo(self) -> None: ...  # error: [override-of-final-method]
+        def baz(self) -> None: ...
+
+    else:
+        # Fine because this doesn't override any reachable definitions
+        def foooo(self) -> None: ...
+
+        # There are `@final` definitions being overridden here,
+        # but the definitions that override them are unreachable
+        def spam(self) -> None: ...
+        def baaaaar(self) -> None: ...
+```
+
+## Overloads in statically-known branches in stub files
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```pyi
+import sys
+from typing_extensions import overload, final
+
+class Foo:
+    if sys.version_info >= (3, 10):
+        @overload
+        @final
+        def method(self, x: int) -> int: ...
+
+    else:
+        @overload
+        def method(self, x: int) -> int: ...
+    @overload
+    def method(self, x: str) -> str: ...
+
+    if sys.version_info >= (3, 10):
+        @overload
+        def method2(self, x: int) -> int: ...
+
+    else:
+        @overload
+        @final
+        def method2(self, x: int) -> int: ...
+    @overload
+    def method2(self, x: str) -> str: ...
+
+class Bar(Foo):
+    @overload
+    def method(self, x: int) -> int: ...
+    @overload
+    def method(self, x: str) -> str: ...  # error: [override-of-final-method]
+
+    # This is fine: the only overload that is marked `@final`
+    # is in a statically-unreachable branch
+    @overload
+    def method2(self, x: int) -> int: ...
+    @overload
+    def method2(self, x: str) -> str: ...
+```
+
+## A `@final` class must implement all abstract methods
+
+A class decorated with `@final` cannot be subclassed. Therefore, if such a class has abstract
+methods, those methods must be implemented in the final class itself - there's no other way to
+provide implementations.
+
+At runtime, instantiation of classes with unimplemented abstract methods is only prevented for
+classes that have `ABCMeta` (or a subclass of it) as their metaclass. However, type checkers also
+enforce this for classes that do not use `ABCMeta`, since the intent for the class to be abstract is
+clear from the use of `@abstractmethod`.
+
+### Basic case with ABC
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int:
+        raise NotImplementedError
+
+@final
+class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
+    pass
+```
+
+### Multiple abstract methods
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+    @abstractmethod
+    def bar(self) -> str: ...
+    @abstractmethod
+    def baz(self) -> None: ...
+
+@final
+class MissingAll(Base):  # error: [abstract-method-in-final-class]
+    pass
+
+@final
+class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
+    def foo(self) -> int:
+        return 42
+
+    def bar(self) -> str:
+        return "hello"
+```
+
+### Protocol with abstract methods
+
+```py
+from abc import abstractmethod
+from typing import Protocol, final
+
+class MyProtocol(Protocol):
+    @abstractmethod
+    def method(self) -> int: ...
+
+@final
+class Implementer(MyProtocol):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Protocol with implicitly abstract methods
+
+<!-- snapshot-diagnostics -->
+
+A method in a `Protocol` class can be "implicitly abstract" if one of the following conditions are
+met:
+
+1. The function body only consists of `...` and/or `pass` statements
+1. The function is an overloaded function without an implementation
+1. The function body only consists of `raise NotImplementedError` or `raise NotImplementedError()`
+
+In either case, we also allow the function to have a docstring and still be considered implicitly
+abstract.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing_extensions import Protocol, final, Never, overload
+
+class P(Protocol):
+    # There'd be no unsoundness here if a subclass of this
+    # class were to be instantiated without the method having been overridden:
+    # the function returns `None`, and `None` is assignable to the inferred return
+    # type of the function (`Unknown`). Nonetheless, we consider this method
+    # implicitly abstract anyway, since the distinction based on the return type
+    # would probably be subtle and surprising to many users. This also matches the
+    # behaviour of all other type checkers
+    def still_abstractmethod(self): ...
+
+@final
+class Q(P): ...  # error: [abstract-method-in-final-class]
+
+class R(Protocol):
+    # same here
+    def also_still_abstractmethod(self) -> None: ...
+
+@final
+class S(R): ...  # error: [abstract-method-in-final-class]
+
+class Raises(Protocol):
+    def even_this_is_abstract(self):
+        raise NotImplementedError
+
+@final
+class RaisesSub(Raises): ...  # error: [abstract-method-in-final-class]
+
+class AlsoRaises(Protocol):
+    def also_abstractmethod(self) -> Never:
+        raise NotImplementedError
+
+@final
+class AlsoRaisesSub(AlsoRaises): ...  # error: [abstract-method-in-final-class]
+
+type NotImplementedErrorAlias = NotImplementedError
+
+def _(x: NotImplementedErrorAlias):
+    class Strange(Protocol):
+        def weird_abstractmethod(self):
+            raise x
+
+    @final
+    class StrangeSub(Strange): ...  # error: [abstract-method-in-final-class]
+
+class HasOverloads(Protocol):
+    @overload
+    def foo(self) -> int: ...
+    @overload
+    def foo(self, x: int) -> str: ...
+
+@final
+class HasOverloadSub(HasOverloads): ...  # error: [abstract-method-in-final-class]
+
+class RaisesDifferentException(Protocol):
+    def not_abstractmethod(self) -> int:
+        raise TypeError
+
+@final
+class RaisesDifferentSub(RaisesDifferentException): ...
+
+class RaisesMultiple(Protocol):
+    def not_abstractmethod(self) -> int:
+        raise NotImplementedError
+        raise NotImplementedError
+
+@final
+class RaisesMultipleSub(RaisesMultiple): ...
+
+class HasAbstract(Protocol):
+    def a(self) -> int: ...
+
+class HasAbstract2(Protocol):
+    def a(self) -> int:
+        pass
+
+class HasAbstract3(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+
+class HasAbstract4(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        ...
+
+class HasAbstract5(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        pass
+
+class HasAbstract6(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        pass
+        ...
+        pass
+        ...
+        pass
+        pass
+        pass
+        ...
+
+class HasAbstract7(Protocol):
+    def a(self) -> int:
+        raise NotImplementedError
+
+class HasAbstract8(Protocol):
+    def a(self) -> int:
+        raise NotImplementedError()
+
+class HasAbstract9(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        raise NotImplementedError
+
+class HasAbstract10(Protocol):
+    def a(self) -> int:
+        """My awesome docs"""
+        raise NotImplementedError()
+
+@final
+class HasAbstractSub(HasAbstract): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract2Sub(HasAbstract2): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract3Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract4Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract5Sub(HasAbstract5): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract6Sub(HasAbstract6): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract7Sub(HasAbstract7): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract8Sub(HasAbstract8): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract9Sub(HasAbstract9): ...  # error: [abstract-method-in-final-class]
+
+@final
+class HasAbstract10Sub(HasAbstract10): ...  # error: [abstract-method-in-final-class]
+```
+
+### `Protocol` methods in stub files are never implicitly abstract
+
+Methods in stub files are generally allowed to have stub bodies, so methods on `Protocol` classes in
+stub files are only inferred as being abstract if they are explicitly decorated with
+`@abstractmethod`:
+
+`stub.pyi`:
+
+```pyi
+from abc import abstractmethod
+from typing import Protocol
+
+class Abstract(Protocol):
+    @abstractmethod
+    def a(self) -> int: ...
+
+class NotAbstract(Protocol):
+    def a(self) -> int: ...
+```
+
+`main.py`:
+
+```py
+from typing import final
+from stub import Abstract, NotAbstract
+
+@final
+class Bad(Abstract): ...  # error: [abstract-method-in-final-class]
+
+@final
+class Fine(NotAbstract): ...
+```
+
+### `@final` `Protocol` classes are excluded
+
+We allow `@final` `Protocol` classes to have unimplemented abstract methods. Unlike non-`Protocol`
+classes, it is possible to subtype a `Protocol` class without explicitly subclassing it, so an
+`@final` `Protocol` class with unimplemented abstract methods is not inherently broken in the same
+way as an `@final` non-`Protocol` class:
+
+```py
+from typing import final, Protocol
+from ty_extensions import static_assert, is_subtype_of
+
+class Base(Protocol):
+    def abstract(self) -> int: ...
+
+@final
+class Sub(Base, Protocol):  # No error
+    def also_abstract(self) -> int: ...
+
+# This is rejected:
+#
+# error: [subclass-of-final-class]
+class SubclassesSub(Sub): ...
+
+# But this is fine:
+class ImplementsSubWithoutSubclassing:
+    def abstract(self) -> int:
+        return 42
+
+    def also_abstract(self) -> int:
+        return 56
+
+static_assert(is_subtype_of(ImplementsSubWithoutSubclassing, Sub))
+```
+
+### Fully implemented final class is fine
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+    @abstractmethod
+    def bar(self) -> str: ...
+
+@final
+class FullyImplemented(Base):
+    def foo(self) -> int:
+        return 42
+
+    def bar(self) -> str:
+        return "hello"
+```
+
+### Abstract method in grandparent class
+
+<!-- snapshot-diagnostics -->
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class GrandParent(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+class Parent(GrandParent):
+    pass
+
+@final
+class Child(Parent):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Abstract method re-abstracted after concrete implementation
+
+An abstract method can be overridden as concrete in a middle class, then re-declared as abstract in
+a subclass. A `@final` class inheriting from that subclass must implement it.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class GreatGrandparent(ABC):
+    @abstractmethod
+    def f(self): ...
+
+class Grandparent(GreatGrandparent):
+    def f(self): ...
+
+class Parent(Grandparent):
+    @abstractmethod
+    def f(self): ...
+
+@final
+class Child(Parent):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Abstract method implemented via dynamic class
+
+A dynamic class created with `type()` can provide concrete implementations of abstract methods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+
+DynamicMiddle = type("DynamicMiddle", (Base,), {"foo": lambda self: 42})
+
+@final
+class Final(DynamicMiddle):  # No error; `foo` is implemented by `DynamicMiddle`
+    pass
+```
+
+### Non-final class with unimplemented abstract methods is fine
+
+Non-final classes are allowed to have unimplemented abstract methods, as they can be implemented by
+subclasses.
+
+```py
+from abc import ABC, abstractmethod
+
+class Base(ABC):
+    @abstractmethod
+    def foo(self) -> int: ...
+
+class Derived(Base):  # No error - not final, can be subclassed
+    pass
+```
+
+### Enum classes are implicitly final
+
+Enum classes cannot be subclassed if they have any members, so they are treated as final.
+
+```py
+from abc import abstractmethod
+from enum import Enum
+
+class Stringable:
+    @abstractmethod
+    def stringify(self) -> str: ...
+
+class MyEnum(Stringable, Enum):  # error: [abstract-method-in-final-class]
+    A = 1
+    B = 2
+```
+
+### A `@final` class that directly defines an abstract method
+
+A `@final` class that directly defines an `@abstractmethod` is equally invalid, since the method can
+never be implemented by a subclass.
+
+```py
+from abc import abstractmethod
+from typing import final
+
+@final
+class Broken:  # error: [abstract-method-in-final-class]
+    @abstractmethod
+    def foo(self) -> int: ...
+```
+
+### Abstract property
+
+A `@final` class must also implement abstract properties.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def value(self) -> int: ...
+
+@final
+class Good(Base):
+    @property
+    def value(self) -> int:
+        return 42
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+A property with an abstract setter (but concrete getter) is also abstract:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    def value(self) -> int:
+        return 42
+
+    @value.setter
+    @abstractmethod
+    def value(self, v: int) -> None: ...
+
+@final
+class Good(Base):
+    @Base.value.setter
+    def value(self, v: int) -> None:
+        pass
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+Similarly, a property with an abstract deleter is also abstract. However, we don't yet support
+property deleters, so this is a TODO test:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    def value(self) -> int:
+        return 42
+
+    @value.setter
+    def value(self, v: int) -> None:
+        pass
+
+    @value.deleter
+    @abstractmethod
+    def value(self) -> None: ...
+
+@final
+# TODO: should emit [abstract-method-in-final-class]
+class Bad(Base):
+    pass
+```
+
+### Binding overrides abstract property
+
+A binding like `f = 42` does override an abstract property, because the class attribute provides a
+concrete value that will be returned when accessing the property. An annotated assignment with a
+value (`f: int = 42`) also overrides the abstract property.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def f(self) -> int: ...
+
+@final
+class Child1(Base):
+    f = 42  # OK: binding overrides the abstract property
+
+@final
+class Child2(Base):
+    f: int = 42  # OK: annotated assignment with value also overrides
+```
+
+### Annotation doesn't override abstract method
+
+A simple annotation like `method: int` shadows the name but doesn't actually implement the abstract
+method. Attempting to instantiate the class will still fail at runtime.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @abstractmethod
+    def method(self) -> int: ...
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    method: int
+```
+
+The same applies to abstract properties:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @property
+    @abstractmethod
+    def f(self) -> int: ...
+
+@final
+class BadChild(Base):  # error: [abstract-method-in-final-class]
+    f: int
+```
+
+### Abstract classmethod
+
+A `@final` class must also implement abstract classmethods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @classmethod
+    @abstractmethod
+    def make(cls) -> "Base": ...
+
+@final
+class Good(Base):
+    @classmethod
+    def make(cls) -> "Good":
+        return cls()
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Abstract staticmethod
+
+A `@final` class must also implement abstract staticmethods.
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+class Base(ABC):
+    @staticmethod
+    @abstractmethod
+    def create() -> int: ...
+
+@final
+class Good(Base):
+    @staticmethod
+    def create() -> int:
+        return 42
+
+@final
+class Bad(Base):  # error: [abstract-method-in-final-class]
+    pass
+```
+
+### Deprecated abstract decorators
+
+The `abc.abstractproperty`, `abc.abstractclassmethod`, and `abc.abstractstaticmethod` decorators are
+deprecated since Python 3.3 and not currently detected in `@final` classes.
+
+```py
+from abc import (
+    ABC,
+    abstractproperty,  # error: [deprecated]
+    abstractclassmethod,  # error: [deprecated]
+    abstractstaticmethod,  # error: [deprecated]
+)
+from typing import final
+
+class Base(ABC):
+    @abstractproperty  # error: [deprecated]
+    def value(self) -> int:
+        return 0
+
+    @abstractclassmethod  # error: [deprecated]
+    def make(cls) -> "Base":
+        raise NotImplementedError
+
+    @abstractstaticmethod  # error: [deprecated]
+    def create() -> int:
+        return 0
+
+@final
+# TODO: should emit [abstract-method-in-final-class] for `value`, `make`, and `create`
+class Bad(Base):
+    pass
 ```

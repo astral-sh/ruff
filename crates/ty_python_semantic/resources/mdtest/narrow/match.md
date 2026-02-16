@@ -69,6 +69,55 @@ match x:
 reveal_type(x)  # revealed: object
 ```
 
+## Class patterns with generic classes
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never
+
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def f(x: Covariant[int]):
+    match x:
+        case Covariant():
+            reveal_type(x)  # revealed: Covariant[int]
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+```
+
+## Class patterns with generic `@final` classes
+
+These work the same as non-`@final` classes.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never, final
+
+@final
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def f(x: Covariant[int]):
+    match x:
+        case Covariant():
+            reveal_type(x)  # revealed: Covariant[int]
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+```
+
 ## Value patterns
 
 Value patterns are evaluated by equality, which is overridable. Therefore successfully matching on
@@ -203,7 +252,7 @@ def _(x: Literal["foo", b"bar"] | int):
             pass
         case b"bar" if reveal_type(x):  # revealed: Literal[b"bar"] | int
             pass
-        case _ if reveal_type(x):  # revealed: Literal["foo", b"bar"] | int
+        case _ if reveal_type(x):  # revealed: int | Literal["foo", b"bar"]
             pass
 ```
 
@@ -251,4 +300,177 @@ match x:
         pass
 
 reveal_type(x)  # revealed: object
+```
+
+## Narrowing on `Self` in `match` statements
+
+When performing narrowing on `self` inside methods on enums, we take into account that `Self` might
+refer to a subtype of the enum class, like `Literal[Answer.YES]`. This is why we do not simplify
+`Self & ~Literal[Answer.YES]` to `Literal[Answer.NO, Answer.MAYBE]`. Otherwise, we wouldn't be able
+to return `self` in the `assert_yes` method below:
+
+```py
+from enum import Enum
+from typing_extensions import Self, assert_never
+
+class Answer(Enum):
+    NO = 0
+    YES = 1
+    MAYBE = 2
+
+    def is_yes(self) -> bool:
+        reveal_type(self)  # revealed: Self@is_yes
+
+        match self:
+            case Answer.YES:
+                reveal_type(self)  # revealed: Self@is_yes
+                return True
+            case Answer.NO | Answer.MAYBE:
+                reveal_type(self)  # revealed: Self@is_yes & ~Literal[Answer.YES]
+                return False
+            case _:
+                assert_never(self)  # no error
+
+    def assert_yes(self) -> Self:
+        reveal_type(self)  # revealed: Self@assert_yes
+
+        match self:
+            case Answer.YES:
+                reveal_type(self)  # revealed: Self@assert_yes
+                return self
+            case _:
+                reveal_type(self)  # revealed: Self@assert_yes & ~Literal[Answer.YES]
+                raise ValueError("Answer is not YES")
+
+Answer.YES.is_yes()
+
+try:
+    reveal_type(Answer.MAYBE.assert_yes())  # revealed: Literal[Answer.MAYBE]
+except ValueError:
+    pass
+```
+
+## Narrowing is preserved when a terminal branch prevents a path from flowing through
+
+When one branch of a `match` statement is terminal (e.g. contains `raise`), narrowing from the
+non-terminal branches is preserved after the merge point.
+
+```py
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: A | B | C):
+    match x:
+        case A():
+            pass
+        case B():
+            pass
+        case _:
+            raise ValueError()
+
+    reveal_type(x)  # revealed: B | (A & ~B)
+```
+
+Reassignment in non-terminal branches is also preserved when the default branch is terminal:
+
+```py
+def _(number_of_periods: int | None, interval: str):
+    match interval:
+        case "monthly":
+            if number_of_periods is None:
+                number_of_periods = 1
+        case "daily":
+            if number_of_periods is None:
+                number_of_periods = 30
+        case _:
+            raise ValueError("unsupported interval")
+
+    reveal_type(number_of_periods)  # revealed: int
+```
+
+## Narrowing tagged unions of tuples
+
+Narrow unions of tuples based on literal tag elements in `match` statements:
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    match x[0]:
+        case "tag1":
+            reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+            reveal_type(x[1])  # revealed: A
+        case "tag2":
+            reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+            reveal_type(x[1])  # revealed: B
+            reveal_type(x[2])  # revealed: C
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# With int literals
+def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
+    match x[0]:
+        case 1:
+            reveal_type(x)  # revealed: tuple[Literal[1], A]
+        case 2:
+            reveal_type(x)  # revealed: tuple[Literal[2], B]
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# With bytes literals
+def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
+    match x[0]:
+        case b"a":
+            reveal_type(x)  # revealed: tuple[Literal[b"a"], A]
+        case b"b":
+            reveal_type(x)  # revealed: tuple[Literal[b"b"], B]
+        case _:
+            reveal_type(x)  # revealed: Never
+
+# Using index 1 instead of 0
+def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
+    match x[1]:
+        case "tag1":
+            reveal_type(x)  # revealed: tuple[A, Literal["tag1"]]
+        case "tag2":
+            reveal_type(x)  # revealed: tuple[B, Literal["tag2"]]
+        case _:
+            reveal_type(x)  # revealed: Never
+```
+
+Narrowing is restricted to `Literal` tag elements:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
+    match x[0]:
+        case "tag1":
+            # Can't narrow because second tuple has `str` (not literal) at index 0
+            reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
+        case _:
+            # But we *can* narrow with inequality
+            reveal_type(x)  # revealed: tuple[str, B]
+```
+
+and it is also restricted to `match` patterns that solely consist of value patterns:
+
+```py
+class Config:
+    MODE: str = "default"
+
+def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
+    match u[0]:
+        case Config.MODE | "foo":
+            # Config.mode has type `str` (not a literal), which could match
+            # any string value at runtime. We cannot narrow based on "foo" alone
+            # because the actual match might have been against Config.mode.
+            reveal_type(u)  # revealed: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]
+        case "bar":
+            # Since the previous case could match any string, this case can
+            # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
+            reveal_type(u)  # revealed: tuple[Literal["bar"], str]
 ```

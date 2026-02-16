@@ -117,3 +117,33 @@ def calculate_speed(distance: float, time: float) -> float:
     except TypeError:
         print("Not a number? Shame on you!")
         raise
+
+
+# DOC502 regression for Sphinx directive after Raises (issue #18959)
+def foo():
+    """First line.
+
+    Raises
+    ------
+    ValueError
+        some text
+
+    .. versionadded:: 0.7.0
+        The ``init_kwargs`` argument.
+    """
+    raise ValueError
+
+# Make sure we don't bail out on a Sphinx directive in the description of one
+# of the exceptions
+def foo():
+    """First line.
+
+    Raises
+    ------
+    ValueError
+        some text
+        .. math:: e^{xception}
+    ZeroDivisionError
+        Will not be raised, DOC502
+    """
+    raise ValueError

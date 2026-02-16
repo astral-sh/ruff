@@ -1,0 +1,56 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 4
+
+--- Added ---
+S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
+  --> S509.py:15:1
+   |
+13 | import pysnmp.hlapi.auth
+14 |
+15 | pysnmp.hlapi.asyncio.UsmUserData("user")  # S509
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 | pysnmp.hlapi.v3arch.asyncio.UsmUserData("user")  # S509
+17 | pysnmp.hlapi.v3arch.asyncio.auth.UsmUserData("user")  # S509
+   |
+
+
+S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
+  --> S509.py:16:1
+   |
+15 | pysnmp.hlapi.asyncio.UsmUserData("user")  # S509
+16 | pysnmp.hlapi.v3arch.asyncio.UsmUserData("user")  # S509
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+17 | pysnmp.hlapi.v3arch.asyncio.auth.UsmUserData("user")  # S509
+18 | pysnmp.hlapi.auth.UsmUserData("user")  # S509
+   |
+
+
+S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
+  --> S509.py:17:1
+   |
+15 | pysnmp.hlapi.asyncio.UsmUserData("user")  # S509
+16 | pysnmp.hlapi.v3arch.asyncio.UsmUserData("user")  # S509
+17 | pysnmp.hlapi.v3arch.asyncio.auth.UsmUserData("user")  # S509
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+18 | pysnmp.hlapi.auth.UsmUserData("user")  # S509
+   |
+
+
+S509 You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure.
+  --> S509.py:18:1
+   |
+16 | pysnmp.hlapi.v3arch.asyncio.UsmUserData("user")  # S509
+17 | pysnmp.hlapi.v3arch.asyncio.auth.UsmUserData("user")  # S509
+18 | pysnmp.hlapi.auth.UsmUserData("user")  # S509
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+19 |
+20 | pysnmp.hlapi.asyncio.UsmUserData("user", "authkey", "privkey")  # OK
+   |

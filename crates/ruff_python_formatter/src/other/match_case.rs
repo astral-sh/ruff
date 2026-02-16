@@ -5,7 +5,7 @@ use crate::expression::maybe_parenthesize_expression;
 use crate::expression::parentheses::Parenthesize;
 use crate::pattern::maybe_parenthesize_pattern;
 use crate::prelude::*;
-use crate::statement::clause::{ClauseHeader, clause_body, clause_header};
+use crate::statement::clause::{ClauseHeader, clause};
 use crate::statement::suite::SuiteKind;
 
 #[derive(Default)]
@@ -46,23 +46,18 @@ impl FormatNodeRule<MatchCase> for FormatMatchCase {
 
         write!(
             f,
-            [
-                clause_header(
-                    ClauseHeader::MatchCase(item),
-                    dangling_item_comments,
-                    &format_args![
-                        token("case"),
-                        space(),
-                        maybe_parenthesize_pattern(pattern, item),
-                        format_guard
-                    ],
-                ),
-                clause_body(
-                    body,
-                    SuiteKind::other(self.last_suite_in_statement),
-                    dangling_item_comments
-                ),
-            ]
+            [clause(
+                ClauseHeader::MatchCase(item),
+                &format_args![
+                    token("case"),
+                    space(),
+                    maybe_parenthesize_pattern(pattern, item),
+                    format_guard
+                ],
+                dangling_item_comments,
+                body,
+                SuiteKind::other(self.last_suite_in_statement),
+            )]
         )
     }
 }

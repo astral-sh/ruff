@@ -18,10 +18,11 @@ doctest = false
 ruff_python_trivia = { workspace = true }
 
 heck = { workspace = true }
+itertools = { workspace = true }
 proc-macro2 = { workspace = true }
 quote = { workspace = true }
+regex = { workspace = true }
 syn = { workspace = true, features = ["derive", "parsing", "extra-traits", "full"] }
-itertools = { workspace = true }
 
 [lints]
 workspace = true

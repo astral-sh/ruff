@@ -1,12 +1,15 @@
+use std::borrow::Cow;
 use std::ops::Deref;
 use std::sync::Arc;
 
+use ruff_diagnostics::SourceMap;
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
 
 use crate::Db;
 use crate::files::{File, FilePath};
+use crate::system::System;
 
 /// Reads the source text of a python text file (must be valid UTF8) or notebook.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
@@ -15,7 +18,11 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let _span = tracing::trace_span!("source_text", file = %path).entered();
     let mut read_error = None;
 
-    let kind = if is_notebook(file.path(db)) {
+    if let Some(source) = file.source_text_override(db) {
+        return source.clone();
+    }
+
+    let kind = if is_notebook(db.system(), path) {
         file.read_to_notebook(db)
             .unwrap_or_else(|error| {
                 tracing::debug!("Failed to read notebook '{path}': {error}");
@@ -40,18 +47,17 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     }
 }
 
-fn is_notebook(path: &FilePath) -> bool {
-    match path {
-        FilePath::System(system) => system.extension().is_some_and(|extension| {
-            PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
-        }),
-        FilePath::SystemVirtual(system_virtual) => {
-            system_virtual.extension().is_some_and(|extension| {
-                PySourceType::try_from_extension(extension) == Some(PySourceType::Ipynb)
-            })
-        }
-        FilePath::Vendored(_) => false,
-    }
+fn is_notebook(system: &dyn System, path: &FilePath) -> bool {
+    let source_type = match path {
+        FilePath::System(path) => system.source_type(path),
+        FilePath::SystemVirtual(system_virtual) => system.virtual_path_source_type(system_virtual),
+        FilePath::Vendored(_) => return false,
+    };
+
+    let with_extension_fallback =
+        source_type.or_else(|| PySourceType::try_from_extension(path.extension()?));
+
+    with_extension_fallback == Some(PySourceType::Ipynb)
 }
 
 /// The source text of a file containing python code.
@@ -90,6 +96,45 @@ impl SourceText {
     pub fn read_error(&self) -> Option<&SourceTextError> {
         self.inner.read_error.as_ref()
     }
+
+    /// Returns a new instance for this file with the updated source text (Python code).
+    ///
+    /// Uses the `source_map` to preserve the cell-boundaries.
+    #[must_use]
+    pub fn with_text(&self, new_text: String, source_map: &SourceMap) -> Self {
+        let new_kind = match &self.inner.kind {
+            SourceTextKind::Text(_) => SourceTextKind::Text(new_text),
+
+            SourceTextKind::Notebook { notebook } => {
+                let mut new_notebook = notebook.as_ref().clone();
+                new_notebook.update(source_map, new_text);
+                SourceTextKind::Notebook {
+                    notebook: new_notebook.into(),
+                }
+            }
+        };
+
+        Self {
+            inner: Arc::new(SourceTextInner {
+                kind: new_kind,
+                read_error: self.inner.read_error.clone(),
+            }),
+        }
+    }
+
+    pub fn to_bytes(&self) -> Cow<'_, [u8]> {
+        match &self.inner.kind {
+            SourceTextKind::Text(source) => Cow::Borrowed(source.as_bytes()),
+            SourceTextKind::Notebook { notebook } => {
+                let mut output: Vec<u8> = Vec::new();
+                notebook
+                    .write(&mut output)
+                    .expect("writing to a Vec should never fail");
+
+                Cow::Owned(output)
+            }
+        }
+    }
 }
 
 impl Deref for SourceText {
@@ -117,13 +162,13 @@ impl std::fmt::Debug for SourceText {
     }
 }
 
-#[derive(Eq, PartialEq, get_size2::GetSize)]
+#[derive(Eq, PartialEq, get_size2::GetSize, Clone)]
 struct SourceTextInner {
     kind: SourceTextKind,
     read_error: Option<SourceTextError>,
 }
 
-#[derive(Eq, PartialEq, get_size2::GetSize)]
+#[derive(Eq, PartialEq, get_size2::GetSize, Clone)]
 enum SourceTextKind {
     Text(String),
     Notebook {

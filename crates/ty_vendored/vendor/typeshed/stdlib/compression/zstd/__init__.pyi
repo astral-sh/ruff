@@ -88,7 +88,10 @@ def finalize_dict(zstd_dict: ZstdDict, /, samples: Iterable[ReadableBuffer], dic
     """
 
 def compress(
-    data: ReadableBuffer, level: int | None = None, options: Mapping[int, int] | None = None, zstd_dict: ZstdDict | None = None
+    data: ReadableBuffer,
+    level: int | None = None,
+    options: Mapping[int, int] | None = None,
+    zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
 ) -> bytes:
     """Return Zstandard compressed *data* as bytes.
 
@@ -102,7 +105,9 @@ def compress(
     For incremental compression, use a ZstdCompressor instead.
     """
 
-def decompress(data: ReadableBuffer, zstd_dict: ZstdDict | None = None, options: Mapping[int, int] | None = None) -> bytes:
+def decompress(
+    data: ReadableBuffer, zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None, options: Mapping[int, int] | None = None
+) -> bytes:
     """Decompress one or more frames of Zstandard compressed *data*.
 
     *zstd_dict* is a ZstdDict object, a pre-trained Zstandard dictionary. See

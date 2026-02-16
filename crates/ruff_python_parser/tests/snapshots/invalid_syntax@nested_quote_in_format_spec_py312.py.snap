@@ -88,5 +88,5 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.12"}
 2 | f"{1:""}"  # this is a ParseError on all versions
-  |      ^ Syntax Error: f-string: expecting '}'
+  |      ^ Syntax Error: f-string: expecting `}`
   |

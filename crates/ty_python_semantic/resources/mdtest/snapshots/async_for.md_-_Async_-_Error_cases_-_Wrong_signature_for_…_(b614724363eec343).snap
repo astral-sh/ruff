@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: async_for.md - Async - Error cases - Wrong signature for `__anext__`
 mdtest path: crates/ty_python_semantic/resources/mdtest/loops/async_for.md

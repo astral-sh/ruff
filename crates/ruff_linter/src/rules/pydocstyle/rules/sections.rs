@@ -4,7 +4,9 @@ use rustc_hash::FxHashSet;
 use std::sync::LazyLock;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Parameter;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_trivia::textwrap::dedent;
@@ -1064,6 +1066,10 @@ impl AlwaysFixableViolation for MissingBlankLineAfterLastSection {
 ///         raise FasterThanLightError from exc
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
@@ -1184,6 +1190,9 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
 ///
+/// Parameters annotated with `typing.Unpack` are exempt from this rule.
+/// This follows the Python typing specification for unpacking keyword arguments.
+///
 /// ## Example
 /// ```python
 /// def calculate_speed(distance: float, time: float) -> float:
@@ -1233,6 +1242,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+/// - [Python - Unpack for keyword arguments](https://typing.python.org/en/latest/spec/callables.html#unpack-kwargs)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UndocumentedParam {
@@ -1310,6 +1320,10 @@ impl Violation for UndocumentedParam {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
 ///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
@@ -1808,7 +1822,9 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                 missing_arg_names.insert(starred_arg_name);
             }
         }
-        if let Some(arg) = function.parameters.kwarg.as_ref() {
+        if let Some(arg) = function.parameters.kwarg.as_ref()
+            && !has_unpack_annotation(checker, arg)
+        {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("**{arg_name}");
             if !arg_name.starts_with('_')
@@ -1832,6 +1848,15 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
             );
         }
     }
+}
+
+/// Returns `true` if the parameter is annotated with `typing.Unpack`
+fn has_unpack_annotation(checker: &Checker, parameter: &Parameter) -> bool {
+    parameter.annotation.as_ref().is_some_and(|annotation| {
+        checker
+            .semantic()
+            .match_typing_expr(map_subscript(annotation), "Unpack")
+    })
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.

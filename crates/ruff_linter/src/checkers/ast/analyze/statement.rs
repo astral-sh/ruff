@@ -4,6 +4,7 @@ use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_standalone_mock_non_existent_enabled;
 use crate::registry::Rule;
 use crate::rules::{
     airflow, fastapi, flake8_async, flake8_bandit, flake8_boolean_trap, flake8_bugbear,
@@ -42,9 +43,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 for name in names {
                     pycodestyle::rules::ambiguous_variable_name(checker, name, name.range());
                 }
-            }
-            if checker.is_rule_enabled(Rule::NonlocalWithoutBinding) {
-                pylint::rules::nonlocal_without_binding(checker, nonlocal);
             }
             if checker.is_rule_enabled(Rule::NonlocalAndGlobal) {
                 pylint::rules::nonlocal_and_global(checker, nonlocal);
@@ -133,6 +131,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::GeneratorReturnFromIterMethod) {
                 flake8_pyi::rules::bad_generator_return_type(function_def, checker);
+            }
+            if checker.is_rule_enabled(Rule::StopIterationReturn) {
+                pylint::rules::stop_iteration_return(checker, function_def);
             }
             if checker.source_type.is_stub() {
                 if checker.is_rule_enabled(Rule::StrOrReprDefinedInStub) {
@@ -341,11 +342,17 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_function_def(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::Airflow3IncompatibleFunctionSignature) {
+                airflow::rules::airflow_3_incompatible_method_signature_def(checker, function_def);
+            }
             if checker.is_rule_enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
             }
             if checker.is_rule_enabled(Rule::InvalidArgumentName) {
                 pep8_naming::rules::invalid_argument_name_function(checker, function_def);
+            }
+            if checker.is_rule_enabled(Rule::PropertyWithoutReturn) {
+                ruff::rules::property_without_return(checker, function_def);
             }
         }
         Stmt::Return(_) => {
@@ -720,7 +727,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryBuiltinImport) {
                 if let Some(module) = module {
-                    pyupgrade::rules::unnecessary_builtin_import(checker, stmt, module, names);
+                    pyupgrade::rules::unnecessary_builtin_import(
+                        checker, stmt, module, names, level,
+                    );
                 }
             }
             if checker.any_rule_enabled(&[
@@ -951,9 +960,6 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::MisplacedBareRaise) {
                 pylint::rules::misplaced_bare_raise(checker, raise);
             }
-            if checker.is_rule_enabled(Rule::StopIterationReturn) {
-                pylint::rules::stop_iteration_return(checker, raise);
-            }
         }
         Stmt::AugAssign(aug_assign @ ast::StmtAugAssign { target, .. }) => {
             if checker.is_rule_enabled(Rule::GlobalStatement) {
@@ -963,6 +969,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_aug_assign(checker, aug_assign);
+            }
+            if checker.is_rule_enabled(Rule::DuplicateEntryInDunderAll) {
+                ruff::rules::duplicate_entry_in_dunder_all_aug_assign(checker, aug_assign);
             }
         }
         Stmt::If(
@@ -1432,6 +1441,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_assign(checker, assign);
             }
+            if checker.is_rule_enabled(Rule::DuplicateEntryInDunderAll) {
+                ruff::rules::duplicate_entry_in_dunder_all_assign(checker, assign);
+            }
             if checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
                     Rule::UnprefixedTypeParam,
@@ -1523,6 +1535,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
             }
+            if checker.is_rule_enabled(Rule::DuplicateEntryInDunderAll) {
+                ruff::rules::duplicate_entry_in_dunder_all_ann_assign(checker, assign_stmt);
+            }
             if checker.source_type.is_stub() {
                 if let Some(value) = value {
                     if checker.is_rule_enabled(Rule::AssignmentDefaultInStub) {
@@ -1602,6 +1617,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::InvalidMockAccess) {
                 pygrep_hooks::rules::uncalled_mock_method(checker, value);
+                if is_standalone_mock_non_existent_enabled(checker.settings()) {
+                    pygrep_hooks::rules::non_existent_mock_method(checker, value);
+                }
             }
             if checker.is_rule_enabled(Rule::NamedExprWithoutContext) {
                 pylint::rules::named_expr_without_context(checker, value);
@@ -1627,5 +1645,8 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
         }
         _ => {}
+    }
+    if checker.is_rule_enabled(Rule::NonEmptyInitModule) {
+        ruff::rules::non_empty_init_module(checker, stmt);
     }
 }

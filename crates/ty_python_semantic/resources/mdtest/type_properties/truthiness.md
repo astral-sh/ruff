@@ -221,15 +221,14 @@ class Normal(TypedDict):
     b: int
 
 def _(n: Normal) -> None:
-    # Could be `Literal[True]`
-    reveal_type(bool(n))  # revealed: bool
+    reveal_type(bool(n))  # revealed: Literal[True]
 
 class OnlyFalsyItems(TypedDict):
     wrong: Literal[False]
 
 def _(n: OnlyFalsyItems) -> None:
-    # Could be `Literal[True]` (it does not matter if all items are falsy)
-    reveal_type(bool(n))  # revealed: bool
+    # (it does not matter if all items are falsy)
+    reveal_type(bool(n))  # revealed: Literal[True]
 
 class Empty(TypedDict):
     pass
