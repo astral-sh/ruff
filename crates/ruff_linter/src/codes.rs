@@ -995,7 +995,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pydoclint, "102") => rules::pydoclint::rules::DocstringExtraneousParameter,
         (Pydoclint, "201") => rules::pydoclint::rules::DocstringMissingReturns,
         (Pydoclint, "202") => rules::pydoclint::rules::DocstringExtraneousReturns,
-        (Pydoclint, "301") => rules::pydoclint::rules::DocstringInit,
         (Pydoclint, "302") => rules::pydoclint::rules::DocstringClassExtraneousReturns,
         (Pydoclint, "304") => rules::pydoclint::rules::DocstringClassExtraneousArguments,
         (Pydoclint, "305") => rules::pydoclint::rules::DocstringClassExtraneousRaises,

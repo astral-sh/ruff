@@ -84,7 +84,6 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::DocstringExtraneousParameter,
         Rule::DocstringMissingReturns,
         Rule::DocstringExtraneousReturns,
-        Rule::DocstringInit,
         Rule::DocstringClassExtraneousReturns,
         Rule::DocstringClassExtraneousArguments,
         Rule::DocstringClassExtraneousRaises,

@@ -246,66 +246,6 @@ impl Violation for DocstringClassExtraneousReturns {
 }
 
 /// ## What it does
-/// Check that `__init__` method does not have a docstring.
-///
-/// ## Why is this bad?
-/// The `__init__` method should not have its own docstring because the class
-/// docstring already provides the primary documentation for the class's
-/// initialization. Having a separate docstring for `__init__` is redundant and
-/// can lead to duplication.
-///
-/// ## Example
-/// ```python
-/// class Physics:
-///     """Class docstring"""
-///
-///     def __init__(self, distance: float, time: float) -> None:
-///         """Initialize class.
-///
-///         Args:
-///             distance: Distance traveled.
-///             time: Time spent traveling.
-///         """
-///         self.distance = distance
-///         self.time = time
-/// ```
-///
-/// Use instead:
-/// ```python
-/// class Physics:
-///     """
-///     Class docstring
-///
-///     Initialize with arguments:
-///         distance: float
-///         time:float
-///     """
-///
-///     def __init__(self, distance: float, time: float) -> None:
-///         self.distance = distance
-///         self.time = time
-/// ```
-///
-/// ## Options
-///
-/// - `lint.pydoclint.ignore-one-line-docstrings`
-/// - `lint.pydocstyle.convention`
-#[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.15")]
-pub(crate) struct DocstringInit;
-
-impl Violation for DocstringInit {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        "`__init__` should not have a docstring".to_string()
-    }
-
-    fn fix_title(&self) -> Option<String> {
-        Some("Please combine `__init__` docstring with the docstring of the class".to_string())
-    }
-}
-
-/// ## What it does
 /// Checks for function docstrings that include parameters which are not
 /// in the function signature.
 ///
@@ -1549,7 +1489,7 @@ fn check_class_docstring(
     };
 }
 
-/// DOC102, DOC201, DOC202, DOC301, DOC402, DOC403, DOC501, DOC502
+/// DOC102, DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &Checker,
     definition: &Definition,
@@ -1698,13 +1638,6 @@ pub(crate) fn check_docstring(
                     }
                 }
             }
-        }
-    }
-
-    // DOC301
-    if checker.is_rule_enabled(Rule::DocstringInit) {
-        if visibility::is_init(&function_def.name) && docstring_sections.parameters.is_some() {
-            checker.report_diagnostic(DocstringInit, docstring.range());
         }
     }
 
