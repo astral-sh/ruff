@@ -2018,7 +2018,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             f.write_char('(')?;
         }
         self.return_ty
-            .display_with(self.db, return_settings)
+            .display_with(self.db, settings.singleline())
             .fmt_detailed(&mut f)?;
         if should_parenthesize_return_type {
             f.write_char(')')?;
