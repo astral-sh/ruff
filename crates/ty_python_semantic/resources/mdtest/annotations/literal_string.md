@@ -89,8 +89,7 @@ def _(literal_a: LiteralString, literal_b: LiteralString, a_str: str):
     reveal_type("{}, {}".format(literal_a, a_str))  # revealed: str
 
     # f-string
-    # TODO: could be `LiteralString` if all components are `LiteralString`
-    reveal_type(f"{literal_a} {literal_b}")  # revealed: str
+    reveal_type(f"{literal_a} {literal_b}")  # revealed: LiteralString
     reveal_type(f"{literal_a} {a_str}")  # revealed: str
 
     # Repetition
