@@ -253,6 +253,7 @@ impl Configuration {
             .unwrap_or_default();
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
+        conflicting_required_import_pyi025(&isort, &rules)?;
 
         let future_annotations = lint.future_annotations.unwrap_or_default();
 
@@ -1679,6 +1680,40 @@ fn conflicting_import_settings(
     Ok(())
 }
 
+/// Detect conflicts between I002 (missing-required-import) and PYI025
+/// (unaliased-collections-abc-set-import).
+///
+/// If `required-imports` includes `from collections.abc import Set` (without
+/// aliasing it as `AbstractSet`) and PYI025 is enabled, the configuration is
+/// contradictory: I002 requires the unaliased import, while PYI025 forbids it.
+fn conflicting_required_import_pyi025(
+    isort: &isort::settings::Settings,
+    rules: &RuleTable,
+) -> Result<()> {
+    if !rules.enabled(Rule::UnaliasedCollectionsAbcSetImport) {
+        return Ok(());
+    }
+
+    for required_import in &isort.required_imports {
+        let qualified_name = required_import.qualified_name();
+        if qualified_name.segments() == ["collections", "abc", "Set"]
+            && required_import.bound_name() != "AbstractSet"
+        {
+            return Err(anyhow!(
+                "Required import `from collections.abc import Set` specified in \
+                `lint.isort.required-imports` (I002) conflicts with \
+                `unaliased-collections-abc-set-import` (PYI025), which requires \
+                this import to be aliased as `AbstractSet`.\n\n\
+                Help: Either alias the required import \
+                (`from collections.abc import Set as AbstractSet`), \
+                or disable PYI025."
+            ));
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use std::str::FromStr;
@@ -2180,5 +2215,61 @@ mod tests {
         )?;
 
         Ok(())
+    }
+
+    mod pyi025_conflict {
+        use std::collections::BTreeSet;
+
+        use ruff_linter::registry::Rule;
+        use ruff_linter::rules::isort;
+        use ruff_linter::settings::rule_table::RuleTable;
+        use ruff_python_semantic::{MemberNameImport, NameImport};
+
+        use super::super::conflicting_required_import_pyi025;
+
+        #[test]
+        fn unaliased_set_with_pyi025_is_error() {
+            let isort = isort::settings::Settings {
+                required_imports: BTreeSet::from_iter([NameImport::ImportFrom(
+                    MemberNameImport::member("collections.abc".to_string(), "Set".to_string()),
+                )]),
+                ..isort::settings::Settings::default()
+            };
+            let rules = RuleTable::from_iter([Rule::UnaliasedCollectionsAbcSetImport]);
+
+            let result = conflicting_required_import_pyi025(&isort, &rules);
+            assert!(result.is_err());
+            assert!(result.unwrap_err().to_string().contains("conflicts with"));
+        }
+
+        #[test]
+        fn aliased_as_abstract_set_is_ok() {
+            let isort = isort::settings::Settings {
+                required_imports: BTreeSet::from_iter([NameImport::ImportFrom(
+                    MemberNameImport::alias(
+                        "collections.abc".to_string(),
+                        "Set".to_string(),
+                        "AbstractSet".to_string(),
+                    ),
+                )]),
+                ..isort::settings::Settings::default()
+            };
+            let rules = RuleTable::from_iter([Rule::UnaliasedCollectionsAbcSetImport]);
+
+            assert!(conflicting_required_import_pyi025(&isort, &rules).is_ok());
+        }
+
+        #[test]
+        fn pyi025_not_enabled_is_ok() {
+            let isort = isort::settings::Settings {
+                required_imports: BTreeSet::from_iter([NameImport::ImportFrom(
+                    MemberNameImport::member("collections.abc".to_string(), "Set".to_string()),
+                )]),
+                ..isort::settings::Settings::default()
+            };
+            let rules = RuleTable::empty();
+
+            assert!(conflicting_required_import_pyi025(&isort, &rules).is_ok());
+        }
     }
 }
