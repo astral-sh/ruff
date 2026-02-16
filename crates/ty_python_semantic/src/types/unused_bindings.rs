@@ -65,6 +65,10 @@ pub struct UnusedBinding {
 #[salsa::tracked(returns(ref))]
 pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBinding> {
     let parsed = parsed_module(db, file).load(db);
+    if !parsed.errors().is_empty() || !parsed.unsupported_syntax_errors().is_empty() {
+        return Vec::new();
+    }
+
     let model = SemanticModel::new(db, file);
 
     let mut collector = UnusedBindingCollector::new(&model);
