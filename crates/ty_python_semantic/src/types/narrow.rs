@@ -1355,13 +1355,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 // If this is `None`, it indicates that we cannot do `if type(x) is Y`
                 // narrowing: we can only do narrowing for `if type(x) is Y` and
                 // `if type(x) is not Y`, not for `if type(x) == Y` or `if type(x) != Y`.
-                let type_narrowing_is_positive = match op {
+                let is_positive = match op {
                     ast::CmpOp::Is => Some(is_positive),
                     ast::CmpOp::IsNot => Some(!is_positive),
                     _ => None,
                 };
 
-                if let Some(type_narrowing_is_positive) = type_narrowing_is_positive
+                if let Some(is_positive) = is_positive
                     && keywords.is_empty()
                     && let [single_argument] = &**args
                     && let Some(target) = PlaceExpr::try_from_expr(single_argument)
@@ -1370,14 +1370,14 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     && let Some(other_class) = find_underlying_class(self.db, other)
                     // `else`-branch narrowing for `if type(x) is Y` can only be done
                     // if `Y` is a final class
-                    && (type_narrowing_is_positive || other_class.is_final(self.db))
+                    && (is_positive || other_class.is_final(self.db))
                 {
                     let place = self.expect_place(&target);
                     constraints.insert(
                         place,
                         NarrowingConstraint::intersection(
                             Type::instance(self.db, other_class.top_materialization(self.db))
-                                .negate_if(self.db, !type_narrowing_is_positive),
+                                .negate_if(self.db, !is_positive),
                         ),
                     );
                     last_rhs_ty = Some(rhs_ty);
@@ -1451,14 +1451,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> DualNarrowingConstraints<'db> {
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
-        if let Some(positive_type_guard_call_constraints) =
+        // If the return type of expr_call is TypeGuard (positive) / TypeIs:
+        if let Some(positive_constraints) =
             self.evaluate_type_guard_call_for_polarity(inference, expr_call, true)
         {
-            let negative_type_guard_call_constraints =
+            let negative_constraints =
                 self.evaluate_type_guard_call_for_polarity(inference, expr_call, false);
             return DualNarrowingConstraints::from_sides(
-                Some(positive_type_guard_call_constraints),
-                negative_type_guard_call_constraints,
+                Some(positive_constraints),
+                negative_constraints,
             );
         }
 
@@ -1487,17 +1488,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<NarrowingConstraints<'db>> {
         match callable_ty {
-            Type::FunctionLiteral(function_type)
-                if matches!(
-                    function_type.known(self.db),
-                    None | Some(KnownFunction::RevealType)
-                ) =>
-            {
-                self.evaluate_type_guard_call_for_polarity(inference, expr_call, is_positive)
-            }
-            Type::BoundMethod(_) => {
-                self.evaluate_type_guard_call_for_polarity(inference, expr_call, is_positive)
-            }
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
             // (i.e., whether E is non-empty). We only narrow the parts of the type where we know
             // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
@@ -1573,7 +1563,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     // Helper to evaluate TypeGuard/TypeIs narrowing for a call expression.
-    // Used for both direct function calls and bound method calls.
+    // This is based on the call expression's return type, so it applies to any callable type.
     fn evaluate_type_guard_call_for_polarity(
         &mut self,
         inference: &ExpressionInference<'db>,
