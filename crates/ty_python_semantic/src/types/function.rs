@@ -1774,8 +1774,8 @@ impl KnownFunction {
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
-                        asserted_ty.display(db),
                         actual_ty.display(db),
+                        asserted_ty.display(db),
                     ));
                 }
             }
