@@ -881,7 +881,7 @@ def g(x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
 ```
 
-## Inferring typevars in iterable parameters from literal string arguments
+## Inferring typevars in iterable parameters from literal string and bytes arguments
 
 ```py
 from typing import Iterable, TypeVar
