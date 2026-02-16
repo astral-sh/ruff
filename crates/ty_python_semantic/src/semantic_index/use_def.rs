@@ -1491,52 +1491,7 @@ impl<'db> UseDefMapBuilder<'db> {
             .add_or_constraint(self.reachability, snapshot.reachability);
     }
 
-    fn mark_reachability_constraints(&mut self) {
-        // We only walk the fields that are copied through to the UseDefMap when we finish building
-        // it.
-        for bindings in &mut self.bindings_by_use {
-            bindings.finish(&mut self.reachability_constraints);
-        }
-        for constraint in self.node_reachability.values() {
-            self.reachability_constraints.mark_used(*constraint);
-        }
-        for symbol_state in &mut self.symbol_states {
-            symbol_state.finish(&mut self.reachability_constraints);
-        }
-        for member_state in &mut self.member_states {
-            member_state.finish(&mut self.reachability_constraints);
-        }
-        for reachable_definition in &mut self.reachable_symbol_definitions {
-            reachable_definition
-                .bindings
-                .finish(&mut self.reachability_constraints);
-            reachable_definition
-                .declarations
-                .finish(&mut self.reachability_constraints);
-        }
-        for reachable_definition in &mut self.reachable_member_definitions {
-            reachable_definition
-                .bindings
-                .finish(&mut self.reachability_constraints);
-            reachable_definition
-                .declarations
-                .finish(&mut self.reachability_constraints);
-        }
-        for declarations in self.declarations_by_binding.values_mut() {
-            declarations.finish(&mut self.reachability_constraints);
-        }
-        for bindings in self.bindings_by_definition.values_mut() {
-            bindings.finish(&mut self.reachability_constraints);
-        }
-        for eager_snapshot in &mut self.enclosing_snapshots {
-            eager_snapshot.finish(&mut self.reachability_constraints);
-        }
-        self.reachability_constraints.mark_used(self.reachability);
-    }
-
     pub(super) fn finish(mut self) -> UseDefMap<'db> {
-        self.mark_reachability_constraints();
-
         self.all_definitions.shrink_to_fit();
         self.symbol_states.shrink_to_fit();
         self.member_states.shrink_to_fit();
@@ -1548,9 +1503,8 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_definition.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
-        let mut interned_bindings: IndexVec<ScopedBindingsId, Bindings> =
-            IndexVec::with_capacity(self.bindings_by_definition.len());
-        let mut interned_ids_by_bindings: FxHashMap<Bindings, ScopedBindingsId> =
+        let mut interned_bindings = IndexVec::with_capacity(self.bindings_by_definition.len());
+        let mut interned_ids_by_bindings =
             FxHashMap::with_capacity_and_hasher(self.bindings_by_definition.len(), FxBuildHasher);
         let bindings_by_definition = Self::intern_bindings_by_definition(
             self.bindings_by_definition,
@@ -1562,14 +1516,52 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut interned_bindings,
             &mut interned_ids_by_bindings,
         );
-        let (interned_place_states, end_of_scope_members) =
+        let (mut interned_place_states, end_of_scope_members) =
             Self::intern_end_of_scope_members(self.member_states);
-        let (interned_reachable_definitions, reachable_definitions_by_member) =
+        let (mut interned_reachable_definitions, reachable_definitions_by_member) =
             Self::intern_reachable_definitions_by_member(self.reachable_member_definitions);
-        let (interned_enclosing_snapshots, enclosing_snapshots) =
+        let (mut interned_enclosing_snapshots, enclosing_snapshots) =
             Self::intern_enclosing_snapshots(self.enclosing_snapshots);
 
         interned_bindings.shrink_to_fit();
+
+        // We only walk the fields that are copied through to the UseDefMap when we finish building
+        // it.
+        for bindings in &mut interned_bindings {
+            bindings.finish(&mut self.reachability_constraints);
+        }
+        for constraint in self.node_reachability.values() {
+            self.reachability_constraints.mark_used(*constraint);
+        }
+        for symbol_state in &mut self.symbol_states {
+            symbol_state.finish(&mut self.reachability_constraints);
+        }
+        for member_state in &mut interned_place_states {
+            member_state.finish(&mut self.reachability_constraints);
+        }
+        for reachable_definition in &mut self.reachable_symbol_definitions {
+            reachable_definition
+                .bindings
+                .finish(&mut self.reachability_constraints);
+            reachable_definition
+                .declarations
+                .finish(&mut self.reachability_constraints);
+        }
+        for reachable_definition in &mut interned_reachable_definitions {
+            reachable_definition
+                .bindings
+                .finish(&mut self.reachability_constraints);
+            reachable_definition
+                .declarations
+                .finish(&mut self.reachability_constraints);
+        }
+        for declarations in self.declarations_by_binding.values_mut() {
+            declarations.finish(&mut self.reachability_constraints);
+        }
+        for enclosing_snapshot in &mut interned_enclosing_snapshots {
+            enclosing_snapshot.finish(&mut self.reachability_constraints);
+        }
+        self.reachability_constraints.mark_used(self.reachability);
 
         UseDefMap {
             all_definitions: self.all_definitions,
