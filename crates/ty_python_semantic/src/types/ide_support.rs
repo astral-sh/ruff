@@ -735,7 +735,7 @@ pub fn definitions_for_bin_op<'db>(
 
     let definitions: Vec<_> = bindings
         .iter()
-        .flat_map(IntoIterator::into_iter)
+        .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
                 binding.signature.definition?,
@@ -793,7 +793,7 @@ pub fn definitions_for_unary_op<'db>(
 
     let definitions = bindings
         .iter()
-        .flat_map(IntoIterator::into_iter)
+        .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
                 binding.signature.definition?,
