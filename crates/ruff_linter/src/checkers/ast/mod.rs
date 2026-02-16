@@ -581,10 +581,10 @@ impl<'a> Checker<'a> {
     where
         'a: 'b,
     {
-        if let ast::Expr::StringLiteral(string_annotation) = expr {
-            if let Ok(parsed_annotation) = self.parse_type_annotation(string_annotation) {
-                return parsed_annotation.expression();
-            }
+        if let ast::Expr::StringLiteral(string_annotation) = expr
+            && let Ok(parsed_annotation) = self.parse_type_annotation(string_annotation)
+        {
+            return parsed_annotation.expression();
         }
         expr
     }
