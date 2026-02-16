@@ -156,6 +156,8 @@ reveal_type(-42 << 3)  # revealed: Literal[-336]
 reveal_type(42 >> 3)  # revealed: Literal[5]
 reveal_type(0 >> 3)  # revealed: Literal[0]
 reveal_type(-42 >> 3)  # revealed: Literal[-6]
+reveal_type(1 >> 5000000000)  # revealed: Literal[0]
+reveal_type(-1 >> 5000000000)  # revealed: Literal[-1]
 ```
 
 If the result of a left shift overflows the `int` literal type, it becomes `int`. This includes
@@ -164,6 +166,10 @@ precision and `1 << 63` is a large positive number, not a negative one. Right sh
 overflow:
 
 ```py
+# For `0` specifically, we know that any right-shift
+# will produce `0`
+reveal_type(0 << 4000000000000000000)  # revealed: Literal[0]
+
 reveal_type(1 << 62)  # revealed: Literal[4611686018427387904]
 reveal_type(1 << 63)  # revealed: int
 

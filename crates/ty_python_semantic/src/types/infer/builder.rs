@@ -14259,6 +14259,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(Type::IntLiteral(n ^ m))
             }
 
+            (Type::IntLiteral(0), Type::IntLiteral(m), ast::Operator::LShift) if m >= 0 => {
+                Some(Type::IntLiteral(0))
+            }
+
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::LShift) => {
                 // An additional overflow check beyond `checked_shl` is necessary
                 // here, because `checked_shl` only rejects shift amounts >= 64;
@@ -14284,13 +14288,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
             }
 
-            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::RShift) => Some(
-                u32::try_from(m)
-                    .ok()
-                    .map(|m| n >> m.clamp(0, 63))
-                    .map(Type::IntLiteral)
-                    .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
-            ),
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::RShift) => {
+                let result = match u32::try_from(m) {
+                    Ok(m) => Type::IntLiteral(n >> m.clamp(0, 63)),
+                    Err(_) if m > 0 => Type::IntLiteral(if n >= 0 { 0 } else { -1 }),
+                    Err(_) => KnownClass::Int.to_instance(self.db()),
+                };
+                Some(result)
+            }
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {
                 let bytes = [lhs.value(self.db()), rhs.value(self.db())].concat();
