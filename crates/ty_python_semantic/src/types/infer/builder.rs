@@ -3539,12 +3539,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Pydantic decorators like `@field_validator("name")` are call expressions
             // that implicitly wrap the decorated function as a classmethod.
+            // Exception: `@model_validator(mode="after")` is an instance method.
             if let ast::Expr::Call(call_expr) = &decorator.expression {
                 let callee_ty = inference.expression_type(&call_expr.func);
                 if let Some(known_function) =
                     callee_ty.as_function_literal().and_then(|f| f.known(db))
                 {
-                    is_classmethod |= known_function.is_pydantic_implicit_classmethod_decorator();
+                    is_classmethod |= known_function.is_pydantic_implicit_classmethod_decorator()
+                        && !is_model_validator_mode_after(known_function, call_expr);
                 }
             }
         }
@@ -16672,6 +16674,20 @@ impl StringPartsCollector {
             Type::LiteralString
         }
     }
+}
+
+/// Returns `true` if `known_function` is `@model_validator(mode="after")`, which is an
+/// instance method (receives `self`) rather than a classmethod.
+fn is_model_validator_mode_after(known_function: KnownFunction, call_expr: &ast::ExprCall) -> bool {
+    if known_function != KnownFunction::ModelValidator {
+        return false;
+    }
+    call_expr.arguments.find_keyword("mode").is_some_and(|kw| {
+        matches!(
+            &kw.value,
+            ast::Expr::StringLiteral(s) if s.value.to_str() == "after"
+        )
+    })
 }
 
 fn contains_string_literal(expr: &ast::Expr) -> bool {
