@@ -21,7 +21,10 @@ use ty_project::{ProgressReporter, ProjectDatabase};
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::DocumentKey;
-use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
+use crate::server::api::diagnostics::{
+    Diagnostics, UnnecessaryBindingDiagnostic, to_lsp_diagnostic, to_lsp_unnecessary_diagnostic,
+    unnecessary_binding_diagnostics,
+};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -252,13 +255,15 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             state.report_progress(&self.work_done);
         }
 
+        let unnecessary = unnecessary_binding_diagnostics(db, file);
+
         // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
         // which also handles the case where a file no longer has diagnostics because
         // it's no longer part of the project.
-        if !diagnostics.is_empty() {
+        if !diagnostics.is_empty() || !unnecessary.is_empty() {
             state
                 .response
-                .write_diagnostics_for_file(db, file, diagnostics);
+                .write_diagnostics_for_file(db, file, diagnostics, &unnecessary);
         }
 
         state.response.maybe_flush();
@@ -281,7 +286,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            response.write_diagnostics_for_file(db, file, &diagnostics);
+            response.write_diagnostics_for_file(db, file, &diagnostics, &[]);
         }
         response.maybe_flush();
     }
@@ -371,6 +376,7 @@ impl<'a> ResponseWriter<'a> {
         db: &ProjectDatabase,
         file: File,
         diagnostics: &[Diagnostic],
+        unnecessary: &[UnnecessaryBindingDiagnostic],
     ) {
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
@@ -392,7 +398,7 @@ impl<'a> ResponseWriter<'a> {
             .map(|doc| i64::from(doc.version()))
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(diagnostics);
+        let result_id = Diagnostics::result_id_from_hash(diagnostics, unnecessary);
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_url, id)| id);
 
@@ -424,6 +430,19 @@ impl<'a> ResponseWriter<'a> {
                         )
                     })
                     .collect::<Vec<_>>();
+
+                let mut lsp_diagnostics = lsp_diagnostics;
+                lsp_diagnostics.extend(unnecessary.iter().filter_map(|diagnostic| {
+                    Some(
+                        to_lsp_unnecessary_diagnostic(
+                            db,
+                            file,
+                            diagnostic,
+                            self.position_encoding,
+                        )?
+                        .1,
+                    )
+                }));
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
                     uri: url,
@@ -477,7 +496,7 @@ impl<'a> ResponseWriter<'a> {
                 .ok()
                 .map(|doc| i64::from(doc.version()));
 
-            let new_result_id = Diagnostics::result_id_from_hash(&[]);
+            let new_result_id = Diagnostics::result_id_from_hash(&[], &[]);
 
             let report = match new_result_id {
                 Some(new_id) if new_id == previous_result_id => {
