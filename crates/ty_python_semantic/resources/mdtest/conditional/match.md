@@ -444,7 +444,16 @@ then uses `isinstance` to check the match.
 If the match pattern is not an instance of `type`, we raise a diagnostic:
 
 ```py
-def _(val):
+from typing import Any
+from ty_extensions import Intersection
+
+def _(
+    val,
+    val2: type | Any,
+    val3: Intersection[type, Any],
+    val4: type[Any],
+    val5: type[int]
+):
     Invalid1 = "foo"
 
     match val:
@@ -455,7 +464,16 @@ def _(val):
 
     match val:
         # error: [invalid-match-pattern] "`<types.UnionType special-form 'int | str'>` cannot be used in a class pattern because it is not a type"
-        case Invalid2(): ...
+        case Invalid2():
+            pass
+        case val2():  # fine
+            pass
+        case val3():  # fine
+            pass
+        case val4():  # fine
+            pass
+        case val5():  # fine
+            pass
 ```
 
 We also raise a diagnostic if the class cannot be used with `isinstance`:

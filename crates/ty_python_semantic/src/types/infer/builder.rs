@@ -5070,9 +5070,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     protocol_class,
                 );
             }
-        } else if !cls_ty.is_dynamic()
-            && !cls_ty.is_subtype_of(self.db(), KnownClass::Type.to_instance(self.db()))
-        {
+        } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {
             report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);
         }
     }
