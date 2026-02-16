@@ -507,7 +507,7 @@ def group_diagnostics_by_key(
 
     for diag in chain(old, new):
         diag.tag = tagged_lines.get(
-            (diag.location.path.name, diag.location.positions.begin.line), None
+            (diag.location.path.name, diag.location.positions.begin.line)
         )
 
     diagnostics = [
