@@ -3256,21 +3256,26 @@ impl<'db> StaticClassLiteral<'db> {
                         // descriptor attribute, data-classes will (implicitly) call the `__set__` method
                         // of the descriptor. This means that the synthesized `__init__` parameter for
                         // this attribute is determined by possible `value` parameter types with which
-                        // the `__set__` method can be called. We build a union of all possible options
-                        // to account for possible overloads.
-                        let mut value_types = UnionBuilder::new(db);
-                        for binding in &dunder_set.bindings(db) {
+                        // the `__set__` method can be called.
+                        //
+                        // We union parameter types across overloads of a single callable, intersect
+                        // callable bindings inside an intersection element, and union outer elements.
+                        field_ty = dunder_set.bindings(db).map_types(db, |binding| {
+                            let mut value_types = UnionBuilder::new(db);
+                            let mut has_value_type = false;
                             for overload in binding {
                                 if let Some(value_param) =
                                     overload.signature.parameters().get_positional(2)
                                 {
                                     value_types = value_types.add(value_param.annotated_type());
+                                    has_value_type = true;
                                 } else if overload.signature.parameters().is_gradual() {
                                     value_types = value_types.add(Type::unknown());
+                                    has_value_type = true;
                                 }
                             }
-                        }
-                        field_ty = value_types.build();
+                            has_value_type.then(|| value_types.build())
+                        });
 
                         // The default value of the attribute is *not* determined by the right hand side
                         // of the class-body assignment. Instead, the runtime invokes `__get__` on the

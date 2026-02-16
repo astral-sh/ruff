@@ -113,7 +113,7 @@ impl<'db> CallError<'db> {
             return None;
         }
         self.1
-            .iter()
+            .iter_flat()
             .flatten()
             .flat_map(bind::Binding::errors)
             .find_map(|error| match error {
