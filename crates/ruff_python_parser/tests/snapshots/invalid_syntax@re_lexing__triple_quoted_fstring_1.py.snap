@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/invalid/re_lexing/triple_quoted_fstring_1.py
 ---
 ## AST
 
@@ -64,21 +63,36 @@ Module(
                     ),
                 },
             ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 193..198,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 193..194,
+                                id: Name("y"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 197..198,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
 ```
 ## Errors
-
-  |
-3 |   # https://github.com/astral-sh/ruff/issues/11929
-4 |
-5 |   f"""hello {x # comment    
-  |  ___________________________^
-6 | | y = 1
-  | |_____^ Syntax Error: f-string: unterminated triple-quoted string
-  |
-
 
   |
 5 | f"""hello {x # comment    
@@ -88,17 +102,7 @@ Module(
 
 
   |
-3 |   # https://github.com/astral-sh/ruff/issues/11929
-4 |
-5 |   f"""hello {x # comment    
-  |  ___________________________^
-6 | | y = 1
-  | |_____^ Syntax Error: Expected FStringEnd, found FStringMiddle
-  |
-
-
-  |
 5 | f"""hello {x # comment    
 6 | y = 1
-  |      ^ Syntax Error: Expected a statement
+  |      ^ Syntax Error: f-string: unterminated string
   |

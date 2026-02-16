@@ -1452,6 +1452,23 @@ impl<'src> Lexer<'src> {
             return false;
         }
 
+        // Don't allow the generic bracket recovery to close the opening `{` of a
+        // triple-quoted f-string/t-string interpolation element. That brace is managed
+        // by the interpolated string machinery; decrementing nesting past it would
+        // cause `is_in_interpolation` to return `false`, making the lexer switch to
+        // f-string middle/end mode and desynchronize from the parser.
+        //
+        // For non-triple-quoted strings, crossing the boundary is intentional: it
+        // triggers the newline-based string termination recovery in
+        // `lex_interpolated_string_middle_or_end`.
+        if let Some(interpolated_string) = self.interpolated_strings.current() {
+            if interpolated_string.is_triple_quoted()
+                && self.nesting <= interpolated_string.nesting() + 1
+            {
+                return false;
+            }
+        }
+
         // Reduce the nesting level because the parser recovered from an error inside list parsing
         // i.e., it recovered from an unclosed parenthesis (`(`, `[`, or `{`).
         self.nesting -= 1;
