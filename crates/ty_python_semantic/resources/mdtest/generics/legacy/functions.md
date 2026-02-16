@@ -880,3 +880,20 @@ def f(x: T) -> T:
 def g(x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
 ```
+
+## Inferring typevars in iterable parameters from literal string arguments
+
+```py
+from typing import Iterable, TypeVar
+from typing_extensions import LiteralString
+
+FlatT = TypeVar("FlatT")
+
+def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
+    return [x for iterable in iterables for x in iterable]
+
+reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
+
+def literal_string_case(literal_string: LiteralString):
+    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+```
