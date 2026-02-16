@@ -24,15 +24,11 @@ impl HideUnderscoredSuggestions {
     }
 }
 
-pub(super) fn find_best_suggestion<'a, O, I>(
-    options: O,
+pub(super) fn find_best_suggestion<'a>(
+    options: impl IntoIterator<Item = &'a str>,
     typo: &str,
     hide_underscored_suggestions: HideUnderscoredSuggestions,
-) -> Option<&'a str>
-where
-    O: IntoIterator<IntoIter = I>,
-    I: ExactSizeIterator<Item = &'a str>,
-{
+) -> Option<&'a str> {
     if typo.is_empty() {
         return None;
     }
@@ -41,7 +37,7 @@ where
 
     // Don't spend a *huge* amount of time computing suggestions if there are many candidates.
     // This limit is fairly arbitrary and can be adjusted as needed.
-    if options.len() > 4096 {
+    if options.size_hint().1.is_some_and(|hint| hint > 4096) {
         return None;
     }
 

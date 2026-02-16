@@ -9479,13 +9479,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                if !module_name.contains('.')
-                    && let Some(suggestion) = did_you_mean(
-                        typeshed_versions.available_top_level_stdlib_modules(self.db()),
-                        &module_name,
-                    )
-                {
-                    diagnostic.set_primary_message(format_args!("Did you mean `{suggestion}`?"));
+                if !module_name.contains('.') {
+                    let current_version = Program::get(self.db()).python_version(self.db());
+                    let available_modules =
+                        typeshed_versions.available_top_level_stdlib_modules(current_version);
+                    if let Some(suggestion) =
+                        did_you_mean(available_modules.map(ModuleName::as_str), module_name)
+                    {
+                        diagnostic
+                            .set_primary_message(format_args!("Did you mean `{suggestion}`?"));
+                    }
                 }
             }
         } else {

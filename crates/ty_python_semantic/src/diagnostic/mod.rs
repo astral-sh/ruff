@@ -12,11 +12,10 @@ use std::fmt::Write;
 mod levenshtein;
 
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
-pub(crate) fn did_you_mean<'a, O, I>(options: O, typo: &str) -> Option<&'a str>
-where
-    O: IntoIterator<IntoIter = I>,
-    I: ExactSizeIterator<Item = &'a str>,
-{
+pub(crate) fn did_you_mean<'a>(
+    options: impl IntoIterator<Item = &'a str>,
+    typo: &str,
+) -> Option<&'a str> {
     find_best_suggestion(options, typo, HideUnderscoredSuggestions::Yes)
 }
 

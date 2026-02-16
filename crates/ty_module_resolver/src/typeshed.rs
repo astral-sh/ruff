@@ -110,16 +110,21 @@ impl TypeshedVersions {
         }
     }
 
-    pub(crate) fn available_top_level_stdlib_modules(
+    pub fn available_top_level_stdlib_modules(
         &self,
-        db: &dyn Db,
+        current_version: PythonVersion,
     ) -> impl Iterator<Item = &ModuleName> {
-        let current_version = Program::get(db).python_version(db);
         self.0
             .iter()
             .filter(move |(_, range)| range.contains(current_version))
             .map(|(name, _)| name)
-            .filter(|name| !name.contains('.'))
+            .filter(|name| {
+                !name.contains('.')
+                    && !matches!(
+                        &***name,
+                        "ty_extensions" | "_typeshed" | "typing_extensions"
+                    )
+            })
     }
 }
 

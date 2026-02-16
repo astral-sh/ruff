@@ -434,7 +434,7 @@ import colorama
     1 | import foo
     2 | import bar
     3 | import colorama
-      |        ^^^^^^^^
+      |        ^^^^^^^^ Did you mean `colorsys`?
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -475,7 +475,7 @@ import colorama
     1 | import foo
     2 | import bar
     3 | import colorama
-      |        ^^^^^^^^
+      |        ^^^^^^^^ Did you mean `colorsys`?
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -516,7 +516,7 @@ import colorama
     1 | import foo
     2 | import bar
     3 | import colorama
-      |        ^^^^^^^^
+      |        ^^^^^^^^ Did you mean `colorsys`?
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
@@ -557,7 +557,7 @@ import colorama
     1 | import foo
     2 | import bar
     3 | import colorama
-      |        ^^^^^^^^
+      |        ^^^^^^^^ Did you mean `colorsys`?
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/project (first-party code)
