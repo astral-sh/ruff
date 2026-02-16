@@ -166,13 +166,14 @@ E302 [*] Expected 2 blank lines, found 1
 604 |     pass
     |
 help: Add missing blank line(s)
-598 | def f():
 599 |     pass
 600 | 
-601 + 
-602 | # comment
-603 | @decorator
-604 | def g():
+601 | # comment
+602 + 
+603 + 
+604 | @decorator
+605 | def g():
+606 |     pass
 
 E302 [*] Expected 2 blank lines, found 0
    --> E30.py:624:1
@@ -263,11 +264,30 @@ E302 [*] Expected 2 blank lines, found 0
 964 | # end
     |
 help: Add missing blank line(s)
-958 | # E302
 959 | def test_update():
 960 |     pass
-961 + 
+961 | # comment
 962 + 
-963 | # comment
+963 + 
 964 | def test_clientmodel():
 965 |     pass
+966 | # end
+
+E302 [*] Expected 2 blank lines, found 1
+    --> E30.py:1025:1
+     |
+1024 | # whatever 3
+1025 | @pytest.mark.skip
+     | ^
+1026 | def test_ruff_fails() -> None:
+1027 |     """A test case that causes ruff to have an infinite loop"""
+     |
+help: Add missing blank line(s)
+1022 | # whatever 2
+1023 | 
+1024 | # whatever 3
+1025 + 
+1026 + 
+1027 | @pytest.mark.skip
+1028 | def test_ruff_fails() -> None:
+1029 |     """A test case that causes ruff to have an infinite loop"""
