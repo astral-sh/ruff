@@ -2010,7 +2010,6 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
 
         // Return type
         f.write_str(" -> ")?;
-        let return_settings = settings.singleline();
 
         let should_parenthesize_return_type =
             should_parenthesize_callable_type(self.return_ty, self.db);
