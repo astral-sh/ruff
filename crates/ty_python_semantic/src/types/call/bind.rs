@@ -128,7 +128,8 @@ impl<'db> BindingsElement<'db> {
     /// We keep successful bindings, and also keep top-callable failures. Top callables contribute
     /// useful return-type information (e.g. `Awaitable[object]`) for narrowed intersections like
     /// `f: KnownCallable & Top[Callable[..., Awaitable[object]]]`, even though the top-callable
-    /// call itself is unsafe.
+    /// call itself is unsafe. (We know that somewhere in the infinite-union of the top callable,
+    /// there is a callable with the right parameters to match the call.)
     fn retain_successful(&mut self) {
         if self.is_intersection() && self.as_result().is_ok() {
             self.bindings.retain(|binding| {
@@ -221,11 +222,7 @@ impl<'db> Bindings<'db> {
     /// Creates a new `Bindings` from an iterator of [`Bindings`]s for an intersection type.
     /// All input bindings are combined into a single intersection element.
     /// Panics if the iterator is empty.
-    pub(crate) fn from_intersection<I>(
-        _db: &'db dyn Db,
-        callable_type: Type<'db>,
-        bindings_iter: I,
-    ) -> Self
+    pub(crate) fn from_intersection<I>(callable_type: Type<'db>, bindings_iter: I) -> Self
     where
         I: IntoIterator<Item = Bindings<'db>>,
     {
@@ -356,7 +353,7 @@ impl<'db> Bindings<'db> {
         db: &'db dyn Db,
         mut map: impl FnMut(&CallableBinding<'db>) -> Option<Type<'db>>,
     ) -> Type<'db> {
-        let mut element_types = Vec::new();
+        let mut element_types = Vec::with_capacity(self.elements.len());
         for element in &self.elements {
             let mut binding_types = Vec::new();
             for binding in &element.bindings {
@@ -514,7 +511,10 @@ impl<'db> Bindings<'db> {
 
     /// Returns true if this is a single callable (not a union or intersection).
     pub(crate) fn is_single(&self) -> bool {
-        self.elements.len() == 1 && self.elements[0].bindings.len() == 1
+        match &*self.elements {
+            [single] => single.bindings.len() == 1,
+            _ => false,
+        }
     }
 
     /// Returns the single `CallableBinding` if this is not a union or intersection.
@@ -585,8 +585,8 @@ impl<'db> Bindings<'db> {
         // - Multiple bindings (intersection): for intersections, only include
         //   successful bindings (failed ones have been filtered out by retain_successful)
         let element_return_types = self.elements.iter().map(|element| {
-            if element.bindings.len() == 1 {
-                element.bindings[0].return_type()
+            if let [single_binding] = &*element.bindings {
+                single_binding.return_type()
             } else {
                 // For intersections, intersect the return types of remaining bindings
                 IntersectionType::from_elements(

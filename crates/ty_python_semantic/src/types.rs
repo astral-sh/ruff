@@ -4344,18 +4344,12 @@ impl<'db> Type<'db> {
                     .map(|element| element.bindings(db)),
             ),
 
-            Type::Intersection(intersection) => {
-                // For intersections, we try to call each positive element.
-                // Elements where the call fails are discarded.
-                // The return type is the intersection of return types from successful calls.
-                Bindings::from_intersection(
-                    db,
-                    self,
-                    intersection
-                        .positive_elements_or_object(db)
-                        .map(|element| element.bindings(db)),
-                )
-            }
+            Type::Intersection(intersection) => Bindings::from_intersection(
+                self,
+                intersection
+                    .positive_elements_or_object(db)
+                    .map(|element| element.bindings(db)),
+            ),
 
             Type::DataclassDecorator(_) => {
                 let typevar = BoundTypeVarInstance::synthetic(
@@ -5074,21 +5068,17 @@ impl<'db> Type<'db> {
         // TODO: we might be able to remove this after fixing
         // https://github.com/astral-sh/ty/issues/2428.
         if let Type::Intersection(intersection) = self {
-            let mut successful_bindings = Vec::new();
-            let mut last_error = None;
-
             // Using `positive()` rather than `positive_elements_or_object()` is safe
             // here because `object` does not define any of the dunders that are called
             // through this path without `MRO_NO_OBJECT_FALLBACK` (e.g. `__await__`,
             // `__iter__`, `__enter__`, `__bool__`).
-            for element in intersection.positive(db) {
-                match element.try_call_dunder_with_policy(
-                    db,
-                    name,
-                    &mut argument_types.clone(),
-                    tcx,
-                    policy,
-                ) {
+            let positive = intersection.positive(db);
+
+            let mut successful_bindings = Vec::with_capacity(positive.len());
+            let mut last_error = None;
+
+            for element in positive {
+                match element.try_call_dunder_with_policy(db, name, argument_types, tcx, policy) {
                     Ok(bindings) => successful_bindings.push(bindings),
                     Err(err) => last_error = Some(err),
                 }
@@ -5100,7 +5090,7 @@ impl<'db> Type<'db> {
                 return Err(last_error.unwrap_or(CallDunderError::MethodNotAvailable));
             }
 
-            return Ok(Bindings::from_intersection(db, self, successful_bindings));
+            return Ok(Bindings::from_intersection(self, successful_bindings));
         }
 
         // Implicit calls to dunder methods never access instance members, so we pass
