@@ -1364,7 +1364,7 @@ impl<'src> Parser<'src> {
                 // 'first' f'second' b'third'
                 self.add_error(
                     ParseErrorType::OtherError(
-                        "Bytes literal cannot be mixed with non-bytes literals".to_string(),
+                        "cannot mix bytes and nonbytes literals".to_string(),
                     ),
                     range,
                 );
