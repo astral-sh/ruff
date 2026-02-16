@@ -2254,6 +2254,19 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                actual_literal @ (Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)),
+            ) => {
+                // Retry specialization with the literal's fallback instance (`str` / `bytes`)
+                // so literal iterables can contribute to generic inference.
+                if let Some(actual_instance) = actual_literal.literal_fallback_instance(self.db) {
+                    return self.infer_map_impl(formal, actual_instance, polarity, f, seen);
+                }
+            }
+
             (formal, Type::ProtocolInstance(actual_protocol)) => {
                 // TODO: This will only handle protocol classes that explicit inherit
                 // from other generic protocol classes by listing it as a base class.
