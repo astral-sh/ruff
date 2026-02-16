@@ -11,10 +11,10 @@ Added: 4
 
 --- Added ---
 PYI041 Use `float` instead of `int | float`
- --> PYI041_4.py:4:11
+ --> PYI041_4.py:4:12
   |
 4 | def f1(a: "U" "no[int, fl" "oat, Foo]") -> "None": ...
-  |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |            ^^^^^^^^^^^^^^^^^^^^^^^^^^
 5 | def f2(a: "Uno[int, float, Foo]") -> "None": ...
 6 | def f3(a: """Uno[int, float, Foo]""") -> "None": ...
   |
@@ -64,13 +64,13 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 PYI041 Use `float` instead of `int | float`
- --> PYI041_4.py:7:11
+ --> PYI041_4.py:7:12
   |
 5 |   def f2(a: "Uno[int, float, Foo]") -> "None": ...
 6 |   def f3(a: """Uno[int, float, Foo]""") -> "None": ...
 7 |   def f4(a: "Uno[in\
-  |  ___________^
+  |  ____________^
 8 | | t, float, Foo]") -> "None": ...
-  | |_______________^
+  | |______________^
   |
 help: Remove redundant type

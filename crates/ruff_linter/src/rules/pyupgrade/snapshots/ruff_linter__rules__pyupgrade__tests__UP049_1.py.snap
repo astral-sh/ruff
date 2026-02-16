@@ -281,7 +281,7 @@ help: Rename type parameter to remove leading underscores
 71 + class C[T]:
 72 +     v1 = cast(T, ...)
 73 +     v2 = cast('T', ...)
-74 +     v3 = cast(T, ...)
+74 +     v3 = cast("T", ...)
 75 | 
 76 |     def _(self):
    -         v1 = cast(_T, ...)
@@ -289,7 +289,7 @@ help: Rename type parameter to remove leading underscores
    -         v3 = cast("\u005fT", ...)
 77 +         v1 = cast(T, ...)
 78 +         v2 = cast('T', ...)
-79 +         v3 = cast(T, ...)
+79 +         v3 = cast("T", ...)
 80 | 
 81 | 
 82 | class C[_T]:
@@ -309,7 +309,7 @@ help: Rename type parameter to remove leading underscores
    - class C[_T]:
    -     v = cast('Literal[\'foo\'] | _T', ...)
 82 + class C[T]:
-83 +     v = cast(T, ...)
+83 +     v = cast('T', ...)
 84 | 
 85 | 
 86 | ## Name collision

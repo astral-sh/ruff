@@ -334,10 +334,10 @@ help: Convert to `T | None`
 note: This is an unsafe fix and may change runtime behavior
 
 RUF013 PEP 484 prohibits implicit `Optional`
-   --> RUF013_0.py:196:12
+   --> RUF013_0.py:196:13
     |
 196 | def f(arg: "st" "r" = None):  # RUF013
-    |            ^^^^^^^^
+    |             ^^^^^^
 197 |     pass
     |
 help: Convert to `T | None`

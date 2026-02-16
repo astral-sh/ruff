@@ -2,7 +2,7 @@
 
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::{Expr, ExprStringLiteral, ModExpression, StringLiteral};
-use ruff_text_size::Ranged;
+use ruff_text_size::TextRange;
 
 use crate::{ParseError, Parsed, parse_expression, parse_string_annotation};
 
@@ -84,7 +84,20 @@ fn parse_simple_type_annotation(
 
 fn parse_complex_type_annotation(string_expr: &ExprStringLiteral) -> AnnotationParseResult {
     let mut parsed = parse_expression(string_expr.value.to_str())?;
-    relocate_expr(parsed.expr_mut(), string_expr.range());
+
+    // Use the content range (excluding quotes and prefixes) rather than
+    // `string_expr.range()`. `ParsedAnnotationsCache` is keyed by the start
+    // offset of the annotation; if we used the full range here, a nested
+    // string literal (e.g. `"'int'"`) would receive the same start offset as
+    // the outer annotation, causing an infinite cache-lookup cycle through
+    // ForwardReference → try_from_expr → cache hit → …
+    let parts = string_expr.value.as_slice();
+    let content_range = TextRange::new(
+        parts[0].content_range().start(),
+        parts[parts.len() - 1].content_range().end(),
+    );
+    relocate_expr(parsed.expr_mut(), content_range);
+
     Ok(ParsedAnnotation {
         parsed,
         kind: AnnotationKind::Complex,

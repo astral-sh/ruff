@@ -138,10 +138,10 @@ help: Replace with `list`
 44 | 
 
 UP006 Use `list` instead of `List` for type annotation
-  --> UP006_0.py:45:10
+  --> UP006_0.py:45:11
    |
 45 | def f(x: "Li" "st[str]") -> None:
-   |          ^^^^^^^^^^^^^^
+   |           ^^^^^^^^^^^^
 46 |     ...
    |
 help: Replace with `list`
@@ -198,28 +198,28 @@ help: Replace with `list`
 56 | 
 
 UP006 Use `list` instead of `List` for type annotation
-  --> UP006_0.py:53:16
+  --> UP006_0.py:53:17
    |
 53 | def f(x: "List['Li' 'st[str]']") -> None:
-   |                ^^^^^^^^^^^^^^
+   |                 ^^^^^^^^^^^^
 54 |     ...
    |
 help: Replace with `list`
 
 UP006 Use `list` instead of `List` for type annotation
-  --> UP006_0.py:57:10
+  --> UP006_0.py:57:11
    |
 57 | def f(x: "Li" "st['List[str]']") -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^
+   |           ^^^^^^^^^^^^^^^^^^^^
 58 |     ...
    |
 help: Replace with `list`
 
 UP006 Use `list` instead of `List` for type annotation
-  --> UP006_0.py:57:10
+  --> UP006_0.py:57:12
    |
 57 | def f(x: "Li" "st['List[str]']") -> None:
-   |          ^^^^^^^^^^^^^^^^^^^^^^
+   |            ^^^^^^^^^^^^^^^^^^
 58 |     ...
    |
 help: Replace with `list`
