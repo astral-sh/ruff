@@ -190,19 +190,6 @@ pub(super) enum EnclosingSnapshot {
     Bindings(Bindings),
 }
 
-impl EnclosingSnapshot {
-    pub(super) fn finish(&mut self, reachability_constraints: &mut ReachabilityConstraintsBuilder) {
-        match self {
-            Self::Constraint(constraint) => {
-                reachability_constraints.mark_used(*constraint);
-            }
-            Self::Bindings(bindings) => {
-                bindings.finish(reachability_constraints);
-            }
-        }
-    }
-}
-
 /// Live bindings for a single place at some point in control flow. Each live binding comes
 /// with a set of narrowing constraints and a reachability constraint.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]

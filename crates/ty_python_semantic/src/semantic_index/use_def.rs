@@ -284,9 +284,11 @@ struct ScopedPlaceStateId;
 #[derive(get_size2::GetSize)]
 struct ScopedReachableDefinitionsId;
 
-#[newtype_index]
-#[derive(get_size2::GetSize)]
-struct ScopedEnclosingSnapshotDataId;
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+enum ScopedEnclosingSnapshotDataId {
+    Constraint(ScopedNarrowingConstraint),
+    Bindings(ScopedBindingsId),
+}
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -346,7 +348,6 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// scope.
-    interned_enclosing_snapshots: IndexVec<ScopedEnclosingSnapshotDataId, EnclosingSnapshot>,
     enclosing_snapshots: IndexVec<ScopedEnclosingSnapshotId, ScopedEnclosingSnapshotDataId>,
 
     /// Whether or not the end of the scope is reachable.
@@ -530,17 +531,20 @@ impl<'db> UseDefMap<'db> {
             // TODO: We haven't implemented proper boundness analysis for nonlocal symbols, so we assume the boundness is bound for now.
             BoundnessAnalysis::AssumeBound
         };
-        let Some(snapshot_data_id) = self.enclosing_snapshots.get(snapshot_id) else {
-            return EnclosingSnapshotResult::NotFound;
-        };
 
-        match &self.interned_enclosing_snapshots[*snapshot_data_id] {
-            EnclosingSnapshot::Constraint(constraint) => {
+        match self.enclosing_snapshots.get(snapshot_id) {
+            Some(ScopedEnclosingSnapshotDataId::Constraint(constraint)) => {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
-            EnclosingSnapshot::Bindings(bindings) => EnclosingSnapshotResult::FoundBindings(
-                self.bindings_iterator(bindings, boundness_analysis),
-            ),
+            Some(ScopedEnclosingSnapshotDataId::Bindings(bindings_id)) => {
+                EnclosingSnapshotResult::FoundBindings(
+                    self.bindings_iterator(
+                        &self.interned_bindings[*bindings_id],
+                        boundness_analysis,
+                    ),
+                )
+            }
+            None => EnclosingSnapshotResult::NotFound,
         }
     }
 
@@ -1520,8 +1524,11 @@ impl<'db> UseDefMapBuilder<'db> {
             Self::intern_end_of_scope_members(self.member_states);
         let (mut interned_reachable_definitions, reachable_definitions_by_member) =
             Self::intern_reachable_definitions_by_member(self.reachable_member_definitions);
-        let (mut interned_enclosing_snapshots, enclosing_snapshots) =
-            Self::intern_enclosing_snapshots(self.enclosing_snapshots);
+        let enclosing_snapshots = Self::intern_enclosing_snapshots(
+            self.enclosing_snapshots,
+            &mut interned_bindings,
+            &mut interned_ids_by_bindings,
+        );
 
         interned_bindings.shrink_to_fit();
 
@@ -1558,8 +1565,11 @@ impl<'db> UseDefMapBuilder<'db> {
         for declarations in self.declarations_by_binding.values_mut() {
             declarations.finish(&mut self.reachability_constraints);
         }
-        for enclosing_snapshot in &mut interned_enclosing_snapshots {
-            enclosing_snapshot.finish(&mut self.reachability_constraints);
+        for enclosing_snapshot in &enclosing_snapshots {
+            // Bindings are already marked above.
+            if let ScopedEnclosingSnapshotDataId::Constraint(constraint) = enclosing_snapshot {
+                self.reachability_constraints.mark_used(*constraint);
+            }
         }
         self.reachability_constraints.mark_used(self.reachability);
 
@@ -1578,7 +1588,6 @@ impl<'db> UseDefMapBuilder<'db> {
             reachable_definitions_by_member,
             declarations_by_binding: self.declarations_by_binding,
             bindings_by_definition,
-            interned_enclosing_snapshots,
             enclosing_snapshots,
             end_of_scope_reachability: self.reachability,
         }
@@ -1703,35 +1712,35 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_enclosing_snapshots(
         enclosing_snapshots: EnclosingSnapshots,
-    ) -> (
-        IndexVec<ScopedEnclosingSnapshotDataId, EnclosingSnapshot>,
-        IndexVec<ScopedEnclosingSnapshotId, ScopedEnclosingSnapshotDataId>,
-    ) {
-        let mut interned_snapshots: IndexVec<ScopedEnclosingSnapshotDataId, EnclosingSnapshot> =
-            IndexVec::with_capacity(enclosing_snapshots.len());
-        let mut interned_ids_by_snapshot_key: IndexVec<
+        interned_bindings: &mut IndexVec<ScopedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, ScopedBindingsId>,
+    ) -> IndexVec<ScopedEnclosingSnapshotId, ScopedEnclosingSnapshotDataId> {
+        let mut interned_ids_by_snapshot: IndexVec<
             ScopedEnclosingSnapshotId,
             ScopedEnclosingSnapshotDataId,
         > = IndexVec::with_capacity(enclosing_snapshots.len());
-        let mut interned_ids_by_snapshot: FxHashMap<
-            EnclosingSnapshot,
-            ScopedEnclosingSnapshotDataId,
-        > = FxHashMap::with_capacity_and_hasher(enclosing_snapshots.len(), FxBuildHasher);
 
         for snapshot in enclosing_snapshots {
-            let interned_id = if let Some(interned_id) = interned_ids_by_snapshot.get(&snapshot) {
-                *interned_id
-            } else {
-                let interned_id = interned_snapshots.push(snapshot.clone());
-                interned_ids_by_snapshot.insert(snapshot, interned_id);
-                interned_id
+            let interned_id = match snapshot {
+                EnclosingSnapshot::Bindings(bindings) => {
+                    let interned_bindings_id =
+                        if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
+                            *interned_id
+                        } else {
+                            let interned_id = interned_bindings.push(bindings.clone());
+                            interned_ids_by_bindings.insert(bindings, interned_id);
+                            interned_id
+                        };
+                    ScopedEnclosingSnapshotDataId::Bindings(interned_bindings_id)
+                }
+                EnclosingSnapshot::Constraint(constraint) => {
+                    ScopedEnclosingSnapshotDataId::Constraint(constraint)
+                }
             };
-            interned_ids_by_snapshot_key.push(interned_id);
+            interned_ids_by_snapshot.push(interned_id);
         }
 
-        interned_snapshots.shrink_to_fit();
-        interned_ids_by_snapshot_key.shrink_to_fit();
-
-        (interned_snapshots, interned_ids_by_snapshot_key)
+        interned_ids_by_snapshot.shrink_to_fit();
+        interned_ids_by_snapshot
     }
 }
