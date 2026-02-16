@@ -401,6 +401,7 @@ impl std::fmt::Display for BytesRepr<'_, '_> {
 #[cfg(test)]
 mod unicode_escape_tests {
     use super::*;
+    use ruff_python_ast::str::TripleQuotes;
 
     #[test]
     fn changed() {
@@ -413,5 +414,187 @@ mod unicode_escape_tests {
 
         assert!(test("'\"hello"));
         assert!(test("hello\n"));
+    }
+
+    #[test]
+    fn test_choose_quote_prefers_primary() {
+        // No quotes in string => use preferred
+        assert_eq!(choose_quote(0, 0, Quote::Single), (Quote::Single, 0));
+        assert_eq!(choose_quote(0, 0, Quote::Double), (Quote::Double, 0));
+    }
+
+    #[test]
+    fn test_choose_quote_switches_when_only_primary() {
+        // Only single quotes, preferred single => switch to double
+        assert_eq!(choose_quote(3, 0, Quote::Single), (Quote::Double, 0));
+        // Only double quotes, preferred double => switch to single
+        assert_eq!(choose_quote(0, 3, Quote::Double), (Quote::Single, 0));
+    }
+
+    #[test]
+    fn test_choose_quote_keeps_primary_when_both() {
+        // Both quote types present => keep preferred, escape primary count
+        assert_eq!(choose_quote(2, 3, Quote::Single), (Quote::Single, 2));
+        assert_eq!(choose_quote(2, 3, Quote::Double), (Quote::Double, 3));
+    }
+
+    #[test]
+    fn test_unicode_escape_empty_string() {
+        let escape = UnicodeEscape::new_repr("");
+        assert!(!escape.changed());
+        assert_eq!(escape.layout().len, Some(0));
+    }
+
+    #[test]
+    fn test_unicode_escape_ascii_printable() {
+        let escape = UnicodeEscape::new_repr("hello world");
+        assert!(!escape.changed());
+        assert_eq!(escape.layout().len, Some(11));
+    }
+
+    #[test]
+    fn test_unicode_escape_with_newline() {
+        let escape = UnicodeEscape::new_repr("line1\nline2");
+        assert!(escape.changed());
+        // "line1" (5) + "\\n" (2) + "line2" (5) = 12
+        assert_eq!(escape.layout().len, Some(12));
+    }
+
+    #[test]
+    fn test_unicode_escape_with_tab() {
+        let escape = UnicodeEscape::new_repr("a\tb");
+        assert!(escape.changed());
+        // "a" (1) + "\\t" (2) + "b" (1) = 4
+        assert_eq!(escape.layout().len, Some(4));
+    }
+
+    #[test]
+    fn test_unicode_escape_with_backslash() {
+        let escape = UnicodeEscape::new_repr("a\\b");
+        assert!(escape.changed());
+        // "a" (1) + "\\\\" (2) + "b" (1) = 4
+        assert_eq!(escape.layout().len, Some(4));
+    }
+
+    #[test]
+    fn test_unicode_escape_control_characters() {
+        // Control char (< 0x20) gets \xHH encoding (4 chars)
+        let escape = UnicodeEscape::new_repr("\x01");
+        assert!(escape.changed());
+        assert_eq!(escape.layout().len, Some(4));
+    }
+
+    #[test]
+    fn test_unicode_escape_write_body() {
+        let escape = UnicodeEscape::new_repr("hello\nworld");
+        let mut output = String::new();
+        escape.write_body(&mut output).unwrap();
+        assert_eq!(output, "hello\\nworld");
+    }
+
+    #[test]
+    fn test_unicode_str_repr_display() {
+        let escape = UnicodeEscape::new_repr("hello");
+        let repr = escape.str_repr(TripleQuotes::No);
+        assert_eq!(repr.to_string(), Some("'hello'".to_string()));
+    }
+
+    #[test]
+    fn test_unicode_str_repr_with_escapes() {
+        let escape = UnicodeEscape::new_repr("line1\nline2");
+        let repr = escape.str_repr(TripleQuotes::No);
+        assert_eq!(repr.to_string(), Some("'line1\\nline2'".to_string()));
+    }
+
+    #[test]
+    fn test_unicode_escape_preferred_double_quote() {
+        let escape = UnicodeEscape::with_preferred_quote("hello", Quote::Double);
+        assert_eq!(escape.layout().quote, Quote::Double);
+    }
+
+    #[test]
+    fn test_unicode_escape_quote_selection_with_singles() {
+        // String with only single quotes, preferred single => switches to double
+        let escape = UnicodeEscape::with_preferred_quote("it's", Quote::Single);
+        assert_eq!(escape.layout().quote, Quote::Double);
+    }
+}
+
+#[cfg(test)]
+mod ascii_escape_tests {
+    use super::*;
+    use ruff_python_ast::str::TripleQuotes;
+
+    #[test]
+    fn test_ascii_escape_empty() {
+        let escape = AsciiEscape::new_repr(b"");
+        assert!(!escape.changed());
+        assert_eq!(escape.layout().len, Some(0));
+    }
+
+    #[test]
+    fn test_ascii_escape_printable() {
+        let escape = AsciiEscape::new_repr(b"hello");
+        assert!(!escape.changed());
+        assert_eq!(escape.layout().len, Some(5));
+    }
+
+    #[test]
+    fn test_ascii_escape_with_newline() {
+        let escape = AsciiEscape::new_repr(b"a\nb");
+        assert!(escape.changed());
+        // "a" (1) + "\\n" (2) + "b" (1) = 4
+        assert_eq!(escape.layout().len, Some(4));
+    }
+
+    #[test]
+    fn test_ascii_escape_non_printable_byte() {
+        let escape = AsciiEscape::new_repr(&[0x80]);
+        assert!(escape.changed());
+        // \xHH = 4 chars
+        assert_eq!(escape.layout().len, Some(4));
+    }
+
+    #[test]
+    fn test_ascii_escape_write_body() {
+        let escape = AsciiEscape::new_repr(b"hello\tworld");
+        let mut output = String::new();
+        escape.write_body(&mut output).unwrap();
+        assert_eq!(output, "hello\\tworld");
+    }
+
+    #[test]
+    fn test_bytes_repr_display() {
+        let escape = AsciiEscape::new_repr(b"hello");
+        let repr = escape.bytes_repr(TripleQuotes::No);
+        assert_eq!(repr.to_string(), Some("b'hello'".to_string()));
+    }
+
+    #[test]
+    fn test_bytes_repr_with_escapes() {
+        let escape = AsciiEscape::new_repr(b"\x00\xff");
+        let repr = escape.bytes_repr(TripleQuotes::No);
+        assert_eq!(repr.to_string(), Some("b'\\x00\\xff'".to_string()));
+    }
+
+    #[test]
+    fn test_ascii_escape_quote_selection() {
+        // Only single quotes => switch to double
+        let escape = AsciiEscape::with_preferred_quote(b"it's", Quote::Single);
+        assert_eq!(escape.layout().quote, Quote::Double);
+    }
+
+    #[test]
+    fn test_ascii_escape_backslash() {
+        let escape = AsciiEscape::new_repr(b"a\\b");
+        assert!(escape.changed());
+        assert_eq!(escape.layout().len, Some(4));
+    }
+
+    #[test]
+    fn test_ascii_escape_carriage_return() {
+        let escape = AsciiEscape::new_repr(b"a\rb");
+        assert!(escape.changed());
+        assert_eq!(escape.layout().len, Some(4));
     }
 }
