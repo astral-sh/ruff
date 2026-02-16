@@ -135,16 +135,17 @@ mod tests {
 
     #[test]
     fn missing_fstring_syntax_backslash_py311() -> Result<()> {
-        let diagnostics = test_path(
+        assert_diagnostics_diff!(
             Path::new("ruff/RUF027_0.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
             &LinterSettings {
                 unresolved_target_version: PythonVersion::PY311.into(),
                 ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
             },
-        )?;
-        // With Python 3.11, backslashes in interpolations should NOT trigger RUF027
-        // (only the backslash_test function should be skipped)
-        assert_diagnostics!(diagnostics);
+        );
         Ok(())
     }
 
