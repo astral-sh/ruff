@@ -137,6 +137,7 @@ mod type_alias;
 mod typed_dict;
 mod typevar;
 mod unpacker;
+pub mod unused_bindings;
 mod variance;
 mod visitor;
 
