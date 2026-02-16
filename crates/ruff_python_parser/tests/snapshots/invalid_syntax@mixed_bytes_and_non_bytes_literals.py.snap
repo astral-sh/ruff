@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/mixed_bytes_and_non_bytes_literals.py
 ---
 ## AST
 
@@ -178,7 +177,7 @@ Module(
 
   |
 1 | 'first' b'second'
-  | ^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+  | ^^^^^^^^^^^^^^^^^ Syntax Error: cannot mix bytes and nonbytes literals
 2 | f'first' b'second'
 3 | 'first' f'second' b'third'
   |
@@ -187,7 +186,7 @@ Module(
   |
 1 | 'first' b'second'
 2 | f'first' b'second'
-  | ^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+  | ^^^^^^^^^^^^^^^^^^ Syntax Error: cannot mix bytes and nonbytes literals
 3 | 'first' f'second' b'third'
   |
 
@@ -196,5 +195,5 @@ Module(
 1 | 'first' b'second'
 2 | f'first' b'second'
 3 | 'first' f'second' b'third'
-  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: Bytes literal cannot be mixed with non-bytes literals
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ Syntax Error: cannot mix bytes and nonbytes literals
   |
