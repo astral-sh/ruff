@@ -438,48 +438,61 @@ def _(answer: Answer | None):
 
 ## Invalid class patterns
 
-For class patterns, CPython first checks that the "class" is an instance of `type`, and then uses
-`isinstance` to check the match.
+For class patterns, the runtime first checks that the match pattern is an instance of `type`, and
+then uses `isinstance` to check the match.
 
-If the "class" is not an instance of "type", we raise a diagnostic.
+If the match pattern is not an instance of `type`, we raise a diagnostic:
 
 ```py
-Foo = "foo"
+def _(val):
+    Invalid1 = "foo"
 
-match 42:
-    case Foo():  # error: [invalid-match-pattern]
-        ...
+    match val:
+        # error: [invalid-match-pattern] "`Literal["foo"]` cannot be used in a class pattern because it is not a type"
+        case Invalid1(): ...
 
-Foo = int | str
+    Invalid2 = int | str
 
-match 42:
-    case Foo():  # error: [invalid-match-pattern]
-        ...
+    match val:
+        # error: [invalid-match-pattern] "`<types.UnionType special-form 'int | str'>` cannot be used in a class pattern because it is not a type"
+        case Invalid2(): ...
 ```
 
-We also raise a diagnostic if the class cannot be used with `isinstance`.
+We also raise a diagnostic if the class cannot be used with `isinstance`:
 
 ```py
 from typing import Any, TypedDict
 
-Foo = Any
+def _(val):
+    Invalid3 = Any
 
-match 42:
-    case Foo():  # TODO: error: [invalid-match-pattern]
-        ...
+    match val:
+        # TODO: this should be an `invalid-match-pattern` error
+        case Invalid3(): ...
 
-class Foo(TypedDict): ...
+    class Invalid4(TypedDict): ...
 
-match 42:
-    case Foo():  # error: [isinstance-against-typed-dict] # TODO: unify this (?)
-        ...
+    match val:
+        # TODO: this could have the `invalid-match-pattern` error code instead.
+        # error: [isinstance-against-typed-dict] "`TypedDict` class `Invalid4` cannot be used in a class pattern"
+        case Invalid4(): ...
 ```
 
-Don't raise any diagnostic for `Unknown` types.
+We do not raise a diagnostic for dynamic types:
 
 ```py
-def _f(Foo):
-    reveal_type(Foo)  # revealed: Unknown
-    match 42:
-        case Foo(): ...
+def _(val, UnknownSymbol):
+    reveal_type(UnknownSymbol)  # revealed: Unknown
+
+    match val:
+        case UnknownSymbol(): ...
+```
+
+We also do not raise a diagnostic if the match pattern is a non-statically known instance of `type`:
+
+```py
+def _(val, IntOrStr: type[int | str]):
+    match val:
+        case IntOrStr():
+            print(f"Matched as {IntOrStr}: {val!r}")
 ```

@@ -1611,16 +1611,16 @@ Checks for invalid match patterns.
 
 **Why is this bad?**
 
-Such called patterns lead to runtime errors.
+Matching on invalid patterns will lead to a runtime error.
 
 **Examples**
 
 ```python
-def _(foo):
-    bar = "bar"
-    match foo:
-        case bar():    # class pattern must refer to a class
-            ...
+NotAClass = 42
+
+match x:
+    case NotAClass():    # TypeError at runtime: must be a class
+        ...
 ```
 
 ## `invalid-metaclass`
