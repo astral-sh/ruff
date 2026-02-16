@@ -387,7 +387,8 @@ impl<'db> Type<'db> {
             }
         };
 
-        // Determine if `Sequence[<union of literals>]` has the given type relation to `class`.
+        // Optimized routine to determine if `<instance of class>` has the given type relation
+        // to `Sequence[<union of literals>]`.
         let literal_sequence_relation = |class: ClassType<'db>, literal_types: Box<[Type<'db>]>| {
             let spec = match literal_types.len() {
                 0 => Type::Never,
