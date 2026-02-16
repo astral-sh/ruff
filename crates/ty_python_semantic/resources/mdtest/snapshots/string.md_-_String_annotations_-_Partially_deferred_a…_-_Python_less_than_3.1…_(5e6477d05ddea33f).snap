@@ -24,7 +24,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
  9 | 
 10 | # fmt: off
 11 | def f(
-12 |     # error: [unsupported-operator] "String annotations are not supported in PEP-604 unions on Python <3.14"
+12 |     # error: [unsupported-operator] "String annotations are not supported in `|` unions on Python <3.14"
 13 |     a: int | "Foo",
 14 |     # error: [unsupported-operator]
 15 |     b: int | "memoryview" | bytes,
@@ -55,11 +55,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 # Diagnostics
 
 ```
-error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
   --> src/mdtest_snippet.py:13:8
    |
 11 | def f(
-12 |     # error: [unsupported-operator] "String annotations are not supported in PEP-604 unions on Python <3.14"
+12 |     # error: [unsupported-operator] "String annotations are not supported in `|` unions on Python <3.14"
 13 |     a: int | "Foo",
    |        ^^^^^^-----
    |              |
@@ -75,7 +75,7 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
   --> src/mdtest_snippet.py:15:8
    |
 13 |     a: int | "Foo",
@@ -95,7 +95,7 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
   --> src/mdtest_snippet.py:17:8
    |
 15 |     b: int | "memoryview" | bytes,
@@ -115,7 +115,7 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
   --> src/mdtest_snippet.py:19:8
    |
 17 |     c: "TD" | None,
@@ -135,7 +135,7 @@ info: rule `unsupported-operator` is enabled by default
 ```
 
 ```
-error[unsupported-operator]: String annotations are not supported in PEP-604 unions on Python <3.14
+error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
   --> src/mdtest_snippet.py:37:10
    |
 36 | # error: [unsupported-operator]

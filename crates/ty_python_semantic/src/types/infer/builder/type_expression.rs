@@ -163,6 +163,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             | Type::TypedDict(_),
                             _,
                         ) = (&*binary.left, &*binary.right, left_ty, right_ty)
+                            && !self.deferred_state.in_string_annotation()
                             && !self.file().is_stub(self.db())
                             && Program::get(self.db()).python_version(self.db())
                                 < PythonVersion::PY314
@@ -171,7 +172,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 self.context.report_lint(&UNSUPPORTED_OPERATOR, binary)
                         {
                             let mut diagnostic = builder.into_diagnostic(
-                                "String annotations are not supported in PEP-604 unions on Python <3.14",
+                                "String annotations are not supported in `|` unions on Python <3.14",
                             );
                             diagnostic.annotate(
                                 self.context

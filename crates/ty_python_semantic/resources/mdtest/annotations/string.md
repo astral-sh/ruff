@@ -35,7 +35,13 @@ def f(v: tuple[int, "str"]):
 def f(v: "Foo"):
     reveal_type(v)  # revealed: Foo
 
+def f(x: "int | 'Foo'"): ...
+
 class Foo: ...
+
+f("not an int or a Foo")  # error: [invalid-argument-type]
+f(Foo())  # fine
+f(42)  # fine
 ```
 
 ## Deferred (undefined)
@@ -72,7 +78,7 @@ T = TypeVar("T")
 
 # fmt: off
 def f(
-    # error: [unsupported-operator] "String annotations are not supported in PEP-604 unions on Python <3.14"
+    # error: [unsupported-operator] "String annotations are not supported in `|` unions on Python <3.14"
     a: int | "Foo",
     # error: [unsupported-operator]
     b: int | "memoryview" | bytes,
