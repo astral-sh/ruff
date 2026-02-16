@@ -160,9 +160,8 @@
 //! complete module, not a partially-executed module. (We may want to get a little smarter than
 //! this in the future for some closures, but for now this is where we start.)
 //!
-//! The data structure we build to answer these questions is the `UseDefMap`. It has an interned
-//! bindings table plus a `bindings_by_use` vector of interned bindings IDs indexed by
-//! [`ScopedUseId`], a
+//! The data structure we build to answer these questions is the `UseDefMap`. It has a
+//! `bindings_by_use` vector of [`Bindings`] indexed by [`ScopedUseId`], a
 //! `declarations_by_binding` vector of [`Declarations`] indexed by [`ScopedDefinitionId`], a
 //! `bindings_by_declaration` vector of [`Bindings`] indexed by [`ScopedDefinitionId`], and
 //! `public_bindings` and `public_definitions` vectors indexed by [`ScopedPlaceId`]. The values in
@@ -283,11 +282,6 @@ pub(crate) struct PredicatePlaceVersionInfo {
 pub(crate) type PredicatePlaceVersions =
     FxHashMap<(ScopedPredicateId, ScopedPlaceId), PredicatePlaceVersionInfo>;
 
-/// Uniquely identifies an interned [`Bindings`] entry in [`UseDefMap::interned_bindings`].
-#[newtype_index]
-#[derive(get_size2::GetSize)]
-struct ScopedBindingsId;
-
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct UseDefMap<'db> {
@@ -310,11 +304,8 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of reachability constraints in this scope.
     reachability_constraints: ReachabilityConstraints,
 
-    /// Interned [`Bindings`] values referenced by [`Self::bindings_by_use`].
-    interned_bindings: IndexVec<ScopedBindingsId, Bindings>,
-
-    /// Interned bindings ID reaching a [`ScopedUseId`].
-    bindings_by_use: IndexVec<ScopedUseId, ScopedBindingsId>,
+    /// [`Bindings`] reaching a [`ScopedUseId`].
+    bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
     node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
@@ -385,9 +376,8 @@ impl<'db> UseDefMap<'db> {
         &self,
         use_id: ScopedUseId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let bindings_id = self.bindings_by_use[use_id];
         self.bindings_iterator(
-            &self.interned_bindings[bindings_id],
+            &self.bindings_by_use[use_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -1629,9 +1619,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_definition.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
-        let (interned_bindings, bindings_by_use) =
-            Self::intern_bindings_by_use(self.bindings_by_use);
-
         let end_of_scope_symbols: IndexVec<ScopedSymbolId, PlaceState> = self
             .symbol_states
             .into_iter()
@@ -1649,8 +1636,7 @@ impl<'db> UseDefMapBuilder<'db> {
             definition_place_versions: self.definition_place_versions,
             predicate_place_versions: self.predicate_place_versions,
             reachability_constraints: self.reachability_constraints.build(),
-            interned_bindings,
-            bindings_by_use,
+            bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
             end_of_scope_symbols,
             end_of_scope_members,
@@ -1661,33 +1647,5 @@ impl<'db> UseDefMapBuilder<'db> {
             enclosing_snapshots: self.enclosing_snapshots,
             end_of_scope_reachability: self.reachability,
         }
-    }
-
-    fn intern_bindings_by_use(
-        bindings_by_use: IndexVec<ScopedUseId, Bindings>,
-    ) -> (
-        IndexVec<ScopedBindingsId, Bindings>,
-        IndexVec<ScopedUseId, ScopedBindingsId>,
-    ) {
-        let mut interned_bindings: IndexVec<ScopedBindingsId, Bindings> = IndexVec::new();
-        let mut interned_ids_by_use: IndexVec<ScopedUseId, ScopedBindingsId> = IndexVec::new();
-        let mut interned_ids_by_bindings: FxHashMap<Bindings, ScopedBindingsId> =
-            FxHashMap::default();
-
-        for bindings in bindings_by_use {
-            let interned_id = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
-                *interned_id
-            } else {
-                let interned_id = interned_bindings.push(bindings.clone());
-                interned_ids_by_bindings.insert(bindings, interned_id);
-                interned_id
-            };
-            interned_ids_by_use.push(interned_id);
-        }
-
-        interned_bindings.shrink_to_fit();
-        interned_ids_by_use.shrink_to_fit();
-
-        (interned_bindings, interned_ids_by_use)
     }
 }
