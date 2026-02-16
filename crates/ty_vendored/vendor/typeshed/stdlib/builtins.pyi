@@ -49,7 +49,7 @@ from types import CellType, CodeType, GenericAlias, TracebackType
 
 # mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping}
 # are imported from collections.abc in builtins.pyi
-from typing import (  # noqa: Y022,UP035
+from typing import (  # noqa: Y022,UP035,RUF100
     IO,
     Any,
     BinaryIO,
@@ -3409,7 +3409,7 @@ def ascii(obj: object, /) -> str:
     to that returned by repr() in Python 2.
     """
 
-def bin(number: int | SupportsIndex, /) -> str:
+def bin(number: SupportsIndex, /) -> str:
     """Return the binary representation of an integer.
 
     >>> bin(2796202)
@@ -3430,7 +3430,7 @@ def callable(obj: object, /) -> TypeIs[Callable[..., object]]:
     __call__() method.
     """
 
-def chr(i: int | SupportsIndex, /) -> str:
+def chr(i: SupportsIndex, /) -> str:
     """Return a Unicode string of one character with ordinal i; 0 <= i <= 0x10ffff."""
 
 if sys.version_info >= (3, 10):
@@ -3715,7 +3715,7 @@ def hash(obj: object, /) -> int:
 
 help: _sitebuiltins._Helper
 
-def hex(number: int | SupportsIndex, /) -> str:
+def hex(number: SupportsIndex, /) -> str:
     """Return the hexadecimal representation of an integer.
 
     >>> hex(12648430)
@@ -3967,7 +3967,7 @@ def next(i: SupportsNext[_T], /) -> _T:
 
 @overload
 def next(i: SupportsNext[_T], default: _VT, /) -> _T | _VT: ...
-def oct(number: int | SupportsIndex, /) -> str:
+def oct(number: SupportsIndex, /) -> str:
     """Return the octal representation of an integer.
 
     >>> oct(342391)

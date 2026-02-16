@@ -19,10 +19,8 @@ class A:
 
 class Parent:
     def foo(self): ...
-
     @property
     def my_property1(self) -> int: ...
-
     @property
     def my_property2(self) -> int: ...
 
@@ -30,63 +28,47 @@ class Parent:
 
     @classmethod
     def class_method1(cls) -> int: ...
-
     @staticmethod
     def static_method1() -> int: ...
-
     @classmethod
     def class_method2(cls) -> int: ...
-
     @staticmethod
     def static_method2() -> int: ...
-
     @lossy_decorator
     def decorated_1(self): ...
-
     @lossy_decorator
     def decorated_2(self): ...
-
     @lossy_decorator
     def decorated_3(self): ...
 
 class Child(Parent):
     @override
     def foo(self): ...  # fine: overrides `Parent.foo`
-
     @property
     @override
     def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
-
     @override
     @property
     def my_property2(self) -> int: ...  # fine: overrides `Parent.my_property2`
-
     @override
     def baz(self): ...  # fine: overrides `Parent.baz`
-
     @classmethod
     @override
     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
-
     @staticmethod
     @override
     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
-
     @override
     @classmethod
     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
-
     @override
     @staticmethod
     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
-
     @override
     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
-
     @override
     @lossy_decorator
     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
-
     @lossy_decorator
     @override
     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
@@ -96,37 +78,28 @@ class OtherChild(Parent): ...
 class Grandchild(OtherChild):
     @override
     def foo(self): ...  # fine: overrides `Parent.foo`
-
     @override
     @property
     def my_property1(self) -> int: ...  # fine: overrides `Parent.my_property1`
-
     @override
     def baz(self): ...  # fine: overrides `Parent.baz`
-
     @classmethod
     @override
     def class_method1(cls) -> int: ...  # fine: overrides `Parent.class_method1`
-
     @staticmethod
     @override
     def static_method1() -> int: ...  # fine: overrides `Parent.static_method1`
-
     @override
     @classmethod
     def class_method2(cls) -> int: ...  # fine: overrides `Parent.class_method2`
-
     @override
     @staticmethod
     def static_method2() -> int: ...  # fine: overrides `Parent.static_method2`
-
     @override
     def decorated_1(self): ...  # fine: overrides `Parent.decorated_1`
-
     @override
     @lossy_decorator
     def decorated_2(self): ...  # fine: overrides `Parent.decorated_2`
-
     @lossy_decorator
     @override
     def decorated_3(self): ...  # fine: overrides `Parent.decorated_3`
@@ -134,41 +107,32 @@ class Grandchild(OtherChild):
 class Invalid:
     @override
     def ___reprrr__(self): ...  # error: [invalid-explicit-override]
-
     @override
     @classmethod
     def foo(self): ...  # error: [invalid-explicit-override]
-
     @classmethod
     @override
     def bar(self): ...  # error: [invalid-explicit-override]
-
     @staticmethod
     @override
     def baz(): ...  # error: [invalid-explicit-override]
-
     @override
     @staticmethod
     def eggs(): ...  # error: [invalid-explicit-override]
-
     @property
     @override
     def bad_property1(self) -> int: ...  # error: [invalid-explicit-override]
-
     @override
     @property
     def bad_property2(self) -> int: ...  # error: [invalid-explicit-override]
-
     @property
     @override
     def bad_settable_property(self) -> int: ...  # error: [invalid-explicit-override]
     @bad_settable_property.setter
     def bad_settable_property(self, x: int) -> None: ...
-
     @lossy_decorator
     @override
     def lossy(self): ...  # TODO: should emit `invalid-explicit-override` here
-
     @override
     @lossy_decorator
     def lossy2(self): ...  # TODO: should emit `invalid-explicit-override` here
@@ -179,7 +143,6 @@ class LiskovViolatingButNotOverrideViolating(Parent):
     @override
     @property
     def foo(self) -> int: ...
-
     @override
     def my_property1(self) -> int: ...
 
@@ -189,7 +152,6 @@ class LiskovViolatingButNotOverrideViolating(Parent):
     @staticmethod
     @override
     def class_method1() -> int: ...  # error: [invalid-method-override]
-
     @classmethod
     @override
     def static_method1(cls) -> int: ...
@@ -239,6 +201,7 @@ class Parent:
     if coinflip():
         def method3(self) -> None: ...
         def method4(self) -> None: ...
+
     else:
         def method3(self) -> None: ...
         def method4(self) -> None: ...
@@ -259,6 +222,7 @@ class Child(Parent):
     if coinflip():
         @override
         def method4(self) -> None: ...
+
     else:
         @override
         def method4(self) -> None: ...
@@ -270,6 +234,7 @@ class Child(Parent):
     if coinflip():
         @override
         def method6(self) -> None: ...
+
     else:
         @override
         def method6(self) -> None: ...
@@ -281,6 +246,7 @@ class Child(Parent):
     if coinflip():
         @override
         def method8(self) -> None: ...  # error: [invalid-explicit-override]
+
     else:
         @override
         def method8(self) -> None: ...
@@ -302,6 +268,7 @@ def coinflip() -> bool:
 class Foo:
     if coinflip():
         def method(self, x): ...
+
     elif coinflip():
         @overload
         def method(self, x: str) -> str: ...
@@ -310,6 +277,7 @@ class Foo:
         @override
         def method(self, x: str | int) -> str | int:  # error: [invalid-explicit-override]
             return x
+
     elif coinflip():
         @override
         def method(self, x): ...
@@ -326,6 +294,7 @@ def coinflip() -> bool:
 class Foo:
     if coinflip():
         def method(self, x): ...
+
     elif coinflip():
         @overload
         @override
@@ -335,19 +304,21 @@ class Foo:
 
     if coinflip():
         def method2(self, x): ...
+
     elif coinflip():
         @overload
         @override
         def method2(self, x: str) -> str: ...
         @overload
         def method2(self, x: int) -> int: ...
+
     else:
-       # TODO: not sure why this is being emitted on this line rather than on
-       # the first overload in the `elif` block? Ideally it would be emitted
-       # on the first reachable definition, but perhaps this is due to the way
-       # name lookups are deferred in stub files...? -- AW
-       @override
-       def method2(self, x): ...  # error: [invalid-explicit-override]
+        # TODO: not sure why this is being emitted on this line rather than on
+        # the first overload in the `elif` block? Ideally it would be emitted
+        # on the first reachable definition, but perhaps this is due to the way
+        # name lookups are deferred in stub files...? -- AW
+        @override
+        def method2(self, x): ...  # error: [invalid-explicit-override]
 ```
 
 ## Definitions in statically known branches
@@ -365,6 +336,7 @@ class Parent:
     if sys.version_info >= (3, 10):
         def foo(self) -> None: ...
         def foooo(self) -> None: ...
+
     else:
         def bar(self) -> None: ...
         def baz(self) -> None: ...
@@ -384,6 +356,7 @@ class Child(Parent):
         def foooo(self) -> None: ...
         @override
         def baz(self) -> None: ...  # error: [invalid-explicit-override]
+
     else:
         # This doesn't override any reachable definitions,
         # but the subclass definition also isn't a reachable definition
@@ -452,7 +425,6 @@ class Spam:
     @override
     # error: [invalid-overload]  "`@override` decorator should be applied only to the first overload"
     def foo(self, x: int) -> int: ...
-
     @overload
     @override
     def bar(self, x: str) -> str: ...  # error: [invalid-explicit-override]
@@ -460,7 +432,6 @@ class Spam:
     @override
     # error: [invalid-overload]  "`@override` decorator should be applied only to the first overload"
     def bar(self, x: int) -> int: ...
-
     @overload
     @override
     def baz(self, x: str) -> str: ...  # error: [invalid-explicit-override]
@@ -484,6 +455,7 @@ class Foo:
         @overload
         @override
         def method(self, x: int) -> int: ...  # error: [invalid-explicit-override]
+
     else:
         @overload
         def method(self, x: int) -> int: ...
@@ -493,6 +465,7 @@ class Foo:
     if sys.version_info >= (3, 10):
         @overload
         def method2(self, x: int) -> int: ...
+
     else:
         @overload
         @override

@@ -389,11 +389,11 @@ impl LintRegistry {
                     }
                 }
 
-                let suggestion = did_you_mean(self.by_name.keys(), code);
+                let suggestion = did_you_mean(self.by_name.keys().copied(), code);
 
                 Err(GetLintError::Unknown {
                     code: code.to_string(),
-                    suggestion,
+                    suggestion: suggestion.map(str::to_string),
                 })
             }
         }

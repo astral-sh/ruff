@@ -1450,6 +1450,18 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         expression: Expression<'db>,
     ) -> DualNarrowingConstraints<'db> {
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
+
+        if let Some(positive_type_guard_call_constraints) =
+            self.evaluate_type_guard_call_for_polarity(inference, expr_call, true)
+        {
+            let negative_type_guard_call_constraints =
+                self.evaluate_type_guard_call_for_polarity(inference, expr_call, false);
+            return DualNarrowingConstraints::from_sides(
+                Some(positive_type_guard_call_constraints),
+                negative_type_guard_call_constraints,
+            );
+        }
+
         let callable_ty = inference.expression_type(&*expr_call.func);
 
         if let Type::ClassLiteral(class_type) = callable_ty

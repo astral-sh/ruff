@@ -74,14 +74,17 @@ class _:
     def _(a) -> TypeIs[str]: ...
 
     # errors
-    def _(self) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
-    def _(self, /, *, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(self) -> TypeGuard[str]: ...
+    # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(self, /, *, a) -> TypeGuard[str]: ...
     @classmethod
     def _(cls) -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @classmethod
     def _() -> TypeIs[str]: ...  # error: [invalid-type-guard-definition] "`TypeIs` function must have a parameter to narrow"
     @staticmethod
-    def _(*, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    # error: [invalid-type-guard-definition] "`TypeGuard` function must have a parameter to narrow"
+    def _(*, a) -> TypeGuard[str]: ...
 ```
 
 For `TypeIs` functions, the narrowed type must be assignable to the declared type of that parameter,
@@ -238,7 +241,7 @@ def _(d: Any):
         ...
 
     if g(*d):
-        ...
+        pass
 
     if f("foo"):  # TODO: error: [invalid-type-guard-call]
         ...
@@ -386,6 +389,18 @@ def _(a: Foo):
 
     if g(f(a)):
         reveal_type(a)  # revealed: Foo & Bar
+```
+
+Type guard narrowing also works when the callee has a `Callable` type:
+
+```py
+from typing import Callable
+
+def _(x: Foo | Bar, is_bar: Callable[[object], TypeIs[Bar]]):
+    if is_bar(x):
+        reveal_type(x)  # revealed: Bar
+    else:
+        reveal_type(x)  # revealed: Foo & ~Bar
 ```
 
 For generics, we transform the argument passed into `TypeIs[]` from `X` to `Top[X]`. This helps
