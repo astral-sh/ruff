@@ -655,11 +655,10 @@ impl<'db> Bindings<'db> {
             {
                 continue;
             }
-            let resolved = overload
-                .specialization
-                .map_or(sig_return, |specialization| {
-                    sig_return.apply_specialization(db, specialization)
-                });
+            let Some(specialization) = overload.specialization else {
+                continue;
+            };
+            let resolved = sig_return.apply_specialization(db, specialization);
             if resolved.has_typevar(db) || resolved.is_unknown() {
                 continue;
             }
@@ -693,34 +692,12 @@ impl<'db> Bindings<'db> {
             let Some((_, overload)) = binding.matching_overloads().next() else {
                 continue;
             };
-            // Prefer extracting the class specialization from the resolved signature return type
-            // (handles `__new__[S](cls, x: S) -> C[tuple[S, S]]` where method-level type
-            // variables map to the class specialization through the return type).
+            // Prefer extracting the class specialization from the resolved overload return type.
             // Fall back to restricting the inferred specialization to class-level type
             // variables.
             let specialization = class_literal
                 // Fast path: use the already-resolved overload return type when possible.
                 .and_then(|lit| overload.return_ty.specialization_of(db, lit))
-                // Fallback: derive from the signature return type resolved with the inferred
-                // specialization, which handles method-level typevars that map through
-                // `__new__`'s return type.
-                .or_else(|| {
-                    let lit = class_literal?;
-                    // Only attempt this when the declared signature return is of the
-                    // constructed class; otherwise this fallback cannot contribute a class
-                    // specialization.
-                    overload.signature.return_ty.specialization_of(db, lit)?;
-                    let resolved_return = overload.specialization.map_or(
-                        overload.signature.return_ty,
-                        |specialization| {
-                            overload
-                                .signature
-                                .return_ty
-                                .apply_specialization(db, specialization)
-                        },
-                    );
-                    resolved_return.specialization_of(db, lit)
-                })
                 .or_else(|| {
                     overload
                         .specialization
