@@ -964,6 +964,20 @@ impl<'a> SemanticModel<'a> {
     where
         'a: 'name,
     {
+        self.resolve_qualified_name_inner(value, 5)
+    }
+
+    /// Inner implementation of [`Self::resolve_qualified_name`] with a depth limit
+    /// to prevent unbounded recursion when following assignment chains (e.g.,
+    /// `A = B; B = A`).
+    fn resolve_qualified_name_inner<'name, 'val: 'name>(
+        &self,
+        value: &'val Expr,
+        remaining_depth: u8,
+    ) -> Option<QualifiedName<'name>>
+    where
+        'a: 'name,
+    {
         /// Return the [`ast::ExprName`] at the head of the expression, if any.
         const fn match_head(value: &Expr) -> Option<&ast::ExprName> {
             match value {
@@ -1068,6 +1082,26 @@ impl<'a> SemanticModel<'a> {
                             .collect(),
                     )
                 }
+            }
+            // Follow assignments to their RHS value expression.
+            // E.g., `BaseModel = models.Model` resolves to `django.db.models.Model`.
+            //
+            // Only for simple name expressions — for attribute chains like `obj.attr`
+            // where `obj` is assignment-bound, following the assignment would resolve
+            // only the head and lose the attribute tail.
+            BindingKind::Assignment | BindingKind::NamedExprAssignment if value.is_name_expr() => {
+                if remaining_depth == 0 {
+                    return None;
+                }
+                let stmt = binding.statement(self)?;
+                let rhs = match stmt {
+                    Stmt::Assign(ast::StmtAssign { value, .. }) => Some(value.as_ref()),
+                    Stmt::AnnAssign(ast::StmtAnnAssign {
+                        value: Some(value), ..
+                    }) => Some(value.as_ref()),
+                    _ => None,
+                }?;
+                self.resolve_qualified_name_inner(rhs, remaining_depth - 1)
             }
             _ => None,
         }

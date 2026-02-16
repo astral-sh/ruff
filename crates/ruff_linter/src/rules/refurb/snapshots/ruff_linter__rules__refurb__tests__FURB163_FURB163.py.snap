@@ -165,6 +165,25 @@ help: Replace with `math.log10(1)`
 15 | math.log2(1)
 note: This is an unsafe fix and may change runtime behavior
 
+FURB163 [*] Prefer `math.log(1)` over `math.log` with a redundant base
+  --> FURB163.py:28:1
+   |
+27 | e = math.e
+28 | math.log(1, e)
+   | ^^^^^^^^^^^^^^
+29 |
+30 | math.log2(1, 10)  # math.log2 takes only one argument.
+   |
+help: Replace with `math.log(1)`
+25 | math.log(1, ten)
+26 | 
+27 | e = math.e
+   - math.log(1, e)
+28 + math.log(1)
+29 | 
+30 | math.log2(1, 10)  # math.log2 takes only one argument.
+31 | math.log10(1, 2)  # math.log10 takes only one argument.
+
 FURB163 [*] Prefer `math.log(yield)` over `math.log` with a redundant base
   --> FURB163.py:49:11
    |

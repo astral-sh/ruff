@@ -538,3 +538,23 @@ help: Replace with `numpy.any`
 69 |                                    # (must have an attribute access of the undeprecated name in the `try` body for it to be ignored)
 70 | 
 71 |     try:
+
+NPY201 [*] `np.ComplexWarning` will be removed in NumPy 2.0. Use `numpy.exceptions.ComplexWarning` instead.
+  --> NPY201_2.py:76:11
+   |
+74 |         exc = np.ComplexWarning   # `except AttributeError` means that this is okay
+75 |
+76 |     raise exc
+   |           ^^^
+   |
+help: Replace with `numpy.exceptions.ComplexWarning`
+1  + from numpy.exceptions import ComplexWarning
+2  | def func():
+3  |     import numpy as np
+4  | 
+--------------------------------------------------------------------------------
+74 |     except AttributeError:
+75 |         exc = np.ComplexWarning   # `except AttributeError` means that this is okay
+76 | 
+   -     raise exc
+77 +     raise ComplexWarning

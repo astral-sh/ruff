@@ -174,6 +174,25 @@ DOC501 Raised exception `SomeError` missing from docstring
     |
 help: Add `SomeError` to the docstring
 
+DOC501 Raised exception `Exception` missing from docstring
+   --> DOC501_google.py:144:5
+    |
+142 |   # DOC501, but can't resolve the error
+143 |   def calculate_speed(distance: float, time: float) -> float:
+144 | /     """Calculate speed as distance divided by time.
+145 | |
+146 | |     Args:
+147 | |         distance: Distance traveled.
+148 | |         time: Time spent traveling.
+149 | |
+150 | |     Returns:
+151 | |         Speed as distance divided by time.
+152 | |     """
+    | |_______^
+153 |       raise _some_error
+    |
+help: Add `Exception` to the docstring
+
 DOC501 Raised exception `ZeroDivisionError` missing from docstring
    --> DOC501_google.py:197:5
     |

@@ -146,6 +146,21 @@ class StrBeforeFieldInheritedModel(BaseModel):
     first_name = models.CharField(max_length=32)
 
 
+# Aliased base class (https://github.com/astral-sh/ruff/issues/12865)
+AliasedModel = models.Model
+
+
+class StrBeforeMetaAliasedModel(AliasedModel):
+    """Model with `__str__` before `Meta` using an aliased base class."""
+
+    def __str__(self):
+        return "foobar"
+
+    class Meta:
+        verbose_name = "test"
+        verbose_name_plural = "tests"
+
+
 # https://github.com/astral-sh/ruff/issues/13892
 class DunderMethodOtherThanStrBeforeSave(models.Model):
     name = models.CharField()

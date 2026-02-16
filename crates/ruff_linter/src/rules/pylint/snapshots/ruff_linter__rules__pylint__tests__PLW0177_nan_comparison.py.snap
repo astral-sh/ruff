@@ -56,12 +56,30 @@ PLW0177 Comparing against a NaN value; use `math.isnan` instead
    |
 
 PLW0177 Comparing against a NaN value; use `np.isnan` instead
+  --> nan_comparison.py:35:4
+   |
+34 | # PLW0117
+35 | if y == np.NaN:
+   |    ^
+36 |     pass
+   |
+
+PLW0177 Comparing against a NaN value; use `np.isnan` instead
   --> nan_comparison.py:35:9
    |
 34 | # PLW0117
 35 | if y == np.NaN:
    |         ^^^^^^
 36 |     pass
+   |
+
+PLW0177 Comparing against a NaN value; use `np.isnan` instead
+  --> nan_comparison.py:39:4
+   |
+38 | # PLW0117
+39 | if y == np.NAN:
+   |    ^
+40 |     pass
    |
 
 PLW0177 Comparing against a NaN value; use `np.isnan` instead
@@ -74,12 +92,30 @@ PLW0177 Comparing against a NaN value; use `np.isnan` instead
    |
 
 PLW0177 Comparing against a NaN value; use `np.isnan` instead
+  --> nan_comparison.py:43:4
+   |
+42 | # PLW0117
+43 | if y == np.nan:
+   |    ^
+44 |     pass
+   |
+
+PLW0177 Comparing against a NaN value; use `np.isnan` instead
   --> nan_comparison.py:43:9
    |
 42 | # PLW0117
 43 | if y == np.nan:
    |         ^^^^^^
 44 |     pass
+   |
+
+PLW0177 Comparing against a NaN value; use `np.isnan` instead
+  --> nan_comparison.py:47:4
+   |
+46 | # PLW0117
+47 | if y == npy_nan:
+   |    ^
+48 |     pass
    |
 
 PLW0177 Comparing against a NaN value; use `np.isnan` instead
@@ -119,6 +155,15 @@ PLW0177 Comparing against a NaN value; use `math.isnan` instead
    |          ^^^^^^^^
 61 |
 62 |     # No errors
+   |
+
+PLW0177 Comparing against a NaN value; use `np.isnan` instead
+  --> nan_comparison.py:89:4
+   |
+88 | # OK
+89 | if y == np.inf:
+   |    ^
+90 |     pass
    |
 
 PLW0177 Comparing against a NaN value; use `math.isnan` instead
