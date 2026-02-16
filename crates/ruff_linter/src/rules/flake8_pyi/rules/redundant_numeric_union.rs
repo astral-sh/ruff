@@ -81,15 +81,14 @@ impl Violation for RedundantNumericUnion {
 /// PYI041
 pub(crate) fn redundant_numeric_union(checker: &Checker, parameters: &Parameters) {
     for annotation in parameters.iter().filter_map(AnyParameterRef::annotation) {
-        check_annotation(
-            checker,
-            checker.map_maybe_stringized_annotation(annotation),
-            annotation,
-        );
+        check_annotation(checker, annotation);
     }
 }
 
-fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr, unresolved_annotation: &'a Expr) {
+fn check_annotation<'a, 'b>(checker: &Checker<'a>, unresolved_annotation: &'b Expr)
+where
+    'a: 'b,
+{
     let mut numeric_flags = NumericFlags::empty();
 
     let mut find_numeric_type = |expr: &Expr, _parent: &Expr| {
@@ -99,6 +98,8 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr, unresolved_anno
 
         numeric_flags.seen_builtin_type(builtin_type);
     };
+
+    let annotation = map_maybe_stringized_annotation(checker, unresolved_annotation);
 
     // Traverse the union, and remember which numeric types are found.
     traverse_union(&mut find_numeric_type, checker.semantic(), annotation);
@@ -111,7 +112,7 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr, unresolved_anno
     let mut necessary_nodes: Vec<&Expr> = Vec::new();
 
     let mut union_type = UnionKind::TypingUnion;
-    let mut remove_numeric_type = |expr: &'a Expr, parent: &'a Expr| {
+    let mut remove_numeric_type = |expr: &'b Expr, parent: &'b Expr| {
         let Some(builtin_type) = checker.semantic().resolve_builtin_symbol(expr) else {
             // Keep type annotations that are not numeric.
             necessary_nodes.push(expr);
@@ -196,6 +197,23 @@ fn check_annotation<'a>(checker: &Checker, annotation: &'a Expr, unresolved_anno
     if let Some(fix) = fix {
         diagnostic.set_fix(fix);
     }
+}
+
+/// Given a type annotation [`Expr`], abstracting over the fact that the annotation expression
+/// might be "stringized".
+///
+/// A stringized annotation is one enclosed in string quotes:
+/// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
+fn map_maybe_stringized_annotation<'a, 'b>(checker: &Checker<'a>, expr: &'b Expr) -> &'b Expr
+where
+    'a: 'b,
+{
+    if let Expr::StringLiteral(string_annotation) = expr
+        && let Ok(parsed_annotation) = checker.parse_type_annotation(string_annotation)
+    {
+        return parsed_annotation.expression();
+    }
+    expr
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]

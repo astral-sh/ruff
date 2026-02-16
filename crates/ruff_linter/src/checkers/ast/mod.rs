@@ -572,23 +572,6 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Given a type annotation [`Expr`], abstracting over the fact that the annotation expression
-    /// might be "stringized".
-    ///
-    /// A stringized annotation is one enclosed in string quotes:
-    /// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
-    pub(crate) fn map_maybe_stringized_annotation<'b>(&self, expr: &'b ast::Expr) -> &'b ast::Expr
-    where
-        'a: 'b,
-    {
-        if let ast::Expr::StringLiteral(string_annotation) = expr
-            && let Ok(parsed_annotation) = self.parse_type_annotation(string_annotation)
-        {
-            return parsed_annotation.expression();
-        }
-        expr
-    }
-
     /// Push `diagnostic` if the checker is not in a `@no_type_check` context.
     pub(crate) fn report_type_diagnostic<T: Violation>(&self, kind: T, range: TextRange) {
         if !self.semantic.in_no_type_check() {
