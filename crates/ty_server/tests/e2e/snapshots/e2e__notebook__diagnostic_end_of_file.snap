@@ -22,8 +22,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#invalid-return-type"
       },
       "source": "ty",
-      "message": "Function can implicitly return `None`, which is not assignable to return type `str`",
-      "relatedInformation": []
+      "message": "Function can implicitly return `None`, which is not assignable to return type `str`"
     }
   ],
   "vscode-notebook-cell://test.ipynb#2": [
@@ -41,8 +40,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name",
-      "relatedInformation": []
+      "message": "Expected `,`, found name"
     },
     {
       "range": {
@@ -61,8 +59,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#unresolved-reference"
       },
       "source": "ty",
-      "message": "Name `word` used when not defined",
-      "relatedInformation": []
+      "message": "Name `word` used when not defined"
     },
     {
       "range": {
@@ -78,8 +75,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found string",
-      "relatedInformation": []
+      "message": "Expected `,`, found string"
     },
     {
       "range": {
@@ -98,41 +94,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#invalid-argument-type"
       },
       "source": "ty",
-      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/", /"]`",
-      "relatedInformation": [
-        {
-          "location": {
-            "uri": "vscode-notebook-cell://test.ipynb#1",
-            "range": {
-              "start": {
-                "line": 0,
-                "character": 4
-              },
-              "end": {
-                "line": 0,
-                "character": 14
-              }
-            }
-          },
-          "message": "Function defined here"
-        },
-        {
-          "location": {
-            "uri": "vscode-notebook-cell://test.ipynb#1",
-            "range": {
-              "start": {
-                "line": 0,
-                "character": 32
-              },
-              "end": {
-                "line": 0,
-                "character": 44
-              }
-            }
-          },
-          "message": "Parameter declared here"
-        }
-      ]
+      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/", /"]`"
     },
     {
       "range": {
@@ -148,8 +110,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name",
-      "relatedInformation": []
+      "message": "Expected `,`, found name"
     },
     {
       "range": {
@@ -168,8 +129,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#unresolved-reference"
       },
       "source": "ty",
-      "message": "Name `underline` used when not defined",
-      "relatedInformation": []
+      "message": "Name `underline` used when not defined"
     },
     {
       "range": {
@@ -188,25 +148,7 @@ expression: diagnostics
         "href": "https://ty.dev/rules#too-many-positional-arguments"
       },
       "source": "ty",
-      "message": "Too many positional arguments to function `with_style`: expected 3, got 6",
-      "relatedInformation": [
-        {
-          "location": {
-            "uri": "vscode-notebook-cell://test.ipynb#1",
-            "range": {
-              "start": {
-                "line": 0,
-                "character": 4
-              },
-              "end": {
-                "line": 0,
-                "character": 52
-              }
-            }
-          },
-          "message": "Function signature here"
-        }
-      ]
+      "message": "Too many positional arguments to function `with_style`: expected 3, got 6"
     },
     {
       "range": {
@@ -222,8 +164,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "missing closing quote in string literal",
-      "relatedInformation": []
+      "message": "missing closing quote in string literal"
     },
     {
       "range": {
@@ -239,8 +180,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "Expected `,`, found name",
-      "relatedInformation": []
+      "message": "Expected `,`, found name"
     },
     {
       "range": {
@@ -256,8 +196,7 @@ expression: diagnostics
       "severity": 1,
       "code": "invalid-syntax",
       "source": "ty",
-      "message": "unexpected EOF while parsing",
-      "relatedInformation": []
+      "message": "unexpected EOF while parsing"
     }
   ]
 }

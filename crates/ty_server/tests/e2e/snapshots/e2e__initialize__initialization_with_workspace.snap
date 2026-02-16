@@ -48,12 +48,21 @@ expression: initialization_result
         "quickfix"
       ]
     },
+    "renameProvider": {
+      "prepareProvider": true
+    },
     "declarationProvider": true,
     "executeCommandProvider": {
       "commands": [
         "ty.printDebugInformation"
       ],
       "workDoneProgress": false
+    },
+    "workspace": {
+      "workspaceFolders": {
+        "supported": true,
+        "changeNotifications": true
+      }
     },
     "semanticTokensProvider": {
       "legend": {
@@ -77,7 +86,8 @@ expression: initialization_result
         "tokenModifiers": [
           "definition",
           "readonly",
-          "async"
+          "async",
+          "documentation"
         ]
       },
       "range": true,

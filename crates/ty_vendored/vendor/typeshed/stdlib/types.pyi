@@ -101,14 +101,19 @@ class FunctionType:
     __name__: str
     __qualname__: str
     __annotations__: dict[str, AnnotationForm]
+    """Dict of annotations in a function object."""
+
     if sys.version_info >= (3, 14):
         __annotate__: AnnotateFunc | None
+        """Get the code object for a function."""
+
     __kwdefaults__: dict[str, Any] | None
     if sys.version_info >= (3, 10):
         @property
         def __builtins__(self) -> dict[str, Any]: ...
     if sys.version_info >= (3, 12):
         __type_params__: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+        """Get the declared type parameters for a function."""
 
     __module__: str
     if sys.version_info >= (3, 13):
@@ -335,12 +340,15 @@ class CodeType:
             """Return a copy of the code object with new values for the specified fields."""
     if sys.version_info >= (3, 13):
         __replace__ = replace
+        """The same as replace()."""
 
 @final
 class MappingProxyType(Mapping[_KT_co, _VT_co]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]
     """Read-only proxy of a mapping."""
 
     __hash__: ClassVar[None]  # type: ignore[assignment]
+    """Return hash(self)."""
+
     def __new__(cls, mapping: SupportsKeysAndGetItem[_KT_co, _VT_co]) -> Self: ...
     def __getitem__(self, key: _KT_co, /) -> _VT_co:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
         """Return self[key]."""
@@ -475,7 +483,7 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
     @property
     def gi_code(self) -> CodeType: ...
     @property
-    def gi_frame(self) -> FrameType: ...
+    def gi_frame(self) -> FrameType | None: ...
     @property
     def gi_running(self) -> bool: ...
     @property
@@ -485,7 +493,11 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
         @property
         def gi_suspended(self) -> bool: ...
     __name__: str
+    """name of the generator"""
+
     __qualname__: str
+    """qualified name of the generator"""
+
     def __iter__(self) -> Self:
         """Implement iter(self)."""
 
@@ -493,7 +505,7 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
         """Implement next(self)."""
 
     def send(self, arg: _SendT_contra, /) -> _YieldT_co:
-        """send(arg) -> send 'arg' into generator,
+        """send(value) -> send 'value' into generator,
         return next yielded value or raise StopIteration.
         """
 
@@ -523,11 +535,15 @@ class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
     @property
     def ag_code(self) -> CodeType: ...
     @property
-    def ag_frame(self) -> FrameType: ...
+    def ag_frame(self) -> FrameType | None: ...
     @property
     def ag_running(self) -> bool: ...
     __name__: str
+    """name of the async generator"""
+
     __qualname__: str
+    """qualified name of the async generator"""
+
     if sys.version_info >= (3, 12):
         @property
         def ag_suspended(self) -> bool: ...
@@ -568,20 +584,19 @@ _ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
 @final
 class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
     __name__: str
+    """name of the coroutine"""
+
     __qualname__: str
+    """qualified name of the coroutine"""
+
     @property
     def cr_await(self) -> Any | None:
         """object being awaited on, or None"""
 
     @property
     def cr_code(self) -> CodeType: ...
-    if sys.version_info >= (3, 12):
-        @property
-        def cr_frame(self) -> FrameType | None: ...
-    else:
-        @property
-        def cr_frame(self) -> FrameType: ...
-
+    @property
+    def cr_frame(self) -> FrameType | None: ...
     @property
     def cr_running(self) -> bool: ...
     @property
@@ -769,8 +784,12 @@ class FrameType:
     def f_locals(self) -> dict[str, Any]:
         """Return the mapping used by the frame to look up local variables."""
     f_trace: Callable[[FrameType, str, Any], Any] | None
+    """Return the trace function for this frame, or None if no trace function is set."""
+
     f_trace_lines: bool
     f_trace_opcodes: bool
+    """Return True if opcode tracing is enabled, False otherwise."""
+
     def clear(self) -> None:
         """Clear all references held by the frame."""
     if sys.version_info >= (3, 14):

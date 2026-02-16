@@ -19,6 +19,7 @@ mod tests {
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
+    use crate::rules::pydocstyle::settings::Settings as PydocstyleSettings;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
@@ -116,9 +117,12 @@ mod tests {
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_0.py"))]
     #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
     #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
+    #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
+    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
+    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -136,6 +140,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
+                    ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -151,6 +156,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
+                    ..super::settings::Settings::default()
                 },
                 unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -232,6 +238,24 @@ mod tests {
     }
 
     #[test]
+    fn property_without_return_custom_decorator() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF066_custom_property_decorator.py"),
+            &LinterSettings {
+                pydocstyle: PydocstyleSettings {
+                    property_decorators: ["my_library.custom_property".to_string()]
+                        .into_iter()
+                        .collect(),
+                    ..PydocstyleSettings::default()
+                },
+                ..LinterSettings::for_rule(Rule::PropertyWithoutReturn)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn confusables() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
@@ -300,6 +324,24 @@ mod tests {
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
             ]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn range_suppressions() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/suppressions.py"),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedVariable,
+                Rule::AmbiguousVariableName,
+                Rule::UnusedNOQA,
+                Rule::InvalidRuleCode,
+                Rule::InvalidSuppressionComment,
+                Rule::UnmatchedSuppressionComment,
+            ])
+            .with_external_rules(&["TK421"]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -560,6 +602,8 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
@@ -568,6 +612,7 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_3.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
+    #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -685,6 +730,28 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn strictly_empty_init_modules_ruf067() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/RUF067/modules/__init__.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    strictly_empty_init_modules: false,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::NonEmptyInitModule)
+            },
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    strictly_empty_init_modules: true,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::NonEmptyInitModule)
+            },
+        );
         Ok(())
     }
 }

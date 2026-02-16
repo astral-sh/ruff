@@ -14,7 +14,6 @@ use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
-use crate::preview::is_avoid_parens_for_long_as_captures_enabled;
 
 pub(crate) mod pattern_arguments;
 pub(crate) mod pattern_keyword;
@@ -214,8 +213,9 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
     }
 }
 
-/// This function is very similar to [`can_omit_optional_parentheses`] with the only difference that it is for patterns
-/// and not expressions.
+/// This function is very similar to
+/// [`can_omit_optional_parentheses`](crate::expression::can_omit_optional_parentheses)
+/// with the only difference that it is for patterns and not expressions.
 ///
 /// The base idea of the omit optional parentheses layout is to prefer using parentheses of sub-patterns
 /// when splitting the pattern over introducing new patterns. For example, prefer splitting the sequence pattern in
@@ -245,10 +245,7 @@ pub(crate) fn can_pattern_omit_optional_parentheses(
                 | Pattern::MatchStar(_)
                 | Pattern::MatchOr(_) => false,
                 Pattern::MatchAs(PatternMatchAs { pattern, .. }) => match pattern {
-                    Some(pattern) => {
-                        is_avoid_parens_for_long_as_captures_enabled(context)
-                            && has_parentheses_and_is_non_empty(pattern, context)
-                    }
+                    Some(pattern) => has_parentheses_and_is_non_empty(pattern, context),
                     None => false,
                 },
                 Pattern::MatchSequence(sequence) => {
@@ -326,9 +323,7 @@ impl<'a> CanOmitOptionalParenthesesVisitor<'a> {
                 self.first.set_if_none(First::Token);
             }
             Pattern::MatchAs(PatternMatchAs { pattern, .. }) => {
-                if let Some(pattern) = pattern
-                    && is_avoid_parens_for_long_as_captures_enabled(context)
-                {
+                if let Some(pattern) = pattern {
                     self.visit_sub_pattern(pattern, context);
                 }
             }

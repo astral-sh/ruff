@@ -128,3 +128,16 @@ InvalidEmptyUnion = Union[]
 def _(u: InvalidEmptyUnion):
     reveal_type(u)  # revealed: Unknown
 ```
+
+### `typing.Annotated`
+
+```py
+from typing import Annotated
+
+# error: [invalid-syntax] "Expected index or slice expression"
+# error: [invalid-type-form] "Special form `typing.Annotated` expected at least 2 arguments (one type and at least one metadata element)"
+InvalidEmptyAnnotated = Annotated[]
+
+def _(a: InvalidEmptyAnnotated):
+    reveal_type(a)  # revealed: Unknown
+```

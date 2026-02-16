@@ -8,7 +8,7 @@ use lsp_types::{
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
-use ty_ide::{CompletionKind, CompletionSettings, completion};
+use ty_ide::{CompletionKind, completion};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};
@@ -56,10 +56,8 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         ) else {
             return Ok(None);
         };
-        let settings = CompletionSettings {
-            auto_import: snapshot.global_settings().is_auto_import_enabled(),
-        };
-        let completions = completion(db, &settings, file, offset);
+        let settings = snapshot.workspace_settings().completions();
+        let completions = completion(db, settings, file, offset);
         if completions.is_empty() {
             return Ok(None);
         }
@@ -70,7 +68,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             .into_iter()
             .enumerate()
             .map(|(i, comp)| {
-                let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
+                let kind = comp.kind.map(ty_kind_to_lsp_kind);
                 let type_display = comp.ty.map(|ty| ty.display(db).to_string());
                 let import_edit = comp.import.as_ref().and_then(|edit| {
                     let range = edit
@@ -83,8 +81,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     })
                 });
 
-                let name = comp.name.to_string();
-                let import_suffix = comp.module_name.map(|name| format!(" (import {name})"));
+                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let import_suffix = comp
+                    .module_name
+                    .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
                 let (label, label_details) = if snapshot
                     .resolved_client_capabilities()
                     .supports_completion_item_label_details()
@@ -100,6 +100,23 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                         .unwrap_or_else(|| name);
                     (label, None)
                 };
+
+                let documentation = comp.documentation.map(|docstring| {
+                    let (kind, value) = if snapshot
+                        .resolved_client_capabilities()
+                        .prefers_markdown_in_completion()
+                    {
+                        (lsp_types::MarkupKind::Markdown, docstring.render_markdown())
+                    } else {
+                        (
+                            lsp_types::MarkupKind::PlainText,
+                            docstring.render_plaintext(),
+                        )
+                    };
+
+                    Documentation::MarkupContent(lsp_types::MarkupContent { kind, value })
+                });
+
                 CompletionItem {
                     label,
                     kind,
@@ -108,9 +125,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     label_details,
                     insert_text: comp.insert.map(String::from),
                     additional_text_edits: import_edit.map(|edit| vec![edit]),
-                    documentation: comp
-                        .documentation
-                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
+                    documentation,
                     ..Default::default()
                 }
             })

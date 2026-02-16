@@ -121,6 +121,31 @@ def test(x: Literal["a", "b", "c"] | None | int = None):
         reveal_type(x)  # revealed: Literal["a", "c"] | int
 ```
 
+## No narrowing for the right-hand side (currently)
+
+No narrowing is done for the right-hand side currently, even if the right-hand side is a valid
+"target" (name/attribute/subscript) that could potentially be narrowed. We may change this in the
+future:
+
+```py
+from typing import Literal
+
+def f(x: Literal["abc", "def"]):
+    if "a" in x:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+
+    if "a" not in x:
+        # `x` could also be validly narrowed to `Literal["def"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+    else:
+        # `x` could also be validly narrowed to `Literal["abc"]` here:
+        reveal_type(x)  # revealed: Literal["abc", "def"]
+```
+
 ## bool
 
 ```py
@@ -190,4 +215,21 @@ def test(x: Status | int):
         reveal_type(x)  # revealed: Literal[Status.PENDING, Status.APPROVED] | int
     else:
         reveal_type(x)  # revealed: Literal[Status.REJECTED] | int
+```
+
+## Union with tuple and `Literal`
+
+We assume that tuple subclasses don't override `tuple.__eq__`, which only returns True for other
+tuples. So they are excluded from the narrowed type when disjoint from the RHS values.
+
+```py
+from typing import Literal
+
+def test(x: Literal["none", "auto", "required"] | tuple[list[str], Literal["auto", "required"]]):
+    if x in ("auto", "required"):
+        # tuple type is excluded because it's disjoint from the string literals
+        reveal_type(x)  # revealed: Literal["auto", "required"]
+    else:
+        # tuple type remains in the else branch
+        reveal_type(x)  # revealed: Literal["none"] | tuple[list[str], Literal["auto", "required"]]
 ```

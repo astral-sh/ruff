@@ -42,6 +42,14 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as migrating from `@singledispatch` to
 /// `@singledispatchmethod` may change the behavior of the code.
+///
+/// ## Options
+///
+/// This rule applies to regular, static, and class methods. You can customize how Ruff categorizes
+/// methods with the following options:
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct SingledispatchMethod;

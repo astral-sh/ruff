@@ -7,7 +7,9 @@ use ruff_python_semantic::analyze::visibility;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
+use crate::rules::flake8_boolean_trap::helpers::{
+    add_liskov_substitution_principle_help, is_allowed_func_def,
+};
 
 /// ## What it does
 /// Checks for the use of boolean positional arguments in function definitions,
@@ -149,7 +151,10 @@ pub(crate) fn boolean_type_hint_positional_argument(
             return;
         }
 
-        checker.report_diagnostic(BooleanTypeHintPositionalArgument, parameter.identifier());
+        let mut diagnostic =
+            checker.report_diagnostic(BooleanTypeHintPositionalArgument, parameter.identifier());
+
+        add_liskov_substitution_principle_help(&mut diagnostic, name, decorator_list, checker);
     }
 }
 

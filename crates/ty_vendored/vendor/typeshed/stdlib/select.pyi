@@ -8,8 +8,8 @@ import sys
 from _typeshed import FileDescriptorLike
 from collections.abc import Iterable
 from types import TracebackType
-from typing import Any, ClassVar, Final, TypeVar, final
-from typing_extensions import Never, Self
+from typing import Any, ClassVar, Final, TypeVar, final, overload
+from typing_extensions import Never, Self, deprecated
 
 if sys.platform != "win32":
     PIPE_BUF: Final[int]
@@ -103,13 +103,7 @@ if sys.platform != "linux" and sys.platform != "win32":
         ident: int
         udata: Any
         def __init__(
-            self,
-            ident: FileDescriptorLike,
-            filter: int = ...,
-            flags: int = ...,
-            fflags: int = ...,
-            data: Any = ...,
-            udata: Any = ...,
+            self, ident: FileDescriptorLike, filter: int = ..., flags: int = ..., fflags: int = 0, data: Any = 0, udata: Any = 0
         ) -> None: ...
         __hash__: ClassVar[None]  # type: ignore[assignment]
 
@@ -132,6 +126,8 @@ if sys.platform != "linux" and sys.platform != "win32":
         """
 
         closed: bool
+        """True if the kqueue handler is closed"""
+
         def __init__(self) -> None: ...
         def close(self) -> None:
             """Close the kqueue control file descriptor.
@@ -211,12 +207,19 @@ if sys.platform == "linux":
         the maximum number of monitored events.
         """
 
-        def __new__(self, sizehint: int = ..., flags: int = ...) -> Self: ...
+        @overload
+        def __new__(self, sizehint: int = -1) -> Self: ...
+        @overload
+        @deprecated(
+            "The `flags` parameter is deprecated since Python 3.4. "
+            "Use `os.set_inheritable()` to make the file descriptor inheritable."
+        )
+        def __new__(self, sizehint: int = -1, flags: int = 0) -> Self: ...
         def __enter__(self) -> Self: ...
         def __exit__(
             self,
             exc_type: type[BaseException] | None = None,
-            exc_value: BaseException | None = ...,
+            exc_value: BaseException | None = None,
             exc_tb: TracebackType | None = None,
             /,
         ) -> None: ...
@@ -226,6 +229,8 @@ if sys.platform == "linux":
             Further operations on the epoll object will raise an exception.
             """
         closed: bool
+        """True if the epoll handler is closed"""
+
         def fileno(self) -> int:
             """Return the epoll control file descriptor."""
 
@@ -300,4 +305,4 @@ if sys.platform != "linux" and sys.platform != "darwin" and sys.platform != "win
         def register(self, fd: FileDescriptorLike, eventmask: int = ...) -> None: ...
         def modify(self, fd: FileDescriptorLike, eventmask: int = ...) -> None: ...
         def unregister(self, fd: FileDescriptorLike) -> None: ...
-        def poll(self, timeout: float | None = ...) -> list[tuple[int, int]]: ...
+        def poll(self, timeout: float | None = None) -> list[tuple[int, int]]: ...

@@ -15,11 +15,12 @@ use ruff_db::system::{
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
+use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Db as SemanticDb, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
-    SearchPathSettings, default_lint_registry, lint::RuleSelection,
+    AnalysisSettings, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
+    PythonVersionWithSource, default_lint_registry, lint::RuleSelection,
 };
 
 /// Database that can be used for testing.
@@ -33,6 +34,7 @@ struct TestDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
+    analysis_settings: Arc<AnalysisSettings>,
 }
 
 impl TestDb {
@@ -47,6 +49,7 @@ impl TestDb {
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
+            analysis_settings: AnalysisSettings::default().into(),
         }
     }
 }
@@ -81,6 +84,13 @@ impl DbWithTestSystem for TestDb {
 }
 
 #[salsa::db]
+impl ModuleResolverDb for TestDb {
+    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
+        Program::get(self).search_paths(self)
+    }
+}
+
+#[salsa::db]
 impl SemanticDb for TestDb {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
@@ -88,6 +98,10 @@ impl SemanticDb for TestDb {
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
+    }
+
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
+        &self.analysis_settings
     }
 
     fn lint_registry(&self) -> &LintRegistry {

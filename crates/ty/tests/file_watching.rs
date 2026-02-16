@@ -10,12 +10,13 @@ use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard, file_time_now,
 };
 use ruff_python_ast::PythonVersion;
+use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
 use ty_project::metadata::options::{EnvironmentOptions, Options, ProjectOptionsOverrides};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::{Module, ModuleName, PythonPlatform, resolve_module_confident};
+use ty_python_semantic::PythonPlatform;
 
 struct TestCase {
     db: ProjectDatabase,
@@ -1019,7 +1020,7 @@ fn search_path() -> anyhow::Result<()> {
     let site_packages = case.root_path().join("site_packages");
 
     assert_eq!(
-        resolve_module_confident(case.db(), &ModuleName::new("a").unwrap()),
+        resolve_module_confident(case.db(), &ModuleName::new_static("a").unwrap()),
         None
     );
 
@@ -1192,7 +1193,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     // Unset the custom typeshed directory.
     assert_eq!(
-        resolve_module_confident(case.db(), &ModuleName::new("os").unwrap()),
+        resolve_module_confident(case.db(), &ModuleName::new_static("os").unwrap()),
         None
     );
 
@@ -1207,7 +1208,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     case.apply_changes(changes, None);
 
-    assert!(resolve_module_confident(case.db(), &ModuleName::new("os").unwrap()).is_some());
+    assert!(resolve_module_confident(case.db(), &ModuleName::new_static("os").unwrap()).is_some());
 
     Ok(())
 }
@@ -1874,11 +1875,11 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", "class Foo: ...")])?;
 
     assert!(
-        resolve_module_confident(case.db(), &ModuleName::new("lib").unwrap()).is_some(),
+        resolve_module_confident(case.db(), &ModuleName::new_static("lib").unwrap()).is_some(),
         "Expected `lib` module to exist."
     );
     assert_eq!(
-        resolve_module_confident(case.db(), &ModuleName::new("Lib").unwrap()),
+        resolve_module_confident(case.db(), &ModuleName::new_static("Lib").unwrap()),
         None,
         "Expected `Lib` module not to exist"
     );
@@ -1911,13 +1912,13 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
 
     // Resolving `lib` should now fail but `Lib` should now succeed
     assert_eq!(
-        resolve_module_confident(case.db(), &ModuleName::new("lib").unwrap()),
+        resolve_module_confident(case.db(), &ModuleName::new_static("lib").unwrap()),
         None,
         "Expected `lib` module to no longer exist."
     );
 
     assert!(
-        resolve_module_confident(case.db(), &ModuleName::new("Lib").unwrap()).is_some(),
+        resolve_module_confident(case.db(), &ModuleName::new_static("Lib").unwrap()).is_some(),
         "Expected `Lib` module to exist"
     );
 
@@ -1941,7 +1942,7 @@ fn submodule_cache_invalidation_created() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @r"
+        @"
     bar.foo
     bar.wazoo
     ",
@@ -1963,7 +1964,7 @@ fn submodule_cache_invalidation_deleted() -> anyhow::Result<()> {
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @r"
+        @"
     bar.foo
     bar.wazoo
     ",
@@ -2028,7 +2029,7 @@ fn submodule_cache_invalidation_after_pyproject_created() -> anyhow::Result<()> 
 
     insta::assert_snapshot!(
         case.sorted_submodule_names("bar").join("\n"),
-        @r"
+        @"
     bar.foo
     bar.wazoo
     ",

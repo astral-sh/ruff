@@ -33,6 +33,12 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         _client: &Client,
         params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
+        if snapshot.global_settings().diagnostic_mode().is_off() {
+            return Ok(DocumentDiagnosticReportResult::Report(
+                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport::default()),
+            ));
+        }
+
         let diagnostics = compute_diagnostics(db, snapshot.document(), snapshot.encoding());
 
         let Some(diagnostics) = diagnostics else {
@@ -59,7 +65,13 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
                         result_id: new_id,
                         // SAFETY: Pull diagnostic requests are only called for text documents, not for
                         // notebook documents.
-                        items: diagnostics.to_lsp_diagnostics(db).expect_text_document(),
+                        items: diagnostics
+                            .to_lsp_diagnostics(
+                                db,
+                                snapshot.resolved_client_capabilities(),
+                                snapshot.global_settings(),
+                            )
+                            .expect_text_document(),
                     },
                 })
             }

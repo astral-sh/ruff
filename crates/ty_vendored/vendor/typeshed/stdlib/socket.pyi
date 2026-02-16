@@ -566,9 +566,10 @@ if sys.platform != "win32":
 
         __all__ += ["SO_BINDTODEVICE"]
 
-if sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "darwin":
     from _socket import BDADDR_ANY as BDADDR_ANY, BDADDR_LOCAL as BDADDR_LOCAL, BTPROTO_RFCOMM as BTPROTO_RFCOMM
 
+if sys.platform != "darwin" and sys.platform != "linux":
     __all__ += ["BDADDR_ANY", "BDADDR_LOCAL", "BTPROTO_RFCOMM"]
 
 if sys.platform == "darwin" and sys.version_info >= (3, 10):
@@ -1016,6 +1017,22 @@ if sys.platform != "linux":
 if sys.platform != "darwin" and sys.platform != "linux":
     __all__ += ["AF_BLUETOOTH"]
 
+if sys.platform != "win32" and sys.platform != "darwin":
+    from _socket import BTPROTO_HCI as BTPROTO_HCI, BTPROTO_L2CAP as BTPROTO_L2CAP, BTPROTO_SCO as BTPROTO_SCO
+
+if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
+    __all__ += ["BTPROTO_HCI", "BTPROTO_L2CAP", "BTPROTO_SCO"]
+
+if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
+    from _socket import HCI_DATA_DIR as HCI_DATA_DIR, HCI_FILTER as HCI_FILTER, HCI_TIME_STAMP as HCI_TIME_STAMP
+
+    __all__ += ["HCI_FILTER", "HCI_TIME_STAMP", "HCI_DATA_DIR"]
+
+if sys.version_info >= (3, 11) and sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin":
+    from _socket import LOCAL_CREDS as LOCAL_CREDS, LOCAL_CREDS_PERSISTENT as LOCAL_CREDS_PERSISTENT, SCM_CREDS2 as SCM_CREDS2
+
+    __all__ += ["SCM_CREDS2", "LOCAL_CREDS", "LOCAL_CREDS_PERSISTENT"]
+
 if sys.platform == "win32" and sys.version_info >= (3, 12):
     __all__ += ["AF_HYPERV"]
 
@@ -1165,7 +1182,7 @@ class AddressFamily(IntEnum):
         AF_QIPCRTR = 42
     if sys.platform != "linux":
         AF_LINK = 33
-    if sys.platform != "darwin" and sys.platform != "linux":
+    if sys.platform != "darwin":
         AF_BLUETOOTH = 32
     if sys.platform == "win32" and sys.version_info >= (3, 12):
         AF_HYPERV = 34
@@ -1220,7 +1237,7 @@ if sys.platform == "linux":
 
 if sys.platform != "linux":
     AF_LINK: Final = AddressFamily.AF_LINK
-if sys.platform != "darwin" and sys.platform != "linux":
+if sys.platform != "darwin":
     AF_BLUETOOTH: Final = AddressFamily.AF_BLUETOOTH
 if sys.platform == "win32" and sys.version_info >= (3, 12):
     AF_HYPERV: Final = AddressFamily.AF_HYPERV
@@ -1522,7 +1539,7 @@ if sys.platform == "win32":
 
 else:
     def socketpair(
-        family: int | AddressFamily | None = None, type: SocketType | int = ..., proto: int = 0
+        family: int | AddressFamily | None = None, type: SocketKind | int = ..., proto: int = 0
     ) -> tuple[socket, socket]:
         """socketpair([family[, type[, proto]]]) -> (socket object, socket object)
         Create a pair of socket objects from the sockets returned by the platform
@@ -1573,7 +1590,7 @@ def getfqdn(name: str = "") -> str:
 
 if sys.version_info >= (3, 11):
     def create_connection(
-        address: tuple[str | None, int],
+        address: tuple[str | None, bytes | str | int | None],
         timeout: float | None = ...,
         source_address: _Address | None = None,
         *,

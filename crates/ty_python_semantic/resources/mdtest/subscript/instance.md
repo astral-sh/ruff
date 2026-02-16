@@ -7,7 +7,7 @@
 ```py
 class NotSubscriptable: ...
 
-a = NotSubscriptable()[0]  # error: [non-subscriptable]
+a = NotSubscriptable()[0]  # error: [not-subscriptable]
 ```
 
 ## `__getitem__` not callable
@@ -42,6 +42,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, index: int) -> int:
                 return index
+
         else:
             def __getitem__(self, index: int) -> str:
                 return str(index)

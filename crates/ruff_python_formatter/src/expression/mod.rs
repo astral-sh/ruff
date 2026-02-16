@@ -876,6 +876,22 @@ impl<'a> First<'a> {
 ///     )
 /// ).all()
 /// ```
+///
+/// In [`preview`](crate::preview::is_fluent_layout_split_first_call_enabled), we also track the position of the leftmost call or
+/// subscript on an attribute in the chain and break just before the dot.
+///
+/// So, for example, the right-hand summand in the above expression
+/// would get formatted as:
+/// ```python
+///     Blog.objects
+///     .filter(
+///         entry__headline__contains="McCartney",
+///     )
+///     .limit_results[:10]
+///     .filter(
+///         entry__pub_date__year=2010,
+///     )
+/// ```
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum CallChainLayout {
     /// The root of a call chain
@@ -883,19 +899,149 @@ pub enum CallChainLayout {
     Default,
 
     /// A nested call chain element that uses fluent style.
-    Fluent,
+    Fluent(AttributeState),
 
     /// A nested call chain element not using fluent style.
     NonFluent,
 }
 
+/// Records information about the current position within
+/// a call chain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttributeState {
+    /// Stores the number of calls or subscripts
+    /// to the left of the current position in a chain.
+    ///
+    /// Consecutive calls/subscripts on a single
+    /// object only count once. For example, if we are at
+    /// `c` in `a.b()[0]()().c()` then this number would be 1.
+    ///
+    /// Caveat: If the root of the chain is parenthesized,
+    /// it contributes +1 to this count, even if it is not
+    /// a call or subscript. But the name
+    /// `CallLikeOrParenthesizedRootPreceding`
+    /// is a tad unwieldy, and this also rarely occurs.
+    CallLikePreceding(u32),
+    /// Indicates that we are at the first called or
+    /// subscripted object in the chain
+    ///
+    /// For example, if we are at `b` in `a.b()[0]()().c()`
+    FirstCallLike,
+    /// Indicates that we are to the left of the first
+    /// called or subscripted object in the chain, and therefore
+    /// need not break.
+    ///
+    /// For example, if we are at `a` in `a.b()[0]()().c()`
+    BeforeFirstCallLike,
+}
+
 impl CallChainLayout {
+    /// Returns new state decreasing count of remaining calls/subscripts
+    /// to traverse, or the state `FirstCallOrSubscript`, as appropriate.
+    #[must_use]
+    pub(crate) fn decrement_call_like_count(self) -> Self {
+        match self {
+            Self::Fluent(AttributeState::CallLikePreceding(x)) => {
+                if x > 1 {
+                    // Recall that we traverse call chains from right to
+                    // left. So after moving from a call/subscript into
+                    // an attribute, we _decrease_ the count of
+                    // _remaining_ calls or subscripts to the left of our
+                    // current position.
+                    Self::Fluent(AttributeState::CallLikePreceding(x - 1))
+                } else {
+                    Self::Fluent(AttributeState::FirstCallLike)
+                }
+            }
+            _ => self,
+        }
+    }
+
+    /// Returns with state change
+    /// `FirstCallOrSubscript` -> `BeforeFirstCallOrSubscript`
+    /// and otherwise returns unchanged.
+    #[must_use]
+    pub(crate) fn transition_after_attribute(self) -> Self {
+        match self {
+            Self::Fluent(AttributeState::FirstCallLike) => {
+                Self::Fluent(AttributeState::BeforeFirstCallLike)
+            }
+            _ => self,
+        }
+    }
+
+    pub(crate) fn is_first_call_like(self) -> bool {
+        matches!(self, Self::Fluent(AttributeState::FirstCallLike))
+    }
+
+    /// Returns either `Fluent` or `NonFluent` depending on a
+    /// heuristic computed for the whole chain.
+    ///
+    /// Explicitly, the criterion to return `Fluent` is
+    /// as follows:
+    ///
+    /// 1. Beginning from the right (i.e. the `expr` itself),
+    ///    traverse inwards past calls, subscripts, and attribute
+    ///    expressions until we meet the first expression that is
+    ///    either none of these or else is parenthesized. This will
+    ///    be the _root_ of the call chain.
+    /// 2. Count the number of _attribute values_ that are _called
+    ///    or subscripted_ in the chain (note that this includes the
+    ///    root but excludes the rightmost attribute in the chain since
+    ///    it is not the _value_ of some attribute).
+    /// 3. If the root is parenthesized, add 1 to that value.
+    /// 4. If the total is at least 2, return `Fluent`. Otherwise
+    ///    return `NonFluent`
     pub(crate) fn from_expression(
         mut expr: ExprRef,
         comment_ranges: &CommentRanges,
         source: &str,
     ) -> Self {
-        let mut attributes_after_parentheses = 0;
+        // TODO(dylan): Once the fluent layout preview style is
+        // stabilized, see if it is possible to simplify some of
+        // the logic around parenthesized roots. (While supporting
+        // both styles it is more difficult to do this.)
+
+        // Count of attribute _values_ which are called or
+        // subscripted, after the leftmost parenthesized
+        // value.
+        //
+        // Examples:
+        // ```
+        // # Count of 3 - notice that .d()
+        // # does not contribute
+        // a().b().c[0]()().d()
+        // # Count of 2 - notice that a()
+        // # does not contribute
+        // (a()).b().c[0].d
+        // ```
+        let mut computed_attribute_values_after_parentheses = 0;
+
+        // Similar to the above, but instead looks at all calls
+        // and subscripts rather than looking only at those on
+        // _attribute values_. So this count can differ from the
+        // above.
+        //
+        // Examples of `computed_attribute_values_after_parentheses` vs
+        // `call_like_count`:
+        //
+        // a().b --->  1 vs 1
+        // a.b().c --> 1 vs 1
+        // a.b() --->  0 vs 1
+        let mut call_like_count = 0;
+
+        // Going from right to left, we traverse calls, subscripts,
+        // and attributes until we get to an expression of a different
+        // kind _or_ to a parenthesized expression. This records
+        // the case where we end the traversal at a parenthesized expression.
+        //
+        // In these cases, the inferred semantics of the chain are different.
+        // We interpret this as the user indicating:
+        // "this parenthesized value is the object of interest and we are
+        // doing transformations on it". This increases our confidence that
+        // this should be fluently formatted, and also means we should make
+        // our first break after this value.
+        let mut root_value_parenthesized = false;
         loop {
             match expr {
                 ExprRef::Attribute(ast::ExprAttribute { value, .. }) => {
@@ -907,10 +1053,10 @@ impl CallChainLayout {
                     // ```
                     if is_expression_parenthesized(value.into(), comment_ranges, source) {
                         // `(a).b`. We preserve these parentheses so don't recurse
-                        attributes_after_parentheses += 1;
+                        root_value_parenthesized = true;
                         break;
                     } else if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
-                        attributes_after_parentheses += 1;
+                        computed_attribute_values_after_parentheses += 1;
                     }
 
                     expr = ExprRef::from(value.as_ref());
@@ -925,31 +1071,68 @@ impl CallChainLayout {
                 // ```
                 ExprRef::Call(ast::ExprCall { func: inner, .. })
                 | ExprRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
+                    // We preserve these parentheses so don't recurse
+                    // e.g. (a)[0].x().y().z()
+                    //         ^stop here
+                    if is_expression_parenthesized(inner.into(), comment_ranges, source) {
+                        break;
+                    }
+
+                    // Accumulate the `call_like_count`, but we only
+                    // want to count things like `a()[0]()()` once.
+                    if !inner.is_call_expr() && !inner.is_subscript_expr() {
+                        call_like_count += 1;
+                    }
+
                     expr = ExprRef::from(inner.as_ref());
                 }
                 _ => {
-                    // We to format the following in fluent style:
-                    // ```
-                    // f2 = (a).w().t(1,)
-                    //       ^ expr
-                    // ```
-                    if is_expression_parenthesized(expr, comment_ranges, source) {
-                        attributes_after_parentheses += 1;
-                    }
-
                     break;
                 }
             }
-
-            // We preserve these parentheses so don't recurse
-            if is_expression_parenthesized(expr, comment_ranges, source) {
-                break;
-            }
         }
-        if attributes_after_parentheses < 2 {
+
+        if computed_attribute_values_after_parentheses + u32::from(root_value_parenthesized) < 2 {
             CallChainLayout::NonFluent
         } else {
-            CallChainLayout::Fluent
+            CallChainLayout::Fluent(AttributeState::CallLikePreceding(
+                // We count a parenthesized root value as an extra
+                // call for the purposes of tracking state.
+                //
+                // The reason is that, in this case, we want the first
+                // "special" break to happen right after the root, as
+                // opposed to right after the first called/subscripted
+                // attribute.
+                //
+                // For example:
+                //
+                // ```
+                // (object_of_interest)
+                // .data.filter()
+                // .agg()
+                // .etc()
+                // ```
+                //
+                // instead of (in preview):
+                //
+                // ```
+                // (object_of_interest)
+                // .data
+                // .filter()
+                // .etc()
+                // ```
+                //
+                // For comparison, if we didn't have parentheses around
+                // the root, we want (and get, in preview):
+                //
+                // ```
+                // object_of_interest.data
+                // .filter()
+                // .agg()
+                // .etc()
+                // ```
+                call_like_count + u32::from(root_value_parenthesized),
+            ))
         }
     }
 
@@ -972,8 +1155,12 @@ impl CallChainLayout {
                     CallChainLayout::NonFluent
                 }
             }
-            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+            layout @ (CallChainLayout::Fluent(_) | CallChainLayout::NonFluent) => layout,
         }
+    }
+
+    pub(crate) fn is_fluent(self) -> bool {
+        matches!(self, CallChainLayout::Fluent(_))
     }
 }
 

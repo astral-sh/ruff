@@ -29,19 +29,13 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This fix is marked as unsafe because removing the import
-/// may change program behavior. For example, in the following
-/// situation:
+/// This fix is marked as unsafe because it will remove comments attached to the unused import.
 ///
-/// ```python
-/// def str(x):
-///     return x
+/// ## Options
 ///
+/// This rule will not trigger on imports required by the `isort` configuration.
 ///
-/// from builtins import str
-///
-/// str(1)  # `"1"` with the import, `1` without
-/// ```
+/// - `lint.isort.required-imports`
 ///
 /// ## References
 /// - [Python documentation: The Python Standard Library](https://docs.python.org/3/library/index.html)
@@ -90,6 +84,8 @@ pub(crate) fn unnecessary_builtin_import(
         return;
     }
 
+    let semantic = checker.semantic();
+
     // Identify unaliased, builtin imports.
     let unused_imports: Vec<&Alias> = names
         .iter()
@@ -133,6 +129,24 @@ pub(crate) fn unnecessary_builtin_import(
                     | ("six", "callable" | "next")
                     | ("six.moves", "filter" | "input" | "map" | "range" | "zip")
             )
+        })
+        // Check that the import isn't shadowing a non-builtin value.
+        .filter(|alias| {
+            // Always flag `*` imports.
+            if &alias.name == "*" {
+                return true;
+            }
+            let Some(binding_id) = semantic.lookup_symbol(alias.name.as_str()) else {
+                return false;
+            };
+            let binding = semantic.binding(binding_id);
+            let scope = &semantic.scopes[binding.scope];
+            // If the import isn't shadowing anything, it's definitely unnecessary.
+            let Some(shadowed_binding_id) = scope.shadowed_binding(binding_id) else {
+                return true;
+            };
+            let shadowed_binding = semantic.binding(shadowed_binding_id);
+            shadowed_binding.kind.is_builtin()
         })
         .collect();
 

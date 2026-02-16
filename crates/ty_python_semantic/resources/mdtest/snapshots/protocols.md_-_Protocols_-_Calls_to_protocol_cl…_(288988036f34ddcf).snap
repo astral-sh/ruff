@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: protocols.md - Protocols - Calls to protocol classes
 mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
@@ -42,7 +43,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 # Diagnostics
 
 ```
-error[call-non-callable]: Object of type `typing.Protocol` is not callable
+error[call-non-callable]: Object of type `<special-form 'typing.Protocol'>` is not callable
  --> src/mdtest_snippet.py:4:13
   |
 3 | # error: [call-non-callable]

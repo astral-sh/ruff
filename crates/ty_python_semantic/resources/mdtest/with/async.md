@@ -43,7 +43,7 @@ class Manager: ...
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
     async with Manager():
-        ...
+        pass
 ```
 
 ## Context manager without an `__aenter__` method
@@ -55,7 +55,7 @@ class Manager:
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__`"
     async with Manager():
-        ...
+        pass
 ```
 
 ## Context manager without an `__aexit__` method
@@ -67,7 +67,7 @@ class Manager:
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aexit__`"
     async with Manager():
-        ...
+        pass
 ```
 
 ## Context manager with non-callable `__aenter__` attribute
@@ -81,7 +81,7 @@ class Manager:
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not correctly implement `__aenter__`"
     async with Manager():
-        ...
+        pass
 ```
 
 ## Context manager with non-callable `__aexit__` attribute
@@ -97,7 +97,7 @@ class Manager:
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not correctly implement `__aexit__`"
     async with Manager():
-        ...
+        pass
 ```
 
 ## Context expression with possibly-unbound union variants
@@ -166,7 +166,7 @@ class Manager:
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
     async with Manager():
-        ...
+        pass
 ```
 
 ## Incorrect signatures
@@ -182,7 +182,7 @@ class Manager:
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
     async with Manager():
-        ...
+        pass
 ```
 
 ## Incorrect number of arguments
@@ -197,7 +197,7 @@ class Manager:
 async def main():
     # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `async with` because it does not implement `__aenter__` and `__aexit__`"
     async with Manager():
-        ...
+        pass
 ```
 
 ## `@asynccontextmanager`
@@ -212,13 +212,46 @@ class Session: ...
 async def connect() -> AsyncGenerator[Session]:
     yield Session()
 
-# TODO: this should be `() -> _AsyncGeneratorContextManager[Session, None]`
-reveal_type(connect)  # revealed: (...) -> _AsyncGeneratorContextManager[Unknown, None]
+# revealed: () -> _AsyncGeneratorContextManager[Session, None]
+reveal_type(connect)
 
 async def main():
     async with connect() as session:
-        # TODO: should be `Session`
-        reveal_type(session)  # revealed: Unknown
+        reveal_type(session)  # revealed: Session
+```
+
+This also works with `AsyncIterator` return types:
+
+```py
+from typing import AsyncIterator
+
+@asynccontextmanager
+async def connect_iterator() -> AsyncIterator[Session]:
+    yield Session()
+
+# revealed: () -> _AsyncGeneratorContextManager[Session, None]
+reveal_type(connect_iterator)
+
+async def main_iterator():
+    async with connect_iterator() as session:
+        reveal_type(session)  # revealed: Session
+```
+
+And with `AsyncGeneratorType` return types:
+
+```py
+from types import AsyncGeneratorType
+
+@asynccontextmanager
+async def connect_async_generator() -> AsyncGeneratorType[Session]:
+    yield Session()
+
+# revealed: () -> _AsyncGeneratorContextManager[Session, None]
+reveal_type(connect_async_generator)
+
+async def main_async_generator():
+    async with connect_async_generator() as session:
+        reveal_type(session)  # revealed: Session
 ```
 
 ## `asyncio.timeout`

@@ -167,9 +167,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::StringLiteral(string) => self.infer_string_annotation_expression(string),
 
             // Annotation expressions also get special handling for `*args` and `**kwargs`.
-            ast::Expr::Starred(starred) => {
-                TypeAndQualifiers::declared(self.infer_starred_expression(starred))
-            }
+            ast::Expr::Starred(starred) => TypeAndQualifiers::declared(
+                self.infer_starred_expression(starred, TypeContext::default()),
+            ),
 
             ast::Expr::BytesLiteral(bytes) => {
                 if let Some(builder) = self
@@ -190,12 +190,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Attribute(attribute) => match attribute.ctx {
-                ast::ExprContext::Load => infer_name_or_attribute(
-                    self.infer_attribute_expression(attribute),
-                    annotation,
-                    self,
-                    pep_613_policy,
-                ),
+                ast::ExprContext::Load => {
+                    let attribute_type = self.infer_attribute_expression(attribute);
+                    if let Type::TypeVar(typevar) = attribute_type
+                        && typevar.paramspec_attr(self.db()).is_some()
+                    {
+                        TypeAndQualifiers::declared(attribute_type)
+                    } else {
+                        infer_name_or_attribute(attribute_type, annotation, self, pep_613_policy)
+                    }
+                }
                 ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
                 ast::ExprContext::Store | ast::ExprContext::Del => TypeAndQualifiers::declared(
                     todo_type!("Attribute expression annotation in Store/Del context"),
@@ -269,14 +273,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         } else {
                             std::slice::from_ref(slice)
                         };
-                        let num_arguments = arguments.len();
-                        let type_and_qualifiers = if num_arguments == 1 {
-                            let mut type_and_qualifiers = self
-                                .infer_annotation_expression_impl(slice, PEP613Policy::Disallowed);
+                        let type_and_qualifiers = if let [argument] = arguments {
+                            let mut type_and_qualifiers = self.infer_annotation_expression_impl(
+                                argument,
+                                PEP613Policy::Disallowed,
+                            );
 
                             match type_qualifier {
                                 SpecialFormType::ClassVar => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
+                                    if type_and_qualifiers.inner_type().has_typevar(self.db())
+                                        && let Some(builder) =
+                                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                    {
+                                        builder.into_diagnostic(
+                                            "`ClassVar` cannot contain type variables",
+                                        );
+                                    }
                                 }
                                 SpecialFormType::Final => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);
@@ -303,6 +316,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                             {
+                                let num_arguments = arguments.len();
                                 builder.into_diagnostic(format_args!(
                                     "Type qualifier `{type_qualifier}` expected exactly 1 argument, \
                                     got {num_arguments}",
@@ -321,10 +335,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         } else {
                             std::slice::from_ref(slice)
                         };
-                        let num_arguments = arguments.len();
-                        let type_and_qualifiers = if num_arguments == 1 {
-                            let mut type_and_qualifiers = self
-                                .infer_annotation_expression_impl(slice, PEP613Policy::Disallowed);
+                        let type_and_qualifiers = if let [argument] = arguments {
+                            let mut type_and_qualifiers = self.infer_annotation_expression_impl(
+                                argument,
+                                PEP613Policy::Disallowed,
+                            );
                             type_and_qualifiers.add_qualifier(TypeQualifiers::INIT_VAR);
                             type_and_qualifiers
                         } else {
@@ -337,6 +352,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if let Some(builder) =
                                 self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                             {
+                                let num_arguments = arguments.len();
                                 builder.into_diagnostic(format_args!(
                                     "Type qualifier `InitVar` expected exactly 1 argument, \
                                     got {num_arguments}",

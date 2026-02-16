@@ -1,15 +1,19 @@
+use anyhow::Result;
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::str::FromStr;
 use strum::IntoEnumIterator;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
 use ruff_graph::Direction;
+use ruff_linter::RUFF_PKG_VERSION;
+
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -554,6 +558,17 @@ pub struct LintOptions {
         "#
     )]
     pub future_annotations: Option<bool>,
+}
+
+pub fn validate_required_version(required_version: &RequiredVersion) -> anyhow::Result<()> {
+    let ruff_pkg_version = pep440_rs::Version::from_str(RUFF_PKG_VERSION)
+        .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
+    if !required_version.contains(&ruff_pkg_version) {
+        return Err(anyhow::anyhow!(
+            "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
+        ));
+    }
+    Ok(())
 }
 
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
@@ -1479,7 +1494,7 @@ pub struct Flake8GetTextOptions {
 impl Flake8GetTextOptions {
     pub fn into_settings(self) -> flake8_gettext::settings::Settings {
         flake8_gettext::settings::Settings {
-            functions_names: self
+            function_names: self
                 .function_names
                 .unwrap_or_else(flake8_gettext::settings::default_func_names)
                 .into_iter()
@@ -2116,7 +2131,7 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// For example:
     /// ```python
-    /// import fastapi
+    /// from fastapi import FastAPI
     ///
     /// app = FastAPI("app")
     ///
@@ -2482,6 +2497,26 @@ pub struct IsortOptions {
     )]
     pub no_lines_before: Option<Vec<ImportSection>>,
 
+    /// A mapping from import section names to their heading comments.
+    ///
+    /// When set, a comment with the specified text will be added above imports
+    /// in the corresponding section. If a heading comment already exists, it
+    /// will be replaced.
+    ///
+    /// Compatible with isort's `import_heading_{section_name}` settings.
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str, str]"#,
+        example = r#"
+            future = "Future imports"
+            standard-library = "Standard library imports"
+            third-party = "Third party imports"
+            first-party = "First party imports"
+            local-folder = "Local folder imports"
+        "#
+    )]
+    pub import_heading: Option<FxHashMap<ImportSection, String>>,
+
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
     ///
@@ -2828,6 +2863,17 @@ impl IsortOptions {
             }
         }
 
+        let import_heading = self.import_heading.unwrap_or_default();
+
+        // Verify that all sections listed in `import_heading` are defined in `sections`.
+        for section in import_heading.keys() {
+            if let ImportSection::UserDefined(section_name) = section {
+                if !sections.contains_key(section_name) {
+                    warn_user_once!("`import-heading` contains unknown section: `{:?}`", section,);
+                }
+            }
+        }
+
         // Verify that `default_section` is in `section_order`.
         if !section_order.contains(&default_section) {
             warn_user_once!(
@@ -2868,6 +2914,10 @@ impl IsortOptions {
             constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
             variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
             no_lines_before: FxHashSet::from_iter(no_lines_before),
+            import_headings: import_heading
+                .into_iter()
+                .map(|(section, heading)| (section, format!("# {heading}")))
+                .collect(),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
@@ -3497,6 +3547,17 @@ pub struct RuffOptions {
         note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub allowed_markup_calls: Option<Vec<String>>,
+    /// Whether to require `__init__.py` files to contain no code at all, including imports and
+    /// docstrings (see `RUF067`).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Make it a violation to include any code, including imports and docstrings in `__init__.py`
+        strictly-empty-init-modules = true
+        "#
+    )]
+    pub strictly_empty_init_modules: Option<bool>,
 }
 
 impl RuffOptions {
@@ -3505,6 +3566,7 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
+            strictly_empty_init_modules: self.strictly_empty_init_modules.unwrap_or_default(),
         }
     }
 }

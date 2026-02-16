@@ -196,7 +196,26 @@ fn format_import_block(
             continue;
         };
 
-        let imports = order_imports(import_block, import_section, settings);
+        let mut imports = order_imports(import_block, import_section, settings);
+
+        // Strip any heading comments from all imports in the section,
+        // as they will be re-added in the correct position.
+        // Heading comments may be on any import (not just the first) since
+        // sorting may have reordered them.
+        if !settings.import_headings.is_empty() {
+            for import in &mut imports {
+                let atop = match import {
+                    Import((_, comments)) => &mut comments.atop,
+                    ImportFrom((_, comments, _, _)) => &mut comments.atop,
+                };
+                atop.retain(|comment| {
+                    !settings
+                        .import_headings
+                        .values()
+                        .any(|heading| comment == heading)
+                });
+            }
+        }
 
         // Add a blank line between every section.
         if is_first_block {
@@ -205,6 +224,12 @@ fn format_import_block(
         } else if pending_lines_before {
             output.push_str(&stylist.line_ending());
             pending_lines_before = false;
+        }
+
+        // Insert heading comment for this section, if configured.
+        if let Some(heading) = settings.import_headings.get(import_section) {
+            output.push_str(heading);
+            output.push_str(&stylist.line_ending());
         }
 
         let mut line_insertion = None;
@@ -1191,6 +1216,198 @@ mod tests {
                         ImportSection::Known(ImportType::LocalFolder),
                     ]),
                     ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Helper to create a standard `import_headings` map for all sections.
+    fn all_section_headings() -> FxHashMap<ImportSection, String> {
+        FxHashMap::from_iter([
+            (
+                ImportSection::Known(ImportType::Future),
+                "# Future imports".to_string(),
+            ),
+            (
+                ImportSection::Known(ImportType::StandardLibrary),
+                "# Standard library imports".to_string(),
+            ),
+            (
+                ImportSection::Known(ImportType::ThirdParty),
+                "# Third party imports".to_string(),
+            ),
+            (
+                ImportSection::Known(ImportType::FirstParty),
+                "# First party imports".to_string(),
+            ),
+            (
+                ImportSection::Known(ImportType::LocalFolder),
+                "# Local folder imports".to_string(),
+            ),
+        ])
+    }
+
+    /// Helper to create a standard isort Settings with all section headings
+    /// and `known_modules` configured for `my_first_party`.
+    fn isort_settings_with_all_headings() -> super::settings::Settings {
+        super::settings::Settings {
+            import_headings: all_section_headings(),
+            known_modules: KnownModules::new(
+                vec![pattern("my_first_party")],
+                vec![],
+                vec![],
+                vec![],
+                FxHashMap::default(),
+            ),
+            ..super::settings::Settings::default()
+        }
+    }
+
+    #[test_case(Path::new("import_heading.py"))]
+    #[test_case(Path::new("import_heading_already_present.py"))]
+    #[test_case(Path::new("import_heading_unsorted.py"))]
+    #[test_case(Path::new("import_heading_already_correct.py"))]
+    #[test_case(Path::new("import_heading_duplicate.py"))]
+    fn import_heading(path: &Path) -> Result<()> {
+        let snapshot = format!("import_heading_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: isort_settings_with_all_headings(),
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("import_heading_with_no_lines_before.py"))]
+    fn import_heading_with_no_lines_before(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "import_heading_with_no_lines_before_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    no_lines_before: FxHashSet::from_iter([ImportSection::Known(
+                        ImportType::LocalFolder,
+                    )]),
+                    ..isort_settings_with_all_headings()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("import_heading_partial.py"))]
+    fn import_heading_partial(path: &Path) -> Result<()> {
+        let snapshot = format!("import_heading_partial_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    import_headings: FxHashMap::from_iter([
+                        (
+                            ImportSection::Known(ImportType::StandardLibrary),
+                            "# Standard library imports".to_string(),
+                        ),
+                        (
+                            ImportSection::Known(ImportType::ThirdParty),
+                            "# Third party imports".to_string(),
+                        ),
+                    ]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("import_heading_wrong_heading.py"))]
+    fn import_heading_wrong_heading(path: &Path) -> Result<()> {
+        let snapshot = format!("import_heading_wrong_heading_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    import_headings: FxHashMap::from_iter([
+                        (
+                            ImportSection::Known(ImportType::StandardLibrary),
+                            "# Standard library imports".to_string(),
+                        ),
+                        (
+                            ImportSection::Known(ImportType::ThirdParty),
+                            "# Third party imports".to_string(),
+                        ),
+                        (
+                            ImportSection::Known(ImportType::FirstParty),
+                            "# First party imports".to_string(),
+                        ),
+                    ]),
+                    known_modules: KnownModules::new(
+                        vec![pattern("my_first_party")],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::default(),
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("import_heading_single_section.py"))]
+    fn import_heading_single_section(path: &Path) -> Result<()> {
+        let snapshot = format!("import_heading_single_section_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    import_headings: FxHashMap::from_iter([(
+                        ImportSection::Known(ImportType::ThirdParty),
+                        "# Third party imports".to_string(),
+                    )]),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..LinterSettings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    /// Test heading with `force_sort_within_sections`.
+    #[test_case(Path::new("import_heading_force_sort_within_sections.py"))]
+    fn import_heading_force_sort_within_sections(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "import_heading_force_sort_within_sections_{}",
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &LinterSettings {
+                isort: super::settings::Settings {
+                    force_sort_within_sections: true,
+                    ..isort_settings_with_all_headings()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
                 ..LinterSettings::for_rule(Rule::UnsortedImports)

@@ -1,5 +1,6 @@
 """Python wrapper for Expat parser."""
 
+import sys
 from _typeshed import ReadableBuffer, SupportsRead
 from collections.abc import Callable
 from pyexpat import errors as errors, model as model
@@ -70,6 +71,29 @@ class XMLParserType:
 
     def SetReparseDeferralEnabled(self, enabled: bool, /) -> None:
         """Enable/Disable reparse deferral; enabled by default with Expat >=2.6.0."""
+    if sys.version_info >= (3, 10):
+        # Added in Python 3.10.20, 3.11.15, 3.12.3, 3.13.10, 3.14.1
+        def SetAllocTrackerActivationThreshold(self, threshold: int, /) -> None:
+            """Sets the number of allocated bytes of dynamic memory needed to activate protection against disproportionate use of RAM.
+
+            By default, parser objects have an allocation activation threshold of 64 MiB.
+            """
+
+        def SetAllocTrackerMaximumAmplification(self, max_factor: float, /) -> None:
+            """Sets the maximum amplification factor between direct input and bytes of dynamic memory allocated.
+
+            The amplification factor is calculated as "allocated / direct" while parsing,
+            where "direct" is the number of bytes read from the primary document in parsing
+            and "allocated" is the number of bytes of dynamic memory allocated in the parser
+            hierarchy.
+
+            The 'max_factor' value must be a non-NaN floating point value greater than
+            or equal to 1.0. Amplification factors greater than 100.0 can be observed
+            near the start of parsing even with benign files in practice. In particular,
+            the activation threshold should be carefully chosen to avoid false positives.
+
+            By default, parser objects have a maximum amplification factor of 100.0.
+            """
 
     @property
     def intern(self) -> dict[str, str]: ...

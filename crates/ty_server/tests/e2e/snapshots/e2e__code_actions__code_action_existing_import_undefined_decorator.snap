@@ -24,8 +24,7 @@ expression: code_actions
           "href": "https://ty.dev/rules#unresolved-reference"
         },
         "source": "ty",
-        "message": "Name `deprecated` used when not defined",
-        "relatedInformation": []
+        "message": "Name `deprecated` used when not defined"
       }
     ],
     "edit": {
@@ -43,6 +42,51 @@ expression: code_actions
               }
             },
             "newText": "from warnings import deprecated\n"
+          }
+        ]
+      }
+    },
+    "isPreferred": true
+  },
+  {
+    "title": "qualify warnings.deprecated",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 3,
+            "character": 1
+          },
+          "end": {
+            "line": 3,
+            "character": 11
+          }
+        },
+        "severity": 1,
+        "code": "unresolved-reference",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#unresolved-reference"
+        },
+        "source": "ty",
+        "message": "Name `deprecated` used when not defined"
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 3,
+                "character": 1
+              },
+              "end": {
+                "line": 3,
+                "character": 11
+              }
+            },
+            "newText": "warnings.deprecated"
           }
         ]
       }
@@ -70,8 +114,7 @@ expression: code_actions
           "href": "https://ty.dev/rules#unresolved-reference"
         },
         "source": "ty",
-        "message": "Name `deprecated` used when not defined",
-        "relatedInformation": []
+        "message": "Name `deprecated` used when not defined"
       }
     ],
     "edit": {

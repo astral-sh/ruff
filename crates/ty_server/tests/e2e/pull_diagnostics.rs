@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use anyhow::Result;
-use insta::{assert_compact_debug_snapshot, assert_debug_snapshot};
+use insta::{assert_compact_json_snapshot, assert_debug_snapshot};
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -31,10 +31,157 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
     assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_open_diagnostics_off() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(DiagnosticMode::Off)),
+        )?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "items": []}"#);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_syntax_with_syntax_errors_disabled() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo(
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_show_syntax_errors(false)),
+        )?
+        .with_file(foo, foo_content)?
+        .with_initialization_options(
+            ClientOptions::default()
+                .with_show_syntax_errors(false)
+                .with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
+    assert_compact_json_snapshot!(workspace_diagnostics, @r#"
+    {
+      "items": [
+        {
+          "kind": "full",
+          "uri": "file://<temp_dir>/src/foo.py",
+          "version": null,
+          "resultId": "[RESULT_ID]",
+          "items": []
+        }
+      ]
+    }
+    "#);
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_compact_json_snapshot!(diagnostics, @r#"{"kind": "full", "resultId": "[RESULT_ID]", "items": []}"#);
+
+    Ok(())
+}
+
+/// Regression test for <https://github.com/astral-sh/ty/issues/2310>
+#[test]
+fn stack_size() -> Result<()> {
+    use std::fmt::Write;
+
+    let _filter = filter_result_id();
+
+    let mut content = String::new();
+    writeln!(
+        &mut content,
+        "
+from typing_extensions import reveal_type
+total = 1{plus_one_repeated}
+reveal_type(total)
+        ",
+        plus_one_repeated = " + 1".repeat(2000 - 1)
+    )?;
+
+    let file_path = SystemPath::new("src/foo.py");
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(file_path, &content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(file_path, content, 1);
+    let diagnostics = server.document_diagnostic_request(file_path, None);
+
+    assert_compact_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn pull_excluded_file() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let main_path = SystemPath::new("src/foo.py");
+    let main_content = r#"reveal_type("included")"#;
+
+    let excluded_path = SystemPath::new("src/excluded/lib.py");
+    let excluded_content = r#"reveal_type("Excluded")"#;
+
+    let config = r#"
+[src]
+exclude = ["src/excluded/"]
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(SystemPath::new("src"), None)?
+        .with_file(main_path, main_content)?
+        .with_file(excluded_path, excluded_content)?
+        .with_file(SystemPath::new("ty.toml"), config)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(main_path, main_content, 1);
+    let main_diagnostics = server.document_diagnostic_request(main_path, None);
+    assert_compact_json_snapshot!("main", main_diagnostics);
+
+    server.open_text_document(excluded_path, excluded_content, 1);
+    let excluded_diagnostics = server.document_diagnostic_request(excluded_path, None);
+    assert_compact_json_snapshot!("excluded", excluded_diagnostics);
 
     Ok(())
 }
@@ -57,7 +204,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // First request with no previous result ID
     let first_response = server.document_diagnostic_request(foo, None);
@@ -113,7 +260,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content_v1, 1);
+    server.open_text_document(foo, foo_content_v1, 1);
 
     // First request with no previous result ID
     let first_response = server.document_diagnostic_request(foo, None);
@@ -233,7 +380,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(file_a, &file_a_content, 1);
+    server.open_text_document(file_a, file_a_content, 1);
 
     // First request with no previous result IDs
     let mut first_response = server
@@ -250,10 +397,10 @@ def foo() -> str:
 
     // Make changes to files B, C, D, and E (leave A unchanged)
     // Need to open files before changing them
-    server.open_text_document(file_b, &file_b_content_v1, 1);
-    server.open_text_document(file_c, &file_c_content_v1, 1);
-    server.open_text_document(file_d, &file_d_content_v1, 1);
-    server.open_text_document(file_e, &file_e_content_v1, 1);
+    server.open_text_document(file_b, file_b_content_v1, 1);
+    server.open_text_document(file_c, file_c_content_v1, 1);
+    server.open_text_document(file_d, file_d_content_v1, 1);
+    server.open_text_document(file_e, file_e_content_v1, 1);
 
     // File B: Add a new error
     server.change_text_document(
@@ -368,13 +515,13 @@ def foo() -> str:
 
     let second_response = shutdown_and_await_workspace_diagnostic(server, &workspace_request_id);
 
-    assert_compact_debug_snapshot!(second_response, @"Report(WorkspaceDiagnosticReport { items: [] })");
+    insta::assert_compact_debug_snapshot!(second_response, @"Report(WorkspaceDiagnosticReport { items: [] })");
 
     Ok(())
 }
 
 // Redact result_id values since they are hash-based and non-deterministic
-fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
+pub(crate) fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(r#""[a-f0-9]{16}""#, r#""[RESULT_ID]""#);
     settings.bind_to_scope()
@@ -536,9 +683,9 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(SystemPath::new("src/error_0.py"), &error_content, 1);
-    server.open_text_document(SystemPath::new("src/error_1.py"), &error_content, 1);
-    server.open_text_document(SystemPath::new("src/error_2.py"), &error_content, 1);
+    server.open_text_document(SystemPath::new("src/error_0.py"), error_content, 1);
+    server.open_text_document(SystemPath::new("src/error_1.py"), error_content, 1);
+    server.open_text_document(SystemPath::new("src/error_2.py"), error_content, 1);
 
     // First request to get result IDs (non-streaming for simplicity)
     let first_response = server.workspace_diagnostic_request(None, None);
@@ -716,7 +863,7 @@ def hello() -> str:
         create_workspace_server_with_file(workspace_root, file_path, file_content_no_error)?;
 
     // Open the file first
-    server.open_text_document(file_path, &file_content_no_error, 1);
+    server.open_text_document(file_path, file_content_no_error, 1);
 
     // Make a workspace diagnostic request to a project with one file but no diagnostics
     // This should trigger long-polling since the project has no diagnostics
@@ -819,7 +966,7 @@ def hello() -> str:
         create_workspace_server_with_file(workspace_root, file_path, file_content_no_error)?;
 
     // Open the file first
-    server.open_text_document(file_path, &file_content_no_error, 1);
+    server.open_text_document(file_path, file_content_no_error, 1);
 
     // PHASE 1: Initial suspend (no diagnostics)
     let request_id_1 = send_workspace_diagnostic_request(&mut server);
@@ -905,7 +1052,7 @@ fn create_workspace_server_with_file(
 /// Sends a workspace diagnostic request to the server.
 ///
 /// Unlike [`TestServer::workspace_diagnostic_request`], this function does not wait for the response.
-fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
+pub(crate) fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
     server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
         identifier: None,
         previous_result_ids: Vec::new(),
@@ -918,7 +1065,7 @@ fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::Req
     })
 }
 
-fn shutdown_and_await_workspace_diagnostic(
+pub(crate) fn shutdown_and_await_workspace_diagnostic(
     mut server: TestServer,
     request_id: &RequestId,
 ) -> WorkspaceDiagnosticReportResult {
@@ -936,7 +1083,7 @@ fn shutdown_and_await_workspace_diagnostic(
 }
 
 #[track_caller]
-fn assert_workspace_diagnostics_suspends_for_long_polling(
+pub(crate) fn assert_workspace_diagnostics_suspends_for_long_polling(
     server: &mut TestServer,
     request_id: &lsp_server::RequestId,
 ) {

@@ -197,3 +197,45 @@ RUF020 `Never | T` is equivalent to `T`
    |            ^^^^^
    |
 help: Remove `Never`
+
+RUF020 [*] `Never | T` is equivalent to `T`
+  --> RUF020.py:21:9
+   |
+20 | def func() -> (
+21 |         Never  # text
+   |         ^^^^^
+22 |         | # text
+23 |         int
+   |
+help: Remove `Never`
+18 | 
+19 | 
+20 | def func() -> (
+   -         Never  # text
+   -         | # text
+21 |         int
+22 | ): ...
+23 | 
+note: This is an unsafe fix and may change runtime behavior
+
+RUF020 [*] `Union[Never, T]` is equivalent to `T`
+  --> RUF020.py:32:5
+   |
+31 | x: Union[
+32 |     Never,
+   |     ^^^^^
+33 |     Literal["LongLiteralNumberOne"]
+34 |     | Literal["LongLiteralNumberTwo"]
+   |
+help: Remove `Never`
+28 | # Multi-line single-remaining-element Union should be wrapped in parentheses
+29 | from typing import Literal
+30 | 
+   - x: Union[
+   -     Never,
+   -     Literal["LongLiteralNumberOne"]
+31 + x: (Literal["LongLiteralNumberOne"]
+32 |     | Literal["LongLiteralNumberTwo"]
+   -     | Literal["LongLiteralNumberThree"]
+   - ]
+33 +     | Literal["LongLiteralNumberThree"])

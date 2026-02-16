@@ -1,0 +1,76 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: variables.md - Legacy type variables - Type variables - Invalid defaults - A non-constrained default TypeVar is incompatible with a constrained outer TypeVar
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variables.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Generic, TypeVar
+ 2 | 
+ 3 | T1 = TypeVar("T1", bound=int)
+ 4 | T2 = TypeVar("T2")
+ 5 | 
+ 6 | # error: [invalid-type-variable-default]
+ 7 | S = TypeVar("S", float, str, default=T1)
+ 8 | 
+ 9 | # error: [invalid-type-variable-default]
+10 | U = TypeVar("U", str, bytes, default=T2)
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
+ --> src/mdtest_snippet.py:7:18
+  |
+6 | # error: [invalid-type-variable-default]
+7 | S = TypeVar("S", float, str, default=T1)
+  |                  ----------          ^^ Bounded TypeVar cannot be used as the default for a constrained TypeVar
+  |                  |
+  |                  Constraints of `S`
+8 |
+9 | # error: [invalid-type-variable-default]
+  |
+ ::: src/mdtest_snippet.py:3:1
+  |
+1 | from typing import Generic, TypeVar
+2 |
+3 | T1 = TypeVar("T1", bound=int)
+  | ----------------------------- `T1` defined here
+4 | T2 = TypeVar("T2")
+  |
+info: `T1` has bound `int` but is not constrained
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
+  --> src/mdtest_snippet.py:10:18
+   |
+ 9 | # error: [invalid-type-variable-default]
+10 | U = TypeVar("U", str, bytes, default=T2)
+   |                  ----------          ^^ Unbounded TypeVar cannot be used as the default for a constrained TypeVar
+   |                  |
+   |                  Constraints of `U`
+   |
+  ::: src/mdtest_snippet.py:4:1
+   |
+ 3 | T1 = TypeVar("T1", bound=int)
+ 4 | T2 = TypeVar("T2")
+   | ------------------ `T2` defined here
+ 5 |
+ 6 | # error: [invalid-type-variable-default]
+   |
+info: `T2` has no bound or constraints
+info: rule `invalid-type-variable-default` is enabled by default
+
+```

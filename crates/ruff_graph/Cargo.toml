@@ -9,6 +9,10 @@ repository.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[package.metadata.cargo-shear]
+# Used via `CacheKey` macro expansion.
+ignored = ["ruff_cache"]
+
 [dependencies]
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["os", "serde"] }
@@ -16,7 +20,8 @@ ruff_linter = { workspace = true }
 ruff_macros = { workspace = true }
 ruff_python_ast = { workspace = true }
 ruff_python_parser = { workspace = true }
-ty_python_semantic = { workspace = true }
+ty_module_resolver = { workspace = true }
+ty_site_packages = { workspace = true }
 
 anyhow = { workspace = true }
 clap = { workspace = true, optional = true }
@@ -28,7 +33,3 @@ zip = { workspace = true, features = [] }
 
 [lints]
 workspace = true
-
-[package.metadata.cargo-shear]
-# Used via `CacheKey` macro expansion.
-ignored = ["ruff_cache"]

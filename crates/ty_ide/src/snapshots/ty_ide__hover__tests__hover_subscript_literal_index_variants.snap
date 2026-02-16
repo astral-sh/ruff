@@ -1,0 +1,181 @@
+---
+source: crates/ty_ide/src/hover.rs
+expression: output
+---
+case 0:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[0])
+  |       ^^^^^^^-^
+  |       |      |
+  |       |      Cursor offset
+  |       source
+  |
+
+
+
+case 1:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[0])
+  |       ^^^^^^^^-
+  |       |       |
+  |       |       Cursor offset
+  |       source
+  |
+
+
+
+case 2:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[0])
+  |       ^^^^^^-^^
+  |       |     |
+  |       |     Cursor offset
+  |       source
+  |
+
+
+
+case 3:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[-1])
+  |       ^^^^^^-^^^
+  |       |     |
+  |       |     Cursor offset
+  |       source
+  |
+
+
+
+case 4:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[-1])
+  |       ^^^^^^^-^^
+  |       |      |
+  |       |      Cursor offset
+  |       source
+  |
+
+
+
+case 5:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[-1])
+  |       ^^^^^^^^-^
+  |       |       |
+  |       |       Cursor offset
+  |       source
+  |
+
+
+
+case 6:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[-1])
+  |       ^^^^^^^^^-
+  |       |        |
+  |       |        Cursor offset
+  |       source
+  |
+
+
+
+case 7:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[+1])
+  |       ^^^^^^^^-^
+  |       |       |
+  |       |       Cursor offset
+  |       source
+  |
+
+
+
+case 8:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:7
+  |
+2 | values: list[str] = ["a", "b"]
+3 | print(values[+1])
+  |       ^^^^^^^^^-
+  |       |        |
+  |       |        Cursor offset
+  |       source
+  |

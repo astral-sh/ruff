@@ -96,10 +96,10 @@ capabilities available to Python files.
 
 !!! note
 
-    Unlike [`ruff-lsp`](https://github.com/astral-sh/ruff-lsp) and similar to the Ruff's CLI, the
-    native language server requires user to explicitly include the Jupyter Notebook files in the set
-    of files to lint and format. Refer to the [Jupyter Notebook discovery](https://docs.astral.sh/ruff/configuration/#jupyter-notebook-discovery)
-    section on how to do this.
+    Ruff has built-in support for Jupyter Notebooks. The native language server will discover and
+    lint or format `.ipynb` files by default as of version 0.6.0. Refer to the
+    [Jupyter Notebook discovery](../configuration.md#jupyter-notebook-discovery) section for
+    more details.
 
 <img
 src="https://astral.sh/static/GIF/v0.4.5/ipynb_editing_vscode.gif"

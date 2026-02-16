@@ -24,8 +24,8 @@ reveal_type(lambda a, b: a + b)  # revealed: (a, b) -> Unknown
 But, it can have default values:
 
 ```py
-reveal_type(lambda a=1: a)  # revealed: (a=Literal[1]) -> Unknown
-reveal_type(lambda a, b=2: a)  # revealed: (a, b=Literal[2]) -> Unknown
+reveal_type(lambda a=1: a)  # revealed: (a=1) -> Unknown
+reveal_type(lambda a, b=2: a)  # revealed: (a, b=2) -> Unknown
 ```
 
 And, positional-only parameters:
@@ -37,7 +37,7 @@ reveal_type(lambda a, b, /, c: c)  # revealed: (a, b, /, c) -> Unknown
 And, keyword-only parameters:
 
 ```py
-reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=Literal[2], c) -> Unknown
+reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=2, c) -> Unknown
 ```
 
 And, variadic parameter:
@@ -55,7 +55,7 @@ reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> Unknown
 Mixing all of them together:
 
 ```py
-# revealed: (a, b, /, c=Literal[True], *args, *, d=Literal["default"], e=Literal[5], **kwargs) -> Unknown
+# revealed: (a, b, /, c=True, *args, *, d="default", e=5, **kwargs) -> Unknown
 reveal_type(lambda a, b, /, c=True, *args, d="default", e=5, **kwargs: None)
 ```
 
@@ -94,7 +94,7 @@ Here, a `lambda` expression is used as the default value for a parameter in anot
 expression.
 
 ```py
-reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=(x, y) -> Unknown) -> Unknown
+reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Unknown
 ```
 
 ## Assignment

@@ -166,7 +166,7 @@ impl InterpolatedStringState {
         }
     }
 
-    /// Returns `true` if the interpolated string state is [`NestedInterpolatedElement`].
+    /// Returns `true` if the interpolated string state is [`Self::NestedInterpolatedElement`].
     pub(crate) fn is_nested(self) -> bool {
         matches!(self, Self::NestedInterpolatedElement(..))
     }

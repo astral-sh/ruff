@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: invalid.md - Tests for invalid types in type expressions - Diagnostics for common errors - List-literal used when you meant to use a list or tuple
 mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/invalid.md

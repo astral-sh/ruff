@@ -17,7 +17,7 @@ instances of `typing.TypeVar`, just like legacy type variables.
 ```py
 def f[T]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
@@ -33,7 +33,7 @@ python-version = "3.13"
 ```py
 def f[T = int]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__default__)  # revealed: int
     reveal_type(T.__bound__)  # revealed: None
     reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -61,12 +61,170 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid[S = T]: ...
 ```
 
+### Invalid defaults
+
+A TypeVar default must be compatible with its bound or constraints.
+
+#### Concrete default with a bound
+
+The default must be assignable to the bound:
+
+```py
+# error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
+def f[T: str = int](): ...
+def g[T: float = int](): ...
+```
+
+#### Concrete default with constraints
+
+The default must be one of the constrained types, even if it is a subtype of one of them:
+
+```py
+from typing import Any
+
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bytes` is not one of the constraints of `T`"
+def f[T: (int, str) = bytes](): ...
+def g[T: (int, str) = int](): ...
+
+# A subtype is not sufficient; the default must be exactly one of the constraints.
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bool` is not one of the constraints of `T`"
+def h[T: (int, str) = bool](): ...
+
+# `Any` is always allowed as a default, even for constrained TypeVars.
+def i[T: (int, str) = Any](): ...
+```
+
+#### Default TypeVar's bound must be assignable to the outer bound
+
+When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T3 = TypeVar("T3", bound=str)
+
+# OK: `float` in a type expression means `int | float`,
+# and the upper bound of `T1` (`int`) is assignable to `int | float`
+def f[S: float = T1](): ...
+
+# `T3` has bound `str`, which is not assignable to `int | float`
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
+def g[U: float = T3](): ...
+```
+
+#### An unbounded default TypeVar has an implicit `object` bound
+
+An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
+restrictive bound:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1")
+
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
+def f[S: int = T1](): ...
+```
+
+#### A constrained default TypeVar's constraints must all be assignable to the outer bound
+
+When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", int, str)
+T2 = TypeVar("T2", int, bool)
+
+# OK: `T1`'s constraints are `int` and `str`,
+# which are both assignable to `object`
+def f[S: object = T1](): ...
+
+# `T1` has constraint `str`, which is not assignable to bound `int`
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint `str` of `T1` is not assignable to `int`"
+def g[U: int = T1](): ...
+
+# OK: `T2`'s constraints are `int` and `bool`,
+# which are both assignable to `int`
+def h[V: int = T2](): ...
+```
+
+#### Local type-parameter defaults
+
+PEP 695 type parameters from the same scope can be used as defaults:
+
+```py
+# OK: `T` has bound `int`, which is assignable to `int`
+def f[T: int, U: int = T](): ...
+
+# `T` has bound `int`, which is not assignable to `str`
+# error: [invalid-type-variable-default] "Default `T` of TypeVar `U` is not assignable to upper bound `str` of `U` because its upper bound `int` is not assignable to `str`"
+def g[T: int, U: str = T](): ...
+
+# OK: `T`'s constraints ({int, str}) are a subset of `U`'s ({int, str, bool})
+def h[T: (int, str), U: (int, str, bool) = T](): ...
+
+# `T` has constraint `int` which is not one of `U`'s constraints ({bool, complex})
+# error: [invalid-type-variable-default]
+def i[T: (int, str), U: (bool, complex) = T](): ...
+```
+
+#### A constrained default TypeVar's constraints must be a subset of the outer constraints
+
+When the default TypeVar has constraints, they must all appear in the outer TypeVar's constraint
+list:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", int, str)
+
+# OK: `T1`'s constraints ({int, str}) are a subset
+# of `S`'s constraints ({int, str, bool})
+def f[S: (int, str, bool) = T1](): ...
+
+# `T1` has constraint `int` which is not one of `U`'s constraints ({bool, complex})
+# error: [invalid-type-variable-default]
+def g[U: (bool, complex) = T1](): ...
+```
+
+#### Invalid constraints with default (no cascading diagnostic)
+
+When a TypeVar has fewer than two constraints (already invalid), we should not also emit
+`invalid-type-variable-default`:
+
+```py
+# error: [invalid-type-variable-constraints]
+def f[T: (int,) = str](): ...
+```
+
+#### A non-constrained default TypeVar is incompatible with a constrained outer TypeVar
+
+A bounded or unbounded TypeVar (one without constraints) cannot be used as the default for a
+constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T2 = TypeVar("T2")
+
+# `T1` has a bound but no constraints
+# error: [invalid-type-variable-default]
+def f[S: (float, str) = T1](): ...
+
+# `T2` has no bound or constraints
+# error: [invalid-type-variable-default]
+def g[U: (str, bytes) = T2](): ...
+```
+
 ### Type variables with an upper bound
 
 ```py
 def f[T: int]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__bound__)  # revealed: int
     reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -79,7 +237,7 @@ def g[S]():
 ```py
 def f[T: (int, str)]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__constraints__)  # revealed: tuple[int, str]
     reveal_type(T.__bound__)  # revealed: None
 
@@ -96,6 +254,26 @@ def g[S]():
 # error: [invalid-type-variable-constraints] "TypeVar must have at least two constrained types"
 def f[T: (int,)]():
     pass
+```
+
+### No explicit specialization
+
+A type variable itself cannot be explicitly specialized; the result of the specialization is
+`Unknown`. However, generic type aliases that point to type variables can be explicitly specialized.
+
+```py
+type Positive[T] = T
+
+def _[T](
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    a: T[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    b: T[T],
+    c: Positive[int],
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: int
 ```
 
 ## Invalid uses
@@ -779,11 +957,11 @@ A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 ```py
 from typing import Any
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 def f[S, T: list[S]](x: S, y: T) -> S | T:
     return x or y
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 class C[S, T: list[S]]:
     x: S
     y: T
@@ -791,21 +969,21 @@ class C[S, T: list[S]]:
 reveal_type(C[int, list[Any]]().x)  # revealed: int
 reveal_type(C[int, list[Any]]().y)  # revealed: list[Any]
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 def g[T: list[T]](x: T) -> T:
     return x
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 class D[T: list[T]]:
     x: T
 
 reveal_type(D[list[Any]]().x)  # revealed: list[Any]
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
     return x or y
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 class E[S, T: (list[S], str)]:
     x: S
     y: T
@@ -813,11 +991,11 @@ class E[S, T: (list[S], str)]:
 reveal_type(E[int, str]().x)  # revealed: int
 reveal_type(E[int, str]().y)  # revealed: str
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 def i[T: (list[T], str)](x: T) -> T:
     return x
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 class F[T: (list[T], str)]:
     x: T
 
@@ -863,7 +1041,7 @@ reveal_type(C[int]().y)  # revealed: int
 class D[T = T]:
     x: T
 
-reveal_type(D().x)  # revealed: T@D
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

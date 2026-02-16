@@ -1,6 +1,6 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{Comprehension, Expr, StmtFor};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_semantic::analyze::typing::is_io_base_expr;
@@ -104,8 +104,7 @@ fn readlines_in_iter(checker: &Checker, iter_expr: &Expr) {
     let deletion_range = if let Some(parenthesized_range) = parenthesized_range(
         expr_attr.value.as_ref().into(),
         expr_attr.into(),
-        checker.comment_ranges(),
-        checker.source(),
+        checker.tokens(),
     ) {
         expr_call.range().add_start(parenthesized_range.len())
     } else {

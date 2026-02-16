@@ -21,6 +21,8 @@ pub(crate) struct ProjectFilesFilter<'a> {
 
     /// The resolved `src.include` and `src.exclude` filter.
     src_filter: &'a IncludeExcludeFilter,
+
+    force_exclude: bool,
 }
 
 impl<'a> ProjectFilesFilter<'a> {
@@ -28,7 +30,12 @@ impl<'a> ProjectFilesFilter<'a> {
         Self {
             included_paths: project.included_paths_or_root(db),
             src_filter: &project.settings(db).src().files,
+            force_exclude: project.force_exclude(db),
         }
+    }
+
+    pub(crate) fn force_exclude(&self) -> bool {
+        self.force_exclude
     }
 
     fn match_included_paths(
@@ -43,8 +50,8 @@ impl<'a> ProjectFilesFilter<'a> {
                     .iter()
                     .filter_map(|included_path| {
                         if let Ok(relative_path) = path.strip_prefix(included_path) {
-                            // Exact matches are always included
-                            if relative_path.as_str().is_empty() {
+                            // Exact matches are always included, unless forced to exclude
+                            if relative_path.as_str().is_empty() && !self.force_exclude {
                                 Some(CheckPathMatch::Full)
                             } else {
                                 Some(CheckPathMatch::Partial)
@@ -79,7 +86,9 @@ impl<'a> ProjectFilesFilter<'a> {
         match self.match_included_paths(path, mode) {
             None => IncludeResult::NotIncluded,
             Some(CheckPathMatch::Partial) => self.src_filter.is_file_included(path, mode),
-            Some(CheckPathMatch::Full) => IncludeResult::Included,
+            Some(CheckPathMatch::Full) => IncludeResult::Included {
+                literal_match: Some(true),
+            },
         }
     }
 
@@ -93,7 +102,9 @@ impl<'a> ProjectFilesFilter<'a> {
             Some(CheckPathMatch::Partial) => {
                 self.src_filter.is_directory_maybe_included(path, mode)
             }
-            Some(CheckPathMatch::Full) => IncludeResult::Included,
+            Some(CheckPathMatch::Full) => IncludeResult::Included {
+                literal_match: Some(true),
+            },
         }
     }
 }
@@ -172,6 +183,7 @@ impl<'a> ProjectFilesWalker<'a> {
             let filter = &self.filter;
             let files = &files;
             let diagnostics = &diagnostics;
+            let force_exclude = filter.force_exclude();
 
             Box::new(move |entry| {
                 match entry {
@@ -179,59 +191,68 @@ impl<'a> ProjectFilesWalker<'a> {
                         // Skip excluded directories unless they were explicitly passed to the walker
                         // (which is the case passed to `ty check <paths>`).
                         if entry.file_type().is_directory() {
-                            if entry.depth() > 0 {
+                            if entry.depth() > 0 || force_exclude {
                                 let directory_included = filter
                                     .is_directory_included(entry.path(), GlobFilterCheckMode::TopDown);
                                 return match directory_included {
-                                    IncludeResult::Included => WalkState::Continue,
+                                    IncludeResult::Included { .. } => WalkState::Continue,
                                     IncludeResult::Excluded => {
                                         tracing::debug!(
                                             "Skipping directory '{path}' because it is excluded by a default or `src.exclude` pattern",
                                             path=entry.path()
                                         );
                                         WalkState::Skip
-                                    },
+                                    }
                                     IncludeResult::NotIncluded => {
                                         tracing::debug!(
                                             "Skipping directory `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI",
                                             path=entry.path()
                                         );
                                         WalkState::Skip
-                                    },
+                                    }
                                 };
                             }
                         } else {
-                            // Ignore any non python files to avoid creating too many entries in `Files`.
-                            if entry
-                                .path()
-                                .extension()
-                                .and_then(PySourceType::try_from_extension)
-                                .is_none()
-                            {
-                                return WalkState::Continue;
-                            }
-
                             // For all files, except the ones that were explicitly passed to the walker (CLI),
                             // check if they're included in the project.
-                            if entry.depth() > 0 {
+                            if entry.depth() > 0 || force_exclude {
+                                let match_mode = if entry.depth() == 0 && force_exclude {
+                                    GlobFilterCheckMode::Adhoc
+                                } else {
+                                    GlobFilterCheckMode::TopDown
+                                };
                                 match filter
-                                    .is_file_included(entry.path(), GlobFilterCheckMode::TopDown)
+                                    .is_file_included(entry.path(), match_mode)
                                 {
-                                    IncludeResult::Included => {},
+                                    IncludeResult::Included { literal_match } => {
+                                        // Ignore any non python files to avoid creating too many entries in `Files`.
+                                        // Unless the file is explicitly passed on the CLI or a literal match in the `include`, we then always assume it's a file ty can analyze
+                                        let source_type = if literal_match == Some(true) || entry.depth() == 0 {
+                                            Some(PySourceType::Python)
+                                        } else {
+                                            entry.path().extension().and_then(PySourceType::try_from_extension).or_else(|| db.system().source_type(entry.path()))
+                                        };
+
+
+                                        if source_type.is_none()
+                                        {
+                                            return WalkState::Skip;
+                                        }
+                                    }
                                     IncludeResult::Excluded => {
                                         tracing::debug!(
                                             "Ignoring file `{path}` because it is excluded by a default or `src.exclude` pattern.",
                                             path=entry.path()
                                         );
-                                        return WalkState::Continue;
-                                    },
+                                        return WalkState::Skip;
+                                    }
                                     IncludeResult::NotIncluded => {
                                         tracing::debug!(
                                             "Ignoring file `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI.",
                                             path=entry.path()
                                         );
-                                        return WalkState::Continue;
-                                    },
+                                        return WalkState::Skip;
+                                    }
                                 }
                             }
 

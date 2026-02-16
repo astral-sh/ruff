@@ -58,6 +58,11 @@ use crate::rules::pydocstyle::settings::Convention;
 ///     """
 ///     return distance / time
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.1")]
 pub(crate) struct DocstringExtraneousParameter {
@@ -113,6 +118,12 @@ impl Violation for DocstringExtraneousParameter {
 ///     """
 ///     return distance / time
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
+/// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.6")]
 pub(crate) struct DocstringMissingReturns;
@@ -165,6 +176,11 @@ impl Violation for DocstringMissingReturns {
 ///     for _ in range(n):
 ///         print("Hello!")
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.6")]
 pub(crate) struct DocstringExtraneousReturns;
@@ -218,6 +234,11 @@ impl Violation for DocstringExtraneousReturns {
 ///     for i in range(1, n + 1):
 ///         yield i
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct DocstringMissingYields;
@@ -270,6 +291,11 @@ impl Violation for DocstringMissingYields {
 ///     for _ in range(n):
 ///         print("Hello!")
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct DocstringExtraneousYields;
@@ -342,6 +368,11 @@ impl Violation for DocstringExtraneousYields {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.5")]
 pub(crate) struct DocstringMissingException {
@@ -410,6 +441,11 @@ impl Violation for DocstringMissingException {
 /// It may often be desirable to document *all* exceptions that a function
 /// could possibly raise, even those which are not explicitly raised using
 /// `raise` statements in the function body.
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.5")]
 pub(crate) struct DocstringExtraneousException {

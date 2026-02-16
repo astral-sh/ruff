@@ -1,10 +1,11 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{SemanticModel, analyze};
 use ruff_python_stdlib::builtins;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_custom_exception_checking_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_python_ast::PythonVersion;
 
@@ -20,6 +21,9 @@ use ruff_python_ast::PythonVersion;
 /// This rule only detects built-in exceptions, like `ValueError`, and does
 /// not catch user-defined exceptions.
 ///
+/// In [preview], this rule will also detect user-defined exceptions, but only
+/// the ones defined in the file being checked.
+///
 /// ## Example
 /// ```python
 /// ValueError("...")
@@ -33,6 +37,8 @@ use ruff_python_ast::PythonVersion;
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as converting a useless exception
 /// statement to a `raise` statement will change the program's behavior.
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct UselessExceptionStatement;
@@ -56,7 +62,10 @@ pub(crate) fn useless_exception_statement(checker: &Checker, expr: &ast::StmtExp
         return;
     };
 
-    if is_builtin_exception(func, checker.semantic(), checker.target_version()) {
+    if is_builtin_exception(func, checker.semantic(), checker.target_version())
+        || (is_custom_exception_checking_enabled(checker.settings())
+            && is_custom_exception(func, checker.semantic(), checker.target_version()))
+    {
         let mut diagnostic = checker.report_diagnostic(UselessExceptionStatement, expr.range());
         diagnostic.set_fix(Fix::unsafe_edit(Edit::insertion(
             "raise ".to_string(),
@@ -77,4 +86,35 @@ fn is_builtin_exception(
             matches!(qualified_name.segments(), ["" | "builtins", name]
             if builtins::is_exception(name, target_version.minor))
         })
+}
+
+/// Returns `true` if the given expression is a custom exception.
+fn is_custom_exception(
+    expr: &Expr,
+    semantic: &SemanticModel,
+    target_version: PythonVersion,
+) -> bool {
+    let Some(qualified_name) = semantic.resolve_qualified_name(expr) else {
+        return false;
+    };
+    let Some(symbol) = qualified_name.segments().last() else {
+        return false;
+    };
+    let Some(binding_id) = semantic.lookup_symbol(symbol) else {
+        return false;
+    };
+    let binding = semantic.binding(binding_id);
+    let Some(source) = binding.source else {
+        return false;
+    };
+    let statement = semantic.statement(source);
+    if let ast::Stmt::ClassDef(class_def) = statement {
+        return analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+            if let ["" | "builtins", name] = qualified_name.segments() {
+                return builtins::is_exception(name, target_version.minor);
+            }
+            false
+        });
+    }
+    false
 }
