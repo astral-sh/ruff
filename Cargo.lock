@@ -4696,7 +4696,6 @@ dependencies = [
  "serde_json",
  "smallvec",
  "static_assertions",
- "strsim",
  "strum",
  "strum_macros",
  "test-case",

@@ -4521,7 +4521,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         .message(format_args!("TypedDict `{typed_dict_name}`"))
                 });
 
-                let existing_keys = items.keys();
+                let existing_keys = items.keys().map(Name::as_str);
                 if let Some(suggestion) = did_you_mean(existing_keys, key) {
                     if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
                         let quoted_suggestion = format!(
