@@ -67,12 +67,18 @@ python-version = "3.13"
 ```
 
 ```py
-from typing import TypeVar, Callable, Protocol, TypedDict
+from typing import Any, TypeVar, Callable, Protocol, TypedDict
 
 class TD(TypedDict): ...
 
 class P(Protocol):
     x: int
+
+class Meta(type):
+    def __or__(cls, other: str) -> str:
+        return "wow, so fancy, bet type checkers can't handle this"
+
+class UsesMeta(metaclass=Meta): ...
 
 T = TypeVar("T")
 
@@ -80,7 +86,6 @@ T = TypeVar("T")
 def f(
     # error: [unsupported-operator]
     a: int | "Foo",
-    # error: [unsupported-operator]
     # error: [unsupported-operator]
     b: int | "memoryview" | bytes,
     # error: [unsupported-operator]
@@ -91,6 +96,10 @@ def f(
     e: T | "Foo",
     # fine: _SpecialForm.__ror__` accepts strings at runtime
     f: "Foo" | Callable[..., None],
+    # also fine due to the custom metaclass
+    g: UsesMeta | "Foo",
+    # error: [unsupported-operator]
+    h: None | None,
 ):
     reveal_type(a)  # revealed: int | Foo
     reveal_type(b)  # revealed: int | memoryview[int] | bytes
@@ -138,8 +147,7 @@ def f(v: int | "Foo"):  # fine
 
 class Foo: ...
 
-# TODO: ideally we would emit `unsupported-operator` here;
-# it still fails at runtime despite `__future__.annotations`
+# error: [unsupported-operator]
 X = list["int" | None]
 ```
 
@@ -159,8 +167,7 @@ def f(v: int | "Foo"):  # fine
 
 class Foo: ...
 
-# TODO: ideally we would emit `unsupported-operator` here;
-# it still fails at runtime even on Python 3.14+
+# error: [unsupported-operator]
 X = list["int" | None]
 ```
 

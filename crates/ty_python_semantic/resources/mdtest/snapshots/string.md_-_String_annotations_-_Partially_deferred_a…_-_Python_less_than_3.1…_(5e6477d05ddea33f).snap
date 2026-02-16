@@ -13,156 +13,164 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
 ## mdtest_snippet.py
 
 ```
- 1 | from typing import TypeVar, Callable, Protocol, TypedDict
+ 1 | from typing import Any, TypeVar, Callable, Protocol, TypedDict
  2 | 
  3 | class TD(TypedDict): ...
  4 | 
  5 | class P(Protocol):
  6 |     x: int
  7 | 
- 8 | T = TypeVar("T")
- 9 | 
-10 | # fmt: off
-11 | def f(
-12 |     # error: [unsupported-operator]
-13 |     a: int | "Foo",
-14 |     # error: [unsupported-operator]
-15 |     # error: [unsupported-operator]
-16 |     b: int | "memoryview" | bytes,
-17 |     # error: [unsupported-operator]
-18 |     c: "TD" | None,
-19 |     # error: [unsupported-operator]
-20 |     d: "P" | None,
-21 |     # fine: `TypeVar.__or__` accepts strings at runtime
-22 |     e: T | "Foo",
-23 |     # fine: _SpecialForm.__ror__` accepts strings at runtime
-24 |     f: "Foo" | Callable[..., None],
-25 | ):
-26 |     reveal_type(a)  # revealed: int | Foo
-27 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
-28 |     reveal_type(c)  # revealed: TD | None
-29 |     reveal_type(d)  # revealed: P | None
-30 |     reveal_type(e)  # revealed: T@f | Foo
-31 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
-32 | 
-33 | # fmt: on
-34 | 
-35 | class Foo: ...
-36 | 
-37 | # error: [unsupported-operator]
-38 | X = list["int" | None]
+ 8 | class Meta(type):
+ 9 |     def __or__(cls, other: str) -> str:
+10 |         return "wow, so fancy, bet type checkers can't handle this"
+11 | 
+12 | class UsesMeta(metaclass=Meta): ...
+13 | 
+14 | T = TypeVar("T")
+15 | 
+16 | # fmt: off
+17 | def f(
+18 |     # error: [unsupported-operator]
+19 |     a: int | "Foo",
+20 |     # error: [unsupported-operator]
+21 |     b: int | "memoryview" | bytes,
+22 |     # error: [unsupported-operator]
+23 |     c: "TD" | None,
+24 |     # error: [unsupported-operator]
+25 |     d: "P" | None,
+26 |     # fine: `TypeVar.__or__` accepts strings at runtime
+27 |     e: T | "Foo",
+28 |     # fine: _SpecialForm.__ror__` accepts strings at runtime
+29 |     f: "Foo" | Callable[..., None],
+30 |     # also fine due to the custom metaclass
+31 |     g: UsesMeta | "Foo",
+32 |     # error: [unsupported-operator]
+33 |     h: None | None,
+34 | ):
+35 |     reveal_type(a)  # revealed: int | Foo
+36 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
+37 |     reveal_type(c)  # revealed: TD | None
+38 |     reveal_type(d)  # revealed: P | None
+39 |     reveal_type(e)  # revealed: T@f | Foo
+40 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
+41 | 
+42 | # fmt: on
+43 | 
+44 | class Foo: ...
+45 | 
+46 | # error: [unsupported-operator]
+47 | X = list["int" | None]
 ```
 
 # Diagnostics
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:13:8
+  --> src/mdtest_snippet.py:19:8
    |
-11 | def f(
-12 |     # error: [unsupported-operator]
-13 |     a: int | "Foo",
+17 | def f(
+18 |     # error: [unsupported-operator]
+19 |     a: int | "Foo",
    |        ---^^^-----
    |        |     |
    |        |     Has type `Literal["Foo"]`
    |        Has type `<class 'int'>`
-14 |     # error: [unsupported-operator]
-15 |     # error: [unsupported-operator]
+20 |     # error: [unsupported-operator]
+21 |     b: int | "memoryview" | bytes,
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
-help: Put quotes around the whole union rather than just one element
+help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:16:8
+  --> src/mdtest_snippet.py:21:8
    |
-14 |     # error: [unsupported-operator]
-15 |     # error: [unsupported-operator]
-16 |     b: int | "memoryview" | bytes,
+19 |     a: int | "Foo",
+20 |     # error: [unsupported-operator]
+21 |     b: int | "memoryview" | bytes,
    |        ---^^^------------
    |        |     |
    |        |     Has type `Literal["memoryview"]`
    |        Has type `<class 'int'>`
-17 |     # error: [unsupported-operator]
-18 |     c: "TD" | None,
+22 |     # error: [unsupported-operator]
+23 |     c: "TD" | None,
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
-help: Put quotes around the whole union rather than just one element
+help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:16:8
+  --> src/mdtest_snippet.py:23:8
    |
-14 |     # error: [unsupported-operator]
-15 |     # error: [unsupported-operator]
-16 |     b: int | "memoryview" | bytes,
-   |        ---^^^------------
-   |        |     |
-   |        |     Has type `Literal["memoryview"]`
-   |        Has type `<class 'int'>`
-17 |     # error: [unsupported-operator]
-18 |     c: "TD" | None,
-   |
-info: rule `unsupported-operator` is enabled by default
-
-```
-
-```
-error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:18:8
-   |
-16 |     b: int | "memoryview" | bytes,
-17 |     # error: [unsupported-operator]
-18 |     c: "TD" | None,
+21 |     b: int | "memoryview" | bytes,
+22 |     # error: [unsupported-operator]
+23 |     c: "TD" | None,
    |        ----^^^----
    |        |      |
    |        |      Has type `None`
    |        Has type `Literal["TD"]`
-19 |     # error: [unsupported-operator]
-20 |     d: "P" | None,
+24 |     # error: [unsupported-operator]
+25 |     d: "P" | None,
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
-help: Put quotes around the whole union rather than just one element
+help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:20:8
+  --> src/mdtest_snippet.py:25:8
    |
-18 |     c: "TD" | None,
-19 |     # error: [unsupported-operator]
-20 |     d: "P" | None,
+23 |     c: "TD" | None,
+24 |     # error: [unsupported-operator]
+25 |     d: "P" | None,
    |        ---^^^----
    |        |     |
    |        |     Has type `None`
    |        Has type `Literal["P"]`
-21 |     # fine: `TypeVar.__or__` accepts strings at runtime
-22 |     e: T | "Foo",
+26 |     # fine: `TypeVar.__or__` accepts strings at runtime
+27 |     e: T | "Foo",
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
-help: Put quotes around the whole union rather than just one element
+help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
 error[unsupported-operator]: Unsupported `|` operation
-  --> src/mdtest_snippet.py:38:10
+  --> src/mdtest_snippet.py:33:8
    |
-37 | # error: [unsupported-operator]
-38 | X = list["int" | None]
+31 |     g: UsesMeta | "Foo",
+32 |     # error: [unsupported-operator]
+33 |     h: None | None,
+   |        ^^^^^^^^^^^ Both operands have type `None`
+34 | ):
+35 |     reveal_type(a)  # revealed: int | Foo
+   |
+info: All type expressions are evaluated at runtime by default on Python <3.14
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:47:10
+   |
+46 | # error: [unsupported-operator]
+47 | X = list["int" | None]
    |          -----^^^----
    |          |       |
    |          |       Has type `None`
@@ -170,7 +178,7 @@ error[unsupported-operator]: Unsupported `|` operation
    |
 info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
-help: Put quotes around the whole union rather than just one element
+help: Put quotes around the whole union rather than just certain elements
 info: rule `unsupported-operator` is enabled by default
 
 ```

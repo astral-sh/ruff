@@ -144,18 +144,23 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let right_ty = self.infer_type_expression(&binary.right);
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
-                        if !self.deferred_state.in_string_annotation()
-                            && !self.file().is_stub(self.db())
-                            && Program::get(self.db()).python_version(self.db())
-                                < PythonVersion::PY314
-                            && !self.index.has_future_annotations()
-                        {
+                        if !self.deferred_state.is_deferred() {
                             let previous_state = std::mem::replace(
                                 &mut self.multi_inference_state,
                                 MultiInferenceState::Ignore,
                             );
-                            let left_type_value =
-                                self.infer_expression(&binary.left, TypeContext::default());
+                            // If the left-hand side of the union is itself a PEP-604 union,
+                            // we'll already have checked whether it can be used with `|` in a previous inference step
+                            // and emitted a diagnostic if it was appropriate. We should skip inferring it here to
+                            // avoid duplicate diagnostics; just assume that the l.h.s. is a `UnionType` instance
+                            // in that case.
+                            let left_type_value = if let ast::Expr::BinOp(bin_op) = &*binary.left
+                                && bin_op.op.is_bit_or()
+                            {
+                                KnownClass::UnionType.to_instance(self.db())
+                            } else {
+                                self.infer_expression(&binary.left, TypeContext::default())
+                            };
                             let right_type_value =
                                 self.infer_expression(&binary.right, TypeContext::default());
                             self.multi_inference_state = previous_state;
@@ -201,7 +206,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                                 if left_type_value.is_equivalent_to(self.db(), right_type_value) {
                                     diagnostic.set_primary_message(format_args!(
-                                        "Types on both sides of `|` are `{}`",
+                                        "Both operands have type `{}`",
                                         left_type_value.display(self.db())
                                     ));
                                     diagnostic.set_concise_message(format_args!(
@@ -223,31 +228,46 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     }
                                     diagnostic.set_concise_message(format_args!(
                                         "Operator `|` is unsupported between \
-                                        object of type `{}` and object of type `{}`",
+                                        objects of type `{}` and `{}`",
                                         left_type_value.display(self.db()),
                                         right_type_value.display(self.db())
                                     ));
                                 }
 
-                                diagnostic.info(
-                                    "All type expressions are evaluated at runtime \
-                                    by default on Python <3.14",
-                                );
-                                add_inferred_python_version_hint_to_diagnostic(
-                                    self.db(),
-                                    &mut diagnostic,
-                                    "inferring types",
-                                );
+                                let python_version =
+                                    Program::get(self.db()).python_version(self.db());
 
-                                if (binary.left.is_string_literal_expr()
-                                    && !binary.right.is_string_literal_expr())
-                                    || (binary.right.is_string_literal_expr()
-                                        && !binary.left.is_string_literal_expr())
+                                if python_version < PythonVersion::PY310
+                                    && !binary.left.is_string_literal_expr()
+                                    && !binary.right.is_string_literal_expr()
                                 {
-                                    diagnostic.help(
-                                        "Put quotes around the whole union \
-                                        rather than just one element",
+                                    diagnostic.info(
+                                        "PEP 604 `|` unions are only available on Python 3.10+ \
+                                        unless they are quoted",
                                     );
+                                    add_inferred_python_version_hint_to_diagnostic(
+                                        self.db(),
+                                        &mut diagnostic,
+                                        "inferring types",
+                                    );
+                                } else if python_version < PythonVersion::PY314 {
+                                    diagnostic.info(
+                                        "All type expressions are evaluated at runtime \
+                                        by default on Python <3.14",
+                                    );
+                                    add_inferred_python_version_hint_to_diagnostic(
+                                        self.db(),
+                                        &mut diagnostic,
+                                        "inferring types",
+                                    );
+                                    if binary.left.is_string_literal_expr()
+                                        || binary.right.is_string_literal_expr()
+                                    {
+                                        diagnostic.help(
+                                            "Put quotes around the whole union \
+                                            rather than just certain elements",
+                                        );
+                                    }
                                 }
                             }
                         }

@@ -143,10 +143,10 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
-            | Self::TypeQualifier(_)
             | Self::Unknown
             | Self::AlwaysTruthy
-            | Self::AlwaysFalsy => KnownClass::SpecialForm,
+            | Self::AlwaysFalsy
+            | Self::TypeQualifier(_) => KnownClass::SpecialForm,
 
             // Typeshed says it's an instance of `_SpecialForm`,
             // but then we wouldn't recognise things like `issubclass(`X, Protocol)`
