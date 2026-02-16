@@ -103,7 +103,7 @@ where
     let annotation = map_maybe_stringized_annotation(checker, unresolved_annotation);
 
     // Traverse the union, and remember which numeric types are found.
-    traverse_union(&mut find_numeric_type, checker.semantic(), annotation);
+    traverse_union(&mut find_numeric_type, checker.semantic(), &annotation);
 
     let Some(redundancy) = Redundancy::from_numeric_flags(numeric_flags) else {
         return;
@@ -134,7 +134,7 @@ where
     };
 
     // Traverse the union a second time to construct a [`Fix`].
-    traverse_union(&mut remove_numeric_type, checker.semantic(), annotation);
+    traverse_union(&mut remove_numeric_type, checker.semantic(), &annotation);
 
     let mut diagnostic =
         checker.report_diagnostic(RedundantNumericUnion { redundancy }, annotation.range());
@@ -148,16 +148,16 @@ where
         return;
     }
 
-    let string_annotation = unresolved_annotation.as_string_literal_expr();
-    if string_annotation.is_some_and(|s| s.value.is_implicit_concatenated()) {
-        // No fix for concatenated string literals. They're rare and too complex to handle.
+    if annotation.is_complex() {
+        // No fix for concatenated string literals and other complex
+        // annotations. They're rare and too complex to handle.
         // https://github.com/astral-sh/ruff/issues/19184#issuecomment-3047695205
         return;
     }
 
     // Mark [`Fix`] as unsafe when comments are in range.
     let applicability =
-        if string_annotation.is_some() || checker.comment_ranges().intersects(annotation.range()) {
+        if annotation.is_string() || checker.comment_ranges().intersects(annotation.range()) {
             Applicability::Unsafe
         } else {
             Applicability::Safe
@@ -175,7 +175,7 @@ where
             UnionKind::PEP604 => Some(generate_pep604_fix(
                 checker,
                 necessary_nodes,
-                annotation,
+                &annotation,
                 applicability,
             )),
             UnionKind::TypingUnion => {
@@ -187,7 +187,7 @@ where
                     checker.generator(),
                     &importer,
                     necessary_nodes,
-                    annotation,
+                    &annotation,
                     applicability,
                 )
                 .ok()
@@ -205,20 +205,62 @@ where
 ///
 /// A stringized annotation is one enclosed in string quotes:
 /// `foo: "typing.Any"` means the same thing to a type checker as `foo: typing.Any`.
-fn map_maybe_stringized_annotation<'a, 'b>(checker: &Checker<'a>, expr: &'b Expr) -> &'b Expr
+fn map_maybe_stringized_annotation<'a, 'b>(
+    checker: &Checker<'a>,
+    expr: &'b Expr,
+) -> AnnotationKind<'b>
 where
     'a: 'b,
 {
     if !is_resolve_string_annotation_pyi041_enabled(checker.settings()) {
-        return expr;
+        return AnnotationKind::Simple(expr);
     }
 
     if let Expr::StringLiteral(string_annotation) = expr
         && let Ok(parsed_annotation) = checker.parse_type_annotation(string_annotation)
     {
-        return parsed_annotation.expression();
+        let expr = parsed_annotation.expression();
+        return match parsed_annotation.kind() {
+            ruff_python_parser::typing::AnnotationKind::Simple => AnnotationKind::String(expr),
+            ruff_python_parser::typing::AnnotationKind::Complex => AnnotationKind::Complex(expr),
+        };
     }
-    expr
+    AnnotationKind::Simple(expr)
+}
+
+enum AnnotationKind<'a> {
+    /// A simple non-string annotation like `x: int`.
+    Simple(&'a Expr),
+    /// A simple string annotation like `x: "Union[int, str]"`.
+    String(&'a Expr),
+    /// A complex string annotation with a concatenated string, escaped
+    /// character, or other complication.
+    ///
+    /// See [`ruff_python_parser::typing::AnnotationKind::Complex`] for more
+    /// details.
+    Complex(&'a Expr),
+}
+
+impl<'a> std::ops::Deref for AnnotationKind<'a> {
+    type Target = &'a Expr;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            AnnotationKind::Simple(expr)
+            | AnnotationKind::String(expr)
+            | AnnotationKind::Complex(expr) => expr,
+        }
+    }
+}
+
+impl AnnotationKind<'_> {
+    fn is_string(&self) -> bool {
+        matches!(self, Self::String(_))
+    }
+
+    fn is_complex(&self) -> bool {
+        matches!(self, Self::Complex(_))
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
