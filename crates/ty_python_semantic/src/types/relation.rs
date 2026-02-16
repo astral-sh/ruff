@@ -370,44 +370,29 @@ impl<'db> Type<'db> {
             }
         }
 
-        // Pre-check for literal-to-Sequence relation: returns `Some(result)` if the
-        // relation can be determined without computing element types (i.e. the target is
-        // the literal's own class, or is not in `Sequence`'s MRO), or `None` if the full
-        // sequence check is needed.
-        let literal_sequence_precheck =
-            |known_class: KnownClass,
-             other_class: ClassType<'db>|
-             -> Option<ConstraintSet<'db>> {
-                if other_class.is_known(db, known_class) {
-                    return Some(ConstraintSet::from(true));
-                }
+        // Fast-path closure for determining whether a given class might be a subclass of `Sequence`.
+        // `true` is returned if `cls` *could* be a `Sequence` subclass;
+        // `false` if it definitely is not.
+        let sequence_relation_fast_path = |cls: ClassType<'db>| -> bool {
+            if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
+                && !sequence_class
+                    .iter_mro(db, None)
+                    .filter_map(ClassBase::into_class)
+                    .map(|class| class.class_literal(db))
+                    .contains(&cls.class_literal(db))
+            {
+                false
+            } else {
+                true
+            }
+        };
 
-                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
-                    && !sequence_class
-                        .iter_mro(db, None)
-                        .filter_map(ClassBase::into_class)
-                        .map(|class| class.class_literal(db))
-                        .contains(&other_class.class_literal(db))
-                {
-                    return Some(ConstraintSet::from(false));
-                }
-
-                None
-            };
-
-        // Build a `Sequence[spec]` type from the deduplicated element types and check
-        // if it has the required relation to `other_class`.
-        let literal_sequence_relation = |other_class: ClassType<'db>,
-                                         unique_element_types: Box<[Type<'db>]>|
-         -> ConstraintSet<'db> {
-            let spec = match unique_element_types.len() {
+        // Determine if `Sequence[<union of literals>]` has the given type relation to `class`.
+        let literal_sequence_relation = |class: ClassType<'db>, literal_types: Box<[Type<'db>]>| {
+            let spec = match literal_types.len() {
                 0 => Type::Never,
-                1 => unique_element_types[0],
-                _ => Type::Union(UnionType::new(
-                    db,
-                    unique_element_types,
-                    RecursivelyDefined::No,
-                )),
+                1 => literal_types[0],
+                _ => Type::Union(UnionType::new(db, literal_types, RecursivelyDefined::No)),
             };
 
             KnownClass::Sequence
@@ -415,7 +400,7 @@ impl<'db> Type<'db> {
                 .when_some_and(|sequence| {
                     sequence.has_relation_to_impl(
                         db,
-                        other_class,
+                        class,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1140,8 +1125,11 @@ impl<'db> Type<'db> {
             // we only recognise this as being true for assignability.
             (Type::StringLiteral(value), Type::NominalInstance(instance)) => {
                 let other_class = instance.class(db);
-                if let Some(result) = literal_sequence_precheck(KnownClass::Str, other_class) {
-                    return result;
+                if other_class.is_known(db, KnownClass::Str) {
+                    return ConstraintSet::from(true);
+                }
+                if !sequence_relation_fast_path(other_class) {
+                    return ConstraintSet::from(false);
                 }
                 let unique_element_types: Box<[Type<'db>]> = value
                     .value(db)
@@ -1159,8 +1147,11 @@ impl<'db> Type<'db> {
             // `Sequence[Literal[97, 98, 99]]` because bytes are sequences of integers.
             (Type::BytesLiteral(value), Type::NominalInstance(instance)) => {
                 let other_class = instance.class(db);
-                if let Some(result) = literal_sequence_precheck(KnownClass::Bytes, other_class) {
-                    return result;
+                if other_class.is_known(db, KnownClass::Bytes) {
+                    return ConstraintSet::from(true);
+                }
+                if !sequence_relation_fast_path(other_class) {
+                    return ConstraintSet::from(false);
                 }
                 let unique_element_types: Box<[Type<'db>]> = value
                     .value(db)
