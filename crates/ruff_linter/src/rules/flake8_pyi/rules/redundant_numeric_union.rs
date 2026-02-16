@@ -6,6 +6,7 @@ use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
+use crate::preview::is_resolve_string_annotation_pyi041_enabled;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 use super::generate_union_fix;
@@ -208,6 +209,10 @@ fn map_maybe_stringized_annotation<'a, 'b>(checker: &Checker<'a>, expr: &'b Expr
 where
     'a: 'b,
 {
+    if !is_resolve_string_annotation_pyi041_enabled(checker.settings()) {
+        return expr;
+    }
+
     if let Expr::StringLiteral(string_annotation) = expr
         && let Ok(parsed_annotation) = checker.parse_type_annotation(string_annotation)
     {
