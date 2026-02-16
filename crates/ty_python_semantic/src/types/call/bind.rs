@@ -262,7 +262,7 @@ impl<'db> Bindings<'db> {
         if self.callable_type == before {
             self.callable_type = after;
         }
-        for binding in self.iter_mut() {
+        for binding in self.iter_flat_mut() {
             binding.replace_callable_type(before, after);
         }
     }
@@ -273,7 +273,7 @@ impl<'db> Bindings<'db> {
     ) -> Self {
         self.constructor_instance_type = Some(constructor_instance_type);
 
-        for binding in self.iter_mut() {
+        for binding in self.iter_flat_mut() {
             binding.constructor_instance_type = Some(constructor_instance_type);
             for overload in &mut binding.overloads {
                 overload.constructor_instance_type = Some(constructor_instance_type);
@@ -291,7 +291,7 @@ impl<'db> Bindings<'db> {
         let Some(generic_context) = generic_context else {
             return self;
         };
-        for binding in self.iter_mut() {
+        for binding in self.iter_flat_mut() {
             for overload in &mut binding.overloads {
                 overload.signature.generic_context = GenericContext::merge_optional(
                     db,
@@ -304,7 +304,7 @@ impl<'db> Bindings<'db> {
     }
 
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
-        for binding in self.iter_mut() {
+        for binding in self.iter_flat_mut() {
             binding.dunder_call_is_possibly_unbound = true;
         }
     }
@@ -334,7 +334,7 @@ impl<'db> Bindings<'db> {
     /// Note: This loses the union/intersection distinction. The returned iterator yields
     /// all `CallableBinding`s from all elements, which can then be further flattened to
     /// individual `Binding`s via `CallableBinding`'s `IntoIterator` implementation.
-    pub(crate) fn iter(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
+    pub(crate) fn iter_flat(&self) -> impl Iterator<Item = &CallableBinding<'db>> {
         self.elements.iter().flat_map(|e| e.bindings.iter())
     }
 
@@ -342,7 +342,7 @@ impl<'db> Bindings<'db> {
     ///
     /// Note: This loses the union/intersection distinction. Use only when you need to
     /// modify all bindings regardless of their union/intersection grouping.
-    pub(crate) fn iter_mut(&mut self) -> impl Iterator<Item = &mut CallableBinding<'db>> {
+    pub(crate) fn iter_flat_mut(&mut self) -> impl Iterator<Item = &mut CallableBinding<'db>> {
         self.elements.iter_mut().flat_map(|e| e.bindings.iter_mut())
     }
 
@@ -405,7 +405,7 @@ impl<'db> Bindings<'db> {
         arguments: &CallArguments<'_, 'db>,
     ) -> Self {
         let mut argument_forms = ArgumentForms::new(arguments.len());
-        for binding in self.iter_mut() {
+        for binding in self.iter_flat_mut() {
             binding.match_parameters(db, arguments, &mut argument_forms);
         }
         argument_forms.shrink_to_fit();
@@ -543,7 +543,7 @@ impl<'db> Bindings<'db> {
         // TODO this loops over all bindings, flattening union/intersection
         // shape. As we improve our constraint solver, there may be an
         // improvement needed here.
-        for binding in self.iter() {
+        for binding in self.iter_flat() {
             // For constructors, use the first matching overload (declaration order) to avoid
             // merging incompatible constructor specializations.
             let Some((_, overload)) = binding.matching_overloads().next() else {
@@ -723,7 +723,7 @@ impl<'db> Bindings<'db> {
         };
 
         // Each special case listed here should have a corresponding clause in `Type::bindings`.
-        for binding in self.iter_mut() {
+        for binding in self.iter_flat_mut() {
             let binding_type = binding.callable_type;
             for (overload_index, overload) in binding.matching_overloads_mut() {
                 match binding_type {

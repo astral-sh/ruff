@@ -648,7 +648,7 @@ pub fn call_signature_details<'db>(
 
         // Extract signature details from all callable bindings
         bindings
-            .iter()
+            .iter_flat()
             .flatten()
             .map(|binding| CallSignatureDetails::from_binding(db, binding))
             .collect()
@@ -700,7 +700,7 @@ pub fn call_type_simplified_by_overloads(
         .check_types(db, &args, TypeContext::default(), &[])
         // Only use the Ok
         .iter()
-        .flat_map(super::call::bind::Bindings::iter)
+        .flat_map(super::call::bind::Bindings::iter_flat)
         .flat_map(|binding| {
             binding.matching_overloads().map(|(_, overload)| {
                 overload
@@ -734,7 +734,7 @@ pub fn definitions_for_bin_op<'db>(
     let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
 
     let definitions: Vec<_> = bindings
-        .iter()
+        .iter_flat()
         .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
@@ -792,7 +792,7 @@ pub fn definitions_for_unary_op<'db>(
     let callable_type = promote_literals_for_self(model.db(), bindings.callable_type());
 
     let definitions = bindings
-        .iter()
+        .iter_flat()
         .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
@@ -890,7 +890,7 @@ fn resolve_call_signature<'db>(
 
     // First, try to find the matching overload after full type checking.
     let type_checked_details: Vec<_> = bindings
-        .iter()
+        .iter_flat()
         .flat_map(|binding| binding.matching_overloads().map(|(_, overload)| overload))
         .map(|binding| CallSignatureDetails::from_binding(db, binding))
         .collect();
@@ -904,7 +904,7 @@ fn resolve_call_signature<'db>(
     // `matching_overloads()` returns empty. Fall back to arity-based matching
     // across all overloads to pick the best candidate for showing hints.
     let all_details: Vec<_> = bindings
-        .iter()
+        .iter_flat()
         .flatten()
         .map(|binding| CallSignatureDetails::from_binding(db, binding))
         .collect();
