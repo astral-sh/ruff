@@ -126,6 +126,13 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 ) {
                     continue;
                 }
+
+                // Don't flag explicit re-exports (e.g., `from x import y as y`).
+                // A binding in a nested scope (like a class attribute) doesn't
+                // invalidate a module-level re-export.
+                if shadowed.is_explicit_export() {
+                    continue;
+                }
             }
 
             // If the bindings are in different forks, abort.
