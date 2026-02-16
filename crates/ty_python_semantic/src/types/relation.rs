@@ -1134,6 +1134,57 @@ impl<'db> Type<'db> {
 
             (Type::StringLiteral(_), _) => ConstraintSet::from(false),
 
+            // A bytes literal `Literal[b"abc"]` is assignable to `bytes` *and* to
+            // `Sequence[Literal[97, 98, 99]]` because bytes are sequences of integers.
+            (Type::BytesLiteral(value), Type::NominalInstance(instance)) => {
+                let other_class = instance.class(db);
+
+                if other_class.is_known(db, KnownClass::Bytes) {
+                    return ConstraintSet::from(true);
+                }
+
+                if let Some(sequence_class) = KnownClass::Sequence.try_to_class_literal(db)
+                    && !sequence_class
+                        .iter_mro(db, None)
+                        .filter_map(ClassBase::into_class)
+                        .map(|class| class.class_literal(db))
+                        .contains(&other_class.class_literal(db))
+                {
+                    return ConstraintSet::from(false);
+                }
+
+                let ints: FxHashSet<i64> = value
+                    .value(db)
+                    .iter()
+                    .map(|byte| i64::from(*byte))
+                    .collect();
+
+                let spec = match ints.len() {
+                    0 => Type::Never,
+                    1 => Type::IntLiteral(*ints.iter().next().unwrap()),
+                    _ => {
+                        let union_elements: Box<[Type<'db>]> =
+                            ints.iter().map(|int| Type::IntLiteral(*int)).collect();
+                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                    }
+                };
+
+                KnownClass::Sequence
+                    .to_specialized_class_type(db, &[spec])
+                    .when_some_and(|sequence| {
+                        sequence.has_relation_to_impl(
+                            db,
+                            other_class,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+            }
+
+            (Type::BytesLiteral(_), _) => ConstraintSet::from(false),
+
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
             (Type::NominalInstance(_), Type::EnumLiteral(target_enum_literal)) => {
@@ -1147,14 +1198,13 @@ impl<'db> Type<'db> {
                 ))
             }
 
-            // Except for the special `LiteralString` and `StringLiteral` cases above,
+            // Except for the special `LiteralString`, `StringLiteral` and `BytesLiteral` cases above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
             (
                 Type::LiteralString
                 | Type::BooleanLiteral(_)
                 | Type::IntLiteral(_)
-                | Type::BytesLiteral(_)
                 | Type::ModuleLiteral(_)
                 | Type::EnumLiteral(_)
                 | Type::FunctionLiteral(_),
