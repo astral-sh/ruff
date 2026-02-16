@@ -294,19 +294,6 @@ impl ScopedPlaceStateId {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
-struct ScopedReachableDefinitionsId(ScopedBindingsId, ScopedDeclarationsId);
-
-impl ScopedReachableDefinitionsId {
-    fn bindings_id(self) -> ScopedBindingsId {
-        self.0
-    }
-
-    fn declarations_id(self) -> ScopedDeclarationsId {
-        self.1
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum ScopedEnclosingSnapshotDataId {
     Constraint(ScopedNarrowingConstraint),
@@ -367,7 +354,7 @@ pub(crate) struct UseDefMap<'db> {
     reachable_definitions_by_symbol: IndexVec<ScopedSymbolId, ReachableDefinitions>,
 
     /// All potentially reachable bindings and declarations, for each member.
-    reachable_definitions_by_member: IndexVec<ScopedMemberId, ScopedReachableDefinitionsId>,
+    reachable_definitions_by_member: IndexVec<ScopedMemberId, ReachableDefinitions>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// scope.
@@ -538,8 +525,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
-        let reachable_definitions_id = self.reachable_definitions_by_member[member];
-        let bindings = &self.interned_bindings[reachable_definitions_id.bindings_id()];
+        let bindings = &self.reachable_definitions_by_member[member].bindings;
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
@@ -632,8 +618,7 @@ impl<'db> UseDefMap<'db> {
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
-        let reachable_definitions_id = self.reachable_definitions_by_member[member];
-        let declarations = &self.interned_declarations[reachable_definitions_id.declarations_id()];
+        let declarations = &self.reachable_definitions_by_member[member].declarations;
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
@@ -1536,6 +1521,7 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut interned_declarations = IndexVec::with_capacity(self.declarations_by_binding.len());
         let mut interned_ids_by_declarations =
             FxHashMap::with_capacity_and_hasher(self.declarations_by_binding.len(), FxBuildHasher);
+        // These fields are manually interned because they have a statistically high duplication rate (>50%).
         let bindings_by_definition = Self::intern_bindings_by_definition(
             self.bindings_by_definition,
             &mut interned_bindings,
@@ -1553,13 +1539,6 @@ impl<'db> UseDefMapBuilder<'db> {
         );
         let end_of_scope_members = Self::intern_end_of_scope_members(
             self.member_states,
-            &mut interned_bindings,
-            &mut interned_ids_by_bindings,
-            &mut interned_declarations,
-            &mut interned_ids_by_declarations,
-        );
-        let reachable_definitions_by_member = Self::intern_reachable_definitions_by_member(
-            self.reachable_member_definitions,
             &mut interned_bindings,
             &mut interned_ids_by_bindings,
             &mut interned_declarations,
@@ -1596,6 +1575,14 @@ impl<'db> UseDefMapBuilder<'db> {
                 .declarations
                 .finish(&mut self.reachability_constraints);
         }
+        for reachable_definition in &mut self.reachable_member_definitions {
+            reachable_definition
+                .bindings
+                .finish(&mut self.reachability_constraints);
+            reachable_definition
+                .declarations
+                .finish(&mut self.reachability_constraints);
+        }
         for enclosing_snapshot in &enclosing_snapshots {
             // Bindings are already marked above.
             if let ScopedEnclosingSnapshotDataId::Constraint(constraint) = enclosing_snapshot {
@@ -1615,7 +1602,7 @@ impl<'db> UseDefMapBuilder<'db> {
             end_of_scope_symbols: self.symbol_states,
             end_of_scope_members,
             reachable_definitions_by_symbol: self.reachable_symbol_definitions,
-            reachable_definitions_by_member,
+            reachable_definitions_by_member: self.reachable_member_definitions,
             declarations_by_binding,
             bindings_by_definition,
             enclosing_snapshots,
@@ -1734,64 +1721,6 @@ impl<'db> UseDefMapBuilder<'db> {
                 let place_state_id = ScopedPlaceStateId(bindings_id, declarations_id);
                 interned_ids_by_place_state.insert(place_state, place_state_id);
                 place_state_id
-            };
-            interned_ids_by_member.push(interned_id);
-        }
-
-        interned_ids_by_member.shrink_to_fit();
-        interned_ids_by_member
-    }
-
-    fn intern_reachable_definitions_by_member(
-        reachable_definitions_by_member: IndexVec<ScopedMemberId, ReachableDefinitions>,
-        interned_bindings: &mut IndexVec<ScopedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, ScopedBindingsId>,
-        interned_declarations: &mut IndexVec<ScopedDeclarationsId, Declarations>,
-        interned_ids_by_declarations: &mut FxHashMap<Declarations, ScopedDeclarationsId>,
-    ) -> IndexVec<ScopedMemberId, ScopedReachableDefinitionsId> {
-        let mut interned_ids_by_member: IndexVec<ScopedMemberId, ScopedReachableDefinitionsId> =
-            IndexVec::with_capacity(reachable_definitions_by_member.len());
-        let mut interned_ids_by_reachable_definitions: FxHashMap<
-            ReachableDefinitions,
-            ScopedReachableDefinitionsId,
-        > = FxHashMap::with_capacity_and_hasher(
-            reachable_definitions_by_member.len(),
-            FxBuildHasher,
-        );
-
-        for reachable_definitions in reachable_definitions_by_member {
-            let interned_id = if let Some(interned_id) =
-                interned_ids_by_reachable_definitions.get(&reachable_definitions)
-            {
-                *interned_id
-            } else {
-                let bindings_id = if let Some(bindings_id) =
-                    interned_ids_by_bindings.get(&reachable_definitions.bindings)
-                {
-                    *bindings_id
-                } else {
-                    let bindings_id =
-                        interned_bindings.push(reachable_definitions.bindings.clone());
-                    interned_ids_by_bindings
-                        .insert(reachable_definitions.bindings.clone(), bindings_id);
-                    bindings_id
-                };
-                let declarations_id = if let Some(declarations_id) =
-                    interned_ids_by_declarations.get(&reachable_definitions.declarations)
-                {
-                    *declarations_id
-                } else {
-                    let declarations_id =
-                        interned_declarations.push(reachable_definitions.declarations.clone());
-                    interned_ids_by_declarations
-                        .insert(reachable_definitions.declarations.clone(), declarations_id);
-                    declarations_id
-                };
-                let reachable_definitions_id =
-                    ScopedReachableDefinitionsId(bindings_id, declarations_id);
-                interned_ids_by_reachable_definitions
-                    .insert(reachable_definitions, reachable_definitions_id);
-                reachable_definitions_id
             };
             interned_ids_by_member.push(interned_id);
         }
