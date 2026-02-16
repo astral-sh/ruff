@@ -64,10 +64,12 @@ if sys.version_info >= (3, 12):
 
 _LocaleType: TypeAlias = tuple[str | None, str | None]
 
-class IllegalMonthError(ValueError):
+class IllegalMonthError(ValueError, IndexError):
+    month: int
     def __init__(self, month: int) -> None: ...
 
 class IllegalWeekdayError(ValueError):
+    weekday: int
     def __init__(self, weekday: int) -> None: ...
 
 def isleap(year: int) -> bool:

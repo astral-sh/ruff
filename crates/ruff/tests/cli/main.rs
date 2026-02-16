@@ -15,6 +15,8 @@ use std::{
 };
 use tempfile::TempDir;
 
+mod analyze_graph;
+mod format;
 mod lint;
 
 const BIN_NAME: &str = "ruff";
@@ -57,6 +59,14 @@ impl CliTest {
         Self::with_settings(|_, settings| settings)
     }
 
+    pub(crate) fn with_files<'a>(
+        files: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> anyhow::Result<Self> {
+        let case = Self::new()?;
+        case.write_files(files)?;
+        Ok(case)
+    }
+
     pub(crate) fn with_settings(
         setup_settings: impl FnOnce(&Path, insta::Settings) -> insta::Settings,
     ) -> Result<Self> {
@@ -76,6 +86,10 @@ impl CliTest {
         let mut settings = setup_settings(&project_dir, insta::Settings::clone_current());
 
         settings.add_filter(&tempdir_filter(project_dir.to_str().unwrap()), "[TMP]/");
+        settings.add_filter(
+            &tempdir_filter(Self::crate_root().to_str().unwrap()),
+            "CRATE_ROOT/",
+        );
         settings.add_filter(r#"\\([\w&&[^nr"]]\w|\s|\.)"#, "/$1");
         settings.add_filter(r"(Panicked at) [^:]+:\d+:\d+", "$1 <location>");
         settings.add_filter(ruff_linter::VERSION, "[VERSION]");
@@ -142,9 +156,34 @@ impl CliTest {
         Ok(())
     }
 
+    pub(crate) fn write_files<'a>(
+        &self,
+        files: impl IntoIterator<Item = (&'a str, &'a str)>,
+    ) -> Result<()> {
+        for file in files {
+            self.write_file(file.0, file.1)?;
+        }
+        Ok(())
+    }
+
     /// Returns the path to the test directory root.
     pub(crate) fn root(&self) -> &Path {
         &self.project_dir
+    }
+
+    /// Returns the path to the crate root.
+    pub(crate) fn crate_root() -> &'static Path {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+    }
+
+    /// Returns the path to a fixture file inside the crate root.
+    #[expect(clippy::unused_self)]
+    pub(crate) fn fixture_path(&self, filename: &str) -> PathBuf {
+        Self::crate_root()
+            .join("resources")
+            .join("test")
+            .join("fixtures")
+            .join(filename)
     }
 
     /// Creates a pre-configured ruff command for testing.
@@ -172,6 +211,12 @@ impl CliTest {
         // Unset all environment variables because they can affect test behavior.
         command.env_clear();
 
+        command
+    }
+
+    pub(crate) fn format_command(&self) -> Command {
+        let mut command = self.command();
+        command.args(["format", "--no-cache"]);
         command
     }
 }

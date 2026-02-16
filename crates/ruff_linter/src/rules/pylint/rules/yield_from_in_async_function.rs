@@ -24,6 +24,7 @@ use crate::Violation;
 ///         yield number
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct YieldFromInAsyncFunction;
 
 impl Violation for YieldFromInAsyncFunction {

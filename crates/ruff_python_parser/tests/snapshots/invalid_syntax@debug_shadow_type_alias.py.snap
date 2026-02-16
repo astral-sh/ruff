@@ -67,8 +67,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 78..87,
                                         node_index: NodeIndex(None),
+                                        range: 78..87,
                                         name: Identifier {
                                             id: Name("__debug__"),
                                             range: 78..87,

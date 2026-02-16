@@ -33,3 +33,10 @@ class ShellConfig:
 
     def run(self, username):
         Popen("true", shell={**self.shell_defaults, **self.fetch_shell_config(username)})
+
+# Additional truthiness cases for generator, lambda, and f-strings
+Popen("true", shell=(i for i in ()))
+Popen("true", shell=lambda: 0)
+Popen("true", shell=f"{b''}")
+x = 1
+Popen("true", shell=f"{x=}")

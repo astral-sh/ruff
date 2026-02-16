@@ -13,7 +13,6 @@ use log::{debug, warn};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_linter::codes::Rule;
 use ruff_linter::linter::{FixTable, FixerResult, LinterResult, ParseSource, lint_fix, lint_only};
-use ruff_linter::message::create_syntax_error_diagnostic;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::pyproject_toml::lint_pyproject_toml;
 use ruff_linter::settings::types::UnsafeFixes;
@@ -21,7 +20,7 @@ use ruff_linter::settings::{LinterSettings, flags};
 use ruff_linter::source_kind::{SourceError, SourceKind};
 use ruff_linter::{IOError, Violation, fs};
 use ruff_notebook::{NotebookError, NotebookIndex};
-use ruff_python_ast::{PySourceType, SourceType, TomlSourceType};
+use ruff_python_ast::{SourceType, TomlSourceType};
 use ruff_source_file::SourceFileBuilder;
 use ruff_text_size::TextRange;
 use ruff_workspace::Settings;
@@ -103,11 +102,7 @@ impl Diagnostics {
                 let name = path.map_or_else(|| "-".into(), Path::to_string_lossy);
                 let dummy = SourceFileBuilder::new(name, "").finish();
                 Self::new(
-                    vec![create_syntax_error_diagnostic(
-                        dummy,
-                        err,
-                        TextRange::default(),
-                    )],
+                    vec![Diagnostic::invalid_syntax(dummy, err, TextRange::default())],
                     FxHashMap::default(),
                 )
             }
@@ -213,40 +208,39 @@ pub(crate) fn lint_path(
 
     debug!("Checking: {}", path.display());
 
-    let source_type = match settings.extension.get(path).map(PySourceType::from) {
-        Some(source_type) => source_type,
-        None => match SourceType::from(path) {
-            SourceType::Toml(TomlSourceType::Pyproject) => {
-                let diagnostics = if settings
-                    .rules
-                    .iter_enabled()
-                    .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
-                {
-                    let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
-                        Ok(contents) => contents,
-                        Err(err) => {
-                            return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
-                        }
-                    };
-                    let source_file =
-                        SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
-                    lint_pyproject_toml(&source_file, settings)
-                } else {
-                    vec![]
+    let source_type = match settings.extension.get_source_type(path) {
+        SourceType::Toml(TomlSourceType::Pyproject) => {
+            let diagnostics = if settings
+                .rules
+                .iter_enabled()
+                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+            {
+                let contents = match std::fs::read_to_string(path).map_err(SourceError::from) {
+                    Ok(contents) => contents,
+                    Err(err) => {
+                        return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
+                    }
                 };
-                return Ok(Diagnostics {
-                    inner: diagnostics,
-                    ..Diagnostics::default()
-                });
-            }
-            SourceType::Toml(_) => return Ok(Diagnostics::default()),
-            SourceType::Python(source_type) => source_type,
-        },
+                let source_file = SourceFileBuilder::new(path.to_string_lossy(), contents).finish();
+                lint_pyproject_toml(&source_file, settings)
+            } else {
+                vec![]
+            };
+            return Ok(Diagnostics {
+                inner: diagnostics,
+                ..Diagnostics::default()
+            });
+        }
+        SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
+        SourceType::Python(source_type) => source_type,
     };
 
     // Extract the sources from the file.
-    let source_kind = match SourceKind::from_path(path, source_type) {
-        Ok(Some(source_kind)) => source_kind,
+    let source_kind = match SourceKind::from_path(path, SourceType::Python(source_type)) {
+        Ok(Some(source_kind)) => match source_kind {
+            SourceKind::Markdown(_) => return Ok(Diagnostics::default()), // skip linting markdown
+            _ => source_kind,
+        },
         Ok(None) => return Ok(Diagnostics::default()),
         Err(err) => {
             return Ok(Diagnostics::from_source_error(&err, Some(path), settings));
@@ -357,39 +351,38 @@ pub(crate) fn lint_stdin(
     noqa: flags::Noqa,
     fix_mode: flags::FixMode,
 ) -> Result<Diagnostics> {
-    let source_type = match path.and_then(|path| settings.linter.extension.get(path)) {
-        None => match path.map(SourceType::from).unwrap_or_default() {
-            SourceType::Python(source_type) => source_type,
-
-            SourceType::Toml(source_type) if source_type.is_pyproject() => {
-                if !settings
-                    .linter
-                    .rules
-                    .iter_enabled()
-                    .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
-                {
-                    return Ok(Diagnostics::default());
-                }
-
-                let path = path.unwrap();
-                let source_file =
-                    SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();
-
-                match fix_mode {
-                    flags::FixMode::Diff | flags::FixMode::Generate => {}
-                    flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{contents}")?,
-                }
-
-                return Ok(Diagnostics {
-                    inner: lint_pyproject_toml(&source_file, &settings.linter),
-                    fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
-                    notebook_indexes: FxHashMap::default(),
-                });
+    let (source_type, py_source_type) = match path
+        .map(|path| settings.linter.extension.get_source_type(path))
+        .unwrap_or_default()
+    {
+        SourceType::Toml(source_type) if source_type.is_pyproject() => {
+            if !settings
+                .linter
+                .rules
+                .iter_enabled()
+                .any(|rule_code| rule_code.lint_source().is_pyproject_toml())
+            {
+                return Ok(Diagnostics::default());
             }
 
-            SourceType::Toml(_) => return Ok(Diagnostics::default()),
-        },
-        Some(language) => PySourceType::from(language),
+            let path = path.unwrap();
+            let source_file =
+                SourceFileBuilder::new(path.to_string_lossy(), contents.clone()).finish();
+
+            match fix_mode {
+                flags::FixMode::Diff | flags::FixMode::Generate => {}
+                flags::FixMode::Apply => write!(&mut io::stdout().lock(), "{contents}")?,
+            }
+
+            return Ok(Diagnostics {
+                inner: lint_pyproject_toml(&source_file, &settings.linter),
+                fixed: FixMap::from_iter([(fs::relativize_path(path), FixTable::default())]),
+                notebook_indexes: FxHashMap::default(),
+            });
+        }
+
+        SourceType::Toml(_) | SourceType::Markdown => return Ok(Diagnostics::default()),
+        source_type @ SourceType::Python(py_source_type) => (source_type, py_source_type),
     };
 
     // Extract the sources from the file.
@@ -415,7 +408,7 @@ pub(crate) fn lint_stdin(
                 settings.unsafe_fixes,
                 &settings.linter,
                 &source_kind,
-                source_type,
+                py_source_type,
             ) {
                 match fix_mode {
                     flags::FixMode::Apply => {
@@ -448,7 +441,7 @@ pub(crate) fn lint_stdin(
                     &settings.linter,
                     noqa,
                     &source_kind,
-                    source_type,
+                    py_source_type,
                     ParseSource::None,
                 );
 
@@ -468,7 +461,7 @@ pub(crate) fn lint_stdin(
                 &settings.linter,
                 noqa,
                 &source_kind,
-                source_type,
+                py_source_type,
                 ParseSource::None,
             );
             let transformed = source_kind;

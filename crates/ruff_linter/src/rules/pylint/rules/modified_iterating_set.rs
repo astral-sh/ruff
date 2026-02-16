@@ -46,6 +46,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.5")]
 pub(crate) struct ModifiedIteratingSet {
     name: Name,
 }

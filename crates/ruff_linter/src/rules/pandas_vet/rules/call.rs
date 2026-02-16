@@ -40,6 +40,7 @@ use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 /// - [Pandas documentation: `isnull`](https://pandas.pydata.org/docs/reference/api/pandas.isnull.html#pandas.isnull)
 /// - [Pandas documentation: `isna`](https://pandas.pydata.org/docs/reference/api/pandas.isna.html#pandas.isna)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotIsNull;
 
 impl Violation for PandasUseOfDotIsNull {
@@ -80,6 +81,7 @@ impl Violation for PandasUseOfDotIsNull {
 /// - [Pandas documentation: `notnull`](https://pandas.pydata.org/docs/reference/api/pandas.notnull.html#pandas.notnull)
 /// - [Pandas documentation: `notna`](https://pandas.pydata.org/docs/reference/api/pandas.notna.html#pandas.notna)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotNotNull;
 
 impl Violation for PandasUseOfDotNotNull {
@@ -116,6 +118,7 @@ impl Violation for PandasUseOfDotNotNull {
 /// - [Pandas documentation: Reshaping and pivot tables](https://pandas.pydata.org/docs/user_guide/reshaping.html)
 /// - [Pandas documentation: `pivot_table`](https://pandas.pydata.org/docs/reference/api/pandas.pivot_table.html#pandas.pivot_table)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotPivotOrUnstack;
 
 impl Violation for PandasUseOfDotPivotOrUnstack {
@@ -153,6 +156,7 @@ impl Violation for PandasUseOfDotPivotOrUnstack {
 /// - [Pandas documentation: `melt`](https://pandas.pydata.org/docs/reference/api/pandas.melt.html)
 /// - [Pandas documentation: `stack`](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.stack.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfDotStack;
 
 impl Violation for PandasUseOfDotStack {

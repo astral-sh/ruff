@@ -1,0 +1,64 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: variables.md - Legacy type variables - Type variables - Invalid defaults - Concrete default with constraints
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variables.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any, TypeVar
+ 2 | 
+ 3 | # error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bytes` is not one of the constraints of `T`"
+ 4 | T = TypeVar("T", int, str, default=bytes)
+ 5 | 
+ 6 | S = TypeVar("S", int, str, default=int)
+ 7 | 
+ 8 | # A subtype is not sufficient; the default must be exactly one of the constraints.
+ 9 | # error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bool` is not one of the constraints of `U`"
+10 | U = TypeVar("U", int, str, default=bool)
+11 | 
+12 | # `Any` is always allowed as a default, even for constrained TypeVars.
+13 | V = TypeVar("V", int, str, default=Any)
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
+ --> src/mdtest_snippet.py:4:18
+  |
+3 | # error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bytes` is not one of the con…
+4 | T = TypeVar("T", int, str, default=bytes)
+  |                  --------          ^^^^^ `bytes` is not one of the constraints of `T`
+  |                  |
+  |                  Constraints of `T`
+5 |
+6 | S = TypeVar("S", int, str, default=int)
+  |
+info: rule `invalid-type-variable-default` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-default]: TypeVar default is inconsistent with the TypeVar's constraints
+  --> src/mdtest_snippet.py:10:18
+   |
+ 8 | # A subtype is not sufficient; the default must be exactly one of the constraints.
+ 9 | # error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bool` is not one of the con…
+10 | U = TypeVar("U", int, str, default=bool)
+   |                  --------          ^^^^ `bool` is not one of the constraints of `U`
+   |                  |
+   |                  Constraints of `U`
+11 |
+12 | # `Any` is always allowed as a default, even for constrained TypeVars.
+   |
+info: rule `invalid-type-variable-default` is enabled by default
+
+```

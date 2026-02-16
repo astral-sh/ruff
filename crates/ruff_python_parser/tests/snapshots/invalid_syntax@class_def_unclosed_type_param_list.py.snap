@@ -27,8 +27,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 10..12,
                                         node_index: NodeIndex(None),
+                                        range: 10..12,
                                         name: Identifier {
                                             id: Name("T1"),
                                             range: 10..12,
@@ -40,8 +40,8 @@ Module(
                                 ),
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 14..17,
                                         node_index: NodeIndex(None),
+                                        range: 14..17,
                                         name: Identifier {
                                             id: Name("T2"),
                                             range: 15..17,
@@ -121,7 +121,7 @@ Module(
 
   |
 1 | class Foo[T1, *T2(a, b):
-  |                  ^ Syntax Error: Expected ']', found '('
+  |                  ^ Syntax Error: Expected `]`, found `(`
 2 |     pass
 3 | x = 10
   |

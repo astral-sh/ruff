@@ -7,7 +7,7 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
     // Long flag
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -22,11 +22,10 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Short flag
-    assert_cmd_snapshot!(case.command().arg("-c").arg("terminal.error-on-warning=true"), @r"
+    assert_cmd_snapshot!(case.command().arg("-c").arg("terminal.error-on-warning=true"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -41,7 +40,6 @@ fn cli_config_args_toml_string_basic() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -61,7 +59,7 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
     ])?;
 
     // Exit code of 1 due to the setting in `ty.toml`
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -76,11 +74,10 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Exit code of 0 because the `ty.toml` setting is overwritten by `--config`
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=false"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=false"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -95,7 +92,6 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -104,7 +100,7 @@ fn cli_config_args_overrides_ty_toml() -> anyhow::Result<()> {
 #[test]
 fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true").arg("--config").arg("terminal.error-on-warning=false"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config").arg("terminal.error-on-warning=true").arg("--config").arg("terminal.error-on-warning=false"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -119,7 +115,6 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -128,7 +123,7 @@ fn cli_config_args_later_overrides_earlier() -> anyhow::Result<()> {
 #[test]
 fn cli_config_args_invalid_option() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(1)")?;
-    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @r"
+    assert_cmd_snapshot!(case.command().arg("--config").arg("bad-option=true"), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -138,7 +133,7 @@ fn cli_config_args_invalid_option() -> anyhow::Result<()> {
       |
     1 | bad-option=true
       | ^^^^^^^^^^
-    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`, `overrides`
+    unknown field `bad-option`, expected one of `environment`, `src`, `rules`, `terminal`, `analysis`, `overrides`
 
 
     Usage: ty <COMMAND>
@@ -165,7 +160,7 @@ fn config_file_override() -> anyhow::Result<()> {
     ])?;
 
     // Ensure flag works via CLI arg
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config-file").arg("ty-override.toml"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--config-file").arg("ty-override.toml"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -180,11 +175,10 @@ fn config_file_override() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     // Ensure the flag works via an environment variable
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").env("TY_CONFIG_FILE", "ty-override.toml"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").env("TY_CONFIG_FILE", "ty-override.toml"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -199,7 +193,6 @@ fn config_file_override() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())

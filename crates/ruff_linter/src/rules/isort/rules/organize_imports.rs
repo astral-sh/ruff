@@ -1,11 +1,11 @@
 use itertools::{EitherOrBoth, Itertools};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::whitespace::trailing_lines_end;
 use ruff_python_ast::{PySourceType, PythonVersion, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
-use ruff_python_parser::Tokens;
 use ruff_python_trivia::{PythonWhitespace, leading_indentation, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlines};
 use ruff_text_size::{Ranged, TextRange};
@@ -39,6 +39,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```
 ///
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.110")]
 pub(crate) struct UnsortedImports;
 
 impl Violation for UnsortedImports {
@@ -109,8 +110,42 @@ pub(crate) fn organize_imports(
     }
 
     // Extract comments. Take care to grab any inline comments from the last line.
+    // Also extend the start backward to include any import heading comments above
+    // the first import, so they're collected and can be stripped/re-added correctly.
+    let import_headings = &settings.isort.import_headings;
+    let (comment_start, fix_start) = if import_headings.is_empty() {
+        // Preserve original behavior: comments from import start, fix range from line start.
+        (range.start(), locator.line_start(range.start()))
+    } else {
+        // Heading comments are already formatted as "# {heading}" in settings.
+        // Walk backward through comment ranges to find adjacent heading comments above the first import.
+        let comment_ranges: &[TextRange] = indexer.comment_ranges();
+        let import_line_start = locator.line_start(range.start());
+        let partition =
+            comment_ranges.partition_point(|comment| comment.start() < import_line_start);
+
+        let mut earliest = import_line_start;
+        for comment_range in comment_ranges[..partition].iter().rev() {
+            // The comment's line must end right where 'earliest' starts (adjacent).
+            if locator.full_line_end(comment_range.end()) != earliest {
+                break;
+            }
+
+            let comment_text = locator.slice(*comment_range);
+            if import_headings
+                .values()
+                .any(|header| comment_text == header.as_str())
+            {
+                earliest = locator.line_start(comment_range.start());
+            } else {
+                break;
+            }
+        }
+        (earliest, earliest)
+    };
+
     let comments = comments::collect_comments(
-        TextRange::new(range.start(), locator.full_line_end(range.end())),
+        TextRange::new(comment_start, locator.full_line_end(range.end())),
         locator,
         indexer.comment_ranges(),
     );
@@ -138,7 +173,7 @@ pub(crate) fn organize_imports(
     );
 
     // Expand the span the entire range, including leading and trailing space.
-    let fix_range = TextRange::new(locator.line_start(range.start()), trailing_line_end);
+    let fix_range = TextRange::new(fix_start, trailing_line_end);
     let actual = locator.slice(fix_range);
     if matches_ignoring_indentation(actual, &expected) {
         return;

@@ -35,6 +35,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `NotImplemented`](https://docs.python.org/3/library/constants.html#NotImplemented)
 /// - [Python documentation: `NotImplementedError`](https://docs.python.org/3/library/exceptions.html#NotImplementedError)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct RaiseNotImplemented;
 
 impl Violation for RaiseNotImplemented {

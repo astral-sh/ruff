@@ -148,7 +148,7 @@ Module(
 
   |
 1 | a = pass = c
-  |     ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+  |     ^^^^ Syntax Error: Expected an identifier, but found a keyword `pass` that cannot be used here
 2 | a + b
 3 | a = b = pass = c
   |
@@ -158,6 +158,6 @@ Module(
 1 | a = pass = c
 2 | a + b
 3 | a = b = pass = c
-  |         ^^^^ Syntax Error: Expected an identifier, but found a keyword 'pass' that cannot be used here
+  |         ^^^^ Syntax Error: Expected an identifier, but found a keyword `pass` that cannot be used here
 4 | a + b
   |

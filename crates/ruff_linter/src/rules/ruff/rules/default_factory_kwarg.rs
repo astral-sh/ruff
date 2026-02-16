@@ -3,8 +3,8 @@ use anyhow::Result;
 use ast::Keyword;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_constant;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Expr};
-use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -51,6 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// defaultdict(list)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct DefaultFactoryKwarg {
     default_factory: SourceCodeSnippet,
 }
@@ -107,9 +108,8 @@ pub(crate) fn default_factory_kwarg(checker: &Checker, call: &ast::ExprCall) {
         },
         call.range(),
     );
-    diagnostic.try_set_fix(|| {
-        convert_to_positional(call, keyword, checker.locator(), checker.comment_ranges())
-    });
+    diagnostic
+        .try_set_fix(|| convert_to_positional(call, keyword, checker.locator(), checker.tokens()));
 }
 
 /// Returns `true` if a value is definitively not callable (e.g., `1` or `[]`).
@@ -135,7 +135,7 @@ fn convert_to_positional(
     call: &ast::ExprCall,
     default_factory: &Keyword,
     locator: &Locator,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
 ) -> Result<Fix> {
     if call.arguments.len() == 1 {
         // Ex) `defaultdict(default_factory=list)`
@@ -152,7 +152,7 @@ fn convert_to_positional(
             &call.arguments,
             Parentheses::Preserve,
             locator.contents(),
-            comment_ranges,
+            tokens,
         )?;
 
         // Second, insert the value as the first positional argument.

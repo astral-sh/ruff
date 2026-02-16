@@ -53,6 +53,7 @@ use crate::{
 /// [TID253]: https://docs.astral.sh/ruff/rules/banned-module-level-imports/
 /// [PEP 8]: https://peps.python.org/pep-0008/#imports
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ImportOutsideTopLevel;
 
 impl Violation for ImportOutsideTopLevel {

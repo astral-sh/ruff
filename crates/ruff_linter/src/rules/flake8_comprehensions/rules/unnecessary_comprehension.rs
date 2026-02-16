@@ -43,7 +43,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// >>> {x: y for x, y in d1}  # Iterates over the keys of a mapping
 /// {1: 2, 4: 5}
 /// >>> dict(d1)               # Ruff's incorrect suggested fix
-/// (1, 2): 3, (4, 5): 6}
+/// {(1, 2): 3, (4, 5): 6}
 /// >>> dict(d1.keys())        # Correct fix
 /// {1: 2, 4: 5}
 /// ```
@@ -57,6 +57,7 @@ use crate::rules::flake8_comprehensions::fixes;
 ///
 /// Additionally, this fix may drop comments when rewriting the comprehension.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UnnecessaryComprehension {
     kind: ComprehensionKind,
 }

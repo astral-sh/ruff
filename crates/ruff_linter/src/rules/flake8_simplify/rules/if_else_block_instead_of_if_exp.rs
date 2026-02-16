@@ -55,12 +55,18 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Ternary operators can also make it harder to measure [code coverage]
 /// with tools that use line profiling.
 ///
+/// ## Options
+///
+/// - `lint.pycodestyle.max-line-length`
+/// - `indent-width`
+///
 /// ## References
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)
 ///
 /// [code coverage]: https://github.com/nedbat/coveragepy/issues/509
 /// [pycodestyle.max-line-length]: https://docs.astral.sh/ruff/settings/#lint_pycodestyle_max-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct IfElseBlockInsteadOfIfExp {
     /// The ternary or binary expression to replace the `if`-`else`-block.
     contents: String,

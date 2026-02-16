@@ -33,7 +33,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```python
 /// import numpy
 /// ```
+///
+/// ## Options
+///
+/// The rule will emit a diagnostic but not a fix if the import is required by the `isort`
+/// configuration option:
+///
+/// - `lint.isort.required-imports`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.156")]
 pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
 }
@@ -69,7 +77,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     }
 
     // A re-export in __init__.py is probably intentional.
-    if checker.path().ends_with("__init__.py") {
+    if checker.in_init_module() {
         return;
     }
 
@@ -108,7 +116,7 @@ pub(crate) fn useless_import_from_alias(
     }
 
     // A re-export in __init__.py is probably intentional.
-    if checker.path().ends_with("__init__.py") {
+    if checker.in_init_module() {
         return;
     }
 

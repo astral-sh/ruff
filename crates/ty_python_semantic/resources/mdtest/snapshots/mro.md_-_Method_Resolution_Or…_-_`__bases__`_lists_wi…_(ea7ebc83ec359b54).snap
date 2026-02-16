@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: mro.md - Method Resolution Order tests - `__bases__` lists with duplicate bases
 mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
@@ -12,11 +13,11 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 ## mdtest_snippet.py
 
 ```
- 1 | from typing_extensions import reveal_type
+ 1 | from ty_extensions import reveal_mro
  2 | 
  3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
  4 | 
- 5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+ 5 | reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
  6 | 
  7 | class Spam: ...
  8 | class Eggs: ...
@@ -38,12 +39,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 24 | 
 25 | # fmt: on
 26 | 
-27 | reveal_type(Ham.__mro__)  # revealed: tuple[<class 'Ham'>, Unknown, <class 'object'>]
+27 | reveal_mro(Ham)  # revealed: (<class 'Ham'>, Unknown, <class 'object'>)
 28 | 
 29 | class Mushrooms: ...
 30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
 31 | 
-32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+32 | reveal_mro(Omelette)  # revealed: (<class 'Omelette'>, Unknown, <class 'object'>)
 33 | 
 34 | # fmt: off
 35 | 
@@ -82,7 +83,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 68 | # error: [duplicate-base]
 69 | class D(
 70 |     A,
-71 |     # error: [unused-ignore-comment]
+71 |     # error: [unused-type-ignore-comment]
 72 |     A,  # type: ignore[duplicate-base]
 73 | ): ...
 74 | 
@@ -91,7 +92,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 77 |     A,
 78 |     A
 79 | ):
-80 |     # error: [unused-ignore-comment]
+80 |     # error: [unused-type-ignore-comment]
 81 |     x: int  # type: ignore[duplicate-base]
 82 | 
 83 | # fmt: on
@@ -103,40 +104,26 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md
 error[duplicate-base]: Duplicate base class `str`
  --> src/mdtest_snippet.py:3:7
   |
-1 | from typing_extensions import reveal_type
+1 | from ty_extensions import reveal_mro
 2 |
 3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
   |       ^^^^^^^^^^^^^
 4 |
-5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+5 | reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
   |
 info: The definition of class `Foo` will raise `TypeError` at runtime
  --> src/mdtest_snippet.py:3:11
   |
-1 | from typing_extensions import reveal_type
+1 | from ty_extensions import reveal_mro
 2 |
 3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
   |           ---  ^^^ Class `str` later repeated here
   |           |
   |           Class `str` first included in bases list here
 4 |
-5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+5 | reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
   |
 info: rule `duplicate-base` is enabled by default
-
-```
-
-```
-info[revealed-type]: Revealed type
- --> src/mdtest_snippet.py:5:13
-  |
-3 | class Foo(str, str): ...  # error: [duplicate-base] "Duplicate base class `str`"
-4 |
-5 | reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
-  |             ^^^^^^^^^^^ `tuple[<class 'Foo'>, Unknown, <class 'object'>]`
-6 |
-7 | class Spam: ...
-  |
 
 ```
 
@@ -216,20 +203,6 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:27:13
-   |
-25 | # fmt: on
-26 |
-27 | reveal_type(Ham.__mro__)  # revealed: tuple[<class 'Ham'>, Unknown, <class 'object'>]
-   |             ^^^^^^^^^^^ `tuple[<class 'Ham'>, Unknown, <class 'object'>]`
-28 |
-29 | class Mushrooms: ...
-   |
-
-```
-
-```
 error[duplicate-base]: Duplicate base class `Mushrooms`
   --> src/mdtest_snippet.py:30:7
    |
@@ -237,7 +210,7 @@ error[duplicate-base]: Duplicate base class `Mushrooms`
 30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 31 |
-32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+32 | reveal_mro(Omelette)  # revealed: (<class 'Omelette'>, Unknown, <class 'object'>)
    |
 info: The definition of class `Omelette` will raise `TypeError` at runtime
   --> src/mdtest_snippet.py:30:28
@@ -248,23 +221,9 @@ info: The definition of class `Omelette` will raise `TypeError` at runtime
    |                            |
    |                            Class `Mushrooms` first included in bases list here
 31 |
-32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
+32 | reveal_mro(Omelette)  # revealed: (<class 'Omelette'>, Unknown, <class 'object'>)
    |
 info: rule `duplicate-base` is enabled by default
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:32:13
-   |
-30 | class Omelette(Spam, Eggs, Mushrooms, Mushrooms): ...  # error: [duplicate-base]
-31 |
-32 | reveal_type(Omelette.__mro__)  # revealed: tuple[<class 'Omelette'>, Unknown, <class 'object'>]
-   |             ^^^^^^^^^^^^^^^^ `tuple[<class 'Omelette'>, Unknown, <class 'object'>]`
-33 |
-34 | # fmt: off
-   |
 
 ```
 
@@ -321,7 +280,7 @@ error[duplicate-base]: Duplicate base class `A`
 69 |   class D(
    |  _______^
 70 | |     A,
-71 | |     # error: [unused-ignore-comment]
+71 | |     # error: [unused-type-ignore-comment]
 72 | |     A,  # type: ignore[duplicate-base]
 73 | | ): ...
    | |_^
@@ -335,7 +294,7 @@ info: The definition of class `D` will raise `TypeError` at runtime
 69 | class D(
 70 |     A,
    |     - Class `A` first included in bases list here
-71 |     # error: [unused-ignore-comment]
+71 |     # error: [unused-type-ignore-comment]
 72 |     A,  # type: ignore[duplicate-base]
    |     ^ Class `A` later repeated here
 73 | ): ...
@@ -345,15 +304,24 @@ info: rule `duplicate-base` is enabled by default
 ```
 
 ```
-info[unused-ignore-comment]
+warning[unused-type-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:72:9
    |
 70 |     A,
-71 |     # error: [unused-ignore-comment]
+71 |     # error: [unused-type-ignore-comment]
 72 |     A,  # type: ignore[duplicate-base]
-   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused blanket `type: ignore` directive
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 73 | ): ...
    |
+help: Remove the unused suppression comment
+69 | class D(
+70 |     A,
+71 |     # error: [unused-type-ignore-comment]
+   -     A,  # type: ignore[duplicate-base]
+72 +     A,
+73 | ): ...
+74 | 
+75 | # error: [duplicate-base]
 
 ```
 
@@ -368,7 +336,7 @@ error[duplicate-base]: Duplicate base class `A`
 78 | |     A
 79 | | ):
    | |_^
-80 |       # error: [unused-ignore-comment]
+80 |       # error: [unused-type-ignore-comment]
 81 |       x: int  # type: ignore[duplicate-base]
    |
 info: The definition of class `E` will raise `TypeError` at runtime
@@ -381,22 +349,30 @@ info: The definition of class `E` will raise `TypeError` at runtime
 78 |     A
    |     ^ Class `A` later repeated here
 79 | ):
-80 |     # error: [unused-ignore-comment]
+80 |     # error: [unused-type-ignore-comment]
    |
 info: rule `duplicate-base` is enabled by default
 
 ```
 
 ```
-info[unused-ignore-comment]
+warning[unused-type-ignore-comment]: Unused blanket `type: ignore` directive
   --> src/mdtest_snippet.py:81:13
    |
 79 | ):
-80 |     # error: [unused-ignore-comment]
+80 |     # error: [unused-type-ignore-comment]
 81 |     x: int  # type: ignore[duplicate-base]
-   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unused blanket `type: ignore` directive
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 82 |
 83 | # fmt: on
    |
+help: Remove the unused suppression comment
+78 |     A
+79 | ):
+80 |     # error: [unused-type-ignore-comment]
+   -     x: int  # type: ignore[duplicate-base]
+81 +     x: int
+82 | 
+83 | # fmt: on
 
 ```

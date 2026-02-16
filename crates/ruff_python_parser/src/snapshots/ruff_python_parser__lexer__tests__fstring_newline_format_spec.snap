@@ -44,11 +44,16 @@ expression: "lex_invalid(source, Mode::Module)"
         12..13,
     ),
     (
-        Unknown,
+        InterpolatedStringMiddle(
+            "d",
+        ),
         13..14,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        NonLogicalNewline,
+        Newline,
         14..15,
     ),
     (
@@ -62,8 +67,13 @@ expression: "lex_invalid(source, Mode::Module)"
         16..18,
     ),
     (
-        Unknown,
+        String(
+            "",
+        ),
         18..19,
+        TokenFlags(
+            UNCLOSED_STRING,
+        ),
     ),
     (
         Newline,
@@ -104,12 +114,21 @@ expression: "lex_invalid(source, Mode::Module)"
         31..32,
     ),
     (
-        Unknown,
+        InterpolatedStringMiddle(
+            "a",
+        ),
         32..33,
+        TokenFlags(
+            F_STRING,
+        ),
     ),
     (
-        NonLogicalNewline,
+        Newline,
         33..34,
+    ),
+    (
+        Indent,
+        34..42,
     ),
     (
         Name(
@@ -118,8 +137,12 @@ expression: "lex_invalid(source, Mode::Module)"
         42..43,
     ),
     (
-        NonLogicalNewline,
+        Newline,
         43..44,
+    ),
+    (
+        Dedent,
+        44..44,
     ),
     (
         Rbrace,
@@ -132,8 +155,13 @@ expression: "lex_invalid(source, Mode::Module)"
         45..47,
     ),
     (
-        Unknown,
+        String(
+            "",
+        ),
         47..48,
+        TokenFlags(
+            UNCLOSED_STRING,
+        ),
     ),
     (
         Newline,

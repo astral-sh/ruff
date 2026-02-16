@@ -33,11 +33,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     """Return the mean of the given values."""
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct BlankLineBeforeFunction {
     num_lines: usize,
 }
@@ -79,11 +84,16 @@ impl Violation for BlankLineBeforeFunction {
 ///     return sum(values) / len(values)
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct BlankLineAfterFunction {
     num_lines: usize,
 }

@@ -870,6 +870,8 @@ class error(Exception): ...
 @final
 class window:  # undocumented
     encoding: str
+    """the typecode character used to create the array"""
+
     @overload
     def addch(self, ch: _ChType, attr: int = ...) -> None:
         """addch([y, x,] ch, [attr=_curses.A_NORMAL])
@@ -942,7 +944,7 @@ class window:  # undocumented
         """Remove attribute attr from the "background" set."""
 
     def attron(self, attr: int, /) -> None:
-        """Add attribute attr from the "background" set."""
+        """Add attribute attr to the "background" set."""
 
     def attrset(self, attr: int, /) -> None:
         """Set the "background" set of attributes."""

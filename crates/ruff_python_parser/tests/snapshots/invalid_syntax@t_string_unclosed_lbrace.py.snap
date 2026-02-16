@@ -46,6 +46,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -70,7 +71,7 @@ Module(
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
-                                                    range: 51..58,
+                                                    range: 51..57,
                                                     node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
@@ -81,7 +82,7 @@ Module(
                                                         },
                                                     ),
                                                     debug_text: None,
-                                                    conversion: None,
+                                                    conversion: Repr,
                                                     format_spec: None,
                                                 },
                                             ),
@@ -90,6 +91,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -139,6 +141,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -150,71 +153,87 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 68..81,
+                    range: 68..72,
                     value: TString(
                         ExprTString {
                             node_index: NodeIndex(None),
-                            range: 68..81,
+                            range: 68..72,
                             value: TStringValue {
-                                inner: Concatenated(
-                                    [
-                                        TString {
-                                            range: 68..72,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 70..71,
-                                                        node_index: NodeIndex(None),
-                                                        expression: Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 71..71,
-                                                                id: Name(""),
-                                                                ctx: Invalid,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: false,
-                                            },
+                                inner: Single(
+                                    TString {
+                                        range: 68..72,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 70..71,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 71..71,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: false,
+                                            unclosed: false,
                                         },
-                                        TString {
-                                            range: 73..81,
-                                            node_index: NodeIndex(None),
-                                            elements: [
-                                                Interpolation(
-                                                    InterpolatedElement {
-                                                        range: 77..78,
-                                                        node_index: NodeIndex(None),
-                                                        expression: Name(
-                                                            ExprName {
-                                                                node_index: NodeIndex(None),
-                                                                range: 78..78,
-                                                                id: Name(""),
-                                                                ctx: Invalid,
-                                                            },
-                                                        ),
-                                                        debug_text: None,
-                                                        conversion: None,
-                                                        format_spec: None,
-                                                    },
-                                                ),
-                                            ],
-                                            flags: TStringFlags {
-                                                quote_style: Double,
-                                                prefix: Regular,
-                                                triple_quoted: true,
-                                            },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 73..81,
+                    value: TString(
+                        ExprTString {
+                            node_index: NodeIndex(None),
+                            range: 73..81,
+                            value: TStringValue {
+                                inner: Single(
+                                    TString {
+                                        range: 73..81,
+                                        node_index: NodeIndex(None),
+                                        elements: [
+                                            Interpolation(
+                                                InterpolatedElement {
+                                                    range: 77..78,
+                                                    node_index: NodeIndex(None),
+                                                    expression: Name(
+                                                        ExprName {
+                                                            node_index: NodeIndex(None),
+                                                            range: 78..78,
+                                                            id: Name(""),
+                                                            ctx: Invalid,
+                                                        },
+                                                    ),
+                                                    debug_text: None,
+                                                    conversion: None,
+                                                    format_spec: None,
+                                                },
+                                            ),
+                                        ],
+                                        flags: TStringFlags {
+                                            quote_style: Double,
+                                            prefix: Regular,
+                                            triple_quoted: true,
+                                            unclosed: false,
                                         },
-                                    ],
+                                    },
                                 ),
                             },
                         },
@@ -230,25 +249,7 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
-  |    ^ Syntax Error: missing closing quote in string literal
-3 | t"{foo!r"
-4 | t"{foo="
-  |
-
-
-  |
-1 | # parse_options: {"target-version": "3.14"}
-2 | t"{"
-  |     ^ Syntax Error: t-string: unterminated string
-3 | t"{foo!r"
-4 | t"{foo="
-  |
-
-
-  |
-1 | # parse_options: {"target-version": "3.14"}
-2 | t"{"
-  |     ^ Syntax Error: t-string: unterminated string
+  |    ^ Syntax Error: Expected an expression
 3 | t"{foo!r"
 4 | t"{foo="
   |
@@ -258,27 +259,7 @@ Module(
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"{"
 3 | t"{foo!r"
-  |        ^^ Syntax Error: missing closing quote in string literal
-4 | t"{foo="
-5 | t"{"
-  |
-
-
-  |
-1 | # parse_options: {"target-version": "3.14"}
-2 | t"{"
-3 | t"{foo!r"
-  |          ^ Syntax Error: t-string: unterminated string
-4 | t"{foo="
-5 | t"{"
-  |
-
-
-  |
-1 | # parse_options: {"target-version": "3.14"}
-2 | t"{"
-3 | t"{foo!r"
-  |          ^ Syntax Error: t-string: unterminated string
+  |         ^ Syntax Error: t-string: expecting `}`
 4 | t"{foo="
 5 | t"{"
   |
@@ -288,47 +269,7 @@ Module(
 2 | t"{"
 3 | t"{foo!r"
 4 | t"{foo="
-  | ^^ Syntax Error: t-string: expecting '}'
-5 | t"{"
-6 | t"""{"""
-  |
-
-
-  |
-1 | # parse_options: {"target-version": "3.14"}
-2 | t"{"
-3 | t"{foo!r"
-  |          ^ Syntax Error: Expected TStringEnd, found Unknown
-4 | t"{foo="
-5 | t"{"
-  |
-
-
-  |
-2 | t"{"
-3 | t"{foo!r"
-4 | t"{foo="
-  |        ^ Syntax Error: missing closing quote in string literal
-5 | t"{"
-6 | t"""{"""
-  |
-
-
-  |
-2 | t"{"
-3 | t"{foo!r"
-4 | t"{foo="
-  |         ^ Syntax Error: t-string: unterminated string
-5 | t"{"
-6 | t"""{"""
-  |
-
-
-  |
-2 | t"{"
-3 | t"{foo!r"
-4 | t"{foo="
-  |         ^ Syntax Error: t-string: unterminated string
+  |        ^ Syntax Error: t-string: expecting `}`
 5 | t"{"
 6 | t"""{"""
   |
@@ -338,16 +279,8 @@ Module(
 3 | t"{foo!r"
 4 | t"{foo="
 5 | t"{"
-  |    ^ Syntax Error: missing closing quote in string literal
+  |    ^ Syntax Error: Expected an expression
 6 | t"""{"""
-  |
-
-
-  |
-4 | t"{foo="
-5 | t"{"
-6 | t"""{"""
-  | ^^^^ Syntax Error: Expected TStringEnd, found TStringStart
   |
 
 
@@ -356,18 +289,4 @@ Module(
 5 | t"{"
 6 | t"""{"""
   |      ^^^ Syntax Error: Expected an expression
-  |
-
-
-  |
-5 | t"{"
-6 | t"""{"""
-  |         ^ Syntax Error: unexpected EOF while parsing
-  |
-
-
-  |
-5 | t"{"
-6 | t"""{"""
-  |         ^ Syntax Error: t-string: unterminated string
   |

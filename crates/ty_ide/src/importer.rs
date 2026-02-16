@@ -20,18 +20,20 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
-use ruff_python_parser::{Parsed, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_module_resolver::ModuleName;
 use ty_project::Db;
 use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
-use ty_python_semantic::{MemberDefinition, ModuleName, SemanticModel};
+use ty_python_semantic::{MemberDefinition, SemanticModel};
 
 pub(crate) struct Importer<'a> {
     /// The ty Salsa database.
@@ -75,7 +77,8 @@ impl<'a> Importer<'a> {
         source: &'a str,
         parsed: &'a ParsedModuleRef,
     ) -> Self {
-        let imports = TopLevelImports::find(parsed);
+        let imports = TopLevelImports::find(parsed.syntax());
+
         Self {
             db,
             file,
@@ -143,15 +146,36 @@ impl<'a> Importer<'a> {
         members: &MembersInScope,
     ) -> ImportAction {
         let request = request.avoid_conflicts(self.db, self.file, members);
-        let mut symbol_text: Box<str> = request.member.into();
+        let mut symbol_text: Box<str> = request.member.unwrap_or(request.module).into();
         let Some(response) = self.find(&request, members.at) else {
-            let import = Insertion::start_of_file(self.parsed.suite(), self.source, self.stylist)
-                .into_edit(&request.to_string());
-            if matches!(request.style, ImportStyle::Import) {
-                symbol_text = format!("{}.{}", request.module, request.member).into();
+            let insertion = if let Some(future) = self.find_last_future_import(members.at) {
+                Insertion::end_of_statement(future.stmt, self.source, self.stylist)
+            } else {
+                let range = source_text(self.db, self.file)
+                    .as_notebook()
+                    .and_then(|notebook| notebook.cell_offsets().containing_range(members.at));
+
+                Insertion::start_of_file(self.parsed.suite(), self.source, self.stylist, range)
+            };
+            let import = insertion.into_edit(&request.to_string());
+            if let Some(member) = request.member
+                && matches!(request.style, ImportStyle::Import)
+            {
+                symbol_text = format!("{}.{}", request.module, member).into();
             }
             return ImportAction {
                 import: Some(import),
+                symbol_text,
+            };
+        };
+
+        // When we just have a request to import a module (and not
+        // any members from that module), then the only way we can be
+        // here is if we found a pre-existing import that definitively
+        // satisfies the request. So we're done.
+        let Some(member) = request.member else {
+            return ImportAction {
+                import: None,
                 symbol_text,
             };
         };
@@ -179,13 +203,10 @@ impl<'a> Importer<'a> {
                 let import = if let Some(insertion) =
                     Insertion::existing_import(response.import.stmt, self.tokens)
                 {
-                    insertion.into_edit(request.member)
+                    insertion.into_edit(member)
                 } else {
                     Insertion::end_of_statement(response.import.stmt, self.source, self.stylist)
-                        .into_edit(&format!(
-                            "from {} import {}",
-                            request.module, request.member
-                        ))
+                        .into_edit(&format!("from {} import {member}", request.module))
                 };
                 ImportAction {
                     import: Some(import),
@@ -205,6 +226,9 @@ impl<'a> Importer<'a> {
         available_at: TextSize,
     ) -> Option<ImportResponse<'importer, 'a>> {
         let mut choice = None;
+        let source = source_text(self.db, self.file);
+        let notebook = source.as_notebook();
+
         for import in &self.imports {
             // If the import statement comes after the spot where we
             // need the symbol, then we conservatively assume that
@@ -222,7 +246,22 @@ impl<'a> Importer<'a> {
             if import.stmt.start() >= available_at {
                 return choice;
             }
+
             if let Some(response) = import.satisfies(self.db, self.file, request) {
+                let partial = matches!(response.kind, ImportResponseKind::Partial { .. });
+
+                // The LSP doesn't support edits across cell boundaries.
+                // Skip over imports that only partially satisfy the import
+                // because they would require changes to the import (across cell boundaries).
+                if partial
+                    && let Some(notebook) = notebook
+                    && notebook
+                        .cell_offsets()
+                        .has_cell_boundary(TextRange::new(import.stmt.start(), available_at))
+                {
+                    continue;
+                }
+
                 if choice
                     .as_ref()
                     .is_none_or(|c| !c.kind.is_prioritized_over(&response.kind))
@@ -240,6 +279,31 @@ impl<'a> Importer<'a> {
             }
         }
         choice
+    }
+
+    /// Find the last `from __future__` import statement in the AST.
+    fn find_last_future_import(&self, at: TextSize) -> Option<&'a AstImport> {
+        let source = source_text(self.db, self.file);
+        let notebook = source.as_notebook();
+
+        self.imports
+            .iter()
+            .take_while(|import| import.stmt.start() <= at)
+            // Skip over imports from other cells.
+            .skip_while(|import| {
+                notebook.is_some_and(|notebook| {
+                    notebook
+                        .cell_offsets()
+                        .has_cell_boundary(TextRange::new(import.stmt.start(), at))
+                })
+            })
+            .take_while(|import| {
+                import
+                    .stmt
+                    .as_import_from_stmt()
+                    .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+            })
+            .last()
     }
 }
 
@@ -274,9 +338,7 @@ impl<'ast> MembersInScope<'ast> {
             .members_in_scope_at(node)
             .into_iter()
             .map(|(name, memberdef)| {
-                let Some(def) = memberdef.definition else {
-                    return (name, MemberInScope::other(memberdef.ty));
-                };
+                let def = memberdef.first_reachable_definition;
                 let kind = match *def.kind(db) {
                     DefinitionKind::Import(ref kind) => {
                         MemberImportKind::Imported(AstImportKind::Import(kind.import(parsed)))
@@ -300,11 +362,18 @@ impl<'ast> MembersInScope<'ast> {
             .collect();
         MembersInScope { at, map }
     }
+
+    pub(crate) fn find_member(&self, symbol_name: &str) -> Option<&MemberInScope> {
+        self.map
+            .iter()
+            .find(|(name, _)| *name == symbol_name)
+            .map(|(_, member)| member)
+    }
 }
 
 #[derive(Debug)]
-struct MemberInScope<'ast> {
-    ty: Type<'ast>,
+pub(crate) struct MemberInScope<'ast> {
+    pub(crate) ty: Type<'ast>,
     kind: MemberImportKind<'ast>,
 }
 
@@ -430,6 +499,17 @@ impl<'ast> AstImportKind<'ast> {
                 Some(ImportResponseKind::Qualified { ast, alias })
             }
             AstImportKind::ImportFrom(ast) => {
+                // If the request is for a module itself, then we
+                // assume that it can never be satisfies by a
+                // `from ... import ...` statement. For example, a
+                // `request for collections.abc` needs an
+                // `import collections.abc`. Now, there could be a
+                // `from collections import abc`, and we could
+                // plausibly consider that a match and return a
+                // symbol text of `abc`. But it's not clear if that's
+                // the right choice or not.
+                let member = request.member?;
+
                 if request.force_style && !matches!(request.style, ImportStyle::ImportFrom) {
                     return None;
                 }
@@ -441,9 +521,7 @@ impl<'ast> AstImportKind<'ast> {
                 let kind = ast
                     .names
                     .iter()
-                    .find(|alias| {
-                        alias.name.as_str() == "*" || alias.name.as_str() == request.member
-                    })
+                    .find(|alias| alias.name.as_str() == "*" || alias.name.as_str() == member)
                     .map(|alias| ImportResponseKind::Unqualified { ast, alias })
                     .unwrap_or_else(|| ImportResponseKind::Partial(ast));
                 Some(kind)
@@ -459,7 +537,10 @@ pub(crate) struct ImportRequest<'a> {
     /// `foo`, in `from foo import bar`).
     module: &'a str,
     /// The member to import (e.g., `bar`, in `from foo import bar`).
-    member: &'a str,
+    ///
+    /// When `member` is absent, then this request reflects an import
+    /// of the module itself. i.e., `import module`.
+    member: Option<&'a str>,
     /// The preferred style to use when importing the symbol (e.g.,
     /// `import foo` or `from foo import bar`).
     ///
@@ -481,7 +562,7 @@ impl<'a> ImportRequest<'a> {
     pub(crate) fn import(module: &'a str, member: &'a str) -> Self {
         Self {
             module,
-            member,
+            member: Some(member),
             style: ImportStyle::Import,
             force_style: false,
         }
@@ -494,9 +575,33 @@ impl<'a> ImportRequest<'a> {
     pub(crate) fn import_from(module: &'a str, member: &'a str) -> Self {
         Self {
             module,
-            member,
+            member: Some(member),
             style: ImportStyle::ImportFrom,
             force_style: false,
+        }
+    }
+
+    /// Create a new [`ImportRequest`] for bringing the given module
+    /// into scope.
+    ///
+    /// This is for just importing the module itself, always via an
+    /// `import` statement.
+    pub(crate) fn module(module: &'a str) -> Self {
+        Self {
+            module,
+            member: None,
+            style: ImportStyle::Import,
+            force_style: false,
+        }
+    }
+
+    /// Causes this request to become a command. This will force the
+    /// requested import style, even if another style would be more
+    /// appropriate generally.
+    pub(crate) fn force(mut self) -> Self {
+        Self {
+            force_style: true,
+            ..self
         }
     }
 
@@ -504,7 +609,13 @@ impl<'a> ImportRequest<'a> {
     /// of an import conflict are minimized (although not always reduced
     /// to zero).
     fn avoid_conflicts(self, db: &dyn Db, importing_file: File, members: &MembersInScope) -> Self {
-        match (members.map.get(self.module), members.map.get(self.member)) {
+        let Some(member) = self.member else {
+            return Self {
+                style: ImportStyle::Import,
+                ..self
+            };
+        };
+        match (members.map.get(self.module), members.map.get(member)) {
             // Neither symbol exists, so we can just proceed as
             // normal.
             (None, None) => self,
@@ -569,7 +680,10 @@ impl std::fmt::Display for ImportRequest<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self.style {
             ImportStyle::Import => write!(f, "import {}", self.module),
-            ImportStyle::ImportFrom => write!(f, "from {} import {}", self.module, self.member),
+            ImportStyle::ImportFrom => match self.member {
+                None => write!(f, "import {}", self.module),
+                Some(member) => write!(f, "from {} import {member}", self.module),
+            },
         }
     }
 }
@@ -639,8 +753,17 @@ impl ImportResponseKind<'_> {
     fn priority(&self) -> usize {
         match *self {
             ImportResponseKind::Unqualified { .. } => 0,
-            ImportResponseKind::Qualified { .. } => 1,
-            ImportResponseKind::Partial(_) => 2,
+            ImportResponseKind::Partial(_) => 1,
+            // N.B. When given the choice between adding a
+            // name to an existing `from ... import ...`
+            // statement and using an existing `import ...`
+            // in a qualified manner, we currently choose
+            // the former. Originally we preferred qualification,
+            // but there is some evidence that this violates
+            // expectations.
+            //
+            // Ref: https://github.com/astral-sh/ty/issues/1274#issuecomment-3352233790
+            ImportResponseKind::Qualified { .. } => 2,
         }
     }
 }
@@ -686,9 +809,9 @@ struct TopLevelImports<'ast> {
 
 impl<'ast> TopLevelImports<'ast> {
     /// Find all top-level imports from the given AST of a Python module.
-    fn find(parsed: &'ast Parsed<ast::ModModule>) -> Vec<AstImport<'ast>> {
+    fn find(module: &'ast ast::ModModule) -> Vec<AstImport<'ast>> {
         let mut visitor = TopLevelImports::default();
-        visitor.visit_body(parsed.suite());
+        visitor.visit_body(&module.body);
         visitor.imports
     }
 }
@@ -754,7 +877,6 @@ mod tests {
     use insta::assert_snapshot;
     use insta::internals::SettingsBindDropGuard;
 
-    use crate::find_node::covering_node;
     use crate::tests::{CursorTest, CursorTestBuilder, cursor_test};
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
@@ -762,13 +884,14 @@ mod tests {
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_db::{Db, system};
+    use ruff_python_ast::find_node::covering_node;
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
+    use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-        SemanticModel,
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SemanticModel,
     };
 
     use super::*;
@@ -780,6 +903,10 @@ mod tests {
 
         fn import_from(&self, module: &str, member: &str) -> String {
             self.add(ImportRequest::import_from(module, member))
+        }
+
+        fn module(&self, module: &str) -> String {
+            self.add(ImportRequest::module(module))
         }
 
         fn add(&self, request: ImportRequest<'_>) -> String {
@@ -830,7 +957,7 @@ mod tests {
     fn empty_source_qualified() {
         let test = cursor_test("<CURSOR>");
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         collections.defaultdict
         ");
@@ -840,7 +967,7 @@ mod tests {
     fn empty_source_unqualified() {
         let test = cursor_test("<CURSOR>");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         defaultdict
         ");
@@ -855,7 +982,7 @@ import collections
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         collections.defaultdict
         ");
@@ -870,7 +997,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         defaultdict
         ");
@@ -885,7 +1012,7 @@ from collections import *
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import *
         defaultdict
         ");
@@ -900,7 +1027,7 @@ import collections as c
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections as c
         c.defaultdict
         ");
@@ -915,7 +1042,7 @@ from collections import defaultdict as ddict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict as ddict
         ddict
         ");
@@ -930,7 +1057,7 @@ from collections import Counter
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter, defaultdict
         defaultdict
         ");
@@ -945,7 +1072,7 @@ from collections import Counter as C
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter as C, defaultdict
         defaultdict
         ");
@@ -960,7 +1087,7 @@ from collections import Counter, OrderedDict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter, OrderedDict, defaultdict
         defaultdict
         ");
@@ -975,7 +1102,7 @@ from collections import Counter as C, OrderedDict as OD
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter as C, OrderedDict as OD, defaultdict
         defaultdict
         ");
@@ -990,7 +1117,7 @@ from collections import Counter;
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter, defaultdict;
         defaultdict
         ");
@@ -1022,7 +1149,7 @@ from collections import (Counter)
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import (Counter, defaultdict)
         defaultdict
         ");
@@ -1037,7 +1164,7 @@ from collections import (Counter,)
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import (Counter, defaultdict,)
         defaultdict
         ");
@@ -1055,7 +1182,7 @@ from collections import (
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import (
             Counter,
             OrderedDict, defaultdict,
@@ -1076,7 +1203,7 @@ from collections import (
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import (
             Counter,
             OrderedDict, defaultdict
@@ -1096,7 +1223,7 @@ from collections import (
             )
             .build();
         assert_snapshot!(
-            test.import("package.foo", "Bar"), @r"
+            test.import("package.foo", "Bar"), @"
         from ...foo import Foo, Bar
         Bar
         ");
@@ -1111,7 +1238,7 @@ from collections import
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         defaultdict
         ");
@@ -1132,7 +1259,7 @@ from collections import ()
         // always be some cases like this that won't make
         // sense.
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import ()
         from collections import defaultdict
         defaultdict
@@ -1150,7 +1277,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         import re
         from collections import defaultdict
@@ -1169,7 +1296,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         import re
         defaultdict
@@ -1187,7 +1314,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         from collections import defaultdict
         defaultdict
@@ -1204,7 +1331,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import OrderedDict
         from collections import defaultdict
         defaultdict
@@ -1221,10 +1348,10 @@ import collections
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
-        from collections import OrderedDict
+            test.import("collections", "defaultdict"), @"
+        from collections import OrderedDict, defaultdict
         import collections
-        collections.defaultdict
+        defaultdict
         ");
     }
 
@@ -1240,13 +1367,13 @@ from collections import defaultdict
         // we add another import at the top-level
         // of the module.
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         collections.defaultdict
         from collections import defaultdict
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         defaultdict
         from collections import defaultdict
@@ -1266,7 +1393,7 @@ from collections import defaultdict
         // we add another import at the top-level
         // of the module.
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         def foo():
             collections.defaultdict
@@ -1285,12 +1412,51 @@ def foo():
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
 
         def foo():
             defaultdict
         ");
+    }
+
+    #[test]
+    fn existing_future_import() {
+        let test = cursor_test(
+            "\
+from __future__ import annotations
+
+<CURSOR>
+        ",
+        );
+        assert_snapshot!(
+            test.import("typing", "TypeVar"), @"
+        from __future__ import annotations
+        import typing
+
+        typing.TypeVar
+        ");
+    }
+
+    #[test]
+    fn existing_future_import_after_docstring() {
+        let test = cursor_test(
+            r#"
+"This is a module level docstring"
+from __future__ import annotations
+
+<CURSOR>
+        "#,
+        );
+        assert_snapshot!(
+            test.import("typing", "TypeVar"), @r#"
+
+        "This is a module level docstring"
+        from __future__ import annotations
+        import typing
+
+        typing.TypeVar
+        "#);
     }
 
     #[test]
@@ -1303,13 +1469,13 @@ defaultdict = 1
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         defaultdict = 1
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         defaultdict = 1
         (collections.defaultdict)
@@ -1326,13 +1492,13 @@ collections = 1
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         collections = 1
         (defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         collections = 1
         (defaultdict)
@@ -1368,14 +1534,14 @@ defaultdict = 2
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         collections = 1
         defaultdict = 2
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         collections = 1
         defaultdict = 2
@@ -1393,13 +1559,13 @@ def foo():
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         def foo():
             (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         def foo():
             (defaultdict)
@@ -1416,13 +1582,13 @@ def defaultdict():
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         def defaultdict():
             (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         def defaultdict():
             (collections.defaultdict)
@@ -1439,13 +1605,13 @@ def collections():
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         def collections():
             (defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         def collections():
             (defaultdict)
@@ -1463,14 +1629,14 @@ import defaultdict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         import defaultdict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         import defaultdict
 
@@ -1489,14 +1655,14 @@ from foo import collections
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         from foo import collections
 
         (defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         from foo import collections
 
@@ -1515,14 +1681,14 @@ from othermodule import defaultdict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         from othermodule import defaultdict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         from othermodule import defaultdict
 
@@ -1541,14 +1707,14 @@ import defaultdict as ddict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         import defaultdict as ddict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         import defaultdict as ddict
 
@@ -1567,14 +1733,14 @@ from othermodule import something as defaultdict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         from othermodule import something as defaultdict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         from othermodule import something as defaultdict
 
@@ -1593,14 +1759,14 @@ import defaultdict as ddict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         import defaultdict as ddict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         import defaultdict as ddict
 
@@ -1619,14 +1785,14 @@ from foo import defaultdict as ddict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         from foo import defaultdict as ddict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         from foo import defaultdict as ddict
 
@@ -1649,7 +1815,7 @@ import numpy as np
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         import json
         import re
@@ -1660,7 +1826,7 @@ import numpy as np
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         import json
         import re
@@ -1691,7 +1857,7 @@ import numpy as np
             .build();
 
         assert_snapshot!(
-            test.import("foo", "Bar"), @r"
+            test.import("foo", "Bar"), @"
         import foo
         import json
         import re
@@ -1702,7 +1868,7 @@ import numpy as np
         (foo.Bar)
         ");
         assert_snapshot!(
-            test.import_from("foo", "Bar"), @r"
+            test.import_from("foo", "Bar"), @"
         from foo import Bar
         import json
         import re
@@ -1790,13 +1956,13 @@ else:
         "#);
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r#"
-        import foo
+        from foo import MAGIC
         if os.getenv("WHATEVER"):
             from foo import MAGIC
         else:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         "#);
     }
 
@@ -1951,7 +2117,7 @@ except ImportError:
             .build();
 
         assert_snapshot!(
-            test.import("quux", "MAGIC"), @r"
+            test.import("quux", "MAGIC"), @"
         import quux
         try:
             from foo import MAGIC
@@ -1961,7 +2127,7 @@ except ImportError:
         (quux.MAGIC)
         ");
         assert_snapshot!(
-            test.import_from("quux", "MAGIC"), @r"
+            test.import_from("quux", "MAGIC"), @"
         import quux
         try:
             from foo import MAGIC
@@ -1996,7 +2162,7 @@ except ImportError:
             .build();
 
         assert_snapshot!(
-            test.import("foo", "MAGIC"), @r"
+            test.import("foo", "MAGIC"), @"
         import foo
         try:
             from foo import MAGIC
@@ -2006,14 +2172,14 @@ except ImportError:
         (foo.MAGIC)
         ");
         assert_snapshot!(
-            test.import_from("foo", "MAGIC"), @r"
-        import foo
+            test.import_from("foo", "MAGIC"), @"
+        from foo import MAGIC
         try:
             from foo import MAGIC
         except ImportError:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         ");
     }
 
@@ -2037,7 +2203,7 @@ except ImportError:
             .build();
 
         assert_snapshot!(
-            test.import("bar", "MAGIC"), @r"
+            test.import("bar", "MAGIC"), @"
         import bar
         try:
             from foo import MAGIC
@@ -2047,7 +2213,7 @@ except ImportError:
         (bar.MAGIC)
         ");
         assert_snapshot!(
-            test.import_from("bar", "MAGIC"), @r"
+            test.import_from("bar", "MAGIC"), @"
         import bar
         try:
             from foo import MAGIC
@@ -2055,6 +2221,75 @@ except ImportError:
             from bar import MAGIC
 
         (bar.MAGIC)
+        ");
+    }
+
+    #[test]
+    fn import_module_blank() {
+        let test = cursor_test(
+            "\
+<CURSOR>
+        ",
+        );
+        assert_snapshot!(
+            test.module("collections"), @"
+        import collections
+        collections
+        ");
+    }
+
+    #[test]
+    fn import_module_exists() {
+        let test = cursor_test(
+            "\
+import collections
+<CURSOR>
+        ",
+        );
+        assert_snapshot!(
+            test.module("collections"), @"
+        import collections
+        collections
+        ");
+    }
+
+    #[test]
+    fn import_module_from_exists() {
+        let test = cursor_test(
+            "\
+from collections import defaultdict
+<CURSOR>
+        ",
+        );
+        assert_snapshot!(
+            test.module("collections"), @"
+        import collections
+        from collections import defaultdict
+        collections
+        ");
+    }
+
+    // This test is working as intended. That is,
+    // `abc` is already in scope, so requesting an
+    // import for `collections.abc` could feasibly
+    // reuse the import and rewrite the symbol text
+    // to just `abc`. But for now it seems better
+    // to respect what has been written and add the
+    // `import collections.abc`. This behavior could
+    // plausibly be changed.
+    #[test]
+    fn import_module_from_via_member_exists() {
+        let test = cursor_test(
+            "\
+from collections import abc
+<CURSOR>
+        ",
+        );
+        assert_snapshot!(
+            test.module("collections.abc"), @"
+        import collections.abc
+        from collections import abc
+        collections.abc
         ");
     }
 }

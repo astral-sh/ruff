@@ -3,17 +3,20 @@
 # requires-python = ">=3.11"
 # dependencies = [
 #     "rich",
-#     "watchfiles",
+#     "watchfiles>=1.1.0",
 # ]
 # ///
 
 from __future__ import annotations
 
+import argparse
 import json
 import os
 import subprocess
+import sys
+import threading
 from pathlib import Path
-from typing import Final, Literal, Never, assert_never
+from typing import Final, Literal, assert_never
 
 from rich.console import Console
 from watchfiles import Change, watch
@@ -27,15 +30,31 @@ DIRS_TO_WATCH: Final = (
     CRATE_ROOT.parent / "ty_test/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
+SNAPSHOTS_DIR: Final = MDTEST_DIR / "snapshots"
+MDTEST_README: Final = CRATE_ROOT / "resources" / "README.md"
 
 
 class MDTestRunner:
     mdtest_executable: Path | None
     console: Console
+    filters: list[str]
+    enable_external: bool
+    upgrade_lockfiles: bool
 
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        filters: list[str] | None,
+        enable_external: bool,
+        upgrade_lockfiles: bool,
+    ) -> None:
         self.mdtest_executable = None
         self.console = Console()
+        self.filters = [
+            f.removesuffix(".md").replace("/", "_").replace("-", "_")
+            for f in (filters or [])
+        ]
+        self.enable_external = enable_external
+        self.upgrade_lockfiles = upgrade_lockfiles
 
     def _run_cargo_test(self, *, message_format: Literal["human", "json"]) -> str:
         return subprocess.check_output(
@@ -106,20 +125,46 @@ class MDTestRunner:
         return subprocess.run(
             [self.mdtest_executable, *arguments],
             cwd=CRATE_ROOT,
-            env=dict(os.environ, CLICOLOR_FORCE="1"),
+            env=dict(
+                os.environ,
+                CLICOLOR_FORCE="1",
+                INSTA_FORCE_PASS="1",
+                INSTA_OUTPUT="none",
+                MDTEST_EXTERNAL="1" if self.enable_external else "0",
+                MDTEST_UPGRADE_LOCKFILES="1" if self.upgrade_lockfiles else "0",
+            ),
             capture_output=capture_output,
             text=True,
             check=False,
         )
 
+    @staticmethod
+    def _md_file_for_snapshot(snapshot_path: Path) -> Path | None:
+        """Given a deleted .snap.new path, find the source .md file it belongs to.
+
+        Snapshot filenames follow the pattern:
+            <md_filename>_-_<Section_title>_-_…_(<hash>).snap.new
+        where <md_filename> may be truncated to 20 characters with a trailing
+        Unicode ellipsis (U+2026).
+        """
+        snapshot_name = snapshot_path.name.removesuffix(".new").removesuffix(".snap")
+
+        md_filename = snapshot_name.split("_-_", 1)[0]
+
+        is_truncated = md_filename.endswith("\u2026")
+        if is_truncated:
+            md_filename = md_filename[:-1]
+
+        for md_file in MDTEST_DIR.rglob("*.md"):
+            if is_truncated:
+                if md_file.name.startswith(md_filename):
+                    return md_file.relative_to(MDTEST_DIR)
+            elif md_file.name == md_filename:
+                return md_file.relative_to(MDTEST_DIR)
+        return None
+
     def _run_mdtests_for_file(self, markdown_file: Path) -> None:
-        path_mangled = (
-            markdown_file.as_posix()
-            .replace("/", "_")
-            .replace("-", "_")
-            .removesuffix(".md")
-        )
-        test_name = f"mdtest__{path_mangled}"
+        test_name = f"mdtest::{markdown_file}"
 
         output = self._run_mdtest(["--exact", test_name], capture_output=True)
 
@@ -160,19 +205,51 @@ class MDTestRunner:
 
             print(line)
 
-    def watch(self) -> Never:
+    def watch(self):
+        def keyboard_input() -> None:
+            for _ in sys.stdin:
+                # This is silly, but there is no other way to inject events into
+                # the main `watch` loop. We use changes to the `README.md` file
+                # as a trigger to re-run all mdtests:
+                MDTEST_README.touch()
+
+        input_thread = threading.Thread(target=keyboard_input, daemon=True)
+        input_thread.start()
+
         self._recompile_tests("Compiling tests...", message_on_success=False)
-        self._run_mdtest()
+        self._run_mdtest(self.filters)
         self.console.print("[dim]Ready to watch for changes...[/dim]")
 
         for changes in watch(*DIRS_TO_WATCH):
-            new_md_files = set()
-            changed_md_files = set()
+            new_md_files: set[Path] = set()
+            changed_md_files: set[Path] = set()
+            rejected_snapshot_md_files: set[Path] = set()
             rust_code_has_changed = False
             vendored_typeshed_has_changed = False
 
             for change, path_str in changes:
                 path = Path(path_str)
+
+                # See above: `README.md` changes trigger a full re-run of all tests
+                if path == MDTEST_README:
+                    self._run_mdtest(self.filters)
+                    continue
+
+                # When a pending snapshot (.snap.new) is rejected in a separate
+                # process (e.g. `cargo insta review`), the file is deleted.
+                # A common reason for rejecting a snapshot is that it was stale
+                # (produced by an earlier test run and now outdated). Re-run the
+                # relevant tests so the snapshot is regenerated from the current
+                # state of the code.
+                if (
+                    change == Change.deleted
+                    and path.name.endswith(".snap.new")
+                    and path.is_relative_to(SNAPSHOTS_DIR)
+                ):
+                    md_file = self._md_file_for_snapshot(path)
+                    if md_file is not None:
+                        rejected_snapshot_md_files.add(md_file)
+                    continue
 
                 match path.suffix:
                     case ".rs":
@@ -209,25 +286,46 @@ class MDTestRunner:
 
             if rust_code_has_changed:
                 if self._recompile_tests("Rust code has changed, recompiling tests..."):
-                    self._run_mdtest()
-            elif vendored_typeshed_has_changed:
-                if self._recompile_tests(
-                    "Vendored typeshed has changed, recompiling tests..."
-                ):
-                    self._run_mdtest()
-            elif new_md_files:
-                files = " ".join(file.as_posix() for file in new_md_files)
-                self._recompile_tests(
-                    f"New Markdown test [yellow]{files}[/yellow] detected, recompiling tests..."
-                )
+                    self._run_mdtest(self.filters)
+            elif vendored_typeshed_has_changed and self._recompile_tests(
+                "Vendored typeshed has changed, recompiling tests..."
+            ):
+                self._run_mdtest(self.filters)
 
-            for path in new_md_files | changed_md_files:
+            for path in new_md_files | changed_md_files | rejected_snapshot_md_files:
                 self._run_mdtests_for_file(path)
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="A runner for Markdown-based tests for ty"
+    )
+    parser.add_argument(
+        "filters",
+        nargs="*",
+        help="Partial paths or mangled names, e.g., 'loops/for.md' or 'loops_for'",
+    )
+    parser.add_argument(
+        "--enable-external",
+        "-e",
+        action="store_true",
+        help="Enable tests with external dependencies",
+    )
+    parser.add_argument(
+        "--no-lockfile-upgrades",
+        action="store_true",
+        help="By default, lockfiles will be upgraded when dependency requirements in the Markdown test change."
+        + " Set this flag to never upgrade any lockfiles.",
+    )
+
+    args = parser.parse_args()
+
     try:
-        runner = MDTestRunner()
+        runner = MDTestRunner(
+            filters=args.filters,
+            enable_external=args.enable_external,
+            upgrade_lockfiles=not args.no_lockfile_upgrades,
+        )
         runner.watch()
     except KeyboardInterrupt:
         print()

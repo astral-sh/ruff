@@ -74,8 +74,7 @@ class Number(metaclass=ABCMeta):
 
     __slots__ = ()
     @abstractmethod
-    def __hash__(self) -> int:
-        """The type of the None singleton."""
+    def __hash__(self) -> int: ...
 
 # See comment at the top of the file
 # for why some of these return types are purposefully vague
@@ -291,7 +290,11 @@ class Real(Complex, _RealLike):
 # See comment at the top of the file
 # for why some of these return types are purposefully vague
 class Rational(Real):
-    """.numerator and .denominator should be in lowest terms."""
+    """To Real, Rational adds numerator and denominator properties.
+
+    The numerator and denominator values should be in lowest terms,
+    with a positive denominator.
+    """
 
     __slots__ = ()
     @property

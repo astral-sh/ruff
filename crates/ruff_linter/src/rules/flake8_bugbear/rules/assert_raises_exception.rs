@@ -29,6 +29,7 @@ use crate::checkers::ast::Checker;
 /// self.assertRaises(SomeSpecificException, foo)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.83")]
 pub(crate) struct AssertRaisesException {
     exception: ExceptionKind,
 }

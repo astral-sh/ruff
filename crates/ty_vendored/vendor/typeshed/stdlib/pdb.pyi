@@ -343,9 +343,10 @@ from cmd import Cmd
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from inspect import _SourceObjectType
 from linecache import _ModuleGlobals
+from rlcompleter import Completer
 from types import CodeType, FrameType, TracebackType
 from typing import IO, Any, ClassVar, Final, Literal, TypeVar
-from typing_extensions import ParamSpec, Self, TypeAlias
+from typing_extensions import ParamSpec, Self, TypeAlias, deprecated
 
 __all__ = ["run", "pm", "Pdb", "runeval", "runctx", "runcall", "set_trace", "post_mortem", "help"]
 if sys.version_info >= (3, 14):
@@ -463,7 +464,17 @@ class Pdb(Bdb, Cmd):
     stack: list[tuple[FrameType, int]]
     curindex: int
     curframe: FrameType | None
-    curframe_locals: Mapping[str, Any]
+    if sys.version_info >= (3, 13):
+        @property
+        @deprecated("The frame locals reference is no longer cached. Use 'curframe.f_locals' instead.")
+        def curframe_locals(self) -> Mapping[str, Any]: ...
+        @curframe_locals.setter
+        @deprecated(
+            "Setting 'curframe_locals' no longer has any effect as of 3.14. Update the contents of 'curframe.f_locals' instead."
+        )
+        def curframe_locals(self, value: Mapping[str, Any]) -> None: ...
+    else:
+        curframe_locals: Mapping[str, Any]
     if sys.version_info >= (3, 14):
         mode: _Mode | None
         colorize: bool
@@ -943,6 +954,17 @@ class Pdb(Bdb, Cmd):
         def completenames(self, text: str, line: str, begidx: int, endidx: int) -> list[str]: ...  # type: ignore[override]
     if sys.version_info >= (3, 12):
         def set_convenience_variable(self, frame: FrameType, name: str, value: Any) -> None: ...
+    if sys.version_info >= (3, 13):
+        # Added in 3.13.8 and 3.14.1
+        @property
+        def rlcompleter(self) -> type[Completer]:
+            """Return the `Completer` class from `rlcompleter`, while avoiding the
+            side effects of changing the completer from `import rlcompleter`.
+
+            This is a compromise between GH-138860 and GH-139289. If GH-139289 is
+            fixed, then we don't need this and we can just `import rlcompleter` in
+            `Pdb.__init__`.
+            """
 
     def _select_frame(self, number: int) -> None: ...
     def _getval_except(self, arg: str, frame: FrameType | None = None) -> object: ...

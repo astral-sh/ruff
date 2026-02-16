@@ -37,6 +37,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     """
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -44,6 +48,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.68")]
 pub(crate) struct NewLineAfterLastParagraph;
 
 impl AlwaysFixableViolation for NewLineAfterLastParagraph {

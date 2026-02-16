@@ -86,6 +86,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -117,7 +118,7 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"{lambda x: x}"
-  |             ^^ Syntax Error: t-string: expecting '}'
+  |             ^^ Syntax Error: t-string: expecting `}`
   |
 
 

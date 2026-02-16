@@ -559,23 +559,73 @@ InterpolatedStringLiteralElement = { variant = "Literal" }
 [Pattern]
 doc = "See also [pattern](https://docs.python.org/3/library/ast.html#ast.pattern)"
 
-[Pattern.nodes]
-PatternMatchValue = {}
-PatternMatchSingleton = {}
-PatternMatchSequence = {}
-PatternMatchMapping = {}
-PatternMatchClass = {}
-PatternMatchStar = {}
-PatternMatchAs = {}
-PatternMatchOr = {}
+[Pattern.nodes.PatternMatchValue]
+doc = "See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)"
+fields = [{ name = "value", type = "Box<Expr>" }]
+
+[Pattern.nodes.PatternMatchSingleton]
+doc = "See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)"
+fields = [{ name = "value", type = "Singleton" }]
+
+[Pattern.nodes.PatternMatchSequence]
+doc = "See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)"
+fields = [{ name = "patterns", type = "Pattern*" }]
+
+[Pattern.nodes.PatternMatchMapping]
+doc = "See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)"
+fields = [
+  { name = "keys", type = "Expr*" },
+  { name = "patterns", type = "Pattern*" },
+  { name = "rest", type = "Identifier?" },
+]
+custom_source_order = true
+
+[Pattern.nodes.PatternMatchClass]
+doc = "See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)"
+fields = [
+  { name = "cls", type = "Box<Expr>" },
+  { name = "arguments", type = "PatternArguments" },
+]
+
+[Pattern.nodes.PatternMatchStar]
+doc = "See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)"
+fields = [{ name = "name", type = "Identifier?" }]
+
+[Pattern.nodes.PatternMatchAs]
+doc = "See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)"
+fields = [
+  { name = "pattern", type = "Box<Pattern>?" },
+  { name = "name", type = "Identifier?" },
+]
+
+[Pattern.nodes.PatternMatchOr]
+doc = "See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)"
+fields = [{ name = "patterns", type = "Pattern*" }]
 
 [TypeParam]
 doc = "See also [type_param](https://docs.python.org/3/library/ast.html#ast.type_param)"
 
-[TypeParam.nodes]
-TypeParamTypeVar = {}
-TypeParamTypeVarTuple = {}
-TypeParamParamSpec = {}
+[TypeParam.nodes.TypeParamTypeVar]
+doc = "See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)"
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "bound", type = "Box<Expr>?" },
+  { name = "default", type = "Box<Expr>?" },
+]
+
+[TypeParam.nodes.TypeParamTypeVarTuple]
+doc = "See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)"
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "default", type = "Box<Expr>?" },
+]
+
+[TypeParam.nodes.TypeParamParamSpec]
+doc = "See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)"
+fields = [
+  { name = "name", type = "Identifier" },
+  { name = "default", type = "Box<Expr>?" },
+]
 
 [ungrouped.nodes]
 InterpolatedStringFormatSpec = {}

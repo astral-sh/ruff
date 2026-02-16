@@ -209,15 +209,15 @@ impl RuleSelector {
         self.all_rules().filter(move |rule| {
             match rule.group() {
                 // Always include stable rules
-                RuleGroup::Stable => true,
+                RuleGroup::Stable { .. } => true,
                 // Enabling preview includes all preview rules unless explicit selection is turned on
-                RuleGroup::Preview => {
+                RuleGroup::Preview { .. } => {
                     preview_enabled && (self.is_exact() || !preview_require_explicit)
                 }
                 // Deprecated rules are excluded by default unless explicitly selected
-                RuleGroup::Deprecated => !preview_enabled && self.is_exact(),
+                RuleGroup::Deprecated { .. } => !preview_enabled && self.is_exact(),
                 // Removed rules are included if explicitly selected but will error downstream
-                RuleGroup::Removed => self.is_exact(),
+                RuleGroup::Removed { .. } => self.is_exact(),
             }
         })
     }
@@ -257,9 +257,8 @@ pub struct PreviewOptions {
 #[cfg(feature = "schemars")]
 mod schema {
     use itertools::Itertools;
-    use schemars::_serde_json::Value;
-    use schemars::JsonSchema;
-    use schemars::schema::{InstanceType, Schema, SchemaObject};
+    use schemars::{JsonSchema, Schema, SchemaGenerator};
+    use serde_json::Value;
     use strum::IntoEnumIterator;
 
     use crate::RuleSelector;
@@ -267,64 +266,65 @@ mod schema {
     use crate::rule_selector::{Linter, RuleCodePrefix};
 
     impl JsonSchema for RuleSelector {
-        fn schema_name() -> String {
-            "RuleSelector".to_string()
+        fn schema_name() -> std::borrow::Cow<'static, str> {
+            std::borrow::Cow::Borrowed("RuleSelector")
         }
 
-        fn json_schema(_gen: &mut schemars::r#gen::SchemaGenerator) -> Schema {
-            Schema::Object(SchemaObject {
-                instance_type: Some(InstanceType::String.into()),
-                enum_values: Some(
-                    [
-                        // Include the non-standard "ALL" selectors.
-                        "ALL".to_string(),
-                        // Include the legacy "C" and "T" selectors.
-                        "C".to_string(),
-                        "T".to_string(),
-                        // Include some common redirect targets for those legacy selectors.
-                        "C9".to_string(),
-                        "T1".to_string(),
-                        "T2".to_string(),
-                    ]
-                    .into_iter()
-                    .chain(
-                        RuleCodePrefix::iter()
-                            .map(|p| {
-                                let prefix = p.linter().common_prefix();
-                                let code = p.short_code();
-                                format!("{prefix}{code}")
-                            })
-                            .chain(Linter::iter().filter_map(|l| {
-                                let prefix = l.common_prefix();
-                                (!prefix.is_empty()).then(|| prefix.to_string())
-                            })),
-                    )
-                    .filter(|p| {
-                        // Exclude any prefixes where all of the rules are removed
-                        if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
-                            RuleSelector::parse_no_redirect(p)
-                        {
-                            !prefix.rules().all(|rule| rule.is_removed())
-                        } else {
-                            true
-                        }
+        fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
+            let enum_values: Vec<String> = [
+                // Include the non-standard "ALL" selectors.
+                "ALL".to_string(),
+                // Include the legacy "C" and "T" selectors.
+                "C".to_string(),
+                "T".to_string(),
+                // Include some common redirect targets for those legacy selectors.
+                "C9".to_string(),
+                "T1".to_string(),
+                "T2".to_string(),
+            ]
+            .into_iter()
+            .chain(
+                RuleCodePrefix::iter()
+                    .map(|p| {
+                        let prefix = p.linter().common_prefix();
+                        let code = p.short_code();
+                        format!("{prefix}{code}")
                     })
-                    .filter(|_rule| {
-                        // Filter out all test-only rules
-                        #[cfg(any(feature = "test-rules", test))]
-                        #[expect(clippy::used_underscore_binding)]
-                        if _rule.starts_with("RUF9") || _rule == "PLW0101" {
-                            return false;
-                        }
-
-                        true
-                    })
-                    .sorted()
-                    .map(Value::String)
-                    .collect(),
-                ),
-                ..SchemaObject::default()
+                    .chain(Linter::iter().filter_map(|l| {
+                        let prefix = l.common_prefix();
+                        (!prefix.is_empty()).then(|| prefix.to_string())
+                    })),
+            )
+            .filter(|p| {
+                // Exclude any prefixes where all of the rules are removed
+                if let Ok(Self::Rule { prefix, .. } | Self::Prefix { prefix, .. }) =
+                    RuleSelector::parse_no_redirect(p)
+                {
+                    !prefix.rules().all(|rule| rule.is_removed())
+                } else {
+                    true
+                }
             })
+            .filter(|_rule| {
+                // Filter out all test-only rules
+                #[cfg(any(feature = "test-rules", test))]
+                #[expect(clippy::used_underscore_binding)]
+                if _rule.starts_with("RUF9") || _rule == "PLW0101" {
+                    return false;
+                }
+
+                true
+            })
+            .sorted()
+            .collect();
+
+            let mut schema = schemars::json_schema!({ "type": "string" });
+            schema.ensure_object().insert(
+                "enum".to_string(),
+                Value::Array(enum_values.into_iter().map(Value::String).collect()),
+            );
+
+            schema
         }
     }
 }

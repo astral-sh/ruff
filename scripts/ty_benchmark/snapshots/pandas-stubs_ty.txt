@@ -1,0 +1,56 @@
+pandas-stubs/_libs/missing.pyi:120:9: error[invalid-method-override] Invalid override of method `__eq__`: Definition is incompatible with `object.__eq__`
+pandas-stubs/_libs/missing.pyi:130:9: error[invalid-method-override] Invalid override of method `__ne__`: Definition is incompatible with `object.__ne__`
+pandas-stubs/_libs/tslibs/timedeltas.pyi:262:9: error[invalid-method-override] Invalid override of method `__truediv__`: Definition is incompatible with `timedelta.__truediv__`
+pandas-stubs/_libs/tslibs/timestamps.pyi:183:9: error[invalid-method-override] Invalid override of method `__le__`: Definition is incompatible with `date.__le__`
+pandas-stubs/_libs/tslibs/timestamps.pyi:193:9: error[invalid-method-override] Invalid override of method `__lt__`: Definition is incompatible with `date.__lt__`
+pandas-stubs/_libs/tslibs/timestamps.pyi:203:9: error[invalid-method-override] Invalid override of method `__ge__`: Definition is incompatible with `date.__ge__`
+pandas-stubs/_libs/tslibs/timestamps.pyi:213:9: error[invalid-method-override] Invalid override of method `__gt__`: Definition is incompatible with `date.__gt__`
+pandas-stubs/_libs/tslibs/timestamps.pyi:239:9: error[invalid-method-override] Invalid override of method `__sub__`: Definition is incompatible with `date.__sub__`
+pandas-stubs/core/arrays/categorical.pyi:114:9: error[invalid-method-override] Invalid override of method `__contains__`: Definition is incompatible with `ExtensionArray.__contains__`
+pandas-stubs/core/arrays/categorical.pyi:118:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `ExtensionArray.__getitem__`
+pandas-stubs/core/arrays/datetimelike.pyi:76:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `ExtensionArray.__getitem__`
+pandas-stubs/core/arrays/interval.pyi:66:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `ExtensionArray.__getitem__`
+pandas-stubs/core/arrays/sparse/array.pyi:66:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `ExtensionArray.__getitem__`
+pandas-stubs/core/frame.pyi:193:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `_LocationIndexer.__getitem__`
+pandas-stubs/core/frame.pyi:204:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `_NDFrameIndexer.__setitem__`
+pandas-stubs/core/frame.pyi:280:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `_LocationIndexer.__getitem__`
+pandas-stubs/core/frame.pyi:303:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `_NDFrameIndexer.__setitem__`
+pandas-stubs/core/frame.pyi:320:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `_ScalarAccessIndexer.__getitem__`
+pandas-stubs/core/frame.pyi:321:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `_ScalarAccessIndexer.__setitem__`
+pandas-stubs/core/frame.pyi:328:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `_ScalarAccessIndexer.__getitem__`
+pandas-stubs/core/frame.pyi:339:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `_ScalarAccessIndexer.__setitem__`
+pandas-stubs/core/groupby/generic.pyi:208:9: error[override-of-final-method] Cannot override final member `__iter__` from superclass `BaseGroupBy`
+pandas-stubs/core/groupby/generic.pyi:247:9: error[invalid-method-override] Invalid override of method `apply`: Definition is incompatible with `GroupBy.apply`
+pandas-stubs/core/groupby/generic.pyi:300:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `BaseGroupBy.__getitem__`
+pandas-stubs/core/groupby/generic.pyi:452:9: error[invalid-method-override] Invalid override of method `__getattr__`: Definition is incompatible with `GroupBy.__getattr__`
+pandas-stubs/core/groupby/generic.pyi:456:9: error[override-of-final-method] Cannot override final member `__iter__` from superclass `BaseGroupBy`
+pandas-stubs/core/indexes/datetimes.pyi:76:9: error[invalid-method-override] Invalid override of method `__sub__`: Definition is incompatible with `Index.__sub__`
+pandas-stubs/core/indexes/interval.pyi:242:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `Index.__getitem__`
+pandas-stubs/core/indexes/interval.pyi:250:9: error[invalid-method-override] Invalid override of method `__gt__`: Definition is incompatible with `Index.__gt__`
+pandas-stubs/core/indexes/interval.pyi:258:9: error[invalid-method-override] Invalid override of method `__ge__`: Definition is incompatible with `Index.__ge__`
+pandas-stubs/core/indexes/interval.pyi:266:9: error[invalid-method-override] Invalid override of method `__le__`: Definition is incompatible with `Index.__le__`
+pandas-stubs/core/indexes/interval.pyi:274:9: error[invalid-method-override] Invalid override of method `__lt__`: Definition is incompatible with `Index.__lt__`
+pandas-stubs/core/indexes/interval.pyi:282:9: error[invalid-method-override] Invalid override of method `__eq__`: Definition is incompatible with `Index.__eq__`
+pandas-stubs/core/indexes/interval.pyi:290:9: error[invalid-method-override] Invalid override of method `__ne__`: Definition is incompatible with `Index.__ne__`
+pandas-stubs/core/indexes/multi.pyi:132:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `Index.__getitem__`
+pandas-stubs/core/indexes/period.pyi:57:9: error[invalid-method-override] Invalid override of method `__sub__`: Definition is incompatible with `Index.__sub__`
+pandas-stubs/core/indexes/period.pyi:66:9: error[invalid-method-override] Invalid override of method `__rsub__`: Definition is incompatible with `Index.__rsub__`
+pandas-stubs/core/indexes/range.pyi:84:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `Index.__getitem__`
+pandas-stubs/core/indexes/timedeltas.pyi:77:9: error[invalid-method-override] Invalid override of method `__add__`: Definition is incompatible with `Index.__add__`
+pandas-stubs/core/indexes/timedeltas.pyi:86:9: error[invalid-method-override] Invalid override of method `__radd__`: Definition is incompatible with `Index.__radd__`
+pandas-stubs/core/indexes/timedeltas.pyi:98:9: error[invalid-method-override] Invalid override of method `__rsub__`: Definition is incompatible with `Index.__rsub__`
+pandas-stubs/core/indexes/timedeltas.pyi:104:9: error[invalid-method-override] Invalid override of method `__mul__`: Definition is incompatible with `Index.__mul__`
+pandas-stubs/core/indexes/timedeltas.pyi:108:9: error[invalid-method-override] Invalid override of method `__rmul__`: Definition is incompatible with `Index.__rmul__`
+pandas-stubs/core/indexes/timedeltas.pyi:120:9: error[invalid-method-override] Invalid override of method `__truediv__`: Definition is incompatible with `Index.__truediv__`
+pandas-stubs/core/indexes/timedeltas.pyi:128:9: error[invalid-method-override] Invalid override of method `__rtruediv__`: Definition is incompatible with `Index.__rtruediv__`
+pandas-stubs/core/indexes/timedeltas.pyi:138:9: error[invalid-method-override] Invalid override of method `__floordiv__`: Definition is incompatible with `Index.__floordiv__`
+pandas-stubs/core/indexes/timedeltas.pyi:146:9: error[invalid-method-override] Invalid override of method `__rfloordiv__`: Definition is incompatible with `Index.__rfloordiv__`
+pandas-stubs/core/series.pyi:274:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `_LocationIndexer.__getitem__`
+pandas-stubs/core/series.pyi:283:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `_NDFrameIndexer.__setitem__`
+pandas-stubs/core/series.pyi:300:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `_LocationIndexer.__getitem__`
+pandas-stubs/core/series.pyi:330:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `_NDFrameIndexer.__setitem__`
+pandas-stubs/core/series.pyi:4630:9: error[invalid-method-override] Invalid override of method `xs`: Definition is incompatible with `NDFrame.xs`
+pandas-stubs/io/excel/_base.pyi:16:6: error[unresolved-import] Cannot resolve imported module `openpyxl.workbook.workbook`
+pandas-stubs/io/excel/_base.pyi:20:6: error[unresolved-import] Cannot resolve imported module `xlrd.book`
+Found 54 diagnostics
+WARN Ignoring the `tool.ty` section in `<CWD>/pyproject.toml` because `<CWD>/ty.toml` takes precedence.

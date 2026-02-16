@@ -1,0 +1,36 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP037 [*] Remove quotes from type annotation
+  --> UP037_3.py:15:35
+   |
+13 | @dataclass(frozen=True)
+14 | class EmptyCell:
+15 |     _singleton: ClassVar[Optional["EmptyCell"]] = None
+   |                                   ^^^^^^^^^^^
+16 |     # the behavior of _singleton above should match a non-ClassVar
+17 |     _doubleton: "EmptyCell"
+   |
+help: Remove quotes
+12 | 
+13 | @dataclass(frozen=True)
+14 | class EmptyCell:
+   -     _singleton: ClassVar[Optional["EmptyCell"]] = None
+15 +     _singleton: ClassVar[Optional[EmptyCell]] = None
+16 |     # the behavior of _singleton above should match a non-ClassVar
+17 |     _doubleton: "EmptyCell"
+
+UP037 [*] Remove quotes from type annotation
+  --> UP037_3.py:17:17
+   |
+15 |     _singleton: ClassVar[Optional["EmptyCell"]] = None
+16 |     # the behavior of _singleton above should match a non-ClassVar
+17 |     _doubleton: "EmptyCell"
+   |                 ^^^^^^^^^^^
+   |
+help: Remove quotes
+14 | class EmptyCell:
+15 |     _singleton: ClassVar[Optional["EmptyCell"]] = None
+16 |     # the behavior of _singleton above should match a non-ClassVar
+   -     _doubleton: "EmptyCell"
+17 +     _doubleton: EmptyCell

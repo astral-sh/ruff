@@ -1,10 +1,10 @@
 use itertools::Itertools;
-use rustc_hash::{FxHashMap, FxHashSet};
-
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{self as ast, ExceptHandler, Expr, ExprContext};
 use ruff_text_size::{Ranged, TextRange};
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
@@ -37,9 +37,13 @@ use crate::{Edit, Fix};
 ///     ...
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the exception handler contains comments.
+///
 /// ## References
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.67")]
 pub(crate) struct DuplicateTryBlockException {
     name: String,
     is_star: bool,
@@ -87,6 +91,7 @@ impl Violation for DuplicateTryBlockException {
 /// - [Python documentation: `except` clause](https://docs.python.org/3/reference/compound_stmts.html#except-clause)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.67")]
 pub(crate) struct DuplicateHandlerException {
     pub names: Vec<String>,
 }
@@ -152,22 +157,32 @@ fn duplicate_handler_exceptions<'a>(
                 },
                 expr.range(),
             );
-            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-                // Single exceptions don't require parentheses, but since we're _removing_
-                // parentheses, insert whitespace as needed.
-                if let [elt] = unique_elts.as_slice() {
-                    pad(
-                        checker.generator().expr(elt),
-                        expr.range(),
-                        checker.locator(),
-                    )
-                } else {
-                    // Multiple exceptions must always be parenthesized. This is done
-                    // manually as the generator never parenthesizes lone tuples.
-                    format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
-                },
-                expr.range(),
-            )));
+
+            let applicability = if checker.comment_ranges().intersects(expr.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            diagnostic.set_fix(Fix::applicable_edit(
+                Edit::range_replacement(
+                    // Single exceptions don't require parentheses, but since we're _removing_
+                    // parentheses, insert whitespace as needed.
+                    if let [elt] = unique_elts.as_slice() {
+                        pad(
+                            checker.generator().expr(elt),
+                            expr.range(),
+                            checker.locator(),
+                        )
+                    } else {
+                        // Multiple exceptions must always be parenthesized. This is done
+                        // manually as the generator never parenthesizes lone tuples.
+                        format!("({})", checker.generator().expr(&type_pattern(unique_elts)))
+                    },
+                    expr.range(),
+                ),
+                applicability,
+            ));
         }
     }
 

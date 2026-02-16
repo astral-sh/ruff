@@ -18,6 +18,7 @@ mod tests {
     #[test_case(Rule::FastApiRedundantResponseModel, Path::new("FAST001.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_0.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_1.py"))]
+    #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_2.py"))]
     #[test_case(Rule::FastApiUnusedPathParameter, Path::new("FAST003.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.name(), path.to_string_lossy());
@@ -56,6 +57,7 @@ mod tests {
     // since `typing.Annotated` was added in Python 3.9
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_0.py"))]
     #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_1.py"))]
+    #[test_case(Rule::FastApiNonAnnotatedDependency, Path::new("FAST002_2.py"))]
     fn rules_py38(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}_py38", rule_code.name(), path.to_string_lossy());
         let diagnostics = test_path(

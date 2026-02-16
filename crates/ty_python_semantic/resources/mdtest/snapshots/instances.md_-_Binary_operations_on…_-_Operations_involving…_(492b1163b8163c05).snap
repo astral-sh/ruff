@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: instances.md - Binary operations on instances - Operations involving types with invalid `__bool__` methods
 mdtest path: crates/ty_python_semantic/resources/mdtest/binary/instances.md
@@ -24,7 +25,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/binary/instances.md
 # Diagnostics
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
  --> src/mdtest_snippet.py:7:8
   |
 6 | # error: [unsupported-bool-conversion]

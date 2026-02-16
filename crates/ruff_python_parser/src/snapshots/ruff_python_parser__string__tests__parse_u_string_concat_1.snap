@@ -23,6 +23,7 @@ expression: suite
                                             quote_style: Single,
                                             prefix: Empty,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                     StringLiteral {
@@ -33,6 +34,7 @@ expression: suite
                                             quote_style: Single,
                                             prefix: Unicode,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ],

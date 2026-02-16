@@ -39,6 +39,8 @@ def f():
     reveal_type(a7)  # revealed: None
     reveal_type(a8)  # revealed: Literal[1]
     reveal_type(b1)  # revealed: Literal[Color.RED]
+    # TODO should be `Literal[MissingT.MISSING]`
+    reveal_type(b2)  # revealed: @Todo(functional `Enum` syntax)
 
 # error: [invalid-type-form]
 invalid1: Literal[3 + 4]
@@ -64,6 +66,188 @@ invalid5: Literal[NotAnEnum.x]
 a_list: list[int] = [1, 2, 3]
 # error: [invalid-type-form]
 invalid6: Literal[a_list[0]]
+```
+
+## Parameterizing with a type alias
+
+`typing.Literal` can also be parameterized with a type alias for any literal type or union of
+literal types.
+
+### PEP 695 type alias
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+from enum import Enum
+
+import mod
+
+class E(Enum):
+    A = 1
+    B = 2
+
+type SingleInt = Literal[1]
+type SingleStr = Literal["foo"]
+type SingleBytes = Literal[b"bar"]
+type SingleBool = Literal[True]
+type SingleNone = Literal[None]
+type SingleEnum = Literal[E.A]
+type UnionLiterals = Literal[1, "foo", b"bar", True, None, E.A]
+# We support this because it is an equivalent type to the following union of literals, but maybe
+# we should not, because it doesn't use `Literal` form? Other type checkers do not.
+type AnEnum1 = E
+type AnEnum2 = Literal[E.A, E.B]
+# Similarly, we support this because it is equivalent to `Literal[True, False]`.
+type Bool1 = bool
+type Bool2 = Literal[True, False]
+
+def _(
+    single_int: Literal[SingleInt],
+    single_str: Literal[SingleStr],
+    single_bytes: Literal[SingleBytes],
+    single_bool: Literal[SingleBool],
+    single_none: Literal[SingleNone],
+    single_enum: Literal[SingleEnum],
+    union_literals: Literal[UnionLiterals],
+    an_enum1: Literal[AnEnum1],
+    an_enum2: Literal[AnEnum2],
+    bool1: Literal[Bool1],
+    bool2: Literal[Bool2],
+    multiple: Literal[SingleInt, SingleStr, SingleEnum],
+    single_int_other_module: Literal[mod.SingleInt],
+):
+    reveal_type(single_int)  # revealed: Literal[1]
+    reveal_type(single_str)  # revealed: Literal["foo"]
+    reveal_type(single_bytes)  # revealed: Literal[b"bar"]
+    reveal_type(single_bool)  # revealed: Literal[True]
+    reveal_type(single_none)  # revealed: None
+    reveal_type(single_enum)  # revealed: Literal[E.A]
+    reveal_type(union_literals)  # revealed: Literal[1, "foo", b"bar", True, E.A] | None
+    reveal_type(an_enum1)  # revealed: E
+    reveal_type(an_enum2)  # revealed: E
+    reveal_type(bool1)  # revealed: bool
+    reveal_type(bool2)  # revealed: bool
+    reveal_type(multiple)  # revealed: Literal[1, "foo", E.A]
+    reveal_type(single_int_other_module)  # revealed: Literal[2]
+```
+
+`mod.py`:
+
+```py
+from typing import Literal
+
+type SingleInt = Literal[2]
+```
+
+### PEP 613 type alias
+
+```py
+from typing import Literal, TypeAlias
+from enum import Enum
+
+class E(Enum):
+    A = 1
+    B = 2
+
+SingleInt: TypeAlias = Literal[1]
+SingleStr: TypeAlias = Literal["foo"]
+SingleBytes: TypeAlias = Literal[b"bar"]
+SingleBool: TypeAlias = Literal[True]
+SingleNone: TypeAlias = Literal[None]
+SingleEnum: TypeAlias = Literal[E.A]
+UnionLiterals: TypeAlias = Literal[1, "foo", b"bar", True, None, E.A]
+AnEnum1: TypeAlias = E
+AnEnum2: TypeAlias = Literal[E.A, E.B]
+Bool1: TypeAlias = bool
+Bool2: TypeAlias = Literal[True, False]
+
+def _(
+    single_int: Literal[SingleInt],
+    single_str: Literal[SingleStr],
+    single_bytes: Literal[SingleBytes],
+    single_bool: Literal[SingleBool],
+    single_none: Literal[SingleNone],
+    single_enum: Literal[SingleEnum],
+    union_literals: Literal[UnionLiterals],
+    # Could also not error
+    an_enum1: Literal[AnEnum1],  # error: [invalid-type-form]
+    an_enum2: Literal[AnEnum2],
+    # Could also not error
+    bool1: Literal[Bool1],  # error: [invalid-type-form]
+    bool2: Literal[Bool2],
+    multiple: Literal[SingleInt, SingleStr, SingleEnum],
+):
+    reveal_type(single_int)  # revealed: Literal[1]
+    reveal_type(single_str)  # revealed: Literal["foo"]
+    reveal_type(single_bytes)  # revealed: Literal[b"bar"]
+    reveal_type(single_bool)  # revealed: Literal[True]
+    reveal_type(single_none)  # revealed: None
+    reveal_type(single_enum)  # revealed: Literal[E.A]
+    reveal_type(union_literals)  # revealed: Literal[1, "foo", b"bar", True, E.A] | None
+    # Could also be `E`
+    reveal_type(an_enum1)  # revealed: Unknown
+    reveal_type(an_enum2)  # revealed: E
+    # Could also be `bool`
+    reveal_type(bool1)  # revealed: Unknown
+    reveal_type(bool2)  # revealed: bool
+    reveal_type(multiple)  # revealed: Literal[1, "foo", E.A]
+```
+
+### Implicit type alias
+
+```py
+from typing import Literal
+from enum import Enum
+
+class E(Enum):
+    A = 1
+    B = 2
+
+SingleInt = Literal[1]
+SingleStr = Literal["foo"]
+SingleBytes = Literal[b"bar"]
+SingleBool = Literal[True]
+SingleNone = Literal[None]
+SingleEnum = Literal[E.A]
+UnionLiterals = Literal[1, "foo", b"bar", True, None, E.A]
+# For implicit type aliases, we may not want to support this. It's simpler not to, and no other
+# type checker does.
+AnEnum1 = E
+AnEnum2 = Literal[E.A, E.B]
+# For implicit type aliases, we may not want to support this.
+Bool1 = bool
+Bool2 = Literal[True, False]
+
+def _(
+    single_int: Literal[SingleInt],
+    single_str: Literal[SingleStr],
+    single_bytes: Literal[SingleBytes],
+    single_bool: Literal[SingleBool],
+    single_none: Literal[SingleNone],
+    single_enum: Literal[SingleEnum],
+    union_literals: Literal[UnionLiterals],
+    an_enum1: Literal[AnEnum1],  # error: [invalid-type-form]
+    an_enum2: Literal[AnEnum2],
+    bool1: Literal[Bool1],  # error: [invalid-type-form]
+    bool2: Literal[Bool2],
+    multiple: Literal[SingleInt, SingleStr, SingleEnum],
+):
+    reveal_type(single_int)  # revealed: Literal[1]
+    reveal_type(single_str)  # revealed: Literal["foo"]
+    reveal_type(single_bytes)  # revealed: Literal[b"bar"]
+    reveal_type(single_bool)  # revealed: Literal[True]
+    reveal_type(single_none)  # revealed: None
+    reveal_type(single_enum)  # revealed: Literal[E.A]
+    reveal_type(union_literals)  # revealed: Literal[1, "foo", b"bar", True, E.A] | None
+    reveal_type(an_enum1)  # revealed: Unknown
+    reveal_type(an_enum2)  # revealed: E
+    reveal_type(bool1)  # revealed: Unknown
+    reveal_type(bool2)  # revealed: bool
+    reveal_type(multiple)  # revealed: Literal[1, "foo", E.A]
 ```
 
 ## Shortening unions of literals
@@ -146,10 +330,11 @@ from other import Literal
 # ?
 #
 # error: [invalid-type-form] "Int literals are not allowed in this context in a type expression"
+# error: [invalid-type-form] "Invalid subscript of object of type `_SpecialForm` in type expression"
 a1: Literal[26]
 
 def f():
-    reveal_type(a1)  # revealed: @Todo(unknown type subscript)
+    reveal_type(a1)  # revealed: Unknown
 ```
 
 ## Detecting typing_extensions.Literal

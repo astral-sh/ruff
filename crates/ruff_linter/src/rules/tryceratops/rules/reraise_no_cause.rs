@@ -37,6 +37,7 @@ use crate::Violation;
 ///
 /// [B904]: https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "v0.2.0")]
 pub(crate) struct ReraiseNoCause;
 
 /// TRY200

@@ -18,7 +18,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error).
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -35,8 +35,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "###);
+    ");
 
     case.write_file(
         "pyproject.toml",
@@ -47,7 +46,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -64,7 +63,6 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -89,7 +87,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
     // and an unresolved-import (error) diagnostic by default.
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -120,7 +118,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     assert_cmd_snapshot!(
@@ -132,7 +129,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--warn")
             .arg("unresolved-import"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -165,7 +162,6 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -189,7 +185,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's a `unresolved-reference` diagnostic (error) by default.
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -206,8 +202,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "###);
+    ");
 
     assert_cmd_snapshot!(
         case
@@ -218,7 +213,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--ignore")
             .arg("unresolved-reference"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -235,7 +230,6 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "
     );
 
@@ -260,7 +254,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
      --> pyproject.toml:3:1
       |
     2 | [tool.ty.rules]
@@ -271,7 +265,6 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     Ok(())
@@ -282,16 +275,15 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
 fn cli_unknown_rules() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", "print(10)")?;
 
-    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @r"
+    assert_cmd_snapshot!(case.command().arg("--ignore").arg("division-by-zer"), @"
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -334,7 +326,7 @@ fn overrides_basic() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -371,8 +363,7 @@ fn overrides_basic() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "###);
+    ");
 
     Ok(())
 }
@@ -414,7 +405,7 @@ fn overrides_precedence() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -429,7 +420,6 @@ fn overrides_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -466,7 +456,7 @@ fn overrides_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -489,7 +479,6 @@ fn overrides_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -530,7 +519,7 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -564,8 +553,7 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    ");
 
     Ok(())
 }
@@ -600,9 +588,8 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: error[invalid-glob]: Invalid include pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:6:12
       |
     5 | [[tool.ty.overrides]]
@@ -647,9 +634,8 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
-      Cause: error[invalid-glob]: Invalid exclude pattern
+      Cause: error[invalid-glob]: Invalid pattern
      --> pyproject.toml:7:12
       |
     5 | [[tool.ty.overrides]]
@@ -717,7 +703,6 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     Ok(())
@@ -773,7 +758,6 @@ fn overrides_empty_include() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     Ok(())
@@ -812,12 +796,12 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     3 | division-by-zero = "error"
     4 |
     5 | [[tool.ty.overrides]]
-      | ^^^^^^^^^^^^^^^^^^^^^ This overrides section configures no rules
+      | ^^^^^^^^^^^^^^^^^^^^^ This overrides section overrides no settings
     6 | include = ["*.py"]  # Has patterns but no rule overrides
     7 | # Missing [tool.ty.overrides.rules] section entirely
       |
-    info: It has no `rules` table
-    info: Add a `[overrides.rules]` table...
+    info: It has no `rules` or `analysis` table
+    info: Add a `[overrides.rules]` or `[overrides.analysis]` table...
     info: or remove the `[[overrides]]` section if there's nothing to override
 
     error[division-by-zero]: Cannot divide object of type `Literal[4]` by zero
@@ -831,7 +815,6 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     Ok(())
@@ -869,7 +852,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -881,7 +864,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
       |
     info: rule `division-by-zero` was selected in the configuration file
 
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
       --> pyproject.toml:10:1
        |
      8 | [tool.ty.overrides.rules]
@@ -901,8 +884,240 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "###);
+    "#);
+
+    Ok(())
+}
+
+/// The "all" keyword can be used to set all rules to a specific severity
+#[test]
+fn cli_all_rules_ignore() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        import does_not_exit
+
+        y = 4 / 0
+
+        prin(y)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore all should disable all rules
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword works with --warn to set all rules to warn severity
+#[test]
+fn cli_all_rules_warn() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --warn all should make all rules warnings (not errors)
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--warn")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    warning[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:2:1
+      |
+    2 | prin(x)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    warning[unresolved-reference]: Name `x` used when not defined
+     --> test.py:2:6
+      |
+    2 | prin(x)  # unresolved-reference
+      |      ^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword can be overridden by subsequent specific rule settings
+#[test]
+fn cli_all_rules_with_override() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        import does_not_exit
+
+        y = 4 / 0
+
+        prin(y)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore all followed by --error for a specific rule should
+    // disable all rules except the one specified
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("all")
+            .arg("--error")
+            .arg("unresolved-reference"),
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:6:1
+      |
+    4 | y = 4 / 0
+    5 |
+    6 | prin(y)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected on the command line
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword is case-insensitive
+#[test]
+fn cli_all_rules_case_insensitive() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --ignore ALL (uppercase) should work the same as --ignore all
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--ignore")
+            .arg("ALL"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// A specific rule can be set first and then overridden by "all"
+#[test]
+fn cli_specific_then_all() -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        r#"
+        prin(x)  # unresolved-reference
+        "#,
+    )?;
+
+    // Using --error for a specific rule followed by --ignore all should
+    // ignore all rules (including the previously set one)
+    assert_cmd_snapshot!(
+        case
+            .command()
+            .arg("--error")
+            .arg("unresolved-reference")
+            .arg("--ignore")
+            .arg("all"),
+        @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// The "all" keyword works in configuration files
+#[test]
+fn configuration_all_rules() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [tool.ty.rules]
+            all = "ignore"
+            unresolved-reference = "error"
+            "#,
+        ),
+        (
+            "test.py",
+            r#"
+            import does_not_exit
+
+            y = 4 / 0
+
+            prin(y)  # unresolved-reference
+            "#,
+        ),
+    ])?;
+
+    // The "all" rule should be processed first, ignoring all rules,
+    // then unresolved-reference should be enabled as error
+    assert_cmd_snapshot!(case.command(), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `prin` used when not defined
+     --> test.py:6:1
+      |
+    4 | y = 4 / 0
+    5 |
+    6 | prin(y)  # unresolved-reference
+      | ^^^^
+      |
+    info: rule `unresolved-reference` was selected in the configuration file
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }

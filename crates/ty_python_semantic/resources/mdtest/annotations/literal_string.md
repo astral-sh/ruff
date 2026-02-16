@@ -35,6 +35,8 @@ bad_nesting: Literal[LiteralString]  # error: [invalid-type-form]
 
 `LiteralString` cannot be parameterized.
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing_extensions import LiteralString
 
@@ -42,7 +44,6 @@ from typing_extensions import LiteralString
 a: LiteralString[str]
 
 # error: [invalid-type-form]
-# error: [unresolved-reference] "Name `foo` used when not defined"
 b: LiteralString["foo"]
 ```
 

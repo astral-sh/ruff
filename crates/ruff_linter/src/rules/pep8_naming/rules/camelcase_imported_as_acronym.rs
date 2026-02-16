@@ -42,6 +42,7 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.82")]
 pub(crate) struct CamelcaseImportedAsAcronym {
     name: String,
     asname: String,

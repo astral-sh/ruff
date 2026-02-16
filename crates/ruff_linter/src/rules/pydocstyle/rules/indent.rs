@@ -44,6 +44,10 @@ use crate::{Edit, Fix};
 /// The rule is also incompatible with the [formatter] when using
 /// `format.indent-style="tab"`.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -52,6 +56,7 @@ use crate::{Edit, Fix};
 /// [PEP 8]: https://peps.python.org/pep-0008/#tabs-or-spaces
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.75")]
 pub(crate) struct DocstringTabIndentation;
 
 impl Violation for DocstringTabIndentation {
@@ -92,6 +97,10 @@ impl Violation for DocstringTabIndentation {
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -100,6 +109,7 @@ impl Violation for DocstringTabIndentation {
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.75")]
 pub(crate) struct UnderIndentation;
 
 impl AlwaysFixableViolation for UnderIndentation {
@@ -144,6 +154,10 @@ impl AlwaysFixableViolation for UnderIndentation {
 /// We recommend against using this rule alongside the [formatter]. The
 /// formatter enforces consistent indentation, making the rule redundant.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
@@ -152,6 +166,7 @@ impl AlwaysFixableViolation for UnderIndentation {
 /// [PEP 257]: https://peps.python.org/pep-0257/
 /// [formatter]:https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.75")]
 pub(crate) struct OverIndentation;
 
 impl AlwaysFixableViolation for OverIndentation {

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, CmpOp, Stmt};
 use ruff_text_size::Ranged;
 
@@ -46,6 +46,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct IfStmtMinMax {
     min_max: MinMax,
     replacement: SourceCodeSnippet,
@@ -165,13 +166,8 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
     let replacement = format!(
         "{} = {min_max}({}, {})",
         checker.locator().slice(
-            parenthesized_range(
-                body_target.into(),
-                body.into(),
-                checker.comment_ranges(),
-                checker.locator().contents()
-            )
-            .unwrap_or(body_target.range())
+            parenthesized_range(body_target.into(), body.into(), checker.tokens())
+                .unwrap_or(body_target.range())
         ),
         checker.locator().slice(arg1),
         checker.locator().slice(arg2),

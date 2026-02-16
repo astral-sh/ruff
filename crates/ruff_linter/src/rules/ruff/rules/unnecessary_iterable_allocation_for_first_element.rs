@@ -48,12 +48,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///    element. As such, any side effects that occur during iteration will be
 ///    delayed.
 /// 2. Second, accessing members of a collection via square bracket notation
-///    `[0]` of the `pop()` function will raise `IndexError` if the collection
+///    `[0]` or the `pop()` function will raise `IndexError` if the collection
 ///    is empty, while `next(iter(...))` will raise `StopIteration`.
 ///
 /// ## References
 /// - [Iterators and Iterables in Python: Run Efficient Iterations](https://realpython.com/python-iterators-iterables/#when-to-use-an-iterator-in-python)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.278")]
 pub(crate) struct UnnecessaryIterableAllocationForFirstElement {
     iterable: SourceCodeSnippet,
 }

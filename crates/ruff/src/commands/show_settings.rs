@@ -29,10 +29,10 @@ pub(crate) fn show_settings(
         bail!("No files found under the given path");
     };
 
-    let settings = resolver.resolve(&path);
+    let (settings, config_path) = resolver.resolve_with_path(&path);
 
     writeln!(writer, "Resolved settings for: \"{}\"", path.display())?;
-    if let Some(settings_path) = pyproject_config.path.as_ref() {
+    if let Some(settings_path) = config_path {
         writeln!(writer, "Settings path: \"{}\"", settings_path.display())?;
     }
     write!(writer, "{settings}")?;

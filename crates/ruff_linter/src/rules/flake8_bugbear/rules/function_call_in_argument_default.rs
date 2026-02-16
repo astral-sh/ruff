@@ -62,6 +62,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.102")]
 pub(crate) struct FunctionCallInDefaultArgument {
     name: Option<String>,
 }

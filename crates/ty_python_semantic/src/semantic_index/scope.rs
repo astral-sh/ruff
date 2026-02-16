@@ -2,7 +2,7 @@ use std::ops::Range;
 
 use ruff_db::{files::File, parsed::ParsedModuleRef};
 use ruff_index::newtype_index;
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, NodeIndex};
 
 use crate::{
     Db,
@@ -11,6 +11,7 @@ use crate::{
     semantic_index::{
         SemanticIndex, reachability_constraints::ScopedReachabilityConstraintId, semantic_index,
     },
+    types::{GenericContext, binding_type, infer_definition_types},
 };
 
 /// A cross-module identifier of a scope that can be used as a salsa query parameter.
@@ -32,6 +33,16 @@ impl<'db> ScopeId<'db> {
 
     pub(crate) fn node(self, db: &dyn Db) -> &NodeWithScopeKind {
         self.scope(db).node()
+    }
+
+    /// Returns `true` if this scope may require type context from its parent scope.
+    pub(crate) fn accepts_type_context(self, db: &dyn Db) -> bool {
+        matches!(
+            self.node(db),
+            NodeWithScopeKind::ListComprehension(_)
+                | NodeWithScopeKind::SetComprehension(_)
+                | NodeWithScopeKind::DictComprehension(_)
+        )
     }
 
     pub(crate) fn scope(self, db: &dyn Db) -> &Scope {
@@ -429,6 +440,59 @@ impl NodeWithScopeKind {
 
     pub(crate) fn expect_type_alias(&self) -> &AstNodeRef<ast::StmtTypeAlias> {
         self.as_type_alias().expect("expected type alias")
+    }
+
+    pub(crate) fn generic_context<'db>(
+        &self,
+        db: &'db dyn Db,
+        index: &SemanticIndex<'db>,
+    ) -> Option<GenericContext<'db>> {
+        match self {
+            NodeWithScopeKind::Class(class) => {
+                let definition = index.expect_single_definition(class);
+                binding_type(db, definition)
+                    .as_class_literal()?
+                    .generic_context(db)
+            }
+            NodeWithScopeKind::Function(function) => {
+                let definition = index.expect_single_definition(function);
+                infer_definition_types(db, definition)
+                    .undecorated_type()
+                    .expect("function should have undecorated type")
+                    .as_function_literal()?
+                    .last_definition_signature(db)
+                    .generic_context
+            }
+            NodeWithScopeKind::TypeAlias(type_alias) => {
+                let definition = index.expect_single_definition(type_alias);
+                binding_type(db, definition)
+                    .as_type_alias()?
+                    .as_pep_695_type_alias()?
+                    .generic_context(db)
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns the anchor node index for this scope, or `None` for the module scope.
+    ///
+    /// This is used to compute relative node indices for expressions within the scope,
+    /// providing a stable anchor that only changes when the scope-introducing node changes.
+    pub(crate) fn node_index(&self) -> Option<NodeIndex> {
+        match self {
+            Self::Module => None,
+            Self::Class(class) => Some(class.index()),
+            Self::ClassTypeParameters(class) => Some(class.index()),
+            Self::Function(function) => Some(function.index()),
+            Self::FunctionTypeParameters(function) => Some(function.index()),
+            Self::TypeAlias(type_alias) => Some(type_alias.index()),
+            Self::TypeAliasTypeParameters(type_alias) => Some(type_alias.index()),
+            Self::Lambda(lambda) => Some(lambda.index()),
+            Self::ListComprehension(comp) => Some(comp.index()),
+            Self::SetComprehension(comp) => Some(comp.index()),
+            Self::DictComprehension(comp) => Some(comp.index()),
+            Self::GeneratorExpression(generator) => Some(generator.index()),
+        }
     }
 }
 

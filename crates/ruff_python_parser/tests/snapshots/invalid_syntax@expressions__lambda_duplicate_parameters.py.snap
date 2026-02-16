@@ -338,7 +338,7 @@ Module(
 7 | lambda a, *a: 1
 8 |
 9 | lambda a, *, **a: 1
-  |              ^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |              ^^^ Syntax Error: Expected one or more keyword parameter after `*` separator
   |
 
 

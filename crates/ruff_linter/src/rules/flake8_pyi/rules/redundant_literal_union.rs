@@ -37,6 +37,7 @@ use crate::fix::snippet::SourceCodeSnippet;
 /// x: Literal[b"B"] | str
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.283")]
 pub(crate) struct RedundantLiteralUnion {
     literal: SourceCodeSnippet,
     builtin_type: ExprType,

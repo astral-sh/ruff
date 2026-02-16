@@ -69,6 +69,7 @@ use crate::checkers::ast::Checker;
 ///     def __iter__(self) -> collections.abc.Iterator[str]: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct IterMethodReturnIterable {
     is_async: bool,
 }

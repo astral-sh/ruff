@@ -145,6 +145,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.pylint.max-branches`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.242")]
 pub(crate) struct TooManyBranches {
     branches: usize,
     max_branches: usize,

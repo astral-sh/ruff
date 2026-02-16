@@ -64,6 +64,7 @@ use crate::rules::flake8_pytest_style::rules::is_pytest_raises;
 /// - [Python documentation: `re.escape`](https://docs.python.org/3/library/re.html#re.escape)
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct PytestRaisesAmbiguousPattern;
 
 impl Violation for PytestRaisesAmbiguousPattern {

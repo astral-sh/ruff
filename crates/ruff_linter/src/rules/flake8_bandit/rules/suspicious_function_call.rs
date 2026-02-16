@@ -4,11 +4,16 @@
 use itertools::Either;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::is_suspicious_function_reference_enabled;
+use crate::preview::{
+    is_s310_resolve_string_literal_bindings_enabled, is_suspicious_function_reference_enabled,
+};
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -51,6 +56,7 @@ use crate::preview::is_suspicious_function_reference_enabled;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousPickleUsage;
 
 impl Violation for SuspiciousPickleUsage {
@@ -100,6 +106,7 @@ impl Violation for SuspiciousPickleUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousMarshalUsage;
 
 impl Violation for SuspiciousMarshalUsage {
@@ -150,6 +157,7 @@ impl Violation for SuspiciousMarshalUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousInsecureHashUsage;
 
 impl Violation for SuspiciousInsecureHashUsage {
@@ -192,6 +200,7 @@ impl Violation for SuspiciousInsecureHashUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousInsecureCipherUsage;
 
 impl Violation for SuspiciousInsecureCipherUsage {
@@ -236,6 +245,7 @@ impl Violation for SuspiciousInsecureCipherUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousInsecureCipherModeUsage;
 
 impl Violation for SuspiciousInsecureCipherModeUsage {
@@ -285,6 +295,7 @@ impl Violation for SuspiciousInsecureCipherModeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousMktempUsage;
 
 impl Violation for SuspiciousMktempUsage {
@@ -325,6 +336,7 @@ impl Violation for SuspiciousMktempUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousEvalUsage;
 
 impl Violation for SuspiciousEvalUsage {
@@ -368,7 +380,7 @@ impl Violation for SuspiciousEvalUsage {
 ///
 ///
 /// def render_username(username):
-///     return django.utils.html.format_html("<i>{}</i>", username)  # username is escaped.
+///     return format_html("<i>{}</i>", username)  # username is escaped.
 /// ```
 ///
 /// ## References
@@ -378,6 +390,7 @@ impl Violation for SuspiciousEvalUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousMarkSafeUsage;
 
 impl Violation for SuspiciousMarkSafeUsage {
@@ -430,6 +443,7 @@ impl Violation for SuspiciousMarkSafeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousURLOpenUsage;
 
 impl Violation for SuspiciousURLOpenUsage {
@@ -472,6 +486,7 @@ impl Violation for SuspiciousURLOpenUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousNonCryptographicRandomUsage;
 
 impl Violation for SuspiciousNonCryptographicRandomUsage {
@@ -516,6 +531,7 @@ impl Violation for SuspiciousNonCryptographicRandomUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLCElementTreeUsage;
 
 impl Violation for SuspiciousXMLCElementTreeUsage {
@@ -560,6 +576,7 @@ impl Violation for SuspiciousXMLCElementTreeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLElementTreeUsage;
 
 impl Violation for SuspiciousXMLElementTreeUsage {
@@ -604,6 +621,7 @@ impl Violation for SuspiciousXMLElementTreeUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLExpatReaderUsage;
 
 impl Violation for SuspiciousXMLExpatReaderUsage {
@@ -648,6 +666,7 @@ impl Violation for SuspiciousXMLExpatReaderUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLExpatBuilderUsage;
 
 impl Violation for SuspiciousXMLExpatBuilderUsage {
@@ -692,6 +711,7 @@ impl Violation for SuspiciousXMLExpatBuilderUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLSaxUsage;
 
 impl Violation for SuspiciousXMLSaxUsage {
@@ -736,6 +756,7 @@ impl Violation for SuspiciousXMLSaxUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLMiniDOMUsage;
 
 impl Violation for SuspiciousXMLMiniDOMUsage {
@@ -780,6 +801,7 @@ impl Violation for SuspiciousXMLMiniDOMUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousXMLPullDOMUsage;
 
 impl Violation for SuspiciousXMLPullDOMUsage {
@@ -821,6 +843,7 @@ impl Violation for SuspiciousXMLPullDOMUsage {
 /// [preview]: https://docs.astral.sh/ruff/preview/
 /// [deprecated]: https://pypi.org/project/defusedxml/0.8.0rc2/#defusedxml-lxml
 #[derive(ViolationMetadata)]
+#[violation_metadata(removed_since = "0.12.0")]
 pub(crate) struct SuspiciousXMLETreeUsage;
 
 impl Violation for SuspiciousXMLETreeUsage {
@@ -867,6 +890,7 @@ impl Violation for SuspiciousXMLETreeUsage {
 /// [PEP 476]: https://peps.python.org/pep-0476/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousUnverifiedContextUsage;
 
 impl Violation for SuspiciousUnverifiedContextUsage {
@@ -892,6 +916,7 @@ impl Violation for SuspiciousUnverifiedContextUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousTelnetUsage;
 
 impl Violation for SuspiciousTelnetUsage {
@@ -917,6 +942,7 @@ impl Violation for SuspiciousTelnetUsage {
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.258")]
 pub(crate) struct SuspiciousFTPLibUsage;
 
 impl Violation for SuspiciousFTPLibUsage {
@@ -993,6 +1019,25 @@ fn suspicious_function(
     fn has_http_prefix(chars: impl Iterator<Item = char> + Clone) -> bool {
         has_prefix(chars.clone().skip_while(|c| c.is_whitespace()), "http://")
             || has_prefix(chars.skip_while(|c| c.is_whitespace()), "https://")
+    }
+
+    /// Resolves `expr` to its binding and checks if the resolved expression starts with an HTTP or HTTPS prefix.
+    fn expression_starts_with_http_prefix(
+        expr: &Expr,
+        semantic: &SemanticModel,
+        settings: &LinterSettings,
+    ) -> bool {
+        let resolved_expression = if is_s310_resolve_string_literal_bindings_enabled(settings)
+            && let Some(name_expr) = expr.as_name_expr()
+            && let Some(binding_id) = semantic.only_binding(name_expr)
+            && let Some(value) = find_binding_value(semantic.binding(binding_id), semantic)
+        {
+            value
+        } else {
+            expr
+        };
+
+        leading_chars(resolved_expression).is_some_and(has_http_prefix)
     }
 
     /// Return the leading characters for an expression, if it's a string literal, f-string, or
@@ -1091,9 +1136,12 @@ fn suspicious_function(
         ] => checker.report_diagnostic_if_enabled(SuspiciousInsecureCipherModeUsage, range),
 
         // Mktemp
-        ["tempfile", "mktemp"] => {
-            checker.report_diagnostic_if_enabled(SuspiciousMktempUsage, range)
-        }
+        ["tempfile", "mktemp"] => checker
+            .report_diagnostic_if_enabled(SuspiciousMktempUsage, range)
+            .map(|mut diagnostic| {
+                diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
+                diagnostic
+            }),
 
         // Eval
         ["" | "builtins", "eval"] => {
@@ -1115,17 +1163,19 @@ fn suspicious_function(
         // URLOpen (`Request`)
         ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
             if let Some(arguments) = arguments {
-                // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
+                // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                 if arguments.args.iter().all(|arg| !arg.is_starred_expr())
                     && arguments
                         .keywords
                         .iter()
                         .all(|keyword| keyword.arg.is_some())
                 {
-                    if arguments
-                        .find_argument_value("url", 0)
-                        .and_then(leading_chars)
-                        .is_some_and(has_http_prefix)
+                    if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                        && expression_starts_with_http_prefix(
+                            url_expr,
+                            checker.semantic(),
+                            checker.settings(),
+                        )
                     {
                         return;
                     }
@@ -1162,19 +1212,25 @@ fn suspicious_function(
                                     name.segments() == ["urllib", "request", "Request"]
                                 })
                             {
-                                if arguments
-                                    .find_argument_value("url", 0)
-                                    .and_then(leading_chars)
-                                    .is_some_and(has_http_prefix)
+                                if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                                    && expression_starts_with_http_prefix(
+                                        url_expr,
+                                        checker.semantic(),
+                                        checker.settings(),
+                                    )
                                 {
                                     return;
                                 }
                             }
                         }
 
-                        // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                        // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                         Some(expr) => {
-                            if leading_chars(expr).is_some_and(has_http_prefix) {
+                            if expression_starts_with_http_prefix(
+                                expr,
+                                checker.semantic(),
+                                checker.settings(),
+                            ) {
                                 return;
                             }
                         }

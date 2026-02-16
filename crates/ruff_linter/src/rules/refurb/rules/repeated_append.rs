@@ -45,6 +45,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: More on Lists](https://docs.python.org/3/tutorial/datastructures.html#more-on-lists)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.287")]
 pub(crate) struct RepeatedAppend {
     name: String,
     replacement: SourceCodeSnippet,
@@ -175,7 +176,7 @@ fn match_consecutive_appends<'a>(
     let suite = if semantic.at_top_level() {
         // If the statement is at the top level, we should go to the parent module.
         // Module is available in the definitions list.
-        EnclosingSuite::new(semantic.definitions.python_ast()?, stmt)?
+        EnclosingSuite::new(semantic.definitions.python_ast()?, stmt.into())?
     } else {
         // Otherwise, go to the parent, and take its body as a sequence of siblings.
         semantic

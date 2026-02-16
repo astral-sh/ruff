@@ -41,6 +41,7 @@ use crate::checkers::ast::Checker;
 /// dag = DAG(dag_id="my_dag", schedule=timedelta(days=1))
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct AirflowDagNoScheduleArgument;
 
 impl Violation for AirflowDagNoScheduleArgument {

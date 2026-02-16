@@ -209,14 +209,14 @@ class array(MutableSequence[_T]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> array[_T]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> array[_T]: ...
     @overload  # type: ignore[override]
     def __setitem__(self, key: SupportsIndex, value: _T, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: array[_T], /) -> None: ...
-    def __delitem__(self, key: SupportsIndex | slice, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: array[_T], /) -> None: ...
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
 
     def __add__(self, value: array[_T], /) -> array[_T]:

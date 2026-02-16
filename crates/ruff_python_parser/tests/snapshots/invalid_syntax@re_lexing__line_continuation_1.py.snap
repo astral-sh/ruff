@@ -110,7 +110,7 @@ Module(
   |
 1 | call(a, b, \\\
 2 |
-  | ^ Syntax Error: Expected ')', found newline
+  | ^ Syntax Error: Expected `)`, found newline
 3 | def bar():
 4 |     pass
   |

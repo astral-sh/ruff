@@ -1,0 +1,27 @@
+---
+source: crates/ruff_db/src/diagnostic/render/full.rs
+expression: env.render(&diagnostic)
+---
+error[unused-import][*]: `os` imported but unused
+ --> notebook.ipynb:cell 1:2:8
+  |
+1 | # cell 1
+2 | import os
+  |        ^^
+  |
+help: Remove unused import: `os`
+ ::: cell 1
+1 | # cell 1
+  - import os
+ ::: cell 2
+1 | # cell 2
+  - import math
+2 | 
+3 | print('hello world')
+ ::: cell 3
+1 | # cell 3
+2 | def foo():
+3 |     print()
+  -     x = 1
+4 | 
+note: This is an unsafe fix and may change runtime behavior

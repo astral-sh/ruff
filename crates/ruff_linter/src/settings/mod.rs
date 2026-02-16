@@ -465,6 +465,19 @@ impl LinterSettings {
         self
     }
 
+    #[must_use]
+    pub fn with_preview_mode(mut self) -> Self {
+        self.preview = PreviewMode::Enabled;
+        self
+    }
+
+    #[must_use]
+    pub fn with_external_rules(mut self, rules: &[&str]) -> Self {
+        self.external
+            .extend(rules.iter().map(std::string::ToString::to_string));
+        self
+    }
+
     /// Resolve the [`TargetVersion`] to use for linting.
     ///
     /// This method respects the per-file version overrides in
@@ -491,7 +504,7 @@ impl Default for LinterSettings {
 /// unset. In contrast, we want to default to `PythonVersion::default()` for lint rules. These
 /// correspond to the [`TargetVersion::parser_version`] and [`TargetVersion::linter_version`]
 /// methods, respectively.
-#[derive(Debug, Clone, Copy, CacheKey)]
+#[derive(Debug, Clone, Copy, CacheKey, PartialEq, Eq)]
 pub struct TargetVersion(pub Option<PythonVersion>);
 
 impl TargetVersion {

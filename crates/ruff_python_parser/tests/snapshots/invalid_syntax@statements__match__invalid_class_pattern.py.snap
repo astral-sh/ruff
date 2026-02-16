@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 68..83,
                                     node_index: NodeIndex(None),
+                                    range: 68..83,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -53,8 +53,8 @@ Module(
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 81..82,
                                                         node_index: NodeIndex(None),
+                                                        range: 81..82,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
                                                                 node_index: NodeIndex(None),
@@ -86,8 +86,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 107..121,
                                     node_index: NodeIndex(None),
+                                    range: 107..121,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -111,8 +111,8 @@ Module(
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 119..120,
                                                         node_index: NodeIndex(None),
+                                                        range: 119..120,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
                                                                 node_index: NodeIndex(None),
@@ -144,8 +144,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 145..160,
                                     node_index: NodeIndex(None),
+                                    range: 145..160,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -169,8 +169,8 @@ Module(
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 158..159,
                                                         node_index: NodeIndex(None),
+                                                        range: 158..159,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
                                                                 node_index: NodeIndex(None),
@@ -202,8 +202,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 184..203,
                                     node_index: NodeIndex(None),
+                                    range: 184..203,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -227,8 +227,8 @@ Module(
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 201..202,
                                                         node_index: NodeIndex(None),
+                                                        range: 201..202,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
                                                                 node_index: NodeIndex(None),
@@ -260,8 +260,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 227..235,
                                     node_index: NodeIndex(None),
+                                    range: 227..235,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -285,8 +285,8 @@ Module(
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 233..234,
                                                         node_index: NodeIndex(None),
+                                                        range: 233..234,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
                                                                 node_index: NodeIndex(None),
@@ -318,8 +318,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 259..271,
                                     node_index: NodeIndex(None),
+                                    range: 259..271,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -343,8 +343,8 @@ Module(
                                                 },
                                                 pattern: MatchValue(
                                                     PatternMatchValue {
-                                                        range: 269..270,
                                                         node_index: NodeIndex(None),
+                                                        range: 269..270,
                                                         value: NumberLiteral(
                                                             ExprNumberLiteral {
                                                                 node_index: NodeIndex(None),

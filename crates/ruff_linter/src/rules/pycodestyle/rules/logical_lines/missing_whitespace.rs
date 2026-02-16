@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::Ranged;
 
 use crate::Edit;
@@ -24,6 +24,7 @@ use super::{DefinitionState, LogicalLine};
 /// a = (1, 2)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.269")]
 pub(crate) struct MissingWhitespace {
     token: TokenKind,
 }

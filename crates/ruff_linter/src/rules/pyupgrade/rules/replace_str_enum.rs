@@ -72,11 +72,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// As such, migrating to `enum.StrEnum` will introduce a behavior change for
 /// code that relies on the Python 3.11 behavior.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// ## References
 /// - [enum.StrEnum](https://docs.python.org/3/library/enum.html#enum.StrEnum)
 ///
 /// [breaking change]: https://blog.pecar.me/python-enum
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct ReplaceStrEnum {
     name: String,
 }

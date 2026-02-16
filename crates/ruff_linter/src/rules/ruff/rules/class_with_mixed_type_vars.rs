@@ -62,6 +62,7 @@ use ruff_python_ast::PythonVersion;
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [type parameter lists]: https://docs.python.org/3/reference/compound_stmts.html#type-params
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct ClassWithMixedTypeVars;
 
 impl Violation for ClassWithMixedTypeVars {
@@ -162,7 +163,7 @@ fn convert_type_vars(
         class_arguments,
         Parentheses::Remove,
         source,
-        checker.comment_ranges(),
+        checker.tokens(),
     )?;
     let replace_type_params =
         Edit::range_replacement(new_type_params.to_string(), type_params.range);

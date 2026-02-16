@@ -222,6 +222,17 @@ where
     visitor.leave_node(node);
 }
 
+pub fn walk_node<'a, V>(visitor: &mut V, node: AnyNodeRef<'a>)
+where
+    V: SourceOrderVisitor<'a> + ?Sized,
+{
+    if visitor.enter_node(node).is_traverse() {
+        node.visit_source_order(visitor);
+    }
+
+    visitor.leave_node(node);
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TraversalSignal {
     Traverse,

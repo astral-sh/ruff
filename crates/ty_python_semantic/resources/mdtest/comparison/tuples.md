@@ -79,6 +79,8 @@ def _(x: bool, y: int):
 
 #### Comparison Unsupported
 
+<!-- snapshot-diagnostics -->
+
 If two tuples contain types that do not support comparison, the result may be `Unknown`. However,
 `==` and `!=` are exceptions and can still provide definite results.
 
@@ -92,14 +94,17 @@ reveal_type(a == b)  # revealed: bool
 # TODO: should be Literal[True], once we implement (in)equality for mismatched literals
 reveal_type(a != b)  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a < b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `<=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a <= b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `>` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a > b)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `str`, in comparing `tuple[Literal[1], Literal[2]]` with `tuple[Literal[1], Literal["hello"]]`"
+# error: [unsupported-operator] "Operator `>=` is not supported between objects of type `tuple[Literal[1], Literal[2]]` and `tuple[Literal[1], Literal["hello"]]`"
 reveal_type(a >= b)  # revealed: Unknown
+# error: [unsupported-operator]
+# error: [unsupported-operator]
+reveal_type((object(),) < (object(),) < (object(),))  # revealed: Unknown
 ```
 
 However, if the lexicographic comparison completes without reaching a point where str and int are
@@ -155,10 +160,10 @@ class GtReturnType: ...
 class GeReturnType: ...
 
 class A:
-    def __eq__(self, o: object) -> EqReturnType:
+    def __eq__(self, o: object) -> EqReturnType:  # error: [invalid-method-override]
         return EqReturnType()
 
-    def __ne__(self, o: object) -> NeReturnType:
+    def __ne__(self, o: object) -> NeReturnType:  # error: [invalid-method-override]
         return NeReturnType()
 
     def __lt__(self, o: A) -> LtReturnType:
@@ -257,24 +262,24 @@ comparison can clearly conclude before encountering an error, the error should n
 ```py
 def _(n: int, s: str):
     class A: ...
-    # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `A`"
     A() < A()
-    # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `<=` is not supported between two objects of type `A`"
     A() <= A()
-    # error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `A`"
     A() > A()
-    # error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`"
+    # error: [unsupported-operator] "Operator `>=` is not supported between two objects of type `A`"
     A() >= A()
 
     a = (0, n, A())
 
-    # error: [unsupported-operator] "Operator `<` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `<` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a < a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `<=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `<=` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a <= a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `>` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a > a)  # revealed: Unknown
-    # error: [unsupported-operator] "Operator `>=` is not supported for types `A` and `A`, in comparing `tuple[Literal[0], int, A]` with `tuple[Literal[0], int, A]`"
+    # error: [unsupported-operator] "Operator `>=` is not supported between two objects of type `tuple[Literal[0], int, A]`"
     reveal_type(a >= a)  # revealed: Unknown
 
     # Comparison between `a` and `b` should only involve the first elements, `Literal[0]` and `Literal[99999]`,
@@ -333,7 +338,111 @@ reveal_type(a is not c)  # revealed: Literal[True]
 
 For tuples like `tuple[int, ...]`, `tuple[Any, ...]`
 
-// TODO
+### Unsupported Comparisons
+
+<!-- snapshot-diagnostics -->
+
+Comparisons between homogeneous tuples with incompatible element types should emit diagnostics for
+ordering operators (`<`, `<=`, `>`, `>=`), but not for equality operators (`==`, `!=`).
+
+```py
+def f(
+    a: tuple[int, ...],
+    b: tuple[str, ...],
+    c: tuple[str],
+):
+    # Equality comparisons are always valid
+    reveal_type(a == b)  # revealed: bool
+    reveal_type(a != b)  # revealed: bool
+
+    # Ordering comparisons between incompatible types should emit errors
+    # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[int, ...]` and `tuple[str, ...]`"
+    a < b
+    # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[str, ...]` and `tuple[int, ...]`"
+    b < a
+    # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[int, ...]` and `tuple[str]`"
+    a < c
+    # error: [unsupported-operator] "Operator `<` is not supported between objects of type `tuple[str]` and `tuple[int, ...]`"
+    c < a
+```
+
+When comparing fixed-length tuples with variable-length tuples, all element types that could
+potentially be compared must be compatible.
+
+```py
+def _(
+    var_int: tuple[int, ...],
+    var_str: tuple[str, ...],
+    fixed_int_str: tuple[int, str],
+):
+    # Fixed `tuple[int, str]` vs. variable `tuple[int, ...]`:
+    # Position 0: `int` vs. `int` are comparable.
+    # Position 1 (if `var_int` has 2+ elements): `str` vs. `int` are not comparable.
+    # error: [unsupported-operator]
+    fixed_int_str < var_int
+
+    # Variable `tuple[int, ...]` vs. fixed `tuple[int, str]`:
+    # Position 0: `int` vs. `int` are comparable.
+    # Position 1 (if `var_int` has 2+ elements): `int` vs. `str` are not comparable.
+    # error: [unsupported-operator]
+    var_int < fixed_int_str
+
+    # Variable `tuple[str, ...]` vs. fixed `tuple[int, str]`:
+    # Position 0: `str` vs. `int` are not comparable.
+    # error: [unsupported-operator]
+    var_str < fixed_int_str
+```
+
+### Supported Comparisons
+
+Comparisons between homogeneous tuples with compatible element types should work.
+
+```py
+def _(a: tuple[int, ...], b: tuple[int, ...], c: tuple[bool, ...]):
+    # Same element types - always valid
+    reveal_type(a == b)  # revealed: bool
+    reveal_type(a != b)  # revealed: bool
+    reveal_type(a < b)  # revealed: bool
+    reveal_type(a <= b)  # revealed: bool
+    reveal_type(a > b)  # revealed: bool
+    reveal_type(a >= b)  # revealed: bool
+
+    # int and bool are compatible for comparison
+    reveal_type(a < c)  # revealed: bool
+    reveal_type(c < a)  # revealed: bool
+```
+
+### Tuples with Prefixes and Suffixes
+
+<!-- snapshot-diagnostics -->
+
+Variable-length tuples with prefixes and suffixes are also checked.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def _(
+    prefix_int_var_str: tuple[int, *tuple[str, ...]],
+    prefix_str_var_int: tuple[str, *tuple[int, ...]],
+):
+    # Prefix `int` vs. prefix `str` are not comparable.
+    # error: [unsupported-operator]
+    prefix_int_var_str < prefix_str_var_int
+```
+
+Tuples with compatible prefixes/suffixes are allowed.
+
+```py
+def _(
+    prefix_int_var_int: tuple[int, *tuple[int, ...]],
+    prefix_int_var_bool: tuple[int, *tuple[bool, ...]],
+):
+    # Prefix `int` vs. prefix `int`, variable `int` vs. variable `bool` are all comparable.
+    reveal_type(prefix_int_var_int < prefix_int_var_bool)  # revealed: bool
+```
 
 ## Chained comparisons with elements that incorrectly implement `__bool__`
 
@@ -386,6 +495,7 @@ class NotBoolable:
     __bool__: None = None
 
 class A:
+    # error: [invalid-method-override]
     def __eq__(self, other) -> NotBoolable:
         return NotBoolable()
 

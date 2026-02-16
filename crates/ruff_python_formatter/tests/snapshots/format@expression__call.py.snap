@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/call.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -556,4 +555,21 @@ result = (
 
 
 result = (object[complicate_caller])("argument").a["b"].test(argument)
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -57,7 +57,8 @@
+ 
+ # Call chains/fluent interface (https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#call-chains)
+ result = (
+-    session.query(models.Customer.id)
++    session
++    .query(models.Customer.id)
+     .filter(
+         models.Customer.account_id == 10000,
+         models.Customer.email == "user@example.org",
 ```

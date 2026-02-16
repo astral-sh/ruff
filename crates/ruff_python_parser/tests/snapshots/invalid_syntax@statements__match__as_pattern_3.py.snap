@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 108..117,
                                     node_index: NodeIndex(None),
+                                    range: 108..117,
                                     cls: Dict(
                                         ExprDict {
                                             node_index: NodeIndex(None),
@@ -43,13 +43,13 @@ Module(
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 110..116,
                                                     node_index: NodeIndex(None),
+                                                    range: 110..116,
                                                     pattern: Some(
                                                         MatchAs(
                                                             PatternMatchAs {
-                                                                range: 110..111,
                                                                 node_index: NodeIndex(None),
+                                                                range: 110..111,
                                                                 pattern: None,
                                                                 name: Some(
                                                                     Identifier {
@@ -113,7 +113,7 @@ Module(
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |           ^ Syntax Error: Expected '}', found '('
+  |           ^ Syntax Error: Expected `}`, found `(`
 5 |         pass
   |
 
@@ -131,7 +131,7 @@ Module(
 2 |     #     Not in the mapping start token set, so the list parsing bails
 3 |     #     v
 4 |     case {(x as y): 1}:
-  |                      ^ Syntax Error: Expected newline, found '}'
+  |                      ^ Syntax Error: Expected newline, found `}`
 5 |         pass
   |
 

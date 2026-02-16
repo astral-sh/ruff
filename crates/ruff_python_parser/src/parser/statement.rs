@@ -2,6 +2,7 @@ use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
     PythonVersion, Stmt, WithItem,
@@ -14,7 +15,7 @@ use crate::parser::progress::ParserProgress;
 use crate::parser::{
     FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
 };
-use crate::token::{TokenKind, TokenValue};
+use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 
@@ -2130,7 +2131,7 @@ impl<'src> Parser<'src> {
         let open_paren_range = self.current_token_range();
 
         if self.at(TokenKind::Lpar) {
-            if let Some(items) = self.try_parse_parenthesized_with_items() {
+            if let (Some(items), has_trailing_comma) = self.try_parse_parenthesized_with_items() {
                 // test_ok tuple_context_manager_py38
                 // # parse_options: {"target-version": "3.8"}
                 // with (
@@ -2139,14 +2140,19 @@ impl<'src> Parser<'src> {
                 //   baz,
                 // ) as tup: ...
 
+                // test_ok single_parenthesized_item_context_manager_py38
+                // # parse_options: {"target-version": "3.8"}
+                // with (
+                //   open('foo.txt')) as foo: ...
+                // with (
+                //   open('foo.txt')): ...
+
                 // test_err tuple_context_manager_py38
                 // # parse_options: {"target-version": "3.8"}
                 // # these cases are _syntactically_ valid before Python 3.9 because the `with` item
                 // # is parsed as a tuple, but this will always cause a runtime error, so we flag it
                 // # anyway
                 // with (foo, bar): ...
-                // with (
-                //   open('foo.txt')) as foo: ...
                 // with (
                 //   foo,
                 //   bar,
@@ -2165,10 +2171,12 @@ impl<'src> Parser<'src> {
                 // with (foo as x, bar as y): ...
                 // with (foo, bar as y): ...
                 // with (foo as x, bar): ...
-                self.add_unsupported_syntax_error(
-                    UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
-                    open_paren_range,
-                );
+                if items.len() > 1 || has_trailing_comma {
+                    self.add_unsupported_syntax_error(
+                        UnsupportedSyntaxErrorKind::ParenthesizedContextManager,
+                        open_paren_range,
+                    );
+                }
 
                 self.expect(TokenKind::Rpar);
                 items
@@ -2228,7 +2236,7 @@ impl<'src> Parser<'src> {
     /// If the parser isn't positioned at a `(` token.
     ///
     /// See: <https://docs.python.org/3/reference/compound_stmts.html#grammar-token-python-grammar-with_stmt_contents>
-    fn try_parse_parenthesized_with_items(&mut self) -> Option<Vec<WithItem>> {
+    fn try_parse_parenthesized_with_items(&mut self) -> (Option<Vec<WithItem>>, bool) {
         let checkpoint = self.checkpoint();
 
         // We'll start with the assumption that the with items are parenthesized.
@@ -2245,11 +2253,12 @@ impl<'src> Parser<'src> {
         // with (item1, item2 item3, item4): ...
         // with (item1, item2 as f1 item3, item4): ...
         // with (item1, item2: ...
-        self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |p| {
-            let parsed_with_item = p.parse_with_item(WithItemParsingState::Speculative);
-            has_optional_vars |= parsed_with_item.item.optional_vars.is_some();
-            parsed_with_items.push(parsed_with_item);
-        });
+        let has_trailing_comma =
+            self.parse_comma_separated_list(RecoveryContextKind::WithItems(with_item_kind), |p| {
+                let parsed_with_item = p.parse_with_item(WithItemParsingState::Speculative);
+                has_optional_vars |= parsed_with_item.item.optional_vars.is_some();
+                parsed_with_items.push(parsed_with_item);
+            });
 
         // Check if our assumption is incorrect and it's actually a parenthesized expression.
         if has_optional_vars {
@@ -2319,7 +2328,7 @@ impl<'src> Parser<'src> {
             with_item_kind = WithItemKind::ParenthesizedExpression;
         }
 
-        if with_item_kind.is_parenthesized() {
+        let with_items = if with_item_kind.is_parenthesized() {
             Some(
                 parsed_with_items
                     .into_iter()
@@ -2330,7 +2339,9 @@ impl<'src> Parser<'src> {
             self.rewind(checkpoint);
 
             None
-        }
+        };
+
+        (with_items, has_trailing_comma)
     }
 
     /// Parses a single `with` item.
@@ -2771,13 +2782,20 @@ impl<'src> Parser<'src> {
         // def foo(): ...
         // @@
         // def foo(): ...
+        // @test
+        // @
+        // class Test
         while self.at(TokenKind::At) {
             progress.assert_progressing(self);
 
             let decorator_start = self.node_start();
             self.bump(TokenKind::At);
 
-            let parsed_expr = self.parse_named_expression_or_higher(ExpressionContext::default());
+            let parsed_expr = if self.at(TokenKind::Def) || self.at(TokenKind::Class) {
+                Expr::Name(self.parse_missing_name()).into()
+            } else {
+                self.parse_named_expression_or_higher(ExpressionContext::default())
+            };
 
             if self.options.target_version < PythonVersion::PY39 {
                 // test_ok decorator_expression_dotted_ident_py38
@@ -2903,21 +2921,27 @@ impl<'src> Parser<'src> {
                     self.current_token_range(),
                 );
 
-                // TODO(dhruvmanila): It seems that this recovery drops all the parsed
-                // decorators. Maybe we could convert them into statement expression
-                // with a flag indicating that this expression is part of a decorator.
-                // It's only possible to keep them if it's a function or class definition.
-                // We could possibly keep them if there's indentation error:
-                //
-                // ```python
-                // @decorator
-                //   @decorator
-                // def foo(): ...
-                // ```
-                //
-                // Or, parse it as a binary expression where the left side is missing.
-                // We would need to convert each decorator into a binary expression.
-                self.parse_statement()
+                let range = self.node_range(start);
+
+                ast::StmtFunctionDef {
+                    node_index: AtomicNodeIndex::default(),
+                    range,
+                    is_async: false,
+                    decorator_list: decorators,
+                    name: ast::Identifier {
+                        id: Name::empty(),
+                        range: self.missing_node_range(),
+                        node_index: AtomicNodeIndex::NONE,
+                    },
+                    type_params: None,
+                    parameters: Box::new(ast::Parameters {
+                        range: self.missing_node_range(),
+                        ..ast::Parameters::default()
+                    }),
+                    returns: None,
+                    body: vec![],
+                }
+                .into()
             }
         }
     }

@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::Expr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -28,12 +29,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// datetime.UTC
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## Options
 /// - `target-version`
 ///
 /// ## References
 /// - [Python documentation: `datetime.UTC`](https://docs.python.org/3/library/datetime.html#datetime.UTC)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.192")]
 pub(crate) struct DatetimeTimezoneUTC;
 
 impl Violation for DatetimeTimezoneUTC {
@@ -66,7 +71,18 @@ pub(crate) fn datetime_utc_alias(checker: &Checker, expr: &Expr) {
                 checker.semantic(),
             )?;
             let reference_edit = Edit::range_replacement(binding, expr.range());
-            Ok(Fix::safe_edits(import_edit, [reference_edit]))
+
+            let applicability = if checker.comment_ranges().intersects(expr.range()) {
+                Applicability::Unsafe
+            } else {
+                Applicability::Safe
+            };
+
+            Ok(Fix::applicable_edits(
+                import_edit,
+                [reference_edit],
+                applicability,
+            ))
         });
     }
 }

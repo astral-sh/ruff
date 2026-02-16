@@ -43,6 +43,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [a simpler `try`/`except` (and why maybe shouldn't)](https://www.youtube.com/watch?v=MZAJ8qnC7mk)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct SuppressibleException {
     exception: String,
 }
@@ -156,14 +157,11 @@ pub(crate) fn suppressible_exception(
             let mut rest: Vec<Edit> = Vec::new();
             let content: String;
             if exception == "BaseException" && handler_names.is_empty() {
-                let (import_exception, binding_exception) =
-                    checker.importer().get_or_import_symbol(
-                        &ImportRequest::import("builtins", &exception),
-                        stmt.start(),
-                        checker.semantic(),
-                    )?;
+                let (import_exception, binding_exception) = checker
+                    .importer()
+                    .get_or_import_builtin_symbol(&exception, stmt.start(), checker.semantic())?;
                 content = format!("with {binding}({binding_exception})");
-                rest.push(import_exception);
+                rest.extend(import_exception);
             } else {
                 content = format!("with {binding}({exception})");
             }

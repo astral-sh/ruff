@@ -35,6 +35,7 @@ use crate::rules::pylint::helpers::in_dunder_method;
 /// ## References
 /// - [CodeQL: `py-explicit-return-in-init`](https://codeql.github.com/codeql-query-help/python/py-explicit-return-in-init/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.248")]
 pub(crate) struct ReturnInInit;
 
 impl Violation for ReturnInInit {

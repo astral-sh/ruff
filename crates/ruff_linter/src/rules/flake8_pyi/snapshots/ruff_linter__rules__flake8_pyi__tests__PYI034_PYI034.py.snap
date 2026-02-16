@@ -451,6 +451,7 @@ help: Use `Self` as return type
 359 +     def __new__(cls) -> typing.Self: ...
 360 |     def __enter__(self: Generic5) -> Generic5: ...
 361 | 
+362 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PYI034 [*] `__enter__` methods in classes like `Generic5` usually return `self` at runtime
@@ -468,4 +469,80 @@ help: Use `Self` as return type
     -     def __enter__(self: Generic5) -> Generic5: ...
 360 +     def __enter__(self) -> typing.Self: ...
 361 | 
+362 | 
+363 | # Test cases based on issue #20781 - metaclasses that triggers IsMetaclass::Maybe
+note: This is an unsafe fix and may change runtime behavior
+
+PYI034 [*] `__new__` methods in classes like `UsesStringizedForwardReferences` usually return `self` at runtime
+   --> PYI034.py:391:9
+    |
+390 | class UsesStringizedForwardReferences:
+391 |     def __new__(cls) -> "UsesStringizedForwardReferences": ...       # PYI034
+    |         ^^^^^^^
+392 |     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+    |
+help: Use `Self` as return type
+388 | 
+389 | 
+390 | class UsesStringizedForwardReferences:
+    -     def __new__(cls) -> "UsesStringizedForwardReferences": ...       # PYI034
+391 +     def __new__(cls) -> typing.Self: ...       # PYI034
+392 |     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+note: This is an unsafe fix and may change runtime behavior
+
+PYI034 [*] `__enter__` methods in classes like `UsesStringizedForwardReferences` usually return `self` at runtime
+   --> PYI034.py:392:9
+    |
+390 | class UsesStringizedForwardReferences:
+391 |     def __new__(cls) -> "UsesStringizedForwardReferences": ...       # PYI034
+392 |     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+    |         ^^^^^^^^^
+393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+    |
+help: Use `Self` as return type
+389 | 
+390 | class UsesStringizedForwardReferences:
+391 |     def __new__(cls) -> "UsesStringizedForwardReferences": ...       # PYI034
+    -     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+392 +     def __enter__(self) -> typing.Self: ...    # PYI034
+393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+note: This is an unsafe fix and may change runtime behavior
+
+PYI034 [*] `__aenter__` methods in classes like `UsesStringizedForwardReferences` usually return `self` at runtime
+   --> PYI034.py:393:15
+    |
+391 |     def __new__(cls) -> "UsesStringizedForwardReferences": ...       # PYI034
+392 |     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+    |               ^^^^^^^^^^
+394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+    |
+help: Use `Self` as return type
+390 | class UsesStringizedForwardReferences:
+391 |     def __new__(cls) -> "UsesStringizedForwardReferences": ...       # PYI034
+392 |     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+    -     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+393 +     async def __aenter__(self) -> typing.Self: ...  # PYI034
+394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+note: This is an unsafe fix and may change runtime behavior
+
+PYI034 [*] `__iadd__` methods in classes like `UsesStringizedForwardReferences` usually return `self` at runtime
+   --> PYI034.py:394:9
+    |
+392 |     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+394 |     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+    |         ^^^^^^^^
+    |
+help: Use `Self` as return type
+391 |     def __new__(cls) -> "UsesStringizedForwardReferences": ...       # PYI034
+392 |     def __enter__(self) -> "UsesStringizedForwardReferences": ...    # PYI034
+393 |     async def __aenter__(self) -> "UsesStringizedForwardReferences": ...  # PYI034
+    -     def __iadd__(self, other) -> "UsesStringizedForwardReferences": ...  # PYI034
+394 +     def __iadd__(self, other) -> typing.Self: ...  # PYI034
 note: This is an unsafe fix and may change runtime behavior

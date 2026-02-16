@@ -66,3 +66,5 @@ help: Replace with `str`
    - def print_fourth_word(word: Goodbye) -> None:
 19 + def print_fourth_word(word: str) -> None:
 20 |     print(word)
+21 |     
+22 |

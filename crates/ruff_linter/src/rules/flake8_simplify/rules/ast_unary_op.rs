@@ -33,6 +33,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct NegateEqualOp {
     left: String,
     right: String,
@@ -75,6 +76,7 @@ impl AlwaysFixableViolation for NegateEqualOp {
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct NegateNotEqualOp {
     left: String,
     right: String,
@@ -112,6 +114,7 @@ impl AlwaysFixableViolation for NegateNotEqualOp {
 /// ## References
 /// - [Python documentation: Comparisons](https://docs.python.org/3/reference/expressions.html#comparisons)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct DoubleNegation {
     expr: String,
 }

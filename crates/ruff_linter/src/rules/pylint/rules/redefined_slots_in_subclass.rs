@@ -38,6 +38,7 @@ use crate::checkers::ast::Checker;
 ///     __slots__ = "d"
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.3")]
 pub(crate) struct RedefinedSlotsInSubclass {
     base: String,
     slot_name: String,

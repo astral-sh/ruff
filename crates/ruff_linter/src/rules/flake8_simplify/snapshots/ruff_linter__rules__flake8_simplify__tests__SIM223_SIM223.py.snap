@@ -1025,3 +1025,23 @@ help: Replace with `f"{''}{''}"`
 156 | 
 157 | 
 note: This is an unsafe fix and may change runtime behavior
+
+SIM223 [*] Use `tuple("")` instead of `tuple("") and ...`
+   --> SIM223.py:163:1
+    |
+162 | # https://github.com/astral-sh/ruff/issues/21473
+163 | tuple("") and False  # SIM223
+    | ^^^^^^^^^^^^^^^^^^^
+164 | tuple(t"") and False  # OK
+165 | tuple(0) and False  # OK
+    |
+help: Replace with `tuple("")`
+160 | 
+161 | 
+162 | # https://github.com/astral-sh/ruff/issues/21473
+    - tuple("") and False  # SIM223
+163 + tuple("")  # SIM223
+164 | tuple(t"") and False  # OK
+165 | tuple(0) and False  # OK
+166 | tuple(1) and False  # OK
+note: This is an unsafe fix and may change runtime behavior

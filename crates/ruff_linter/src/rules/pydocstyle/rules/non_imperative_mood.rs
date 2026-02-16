@@ -51,6 +51,7 @@ static MOOD: LazyLock<Mood> = LazyLock::new(Mood::new);
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.228")]
 pub(crate) struct NonImperativeMood {
     first_line: String,
 }

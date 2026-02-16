@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_python_ast::{self as ast, Arguments, Expr, str_prefix::StringLiteralPrefix};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -41,6 +42,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `os.environ`](https://docs.python.org/3/library/os.html#os.environ)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.218")]
 pub(crate) struct UncapitalizedEnvironmentVariables {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -88,9 +90,13 @@ impl Violation for UncapitalizedEnvironmentVariables {
 /// age = ages.get("Cat")
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `dict.get`](https://docs.python.org/3/library/stdtypes.html#dict.get)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.261")]
 pub(crate) struct DictGetWithNoneDefault {
     expected: SourceCodeSnippet,
     actual: SourceCodeSnippet,
@@ -264,11 +270,6 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
     let Some(key) = args.first() else {
         return;
     };
-    if !crate::preview::is_sim910_expanded_key_support_enabled(checker.settings()) {
-        if !(key.is_literal_expr() || key.is_name_expr()) {
-            return;
-        }
-    }
     let Some(default) = args.get(1) else {
         return;
     };
@@ -308,8 +309,15 @@ pub(crate) fn dict_get_with_none_default(checker: &Checker, expr: &Expr) {
         },
         expr.range(),
     );
-    diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
-        expected,
-        expr.range(),
-    )));
+
+    let applicability = if checker.comment_ranges().intersects(expr.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    diagnostic.set_fix(Fix::applicable_edit(
+        Edit::range_replacement(expected, expr.range()),
+        applicability,
+    ));
 }

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, CmpOp, Comprehension, Expr};
 use ruff_python_semantic::analyze::typing;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
@@ -38,6 +38,7 @@ use crate::{Applicability, Edit};
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.176")]
 pub(crate) struct InDictKeys {
     operator: String,
 }
@@ -89,20 +90,10 @@ fn key_in_dict(checker: &Checker, left: &Expr, right: &Expr, operator: CmpOp, pa
     }
 
     // Extract the exact range of the left and right expressions.
-    let left_range = parenthesized_range(
-        left.into(),
-        parent,
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    )
-    .unwrap_or(left.range());
-    let right_range = parenthesized_range(
-        right.into(),
-        parent,
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    )
-    .unwrap_or(right.range());
+    let left_range =
+        parenthesized_range(left.into(), parent, checker.tokens()).unwrap_or(left.range());
+    let right_range =
+        parenthesized_range(right.into(), parent, checker.tokens()).unwrap_or(right.range());
 
     let mut diagnostic = checker.report_diagnostic(
         InDictKeys {

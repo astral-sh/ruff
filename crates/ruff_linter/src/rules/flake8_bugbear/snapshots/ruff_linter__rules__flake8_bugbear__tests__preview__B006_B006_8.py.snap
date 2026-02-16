@@ -51,7 +51,7 @@ help: Replace with `None`; initialize within function
 10 + def baz(a: list = None):
 11 |     """This one raises a different exception"""
 12 +     if a is None:
-13 +         a: list = []
+13 +         a = []
 14 |     raise IndexError()
 15 | 
 16 | 

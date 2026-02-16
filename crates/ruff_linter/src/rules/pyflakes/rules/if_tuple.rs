@@ -29,6 +29,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct IfTuple;
 
 impl Violation for IfTuple {

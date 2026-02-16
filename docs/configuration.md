@@ -345,12 +345,14 @@ formatting `.pyi` files, but would continue to include them in linting:
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
 `.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](settings.md#respect-gitignore)).
 
-Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria.
-For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
+Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria, 
+unless [`force-exclude`](settings.md#force-exclude) is also enabled (via CLI or settings file).
+For example, without `force-exclude` enabled, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
 By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.ipynb`, or `pyproject.toml`.
+In [preview](preview.md) mode, Ruff will also discover `*.pyw` by default.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
 You can also change the default selection using the [`include`](settings.md#include) setting.
@@ -538,7 +540,7 @@ Commands:
   help     Print this message or the help of the given subcommand(s)
 
 Options:
-  -h, --help     Print help
+  -h, --help     Print help (see more with '--help')
   -V, --version  Print version
 
 Log levels:
@@ -557,6 +559,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 
 For help with a specific command, see: `ruff help <command>`.
 ```
@@ -573,7 +578,8 @@ Run Ruff on the given files or directories
 Usage: ruff check [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to check [default: .]
+  [FILES]...  List of files or directories to check, or `-` to read from stdin
+              [default: .]
 
 Options:
       --fix
@@ -608,7 +614,7 @@ Options:
           RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313, py314]
+          py37, py38, py39, py310, py311, py312, py313, py314, py315]
       --preview
           Enable preview mode; checks will include unstable rules and fixes.
           Use `--no-preview` to disable
@@ -618,14 +624,15 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --statistics
           Show counts for every rule with at least one violation
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
+      --add-noqa[=<REASON>]
+          Enable automatic additions of `noqa` directives to failing lines.
+          Optionally provide a reason to append after the codes
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help
+          Print help (see more with '--help')
 
 Rule selection:
       --select <RULE_CODE>
@@ -693,6 +700,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 ```
 
 <!-- End auto-generated check help. -->
@@ -707,7 +717,8 @@ Run the Ruff formatter on the given files or directories
 Usage: ruff format [OPTIONS] [FILES]...
 
 Arguments:
-  [FILES]...  List of files or directories to format [default: .]
+  [FILES]...  List of files or directories to format, or `-` to read from stdin
+              [default: .]
 
 Options:
       --check
@@ -723,7 +734,7 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
-          py37, py38, py39, py310, py311, py312, py313, py314]
+          py37, py38, py39, py310, py311, py312, py313, py314, py315]
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
@@ -783,6 +794,9 @@ Global options:
           configuration files that were also specified using `--config`
       --isolated
           Ignore all configuration files
+      --color <WHEN>
+          Control when colored output is used [possible values: auto, always,
+          never]
 ```
 
 <!-- End auto-generated format help. -->
@@ -793,15 +807,43 @@ Ruff supports autocompletion for most shells. A shell-specific completion script
 by `ruff generate-shell-completion <SHELL>`, where `<SHELL>` is one of `bash`, `elvish`, `fig`, `fish`,
 `powershell`, or `zsh`.
 
-The exact steps required to enable autocompletion will vary by shell. For example instructions,
-see the [Poetry](https://python-poetry.org/docs/#enable-tab-completion-for-bash-fish-or-zsh) or
-[ripgrep](https://github.com/BurntSushi/ripgrep/blob/master/FAQ.md#complete) documentation.
+!!! tip
 
-As an example: to enable autocompletion for Zsh, run
-`ruff generate-shell-completion zsh > ~/.zfunc/_ruff`. Then add the following line to your
-`~/.zshrc` file, if they're not already present:
+    You can run `echo $SHELL` to help you determine your shell.
 
-```zsh
-fpath+=~/.zfunc
-autoload -Uz compinit && compinit
-```
+To enable shell autocompletion for Ruff, run one of the following:
+
+=== "Bash"
+
+    ```bash
+    echo 'eval "$(ruff generate-shell-completion bash)"' >> ~/.bashrc
+    ```
+
+=== "Zsh"
+
+    ```bash
+    echo 'eval "$(ruff generate-shell-completion zsh)"' >> ~/.zshrc
+    ```
+
+=== "fish"
+
+    ```bash
+    echo 'ruff generate-shell-completion fish | source' > ~/.config/fish/completions/ruff.fish
+    ```
+
+=== "Elvish"
+
+    ```bash
+    echo 'eval (ruff generate-shell-completion elvish | slurp)' >> ~/.elvish/rc.elv
+    ```
+
+=== "PowerShell / pwsh"
+
+    ```powershell
+    if (!(Test-Path -Path $PROFILE)) {
+      New-Item -ItemType File -Path $PROFILE -Force
+    }
+    Add-Content -Path $PROFILE -Value '(& ruff generate-shell-completion powershell) | Out-String | Invoke-Expression'
+    ```
+
+Then restart the shell or source the shell config file.

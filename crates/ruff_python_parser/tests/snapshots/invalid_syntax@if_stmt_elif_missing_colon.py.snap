@@ -79,7 +79,7 @@ Module(
 1 | if x:
 2 |     pass
 3 | elif y
-  |       ^ Syntax Error: Expected ':', found newline
+  |       ^ Syntax Error: Expected `:`, found newline
 4 |     pass
 5 | else:
 6 |     pass

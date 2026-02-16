@@ -137,13 +137,21 @@ _OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
 @disjoint_base
 class Element(Generic[_Tag]):
     tag: _Tag
+    """A string identifying what kind of data this element represents"""
+
     attrib: dict[str, str]
+    """A dictionary containing the element's attributes"""
+
     text: str | None
+    """A string of text directly after the start tag, or None"""
+
     tail: str | None
+    """A string of text directly after the end tag, or None"""
+
     def __init__(self, tag: _Tag, attrib: dict[str, str] = {}, **extra: str) -> None: ...
     def append(self, subelement: Element[Any], /) -> None: ...
     def clear(self) -> None: ...
-    def extend(self, elements: Iterable[Element], /) -> None: ...
+    def extend(self, elements: Iterable[Element[Any]], /) -> None: ...
     def find(self, path: str, namespaces: dict[str, str] | None = None) -> Element | None: ...
     def findall(self, path: str, namespaces: dict[str, str] | None = None) -> list[Element]: ...
     @overload
@@ -154,7 +162,7 @@ class Element(Generic[_Tag]):
     def get(self, key: str, default: None = None) -> str | None: ...
     @overload
     def get(self, key: str, default: _T) -> str | _T: ...
-    def insert(self, index: int, subelement: Element, /) -> None: ...
+    def insert(self, index: int, subelement: Element[Any], /) -> None: ...
     def items(self) -> ItemsView[str, str]: ...
     def iter(self, tag: str | None = None) -> Generator[Element, None, None]: ...
     @overload
@@ -165,7 +173,7 @@ class Element(Generic[_Tag]):
     def keys(self) -> dict_keys[str, str]: ...
     # makeelement returns the type of self in Python impl, but not in C impl
     def makeelement(self, tag: _OtherTag, attrib: dict[str, str], /) -> Element[_OtherTag]: ...
-    def remove(self, subelement: Element, /) -> None: ...
+    def remove(self, subelement: Element[Any], /) -> None: ...
     def set(self, key: str, value: str, /) -> None: ...
     def __copy__(self) -> Element[_Tag]: ...  # returns the type of self in Python impl, but not in C impl
     def __deepcopy__(self, memo: Any, /) -> Element: ...  # Only exists in C impl
@@ -177,24 +185,24 @@ class Element(Generic[_Tag]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> list[Element]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Element]: ...
     def __len__(self) -> int:
         """Return len(self)."""
     # Doesn't actually exist at runtime, but instance of the class are indeed iterable due to __getitem__.
     def __iter__(self) -> Iterator[Element]: ...
     @overload
-    def __setitem__(self, key: SupportsIndex, value: Element, /) -> None:
+    def __setitem__(self, key: SupportsIndex, value: Element[Any], /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[Element], /) -> None: ...
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[Element[Any]], /) -> None: ...
 
     # Doesn't really exist in earlier versions, where __len__ is called implicitly instead
     @deprecated("Testing an element's truth value is deprecated.")
     def __bool__(self) -> bool:
         """True if self else False"""
 
-def SubElement(parent: Element, tag: str, attrib: dict[str, str] = ..., **extra: str) -> Element: ...
+def SubElement(parent: Element[Any], tag: str, attrib: dict[str, str] = ..., **extra: str) -> Element: ...
 def Comment(text: str | None = None) -> Element[_ElementCallable]:
     """Comment element factory.
 
@@ -256,9 +264,17 @@ class ElementTree(Generic[_Root]):
 
     """
 
-    def __init__(self, element: Element | None = None, file: _FileRead | None = None) -> None: ...
+    def __init__(self, element: Element[Any] | None = None, file: _FileRead | None = None) -> None: ...
     def getroot(self) -> _Root:
         """Return root element of this tree."""
+
+    def _setroot(self, element: Element[Any]) -> None:
+        """Replace root element of this tree.
+
+        This will discard the current contents of the tree and replace it
+        with the given element.  Use with care!
+
+        """
 
     def parse(self, source: _FileRead, parser: XMLParser | None = None) -> Element:
         """Load external XML document into element tree.
@@ -389,7 +405,7 @@ def register_namespace(prefix: str, uri: str) -> None:
 
 @overload
 def tostring(
-    element: Element,
+    element: Element[Any],
     encoding: None = None,
     method: Literal["xml", "html", "text", "c14n"] | None = None,
     *,
@@ -413,7 +429,7 @@ def tostring(
 
 @overload
 def tostring(
-    element: Element,
+    element: Element[Any],
     encoding: Literal["unicode"],
     method: Literal["xml", "html", "text", "c14n"] | None = None,
     *,
@@ -423,7 +439,7 @@ def tostring(
 ) -> str: ...
 @overload
 def tostring(
-    element: Element,
+    element: Element[Any],
     encoding: str,
     method: Literal["xml", "html", "text", "c14n"] | None = None,
     *,
@@ -433,7 +449,7 @@ def tostring(
 ) -> Any: ...
 @overload
 def tostringlist(
-    element: Element,
+    element: Element[Any],
     encoding: None = None,
     method: Literal["xml", "html", "text", "c14n"] | None = None,
     *,
@@ -443,7 +459,7 @@ def tostringlist(
 ) -> list[bytes]: ...
 @overload
 def tostringlist(
-    element: Element,
+    element: Element[Any],
     encoding: Literal["unicode"],
     method: Literal["xml", "html", "text", "c14n"] | None = None,
     *,
@@ -453,7 +469,7 @@ def tostringlist(
 ) -> list[str]: ...
 @overload
 def tostringlist(
-    element: Element,
+    element: Element[Any],
     encoding: str,
     method: Literal["xml", "html", "text", "c14n"] | None = None,
     *,
@@ -461,7 +477,7 @@ def tostringlist(
     default_namespace: str | None = None,
     short_empty_elements: bool = True,
 ) -> list[Any]: ...
-def dump(elem: Element | ElementTree[Any]) -> None:
+def dump(elem: Element[Any] | ElementTree[Any]) -> None:
     """Write element tree or element structure to sys.stdout.
 
     This function should be used for debugging only.
@@ -472,7 +488,7 @@ def dump(elem: Element | ElementTree[Any]) -> None:
 
     """
 
-def indent(tree: Element | ElementTree[Any], space: str = "  ", level: int = 0) -> None:
+def indent(tree: Element[Any] | ElementTree[Any], space: str = "  ", level: int = 0) -> None:
     """Indent an XML document by inserting newlines and indentation space
     after elements.
 
@@ -507,7 +523,8 @@ class _IterParseIterator(Iterator[tuple[str, Element]], Protocol):
     if sys.version_info >= (3, 11):
         def __del__(self) -> None: ...
 
-def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XMLParser | None = None) -> _IterParseIterator:
+@overload
+def iterparse(source: _FileRead, events: Sequence[str] | None = None) -> _IterParseIterator:
     """Incrementally parse XML document into ElementTree.
 
     This class also reports what's going on to the user based on the
@@ -522,6 +539,10 @@ def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XM
     Returns an iterator providing (event, elem) pairs.
 
     """
+
+@overload
+@deprecated("The `parser` parameter is deprecated since Python 3.4.")
+def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XMLParser | None = None) -> _IterParseIterator: ...
 
 _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, None]
 

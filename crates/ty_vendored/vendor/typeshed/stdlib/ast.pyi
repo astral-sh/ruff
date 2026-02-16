@@ -1444,6 +1444,8 @@ class Tuple(expr):
     elts: list[expr]
     ctx: expr_context  # Not present in Python < 3.13 if not passed to `__init__`
     dims: list[expr]
+    """Deprecated. Use elts instead."""
+
     if sys.version_info >= (3, 13):
         def __init__(self, elts: list[expr] = ..., ctx: expr_context = ..., **kwargs: Unpack[_Attributes]) -> None: ...
     else:
@@ -1677,7 +1679,7 @@ class ExceptHandler(excepthandler):
             """Return a copy of the AST node with new values for the specified fields."""
 
 class arguments(AST):
-    """arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr* kw_defaults, arg? kwarg, expr* defaults)"""
+    """arguments(arg* posonlyargs, arg* args, arg? vararg, arg* kwonlyargs, expr?* kw_defaults, arg? kwarg, expr* defaults)"""
 
     if sys.version_info >= (3, 10):
         __match_args__ = ("posonlyargs", "args", "vararg", "kwonlyargs", "kw_defaults", "kwarg", "defaults")
@@ -2179,14 +2181,14 @@ _T = _TypeVar("_T", bound=AST)
 if sys.version_info >= (3, 13):
     @overload
     def parse(
-        source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any] = "<unknown>",
-        mode: Literal["exec"] = "exec",
+        source: _T,
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
+        mode: Literal["exec", "eval", "func_type", "single"] = "exec",
         *,
         type_comments: bool = False,
         feature_version: None | int | tuple[int, int] = None,
         optimize: Literal[-1, 0, 1, 2] = -1,
-    ) -> Module:
+    ) -> _T:
         """
         Parse the source into an AST node.
         Equivalent to compile(source, filename, mode, PyCF_ONLY_AST).
@@ -2196,7 +2198,17 @@ if sys.version_info >= (3, 13):
     @overload
     def parse(
         source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any],
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
+        mode: Literal["exec"] = "exec",
+        *,
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+        optimize: Literal[-1, 0, 1, 2] = -1,
+    ) -> Module: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        filename: str | bytes | os.PathLike[Any],
         mode: Literal["eval"],
         *,
         type_comments: bool = False,
@@ -2206,7 +2218,7 @@ if sys.version_info >= (3, 13):
     @overload
     def parse(
         source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any],
+        filename: str | bytes | os.PathLike[Any],
         mode: Literal["func_type"],
         *,
         type_comments: bool = False,
@@ -2216,7 +2228,7 @@ if sys.version_info >= (3, 13):
     @overload
     def parse(
         source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any],
+        filename: str | bytes | os.PathLike[Any],
         mode: Literal["single"],
         *,
         type_comments: bool = False,
@@ -2253,7 +2265,7 @@ if sys.version_info >= (3, 13):
     @overload
     def parse(
         source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any] = "<unknown>",
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
         mode: str = "exec",
         *,
         type_comments: bool = False,
@@ -2264,13 +2276,13 @@ if sys.version_info >= (3, 13):
 else:
     @overload
     def parse(
-        source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any] = "<unknown>",
-        mode: Literal["exec"] = "exec",
+        source: _T,
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
+        mode: Literal["exec", "eval", "func_type", "single"] = "exec",
         *,
         type_comments: bool = False,
         feature_version: None | int | tuple[int, int] = None,
-    ) -> Module:
+    ) -> _T:
         """
         Parse the source into an AST node.
         Equivalent to compile(source, filename, mode, PyCF_ONLY_AST).
@@ -2280,7 +2292,16 @@ else:
     @overload
     def parse(
         source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any],
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
+        mode: Literal["exec"] = "exec",
+        *,
+        type_comments: bool = False,
+        feature_version: None | int | tuple[int, int] = None,
+    ) -> Module: ...
+    @overload
+    def parse(
+        source: str | ReadableBuffer,
+        filename: str | bytes | os.PathLike[Any],
         mode: Literal["eval"],
         *,
         type_comments: bool = False,
@@ -2289,7 +2310,7 @@ else:
     @overload
     def parse(
         source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any],
+        filename: str | bytes | os.PathLike[Any],
         mode: Literal["func_type"],
         *,
         type_comments: bool = False,
@@ -2298,7 +2319,7 @@ else:
     @overload
     def parse(
         source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any],
+        filename: str | bytes | os.PathLike[Any],
         mode: Literal["single"],
         *,
         type_comments: bool = False,
@@ -2331,7 +2352,7 @@ else:
     @overload
     def parse(
         source: str | ReadableBuffer,
-        filename: str | ReadableBuffer | os.PathLike[Any] = "<unknown>",
+        filename: str | bytes | os.PathLike[Any] = "<unknown>",
         mode: str = "exec",
         *,
         type_comments: bool = False,

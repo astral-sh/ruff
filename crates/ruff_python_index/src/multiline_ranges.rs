@@ -1,4 +1,4 @@
-use ruff_python_parser::{Token, TokenKind};
+use ruff_python_ast::token::{Token, TokenKind};
 use ruff_text_size::{Ranged, TextRange};
 
 /// Stores the range of all multiline strings in a file sorted by

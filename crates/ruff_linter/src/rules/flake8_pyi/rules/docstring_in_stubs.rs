@@ -27,6 +27,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// def func(param: int) -> str: ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct DocstringInStub;
 
 impl AlwaysFixableViolation for DocstringInStub {

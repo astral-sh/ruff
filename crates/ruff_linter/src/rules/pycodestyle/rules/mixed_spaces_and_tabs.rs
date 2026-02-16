@@ -27,6 +27,7 @@ use crate::{Violation, checkers::ast::LintContext};
 /// if a == 0:\n    a = 1\n    b = 1
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.229")]
 pub(crate) struct MixedSpacesAndTabs;
 
 impl Violation for MixedSpacesAndTabs {

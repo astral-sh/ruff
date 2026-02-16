@@ -670,9 +670,8 @@ Fully-static `TypeGuard[...]` and `TypeIs[...]` are subtypes of `bool`.
 from ty_extensions import is_subtype_of, static_assert
 from typing_extensions import TypeGuard, TypeIs
 
-# TODO: TypeGuard
-# static_assert(is_subtype_of(TypeGuard[int], bool))
-# static_assert(is_subtype_of(TypeGuard[int], int))
+static_assert(is_subtype_of(TypeGuard[str], bool))
+static_assert(is_subtype_of(TypeGuard[str], int))
 static_assert(is_subtype_of(TypeIs[str], bool))
 static_assert(is_subtype_of(TypeIs[str], int))
 ```
@@ -683,12 +682,12 @@ static_assert(is_subtype_of(TypeIs[str], int))
 from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
 from typing_extensions import TypeGuard, TypeIs
 
-# TODO: TypeGuard
-# static_assert(is_subtype_of(TypeGuard[int], TypeGuard[int]))
-# static_assert(is_subtype_of(TypeGuard[bool], TypeGuard[int]))
+static_assert(is_subtype_of(TypeGuard[int], TypeGuard[int]))
+static_assert(is_subtype_of(TypeGuard[bool], TypeGuard[int]))
 static_assert(is_subtype_of(TypeIs[int], TypeIs[int]))
 static_assert(is_subtype_of(TypeIs[int], TypeIs[int]))
 
+static_assert(is_subtype_of(TypeGuard[bool], TypeGuard[int]))
 static_assert(not is_subtype_of(TypeGuard[int], TypeGuard[bool]))
 static_assert(not is_subtype_of(TypeIs[bool], TypeIs[int]))
 static_assert(not is_subtype_of(TypeIs[int], TypeIs[bool]))
@@ -1496,13 +1495,38 @@ static_assert(is_subtype_of(CallableTypeOf[kwargs_float], CallableTypeOf[kwargs_
 static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[kwargs_float]))
 ```
 
-A variadic parameter can be omitted in the subtype:
+A variadic parameter can be added in a subtype, since callers can omit it:
 
 ```py
 def empty() -> None: ...
 
 static_assert(is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[empty]))
 static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[kwargs_int]))
+```
+
+A positional parameter with default can also be added to the subtype, since callers can omit it:
+
+```py
+def positional_with_default(x: int = 0) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_with_default]))
+
+def positional_with_default_and_kwargs(x: int = 0, **kwargs: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default_and_kwargs], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_with_default_and_kwargs]))
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default_and_kwargs], CallableTypeOf[kwargs_int]))
+static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[positional_with_default_and_kwargs]))
+
+def positional_only_with_default_and_kwargs(x: int = 0, /, **kwargs: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_only_with_default_and_kwargs], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_only_with_default_and_kwargs]))
+
+static_assert(is_subtype_of(CallableTypeOf[positional_only_with_default_and_kwargs], CallableTypeOf[kwargs_int]))
+static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[positional_only_with_default_and_kwargs]))
 ```
 
 #### Keyword-variadic with keyword-only
@@ -1635,18 +1659,17 @@ f(a)
 An instance type can be a subtype of a compatible callable type if the instance type's class has a
 callable `__call__` attribute.
 
-TODO: for the moment, we don't consider the callable type as a bound-method descriptor, but this may
-change for better compatibility with mypy/pyright.
-
 ```py
+from __future__ import annotations
+
 from typing import Callable
 from ty_extensions import static_assert, is_subtype_of
 
-def call_impl(a: int) -> str:
+def call_impl(a: A, x: int) -> str:
     return ""
 
 class A:
-    __call__: Callable[[int], str] = call_impl
+    __call__: Callable[[A, int], str] = call_impl
 
 static_assert(is_subtype_of(A, Callable[[int], str]))
 static_assert(not is_subtype_of(A, Callable[[int], int]))
@@ -2121,31 +2144,26 @@ class Other: ...
 def pg(a: Parent) -> None: ...
 @overload
 def pg(a: Grandparent) -> None: ...
-
 @overload
 def po(a: Parent) -> None: ...
 @overload
 def po(a: Other) -> None: ...
-
 @overload
 def go(a: Grandparent) -> None: ...
 @overload
 def go(a: Other) -> None: ...
-
 @overload
 def cpg(a: Child) -> None: ...
 @overload
 def cpg(a: Parent) -> None: ...
 @overload
 def cpg(a: Grandparent) -> None: ...
-
 @overload
 def empty_go() -> Child: ...
 @overload
 def empty_go(a: Grandparent) -> None: ...
 @overload
 def empty_go(a: Other) -> Other: ...
-
 @overload
 def empty_cp() -> Parent: ...
 @overload
@@ -2193,7 +2211,6 @@ class B: ...
 def overload_ab(x: A) -> None: ...
 @overload
 def overload_ab(x: B) -> None: ...
-
 @overload
 def overload_ba(x: B) -> None: ...
 @overload
@@ -2206,6 +2223,99 @@ from ty_extensions import CallableTypeOf, is_subtype_of, static_assert
 
 static_assert(is_subtype_of(CallableTypeOf[overload_ab], CallableTypeOf[overload_ba]))
 static_assert(is_subtype_of(CallableTypeOf[overload_ba], CallableTypeOf[overload_ab]))
+```
+
+### Generic callables
+
+A generic callable can be considered equivalent to an intersection of all of its possible
+specializations. That means that a generic callable is a subtype of any particular specialization.
+(If someone expects a function that works with a particular specialization, it's fine to hand them
+the generic callable.)
+
+```py
+from typing import Callable
+from ty_extensions import CallableTypeOf, TypeOf, is_subtype_of, static_assert
+
+def identity[T](t: T) -> T:
+    return t
+
+# TODO: Confusingly, these are not the same results as the corresponding checks in
+# is_assignable_to.md, even though all of these types are fully static. We have some heuristics that
+# currently conflict with each other, that we are in the process of removing with the constraint set
+# work.
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[identity], Callable[[int], int]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(TypeOf[identity], Callable[[str], str]))
+static_assert(not is_subtype_of(TypeOf[identity], Callable[[str], int]))
+
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(CallableTypeOf[identity], Callable[[int], int]))
+# TODO: no error
+# error: [static-assert-error]
+static_assert(is_subtype_of(CallableTypeOf[identity], Callable[[str], str]))
+static_assert(not is_subtype_of(CallableTypeOf[identity], Callable[[str], int]))
+```
+
+The reverse is not true — if someone expects a generic function that can be called with any
+specialization, we cannot hand them a function that only works with one specialization.
+
+```py
+static_assert(not is_subtype_of(Callable[[int], int], TypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], str], TypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], int], TypeOf[identity]))
+
+static_assert(not is_subtype_of(Callable[[int], int], CallableTypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], str], CallableTypeOf[identity]))
+static_assert(not is_subtype_of(Callable[[str], int], CallableTypeOf[identity]))
+```
+
+## String literals and Sequence
+
+String literals are subtypes of `Sequence[Literal[chars...]]` because strings are sequences of their
+characters.
+
+```py
+from typing import Literal, Sequence, Iterable, Collection, Reversible
+from ty_extensions import is_subtype_of, static_assert
+
+static_assert(is_subtype_of(Literal["abba"], Sequence[Literal["a", "b"]]))
+static_assert(is_subtype_of(Literal["abb"], Iterable[Literal["a", "b"]]))
+static_assert(is_subtype_of(Literal["abb"], Collection[Literal["a", "b"]]))
+static_assert(is_subtype_of(Literal["abb"], Reversible[Literal["a", "b"]]))
+static_assert(is_subtype_of(Literal["aaa"], Sequence[Literal["a"]]))
+static_assert(is_subtype_of(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
+static_assert(is_subtype_of(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  # subset of allowed chars
+
+# String literals are NOT subtypes when they contain chars outside the allowed set
+static_assert(not is_subtype_of(Literal["abc"], Sequence[Literal["a", "b"]]))  # 'c' not allowed
+static_assert(not is_subtype_of(Literal["x"], Sequence[Literal["a", "b"]]))  # 'x' not allowed
+static_assert(not is_subtype_of(Literal["aa"], Sequence[Literal[""]]))
+```
+
+## Bytes literals and Sequence
+
+Bytes literals are sequences of integers.
+
+```py
+from typing import Literal, Sequence, Iterable, Collection, Reversible
+from ty_extensions import is_subtype_of, static_assert
+
+static_assert(is_subtype_of(Literal[b"abba"], Sequence[int]))
+static_assert(is_subtype_of(Literal[b"abba"], Sequence[Literal[97, 98]]))
+static_assert(is_subtype_of(Literal[b"abb"], Iterable[int]))
+static_assert(is_subtype_of(Literal[b"abb"], Iterable[Literal[97, 98]]))
+static_assert(is_subtype_of(Literal[b"abb"], Collection[int]))
+static_assert(is_subtype_of(Literal[b"abb"], Collection[Literal[97, 98]]))
+static_assert(is_subtype_of(Literal[b""], Sequence[int]))
+
+static_assert(not is_subtype_of(Literal[b"abc"], Sequence[Literal[97, 98]]))  # '99' not allowed
+
+# bytes literals are NOT subtypes of non-int element sequences
+static_assert(not is_subtype_of(Literal[b"abc"], Sequence[str]))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

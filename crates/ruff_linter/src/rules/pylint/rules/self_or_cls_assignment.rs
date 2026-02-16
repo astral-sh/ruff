@@ -45,7 +45,13 @@ use crate::checkers::ast::Checker;
 ///         supercls = cls.__mro__[-1]
 ///         return supercls
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct SelfOrClsAssignment {
     method_type: MethodType,
 }

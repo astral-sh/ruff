@@ -3,7 +3,7 @@ use std::fmt::Write;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
@@ -79,6 +79,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.92")]
 pub(crate) struct MutableArgumentDefault;
 
 impl Violation for MutableArgumentDefault {
@@ -165,12 +166,7 @@ fn move_initialization(
         return None;
     }
 
-    let range = match parenthesized_range(
-        default.into(),
-        parameter.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    ) {
+    let range = match parenthesized_range(default.into(), parameter.into(), checker.tokens()) {
         Some(range) => range,
         None => default.range(),
     };
@@ -188,24 +184,13 @@ fn move_initialization(
     content.push_str(stylist.line_ending().as_str());
     content.push_str(stylist.indentation());
     if is_b006_unsafe_fix_preserve_assignment_expr_enabled(checker.settings()) {
-        let annotation = if let Some(ann) = parameter.annotation() {
-            format!(": {}", locator.slice(ann))
-        } else {
-            String::new()
-        };
         let _ = write!(
             &mut content,
-            "{}{} = {}",
+            "{} = {}",
             parameter.parameter.name(),
-            annotation,
             locator.slice(
-                parenthesized_range(
-                    default.into(),
-                    parameter.into(),
-                    checker.comment_ranges(),
-                    checker.source()
-                )
-                .unwrap_or(default.range())
+                parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                    .unwrap_or(default.range())
             )
         );
     } else {

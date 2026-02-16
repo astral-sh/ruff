@@ -37,6 +37,7 @@ use crate::checkers::ast::Checker;
 ///         response = await client.get(...)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct BlockingHttpCallHttpxInAsyncFunction {
     name: String,
     call: String,

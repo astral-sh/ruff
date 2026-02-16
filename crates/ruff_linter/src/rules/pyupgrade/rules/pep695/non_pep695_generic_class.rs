@@ -78,6 +78,10 @@ use super::{
 /// This rule only applies to generic classes and does not include generic functions. See
 /// [`non-pep695-generic-function`][UP047] for the function version.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
@@ -86,6 +90,7 @@ use super::{
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericClass {
     name: String,
 }
@@ -186,7 +191,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     //
     // just because we can't confirm that `SomethingElse` is a `TypeVar`
     if !visitor.any_skipped {
-        let Some(type_vars) = check_type_vars(visitor.vars) else {
+        let Some(type_vars) = check_type_vars(visitor.vars, checker) else {
             diagnostic.defuse();
             return;
         };
@@ -203,7 +208,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
                 arguments,
                 Parentheses::Remove,
                 checker.source(),
-                checker.comment_ranges(),
+                checker.tokens(),
             )?;
             Ok(Fix::unsafe_edits(
                 Edit::insertion(type_params.to_string(), name.end()),

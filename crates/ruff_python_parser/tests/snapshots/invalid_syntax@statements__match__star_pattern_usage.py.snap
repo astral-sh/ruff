@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchStar(
                                 PatternMatchStar {
-                                    range: 81..83,
                                     node_index: NodeIndex(None),
+                                    range: 81..83,
                                     name: None,
                                 },
                             ),
@@ -48,13 +48,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 107..114,
                                     node_index: NodeIndex(None),
+                                    range: 107..114,
                                     pattern: Some(
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 107..109,
                                                 node_index: NodeIndex(None),
+                                                range: 107..109,
                                                 name: None,
                                             },
                                         ),
@@ -83,8 +83,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchStar(
                                 PatternMatchStar {
-                                    range: 138..142,
                                     node_index: NodeIndex(None),
+                                    range: 138..142,
                                     name: Some(
                                         Identifier {
                                             id: Name("foo"),
@@ -109,13 +109,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchOr(
                                 PatternMatchOr {
-                                    range: 166..174,
                                     node_index: NodeIndex(None),
+                                    range: 166..174,
                                     patterns: [
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 166..170,
                                                 node_index: NodeIndex(None),
+                                                range: 166..170,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("foo"),
@@ -127,8 +127,8 @@ Module(
                                         ),
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 173..174,
                                                 node_index: NodeIndex(None),
+                                                range: 173..174,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
@@ -158,13 +158,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchOr(
                                 PatternMatchOr {
-                                    range: 198..206,
                                     node_index: NodeIndex(None),
+                                    range: 198..206,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 198..199,
                                                 node_index: NodeIndex(None),
+                                                range: 198..199,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
@@ -178,8 +178,8 @@ Module(
                                         ),
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 202..206,
                                                 node_index: NodeIndex(None),
+                                                range: 202..206,
                                                 name: Some(
                                                     Identifier {
                                                         id: Name("foo"),
@@ -207,8 +207,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 230..237,
                                     node_index: NodeIndex(None),
+                                    range: 230..237,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -223,8 +223,8 @@ Module(
                                         patterns: [
                                             MatchStar(
                                                 PatternMatchStar {
-                                                    range: 234..236,
                                                     node_index: NodeIndex(None),
+                                                    range: 234..236,
                                                     name: None,
                                                 },
                                             ),
@@ -248,8 +248,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 261..270,
                                     node_index: NodeIndex(None),
+                                    range: 261..270,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -273,8 +273,8 @@ Module(
                                                 },
                                                 pattern: MatchStar(
                                                     PatternMatchStar {
-                                                        range: 267..269,
                                                         node_index: NodeIndex(None),
+                                                        range: 267..269,
                                                         name: None,
                                                     },
                                                 ),
@@ -298,8 +298,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 294..298,
                                     node_index: NodeIndex(None),
+                                    range: 294..298,
                                     keys: [
                                         Starred(
                                             ExprStarred {
@@ -320,8 +320,8 @@ Module(
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 297..297,
                                                 node_index: NodeIndex(None),
+                                                range: 297..297,
                                                 value: Name(
                                                     ExprName {
                                                         node_index: NodeIndex(None),
@@ -351,8 +351,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 322..329,
                                     node_index: NodeIndex(None),
+                                    range: 322..329,
                                     keys: [
                                         Starred(
                                             ExprStarred {
@@ -373,8 +373,8 @@ Module(
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 327..328,
                                                 node_index: NodeIndex(None),
+                                                range: 327..328,
                                                 value: NumberLiteral(
                                                     ExprNumberLiteral {
                                                         node_index: NodeIndex(None),
@@ -405,8 +405,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchMapping(
                                 PatternMatchMapping {
-                                    range: 353..363,
                                     node_index: NodeIndex(None),
+                                    range: 353..363,
                                     keys: [
                                         NoneLiteral(
                                             ExprNoneLiteral {
@@ -418,8 +418,8 @@ Module(
                                     patterns: [
                                         MatchStar(
                                             PatternMatchStar {
-                                                range: 360..362,
                                                 node_index: NodeIndex(None),
+                                                range: 360..362,
                                                 name: None,
                                             },
                                         ),
@@ -442,8 +442,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 387..393,
                                     node_index: NodeIndex(None),
+                                    range: 387..393,
                                     value: BinOp(
                                         ExprBinOp {
                                             node_index: NodeIndex(None),
@@ -580,7 +580,7 @@ Module(
 15 |     case Foo(x=*_):
 16 |         pass
 17 |     case {*_}:
-   |             ^ Syntax Error: Expected ':', found '}'
+   |             ^ Syntax Error: Expected `:`, found `}`
 18 |         pass
 19 |     case {*_: 1}:
    |
@@ -612,4 +612,26 @@ Module(
 23 |     case 1 + *_:
    |              ^^ Syntax Error: Star pattern cannot be used here
 24 |         pass
+   |
+
+
+## Semantic Syntax Errors
+
+   |
+ 7 |     case *foo:
+ 8 |         pass
+ 9 |     case *foo | 1:
+   |          ^^^^^^^^ Syntax Error: alternative patterns bind different names
+10 |         pass
+11 |     case 1 | *foo:
+   |
+
+
+   |
+ 9 |     case *foo | 1:
+10 |         pass
+11 |     case 1 | *foo:
+   |          ^^^^^^^^ Syntax Error: alternative patterns bind different names
+12 |         pass
+13 |     case Foo(*_):
    |

@@ -195,3 +195,65 @@ class C:
 c = C()
 c.square("hello")  # error: [invalid-argument-type]
 ```
+
+## Types with the same name but from different files
+
+`module.py`:
+
+```py
+class Foo: ...
+
+def needs_a_foo(x: Foo): ...
+```
+
+`main.py`:
+
+```py
+from module import needs_a_foo
+
+class Foo: ...
+
+needs_a_foo(Foo())  # error: [invalid-argument-type]
+```
+
+## TypeVars with bounds that have the same name but are from different files
+
+In this case, using fully qualified names is *not* necessary.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`module.py`:
+
+```py
+class Foo: ...
+
+def needs_a_foo(x: Foo): ...
+```
+
+`main.py`:
+
+```py
+from module import needs_a_foo
+
+class Foo: ...
+
+def f[T: Foo](x: T) -> T:
+    needs_a_foo(x)  # error: [invalid-argument-type]
+    return x
+```
+
+## Numbers special case
+
+```py
+from numbers import Number
+
+def f(x: Number): ...
+
+f(5)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `Literal[5]`"
+
+def g(x: float):
+    f(x)  # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `Number`, found `int | float`"
+```

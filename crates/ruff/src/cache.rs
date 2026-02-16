@@ -486,6 +486,7 @@ mod tests {
     use anyhow::Result;
     use filetime::{FileTime, set_file_mtime};
     use itertools::Itertools;
+    use ruff_python_ast::SourceType;
     use test_case::test_case;
 
     use ruff_cache::CACHE_DIR_NAME;
@@ -1024,7 +1025,7 @@ mod tests {
             format_path(
                 &file_path,
                 &self.settings.formatter,
-                PySourceType::Python,
+                SourceType::Python(PySourceType::Python),
                 FormatMode::Write,
                 None,
                 Some(cache),

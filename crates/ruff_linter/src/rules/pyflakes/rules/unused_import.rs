@@ -78,9 +78,8 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// a.b.foo()
 /// ```
 ///
-/// then a diagnostic will only be emitted for the first line under [preview],
-/// whereas a diagnostic would only be emitted for the second line under
-/// stable behavior.
+/// then a diagnostic will be emitted for the second line under [preview],
+/// whereas no diagnostic is emitted under stable behavior.
 ///
 /// Note that this behavior is somewhat subjective and is designed
 /// to conform to the developer's intuition rather than Python's actual
@@ -143,6 +142,7 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import
     name: String,
@@ -388,7 +388,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         }
     }
 
-    let in_init = checker.path().ends_with("__init__.py");
+    let in_init = checker.in_init_module();
     let fix_init = !checker.settings().ignore_init_module_imports;
     let preview_mode = is_dunder_init_fix_unused_import_enabled(checker.settings());
     let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());
@@ -409,6 +409,19 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                 } else if in_init
                     && binding.scope.is_global()
                     && is_first_party(&binding.import, checker)
+                    // In the situation where we have
+                    // ```
+                    // import a.b # <-- at this binding
+                    // import a.c
+                    //
+                    // __all__ = ["a"]
+                    // ```
+                    // we should not recommend that we re-export the
+                    // symbol `a` or add it to `__all__`.
+                    //
+                    // So we look up the name `a` and see if it has
+                    // a reference in `__all__`.
+                    && (!is_refined_submodule_import_match_enabled(checker.settings())||!symbol_used_in_dunder_all(checker.semantic(), &binding))
                 {
                     UnusedImportContext::DunderInitFirstParty {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
@@ -897,6 +910,10 @@ fn best_match<'a, 'b>(
 
 #[inline]
 fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &SemanticModel) -> bool {
+    let Some(binding_node) = semantic.binding(id).source else {
+        return false;
+    };
+
     scope.shadowed_bindings(id).enumerate().all(|(i, shadow)| {
         let shadowed_binding = semantic.binding(shadow);
         // Bail if one of the shadowed bindings is
@@ -911,9 +928,48 @@ fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &Semanti
         if i > 0 && shadowed_binding.is_used() {
             return false;
         }
+        // We want to allow a situation like this:
+        //
+        // ```python
+        // import a.b
+        // if TYPE_CHECKING:
+        //     import a.b.c
+        // ```
+        // but bail in a situation like this:
+        //
+        // ```python
+        // try:
+        //     import a.b
+        // except ImportError:
+        //     import argparse
+        //     import a
+        //     a.b = argparse.Namespace()
+        // ```
+        //
+        // So we require that all the shadowed bindings dominate the
+        // last live binding for the import. That is: if the last live
+        // binding is executed it should imply that all the shadowed
+        // bindings were executed as well.
+        if shadowed_binding
+            .source
+            .is_none_or(|node_id| !semantic.dominates(node_id, binding_node))
+        {
+            return false;
+        }
         matches!(
             shadowed_binding.kind,
             BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
         ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
     })
+}
+
+fn symbol_used_in_dunder_all(semantic: &SemanticModel<'_>, binding: &ImportBinding) -> bool {
+    semantic
+        .lookup_symbol_in_scope(binding.symbol_stored_in_outer_scope(), binding.scope, false)
+        .is_some_and(|bdg| {
+            semantic
+                .binding(bdg)
+                .references()
+                .any(|refid| semantic.reference(refid).in_dunder_all_definition())
+        })
 }

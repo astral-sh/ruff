@@ -29,8 +29,8 @@ Module(
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 7..9,
                                         node_index: NodeIndex(None),
+                                        range: 7..9,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 8..9,
@@ -88,7 +88,7 @@ Module(
 
   |
 1 | type X[*T: int] = int
-  |          ^ Syntax Error: Expected ']', found ':'
+  |          ^ Syntax Error: Expected `]`, found `:`
   |
 
 

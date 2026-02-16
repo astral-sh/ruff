@@ -1,15 +1,19 @@
+use anyhow::Result;
 use regex::Regex;
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 use serde::de::{self};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
+use std::str::FromStr;
 use strum::IntoEnumIterator;
 use unicode_normalization::UnicodeNormalization;
 
 use crate::settings::LineEnding;
 use ruff_formatter::IndentStyle;
 use ruff_graph::Direction;
+use ruff_linter::RUFF_PKG_VERSION;
+
 use ruff_linter::line_width::{IndentWidth, LineLength};
 use ruff_linter::rules::flake8_import_conventions::settings::BannedAliases;
 use ruff_linter::rules::flake8_pytest_style::settings::SettingsError;
@@ -59,13 +63,20 @@ pub struct Options {
     )]
     pub cache_dir: Option<String>,
 
-    /// A path to a local `pyproject.toml` file to merge into this
+    /// A path to a local `pyproject.toml` or `ruff.toml` file to merge into this
     /// configuration. User home directory and environment variables will be
     /// expanded.
     ///
-    /// To resolve the current `pyproject.toml` file, Ruff will first resolve
-    /// this base configuration file, then merge in any properties defined
-    /// in the current configuration file.
+    /// To resolve the current configuration file, Ruff will first load
+    /// this base configuration file, then merge in properties defined
+    /// in the current configuration file. Most settings follow simple override
+    /// behavior where the child value replaces the parent value. However,
+    /// rule selection (`lint.select` and `lint.ignore`) has special merging
+    /// behavior: if the child configuration specifies `lint.select`, it
+    /// establishes a new baseline rule set and the parent's `lint.ignore`
+    /// rules are discarded; if the child configuration omits `lint.select`,
+    /// the parent's rule selection is inherited and both parent and child
+    /// `lint.ignore` rules are accumulated together.
     #[option(
         default = r#"null"#,
         value_type = "str",
@@ -469,6 +480,7 @@ pub struct Options {
     deny_unknown_fields,
     rename_all = "kebab-case"
 )]
+#[cfg_attr(feature = "schemars", schemars(!from))]
 pub struct LintOptions {
     #[serde(flatten)]
     pub common: LintCommonOptions,
@@ -548,6 +560,17 @@ pub struct LintOptions {
     pub future_annotations: Option<bool>,
 }
 
+pub fn validate_required_version(required_version: &RequiredVersion) -> anyhow::Result<()> {
+    let ruff_pkg_version = pep440_rs::Version::from_str(RUFF_PKG_VERSION)
+        .expect("RUFF_PKG_VERSION is not a valid PEP 440 version specifier");
+    if !required_version.contains(&ruff_pkg_version) {
+        return Err(anyhow::anyhow!(
+            "Required version `{required_version}` does not match the running version `{RUFF_PKG_VERSION}`"
+        ));
+    }
+    Ok(())
+}
+
 /// Newtype wrapper for [`LintCommonOptions`] that allows customizing the JSON schema and omitting the fields from the [`OptionsMetadata`].
 #[derive(Clone, Debug, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -563,8 +586,8 @@ impl OptionsMetadata for DeprecatedTopLevelLintOptions {
 
 #[cfg(feature = "schemars")]
 impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
-    fn schema_name() -> String {
-        "DeprecatedTopLevelLintOptions".to_owned()
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        std::borrow::Cow::Borrowed("DeprecatedTopLevelLintOptions")
     }
     fn schema_id() -> std::borrow::Cow<'static, str> {
         std::borrow::Cow::Borrowed(concat!(
@@ -573,28 +596,25 @@ impl schemars::JsonSchema for DeprecatedTopLevelLintOptions {
             "DeprecatedTopLevelLintOptions"
         ))
     }
-    fn json_schema(generator: &mut schemars::r#gen::SchemaGenerator) -> schemars::schema::Schema {
-        use schemars::schema::Schema;
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        use serde_json::Value;
 
-        let common_schema = LintCommonOptions::json_schema(generator);
-        let mut schema_obj = common_schema.into_object();
-
-        if let Some(object) = schema_obj.object.as_mut() {
-            for property in object.properties.values_mut() {
-                if let Schema::Object(property_object) = property {
-                    if let Some(metadata) = &mut property_object.metadata {
-                        metadata.deprecated = true;
-                    } else {
-                        property_object.metadata = Some(Box::new(schemars::schema::Metadata {
-                            deprecated: true,
-                            ..schemars::schema::Metadata::default()
-                        }));
-                    }
+        let mut schema = LintCommonOptions::json_schema(generator);
+        if let Some(properties) = schema
+            .ensure_object()
+            .get_mut("properties")
+            .and_then(|value| value.as_object_mut())
+        {
+            for property in properties.values_mut() {
+                if let Ok(property_schema) = <&mut schemars::Schema>::try_from(property) {
+                    property_schema
+                        .ensure_object()
+                        .insert("deprecated".to_string(), Value::Bool(true));
                 }
             }
         }
 
-        Schema::Object(schema_obj)
+        schema
     }
 }
 
@@ -1474,7 +1494,7 @@ pub struct Flake8GetTextOptions {
 impl Flake8GetTextOptions {
     pub fn into_settings(self) -> flake8_gettext::settings::Settings {
         flake8_gettext::settings::Settings {
-            functions_names: self
+            function_names: self
                 .function_names
                 .unwrap_or_else(flake8_gettext::settings::default_func_names)
                 .into_iter()
@@ -2111,7 +2131,7 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// For example:
     /// ```python
-    /// import fastapi
+    /// from fastapi import FastAPI
     ///
     /// app = FastAPI("app")
     ///
@@ -2168,7 +2188,8 @@ pub struct Flake8TypeCheckingOptions {
     ///
     /// Note that this setting has no effect when `from __future__ import annotations`
     /// is present, as `__future__` annotations are always treated equivalently
-    /// to quoted annotations.
+    /// to quoted annotations. Similarly, this setting has no effect on Python
+    /// versions after 3.14 because these annotations are also deferred.
     #[option(
         default = "false",
         value_type = "bool",
@@ -2475,6 +2496,26 @@ pub struct IsortOptions {
         "#
     )]
     pub no_lines_before: Option<Vec<ImportSection>>,
+
+    /// A mapping from import section names to their heading comments.
+    ///
+    /// When set, a comment with the specified text will be added above imports
+    /// in the corresponding section. If a heading comment already exists, it
+    /// will be replaced.
+    ///
+    /// Compatible with isort's `import_heading_{section_name}` settings.
+    #[option(
+        default = r#"{}"#,
+        value_type = r#"dict["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str, str]"#,
+        example = r#"
+            future = "Future imports"
+            standard-library = "Standard library imports"
+            third-party = "Third party imports"
+            first-party = "First party imports"
+            local-folder = "Local folder imports"
+        "#
+    )]
+    pub import_heading: Option<FxHashMap<ImportSection, String>>,
 
     /// The number of blank lines to place after imports.
     /// Use `-1` for automatic determination.
@@ -2822,6 +2863,17 @@ impl IsortOptions {
             }
         }
 
+        let import_heading = self.import_heading.unwrap_or_default();
+
+        // Verify that all sections listed in `import_heading` are defined in `sections`.
+        for section in import_heading.keys() {
+            if let ImportSection::UserDefined(section_name) = section {
+                if !sections.contains_key(section_name) {
+                    warn_user_once!("`import-heading` contains unknown section: `{:?}`", section,);
+                }
+            }
+        }
+
         // Verify that `default_section` is in `section_order`.
         if !section_order.contains(&default_section) {
             warn_user_once!(
@@ -2862,6 +2914,10 @@ impl IsortOptions {
             constants: FxHashSet::from_iter(self.constants.unwrap_or_default()),
             variables: FxHashSet::from_iter(self.variables.unwrap_or_default()),
             no_lines_before: FxHashSet::from_iter(no_lines_before),
+            import_headings: import_heading
+                .into_iter()
+                .map(|(section, heading)| (section, format!("# {heading}")))
+                .collect(),
             lines_after_imports: self.lines_after_imports.unwrap_or(-1),
             lines_between_types,
             forced_separate: Vec::from_iter(self.forced_separate.unwrap_or_default()),
@@ -3491,6 +3547,17 @@ pub struct RuffOptions {
         note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub allowed_markup_calls: Option<Vec<String>>,
+    /// Whether to require `__init__.py` files to contain no code at all, including imports and
+    /// docstrings (see `RUF067`).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Make it a violation to include any code, including imports and docstrings in `__init__.py`
+        strictly-empty-init-modules = true
+        "#
+    )]
+    pub strictly_empty_init_modules: Option<bool>,
 }
 
 impl RuffOptions {
@@ -3499,6 +3566,7 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
+            strictly_empty_init_modules: self.strictly_empty_init_modules.unwrap_or_default(),
         }
     }
 }
@@ -3886,6 +3954,18 @@ pub struct AnalyzeOptions {
         "#
     )]
     pub include_dependencies: Option<BTreeMap<PathBuf, Vec<String>>>,
+    /// Whether to include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).
+    /// When enabled (default), type-checking-only imports are included in the import graph.
+    /// When disabled, they are excluded.
+    #[option(
+        default = "true",
+        value_type = "bool",
+        example = r#"
+            # Exclude type-checking-only imports from the graph
+            type-checking-imports = false
+        "#
+    )]
+    pub type_checking_imports: Option<bool>,
 }
 
 /// Like [`LintCommonOptions`], but with any `#[serde(flatten)]` fields inlined. This leads to far,

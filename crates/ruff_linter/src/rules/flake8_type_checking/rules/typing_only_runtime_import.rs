@@ -81,6 +81,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct TypingOnlyFirstPartyImport {
     qualified_name: String,
 }
@@ -163,6 +164,7 @@ impl Violation for TypingOnlyFirstPartyImport {
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct TypingOnlyThirdPartyImport {
     qualified_name: String,
 }
@@ -245,6 +247,7 @@ impl Violation for TypingOnlyThirdPartyImport {
 /// ## References
 /// - [PEP 563: Runtime annotation resolution and `TYPE_CHECKING`](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct TypingOnlyStandardLibraryImport {
     qualified_name: String,
 }
@@ -371,6 +374,7 @@ pub(crate) fn typing_only_runtime_import(
             range: binding.range(),
             parent_range: binding.parent_range(checker.semantic()),
             needs_future_import,
+            runtime_reference: None,
         };
 
         if checker.rule_is_ignored(rule_for(import_type), import.start())

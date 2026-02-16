@@ -47,6 +47,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -73,7 +74,7 @@ Module(
                                             elements: [
                                                 Interpolation(
                                                     InterpolatedElement {
-                                                        range: 7..14,
+                                                        range: 7..13,
                                                         node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
@@ -84,7 +85,7 @@ Module(
                                                             },
                                                         ),
                                                         debug_text: None,
-                                                        conversion: None,
+                                                        conversion: Repr,
                                                         format_spec: None,
                                                     },
                                                 ),
@@ -93,6 +94,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -144,6 +146,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -156,75 +159,91 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 24..37,
+                    range: 24..28,
                     value: FString(
                         ExprFString {
                             node_index: NodeIndex(None),
-                            range: 24..37,
+                            range: 24..28,
                             value: FStringValue {
-                                inner: Concatenated(
-                                    [
-                                        FString(
-                                            FString {
-                                                range: 24..28,
-                                                node_index: NodeIndex(None),
-                                                elements: [
-                                                    Interpolation(
-                                                        InterpolatedElement {
-                                                            range: 26..27,
-                                                            node_index: NodeIndex(None),
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 27..27,
-                                                                    id: Name(""),
-                                                                    ctx: Invalid,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: false,
-                                                },
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 24..28,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 26..27,
+                                                        node_index: NodeIndex(None),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 27..27,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: false,
+                                                unclosed: false,
                                             },
-                                        ),
-                                        FString(
-                                            FString {
-                                                range: 29..37,
-                                                node_index: NodeIndex(None),
-                                                elements: [
-                                                    Interpolation(
-                                                        InterpolatedElement {
-                                                            range: 33..34,
-                                                            node_index: NodeIndex(None),
-                                                            expression: Name(
-                                                                ExprName {
-                                                                    node_index: NodeIndex(None),
-                                                                    range: 34..34,
-                                                                    id: Name(""),
-                                                                    ctx: Invalid,
-                                                                },
-                                                            ),
-                                                            debug_text: None,
-                                                            conversion: None,
-                                                            format_spec: None,
-                                                        },
-                                                    ),
-                                                ],
-                                                flags: FStringFlags {
-                                                    quote_style: Double,
-                                                    prefix: Regular,
-                                                    triple_quoted: true,
-                                                },
+                                        },
+                                    ),
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 29..37,
+                    value: FString(
+                        ExprFString {
+                            node_index: NodeIndex(None),
+                            range: 29..37,
+                            value: FStringValue {
+                                inner: Single(
+                                    FString(
+                                        FString {
+                                            range: 29..37,
+                                            node_index: NodeIndex(None),
+                                            elements: [
+                                                Interpolation(
+                                                    InterpolatedElement {
+                                                        range: 33..34,
+                                                        node_index: NodeIndex(None),
+                                                        expression: Name(
+                                                            ExprName {
+                                                                node_index: NodeIndex(None),
+                                                                range: 34..34,
+                                                                id: Name(""),
+                                                                ctx: Invalid,
+                                                            },
+                                                        ),
+                                                        debug_text: None,
+                                                        conversion: None,
+                                                        format_spec: None,
+                                                    },
+                                                ),
+                                            ],
+                                            flags: FStringFlags {
+                                                quote_style: Double,
+                                                prefix: Regular,
+                                                triple_quoted: true,
+                                                unclosed: false,
                                             },
-                                        ),
-                                    ],
+                                        },
+                                    ),
                                 ),
                             },
                         },
@@ -239,23 +258,7 @@ Module(
 
   |
 1 | f"{"
-  |    ^ Syntax Error: missing closing quote in string literal
-2 | f"{foo!r"
-3 | f"{foo="
-  |
-
-
-  |
-1 | f"{"
-  |     ^ Syntax Error: f-string: unterminated string
-2 | f"{foo!r"
-3 | f"{foo="
-  |
-
-
-  |
-1 | f"{"
-  |     ^ Syntax Error: f-string: unterminated string
+  |    ^ Syntax Error: Expected an expression
 2 | f"{foo!r"
 3 | f"{foo="
   |
@@ -264,25 +267,7 @@ Module(
   |
 1 | f"{"
 2 | f"{foo!r"
-  |        ^^ Syntax Error: missing closing quote in string literal
-3 | f"{foo="
-4 | f"{"
-  |
-
-
-  |
-1 | f"{"
-2 | f"{foo!r"
-  |          ^ Syntax Error: f-string: unterminated string
-3 | f"{foo="
-4 | f"{"
-  |
-
-
-  |
-1 | f"{"
-2 | f"{foo!r"
-  |          ^ Syntax Error: f-string: unterminated string
+  |         ^ Syntax Error: f-string: expecting `}`
 3 | f"{foo="
 4 | f"{"
   |
@@ -292,46 +277,7 @@ Module(
 1 | f"{"
 2 | f"{foo!r"
 3 | f"{foo="
-  | ^^ Syntax Error: f-string: expecting '}'
-4 | f"{"
-5 | f"""{"""
-  |
-
-
-  |
-1 | f"{"
-2 | f"{foo!r"
-  |          ^ Syntax Error: Expected FStringEnd, found Unknown
-3 | f"{foo="
-4 | f"{"
-  |
-
-
-  |
-1 | f"{"
-2 | f"{foo!r"
-3 | f"{foo="
-  |        ^ Syntax Error: missing closing quote in string literal
-4 | f"{"
-5 | f"""{"""
-  |
-
-
-  |
-1 | f"{"
-2 | f"{foo!r"
-3 | f"{foo="
-  |         ^ Syntax Error: f-string: unterminated string
-4 | f"{"
-5 | f"""{"""
-  |
-
-
-  |
-1 | f"{"
-2 | f"{foo!r"
-3 | f"{foo="
-  |         ^ Syntax Error: f-string: unterminated string
+  |        ^ Syntax Error: f-string: expecting `}`
 4 | f"{"
 5 | f"""{"""
   |
@@ -341,16 +287,8 @@ Module(
 2 | f"{foo!r"
 3 | f"{foo="
 4 | f"{"
-  |    ^ Syntax Error: missing closing quote in string literal
+  |    ^ Syntax Error: Expected an expression
 5 | f"""{"""
-  |
-
-
-  |
-3 | f"{foo="
-4 | f"{"
-5 | f"""{"""
-  | ^^^^ Syntax Error: Expected FStringEnd, found FStringStart
   |
 
 
@@ -359,18 +297,4 @@ Module(
 4 | f"{"
 5 | f"""{"""
   |      ^^^ Syntax Error: Expected an expression
-  |
-
-
-  |
-4 | f"{"
-5 | f"""{"""
-  |         ^ Syntax Error: unexpected EOF while parsing
-  |
-
-
-  |
-4 | f"{"
-5 | f"""{"""
-  |         ^ Syntax Error: f-string: unterminated string
   |

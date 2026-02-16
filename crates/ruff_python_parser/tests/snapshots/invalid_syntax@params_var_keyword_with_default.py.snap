@@ -85,6 +85,7 @@ Module(
                                                                             quote_style: Single,
                                                                             prefix: Empty,
                                                                             triple_quoted: false,
+                                                                            unclosed: false,
                                                                         },
                                                                     },
                                                                 ),
@@ -118,6 +119,7 @@ Module(
                                                                             quote_style: Single,
                                                                             prefix: Empty,
                                                                             triple_quoted: false,
+                                                                            unclosed: false,
                                                                         },
                                                                     },
                                                                 ),
@@ -163,19 +165,19 @@ Module(
 
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                    ^ Syntax Error: Parameter with '*' or '**' cannot have default value
+  |                    ^ Syntax Error: Parameter with `*` or `**` cannot have default value
   |
 
 
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                     ^ Syntax Error: Expected ')', found '{'
+  |                     ^ Syntax Error: Expected `)`, found `{`
   |
 
 
   |
 1 | def foo(a, **kwargs={'b': 1, 'c': 2}): ...
-  |                                     ^ Syntax Error: Expected newline, found ')'
+  |                                     ^ Syntax Error: Expected newline, found `)`
   |
 
 

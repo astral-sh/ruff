@@ -6,7 +6,7 @@ use crate::CliTest;
 fn only_warnings() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -21,7 +21,6 @@ fn only_warnings() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -37,7 +36,7 @@ fn only_info() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -52,7 +51,6 @@ fn only_info() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -68,7 +66,7 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @r"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -83,7 +81,6 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -93,7 +90,7 @@ fn only_info_and_error_on_warning_is_true() -> anyhow::Result<()> {
 fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     let case = CliTest::with_file("test.py", r"print(x)  # [unresolved-reference]")?;
 
-    assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--error-on-warning").arg("--warn").arg("unresolved-reference"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -108,7 +105,6 @@ fn no_errors_but_error_on_warning_is_true() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -127,7 +123,7 @@ fn no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Resul
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -142,7 +138,6 @@ fn no_errors_but_error_on_warning_is_enabled_in_configuration() -> anyhow::Resul
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -154,11 +149,11 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -167,23 +162,22 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |
     info: rule `unresolved-reference` was selected on the command line
 
-    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
-    3 | print(4[1])  # [non-subscriptable]
-      |       ^
+    3 | print(4[1])  # [not-subscriptable]
+      |       ^^^^
       |
-    info: rule `non-subscriptable` is enabled by default
+    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -195,11 +189,11 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
         "test.py",
         r###"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
         "###,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @r"
+    assert_cmd_snapshot!(case.command().arg("--warn").arg("unresolved-reference").arg("--error-on-warning"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -208,23 +202,22 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |
     info: rule `unresolved-reference` was selected on the command line
 
-    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
-    3 | print(4[1])  # [non-subscriptable]
-      |       ^
+    3 | print(4[1])  # [not-subscriptable]
+      |       ^^^^
       |
-    info: rule `non-subscriptable` is enabled by default
+    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -236,11 +229,11 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exit-zero").arg("--warn").arg("unresolved-reference"), @r"
+    assert_cmd_snapshot!(case.command().arg("--exit-zero").arg("--warn").arg("unresolved-reference"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -249,23 +242,22 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |
     info: rule `unresolved-reference` was selected on the command line
 
-    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
-    3 | print(4[1])  # [non-subscriptable]
-      |       ^
+    3 | print(4[1])  # [not-subscriptable]
+      |       ^^^^
       |
-    info: rule `non-subscriptable` is enabled by default
+    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())

@@ -63,12 +63,7 @@ fn generate_markdown() -> String {
     let _ = writeln!(&mut output, "# Rules\n");
 
     let mut lints: Vec<_> = registry.lints().iter().collect();
-    lints.sort_by(|a, b| {
-        a.default_level()
-            .cmp(&b.default_level())
-            .reverse()
-            .then_with(|| a.name().cmp(&b.name()))
-    });
+    lints.sort_by_key(|a| a.name());
 
     for lint in lints {
         let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());
@@ -93,13 +88,38 @@ fn generate_markdown() -> String {
             })
             .join("\n");
 
+        let status_text = match lint.status() {
+            ty_python_semantic::lint::LintStatus::Stable { since } => {
+                format!(
+                    r#"Added in <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>"#
+                )
+            }
+            ty_python_semantic::lint::LintStatus::Preview { since } => {
+                format!(
+                    r#"Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+            ty_python_semantic::lint::LintStatus::Deprecated { since, .. } => {
+                format!(
+                    r#"Deprecated (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+            ty_python_semantic::lint::LintStatus::Removed { since, .. } => {
+                format!(
+                    r#"Removed (since <a href="https://github.com/astral-sh/ty/releases/tag/{since}">{since}</a>)"#
+                )
+            }
+        };
+
         let _ = writeln!(
             &mut output,
             r#"<small>
-Default level: [`{level}`](../rules.md#rule-levels "This lint has a default level of '{level}'.") ·
-[Related issues](https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name}) ·
-[View source](https://github.com/astral-sh/ruff/blob/main/{file}#L{line})
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
+{status_text} ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name}" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
 </small>
+
 
 {documentation}
 "#,

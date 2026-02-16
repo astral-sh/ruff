@@ -11,7 +11,7 @@ use crate::{FixAvailability, Violation};
 ///
 /// ## Why is this bad?
 /// `ByteString` has been deprecated since Python 3.9 and will be removed in
-/// Python 3.14. The Python documentation recommends using either
+/// Python 3.17. The Python documentation recommends using either
 /// `collections.abc.Buffer` (or the `typing_extensions` backport
 /// on Python <3.12) or a union like `bytes | bytearray | memoryview` instead.
 ///
@@ -28,6 +28,7 @@ use crate::{FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: The `ByteString` type](https://docs.python.org/3/library/typing.html#typing.ByteString)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct ByteStringUsage {
     origin: ByteStringOrigin,
 }
@@ -74,7 +75,8 @@ pub(crate) fn bytestring_attribute(checker: &Checker, attribute: &Expr) {
         ["collections", "abc", "ByteString"] => ByteStringOrigin::CollectionsAbc,
         _ => return,
     };
-    checker.report_diagnostic(ByteStringUsage { origin }, attribute.range());
+    let mut diagnostic = checker.report_diagnostic(ByteStringUsage { origin }, attribute.range());
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
 }
 
 /// PYI057
@@ -94,7 +96,9 @@ pub(crate) fn bytestring_import(checker: &Checker, import_from: &ast::StmtImport
 
     for name in names {
         if name.name.as_str() == "ByteString" {
-            checker.report_diagnostic(ByteStringUsage { origin }, name.range());
+            let mut diagnostic =
+                checker.report_diagnostic(ByteStringUsage { origin }, name.range());
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         }
     }
 }

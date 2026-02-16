@@ -13,22 +13,39 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 0..7,
+                    range: 0..14,
                     value: StringLiteral(
                         ExprStringLiteral {
                             node_index: NodeIndex(None),
-                            range: 0..7,
+                            range: 0..14,
                             value: StringLiteralValue {
-                                inner: Single(
-                                    StringLiteral {
-                                        range: 0..7,
-                                        node_index: NodeIndex(None),
-                                        value: "hello",
-                                        flags: StringLiteralFlags {
-                                            quote_style: Single,
-                                            prefix: Empty,
-                                            triple_quoted: false,
-                                        },
+                                inner: Concatenated(
+                                    ConcatenatedStringLiteral {
+                                        strings: [
+                                            StringLiteral {
+                                                range: 0..7,
+                                                node_index: NodeIndex(None),
+                                                value: "hello",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                            StringLiteral {
+                                                range: 8..14,
+                                                node_index: NodeIndex(None),
+                                                value: "world",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: true,
+                                                },
+                                            },
+                                        ],
+                                        value: "helloworld",
                                     },
                                 ),
                             },
@@ -87,6 +104,7 @@ Module(
                                                     quote_style: Single,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
@@ -124,6 +142,7 @@ Module(
                                                     quote_style: Single,
                                                     prefix: Regular,
                                                     triple_quoted: false,
+                                                    unclosed: true,
                                                 },
                                             },
                                         ),
@@ -176,15 +195,6 @@ Module(
   |         ^^^^^^ Syntax Error: missing closing quote in string literal
 2 | 1 + 1
 3 | 'hello' f'world {x}
-  |
-
-
-  |
-1 | 'hello' 'world
-  |               ^ Syntax Error: Expected a statement
-2 | 1 + 1
-3 | 'hello' f'world {x}
-4 | 2 + 2
   |
 
 

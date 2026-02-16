@@ -111,6 +111,7 @@ Module(
                                                     quote_style: Double,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
@@ -140,8 +141,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 68..69,
                                         node_index: NodeIndex(None),
+                                        range: 68..69,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 68..69,
@@ -228,8 +229,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 108..109,
                                         node_index: NodeIndex(None),
+                                        range: 108..109,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 108..109,
@@ -271,8 +272,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 124..125,
                                         node_index: NodeIndex(None),
+                                        range: 124..125,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 124..125,
@@ -359,8 +360,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 153..154,
                                         node_index: NodeIndex(None),
+                                        range: 153..154,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 153..154,
@@ -372,8 +373,8 @@ Module(
                                 ),
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 156..159,
                                         node_index: NodeIndex(None),
+                                        range: 156..159,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 157..159,
@@ -384,8 +385,8 @@ Module(
                                 ),
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 161..164,
                                         node_index: NodeIndex(None),
+                                        range: 161..164,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 163..164,
@@ -452,8 +453,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 186..192,
                                         node_index: NodeIndex(None),
+                                        range: 186..192,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 186..187,
@@ -474,8 +475,8 @@ Module(
                                 ),
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 194..197,
                                         node_index: NodeIndex(None),
+                                        range: 194..197,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 195..197,
@@ -486,8 +487,8 @@ Module(
                                 ),
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 199..202,
                                         node_index: NodeIndex(None),
+                                        range: 199..202,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 201..202,
@@ -554,8 +555,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 224..237,
                                         node_index: NodeIndex(None),
+                                        range: 224..237,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 224..225,
@@ -594,8 +595,8 @@ Module(
                                 ),
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 239..242,
                                         node_index: NodeIndex(None),
+                                        range: 239..242,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 240..242,
@@ -606,8 +607,8 @@ Module(
                                 ),
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 244..247,
                                         node_index: NodeIndex(None),
+                                        range: 244..247,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 246..247,
@@ -674,8 +675,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 269..276,
                                         node_index: NodeIndex(None),
+                                        range: 269..276,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 269..270,
@@ -741,8 +742,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 295..313,
                                         node_index: NodeIndex(None),
+                                        range: 295..313,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 295..296,
@@ -847,8 +848,8 @@ Module(
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 338..360,
                                         node_index: NodeIndex(None),
+                                        range: 338..360,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 339..341,
@@ -986,8 +987,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 392..408,
                                         node_index: NodeIndex(None),
+                                        range: 392..408,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 394..395,
@@ -1317,8 +1318,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 687..688,
                                         node_index: NodeIndex(None),
+                                        range: 687..688,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 687..688,
@@ -1360,8 +1361,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 708..709,
                                         node_index: NodeIndex(None),
+                                        range: 708..709,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 708..709,
@@ -1403,8 +1404,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 722..723,
                                         node_index: NodeIndex(None),
+                                        range: 722..723,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 722..723,
@@ -1610,8 +1611,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 865..866,
                                         node_index: NodeIndex(None),
+                                        range: 865..866,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 865..866,
@@ -1686,8 +1687,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 895..898,
                                         node_index: NodeIndex(None),
+                                        range: 895..898,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 897..898,
@@ -1761,8 +1762,8 @@ Module(
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 950..953,
                                         node_index: NodeIndex(None),
+                                        range: 950..953,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 951..953,
@@ -1843,8 +1844,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 1011..1022,
                                         node_index: NodeIndex(None),
+                                        range: 1011..1022,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1011..1012,
@@ -1910,8 +1911,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 1082..1095,
                                         node_index: NodeIndex(None),
+                                        range: 1082..1095,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1082..1083,

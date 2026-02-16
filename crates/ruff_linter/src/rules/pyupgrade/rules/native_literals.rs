@@ -128,6 +128,7 @@ impl fmt::Display for LiteralType {
 /// - [Python documentation: `float`](https://docs.python.org/3/library/functions.html#float)
 /// - [Python documentation: `bool`](https://docs.python.org/3/library/functions.html#bool)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.193")]
 pub(crate) struct NativeLiterals {
     literal_type: LiteralType,
 }

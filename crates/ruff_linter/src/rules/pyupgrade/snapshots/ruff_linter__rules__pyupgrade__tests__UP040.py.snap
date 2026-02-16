@@ -217,7 +217,7 @@ UP040 [*] Type alias `x` uses `TypeAlias` annotation instead of the `type` keywo
 44 | x: typing.TypeAlias = list[T]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 45 |
-46 | # `default` should be skipped for now, added in Python 3.13
+46 | # `default` was added in Python 3.13
    |
 help: Use the `type` keyword
 41 | 
@@ -226,7 +226,7 @@ help: Use the `type` keyword
    - x: typing.TypeAlias = list[T]
 44 + type x = list[T]
 45 | 
-46 | # `default` should be skipped for now, added in Python 3.13
+46 | # `default` was added in Python 3.13
 47 | T = typing.TypeVar("T", default=Any)
 note: This is an unsafe fix and may change runtime behavior
 
@@ -355,6 +355,26 @@ help: Use the `type` keyword
 87 | # OK: Other name
 88 | T = TypeVar("T", bound=SupportGt)
 
+UP040 [*] Type alias `AnyList` uses `TypeAliasType` assignment instead of the `type` keyword
+  --> UP040.py:95:1
+   |
+93 | # `default` was added in Python 3.13
+94 | T = typing.TypeVar("T", default=Any)
+95 | AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+96 |
+97 | # unsafe fix if comments within the fix
+   |
+help: Use the `type` keyword
+92 | 
+93 | # `default` was added in Python 3.13
+94 | T = typing.TypeVar("T", default=Any)
+   - AnyList = TypeAliasType("AnyList", list[T], type_params=(T,))
+95 + type AnyList[T = Any] = list[T]
+96 | 
+97 | # unsafe fix if comments within the fix
+98 | T = TypeVar("T")
+
 UP040 [*] Type alias `PositiveList` uses `TypeAliasType` assignment instead of the `type` keyword
    --> UP040.py:99:1
     |
@@ -469,6 +489,8 @@ UP040 [*] Type alias `T` uses `TypeAlias` annotation instead of the `type` keywo
 129 | |     # comment7
 130 | | ) # comment8
     | |_^
+131 |
+132 |   # Test case for TypeVar with default - should be converted when preview mode is enabled
     |
 help: Use the `type` keyword
 119 |     | str

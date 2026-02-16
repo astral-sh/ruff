@@ -59,6 +59,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -124,6 +125,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -141,7 +143,7 @@ Module(
   |
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"hello {x:"
-  |            ^ Syntax Error: t-string: expecting '}'
+  |            ^ Syntax Error: t-string: expecting `}`
 3 | t"hello {x:.3f"
   |
 
@@ -150,5 +152,5 @@ Module(
 1 | # parse_options: {"target-version": "3.14"}
 2 | t"hello {x:"
 3 | t"hello {x:.3f"
-  |               ^ Syntax Error: t-string: expecting '}'
+  |               ^ Syntax Error: t-string: expecting `}`
   |

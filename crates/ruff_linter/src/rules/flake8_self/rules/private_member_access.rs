@@ -55,6 +55,7 @@ use crate::rules::pylint::helpers::is_dunder_operator_method;
 /// ## References
 /// - [_What is the meaning of single or double underscores before an object name?_](https://stackoverflow.com/questions/1301346/what-is-the-meaning-of-single-and-double-underscore-before-an-object-name)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.240")]
 pub(crate) struct PrivateMemberAccess {
     access: String,
 }
@@ -100,7 +101,7 @@ pub(crate) fn private_member_access(checker: &Checker, expr: &Expr) {
         }
     }
 
-    // Allow some documented private methods, like `os._exit()`.
+    // Allow some public functions whose names start with an underscore, like `os._exit()`.
     if let Some(qualified_name) = semantic.resolve_qualified_name(expr) {
         if matches!(qualified_name.segments(), ["os", "_exit"]) {
             return;

@@ -15,7 +15,7 @@ def f(x: str):
 ```py
 def f(): ...
 
-f = 1  # error: "Implicit shadowing of function `f`"
+f = 1  # error: [invalid-assignment]
 ```
 
 ## Explicit shadowing

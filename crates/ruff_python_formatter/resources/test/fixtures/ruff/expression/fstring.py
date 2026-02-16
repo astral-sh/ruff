@@ -748,3 +748,7 @@ print(f"{  # Tuple with multiple elements that doesn't fit on a single line gets
 
 # Regression tests for https://github.com/astral-sh/ruff/issues/15536
 print(f"{ {}, 1, }")
+
+
+# The inner quotes should not be changed to double quotes before Python 3.12
+f"{f'''{'nested'} inner'''} outer"

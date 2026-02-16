@@ -51,6 +51,7 @@ use crate::rules::flake8_datetimez::helpers::DatetimeModuleAntipattern;
 /// - [Python documentation: Aware and Naive Objects](https://docs.python.org/3/library/datetime.html#aware-and-naive-objects)
 /// - [Python documentation: `strftime()` and `strptime()` Behavior](https://docs.python.org/3/library/datetime.html#strftime-and-strptime-behavior)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct CallDatetimeStrptimeWithoutZone(DatetimeModuleAntipattern);
 
 impl Violation for CallDatetimeStrptimeWithoutZone {

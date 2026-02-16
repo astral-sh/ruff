@@ -28,13 +28,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 164..170,
                                     node_index: NodeIndex(None),
+                                    range: 164..170,
                                     pattern: Some(
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 164..165,
                                                 node_index: NodeIndex(None),
+                                                range: 164..165,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
@@ -111,7 +111,7 @@ Module(
 2 |     # This `as` pattern is unparenthesied so the parser never takes the path
 3 |     # where it might be confused as a complex literal pattern.
 4 |     case x as y + 1j:
-  |                 ^ Syntax Error: Expected ':', found '+'
+  |                 ^ Syntax Error: Expected `:`, found `+`
 5 |         pass
   |
 

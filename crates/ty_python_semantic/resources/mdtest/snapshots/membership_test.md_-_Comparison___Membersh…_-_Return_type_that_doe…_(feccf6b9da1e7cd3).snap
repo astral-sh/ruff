@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: membership_test.md - Comparison: Membership Test - Return type that doesn't implement `__bool__` correctly
 mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/membership_test.md
@@ -28,7 +29,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/instances/mem
 # Diagnostics
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
   --> src/mdtest_snippet.py:9:1
    |
  8 | # error: [unsupported-bool-conversion]
@@ -43,7 +44,7 @@ info: rule `unsupported-bool-conversion` is enabled by default
 ```
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
   --> src/mdtest_snippet.py:11:1
    |
  9 | 10 in WithContains()

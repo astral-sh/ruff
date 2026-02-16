@@ -1,0 +1,9 @@
+---
+source: crates/ty_server/tests/e2e/publish_diagnostics.rs
+expression: diagnostics
+---
+{
+  "uri": "file://<temp_dir>/src/foo.py",
+  "diagnostics": [],
+  "version": 1
+}

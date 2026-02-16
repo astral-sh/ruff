@@ -74,6 +74,7 @@ use crate::rules::flake8_bandit::helpers::string_literal;
 /// - [Common Weakness Enumeration: CWE-328](https://cwe.mitre.org/data/definitions/328.html)
 /// - [Common Weakness Enumeration: CWE-916](https://cwe.mitre.org/data/definitions/916.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.212")]
 pub(crate) struct HashlibInsecureHashFunction {
     library: String,
     string: String,

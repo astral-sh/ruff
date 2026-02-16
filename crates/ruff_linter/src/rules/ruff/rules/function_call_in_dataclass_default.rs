@@ -61,6 +61,7 @@ use crate::rules::ruff::helpers::{
 /// ## Options
 /// - `lint.flake8-bugbear.extend-immutable-calls`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.262")]
 pub(crate) struct FunctionCallInDataclassDefaultArgument {
     name: Option<String>,
 }

@@ -38,6 +38,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingTypeFunctionArgument {
     name: String,
 }
@@ -73,6 +74,7 @@ impl Violation for MissingTypeFunctionArgument {
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingTypeArgs {
     name: String,
 }
@@ -108,6 +110,7 @@ impl Violation for MissingTypeArgs {
 /// ## Options
 /// - `lint.flake8-annotations.suppress-dummy-args`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingTypeKwargs {
     name: String,
 }
@@ -149,6 +152,7 @@ impl Violation for MissingTypeKwargs {
 /// ```
 #[derive(ViolationMetadata)]
 #[deprecated(note = "ANN101 has been removed")]
+#[violation_metadata(removed_since = "0.8.0")]
 pub(crate) struct MissingTypeSelf;
 
 #[expect(deprecated)]
@@ -193,6 +197,7 @@ impl Violation for MissingTypeSelf {
 /// ```
 #[derive(ViolationMetadata)]
 #[deprecated(note = "ANN102 has been removed")]
+#[violation_metadata(removed_since = "0.8.0")]
 pub(crate) struct MissingTypeCls;
 
 #[expect(deprecated)]
@@ -236,6 +241,7 @@ impl Violation for MissingTypeCls {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
     annotation: Option<String>,
@@ -289,6 +295,7 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,
     annotation: Option<String>,
@@ -344,7 +351,12 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///     def __init__(self, x: int) -> None:
 ///         self.x = x
 /// ```
+///
+/// ## Options
+///
+/// - `lint.flake8-annotations.mypy-init-return`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingReturnTypeSpecialMethod {
     name: String,
     annotation: Option<String>,
@@ -391,7 +403,12 @@ impl Violation for MissingReturnTypeSpecialMethod {
 ///     def bar() -> int:
 ///         return 1
 /// ```
+///
+/// ## Options
+///
+/// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingReturnTypeStaticMethod {
     name: String,
     annotation: Option<String>,
@@ -438,7 +455,12 @@ impl Violation for MissingReturnTypeStaticMethod {
 ///     def bar(cls) -> int:
 ///         return 1
 /// ```
+///
+/// ## Options
+///
+/// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingReturnTypeClassMethod {
     name: String,
     annotation: Option<String>,
@@ -503,11 +525,15 @@ impl Violation for MissingReturnTypeClassMethod {
 /// def foo(x: MyAny): ...
 /// ```
 ///
+/// ## Options
+/// - `lint.flake8-annotations.allow-star-arg-any`
+///
 /// ## References
 /// - [Typing spec: `Any`](https://typing.python.org/en/latest/spec/special-types.html#any)
 /// - [Python documentation: `typing.Any`](https://docs.python.org/3/library/typing.html#typing.Any)
 /// - [Mypy documentation: The Any type](https://mypy.readthedocs.io/en/stable/kinds_of_types.html#the-any-type)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.108")]
 pub(crate) struct AnyType {
     name: String,
 }
@@ -748,7 +774,7 @@ pub(crate) fn definition(
                 let return_type = if is_stub_function(function, checker) {
                     None
                 } else {
-                    auto_return_type(function)
+                    auto_return_type(function, checker.semantic())
                         .and_then(|return_type| {
                             return_type.into_expression(checker, function.parameters.start())
                         })
@@ -775,7 +801,7 @@ pub(crate) fn definition(
                 let return_type = if is_stub_function(function, checker) {
                     None
                 } else {
-                    auto_return_type(function)
+                    auto_return_type(function, checker.semantic())
                         .and_then(|return_type| {
                             return_type.into_expression(checker, function.parameters.start())
                         })
@@ -861,7 +887,7 @@ pub(crate) fn definition(
                         let return_type = if is_stub_function(function, checker) {
                             None
                         } else {
-                            auto_return_type(function)
+                            auto_return_type(function, checker.semantic())
                                 .and_then(|return_type| {
                                     return_type
                                         .into_expression(checker, function.parameters.start())
@@ -896,7 +922,7 @@ pub(crate) fn definition(
                         let return_type = if is_stub_function(function, checker) {
                             None
                         } else {
-                            auto_return_type(function)
+                            auto_return_type(function, checker.semantic())
                                 .and_then(|return_type| {
                                     return_type
                                         .into_expression(checker, function.parameters.start())

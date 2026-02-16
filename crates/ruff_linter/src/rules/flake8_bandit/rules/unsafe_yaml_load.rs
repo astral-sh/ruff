@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// - [PyYAML documentation: Loading YAML](https://pyyaml.org/wiki/PyYAMLDocumentation)
 /// - [Common Weakness Enumeration: CWE-20](https://cwe.mitre.org/data/definitions/20.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.212")]
 pub(crate) struct UnsafeYAMLLoad {
     pub loader: Option<String>,
 }
@@ -74,6 +75,7 @@ pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
                         qualified_name.segments(),
                         ["yaml", "SafeLoader" | "CSafeLoader"]
                             | ["yaml", "loader", "SafeLoader" | "CSafeLoader"]
+                            | ["yaml", "cyaml", "CSafeLoader"]
                     )
                 })
             {

@@ -13,6 +13,7 @@ nan: Final[float]
 nanj: Final[complex]
 tau: Final[float]
 
+_F: TypeAlias = SupportsFloat | SupportsIndex
 _C: TypeAlias = SupportsFloat | SupportsComplex | SupportsIndex | complex
 
 def acos(z: _C, /) -> complex:
@@ -67,7 +68,7 @@ def isinf(z: _C, /) -> bool:
 def isnan(z: _C, /) -> bool:
     """Checks if the real or imaginary part of z not a number (NaN)."""
 
-def log(x: _C, base: _C = ..., /) -> complex:
+def log(z: _C, base: _C = ..., /) -> complex:
     """log(z[, base]) -> the logarithm of z to the given base.
 
     If the base is not specified, returns the natural logarithm (base e) of z.
@@ -85,7 +86,7 @@ def polar(z: _C, /) -> tuple[float, float]:
     r is the distance from 0 and phi the phase angle.
     """
 
-def rect(r: float, phi: float, /) -> complex:
+def rect(r: _F, phi: _F, /) -> complex:
     """Convert from polar coordinates to rectangular coordinates."""
 
 def sin(z: _C, /) -> complex:

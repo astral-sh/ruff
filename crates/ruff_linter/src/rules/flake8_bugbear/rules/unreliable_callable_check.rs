@@ -67,6 +67,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `__getattr__`](https://docs.python.org/3/reference/datamodel.html#object.__getattr__)
 /// - [Python documentation: `__call__`](https://docs.python.org/3/reference/datamodel.html#object.__call__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.106")]
 pub(crate) struct UnreliableCallableCheck;
 
 impl Violation for UnreliableCallableCheck {

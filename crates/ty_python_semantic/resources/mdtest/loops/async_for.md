@@ -42,8 +42,6 @@ async def foo():
 ### No `__aiter__` method
 
 ```py
-from typing_extensions import reveal_type
-
 class NotAsyncIterable: ...
 
 async def foo():
@@ -55,8 +53,6 @@ async def foo():
 ### Synchronously iterable, but not asynchronously iterable
 
 ```py
-from typing_extensions import reveal_type
-
 async def foo():
     class Iterator:
         def __next__(self) -> int:
@@ -74,8 +70,6 @@ async def foo():
 ### No `__anext__` method
 
 ```py
-from typing_extensions import reveal_type
-
 class NoAnext: ...
 
 class AsyncIterable:
@@ -91,8 +85,6 @@ async def foo():
 ### Possibly missing `__anext__` method
 
 ```py
-from typing_extensions import reveal_type
-
 async def foo(flag: bool):
     class PossiblyUnboundAnext:
         if flag:
@@ -111,8 +103,6 @@ async def foo(flag: bool):
 ### Possibly missing `__aiter__` method
 
 ```py
-from typing_extensions import reveal_type
-
 async def foo(flag: bool):
     class AsyncIterable:
         async def __anext__(self) -> int:
@@ -131,8 +121,6 @@ async def foo(flag: bool):
 ### Wrong signature for `__aiter__`
 
 ```py
-from typing_extensions import reveal_type
-
 class AsyncIterator:
     async def __anext__(self) -> int:
         return 42
@@ -150,8 +138,6 @@ async def foo():
 ### Wrong signature for `__anext__`
 
 ```py
-from typing_extensions import reveal_type
-
 class AsyncIterator:
     async def __anext__(self, arg: int) -> int:  # wrong
         return 42

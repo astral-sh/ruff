@@ -3,13 +3,11 @@
 use bstr::ByteSlice;
 use std::fmt;
 
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyStringFlags, AtomicNodeIndex, Expr, StringFlags};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::{
-    TokenKind,
-    error::{LexicalError, LexicalErrorType},
-};
+use crate::error::{LexicalError, LexicalErrorType};
 
 #[derive(Debug)]
 pub(crate) enum StringType {

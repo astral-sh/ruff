@@ -1,4 +1,5 @@
 use anyhow::{Result, bail};
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::any_over_expr;
@@ -40,12 +41,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// all(starmap(predicate, some_iterable))
 /// ```
 ///
+/// ## Fix safety
+/// This rule's fix is marked as safe, unless the expression contains comments.
+///
 /// ## References
 /// - [Python documentation: `itertools.starmap`](https://docs.python.org/3/library/itertools.html#itertools.starmap)
 ///
 /// [PEP 709]: https://peps.python.org/pep-0709/
 /// [#7771]: https://github.com/astral-sh/ruff/issues/7771
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.291")]
 pub(crate) struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {
@@ -154,7 +159,18 @@ pub(crate) fn reimplemented_starmap(checker: &Checker, target: &StarmapCandidate
             )?,
             target.range(),
         );
-        Ok(Fix::safe_edits(import_edit, [main_edit]))
+
+        let applicability = if checker.comment_ranges().intersects(target.range()) {
+            Applicability::Unsafe
+        } else {
+            Applicability::Safe
+        };
+
+        Ok(Fix::applicable_edits(
+            import_edit,
+            [main_edit],
+            applicability,
+        ))
     });
 }
 

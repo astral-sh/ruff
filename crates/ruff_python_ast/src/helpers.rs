@@ -3,16 +3,17 @@ use std::path::Path;
 
 use rustc_hash::FxHashMap;
 
-use ruff_python_trivia::{CommentRanges, SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, indentation_at_offset};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::name::{Name, QualifiedName, QualifiedNameBuilder};
-use crate::parenthesize::parenthesized_range;
 use crate::statement_visitor::StatementVisitor;
+use crate::token::Tokens;
+use crate::token::parenthesized_range;
 use crate::visitor::Visitor;
 use crate::{
-    self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr,
+    self as ast, Arguments, AtomicNodeIndex, CmpOp, DictItem, ExceptHandler, Expr, ExprNoneLiteral,
     InterpolatedStringElement, MatchCase, Operator, Pattern, Stmt, TypeParam,
 };
 use crate::{AnyNodeRef, ExprContext};
@@ -1219,6 +1220,8 @@ impl Truthiness {
         F: Fn(&str) -> bool,
     {
         match expr {
+            Expr::Lambda(_) => Self::Truthy,
+            Expr::Generator(_) => Self::Truthy,
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => {
                 if value.is_empty() {
                     Self::Falsey
@@ -1316,9 +1319,27 @@ impl Truthiness {
                         if arguments.is_empty() {
                             // Ex) `list()`
                             Self::Falsey
-                        } else if arguments.args.len() == 1 && arguments.keywords.is_empty() {
+                        } else if let [argument] = &*arguments.args
+                            && arguments.keywords.is_empty()
+                        {
                             // Ex) `list([1, 2, 3])`
-                            Self::from_expr(&arguments.args[0], is_builtin)
+                            match argument {
+                                // Return Unknown for types with definite truthiness that might
+                                // result in empty iterables (t-strings and generators) or will
+                                // raise a type error (non-iterable types like numbers, booleans,
+                                // None, etc.).
+                                Expr::NumberLiteral(_)
+                                | Expr::BooleanLiteral(_)
+                                | Expr::NoneLiteral(_)
+                                | Expr::EllipsisLiteral(_)
+                                | Expr::TString(_)
+                                | Expr::Lambda(_)
+                                | Expr::Generator(_) => Self::Unknown,
+                                // Recurse for all other types - collections, comprehensions, variables, etc.
+                                // StringLiteral, FString, and BytesLiteral recurse because Self::from_expr
+                                // correctly handles their truthiness (checking if empty or not).
+                                _ => Self::from_expr(argument, is_builtin),
+                            }
                         } else {
                             Self::Unknown
                         }
@@ -1388,7 +1409,9 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
             Expr::FString(f_string) => is_non_empty_f_string(f_string),
             // These literals may or may not be empty.
             Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) => !value.is_empty(),
-            Expr::BytesLiteral(ast::ExprBytesLiteral { value, .. }) => !value.is_empty(),
+            // Confusingly, f"{b""}" renders as the string 'b""', which is non-empty.
+            // Therefore, any bytes interpolation is guaranteed non-empty when stringified.
+            Expr::BytesLiteral(_) => true,
         }
     }
 
@@ -1397,7 +1420,9 @@ fn is_non_empty_f_string(expr: &ast::ExprFString) -> bool {
         ast::FStringPart::FString(f_string) => {
             f_string.elements.iter().all(|element| match element {
                 InterpolatedStringElement::Literal(string_literal) => !string_literal.is_empty(),
-                InterpolatedStringElement::Interpolation(f_string) => inner(&f_string.expression),
+                InterpolatedStringElement::Interpolation(f_string) => {
+                    f_string.debug_text.is_some() || inner(&f_string.expression)
+                }
             })
         }
     })
@@ -1450,7 +1475,7 @@ pub fn generate_comparison(
     ops: &[CmpOp],
     comparators: &[Expr],
     parent: AnyNodeRef,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
     source: &str,
 ) -> String {
     let start = left.start();
@@ -1459,8 +1484,7 @@ pub fn generate_comparison(
 
     // Add the left side of the comparison.
     contents.push_str(
-        &source[parenthesized_range(left.into(), parent, comment_ranges, source)
-            .unwrap_or(left.range())],
+        &source[parenthesized_range(left.into(), parent, tokens).unwrap_or(left.range())],
     );
 
     for (op, comparator) in ops.iter().zip(comparators) {
@@ -1480,7 +1504,7 @@ pub fn generate_comparison(
 
         // Add the right side of the comparison.
         contents.push_str(
-            &source[parenthesized_range(comparator.into(), parent, comment_ranges, source)
+            &source[parenthesized_range(comparator.into(), parent, tokens)
                 .unwrap_or(comparator.range())],
         );
     }
@@ -1493,7 +1517,7 @@ pub fn pep_604_optional(expr: &Expr) -> Expr {
     ast::ExprBinOp {
         left: Box::new(expr.clone()),
         op: Operator::BitOr,
-        right: Box::new(Expr::NoneLiteral(ast::ExprNoneLiteral::default())),
+        right: Box::new(Expr::NoneLiteral(ExprNoneLiteral::default())),
         range: TextRange::default(),
         node_index: AtomicNodeIndex::NONE,
     }

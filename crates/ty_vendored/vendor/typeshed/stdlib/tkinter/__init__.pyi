@@ -7,32 +7,32 @@ Checkbutton, Scale, Listbox, Scrollbar, OptionMenu, Spinbox
 LabelFrame and PanedWindow.
 
 Properties of the widgets are specified with keyword arguments.
-Keyword arguments have the same name as the corresponding resource
+Keyword arguments have the same name as the corresponding options
 under Tk.
 
 Widgets are positioned with one of the geometry managers Place, Pack
 or Grid. These managers can be called with methods place, pack, grid
 available in every Widget.
 
-Actions are bound to events by resources (e.g. keyword argument
-command) or with the method bind.
+Actions are bound to events by options (e.g. the command
+keyword argument) or with the bind() method.
 
 Example (Hello, World):
 import tkinter
 from tkinter.constants import *
 tk = tkinter.Tk()
 frame = tkinter.Frame(tk, relief=RIDGE, borderwidth=2)
-frame.pack(fill=BOTH,expand=1)
+frame.pack(fill=BOTH, expand=1)
 label = tkinter.Label(frame, text="Hello, World")
 label.pack(fill=X, expand=1)
-button = tkinter.Button(frame,text="Exit",command=tk.destroy)
+button = tkinter.Button(frame, text="Exit", command=tk.destroy)
 button.pack(side=BOTTOM)
 tk.mainloop()
 """
 
 import _tkinter
 import sys
-from _typeshed import Incomplete, MaybeNone, StrOrBytesPath
+from _typeshed import FileDescriptorLike, Incomplete, MaybeNone, StrOrBytesPath
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from tkinter.constants import *
 from tkinter.font import _FontDescription
@@ -759,7 +759,7 @@ class Misc:
         The focus order first goes to the next child, then to
         the children of the child recursively and then to the
         next sibling which is higher in the stacking order.  A
-        widget is omitted if it has the takefocus resource set
+        widget is omitted if it has the takefocus option set
         to 0.
         """
 
@@ -1361,15 +1361,15 @@ class Misc:
         """
 
     def keys(self) -> list[str]:
-        """Return a list of all resource names of this widget."""
+        """Return a list of all option names of this widget."""
 
     @overload
     def pack_propagate(self, flag: bool) -> bool | None:
         """Set or get the status for propagation of geometry information.
 
-        A boolean argument specifies whether the geometry information
-        of the slaves will determine the size of this widget. If no argument
-        is given the current setting will be returned.
+        A boolean argument specifies whether the size of this container will
+        be determined by the geometry information of its content.
+        If no argument is given the current setting will be returned.
         """
 
     @overload
@@ -1377,7 +1377,7 @@ class Misc:
     propagate = pack_propagate
     def grid_anchor(self, anchor: Literal["nw", "n", "ne", "w", "center", "e", "sw", "s", "se"] | None = None) -> None:
         """The anchor value controls how to place the grid within the
-        master when no row/column has any weight.
+        container widget when no row/column has any weight.
 
         The default anchor is nw.
         """
@@ -1395,7 +1395,7 @@ class Misc:
         starts at that cell.
 
         The returned integers specify the offset of the upper left
-        corner in the master widget and the width and height.
+        corner in the container widget and the width and height.
         """
 
     @overload
@@ -1415,7 +1415,7 @@ class Misc:
     ) -> _GridIndexInfo | MaybeNone:  # can be None but annoying to check
         """Configure column INDEX of a grid.
 
-        Valid resources are minsize (minimum size of the column),
+        Valid options are minsize (minimum size of the column),
         weight (how much does additional space propagate to this column)
         and pad (how much space to let additionally).
         """
@@ -1432,7 +1432,7 @@ class Misc:
     ) -> _GridIndexInfo | MaybeNone:  # can be None but annoying to check
         """Configure row INDEX of a grid.
 
-        Valid resources are minsize (minimum size of the row),
+        Valid options are minsize (minimum size of the row),
         weight (how much does additional space propagate to this row)
         and pad (how much space to let additionally).
         """
@@ -1440,7 +1440,7 @@ class Misc:
     rowconfigure = grid_rowconfigure
     def grid_location(self, x: float | str, y: float | str) -> tuple[int, int]:
         """Return a tuple of column and row which identify the cell
-        at which the pixel at position X and Y inside the master
+        at which the pixel at position X and Y inside the container
         widget is located.
         """
 
@@ -1448,9 +1448,9 @@ class Misc:
     def grid_propagate(self, flag: bool) -> None:
         """Set or get the status for propagation of geometry information.
 
-        A boolean argument specifies whether the geometry information
-        of the slaves will determine the size of this widget. If no argument
-        is given, the current setting will be returned.
+        A boolean argument specifies whether the size of this container will
+        be determined by the geometry information of its content.
+        If no argument is given the current setting will be returned.
         """
 
     @overload
@@ -1460,18 +1460,22 @@ class Misc:
     size = grid_size
     # Widget because Toplevel or Tk is never a slave
     def pack_slaves(self) -> list[Widget]:
-        """Return a list of all slaves of this widget
-        in its packing order.
+        """Returns a list of all of the content widgets in the packing order
+        for this container.
         """
 
     def grid_slaves(self, row: int | None = None, column: int | None = None) -> list[Widget]:
-        """Return a list of all slaves of this widget
-        in its packing order.
+        """Returns a list of the content widgets.
+
+        If no arguments are supplied, a list of all of the content in this
+        container widget is returned, most recently managed first.
+        If ROW or COLUMN is specified, only the content in the row or
+        column is returned.
         """
 
     def place_slaves(self) -> list[Widget]:
-        """Return a list of all slaves of this widget
-        in its packing order.
+        """Returns a list of all the content widgets for which this widget is
+        the container.
         """
     slaves = pack_slaves
     def event_add(self, virtual: str, *sequences: str) -> None:
@@ -1533,17 +1537,23 @@ class Misc:
     # See #4363 and #4891
     def __setitem__(self, key: str, value: Any) -> None: ...
     def __getitem__(self, key: str) -> Any:
-        """Return the resource value for a KEY given as string."""
+        """Return the current value of the configuration option."""
 
     def cget(self, key: str) -> Any:
-        """Return the resource value for a KEY given as string."""
+        """Return the current value of the configuration option."""
 
     def configure(self, cnf: Any = None) -> Any:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
     # TODO: config is an alias of configure, but adding that here creates
     # conflict with the type of config in the subclasses. See #13149
@@ -1721,17 +1731,22 @@ class Wm:
     if sys.platform == "darwin":
         @overload
         def wm_attributes(self, option: Literal["-modified"], /) -> bool:
-            """Return or sets platform specific attributes.
+            """This subcommand returns or sets platform specific attributes
 
-            When called with a single argument return_python_dict=True,
-            return a dict of the platform specific attributes and their values.
-            When called without arguments or with a single argument
-            return_python_dict=False, return a tuple containing intermixed
-            attribute names with the minus prefix and their values.
+            The first form returns a list of the platform specific flags and
+            their values. The second form returns the value for the specific
+            option. The third form sets one or more of the values. The values
+            are as follows:
 
-            When called with a single string value, return the value for the
-            specific option.  When called with keyword arguments, set the
-            corresponding attributes.
+            On Windows, -disabled gets or sets whether the window is in a
+            disabled state. -toolwindow gets or sets the style of the window
+            to toolwindow (as defined in the MSDN). -topmost gets or sets
+            whether this is a topmost window (displays above all other
+            windows).
+
+            On Macintosh, XXXXX
+
+            On Unix, there are currently no special attribute values.
             """
 
         @overload
@@ -1803,20 +1818,7 @@ class Wm:
         def wm_attributes(self, option: Literal["topmost"], /) -> bool: ...
         if sys.platform == "darwin":
             @overload
-            def wm_attributes(self, option: Literal["modified"], /) -> bool:
-                """Return or sets platform specific attributes.
-
-                When called with a single argument return_python_dict=True,
-                return a dict of the platform specific attributes and their values.
-                When called without arguments or with a single argument
-                return_python_dict=False, return a tuple containing intermixed
-                attribute names with the minus prefix and their values.
-
-                When called with a single string value, return the value for the
-                specific option.  When called with keyword arguments, set the
-                corresponding attributes.
-                """
-
+            def wm_attributes(self, option: Literal["modified"], /) -> bool: ...
             @overload
             def wm_attributes(self, option: Literal["notify"], /) -> bool: ...
             @overload
@@ -1876,17 +1878,22 @@ class Wm:
     if sys.platform == "darwin":
         @overload
         def wm_attributes(self, option: Literal["-modified"], value: bool, /) -> Literal[""]:
-            """Return or sets platform specific attributes.
+            """This subcommand returns or sets platform specific attributes
 
-            When called with a single argument return_python_dict=True,
-            return a dict of the platform specific attributes and their values.
-            When called without arguments or with a single argument
-            return_python_dict=False, return a tuple containing intermixed
-            attribute names with the minus prefix and their values.
+            The first form returns a list of the platform specific flags and
+            their values. The second form returns the value for the specific
+            option. The third form sets one or more of the values. The values
+            are as follows:
 
-            When called with a single string value, return the value for the
-            specific option.  When called with keyword arguments, set the
-            corresponding attributes.
+            On Windows, -disabled gets or sets whether the window is in a
+            disabled state. -toolwindow gets or sets the style of the window
+            to toolwindow (as defined in the MSDN). -topmost gets or sets
+            whether this is a topmost window (displays above all other
+            windows).
+
+            On Macintosh, XXXXX
+
+            On Unix, there are currently no special attribute values.
             """
 
         @overload
@@ -1950,19 +1957,7 @@ class Wm:
                 titlepath: str = ...,
                 topmost: bool = ...,
                 transparent: bool = ...,
-            ) -> None:
-                """Return or sets platform specific attributes.
-
-                When called with a single argument return_python_dict=True,
-                return a dict of the platform specific attributes and their values.
-                When called without arguments or with a single argument
-                return_python_dict=False, return a tuple containing intermixed
-                attribute names with the minus prefix and their values.
-
-                When called with a single string value, return the value for the
-                specific option.  When called with keyword arguments, set the
-                corresponding attributes.
-                """
+            ) -> None: ...
         elif sys.platform == "win32":
             @overload
             def wm_attributes(
@@ -2276,11 +2271,17 @@ class Tk(Misc, Wm):
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -2300,34 +2301,43 @@ class Tk(Misc, Wm):
     # Tk has __getattr__ so that tk_instance.foo falls back to tk_instance.tk.foo
     # Please keep in sync with _tkinter.TkappType.
     # Some methods are intentionally missing because they are inherited from Misc instead.
-    def adderrorinfo(self, msg: str, /): ...
+    def adderrorinfo(self, msg: str, /) -> None: ...
     def call(self, command: Any, /, *args: Any) -> Any: ...
-    def createcommand(self, name: str, func, /): ...
+    # TODO: Figure out what arguments the following `func` callbacks should accept
+    def createcommand(self, name: str, func: Callable[..., object], /) -> None: ...
     if sys.platform != "win32":
-        def createfilehandler(self, file, mask: int, func, /): ...
-        def deletefilehandler(self, file, /) -> None: ...
+        def createfilehandler(self, file: FileDescriptorLike, mask: int, func: Callable[..., object], /) -> None: ...
+        def deletefilehandler(self, file: FileDescriptorLike, /) -> None: ...
 
-    def createtimerhandler(self, milliseconds: int, func, /): ...
-    def dooneevent(self, flags: int = 0, /): ...
+    def createtimerhandler(self, milliseconds: int, func: Callable[..., object], /): ...
+    def dooneevent(self, flags: int = 0, /) -> int: ...
     def eval(self, script: str, /) -> str: ...
-    def evalfile(self, fileName: str, /): ...
-    def exprboolean(self, s: str, /): ...
-    def exprdouble(self, s: str, /): ...
-    def exprlong(self, s: str, /): ...
-    def exprstring(self, s: str, /): ...
+    def evalfile(self, fileName: str, /) -> str: ...
+    def exprboolean(self, s: str, /) -> Literal[0, 1]: ...
+    def exprdouble(self, s: str, /) -> float: ...
+    def exprlong(self, s: str, /) -> int: ...
+    def exprstring(self, s: str, /) -> str: ...
     def globalgetvar(self, *args, **kwargs): ...
     def globalsetvar(self, *args, **kwargs): ...
     def globalunsetvar(self, *args, **kwargs): ...
     def interpaddr(self) -> int: ...
     def loadtk(self) -> None: ...
-    def record(self, script: str, /): ...
+    def record(self, script: str, /) -> str: ...
     if sys.version_info < (3, 11):
         @deprecated("Deprecated since Python 3.9; removed in Python 3.11. Use `splitlist()` instead.")
         def split(self, arg, /): ...
 
-    def splitlist(self, arg, /): ...
+    def splitlist(self, arg, /) -> tuple[Incomplete, ...]: ...
     def unsetvar(self, *args, **kwargs): ...
-    def wantobjects(self, *args, **kwargs): ...
+    if sys.version_info >= (3, 14):
+        @overload
+        def wantobjects(self) -> Literal[0, 1]: ...
+    else:
+        @overload
+        def wantobjects(self) -> bool: ...
+
+    @overload
+    def wantobjects(self, wantobjects: Literal[0, 1] | bool, /) -> None: ...
     def willdispatch(self) -> None: ...
 
 def Tcl(screenName: str | None = None, baseName: str | None = None, className: str = "Tk", useTk: bool = False) -> Tk: ...
@@ -2383,8 +2393,8 @@ class Pack:
         before=widget - pack it before you will pack widget
         expand=bool - expand widget if parent size grows
         fill=NONE or X or Y or BOTH - fill widget if widget grows
-        in=master - use master to contain this widget
-        in_=master - see 'in' option description
+        in=container - use the container widget to contain this widget
+        in_=container - see 'in' option description
         ipadx=amount - add internal padding in x direction
         ipady=amount - add internal padding in y direction
         padx=amount - add padding in x direction
@@ -2441,25 +2451,31 @@ class Place:
         **kw: Any,  # allow keyword argument named 'in', see #4836
     ) -> None:
         """Place a widget in the parent widget. Use as options:
-        in=master - master relative to which the widget is placed
-        in_=master - see 'in' option description
-        x=amount - locate anchor of this widget at position x of master
-        y=amount - locate anchor of this widget at position y of master
+        in=container - the container widget relative to which this widget is
+                       placed
+        in_=container - see 'in' option description
+        x=amount - locate anchor of this widget at position x of the
+                   container widget
+        y=amount - locate anchor of this widget at position y of the
+                   container widget
         relx=amount - locate anchor of this widget between 0.0 and 1.0
-                      relative to width of master (1.0 is right edge)
+                      relative to width of the container widget (1.0 is
+                       right edge)
         rely=amount - locate anchor of this widget between 0.0 and 1.0
-                      relative to height of master (1.0 is bottom edge)
-        anchor=NSEW (or subset) - position anchor according to given direction
+                      relative to height of the container widget (1.0 is
+                      bottom edge)
+        anchor=NSEW (or subset) - position anchor according to given
+                                  direction
         width=amount - width of this widget in pixel
         height=amount - height of this widget in pixel
         relwidth=amount - width of this widget between 0.0 and 1.0
-                          relative to width of master (1.0 is the same width
-                          as the master)
+                          relative to width of the container widget (1.0 is
+                          the same width as the container widget)
         relheight=amount - height of this widget between 0.0 and 1.0
-                           relative to height of master (1.0 is the same
-                           height as the master)
+                           relative to height of the container widget (1.0
+                           is the same height as the container widget)
         bordermode="inside" or "outside" - whether to take border width of
-                                           master widget into account
+                                           the container widget into account
         """
 
     def place_forget(self) -> None:
@@ -2509,8 +2525,8 @@ class Grid:
         """Position a widget in the parent widget in a grid. Use as options:
         column=number - use cell identified with given column (starting with 0)
         columnspan=number - this widget will span several columns
-        in=master - use master to contain this widget
-        in_=master - see 'in' option description
+        in=container - use the container widget to contain this widget
+        in_=container - see 'in' option description
         ipadx=amount - add internal padding in x direction
         ipady=amount - add internal padding in y direction
         padx=amount - add padding in x direction
@@ -2647,7 +2663,7 @@ class Toplevel(BaseWidget, Wm):
     ) -> None:
         """Construct a toplevel widget with the parent MASTER.
 
-        Valid resource names: background, bd, bg, borderwidth, class,
+        Valid option names: background, bd, bg, borderwidth, class,
         colormap, container, cursor, height, highlightbackground,
         highlightcolor, highlightthickness, menu, relief, screen, takefocus,
         use, visual, width.
@@ -2675,11 +2691,17 @@ class Toplevel(BaseWidget, Wm):
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -2798,11 +2820,17 @@ class Button(Widget):
         width: float | str = ...,
         wraplength: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -2873,7 +2901,7 @@ class Canvas(Widget, XView, YView):
     ) -> None:
         """Construct a canvas widget with the parent MASTER.
 
-        Valid resource names: background, bd, bg, borderwidth, closeenough,
+        Valid option names: background, bd, bg, borderwidth, closeenough,
         confine, cursor, height, highlightbackground, highlightcolor,
         highlightthickness, insertbackground, insertborderwidth,
         insertofftime, insertontime, insertwidth, offset, relief,
@@ -2918,11 +2946,17 @@ class Canvas(Widget, XView, YView):
         yscrollcommand: str | Callable[[float, float], object] = ...,
         yscrollincrement: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -3587,16 +3621,14 @@ class Canvas(Widget, XView, YView):
         """
 
     def itemcget(self, tagOrId, option):
-        """Return the resource value for an OPTION for item TAGORID."""
+        """Return the value of OPTION for item TAGORID."""
     # itemconfigure kwargs depend on item type, which is not known when type checking
     def itemconfigure(
         self, tagOrId: str | int, cnf: dict[str, Any] | None = None, **kw: Any
     ) -> dict[str, tuple[str, str, str, str, str]] | None:
-        """Configure resources of an item TAGORID.
+        """Query or modify the configuration options of an item TAGORID.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method without arguments.
+        Similar to configure() except that it applies to the specified item.
         """
     itemconfig = itemconfigure
     def move(self, *args) -> None:
@@ -3741,7 +3773,7 @@ class Checkbutton(Widget):
     ) -> None:
         """Construct a checkbutton widget with the parent MASTER.
 
-        Valid resource names: activebackground, activeforeground, anchor,
+        Valid option names: activebackground, activeforeground, anchor,
         background, bd, bg, bitmap, borderwidth, command, cursor,
         disabledforeground, fg, font, foreground, height,
         highlightbackground, highlightcolor, highlightthickness, image,
@@ -3798,11 +3830,17 @@ class Checkbutton(Widget):
         width: float | str = ...,
         wraplength: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -3815,7 +3853,7 @@ class Checkbutton(Widget):
         """Flash the button."""
 
     def invoke(self) -> Any:
-        """Toggle the button and invoke a command if given as resource."""
+        """Toggle the button and invoke a command if given as option."""
 
     def select(self) -> None:
         """Put the button in on-state."""
@@ -3872,7 +3910,7 @@ class Entry(Widget, XView):
     ) -> None:
         """Construct an entry widget with the parent MASTER.
 
-        Valid resource names: background, bd, bg, borderwidth, cursor,
+        Valid option names: background, bd, bg, borderwidth, cursor,
         exportselection, fg, font, foreground, highlightbackground,
         highlightcolor, highlightthickness, insertbackground,
         insertborderwidth, insertofftime, insertontime, insertwidth,
@@ -3925,11 +3963,17 @@ class Entry(Widget, XView):
         width: int = ...,
         xscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -4016,7 +4060,7 @@ class Frame(Widget):
     ) -> None:
         """Construct a frame widget with the parent MASTER.
 
-        Valid resource names: background, bd, bg, borderwidth, class,
+        Valid option names: background, bd, bg, borderwidth, class,
         colormap, container, cursor, height, highlightbackground,
         highlightcolor, highlightthickness, relief, takefocus, visual, width.
         """
@@ -4042,11 +4086,17 @@ class Frame(Widget):
         takefocus: bool | Literal[0, 1, ""] | Callable[[str], bool | None] = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -4149,11 +4199,17 @@ class Label(Widget):
         width: float | str = ...,
         wraplength: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -4216,7 +4272,7 @@ class Listbox(Widget, XView, YView):
     ) -> None:
         """Construct a listbox widget with the parent MASTER.
 
-        Valid resource names: background, bd, bg, borderwidth, cursor,
+        Valid option names: background, bd, bg, borderwidth, cursor,
         exportselection, fg, font, foreground, height, highlightbackground,
         highlightcolor, highlightthickness, relief, selectbackground,
         selectborderwidth, selectforeground, selectmode, setgrid, takefocus,
@@ -4258,11 +4314,17 @@ class Listbox(Widget, XView, YView):
         xscrollcommand: str | Callable[[float, float], object] = ...,
         yscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -4324,16 +4386,12 @@ class Listbox(Widget, XView, YView):
         """Return the number of elements in the listbox."""
 
     def itemcget(self, index: str | int, option):
-        """Return the resource value for an ITEM and an OPTION."""
+        """Return the value of OPTION for item at INDEX."""
 
     def itemconfigure(self, index: str | int, cnf=None, **kw):
-        """Configure resources of an ITEM.
+        """Query or modify the configuration options of an item at INDEX.
 
-        The values for resources are specified as keyword arguments.
-        To get an overview about the allowed keyword arguments
-        call the method without arguments.
-        Valid resource names: background, bg, foreground, fg,
-        selectbackground, selectforeground.
+        Similar to configure() except that it applies to the specified item.
         """
     itemconfig = itemconfigure
 
@@ -4373,7 +4431,7 @@ class Menu(Widget):
     ) -> None:
         """Construct menu widget with the parent MASTER.
 
-        Valid resource names: activebackground, activeborderwidth,
+        Valid option names: activebackground, activeborderwidth,
         activeforeground, background, bd, bg, borderwidth, cursor,
         disabledforeground, fg, font, foreground, postcommand, relief,
         selectcolor, takefocus, tearoff, tearoffcommand, title, type.
@@ -4406,11 +4464,17 @@ class Menu(Widget):
         title: str = ...,
         type: Literal["menubar", "tearoff", "normal"] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -4642,12 +4706,16 @@ class Menu(Widget):
         """Delete menu items between INDEX1 and INDEX2 (included)."""
 
     def entrycget(self, index: str | int, option: str) -> Any:
-        """Return the resource value of a menu item for OPTION at INDEX."""
+        """Return the value of OPTION for a menu item at INDEX."""
 
     def entryconfigure(
         self, index: str | int, cnf: dict[str, Any] | None = None, **kw: Any
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure a menu item at INDEX."""
+        """Query or modify the configuration options of a menu item at INDEX.
+
+        Similar to configure() except that it applies to the specified
+        menu item.
+        """
     entryconfig = entryconfigure
     def index(self, index: str | int) -> int | None:
         """Return the index of a menu item identified by INDEX."""
@@ -4758,11 +4826,17 @@ class Menubutton(Widget):
         width: float | str = ...,
         wraplength: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -4830,11 +4904,17 @@ class Message(Widget):
         textvariable: Variable = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -4894,7 +4974,7 @@ class Radiobutton(Widget):
     ) -> None:
         """Construct a radiobutton widget with the parent MASTER.
 
-        Valid resource names: activebackground, activeforeground, anchor,
+        Valid option names: activebackground, activeforeground, anchor,
         background, bd, bg, bitmap, borderwidth, command, cursor,
         disabledforeground, fg, font, foreground, height,
         highlightbackground, highlightcolor, highlightthickness, image,
@@ -4950,11 +5030,17 @@ class Radiobutton(Widget):
         width: float | str = ...,
         wraplength: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -4967,7 +5053,7 @@ class Radiobutton(Widget):
         """Flash the button."""
 
     def invoke(self) -> Any:
-        """Toggle the button and invoke a command if given as resource."""
+        """Toggle the button and invoke a command if given as option."""
 
     def select(self) -> None:
         """Put the button in on-state."""
@@ -5019,7 +5105,7 @@ class Scale(Widget):
     ) -> None:
         """Construct a scale widget with the parent MASTER.
 
-        Valid resource names: activebackground, background, bigincrement, bd,
+        Valid option names: activebackground, background, bigincrement, bd,
         bg, borderwidth, command, cursor, digits, fg, font, foreground, from,
         highlightbackground, highlightcolor, highlightthickness, label,
         length, orient, relief, repeatdelay, repeatinterval, resolution,
@@ -5067,11 +5153,17 @@ class Scale(Widget):
         variable: IntVar | DoubleVar = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -5131,7 +5223,7 @@ class Scrollbar(Widget):
     ) -> None:
         """Construct a scrollbar widget with the parent MASTER.
 
-        Valid resource names: activebackground, activerelief,
+        Valid option names: activebackground, activerelief,
         background, bd, bg, borderwidth, command, cursor,
         elementborderwidth, highlightbackground,
         highlightcolor, highlightthickness, jump, orient,
@@ -5166,11 +5258,17 @@ class Scrollbar(Widget):
         troughcolor: str = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -5210,7 +5308,6 @@ class Scrollbar(Widget):
         lower ends as value between 0 and 1).
         """
 
-_TextIndex: TypeAlias = _tkinter.Tcl_Obj | str | float | Misc
 _WhatToCount: TypeAlias = Literal[
     "chars", "displaychars", "displayindices", "displaylines", "indices", "lines", "xpixels", "ypixels"
 ]
@@ -5348,28 +5445,45 @@ class Text(Widget, XView, YView):
         xscrollcommand: str | Callable[[float, float], object] = ...,
         yscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
     def configure(self, cnf: str) -> tuple[str, str, str, Any, Any]: ...
     config = configure
-    def bbox(self, index: _TextIndex) -> tuple[int, int, int, int] | None:  # type: ignore[override]
+    def bbox(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> tuple[int, int, int, int] | None:  # type: ignore[override]
         """Return a tuple of (x,y,width,height) which gives the bounding
         box of the visible part of the character at the given index.
         """
 
-    def compare(self, index1: _TextIndex, op: Literal["<", "<=", "==", ">=", ">", "!="], index2: _TextIndex) -> bool:
+    def compare(
+        self,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        op: Literal["<", "<=", "==", ">=", ">", "!="],
+        index2: str | float | _tkinter.Tcl_Obj | Widget,
+    ) -> bool:
         """Return whether between index INDEX1 and index INDEX2 the
         relation OP is satisfied. OP is one of <, <=, ==, >=, >, or !=.
         """
     if sys.version_info >= (3, 13):
         @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, *, return_ints: Literal[True]) -> int:
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            *,
+            return_ints: Literal[True],
+        ) -> int:
             """Counts the number of relevant things between the two indices.
 
             If INDEX1 is after INDEX2, the result will be a negative number
@@ -5389,13 +5503,19 @@ class Text(Widget, XView, YView):
 
         @overload
         def count(
-            self, index1: _TextIndex, index2: _TextIndex, arg: _WhatToCount | Literal["update"], /, *, return_ints: Literal[True]
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg: _WhatToCount | Literal["update"],
+            /,
+            *,
+            return_ints: Literal[True],
         ) -> int: ...
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: Literal["update"],
             arg2: _WhatToCount,
             /,
@@ -5405,8 +5525,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount,
             arg2: Literal["update"],
             /,
@@ -5415,13 +5535,20 @@ class Text(Widget, XView, YView):
         ) -> int: ...
         @overload
         def count(
-            self, index1: _TextIndex, index2: _TextIndex, arg1: _WhatToCount, arg2: _WhatToCount, /, *, return_ints: Literal[True]
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg1: _WhatToCount,
+            arg2: _WhatToCount,
+            /,
+            *,
+            return_ints: Literal[True],
         ) -> tuple[int, int]: ...
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount | Literal["update"],
             arg2: _WhatToCount | Literal["update"],
             arg3: _WhatToCount | Literal["update"],
@@ -5430,12 +5557,18 @@ class Text(Widget, XView, YView):
             return_ints: Literal[True],
         ) -> tuple[int, ...]: ...
         @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, *, return_ints: Literal[False] = False) -> tuple[int] | None: ...
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            *,
+            return_ints: Literal[False] = False,
+        ) -> tuple[int] | None: ...
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg: _WhatToCount | Literal["update"],
             /,
             *,
@@ -5444,8 +5577,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: Literal["update"],
             arg2: _WhatToCount,
             /,
@@ -5455,8 +5588,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount,
             arg2: Literal["update"],
             /,
@@ -5466,8 +5599,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount,
             arg2: _WhatToCount,
             /,
@@ -5477,8 +5610,8 @@ class Text(Widget, XView, YView):
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount | Literal["update"],
             arg2: _WhatToCount | Literal["update"],
             arg3: _WhatToCount | Literal["update"],
@@ -5488,7 +5621,9 @@ class Text(Widget, XView, YView):
         ) -> tuple[int, ...]: ...
     else:
         @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex) -> tuple[int] | None:
+        def count(
+            self, index1: str | float | _tkinter.Tcl_Obj | Widget, index2: str | float | _tkinter.Tcl_Obj | Widget
+        ) -> tuple[int] | None:
             """Counts the number of relevant things between the two indices.
             If index1 is after index2, the result will be a negative number
             (and this holds for each of the possible options).
@@ -5504,19 +5639,44 @@ class Text(Widget, XView, YView):
 
         @overload
         def count(
-            self, index1: _TextIndex, index2: _TextIndex, arg: _WhatToCount | Literal["update"], /
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg: _WhatToCount | Literal["update"],
+            /,
         ) -> tuple[int] | None: ...
-        @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, arg1: Literal["update"], arg2: _WhatToCount, /) -> int | None: ...
-        @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, arg1: _WhatToCount, arg2: Literal["update"], /) -> int | None: ...
-        @overload
-        def count(self, index1: _TextIndex, index2: _TextIndex, arg1: _WhatToCount, arg2: _WhatToCount, /) -> tuple[int, int]: ...
         @overload
         def count(
             self,
-            index1: _TextIndex,
-            index2: _TextIndex,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg1: Literal["update"],
+            arg2: _WhatToCount,
+            /,
+        ) -> int | None: ...
+        @overload
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg1: _WhatToCount,
+            arg2: Literal["update"],
+            /,
+        ) -> int | None: ...
+        @overload
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
+            arg1: _WhatToCount,
+            arg2: _WhatToCount,
+            /,
+        ) -> tuple[int, int]: ...
+        @overload
+        def count(
+            self,
+            index1: str | float | _tkinter.Tcl_Obj | Widget,
+            index2: str | float | _tkinter.Tcl_Obj | Widget,
             arg1: _WhatToCount | Literal["update"],
             arg2: _WhatToCount | Literal["update"],
             arg3: _WhatToCount | Literal["update"],
@@ -5532,10 +5692,12 @@ class Text(Widget, XView, YView):
 
     @overload
     def debug(self, boolean: bool) -> None: ...
-    def delete(self, index1: _TextIndex, index2: _TextIndex | None = None) -> None:
+    def delete(
+        self, index1: str | float | _tkinter.Tcl_Obj | Widget, index2: str | float | _tkinter.Tcl_Obj | Widget | None = None
+    ) -> None:
         """Delete the characters between INDEX1 and INDEX2 (not included)."""
 
-    def dlineinfo(self, index: _TextIndex) -> tuple[int, int, int, int, int] | None:
+    def dlineinfo(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> tuple[int, int, int, int, int] | None:
         """Return tuple (x,y,width,height,baseline) giving the bounding box
         and baseline position of the visible part of the line containing
         the character at INDEX.
@@ -5544,8 +5706,8 @@ class Text(Widget, XView, YView):
     @overload
     def dump(
         self,
-        index1: _TextIndex,
-        index2: _TextIndex | None = None,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
         command: None = None,
         *,
         all: bool = ...,
@@ -5571,8 +5733,8 @@ class Text(Widget, XView, YView):
     @overload
     def dump(
         self,
-        index1: _TextIndex,
-        index2: _TextIndex | None,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None,
         command: Callable[[str, str, str], object] | str,
         *,
         all: bool = ...,
@@ -5585,8 +5747,8 @@ class Text(Widget, XView, YView):
     @overload
     def dump(
         self,
-        index1: _TextIndex,
-        index2: _TextIndex | None = None,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
         *,
         command: Callable[[str, str, str], object] | str,
         all: bool = ...,
@@ -5651,27 +5813,35 @@ class Text(Widget, XView, YView):
         when the undo option is false
         """
 
-    def get(self, index1: _TextIndex, index2: _TextIndex | None = None) -> str:
+    def get(
+        self, index1: str | float | _tkinter.Tcl_Obj | Widget, index2: str | float | _tkinter.Tcl_Obj | Widget | None = None
+    ) -> str:
         """Return the text from INDEX1 to INDEX2 (not included)."""
 
     @overload
-    def image_cget(self, index: _TextIndex, option: Literal["image", "name"]) -> str:
+    def image_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["image", "name"]) -> str:
         """Return the value of OPTION of an embedded image at INDEX."""
 
     @overload
-    def image_cget(self, index: _TextIndex, option: Literal["padx", "pady"]) -> int: ...
+    def image_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["padx", "pady"]) -> int: ...
     @overload
-    def image_cget(self, index: _TextIndex, option: Literal["align"]) -> Literal["baseline", "bottom", "center", "top"]: ...
+    def image_cget(
+        self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["align"]
+    ) -> Literal["baseline", "bottom", "center", "top"]: ...
     @overload
-    def image_cget(self, index: _TextIndex, option: str) -> Any: ...
+    def image_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: str) -> Any: ...
     @overload
-    def image_configure(self, index: _TextIndex, cnf: str) -> tuple[str, str, str, str, str | int]:
-        """Configure an embedded image at INDEX."""
+    def image_configure(self, index: str | float | _tkinter.Tcl_Obj | Widget, cnf: str) -> tuple[str, str, str, str, str | int]:
+        """Query or modify the configuration options of an embedded image at INDEX.
+
+        Similar to configure() except that it applies to the specified
+        embedded image.
+        """
 
     @overload
     def image_configure(
         self,
-        index: _TextIndex,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
         cnf: dict[str, Any] | None = None,
         *,
         align: Literal["baseline", "bottom", "center", "top"] = ...,
@@ -5682,7 +5852,7 @@ class Text(Widget, XView, YView):
     ) -> dict[str, tuple[str, str, str, str, str | int]] | None: ...
     def image_create(
         self,
-        index: _TextIndex,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
         cnf: dict[str, Any] | None = {},
         *,
         align: Literal["baseline", "bottom", "center", "top"] = ...,
@@ -5696,10 +5866,12 @@ class Text(Widget, XView, YView):
     def image_names(self) -> tuple[str, ...]:
         """Return all names of embedded images in this widget."""
 
-    def index(self, index: _TextIndex) -> str:
+    def index(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> str:
         """Return the index in the form line.char for INDEX."""
 
-    def insert(self, index: _TextIndex, chars: str, *args: str | list[str] | tuple[str, ...]) -> None:
+    def insert(
+        self, index: str | float | _tkinter.Tcl_Obj | Widget, chars: str, *args: str | list[str] | tuple[str, ...]
+    ) -> None:
         """Insert CHARS before the characters at INDEX. An additional
         tag can be given in ARGS. Additional CHARS and tags can follow in ARGS.
         """
@@ -5715,16 +5887,16 @@ class Text(Widget, XView, YView):
     def mark_names(self) -> tuple[str, ...]:
         """Return all mark names."""
 
-    def mark_set(self, markName: str, index: _TextIndex) -> None:
+    def mark_set(self, markName: str, index: str | float | _tkinter.Tcl_Obj | Widget) -> None:
         """Set mark MARKNAME before the character at INDEX."""
 
     def mark_unset(self, *markNames: str) -> None:
         """Delete all marks in MARKNAMES."""
 
-    def mark_next(self, index: _TextIndex) -> str | None:
+    def mark_next(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> str | None:
         """Return the name of the next mark after INDEX."""
 
-    def mark_previous(self, index: _TextIndex) -> str | None:
+    def mark_previous(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> str | None:
         """Return the name of the previous mark before INDEX."""
     # **kw of peer_create is same as the kwargs of Text.__init__
     def peer_create(self, newPathName: str | Text, cnf: dict[str, Any] = {}, **kw) -> None:
@@ -5739,7 +5911,13 @@ class Text(Widget, XView, YView):
         the widget itself).
         """
 
-    def replace(self, index1: _TextIndex, index2: _TextIndex, chars: str, *args: str | list[str] | tuple[str, ...]) -> None:
+    def replace(
+        self,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget,
+        chars: str,
+        *args: str | list[str] | tuple[str, ...],
+    ) -> None:
         """Replaces the range of characters between index1 and index2 with
         the given characters and tags specified by args.
 
@@ -5759,8 +5937,8 @@ class Text(Widget, XView, YView):
     def search(
         self,
         pattern: str,
-        index: _TextIndex,
-        stopindex: _TextIndex | None = None,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
+        stopindex: str | float | _tkinter.Tcl_Obj | Widget | None = None,
         forwards: bool | None = None,
         backwards: bool | None = None,
         exact: bool | None = None,
@@ -5774,10 +5952,12 @@ class Text(Widget, XView, YView):
         empty string.
         """
 
-    def see(self, index: _TextIndex) -> None:
+    def see(self, index: str | float | _tkinter.Tcl_Obj | Widget) -> None:
         """Scroll such that the character at INDEX is visible."""
 
-    def tag_add(self, tagName: str, index1: _TextIndex, *args: _TextIndex) -> None:
+    def tag_add(
+        self, tagName: str, index1: str | float | _tkinter.Tcl_Obj | Widget, *args: str | float | _tkinter.Tcl_Obj | Widget
+    ) -> None:
         """Add tag TAGNAME to all characters between INDEX1 and index2 in ARGS.
         Additional pairs of indices may follow in ARGS.
         """
@@ -5842,7 +6022,10 @@ class Text(Widget, XView, YView):
         underlinefg: str = ...,
         wrap: Literal["none", "char", "word"] = ...,  # be careful with "none" vs None
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure a tag TAGNAME."""
+        """Query or modify the configuration options of a tag TAGNAME.
+
+        Similar to configure() except that it applies to the specified tag.
+        """
 
     @overload
     def tag_configure(self, tagName: str, cnf: str) -> tuple[str, str, str, Any, Any]: ...
@@ -5855,16 +6038,26 @@ class Text(Widget, XView, YView):
         than the priority of BELOWTHIS.
         """
 
-    def tag_names(self, index: _TextIndex | None = None) -> tuple[str, ...]:
+    def tag_names(self, index: str | float | _tkinter.Tcl_Obj | Widget | None = None) -> tuple[str, ...]:
         """Return a list of all tag names."""
 
-    def tag_nextrange(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> tuple[str, str] | tuple[()]:
+    def tag_nextrange(
+        self,
+        tagName: str,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+    ) -> tuple[str, str] | tuple[()]:
         """Return a list of start and end index for the first sequence of
         characters between INDEX1 and INDEX2 which all have tag TAGNAME.
         The text is searched forward from INDEX1.
         """
 
-    def tag_prevrange(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> tuple[str, str] | tuple[()]:
+    def tag_prevrange(
+        self,
+        tagName: str,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+    ) -> tuple[str, str] | tuple[()]:
         """Return a list of start and end index for the first sequence of
         characters between INDEX1 and INDEX2 which all have tag TAGNAME.
         The text is searched backwards from INDEX1.
@@ -5878,29 +6071,42 @@ class Text(Widget, XView, YView):
     def tag_ranges(self, tagName: str) -> tuple[_tkinter.Tcl_Obj, ...]:
         """Return a list of ranges of text which have tag TAGNAME."""
     # tag_remove and tag_delete are different
-    def tag_remove(self, tagName: str, index1: _TextIndex, index2: _TextIndex | None = None) -> None:
+    def tag_remove(
+        self,
+        tagName: str,
+        index1: str | float | _tkinter.Tcl_Obj | Widget,
+        index2: str | float | _tkinter.Tcl_Obj | Widget | None = None,
+    ) -> None:
         """Remove tag TAGNAME from all characters between INDEX1 and INDEX2."""
 
     @overload
-    def window_cget(self, index: _TextIndex, option: Literal["padx", "pady"]) -> int:
+    def window_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["padx", "pady"]) -> int:
         """Return the value of OPTION of an embedded window at INDEX."""
 
     @overload
-    def window_cget(self, index: _TextIndex, option: Literal["stretch"]) -> bool: ...  # actually returns Literal[0, 1]
+    def window_cget(
+        self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["stretch"]
+    ) -> bool: ...  # actually returns Literal[0, 1]
     @overload
-    def window_cget(self, index: _TextIndex, option: Literal["align"]) -> Literal["baseline", "bottom", "center", "top"]: ...
+    def window_cget(
+        self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["align"]
+    ) -> Literal["baseline", "bottom", "center", "top"]: ...
     @overload  # window is set to a widget, but read as the string name.
-    def window_cget(self, index: _TextIndex, option: Literal["create", "window"]) -> str: ...
+    def window_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: Literal["create", "window"]) -> str: ...
     @overload
-    def window_cget(self, index: _TextIndex, option: str) -> Any: ...
+    def window_cget(self, index: str | float | _tkinter.Tcl_Obj | Widget, option: str) -> Any: ...
     @overload
-    def window_configure(self, index: _TextIndex, cnf: str) -> tuple[str, str, str, str, str | int]:
-        """Configure an embedded window at INDEX."""
+    def window_configure(self, index: str | float | _tkinter.Tcl_Obj | Widget, cnf: str) -> tuple[str, str, str, str, str | int]:
+        """Query or modify the configuration options of an embedded window at INDEX.
+
+        Similar to configure() except that it applies to the specified
+        embedded window.
+        """
 
     @overload
     def window_configure(
         self,
-        index: _TextIndex,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
         cnf: dict[str, Any] | None = None,
         *,
         align: Literal["baseline", "bottom", "center", "top"] = ...,
@@ -5913,7 +6119,7 @@ class Text(Widget, XView, YView):
     window_config = window_configure
     def window_create(
         self,
-        index: _TextIndex,
+        index: str | float | _tkinter.Tcl_Obj | Widget,
         cnf: dict[str, Any] | None = {},
         *,
         align: Literal["baseline", "bottom", "center", "top"] = ...,
@@ -5953,7 +6159,7 @@ class OptionMenu(Menubutton):
         command: Callable[[StringVar], object] | None = ...,
     ) -> None:
         """Construct an optionmenu widget with the parent MASTER, with
-        the resource textvariable set to VARIABLE, the initially selected
+        the option textvariable set to VARIABLE, the initially selected
         value VALUE, the other menu values VALUES and an additional
         keyword argument command.
         """
@@ -5985,7 +6191,11 @@ class Image(_Image):
     def __setitem__(self, key, value) -> None: ...
     def __getitem__(self, key): ...
     configure: Incomplete
+    """Configure the image."""
+
     config: Incomplete
+    """Configure the image."""
+
     def type(self):
         """Return the type of the image, e.g. "photo" or "bitmap"."""
 
@@ -6009,7 +6219,7 @@ class PhotoImage(Image, _PhotoImageLike):
     ) -> None:
         """Create an image with NAME.
 
-        Valid resource names: data, format, file, gamma, height, palette,
+        Valid option names: data, format, file, gamma, height, palette,
         width.
         """
 
@@ -6299,7 +6509,7 @@ class BitmapImage(Image, _BitmapImageLike):
     ) -> None:
         """Create a bitmap with NAME.
 
-        Valid resource names: background, data, file, foreground, maskdata, maskfile.
+        Valid option names: background, data, file, foreground, maskdata, maskfile.
         """
 
 def image_names() -> tuple[str, ...]: ...
@@ -6449,11 +6659,17 @@ class Spinbox(Widget, XView):
         wrap: bool = ...,
         xscrollcommand: str | Callable[[float, float], object] = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -6659,11 +6875,17 @@ class LabelFrame(Widget):
         text: float | str = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -6742,11 +6964,17 @@ class PanedWindow(Widget):
         showhandle: bool = ...,
         width: float | str = ...,
     ) -> dict[str, tuple[str, str, str, Any, Any]] | None:
-        """Configure resources of a widget.
+        """Query or modify the configuration options of the widget.
 
-        The values for resources are specified as keyword
-        arguments. To get an overview about
-        the allowed keyword arguments call the method keys.
+        If no arguments are specified, return a dictionary describing
+        all of the available options for the widget.
+
+        If an option name is specified, then return a tuple describing
+        the one named option.
+
+        If one or more keyword arguments are specified or a dictionary
+        is specified, then modify the widget option(s) to have the given
+        value(s).
         """
 
     @overload
@@ -6816,24 +7044,15 @@ class PanedWindow(Widget):
         """Place the sash given by index at the given coordinates"""
 
     def panecget(self, child, option):
-        """Query a management option for window.
-
-        Option may be any value allowed by the paneconfigure subcommand
-        """
+        """Return the value of option for a child window."""
 
     def paneconfigure(self, tagOrId, cnf=None, **kw):
-        """Query or modify the management options for window.
+        """Query or modify the configuration options for a child window.
 
-        If no option is specified, returns a list describing all
-        of the available options for pathName.  If option is
-        specified with no value, then the command returns a list
-        describing the one named option (this list will be identical
-        to the corresponding sublist of the value returned if no
-        option is specified). If one or more option-value pairs are
-        specified, then the command modifies the given widget
-        option(s) to have the given value(s); in this case the
-        command returns an empty string. The following options
-        are supported:
+        Similar to configure() except that it applies to the specified
+        window.
+
+        The following options are supported:
 
         after window
             Insert the window after the window specified. window

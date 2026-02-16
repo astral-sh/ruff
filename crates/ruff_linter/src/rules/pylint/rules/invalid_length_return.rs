@@ -40,6 +40,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__len__` method](https://docs.python.org/3/reference/datamodel.html#object.__len__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.6.0")]
 pub(crate) struct InvalidLengthReturnType;
 
 impl Violation for InvalidLengthReturnType {
@@ -64,10 +65,10 @@ pub(crate) fn invalid_length_return(checker: &Checker, function_def: &ast::StmtF
     }
 
     // Determine the terminal behavior (i.e., implicit return, no return, etc.).
-    let terminal = Terminal::from_function(function_def);
+    let terminal = Terminal::from_function(function_def, checker.semantic());
 
     // If every control flow path raises an exception, ignore the function.
-    if terminal == Terminal::Raise {
+    if terminal.is_always_raise() {
         return;
     }
 

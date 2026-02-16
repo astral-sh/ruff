@@ -9637,6 +9637,113 @@ pub struct ExprIpyEscapeCommand {
     pub value: Box<str>,
 }
 
+/// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct PatternMatchValue {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub value: Box<Expr>,
+}
+
+/// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct PatternMatchSingleton {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub value: crate::Singleton,
+}
+
+/// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct PatternMatchSequence {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub patterns: Vec<Pattern>,
+}
+
+/// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct PatternMatchMapping {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub keys: Vec<Expr>,
+    pub patterns: Vec<Pattern>,
+    pub rest: Option<crate::Identifier>,
+}
+
+/// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct PatternMatchClass {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub cls: Box<Expr>,
+    pub arguments: crate::PatternArguments,
+}
+
+/// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct PatternMatchStar {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub name: Option<crate::Identifier>,
+}
+
+/// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct PatternMatchAs {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub pattern: Option<Box<Pattern>>,
+    pub name: Option<crate::Identifier>,
+}
+
+/// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct PatternMatchOr {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub patterns: Vec<Pattern>,
+}
+
+/// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct TypeParamTypeVar {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub name: crate::Identifier,
+    pub bound: Option<Box<Expr>>,
+    pub default: Option<Box<Expr>>,
+}
+
+/// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct TypeParamTypeVarTuple {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub name: crate::Identifier,
+    pub default: Option<Box<Expr>>,
+}
+
+/// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
+#[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
+pub struct TypeParamParamSpec {
+    pub node_index: crate::AtomicNodeIndex,
+    pub range: ruff_text_size::TextRange,
+    pub name: crate::Identifier,
+    pub default: Option<Box<Expr>>,
+}
+
 impl ModModule {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
@@ -10583,5 +10690,184 @@ impl ExprIpyEscapeCommand {
             range: _,
             node_index: _,
         } = self;
+    }
+}
+
+impl PatternMatchValue {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let PatternMatchValue {
+            value,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_expr(value);
+    }
+}
+
+impl PatternMatchSingleton {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let PatternMatchSingleton {
+            value,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_singleton(value);
+    }
+}
+
+impl PatternMatchSequence {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let PatternMatchSequence {
+            patterns,
+            range: _,
+            node_index: _,
+        } = self;
+
+        for elm in patterns {
+            visitor.visit_pattern(elm);
+        }
+    }
+}
+
+impl PatternMatchClass {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let PatternMatchClass {
+            cls,
+            arguments,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_expr(cls);
+        visitor.visit_pattern_arguments(arguments);
+    }
+}
+
+impl PatternMatchStar {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let PatternMatchStar {
+            name,
+            range: _,
+            node_index: _,
+        } = self;
+
+        if let Some(name) = name {
+            visitor.visit_identifier(name);
+        }
+    }
+}
+
+impl PatternMatchAs {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let PatternMatchAs {
+            pattern,
+            name,
+            range: _,
+            node_index: _,
+        } = self;
+
+        if let Some(pattern) = pattern {
+            visitor.visit_pattern(pattern);
+        }
+
+        if let Some(name) = name {
+            visitor.visit_identifier(name);
+        }
+    }
+}
+
+impl PatternMatchOr {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let PatternMatchOr {
+            patterns,
+            range: _,
+            node_index: _,
+        } = self;
+
+        for elm in patterns {
+            visitor.visit_pattern(elm);
+        }
+    }
+}
+
+impl TypeParamTypeVar {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let TypeParamTypeVar {
+            name,
+            bound,
+            default,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_identifier(name);
+
+        if let Some(bound) = bound {
+            visitor.visit_expr(bound);
+        }
+
+        if let Some(default) = default {
+            visitor.visit_expr(default);
+        }
+    }
+}
+
+impl TypeParamTypeVarTuple {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let TypeParamTypeVarTuple {
+            name,
+            default,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_identifier(name);
+
+        if let Some(default) = default {
+            visitor.visit_expr(default);
+        }
+    }
+}
+
+impl TypeParamParamSpec {
+    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
+    where
+        V: SourceOrderVisitor<'a> + ?Sized,
+    {
+        let TypeParamParamSpec {
+            name,
+            default,
+            range: _,
+            node_index: _,
+        } = self;
+        visitor.visit_identifier(name);
+
+        if let Some(default) = default {
+            visitor.visit_expr(default);
+        }
     }
 }

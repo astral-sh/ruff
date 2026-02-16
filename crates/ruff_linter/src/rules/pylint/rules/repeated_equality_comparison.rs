@@ -53,6 +53,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
     all_hashable: bool,
@@ -137,6 +138,18 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
         for (indices, comparators) in sequences {
             if indices.len() == 1 {
                 continue;
+            }
+
+            if let Some((&first, rest)) = comparators.split_first() {
+                let first_comparable = ComparableExpr::from(first);
+
+                if rest
+                    .iter()
+                    .all(|&c| ComparableExpr::from(c) == first_comparable)
+                {
+                    // Do not flag if all members are identical
+                    continue;
+                }
             }
 
             // if we can determine that all the values are hashable, we can use a set

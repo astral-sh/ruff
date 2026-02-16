@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 18..21,
                                     node_index: NodeIndex(None),
+                                    range: 18..21,
                                     pattern: None,
                                     name: Some(
                                         Identifier {
@@ -61,8 +61,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 55..56,
                                     node_index: NodeIndex(None),
+                                    range: 55..56,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
                                             node_index: NodeIndex(None),
@@ -111,8 +111,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 80..81,
                                     node_index: NodeIndex(None),
+                                    range: 80..81,
                                     pattern: None,
                                     name: None,
                                 },
@@ -138,8 +138,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 96..97,
                                     node_index: NodeIndex(None),
+                                    range: 96..97,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
                                             node_index: NodeIndex(None),
@@ -188,13 +188,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 143..155,
                                     node_index: NodeIndex(None),
+                                    range: 143..155,
                                     pattern: Some(
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 143..147,
                                                 node_index: NodeIndex(None),
+                                                range: 143..147,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
@@ -236,8 +236,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 216..217,
                                     node_index: NodeIndex(None),
+                                    range: 216..217,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
                                             node_index: NodeIndex(None),
@@ -286,13 +286,13 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchOr(
                                 PatternMatchOr {
-                                    range: 241..259,
                                     node_index: NodeIndex(None),
+                                    range: 241..259,
                                     patterns: [
                                         MatchValue(
                                             PatternMatchValue {
-                                                range: 241..253,
                                                 node_index: NodeIndex(None),
+                                                range: 241..253,
                                                 value: Attribute(
                                                     ExprAttribute {
                                                         node_index: NodeIndex(None),
@@ -317,8 +317,8 @@ Module(
                                         ),
                                         MatchAs(
                                             PatternMatchAs {
-                                                range: 256..259,
                                                 node_index: NodeIndex(None),
+                                                range: 256..259,
                                                 pattern: None,
                                                 name: Some(
                                                     Identifier {
@@ -353,8 +353,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchValue(
                                 PatternMatchValue {
-                                    range: 310..311,
                                     node_index: NodeIndex(None),
+                                    range: 310..311,
                                     value: NumberLiteral(
                                         ExprNumberLiteral {
                                             node_index: NodeIndex(None),
@@ -425,5 +425,14 @@ Module(
 10 | match x:
 11 |     case enum.variant | var: ...  # or pattern with irrefutable part
    |                         ^^^ Syntax Error: name capture `var` makes remaining patterns unreachable
+12 |     case 2: ...
+   |
+
+
+   |
+ 9 |     case 2: ...
+10 | match x:
+11 |     case enum.variant | var: ...  # or pattern with irrefutable part
+   |          ^^^^^^^^^^^^^^^^^^ Syntax Error: alternative patterns bind different names
 12 |     case 2: ...
    |

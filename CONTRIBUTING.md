@@ -53,12 +53,12 @@ cargo install cargo-insta
 You'll need [uv](https://docs.astral.sh/uv/getting-started/installation/) (or `pipx` and `pip`) to
 run Python utility commands.
 
-You can optionally install pre-commit hooks to automatically run the validation checks
+You can optionally install hooks to automatically run the validation checks
 when making a commit:
 
 ```shell
-uv tool install pre-commit
-pre-commit install
+uv tool install prek
+prek install
 ```
 
 We recommend [nextest](https://nexte.st/) to run Ruff's test suite (via `cargo nextest run`),
@@ -85,7 +85,7 @@ and that it passes both the lint and test validation checks:
 ```shell
 cargo clippy --workspace --all-targets --all-features -- -D warnings  # Rust linting
 RUFF_UPDATE_SCHEMA=1 cargo test  # Rust testing and updating ruff.schema.json
-uvx pre-commit run --all-files --show-diff-on-failure  # Rust and Python formatting, Markdown and Python linting, etc.
+uvx prek run -a  # Rust and Python formatting, Markdown and Python linting, etc.
 ```
 
 These checks will run on GitHub Actions when you open your pull request, but running them locally
@@ -160,7 +160,10 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 1. Create a file for your rule (e.g., `crates/ruff_linter/src/rules/flake8_bugbear/rules/assert_false.rs`).
 
 1. In that file, define a violation struct (e.g., `pub struct AssertFalse`). You can grep for
-    `#[derive(ViolationMetadata)]` to see examples.
+    `#[derive(ViolationMetadata)]` to see examples. You also need to add a
+    `#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]` attribute on your
+    `ViolationMetadata` struct. This adds the rule in preview, and the version will be filled in
+    automatically in the next release.
 
 1. In that file, define a function that adds the violation to the diagnostic list as appropriate
     (e.g., `pub(crate) fn assert_false`) based on whatever inputs are required for the rule (e.g.,
@@ -174,8 +177,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
     statements, like imports) or `analyze/expression.rs` (if your rule is based on analyzing
     expressions, like function calls).
 
-1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`). New rules
-    should be added in `RuleGroup::Preview`.
+1. Map the violation struct to a rule code in `crates/ruff_linter/src/codes.rs` (e.g., `B011`).
 
 1. Add proper [testing](#rule-testing-fixtures-and-snapshots) for your rule.
 
@@ -186,8 +188,9 @@ to call your new function at the appropriate time and with the appropriate input
 defined therein is a Python AST visitor, which iterates over the AST, building up a semantic model,
 and calling out to lint rule analyzer functions as it goes.
 
-If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file. Grep
-for the `Diagnostic::new` invocations to understand how other, similar rules are implemented.
+If you need to inspect the AST, you can run `cargo dev print-ast` with a Python file or use the AST
+panel in the [playground](https://play.ruff.rs/?secondary=AST). Grep for the
+`Checker::report_diagnostic` invocations to understand how other, similar rules are implemented.
 
 Once you're satisfied with your code, add tests for your rule
 (see: [rule testing](#rule-testing-fixtures-and-snapshots)), and regenerate the documentation and
@@ -280,14 +283,56 @@ Note that plugin-specific configuration options are defined in their own modules
 
 Finally, regenerate the documentation and generated code with `cargo dev generate-all`.
 
-## MkDocs
+### Opening a PR
 
-> [!NOTE]
->
-> The documentation uses Material for MkDocs Insiders, which is closed-source software.
-> This means only members of the Astral organization can preview the documentation exactly as it
-> will appear in production.
-> Outside contributors can still preview the documentation, but there will be some differences. Consult [the Material for MkDocs documentation](https://squidfunk.github.io/mkdocs-material/insiders/benefits/#features) for which features are exclusively available in the insiders version.
+After you finish your changes, the next step is to open a PR. By default, two
+sections will be filled into the PR body: the summary and the test plan.
+
+#### The summary
+
+The summary is intended to give us as maintainers information about your PR.
+This should typically include a link to the relevant issue(s) you're addressing
+in your PR, as well as a summary of the issue and your approach to fixing it. If
+you have any questions about your approach or design, or if you considered
+alternative approaches, that can also be helpful to include.
+
+AI can be helpful in generating both the code and summary of your PR, but a
+successful contribution should still be carefully reviewed by you and the
+summary editorialized before submitting a PR. A great summary is thorough but
+also succinct and gives us the context we need to review your PR.
+
+You can find examples of excellent issues and PRs by searching for the
+[`great writeup`](https://github.com/astral-sh/ruff/issues?q=label%3A%22great%20writeup%22)
+label.
+
+#### The test plan
+
+The test plan is likely to be shorter than the summary and can be as simple as
+"Added new snapshot tests for `RUF123`," at least for rule bugs. For LSP or some
+types of CLI changes, in particular, it can also be helpful to include
+screenshots or recordings of your change in action.
+
+#### Ecosystem report
+
+After opening the PR, an ecosystem report will be run as part of CI. This shows
+a diff of linter and formatter behavior before and after the changes in your PR.
+Going through these changes and reporting your findings in the PR summary or an
+additional comment help us to review your PR more efficiently. It's also a great
+way to find new test cases to incorporate into your PR if you identify any
+issues.
+
+#### PR status
+
+To help us know when your PR is ready for review again, please either move your
+PR back to a draft while working on it (marking it ready for review afterwards
+will ping the previous reviewers) or explicitly re-request a review. This helps
+us to avoid re-reviewing a PR while you're still working on it and also to
+prioritize PRs that are definitely ready for review.
+
+You can also thumbs-up or mark as resolved any comments we leave to let us know
+you addressed them.
+
+## MkDocs
 
 To preview any changes to the documentation locally:
 
@@ -302,11 +347,7 @@ To preview any changes to the documentation locally:
 1. Run the development server with:
 
     ```shell
-    # For contributors.
-    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.public.yml
-
-    # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-    uvx --with-requirements docs/requirements-insiders.txt -- mkdocs serve -f mkdocs.insiders.yml
+    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.yml
     ```
 
 The documentation should then be available locally at
@@ -343,7 +384,7 @@ Commit each step of this process separately for easier review.
 
     - Often labels will be missing from pull requests they will need to be manually organized into the proper section
     - Changes should be edited to be user-facing descriptions, avoiding internal details
-    - Square brackets (eg, `[ruff]` project name) will be automatically escaped by `pre-commit`
+    - Square brackets (eg, `[ruff]` project name) will be automatically escaped by `prek`
 
     Additionally, for minor releases:
 

@@ -12,11 +12,11 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings::types::PreviewMode;
     use crate::test::test_path;
     use crate::{assert_diagnostics, settings};
 
-    #[test_case(Rule::ReadWholeFile, Path::new("FURB101.py"))]
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_0.py"))]
+    #[test_case(Rule::ReadWholeFile, Path::new("FURB101_1.py"))]
     #[test_case(Rule::RepeatedAppend, Path::new("FURB113.py"))]
     #[test_case(Rule::IfExpInsteadOfOrOperator, Path::new("FURB110.py"))]
     #[test_case(Rule::ReimplementedOperator, Path::new("FURB118.py"))]
@@ -47,7 +47,8 @@ mod tests {
     #[test_case(Rule::MetaClassABCMeta, Path::new("FURB180.py"))]
     #[test_case(Rule::HashlibDigestHex, Path::new("FURB181.py"))]
     #[test_case(Rule::ListReverseCopy, Path::new("FURB187.py"))]
-    #[test_case(Rule::WriteWholeFile, Path::new("FURB103.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_0.py"))]
+    #[test_case(Rule::WriteWholeFile, Path::new("FURB103_1.py"))]
     #[test_case(Rule::FStringNumberFormat, Path::new("FURB116.py"))]
     #[test_case(Rule::SortedMinMax, Path::new("FURB192.py"))]
     #[test_case(Rule::SliceToRemovePrefixOrSuffix, Path::new("FURB188.py"))]
@@ -63,29 +64,10 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::ReadWholeFile, Path::new("FURB101.py"))]
-    #[test_case(Rule::WriteWholeFile, Path::new("FURB103.py"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview_{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
-        let diagnostics = test_path(
-            Path::new("refurb").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
-        Ok(())
-    }
-
     #[test]
     fn write_whole_file_python_39() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("refurb/FURB103.py"),
+            Path::new("refurb/FURB103_0.py"),
             &settings::LinterSettings::for_rule(Rule::WriteWholeFile)
                 .with_target_version(PythonVersion::PY39),
         )?;

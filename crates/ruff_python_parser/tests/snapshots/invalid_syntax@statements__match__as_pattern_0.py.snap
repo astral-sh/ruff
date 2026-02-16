@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchClass(
                                 PatternMatchClass {
-                                    range: 132..146,
                                     node_index: NodeIndex(None),
+                                    range: 132..146,
                                     cls: Name(
                                         ExprName {
                                             node_index: NodeIndex(None),
@@ -44,8 +44,8 @@ Module(
                                         patterns: [
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 141..142,
                                                     node_index: NodeIndex(None),
+                                                    range: 141..142,
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {
@@ -58,8 +58,8 @@ Module(
                                             ),
                                             MatchAs(
                                                 PatternMatchAs {
-                                                    range: 144..145,
                                                     node_index: NodeIndex(None),
+                                                    range: 144..145,
                                                     pattern: None,
                                                     name: Some(
                                                         Identifier {

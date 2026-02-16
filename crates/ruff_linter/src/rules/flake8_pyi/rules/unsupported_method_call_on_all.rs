@@ -41,6 +41,7 @@ use crate::checkers::ast::Checker;
 ///     __all__ += ["C"]
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.281")]
 pub(crate) struct UnsupportedMethodCallOnAll {
     name: String,
 }

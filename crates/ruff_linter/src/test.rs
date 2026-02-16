@@ -16,7 +16,7 @@ use ruff_db::diagnostic::{
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
-use ruff_python_ast::PySourceType;
+use ruff_python_ast::{PySourceType, SourceType};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_parser::{ParseError, ParseOptions};
@@ -26,12 +26,13 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{EmitterContext, create_syntax_error_diagnostic};
+use crate::message::EmitterContext;
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, flags};
 use crate::source_kind::SourceKind;
+use crate::suppression::Suppressions;
 use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
@@ -126,7 +127,7 @@ pub(crate) fn test_path(
     settings: &LinterSettings,
 ) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
-    let source_type = PySourceType::from(&path);
+    let source_type = SourceType::Python(PySourceType::from(&path));
     let source_kind = SourceKind::from_path(path.as_ref(), source_type)?.expect("valid source");
     Ok(test_contents(&source_kind, &path, settings).0)
 }
@@ -196,7 +197,15 @@ pub(crate) fn assert_notebook_path(
 pub fn test_snippet(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
     let path = Path::new("<filename>");
     let contents = dedent(contents);
-    test_contents(&SourceKind::Python(contents.into_owned()), path, settings).0
+    test_contents(
+        &SourceKind::Python {
+            code: contents.into_owned(),
+            is_stub: false,
+        },
+        path,
+        settings,
+    )
+    .0
 }
 
 thread_local! {
@@ -234,6 +243,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
+    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
     let messages = check_path(
         path,
         path.parent()
@@ -249,6 +259,7 @@ pub(crate) fn test_contents<'a>(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     let source_has_errors = parsed.has_invalid_syntax();
@@ -299,6 +310,8 @@ pub(crate) fn test_contents<'a>(
                 &indexer,
             );
 
+            let suppressions =
+                Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
             let fixed_messages = check_path(
                 path,
                 None,
@@ -312,6 +325,7 @@ pub(crate) fn test_contents<'a>(
                 source_type,
                 &parsed,
                 target_version,
+                &suppressions,
             );
 
             if parsed.has_invalid_syntax() && !source_has_errors {
@@ -405,7 +419,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             diagnostic
         })
         .chain(parsed.errors().iter().map(|parse_error| {
-            create_syntax_error_diagnostic(source_code.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_code.clone(), &parse_error.error, parse_error)
         }))
         .sorted_by(Diagnostic::ruff_start_ordering)
         .collect();
@@ -419,7 +433,7 @@ fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) 
     let messages: Vec<_> = errors
         .iter()
         .map(|parse_error| {
-            create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
         })
         .collect();
 
@@ -446,7 +460,7 @@ pub(crate) fn print_jupyter_messages(
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let config = DisplayDiagnosticConfig::default()
+    let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)
@@ -465,7 +479,7 @@ pub(crate) fn print_jupyter_messages(
 }
 
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
-    let config = DisplayDiagnosticConfig::default()
+    let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
         .with_show_fix_status(true)

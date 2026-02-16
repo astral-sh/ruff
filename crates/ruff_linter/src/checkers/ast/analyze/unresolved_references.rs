@@ -33,7 +33,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
                 }
 
                 // Allow __path__.
-                if checker.path.ends_with("__init__.py") {
+                if checker.in_init_module() {
                     if reference.name(checker.source()) == "__path__" {
                         continue;
                     }

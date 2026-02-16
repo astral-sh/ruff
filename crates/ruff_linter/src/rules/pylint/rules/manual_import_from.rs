@@ -24,9 +24,16 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// from concurrent import futures
 /// ```
 ///
+/// ## Options
+///
+/// This rule will not trigger on imports required by the `isort` configuration.
+///
+/// - `lint.isort.required-imports`
+///
 /// ## References
 /// - [Python documentation: Submodules](https://docs.python.org/3/reference/import.html#submodules)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct ManualFromImport {
     module: String,
     name: String,

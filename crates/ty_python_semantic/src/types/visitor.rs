@@ -1,18 +1,22 @@
+use rustc_hash::FxHashSet;
+
 use crate::{
-    Db, FxIndexSet,
+    Db,
     types::{
         BoundMethodType, BoundSuperType, BoundTypeVarInstance, CallableType, GenericAlias,
         IntersectionType, KnownBoundMethodType, KnownInstanceType, NominalInstanceType,
         PropertyInstanceType, ProtocolInstanceType, SubclassOfType, Type, TypeAliasType,
-        TypeIsType, TypeVarInstance, TypedDictType, UnionType,
+        TypeGuardType, TypeIsType, TypeVarInstance, TypedDictType, UnionType,
+        bound_super::walk_bound_super_type,
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
+        newtype::{NewType, walk_newtype_instance_type},
         subclass_of::walk_subclass_of_type,
-        walk_bound_method_type, walk_bound_super_type, walk_bound_type_var_type,
-        walk_callable_type, walk_intersection_type, walk_known_instance_type,
-        walk_method_wrapper_type, walk_property_instance_type, walk_type_alias_type,
-        walk_type_var_type, walk_typed_dict_type, walk_typeis_type, walk_union,
+        walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
+        walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
+        walk_property_instance_type, walk_type_alias_type, walk_type_var_type,
+        walk_typed_dict_type, walk_typeguard_type, walk_typeis_type, walk_union,
     },
 };
 use std::cell::{Cell, RefCell};
@@ -46,6 +50,10 @@ pub(crate) trait TypeVisitor<'db> {
 
     fn visit_typeis_type(&self, db: &'db dyn Db, type_is: TypeIsType<'db>) {
         walk_typeis_type(db, type_is, self);
+    }
+
+    fn visit_typeguard_type(&self, db: &'db dyn Db, type_is: TypeGuardType<'db>) {
+        walk_typeguard_type(db, type_is, self);
     }
 
     fn visit_subclass_of_type(&self, db: &'db dyn Db, subclass_of: SubclassOfType<'db>) {
@@ -103,6 +111,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
         walk_typed_dict_type(db, typed_dict, self);
     }
+
+    fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
+        walk_newtype_instance_type(db, newtype, self);
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -121,11 +133,12 @@ pub(super) enum NonAtomicType<'db> {
     NominalInstance(NominalInstanceType<'db>),
     PropertyInstance(PropertyInstanceType<'db>),
     TypeIs(TypeIsType<'db>),
-    NonInferableTypeVar(BoundTypeVarInstance<'db>),
+    TypeGuard(TypeGuardType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
+    NewTypeInstance(NewType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -185,17 +198,20 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             Type::PropertyInstance(property) => {
                 TypeKind::NonAtomic(NonAtomicType::PropertyInstance(property))
             }
-            Type::NonInferableTypeVar(bound_typevar) => {
-                TypeKind::NonAtomic(NonAtomicType::NonInferableTypeVar(bound_typevar))
-            }
             Type::TypeVar(bound_typevar) => {
                 TypeKind::NonAtomic(NonAtomicType::TypeVar(bound_typevar))
             }
             Type::TypeIs(type_is) => TypeKind::NonAtomic(NonAtomicType::TypeIs(type_is)),
+            Type::TypeGuard(type_guard) => {
+                TypeKind::NonAtomic(NonAtomicType::TypeGuard(type_guard))
+            }
             Type::TypedDict(typed_dict) => {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
             Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
+            Type::NewTypeInstance(newtype) => {
+                TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
+            }
         }
     }
 }
@@ -227,9 +243,7 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
             visitor.visit_property_instance_type(db, property);
         }
         NonAtomicType::TypeIs(type_is) => visitor.visit_typeis_type(db, type_is),
-        NonAtomicType::NonInferableTypeVar(bound_typevar) => {
-            visitor.visit_bound_type_var_type(db, bound_typevar);
-        }
+        NonAtomicType::TypeGuard(type_guard) => visitor.visit_typeguard_type(db, type_guard),
         NonAtomicType::TypeVar(bound_typevar) => {
             visitor.visit_bound_type_var_type(db, bound_typevar);
         }
@@ -240,6 +254,36 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::TypeAlias(alias) => {
             visitor.visit_type_alias_type(db, alias);
         }
+        NonAtomicType::NewTypeInstance(newtype) => {
+            visitor.visit_newtype_instance_type(db, newtype);
+        }
+    }
+}
+
+pub(crate) fn walk_type_with_recursion_guard<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    visitor: &impl TypeVisitor<'db>,
+    recursion_guard: &TypeCollector<'db>,
+) {
+    match TypeKind::from(ty) {
+        TypeKind::Atomic => {}
+        TypeKind::NonAtomic(non_atomic_type) => {
+            if recursion_guard.type_was_already_seen(ty) {
+                // If we have already seen this type, we can skip it.
+                return;
+            }
+            walk_non_atomic_type(db, non_atomic_type, visitor);
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub(crate) struct TypeCollector<'db>(RefCell<FxHashSet<Type<'db>>>);
+
+impl<'db> TypeCollector<'db> {
+    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+        !self.0.borrow_mut().insert(ty)
     }
 }
 
@@ -254,12 +298,12 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
 pub(super) fn any_over_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
-    query: &dyn Fn(Type<'db>) -> bool,
     should_visit_lazy_type_attributes: bool,
+    query: impl Fn(Type<'db>) -> bool,
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
         query: &'a dyn Fn(Type<'db>) -> bool,
-        seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<bool>,
         should_visit_lazy_type_attributes: bool,
     }
@@ -279,22 +323,13 @@ pub(super) fn any_over_type<'db>(
             if found {
                 return;
             }
-            match TypeKind::from(ty) {
-                TypeKind::Atomic => {}
-                TypeKind::NonAtomic(non_atomic_type) => {
-                    if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                        // If we have already seen this type, we can skip it.
-                        return;
-                    }
-                    walk_non_atomic_type(db, non_atomic_type, self);
-                }
-            }
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
     }
 
     let visitor = AnyOverTypeVisitor {
-        query,
-        seen_types: RefCell::new(FxIndexSet::default()),
+        query: &query,
+        recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::new(false),
         should_visit_lazy_type_attributes,
     };

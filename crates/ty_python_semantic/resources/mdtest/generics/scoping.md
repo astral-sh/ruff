@@ -102,7 +102,7 @@ class C[T]:
         return "a"
 
 reveal_type(getattr_static(C[int], "f"))  # revealed: def f(self, x: int) -> str
-reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
 reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: def f(self, x: int) -> str
 # revealed: bound method C[int].f(x: int) -> str
 reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))
@@ -153,9 +153,11 @@ already solved and specialized when the class was specialized:
 from ty_extensions import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
-reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S@m) -> S@m
-reveal_type(generic_context(Legacy))  # revealed: tuple[T@Legacy]
-reveal_type(generic_context(legacy.m))  # revealed: tuple[Self@m, S@m]
+reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S) -> S
+# revealed: ty_extensions.GenericContext[T@Legacy]
+reveal_type(generic_context(Legacy))
+# revealed: ty_extensions.GenericContext[Self@m, S@m]
+reveal_type(generic_context(legacy.m))
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
@@ -260,28 +262,93 @@ class C[T]:
 
 ### Generic class within generic function
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad1[T]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
 ```
 
 ### Generic class within generic class
+
+<!-- snapshot-diagnostics -->
 
 ```py
 from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad1[T]: ...
-    # TODO: error for reuse of typevar
+    # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
+```
+
+### Generic class with base that has same-named typevar as enclosing scope
+
+A nested generic class that inherits from a generic base should not be flagged when the base class
+happens to have a type parameter with the same name as the enclosing scope's type parameter, as long
+as the nested class only uses its own type parameters.
+
+```py
+class Base[T]:
+    pass
+
+class Outer[T]:
+    class Inner[U](Base[U]):
+        pass
+```
+
+But it is still an error to directly reference the enclosing scope's type variable in the base class
+list:
+
+```py
+class Outer[T]:
+    # error: [invalid-generic-class]
+    class Bad(list[T]): ...
+```
+
+## Class bases are evaluated within the type parameter scope
+
+```py
+class C[_T](
+    # error: [unresolved-reference] "Name `C` used when not defined"
+    C
+): ...
+
+# `D` in `list[D]` is resolved to be a type variable of class `D`.
+class D[D](list[D]): ...
+
+# error: [unresolved-reference] "Name `E` used when not defined"
+if E:
+    class E[_T](
+        # error: [unresolved-reference] "Name `E` used when not defined"
+        E
+    ): ...
+
+# error: [unresolved-reference] "Name `F` used when not defined"
+F
+
+# error: [unresolved-reference] "Name `F` used when not defined"
+class F[_T](F): ...
+
+def foo():
+    class G[_T](
+        # error: [unresolved-reference] "Name `G` used when not defined"
+        G
+    ): ...
+    # error: [unresolved-reference] "Name `H` used when not defined"
+    if H:
+        class H[_T](
+            # error: [unresolved-reference] "Name `H` used when not defined"
+            H
+        ): ...
 ```
 
 ## Class scopes do not cover inner scopes
@@ -299,6 +366,29 @@ class C[T]:
 
     class Inner[S]: ...
     ok2: Inner[T]
+```
+
+## Mixed-scope type parameters
+
+Methods can have type parameters that are scoped to the method itself, while also referring to type
+parameters from the enclosing class.
+
+```py
+from typing import Generic, TypeVar
+
+from ty_extensions import into_callable
+
+T = TypeVar("T")
+S = TypeVar("S")
+
+class Foo(Generic[T]):
+    def bar(self, x: T, y: S) -> tuple[T, S]:
+        raise NotImplementedError
+
+def f(x: type[Foo[T]]) -> T:
+    # revealed: [S](self, x: T@f, y: S) -> tuple[T@f, S]
+    reveal_type(into_callable(x.bar))
+    raise NotImplementedError
 ```
 
 [scoping]: https://typing.python.org/en/latest/spec/generics.html#scoping-rules-for-type-variables

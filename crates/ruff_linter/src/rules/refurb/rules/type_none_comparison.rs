@@ -32,6 +32,7 @@ use crate::rules::refurb::helpers::replace_with_identity_check;
 /// - [Python documentation: `type`](https://docs.python.org/3/library/functions.html#type)
 /// - [Python documentation: Identity comparisons](https://docs.python.org/3/reference/expressions.html#is-not)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct TypeNoneComparison {
     replacement: IdentityCheck,
 }
