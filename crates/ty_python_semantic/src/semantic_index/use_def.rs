@@ -242,7 +242,7 @@
 //! visits a `StmtIf` node.
 
 use ruff_index::{IndexVec, newtype_index};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::node_key::NodeKey;
 use crate::place::BoundnessAnalysis;
@@ -273,7 +273,7 @@ pub(crate) use place_state::{LiveBinding, ScopedDefinitionId};
 
 /// Uniquely identifies an interned [`Bindings`] entry in [`UseDefMap::interned_bindings`].
 #[newtype_index]
-#[derive(get_size2::GetSize)]
+#[derive(salsa::Update, get_size2::GetSize)]
 struct ScopedBindingsId;
 
 #[newtype_index]
@@ -328,7 +328,7 @@ pub(crate) struct UseDefMap<'db> {
     ///
     /// If we see a binding to a `Final`-qualified symbol, we also need this map to find previous
     /// bindings to that symbol. If there are any, the assignment is invalid.
-    bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
+    bindings_by_definition: FxHashMap<Definition<'db>, ScopedBindingsId>,
 
     /// [`PlaceState`] visible at end of scope for each symbol.
     end_of_scope_symbols: IndexVec<ScopedSymbolId, PlaceState>,
@@ -548,8 +548,9 @@ impl<'db> UseDefMap<'db> {
         &self,
         definition: Definition<'db>,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
+        let bindings_id = self.bindings_by_definition[&definition];
         self.bindings_iterator(
-            &self.bindings_by_definition[&definition],
+            &self.interned_bindings[bindings_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
     }
@@ -1547,14 +1548,28 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_definition.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
-        let (interned_bindings, bindings_by_use) =
-            Self::intern_bindings_by_use(self.bindings_by_use);
+        let mut interned_bindings: IndexVec<ScopedBindingsId, Bindings> =
+            IndexVec::with_capacity(self.bindings_by_definition.len());
+        let mut interned_ids_by_bindings: FxHashMap<Bindings, ScopedBindingsId> =
+            FxHashMap::with_capacity_and_hasher(self.bindings_by_definition.len(), FxBuildHasher);
+        let bindings_by_definition = Self::intern_bindings_by_definition(
+            self.bindings_by_definition,
+            &mut interned_bindings,
+            &mut interned_ids_by_bindings,
+        );
+        let bindings_by_use = Self::intern_bindings_by_use(
+            self.bindings_by_use,
+            &mut interned_bindings,
+            &mut interned_ids_by_bindings,
+        );
         let (interned_place_states, end_of_scope_members) =
             Self::intern_end_of_scope_members(self.member_states);
         let (interned_reachable_definitions, reachable_definitions_by_member) =
             Self::intern_reachable_definitions_by_member(self.reachable_member_definitions);
         let (interned_enclosing_snapshots, enclosing_snapshots) =
             Self::intern_enclosing_snapshots(self.enclosing_snapshots);
+
+        interned_bindings.shrink_to_fit();
 
         UseDefMap {
             all_definitions: self.all_definitions,
@@ -1570,23 +1585,43 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_reachable_definitions,
             reachable_definitions_by_member,
             declarations_by_binding: self.declarations_by_binding,
-            bindings_by_definition: self.bindings_by_definition,
+            bindings_by_definition,
             interned_enclosing_snapshots,
             enclosing_snapshots,
             end_of_scope_reachability: self.reachability,
         }
     }
 
+    fn intern_bindings_by_definition(
+        bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
+        interned_bindings: &mut IndexVec<ScopedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, ScopedBindingsId>,
+    ) -> FxHashMap<Definition<'db>, ScopedBindingsId> {
+        let mut interned_ids_by_definition: FxHashMap<Definition<'db>, ScopedBindingsId> =
+            FxHashMap::with_capacity_and_hasher(bindings_by_definition.len(), FxBuildHasher);
+
+        for (definition, bindings) in bindings_by_definition {
+            let interned_id = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
+                *interned_id
+            } else {
+                let interned_id = interned_bindings.push(bindings.clone());
+                interned_ids_by_bindings.insert(bindings, interned_id);
+                interned_id
+            };
+            interned_ids_by_definition.insert(definition, interned_id);
+        }
+
+        interned_ids_by_definition.shrink_to_fit();
+        interned_ids_by_definition
+    }
+
     fn intern_bindings_by_use(
         bindings_by_use: IndexVec<ScopedUseId, Bindings>,
-    ) -> (
-        IndexVec<ScopedBindingsId, Bindings>,
-        IndexVec<ScopedUseId, ScopedBindingsId>,
-    ) {
-        let mut interned_bindings: IndexVec<ScopedBindingsId, Bindings> = IndexVec::new();
-        let mut interned_ids_by_use: IndexVec<ScopedUseId, ScopedBindingsId> = IndexVec::new();
-        let mut interned_ids_by_bindings: FxHashMap<Bindings, ScopedBindingsId> =
-            FxHashMap::default();
+        interned_bindings: &mut IndexVec<ScopedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, ScopedBindingsId>,
+    ) -> IndexVec<ScopedUseId, ScopedBindingsId> {
+        let mut interned_ids_by_use: IndexVec<ScopedUseId, ScopedBindingsId> =
+            IndexVec::with_capacity(bindings_by_use.len());
 
         for bindings in bindings_by_use {
             let interned_id = if let Some(interned_id) = interned_ids_by_bindings.get(&bindings) {
@@ -1599,10 +1634,8 @@ impl<'db> UseDefMapBuilder<'db> {
             interned_ids_by_use.push(interned_id);
         }
 
-        interned_bindings.shrink_to_fit();
         interned_ids_by_use.shrink_to_fit();
-
-        (interned_bindings, interned_ids_by_use)
+        interned_ids_by_use
     }
 
     fn intern_end_of_scope_members(
@@ -1611,11 +1644,12 @@ impl<'db> UseDefMapBuilder<'db> {
         IndexVec<ScopedPlaceStateId, PlaceState>,
         IndexVec<ScopedMemberId, ScopedPlaceStateId>,
     ) {
-        let mut interned_place_states: IndexVec<ScopedPlaceStateId, PlaceState> = IndexVec::new();
+        let mut interned_place_states: IndexVec<ScopedPlaceStateId, PlaceState> =
+            IndexVec::with_capacity(end_of_scope_members.len());
         let mut interned_ids_by_member: IndexVec<ScopedMemberId, ScopedPlaceStateId> =
-            IndexVec::new();
+            IndexVec::with_capacity(end_of_scope_members.len());
         let mut interned_ids_by_place_state: FxHashMap<PlaceState, ScopedPlaceStateId> =
-            FxHashMap::default();
+            FxHashMap::with_capacity_and_hasher(end_of_scope_members.len(), FxBuildHasher);
 
         for place_state in end_of_scope_members {
             let interned_id =
@@ -1644,13 +1678,16 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut interned_reachable_definitions: IndexVec<
             ScopedReachableDefinitionsId,
             ReachableDefinitions,
-        > = IndexVec::new();
+        > = IndexVec::with_capacity(reachable_definitions_by_member.len());
         let mut interned_ids_by_member: IndexVec<ScopedMemberId, ScopedReachableDefinitionsId> =
-            IndexVec::new();
+            IndexVec::with_capacity(reachable_definitions_by_member.len());
         let mut interned_ids_by_reachable_definitions: FxHashMap<
             ReachableDefinitions,
             ScopedReachableDefinitionsId,
-        > = FxHashMap::default();
+        > = FxHashMap::with_capacity_and_hasher(
+            reachable_definitions_by_member.len(),
+            FxBuildHasher,
+        );
 
         for reachable_definitions in reachable_definitions_by_member {
             let interned_id = if let Some(interned_id) =
@@ -1679,15 +1716,15 @@ impl<'db> UseDefMapBuilder<'db> {
         IndexVec<ScopedEnclosingSnapshotId, ScopedEnclosingSnapshotDataId>,
     ) {
         let mut interned_snapshots: IndexVec<ScopedEnclosingSnapshotDataId, EnclosingSnapshot> =
-            IndexVec::new();
+            IndexVec::with_capacity(enclosing_snapshots.len());
         let mut interned_ids_by_snapshot_key: IndexVec<
             ScopedEnclosingSnapshotId,
             ScopedEnclosingSnapshotDataId,
-        > = IndexVec::new();
+        > = IndexVec::with_capacity(enclosing_snapshots.len());
         let mut interned_ids_by_snapshot: FxHashMap<
             EnclosingSnapshot,
             ScopedEnclosingSnapshotDataId,
-        > = FxHashMap::default();
+        > = FxHashMap::with_capacity_and_hasher(enclosing_snapshots.len(), FxBuildHasher);
 
         for snapshot in enclosing_snapshots {
             let interned_id = if let Some(interned_id) = interned_ids_by_snapshot.get(&snapshot) {
