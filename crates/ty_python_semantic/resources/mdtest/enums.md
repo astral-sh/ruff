@@ -134,9 +134,8 @@ reveal_type(Color2.RED._value_)  # revealed: int
 
 ### `_value_` annotation with `__init__`
 
-When `__init__` is defined, member values are passed through `__init__` rather than directly
-assigned to `_value_`, so we fall back to `Any` for member value validation. The `_value_`
-annotation still constrains assignments to `self._value_` inside `__init__`:
+When `__init__` is defined, member values are validated by synthesizing a call to `__init__`. The
+`_value_` annotation still constrains assignments to `self._value_` inside `__init__`:
 
 ```py
 from enum import Enum
@@ -148,7 +147,7 @@ class Planet(Enum):
         self._value_ = value  # error: [invalid-assignment]
 
     MERCURY = (1, 3.303e23, 2.4397e6)
-    SATURN = "saturn"
+    SATURN = "saturn"  # error: [invalid-assignment]
 
 reveal_type(Planet.MERCURY.value)  # revealed: str
 reveal_type(Planet.MERCURY._value_)  # revealed: str
@@ -156,8 +155,8 @@ reveal_type(Planet.MERCURY._value_)  # revealed: str
 
 ### `__init__` without `_value_` annotation
 
-When `__init__` is defined but no explicit `_value_` annotation exists, we also fall back to `Any`
-for member value validation:
+When `__init__` is defined but no explicit `_value_` annotation exists, member values are validated
+against the `__init__` signature. Values that are incompatible with `__init__` are flagged:
 
 ```py
 from enum import Enum
@@ -169,6 +168,7 @@ class Planet2(Enum):
 
     MERCURY = (3.303e23, 2.4397e6)
     VENUS = (4.869e24, 6.0518e6)
+    INVALID = "not a planet"  # error: [invalid-assignment]
 
 reveal_type(Planet2.MERCURY.value)  # revealed: Any
 reveal_type(Planet2.MERCURY._value_)  # revealed: Any
