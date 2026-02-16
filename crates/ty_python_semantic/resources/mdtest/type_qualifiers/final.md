@@ -666,9 +666,9 @@ from typing import Final
 k = ""
 
 for i in range(10):
+    # TODO: This should be an error; it's a reassignment
     k += " "
 
-    # TODO: This should be an error
     k: Final[str] = ""
 ```
 
