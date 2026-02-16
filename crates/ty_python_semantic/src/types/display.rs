@@ -2011,16 +2011,17 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         // Return type
         f.write_str(" -> ")?;
         let return_settings = settings.singleline();
-        if should_parenthesize_callable_type(self.return_ty, self.db) {
+
+        let should_parenthesize_return_type =
+            should_parenthesize_callable_type(self.return_ty, self.db);
+        if should_parenthesize_return_type {
             f.write_char('(')?;
-            self.return_ty
-                .display_with(self.db, return_settings)
-                .fmt_detailed(&mut f)?;
+        }
+        self.return_ty
+            .display_with(self.db, return_settings)
+            .fmt_detailed(&mut f)?;
+        if should_parenthesize_return_type {
             f.write_char(')')?;
-        } else {
-            self.return_ty
-                .display_with(self.db, return_settings)
-                .fmt_detailed(&mut f)?;
         }
 
         if self.parameters.is_top() {
@@ -2648,14 +2649,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             f.write_char(')')
         };
         match self.ty {
-            Type::Callable(callable)
-                if callable.signatures(self.db).overloads.len() == 1
-                    && !callable.signatures(self.db).overloads[0]
-                        .parameters()
-                        .is_top() =>
-            {
-                write_parentheses(f)
-            }
+            ty if should_parenthesize_callable_type(ty, self.db) => write_parentheses(f),
             Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
