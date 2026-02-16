@@ -24,129 +24,153 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/string.md
  9 | 
 10 | # fmt: off
 11 | def f(
-12 |     # error: [unsupported-operator] "String annotations are not supported in `|` unions on Python <3.14"
+12 |     # error: [unsupported-operator]
 13 |     a: int | "Foo",
 14 |     # error: [unsupported-operator]
-15 |     b: int | "memoryview" | bytes,
-16 |     # error: [unsupported-operator]
-17 |     c: "TD" | None,
-18 |     # error: [unsupported-operator]
-19 |     d: "P" | None,
-20 |     # fine: `TypeVar.__or__` accepts strings at runtime
-21 |     e: T | "Foo",
-22 |     # fine: _SpecialForm.__ror__` accepts strings at runtime
-23 |     f: "Foo" | Callable[..., None],
-24 | ):
-25 |     reveal_type(a)  # revealed: int | Foo
-26 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
-27 |     reveal_type(c)  # revealed: TD | None
-28 |     reveal_type(d)  # revealed: P | None
-29 |     reveal_type(e)  # revealed: T@f | Foo
-30 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
-31 | 
-32 | # fmt: on
-33 | 
-34 | class Foo: ...
-35 | 
-36 | # error: [unsupported-operator]
-37 | X = list["int" | None]
+15 |     # error: [unsupported-operator]
+16 |     b: int | "memoryview" | bytes,
+17 |     # error: [unsupported-operator]
+18 |     c: "TD" | None,
+19 |     # error: [unsupported-operator]
+20 |     d: "P" | None,
+21 |     # fine: `TypeVar.__or__` accepts strings at runtime
+22 |     e: T | "Foo",
+23 |     # fine: _SpecialForm.__ror__` accepts strings at runtime
+24 |     f: "Foo" | Callable[..., None],
+25 | ):
+26 |     reveal_type(a)  # revealed: int | Foo
+27 |     reveal_type(b)  # revealed: int | memoryview[int] | bytes
+28 |     reveal_type(c)  # revealed: TD | None
+29 |     reveal_type(d)  # revealed: P | None
+30 |     reveal_type(e)  # revealed: T@f | Foo
+31 |     reveal_type(f)  # revealed: Foo | ((...) -> None)
+32 | 
+33 | # fmt: on
+34 | 
+35 | class Foo: ...
+36 | 
+37 | # error: [unsupported-operator]
+38 | X = list["int" | None]
 ```
 
 # Diagnostics
 
 ```
-error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
+error[unsupported-operator]: Unsupported `|` operation
   --> src/mdtest_snippet.py:13:8
    |
 11 | def f(
-12 |     # error: [unsupported-operator] "String annotations are not supported in `|` unions on Python <3.14"
+12 |     # error: [unsupported-operator]
 13 |     a: int | "Foo",
-   |        ^^^^^^-----
-   |              |
-   |              Invalid string-literal element
+   |        ---^^^-----
+   |        |     |
+   |        |     Has type `Literal["Foo"]`
+   |        Has type `<class 'int'>`
 14 |     # error: [unsupported-operator]
-15 |     b: int | "memoryview" | bytes,
+15 |     # error: [unsupported-operator]
    |
-info: This will raise `TypeError` at runtime
-help: Put quotes around the whole union rather than just one element
+info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just one element
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
-error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
-  --> src/mdtest_snippet.py:15:8
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:16:8
    |
-13 |     a: int | "Foo",
 14 |     # error: [unsupported-operator]
-15 |     b: int | "memoryview" | bytes,
-   |        ^^^^^^------------
-   |              |
-   |              Invalid string-literal element
-16 |     # error: [unsupported-operator]
-17 |     c: "TD" | None,
+15 |     # error: [unsupported-operator]
+16 |     b: int | "memoryview" | bytes,
+   |        ---^^^------------
+   |        |     |
+   |        |     Has type `Literal["memoryview"]`
+   |        Has type `<class 'int'>`
+17 |     # error: [unsupported-operator]
+18 |     c: "TD" | None,
    |
-info: This will raise `TypeError` at runtime
-help: Put quotes around the whole union rather than just one element
+info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just one element
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
-error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
-  --> src/mdtest_snippet.py:17:8
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:16:8
    |
-15 |     b: int | "memoryview" | bytes,
-16 |     # error: [unsupported-operator]
-17 |     c: "TD" | None,
-   |        ----^^^^^^^
-   |        |
-   |        Invalid string-literal element
-18 |     # error: [unsupported-operator]
-19 |     d: "P" | None,
+14 |     # error: [unsupported-operator]
+15 |     # error: [unsupported-operator]
+16 |     b: int | "memoryview" | bytes,
+   |        ---^^^------------
+   |        |     |
+   |        |     Has type `Literal["memoryview"]`
+   |        Has type `<class 'int'>`
+17 |     # error: [unsupported-operator]
+18 |     c: "TD" | None,
    |
-info: This will raise `TypeError` at runtime
-help: Put quotes around the whole union rather than just one element
-info: Python 3.13 was assumed when inferring types because it was specified on the command line
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
-error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
-  --> src/mdtest_snippet.py:19:8
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:18:8
    |
-17 |     c: "TD" | None,
-18 |     # error: [unsupported-operator]
-19 |     d: "P" | None,
-   |        ---^^^^^^^
-   |        |
-   |        Invalid string-literal element
-20 |     # fine: `TypeVar.__or__` accepts strings at runtime
-21 |     e: T | "Foo",
+16 |     b: int | "memoryview" | bytes,
+17 |     # error: [unsupported-operator]
+18 |     c: "TD" | None,
+   |        ----^^^----
+   |        |      |
+   |        |      Has type `None`
+   |        Has type `Literal["TD"]`
+19 |     # error: [unsupported-operator]
+20 |     d: "P" | None,
    |
-info: This will raise `TypeError` at runtime
-help: Put quotes around the whole union rather than just one element
+info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just one element
 info: rule `unsupported-operator` is enabled by default
 
 ```
 
 ```
-error[unsupported-operator]: String annotations are not supported in `|` unions on Python <3.14
-  --> src/mdtest_snippet.py:37:10
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:20:8
    |
-36 | # error: [unsupported-operator]
-37 | X = list["int" | None]
-   |          -----^^^^^^^
-   |          |
-   |          Invalid string-literal element
+18 |     c: "TD" | None,
+19 |     # error: [unsupported-operator]
+20 |     d: "P" | None,
+   |        ---^^^----
+   |        |     |
+   |        |     Has type `None`
+   |        Has type `Literal["P"]`
+21 |     # fine: `TypeVar.__or__` accepts strings at runtime
+22 |     e: T | "Foo",
    |
-info: This will raise `TypeError` at runtime
-help: Put quotes around the whole union rather than just one element
+info: All type expressions are evaluated at runtime by default on Python <3.14
 info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just one element
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `|` operation
+  --> src/mdtest_snippet.py:38:10
+   |
+37 | # error: [unsupported-operator]
+38 | X = list["int" | None]
+   |          -----^^^----
+   |          |       |
+   |          |       Has type `None`
+   |          Has type `Literal["int"]`
+   |
+info: All type expressions are evaluated at runtime by default on Python <3.14
+info: Python 3.13 was assumed when inferring types because it was specified on the command line
+help: Put quotes around the whole union rather than just one element
 info: rule `unsupported-operator` is enabled by default
 
 ```

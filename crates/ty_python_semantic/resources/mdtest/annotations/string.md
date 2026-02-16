@@ -78,8 +78,9 @@ T = TypeVar("T")
 
 # fmt: off
 def f(
-    # error: [unsupported-operator] "String annotations are not supported in `|` unions on Python <3.14"
+    # error: [unsupported-operator]
     a: int | "Foo",
+    # error: [unsupported-operator]
     # error: [unsupported-operator]
     b: int | "memoryview" | bytes,
     # error: [unsupported-operator]

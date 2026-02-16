@@ -276,7 +276,7 @@ in a tuple unpacking is not supported.
 from typing_extensions import TypeAliasType
 
 # error: [invalid-type-alias-type] "A `TypeAliasType` definition must be a simple variable assignment"
-TypeAliasType("IntOrStr", int | str)
+TypeAliasType("IntOrStr", "int | str")
 ```
 
 ### Mutually recursive `TypeAliasType` definitions

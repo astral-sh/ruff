@@ -8,16 +8,16 @@ use crate::types::diagnostic::{
     report_invalid_argument_number_to_special_form, report_invalid_arguments_to_callable,
 };
 use crate::types::generics::bind_typevar;
-use crate::types::infer::builder::InnerExpressionInferenceState;
+use crate::types::infer::builder::{InnerExpressionInferenceState, MultiInferenceState};
 use crate::types::signatures::Signature;
 use crate::types::special_form::{AliasSpec, LegacyStdlibAlias};
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
-    BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    BindingContext, CallArguments, CallableType, DynamicType, GenericContext, IntersectionBuilder,
+    KnownClass, KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter,
+    Parameters, SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType,
+    TypeIsType, TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 use crate::{FxOrderSet, Program, add_inferred_python_version_hint_to_diagnostic};
 
@@ -144,50 +144,112 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         let right_ty = self.infer_type_expression(&binary.right);
 
                         // Detect runtime errors from e.g. `int | "bytes"` on Python <3.14 without `__future__` annotations.
-                        //
-                        // TODO: this only detects the error if it's a string *literal*, not if it's an arbitrary string.
-                        // Ideally, our detection of this error would be more generalised.
-                        if let (
-                            ast::Expr::StringLiteral(string),
-                            _,
-                            _,
-                            Type::NominalInstance(_)
-                            | Type::ProtocolInstance(_)
-                            | Type::TypedDict(_),
-                        )
-                        | (
-                            _,
-                            ast::Expr::StringLiteral(string),
-                            Type::NominalInstance(_)
-                            | Type::ProtocolInstance(_)
-                            | Type::TypedDict(_),
-                            _,
-                        ) = (&*binary.left, &*binary.right, left_ty, right_ty)
-                            && !self.deferred_state.in_string_annotation()
+                        if !self.deferred_state.in_string_annotation()
                             && !self.file().is_stub(self.db())
                             && Program::get(self.db()).python_version(self.db())
                                 < PythonVersion::PY314
                             && !self.index.has_future_annotations()
-                            && let Some(builder) =
-                                self.context.report_lint(&UNSUPPORTED_OPERATOR, binary)
                         {
-                            let mut diagnostic = builder.into_diagnostic(
-                                "String annotations are not supported in `|` unions on Python <3.14",
+                            let previous_state = std::mem::replace(
+                                &mut self.multi_inference_state,
+                                MultiInferenceState::Ignore,
                             );
-                            diagnostic.annotate(
-                                self.context
-                                    .secondary(string)
-                                    .message("Invalid string-literal element"),
-                            );
-                            diagnostic.info("This will raise `TypeError` at runtime");
-                            diagnostic.help(
-                                "Put quotes around the whole union rather than just one element",
-                            );
-                            add_inferred_python_version_hint_to_diagnostic(
-                                self.db(),
-                                &mut diagnostic,
-                                "inferring types",
-                            );
+                            let left_type_value =
+                                self.infer_expression(&binary.left, TypeContext::default());
+                            let right_type_value =
+                                self.infer_expression(&binary.right, TypeContext::default());
+                            self.multi_inference_state = previous_state;
+
+                            let dunder_fails = left_type_value
+                                .try_call_dunder(
+                                    self.db(),
+                                    "__or__",
+                                    CallArguments::positional([right_type_value]),
+                                    TypeContext::default(),
+                                )
+                                .or_else(|_| {
+                                    right_type_value.try_call_dunder(
+                                        self.db(),
+                                        "__ror__",
+                                        CallArguments::positional([left_type_value]),
+                                        TypeContext::default(),
+                                    )
+                                })
+                                .is_err();
+
+                            // As well as trying the normal dunder lookup,
+                            // we also check for the case where one of the operands is a class-literal type
+                            // and the other is a string literal. The normal dunder lookup fails to catch
+                            // this error, since typeshed annotates `type.__(r)or__` as accepting `Any`.
+                            let should_emit_error = dunder_fails
+                                || matches!(
+                                    (left_type_value, right_type_value),
+                                    (
+                                        Type::ClassLiteral(class), Type::LiteralValue(literal))
+                                        | (Type::LiteralValue(literal), Type::ClassLiteral(class)
+                                    )
+                                    if class.metaclass(self.db()) == KnownClass::Type.to_class_literal(self.db())
+                                    && !literal.is_enum()
+                                );
+
+                            if should_emit_error
+                                && let Some(builder) =
+                                    self.context.report_lint(&UNSUPPORTED_OPERATOR, binary)
+                            {
+                                let mut diagnostic =
+                                    builder.into_diagnostic("Unsupported `|` operation");
+
+                                if left_type_value.is_equivalent_to(self.db(), right_type_value) {
+                                    diagnostic.set_primary_message(format_args!(
+                                        "Types on both sides of `|` are `{}`",
+                                        left_type_value.display(self.db())
+                                    ));
+                                    diagnostic.set_concise_message(format_args!(
+                                        "Operator `|` is unsupported between \
+                                        two objects of type `{}`",
+                                        left_type_value.display(self.db())
+                                    ));
+                                } else {
+                                    for (operand, ty) in [
+                                        (&*binary.left, left_type_value),
+                                        (&*binary.right, right_type_value),
+                                    ] {
+                                        diagnostic.annotate(
+                                            self.context.secondary(operand).message(format_args!(
+                                                "Has type `{}`",
+                                                ty.display(self.db())
+                                            )),
+                                        );
+                                    }
+                                    diagnostic.set_concise_message(format_args!(
+                                        "Operator `|` is unsupported between \
+                                        object of type `{}` and object of type `{}`",
+                                        left_type_value.display(self.db()),
+                                        right_type_value.display(self.db())
+                                    ));
+                                }
+
+                                diagnostic.info(
+                                    "All type expressions are evaluated at runtime \
+                                    by default on Python <3.14",
+                                );
+                                add_inferred_python_version_hint_to_diagnostic(
+                                    self.db(),
+                                    &mut diagnostic,
+                                    "inferring types",
+                                );
+
+                                if (binary.left.is_string_literal_expr()
+                                    && !binary.right.is_string_literal_expr())
+                                    || (binary.right.is_string_literal_expr()
+                                        && !binary.left.is_string_literal_expr())
+                                {
+                                    diagnostic.help(
+                                        "Put quotes around the whole union \
+                                        rather than just one element",
+                                    );
+                                }
+                            }
                         }
 
                         UnionType::from_elements_leave_aliases(self.db(), [left_ty, right_ty])
