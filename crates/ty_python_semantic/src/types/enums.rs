@@ -10,7 +10,7 @@ use crate::{
     semantic_index::{place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
+        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, function::FunctionType,
     },
 };
 
@@ -19,9 +19,10 @@ pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
 
-    /// The type used for *validating* member value assignments.
+    /// The type used for `.value` access when no `_value_` annotation exists.
     ///
-    /// Priority: `__init__` → `Any`, else `_value_` annotation, else `Unknown`.
+    /// When `__init__` is defined, this is `Any` (since values are processed
+    /// through `__init__`). Otherwise, falls back to `Unknown` (use inferred type).
     pub(crate) value_sunder_type: Type<'db>,
 
     /// The explicit `_value_` annotation type, if declared.
@@ -29,6 +30,12 @@ pub(crate) struct EnumMetadata<'db> {
     /// This is kept separate from `value_sunder_type` because `.value` access
     /// always prefers the `_value_` annotation, even when `__init__` exists.
     value_annotation: Option<Type<'db>>,
+
+    /// The custom `__init__` function, if defined on this enum.
+    ///
+    /// When present, member values are validated by synthesizing a call to
+    /// `__init__` rather than by simple type assignability.
+    pub(crate) init_function: Option<FunctionType<'db>>,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
@@ -40,6 +47,7 @@ impl<'db> EnumMetadata<'db> {
             aliases: FxHashMap::default(),
             value_sunder_type: Type::Dynamic(DynamicType::Unknown),
             value_annotation: None,
+            init_function: None,
         }
     }
 
@@ -326,12 +334,15 @@ pub(crate) fn enum_metadata<'db>(
                 .ignore_possibly_undefined()
         });
 
-    // Determine the expected type for member value validation:
-    // (a) If `__init__` is defined, fall back to `Any` (member values are passed
-    //     through `__init__`, not directly assigned to `_value_`).
+    let init_function = custom_init(db, scope_id);
+
+    // Determine the type for `.value` access and simple member value validation:
+    // (a) If `__init__` is defined, fall back to `Any` for `.value` access
+    //     (member value validation is handled separately via call synthesis).
     // (b) Otherwise, use an explicit `_value_` annotation if present.
-    // (c) Otherwise, fall back to `Unknown` (no member value validation).
-    let value_sunder_type = has_custom_init(db, scope_id)
+    // (c) Otherwise, fall back to `Unknown` (use inferred member value type).
+    let value_sunder_type = init_function
+        .map(|_| Type::Dynamic(DynamicType::Any))
         .or(value_annotation)
         .unwrap_or(Type::Dynamic(DynamicType::Unknown));
 
@@ -340,12 +351,12 @@ pub(crate) fn enum_metadata<'db>(
         aliases,
         value_sunder_type,
         value_annotation,
+        init_function,
     })
 }
 
-/// If the enum defines a custom `__init__`, member values are passed through it
-/// rather than being assigned directly to `_value_`, so we fall back to `Any`.
-fn has_custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<Type<'db>> {
+/// Returns the custom `__init__` function type if one is defined on the enum.
+fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
     let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
     let init_type = place_from_declarations(
         db,
@@ -354,7 +365,10 @@ fn has_custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<Type<'db
     .ignore_conflicting_declarations()
     .ignore_possibly_undefined()?;
 
-    matches!(init_type, Type::FunctionLiteral(_)).then_some(Type::Dynamic(DynamicType::Any))
+    match init_type {
+        Type::FunctionLiteral(f) => Some(f),
+        _ => None,
+    }
 }
 
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(

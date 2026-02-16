@@ -23,7 +23,8 @@ use crate::{
     },
     types::{
         CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type, TypeQualifiers,
+        StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
@@ -35,6 +36,7 @@ use crate::{
         enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        tuple::Tuple,
     },
 };
 
@@ -206,24 +208,32 @@ fn check_class_declaration<'db>(
                 let skip_type_check = context.in_stub() && is_ellipsis;
 
                 if !skip_type_check {
-                    // Determine the expected type for the member
-                    let expected_type = enum_info.value_sunder_type;
-                    if !member_value_type.is_assignable_to(db, expected_type) {
-                        if let Some(builder) = context.report_lint(
-                            &INVALID_ASSIGNMENT,
-                            first_reachable_definition.focus_range(db, context.module()),
-                        ) {
-                            let mut diagnostic = builder.into_diagnostic(format_args!(
-                                "Enum member `{}` value is not assignable to expected type",
-                                &member.name
-                            ));
-                            diagnostic.info(format_args!(
-                                "Expected `{}`, got `{}`",
-                                expected_type.display(db),
-                                member_value_type.display(db)
-                            ));
-                            // TODO we could also point to the source of our `_value_` type
-                            // expectations (`_value_` annotation or `__init__` method)
+                    if let Some(init_function) = enum_info.init_function {
+                        check_enum_member_against_init(
+                            context,
+                            init_function,
+                            instance_of_class,
+                            member_value_type,
+                            &member.name,
+                            *first_reachable_definition,
+                        );
+                    } else {
+                        let expected_type = enum_info.value_sunder_type;
+                        if !member_value_type.is_assignable_to(db, expected_type) {
+                            if let Some(builder) = context.report_lint(
+                                &INVALID_ASSIGNMENT,
+                                first_reachable_definition.focus_range(db, context.module()),
+                            ) {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Enum member `{}` value is not assignable to expected type",
+                                    &member.name
+                                ));
+                                diagnostic.info(format_args!(
+                                    "Expected `{}`, got `{}`",
+                                    expected_type.display(db),
+                                    member_value_type.display(db)
+                                ));
+                            }
                         }
                     }
                 }
@@ -710,4 +720,62 @@ fn check_post_init_signature<'db>(
         "`__post_init__` methods must accept all `InitVar` fields \
             as positional-only parameters",
     );
+}
+
+/// Validates an enum member value against the enum's `__init__` signature.
+///
+/// The enum metaclass unpacks tuple values as positional arguments to `__init__`,
+/// and passes non-tuple values as a single argument. This function synthesizes
+/// a call to `__init__` with the appropriate arguments and reports a diagnostic
+/// if the call would fail.
+fn check_enum_member_against_init<'db>(
+    context: &InferContext<'db, '_>,
+    init_function: FunctionType<'db>,
+    self_type: Type<'db>,
+    member_value_type: Type<'db>,
+    member_name: &Name,
+    definition: Definition<'db>,
+) {
+    let db = context.db();
+
+    // The enum metaclass unpacks tuple values as positional args:
+    //   MEMBER = (a, b, c)  →  __init__(self, a, b, c)
+    //   MEMBER = x          →  __init__(self, x)
+    let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type {
+        if let Some(spec) = instance.tuple_spec(db) {
+            if let Tuple::Fixed(fixed) = &*spec {
+                fixed.all_elements().to_vec()
+            } else {
+                // Variable-length tuples: can't determine exact args, skip validation.
+                return;
+            }
+        } else {
+            vec![member_value_type]
+        }
+    } else {
+        vec![member_value_type]
+    };
+
+    let call_args = CallArguments::positional(args);
+    let call_args = call_args.with_self(Some(self_type));
+
+    let result = Type::FunctionLiteral(init_function)
+        .bindings(db)
+        .match_parameters(db, &call_args)
+        .check_types(db, &call_args, TypeContext::default(), &[]);
+
+    if result.is_err() {
+        if let Some(builder) = context.report_lint(
+            &INVALID_ASSIGNMENT,
+            definition.focus_range(db, context.module()),
+        ) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Enum member `{member_name}` is incompatible with `__init__`",
+            ));
+            diagnostic.info(format_args!(
+                "Expected compatible arguments for `{}`",
+                Type::FunctionLiteral(init_function).display(db),
+            ));
+        }
+    }
 }
