@@ -303,10 +303,10 @@ pub(crate) struct UseDefMap<'db> {
     /// Array of reachability constraints in this scope.
     reachability_constraints: ReachabilityConstraints,
 
-    /// Interned [`Bindings`] values referenced by [`Self::bindings_by_use`].
+    /// Interned [`Bindings`] values.
     interned_bindings: IndexVec<ScopedBindingsId, Bindings>,
 
-    /// Interned bindings ID reaching a [`ScopedUseId`].
+    /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, ScopedBindingsId>,
 
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
@@ -335,15 +335,17 @@ pub(crate) struct UseDefMap<'db> {
     /// [`PlaceState`] visible at end of scope for each symbol.
     end_of_scope_symbols: IndexVec<ScopedSymbolId, PlaceState>,
 
-    /// [`PlaceState`] visible at end of scope for each member.
+    /// Interned [`PlaceState`] for members.
     interned_place_states: IndexVec<ScopedPlaceStateId, PlaceState>,
+    /// [`PlaceState`] visible at end of scope for each member.
     end_of_scope_members: IndexVec<ScopedMemberId, ScopedPlaceStateId>,
 
     /// All potentially reachable bindings and declarations, for each symbol.
     reachable_definitions_by_symbol: IndexVec<ScopedSymbolId, ReachableDefinitions>,
 
-    /// All potentially reachable bindings and declarations, for each member.
+    /// Interned [`ReachableDefinitions`] for members.
     interned_reachable_definitions: IndexVec<ScopedReachableDefinitionsId, ReachableDefinitions>,
+    /// All potentially reachable bindings and declarations, for each member.
     reachable_definitions_by_member: IndexVec<ScopedMemberId, ScopedReachableDefinitionsId>,
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
