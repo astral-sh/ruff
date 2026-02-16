@@ -477,7 +477,7 @@ async def main(
             print("| ---- | ------- | --------- | -------- |")
             for rule, (additions, removals) in sorted(
                 rule_changes.items(),
-                key=lambda x: (x[1][0] + x[1][1]),
+                key=lambda x: x[1][0] + x[1][1],
                 reverse=True,
             ):
                 print(f"| {rule} | {additions + removals} | {additions} | {removals} |")
