@@ -389,6 +389,31 @@ def _(number_of_periods: int | None, interval: str):
     reveal_type(number_of_periods)  # revealed: int
 ```
 
+## Non-singleton value patterns do not narrow
+
+Value patterns are checked with `==`, and non-singleton values can implement arbitrary `__eq__`. So
+matching against a non-singleton value pattern should not narrow the subject type.
+
+```py
+class A:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class B:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class Holder:
+    TARGET = A()
+
+def _(x: A | B):
+    match x:
+        case Holder.TARGET:
+            reveal_type(x)  # revealed: A | B
+        case _:
+            reveal_type(x)  # revealed: A | B
+```
+
 ## Narrowing tagged unions of tuples
 
 Narrow unions of tuples based on literal tag elements in `match` statements:
@@ -473,4 +498,205 @@ def _(u: tuple[Literal["foo"], int] | tuple[Literal["bar"], str]):
             # Since the previous case could match any string, this case can
             # still narrow to `tuple[Literal["bar"], str]` when `u[0]` equals "bar".
             reveal_type(u)  # revealed: tuple[Literal["bar"], str]
+```
+
+## Sequence patterns
+
+Sequence patterns narrow tuple element types based on the patterns matched against each element.
+
+```py
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (x, str()):
+            reveal_type(subj)  # revealed: tuple[int | str, str]
+        case (int(), y):
+            reveal_type(subj)  # revealed: tuple[int, int | str]
+
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (int(), str()):
+            reveal_type(subj)  # revealed: tuple[int, str]
+
+def _(subj: tuple[int | str | None, int | str | None]):
+    match subj:
+        case (None, _):
+            reveal_type(subj)  # revealed: tuple[None, int | str | None]
+        case (_, None):
+            reveal_type(subj)  # revealed: tuple[int | str | None, None]
+```
+
+## Sequence patterns with nested tuples
+
+```py
+def _(subj: tuple[tuple[int | str, int], int | str]):
+    match subj:
+        case ((str(), _), _):
+            reveal_type(subj)  # revealed: tuple[tuple[str, int], int | str]
+```
+
+## Sequence patterns with union of tuple and non-tuple
+
+Non-tuple union members can't be narrowed by sequence patterns, but they should be preserved in the
+result since they could still match at runtime.
+
+```py
+def _(subj: list[str] | tuple[int | str, int]):
+    match subj:
+        case (str(), _):
+            reveal_type(subj)  # revealed: list[str] | tuple[str, int]
+```
+
+## Sequence patterns with or patterns
+
+```py
+def _(subj: tuple[int | str | bytes, int | str]):
+    match subj:
+        case (int() | str(), _):
+            reveal_type(subj)  # revealed: tuple[int | str, int | str]
+```
+
+## Sequence patterns with non-singleton value patterns
+
+Value patterns in sequence elements are equality checks, so non-singleton value patterns should not
+narrow the element type.
+
+```py
+class EqA:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class EqB:
+    def __eq__(self, other: object) -> bool:
+        return True
+
+class Holder:
+    TARGET = EqA()
+
+def _(subj: tuple[EqA | EqB, int]):
+    match subj:
+        case (Holder.TARGET, _):
+            reveal_type(subj)  # revealed: tuple[EqA | EqB, int]
+        case _:
+            reveal_type(subj)  # revealed: tuple[EqA | EqB, int]
+```
+
+## Sequence patterns with wildcards
+
+Wildcards (`_`) and name patterns don't narrow the element type.
+
+```py
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (_, _):
+            reveal_type(subj)  # revealed: tuple[int | str, int | str]
+
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (x, y):
+            reveal_type(subj)  # revealed: tuple[int | str, int | str]
+```
+
+## Sequence pattern negative narrowing
+
+Negative narrowing for sequence patterns is not currently supported. When a sequence pattern doesn't
+match, subsequent cases see the original type.
+
+```py
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (int(), int()):
+            reveal_type(subj)  # revealed: tuple[int, int]
+        case _:
+            reveal_type(subj)  # revealed: tuple[int | str, int | str]
+```
+
+## Sequence pattern exhaustiveness
+
+When a sequence pattern exhaustively matches all possible tuple values, subsequent cases should be
+unreachable (`Never`).
+
+```py
+def _(subj: tuple[int, str]):
+    match subj:
+        case (int(), str()):
+            reveal_type(subj)  # revealed: tuple[int, str]
+        case _:
+            reveal_type(subj)  # revealed: Never
+```
+
+## Sequence patterns with homogeneous tuples
+
+Sequence patterns on homogeneous tuples narrow to a fixed-length tuple with the specified length.
+
+```py
+def _(subj: tuple[int | str, ...]):
+    match subj:
+        case (x, str()):
+            reveal_type(subj)  # revealed: tuple[int | str, str]
+
+def _(subj: tuple[int | str, ...]):
+    match subj:
+        case (int(), int(), y):
+            reveal_type(subj)  # revealed: tuple[int, int, int | str]
+```
+
+## Sequence patterns with list syntax
+
+List syntax `[...]` works identically to tuple syntax `(...)` for sequence patterns.
+
+```py
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case [int(), str()]:
+            reveal_type(subj)  # revealed: tuple[int, str]
+```
+
+## Sequence patterns with union tuple subjects
+
+When the subject is a union of tuple types, each union element is narrowed independently.
+
+```py
+def _(subj: tuple[int, int] | tuple[str, str]):
+    match subj:
+        case (int(), _):
+            reveal_type(subj)  # revealed: tuple[int, int]
+
+def _(subj: tuple[int, int] | tuple[str, str]):
+    match subj:
+        case (int(), str()):
+            reveal_type(subj)  # revealed: Never
+
+def _(subj: tuple[int, str] | tuple[str, int]):
+    match subj:
+        case (int(), _):
+            reveal_type(subj)  # revealed: tuple[int, str]
+        case (str(), _):
+            reveal_type(subj)  # revealed: tuple[str, int]
+```
+
+## Sequence patterns with type alias subjects
+
+Sequence patterns correctly narrow through type aliases.
+
+```py
+from typing import TypeAlias
+
+Alias: TypeAlias = tuple[int | str, int | str]
+
+def _(subj: Alias):
+    match subj:
+        case (int(), str()):
+            reveal_type(subj)  # revealed: tuple[int, str]
+```
+
+## Sequence patterns with non-tuple subjects
+
+Sequence patterns on non-tuple subjects still don't produce tuple narrowing, but obviously
+impossible element patterns can be recognized as unreachable.
+
+```py
+def _(subj: list[int]):
+    match subj:
+        case [int(), str()]:
+            reveal_type(subj)  # revealed: Never
 ```
