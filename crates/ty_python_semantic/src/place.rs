@@ -14,9 +14,9 @@ use crate::semantic_index::{
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
-    ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, MemberLookupPolicy,
-    Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
-    declaration_type,
+    ApplyTypeMappingVisitor, DynamicType, KnownClass, MAX_CYCLE_RECOVERY_ITERATIONS,
+    MaterializationKind, MemberLookupPolicy, Truthiness, Type, TypeAndQualifiers, TypeQualifiers,
+    UnionBuilder, UnionType, binding_type, declaration_type,
 };
 use crate::{Db, FxOrderSet, Program};
 
@@ -810,6 +810,12 @@ impl<'db> PlaceAndQualifiers<'db> {
         previous_place: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        // Force convergence when the cycle has been iterating for too many rounds.
+        // See [`MAX_CYCLE_RECOVERY_ITERATIONS`] for details.
+        if cycle.iteration() >= MAX_CYCLE_RECOVERY_ITERATIONS {
+            return previous_place;
+        }
+
         let place = match (previous_place.place, self.place) {
             // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
             // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.

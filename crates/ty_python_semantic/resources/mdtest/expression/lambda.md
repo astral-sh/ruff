@@ -5,7 +5,7 @@
 `lambda` expressions can be defined without any parameters.
 
 ```py
-reveal_type(lambda: 1)  # revealed: () -> Unknown
+reveal_type(lambda: 1)  # revealed: () -> Literal[1]
 
 # error: [unresolved-reference]
 reveal_type(lambda: a)  # revealed: () -> Unknown
@@ -24,7 +24,7 @@ reveal_type(lambda a, b: a + b)  # revealed: (a, b) -> Unknown
 But, it can have default values:
 
 ```py
-reveal_type(lambda a=1: a)  # revealed: (a=1) -> Unknown
+reveal_type(lambda a=1: a)  # revealed: (a=1) -> Unknown | Literal[1]
 reveal_type(lambda a, b=2: a)  # revealed: (a, b=2) -> Unknown
 ```
 
@@ -37,25 +37,25 @@ reveal_type(lambda a, b, /, c: c)  # revealed: (a, b, /, c) -> Unknown
 And, keyword-only parameters:
 
 ```py
-reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=2, c) -> Unknown
+reveal_type(lambda a, *, b=2, c: b)  # revealed: (a, *, b=2, c) -> Unknown | Literal[2]
 ```
 
 And, variadic parameter:
 
 ```py
-reveal_type(lambda *args: args)  # revealed: (*args) -> Unknown
+reveal_type(lambda *args: args)  # revealed: (*args) -> tuple[Unknown, ...]
 ```
 
 And, keyword-varidic parameter:
 
 ```py
-reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> Unknown
+reveal_type(lambda **kwargs: kwargs)  # revealed: (**kwargs) -> dict[str, Unknown]
 ```
 
 Mixing all of them together:
 
 ```py
-# revealed: (a, b, /, c=True, *args, *, d="default", e=5, **kwargs) -> Unknown
+# revealed: (a, b, /, c=True, *args, *, d="default", e=5, **kwargs) -> None
 reveal_type(lambda a, b, /, c=True, *args, d="default", e=5, **kwargs: None)
 ```
 
@@ -94,7 +94,40 @@ Here, a `lambda` expression is used as the default value for a parameter in anot
 expression.
 
 ```py
-reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Unknown
+reveal_type(lambda a=lambda x, y: 0: 2)  # revealed: (a=...) -> Literal[2]
+```
+
+## Return type inference
+
+The return type of a lambda is inferred from the type of its body expression.
+
+```py
+reveal_type(lambda: 1)  # revealed: () -> Literal[1]
+reveal_type(lambda: "hello")  # revealed: () -> Literal["hello"]
+reveal_type(lambda: True)  # revealed: () -> Literal[True]
+reveal_type(lambda: None)  # revealed: () -> None
+reveal_type(lambda: (1, "a"))  # revealed: () -> tuple[Literal[1], Literal["a"]]
+```
+
+When the body uses parameters with unknown types, the return type may be `Unknown`:
+
+```py
+reveal_type(lambda x: x)  # revealed: (x) -> Unknown
+reveal_type(lambda x, y: x + y)  # revealed: (x, y) -> Unknown
+```
+
+When the body is a constant expression unrelated to parameters, the return type is inferred:
+
+```py
+reveal_type(lambda x: 42)  # revealed: (x) -> Literal[42]
+reveal_type(lambda x, y: "result")  # revealed: (x, y) -> Literal["result"]
+reveal_type(lambda x: None)  # revealed: (x) -> None
+```
+
+Nested lambda return types are also inferred:
+
+```py
+reveal_type(lambda: lambda: 1)  # revealed: () -> () -> Literal[1]
 ```
 
 ## Assignment

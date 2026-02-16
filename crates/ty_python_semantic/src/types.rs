@@ -129,6 +129,14 @@ mod definition;
 mod property_tests;
 mod subscript;
 
+/// The maximum number of Salsa fixpoint iterations before `cycle_normalized` forces convergence
+/// by returning the previous value unchanged. Salsa itself panics at 200 iterations;
+/// this limit ensures we stop growing union types well before that point.
+/// In practice, well-behaved cycles converge within ~10 iterations. Cycles that haven't
+/// converged after this many iterations involve pathological code (e.g. classes with circular
+/// decorators, bases, and type parameters) and are unlikely to ever converge.
+pub(crate) const MAX_CYCLE_RECOVERY_ITERATIONS: u32 = 100;
+
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
     let _span = tracing::trace_span!("check_types", ?file).entered();
     tracing::debug!("Checking file '{path}'", path = file.path(db));
@@ -909,6 +917,10 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
+        if cycle.iteration() >= MAX_CYCLE_RECOVERY_ITERATIONS {
+            return previous;
+        }
+
         // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
         // without converging on a fixed-point result. Most of the time, we union together the
         // types from each cycle iteration to ensure that our result is monotonic, even if we

@@ -12110,10 +12110,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.deferred_state = previous_deferred_state;
 
-        // TODO: Useful inference of a lambda's return type will require a different approach,
-        // which does the inference of the body expression based on arguments at each call site,
-        // rather than eagerly computing a return type without knowing the argument types.
-        Type::function_like_callable(self.db(), Signature::new(parameters, Type::unknown()))
+        // Infer the return type from the lambda body expression. This eagerly computes
+        // a return type without knowing the argument types; more precise inference would
+        // require deferring to each call site, similar to how overloaded functions work.
+        let return_ty = if let Some(scope_id) = self
+            .index
+            .try_node_scope(NodeWithScopeRef::Lambda(lambda_expression))
+        {
+            let scope = scope_id.to_scope_id(self.db(), self.file());
+            let inference = infer_scope_types(self.db(), scope, TypeContext::default());
+            inference.expression_type(&*lambda_expression.body)
+        } else {
+            Type::unknown()
+        };
+
+        Type::function_like_callable(self.db(), Signature::new(parameters, return_ty))
     }
 
     fn infer_call_expression(
