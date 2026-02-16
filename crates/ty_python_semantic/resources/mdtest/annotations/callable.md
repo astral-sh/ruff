@@ -227,7 +227,7 @@ A nested `Callable` as one of the parameter types:
 from typing import Callable
 
 def _(c: Callable[[Callable[[int], str]], int]):
-    reveal_type(c)  # revealed: (((int, /) -> str), /) -> int
+    reveal_type(c)  # revealed: ((int, /) -> str, /) -> int
 ```
 
 And, as the return type:

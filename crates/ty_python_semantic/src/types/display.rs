@@ -2194,17 +2194,9 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             if self.param.should_annotation_be_displayed() {
                 let annotated_type = self.param.annotated_type();
                 f.write_str(": ")?;
-                if should_parenthesize_callable_type(annotated_type, self.db) {
-                    f.write_char('(')?;
-                    annotated_type
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                    f.write_char(')')?;
-                } else {
-                    annotated_type
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                }
+                annotated_type
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_type) = self.param.default_type() {
@@ -2245,18 +2237,10 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
             // This case is specifically for the `Callable` signature where name and default value
             // cannot be provided. For unnamed parameters we always display the type, to ensure we
             // have something visible in the parameter slot.
-            let annotated_type = self.param.annotated_type();
-            if should_parenthesize_callable_type(annotated_type, self.db) {
-                f.write_char('(')?;
-                annotated_type
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
-                f.write_char(')')?;
-            } else {
-                annotated_type
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
-            }
+            self.param
+                .annotated_type()
+                .display_with(self.db, self.settings.clone())
+                .fmt_detailed(f)?;
         }
         Ok(())
     }

@@ -278,7 +278,7 @@ from typing import Callable
 class D:
     c: Callable[[int], str]
 
-reveal_type(D.__init__)  # revealed: (self: D, c: ((int, /) -> str)) -> None
+reveal_type(D.__init__)  # revealed: (self: D, c: (int, /) -> str) -> None
 ```
 
 Implicit instance attributes do not affect the signature of `__init__`:
