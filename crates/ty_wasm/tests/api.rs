@@ -31,6 +31,6 @@ fn check() {
     );
     assert_eq!(
         diagnostic.message(),
-        "Cannot resolve imported module `random22`: Did you mean `random`?`"
+        "Cannot resolve imported module `random22`: Did you mean `random`?"
     );
 }
