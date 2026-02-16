@@ -1210,24 +1210,22 @@ fail, the priority hierarchy is used for diagnostics:
 from ty_extensions import Intersection, Top
 from typing import Callable
 
+class A: ...
+class B: ...
+
 def _(
-    i: Intersection[Callable[[int], str], Top[Callable[..., object]]],
-    c: Callable[[str], int],
-    flag: bool,
+    f: Intersection[Callable[[int], A], Top[Callable[..., B]]] | Callable[[str], int],
 ) -> None:
-    # Create a union of the intersection
-    f = i if flag else c
+    reveal_type(f)  # revealed: (((int, /) -> A) & Top[(...) -> B]) | ((str, /) -> int)
 
     # When called with a string argument:
-    # - The intersection element: Callable[[int], str] fails (wrong type),
+    # - The intersection element: Callable[[int], A] fails (wrong type),
     #   Top[...] would fail with call-top-callable. Due to priority hierarchy,
     #   only the invalid-argument-type error is shown for the intersection.
     # - The Callable[[str], int] element succeeds.
     # The return type includes both elements' return types:
-    # - intersection: str (from Callable[[int], str])
-    # - regular: int (from Callable[[str], int])
     # error: [invalid-argument-type]
-    reveal_type(f("hello"))  # revealed: str | int
+    reveal_type(f("hello"))  # revealed: (A & B) | int
 ```
 
 ### All union elements succeed
@@ -1253,6 +1251,7 @@ class ReturnsB:
 def _(
     f: Intersection[ReturnsA, ReturnsB] | Callable[[int], str],
 ) -> None:
+    reveal_type(f)  # revealed: (ReturnsA & ReturnsB) | ((int, /) -> str)
     reveal_type(f(42))  # revealed: (A & B) | str
 ```
 
@@ -1264,18 +1263,16 @@ When all union elements fail (including intersection elements), errors are repor
 from ty_extensions import Intersection, Top
 from typing import Callable
 
+class A: ...
+class B: ...
+
 def _(
-    i: Intersection[Callable[[int], str], Top[Callable[..., object]]],
-    c: Callable[[str], int],
-    flag: bool,
+    f: Intersection[Callable[[int], A], Top[Callable[..., B]]] | Callable[[str], int],
 ) -> None:
-    if flag:
-        f = i
-    else:
-        f = c
+    reveal_type(f)  # revealed: (((int, /) -> A) & Top[(...) -> B]) | ((str, /) -> int)
 
     # When called with no arguments:
-    # - The intersection element: Callable[[int], str] fails (missing argument),
+    # - The intersection element: Callable[[int], A] fails (missing argument),
     #   Top[...] would fail with call-top-callable. Due to priority hierarchy,
     #   only the missing-argument error is shown.
     # - The Callable[[str], int] also fails (missing argument).
