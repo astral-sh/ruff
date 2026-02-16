@@ -98,7 +98,7 @@ get-size2 = { version = "0.7.3", features = [
     "compact-str",
     "ordermap"
 ] }
-getrandom = { version = "0.3.1" }
+getrandom = { version = "0.4.1" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
@@ -147,7 +147,7 @@ quick-junit = { version = "0.5.0" }
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0" }
 quote = { version = "1.0.23" }
-rand = { version = "0.9.0" }
+rand = { version = "0.10.0" }
 rayon = { version = "1.10.0" }
 regex = { version = "1.10.2" }
 regex-automata = { version = "0.4.9" }
