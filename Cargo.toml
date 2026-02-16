@@ -98,7 +98,7 @@ get-size2 = { version = "0.7.3", features = [
     "compact-str",
     "ordermap"
 ] }
-getrandom = { version = "0.3.1" }
+getrandom = { version = "0.4.0" }
 glob = { version = "0.3.1" }
 globset = { version = "0.4.14" }
 globwalk = { version = "0.9.1" }
