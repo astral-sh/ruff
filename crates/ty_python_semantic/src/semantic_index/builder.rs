@@ -1022,13 +1022,39 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             ast::Operator::BitOr => left | right,
                             ast::Operator::BitXor => left ^ right,
                             ast::Operator::LShift => {
-                                let shift = u32::try_from(right).ok()?;
-                                left.checked_shl(shift)?
+                                if left == 0 && right >= 0 {
+                                    0
+                                } else {
+                                    // An additional overflow check beyond `checked_shl` is
+                                    // necessary here, because `checked_shl` only rejects shift
+                                    // amounts >= 64; it does not detect when significant bits
+                                    // are shifted into (or past) the sign bit.
+                                    //
+                                    // We compute the "headroom": the number of redundant
+                                    // sign-extension bits minus one (for the sign bit itself).
+                                    // A shift is safe iff `shift <= headroom`.
+                                    let headroom = if left >= 0 {
+                                        left.leading_zeros().saturating_sub(1)
+                                    } else {
+                                        left.leading_ones().saturating_sub(1)
+                                    };
+                                    u32::try_from(right)
+                                        .ok()
+                                        .filter(|&shift| shift <= headroom)
+                                        .and_then(|shift| left.checked_shl(shift))?
+                                }
                             }
-                            ast::Operator::RShift => {
-                                let shift = u32::try_from(right).ok()?;
-                                left.checked_shr(shift)?
-                            }
+                            ast::Operator::RShift => match u32::try_from(right) {
+                                Ok(shift) => left >> shift.clamp(0, 63),
+                                Err(_) if right > 0 => {
+                                    if left >= 0 {
+                                        0
+                                    } else {
+                                        -1
+                                    }
+                                }
+                                Err(_) => return None,
+                            },
                             ast::Operator::Pow => {
                                 let exp = u32::try_from(right).ok()?;
                                 left.checked_pow(exp)?
