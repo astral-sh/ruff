@@ -160,12 +160,12 @@
 //! complete module, not a partially-executed module. (We may want to get a little smarter than
 //! this in the future for some closures, but for now this is where we start.)
 //!
-//! The data structure we build to answer these questions is the `UseDefMap`. It has an interned
-//! bindings table plus a `bindings_by_use` vector of interned bindings IDs indexed by
-//! [`ScopedUseId`], a
-//! `declarations_by_binding` vector of [`Declarations`] indexed by [`ScopedDefinitionId`], a
+//! The data structure we build to answer these questions is the `UseDefMap`. It has a
+//! `bindings_by_use` vector of [`InternedBindingsId`] indexed by [`ScopedUseId`]
+//! (plus an interned bindings table), a
+//! `declarations_by_binding` vector of [`InternedDeclarationsId`] indexed by [`ScopedDefinitionId`], a
 //! `bindings_by_declaration` vector of [`Bindings`] indexed by [`ScopedDefinitionId`], and
-//! `public_bindings` and `public_definitions` vectors indexed by [`ScopedPlaceId`]. The values in
+//! `end_of_scope_symbols` and `end_of_scope_members` vectors indexed by [`ScopedSymbolId`]/[`ScopedMemberId`]. The values in
 //! each of these vectors are (in principle) a list of live bindings at that use/definition, or at
 //! the end of the scope for that place, with a list of the dominating constraints for each
 //! binding.
@@ -274,30 +274,30 @@ pub(crate) use place_state::{LiveBinding, ScopedDefinitionId};
 /// Uniquely identifies an interned [`Bindings`] entry in [`UseDefMap::interned_bindings`].
 #[newtype_index]
 #[derive(salsa::Update, get_size2::GetSize)]
-struct ScopedBindingsId;
+struct InternedBindingsId;
 
 /// Uniquely identifies an interned [`Declarations`] entry in [`UseDefMap::interned_declarations`].
 #[newtype_index]
 #[derive(salsa::Update, get_size2::GetSize)]
-struct ScopedDeclarationsId;
+struct InternedDeclarationsId;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
-struct ScopedPlaceStateId(ScopedBindingsId, ScopedDeclarationsId);
+struct InternedPlaceStateId(InternedBindingsId, InternedDeclarationsId);
 
-impl ScopedPlaceStateId {
-    fn bindings_id(self) -> ScopedBindingsId {
+impl InternedPlaceStateId {
+    fn bindings_id(self) -> InternedBindingsId {
         self.0
     }
 
-    fn declarations_id(self) -> ScopedDeclarationsId {
+    fn declarations_id(self) -> InternedDeclarationsId {
         self.1
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-enum ScopedEnclosingSnapshotDataId {
+enum InternedEnclosingSnapshotId {
     Constraint(ScopedNarrowingConstraint),
-    Bindings(ScopedBindingsId),
+    Bindings(InternedBindingsId),
 }
 
 /// Applicable definitions and constraints for every use of a name.
@@ -314,12 +314,12 @@ pub(crate) struct UseDefMap<'db> {
     reachability_constraints: ReachabilityConstraints,
 
     /// Interned [`Bindings`] values.
-    interned_bindings: IndexVec<ScopedBindingsId, Bindings>,
+    interned_bindings: IndexVec<InternedBindingsId, Bindings>,
     /// Interned [`Declarations`] values.
-    interned_declarations: IndexVec<ScopedDeclarationsId, Declarations>,
+    interned_declarations: IndexVec<InternedDeclarationsId, Declarations>,
 
     /// [`Bindings`] reaching a [`ScopedUseId`].
-    bindings_by_use: IndexVec<ScopedUseId, ScopedBindingsId>,
+    bindings_by_use: IndexVec<ScopedUseId, InternedBindingsId>,
 
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
     node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
@@ -330,7 +330,7 @@ pub(crate) struct UseDefMap<'db> {
     /// If the definition is both a declaration and a binding -- `x: int = 1` for example -- then
     /// we don't actually need anything here, all we'll need to validate is that our own RHS is a
     /// valid assignment to our own annotation.
-    declarations_by_binding: FxHashMap<Definition<'db>, ScopedDeclarationsId>,
+    declarations_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId>,
 
     /// If the definition is a declaration (only) -- `x: int` for example -- then we need
     /// [`Bindings`] to know whether this declaration is consistent with the previously
@@ -342,13 +342,13 @@ pub(crate) struct UseDefMap<'db> {
     ///
     /// If we see a binding to a `Final`-qualified symbol, we also need this map to find previous
     /// bindings to that symbol. If there are any, the assignment is invalid.
-    bindings_by_definition: FxHashMap<Definition<'db>, ScopedBindingsId>,
+    bindings_by_definition: FxHashMap<Definition<'db>, InternedBindingsId>,
 
     /// [`PlaceState`] visible at end of scope for each symbol.
     end_of_scope_symbols: IndexVec<ScopedSymbolId, PlaceState>,
 
     /// [`PlaceState`] visible at end of scope for each member.
-    end_of_scope_members: IndexVec<ScopedMemberId, ScopedPlaceStateId>,
+    end_of_scope_members: IndexVec<ScopedMemberId, InternedPlaceStateId>,
 
     /// All potentially reachable bindings and declarations, for each symbol.
     reachable_definitions_by_symbol: IndexVec<ScopedSymbolId, ReachableDefinitions>,
@@ -358,7 +358,7 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Snapshot of bindings in this scope that can be used to resolve a reference in a nested
     /// scope.
-    enclosing_snapshots: IndexVec<ScopedEnclosingSnapshotId, ScopedEnclosingSnapshotDataId>,
+    enclosing_snapshots: IndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId>,
 
     /// Whether or not the end of the scope is reachable.
     ///
@@ -542,10 +542,10 @@ impl<'db> UseDefMap<'db> {
         };
 
         match self.enclosing_snapshots.get(snapshot_id) {
-            Some(ScopedEnclosingSnapshotDataId::Constraint(constraint)) => {
+            Some(InternedEnclosingSnapshotId::Constraint(constraint)) => {
                 EnclosingSnapshotResult::FoundConstraint(*constraint)
             }
-            Some(ScopedEnclosingSnapshotDataId::Bindings(bindings_id)) => {
+            Some(InternedEnclosingSnapshotId::Bindings(bindings_id)) => {
                 EnclosingSnapshotResult::FoundBindings(
                     self.bindings_iterator(
                         &self.interned_bindings[*bindings_id],
@@ -1585,7 +1585,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
         for enclosing_snapshot in &enclosing_snapshots {
             // Bindings are already marked above.
-            if let ScopedEnclosingSnapshotDataId::Constraint(constraint) = enclosing_snapshot {
+            if let InternedEnclosingSnapshotId::Constraint(constraint) = enclosing_snapshot {
                 self.reachability_constraints.mark_used(*constraint);
             }
         }
@@ -1612,10 +1612,10 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_bindings_by_definition(
         bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
-        interned_bindings: &mut IndexVec<ScopedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, ScopedBindingsId>,
-    ) -> FxHashMap<Definition<'db>, ScopedBindingsId> {
-        let mut interned_ids_by_definition: FxHashMap<Definition<'db>, ScopedBindingsId> =
+        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+    ) -> FxHashMap<Definition<'db>, InternedBindingsId> {
+        let mut interned_ids_by_definition: FxHashMap<Definition<'db>, InternedBindingsId> =
             FxHashMap::with_capacity_and_hasher(bindings_by_definition.len(), FxBuildHasher);
 
         for (definition, bindings) in bindings_by_definition {
@@ -1635,10 +1635,10 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_declarations_by_binding(
         declarations_by_binding: FxHashMap<Definition<'db>, Declarations>,
-        interned_declarations: &mut IndexVec<ScopedDeclarationsId, Declarations>,
-        interned_ids_by_declarations: &mut FxHashMap<Declarations, ScopedDeclarationsId>,
-    ) -> FxHashMap<Definition<'db>, ScopedDeclarationsId> {
-        let mut interned_ids_by_binding: FxHashMap<Definition<'db>, ScopedDeclarationsId> =
+        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
+        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
+    ) -> FxHashMap<Definition<'db>, InternedDeclarationsId> {
+        let mut interned_ids_by_binding: FxHashMap<Definition<'db>, InternedDeclarationsId> =
             FxHashMap::with_capacity_and_hasher(declarations_by_binding.len(), FxBuildHasher);
 
         for (binding, declarations) in declarations_by_binding {
@@ -1659,10 +1659,10 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_bindings_by_use(
         bindings_by_use: IndexVec<ScopedUseId, Bindings>,
-        interned_bindings: &mut IndexVec<ScopedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, ScopedBindingsId>,
-    ) -> IndexVec<ScopedUseId, ScopedBindingsId> {
-        let mut interned_ids_by_use: IndexVec<ScopedUseId, ScopedBindingsId> =
+        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+    ) -> IndexVec<ScopedUseId, InternedBindingsId> {
+        let mut interned_ids_by_use: IndexVec<ScopedUseId, InternedBindingsId> =
             IndexVec::with_capacity(bindings_by_use.len());
 
         for bindings in bindings_by_use {
@@ -1682,14 +1682,14 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_end_of_scope_members(
         end_of_scope_members: IndexVec<ScopedMemberId, PlaceState>,
-        interned_bindings: &mut IndexVec<ScopedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, ScopedBindingsId>,
-        interned_declarations: &mut IndexVec<ScopedDeclarationsId, Declarations>,
-        interned_ids_by_declarations: &mut FxHashMap<Declarations, ScopedDeclarationsId>,
-    ) -> IndexVec<ScopedMemberId, ScopedPlaceStateId> {
-        let mut interned_ids_by_member: IndexVec<ScopedMemberId, ScopedPlaceStateId> =
+        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+        interned_declarations: &mut IndexVec<InternedDeclarationsId, Declarations>,
+        interned_ids_by_declarations: &mut FxHashMap<Declarations, InternedDeclarationsId>,
+    ) -> IndexVec<ScopedMemberId, InternedPlaceStateId> {
+        let mut interned_ids_by_member: IndexVec<ScopedMemberId, InternedPlaceStateId> =
             IndexVec::with_capacity(end_of_scope_members.len());
-        let mut interned_ids_by_place_state: FxHashMap<PlaceState, ScopedPlaceStateId> =
+        let mut interned_ids_by_place_state: FxHashMap<PlaceState, InternedPlaceStateId> =
             FxHashMap::with_capacity_and_hasher(end_of_scope_members.len(), FxBuildHasher);
 
         for place_state in end_of_scope_members {
@@ -1718,7 +1718,7 @@ impl<'db> UseDefMapBuilder<'db> {
                         .insert(place_state.declarations().clone(), declarations_id);
                     declarations_id
                 };
-                let place_state_id = ScopedPlaceStateId(bindings_id, declarations_id);
+                let place_state_id = InternedPlaceStateId(bindings_id, declarations_id);
                 interned_ids_by_place_state.insert(place_state, place_state_id);
                 place_state_id
             };
@@ -1731,12 +1731,12 @@ impl<'db> UseDefMapBuilder<'db> {
 
     fn intern_enclosing_snapshots(
         enclosing_snapshots: EnclosingSnapshots,
-        interned_bindings: &mut IndexVec<ScopedBindingsId, Bindings>,
-        interned_ids_by_bindings: &mut FxHashMap<Bindings, ScopedBindingsId>,
-    ) -> IndexVec<ScopedEnclosingSnapshotId, ScopedEnclosingSnapshotDataId> {
+        interned_bindings: &mut IndexVec<InternedBindingsId, Bindings>,
+        interned_ids_by_bindings: &mut FxHashMap<Bindings, InternedBindingsId>,
+    ) -> IndexVec<ScopedEnclosingSnapshotId, InternedEnclosingSnapshotId> {
         let mut interned_ids_by_snapshot: IndexVec<
             ScopedEnclosingSnapshotId,
-            ScopedEnclosingSnapshotDataId,
+            InternedEnclosingSnapshotId,
         > = IndexVec::with_capacity(enclosing_snapshots.len());
 
         for snapshot in enclosing_snapshots {
@@ -1750,10 +1750,10 @@ impl<'db> UseDefMapBuilder<'db> {
                             interned_ids_by_bindings.insert(bindings, interned_id);
                             interned_id
                         };
-                    ScopedEnclosingSnapshotDataId::Bindings(interned_bindings_id)
+                    InternedEnclosingSnapshotId::Bindings(interned_bindings_id)
                 }
                 EnclosingSnapshot::Constraint(constraint) => {
-                    ScopedEnclosingSnapshotDataId::Constraint(constraint)
+                    InternedEnclosingSnapshotId::Constraint(constraint)
                 }
             };
             interned_ids_by_snapshot.push(interned_id);
