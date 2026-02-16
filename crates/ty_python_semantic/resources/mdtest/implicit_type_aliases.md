@@ -1507,7 +1507,7 @@ ReturnsCallable = Callable[[int], Callable[[str], bytes]]
 
 def _(takes_callable: TakesCallable, returns_callable: ReturnsCallable):
     reveal_type(takes_callable)  # revealed: ((int, /) -> str, /) -> bytes
-    reveal_type(returns_callable)  # revealed: (int, /) -> (str, /) -> bytes
+    reveal_type(returns_callable)  # revealed: (int, /) -> ((str, /) -> bytes)
 ```
 
 Invalid uses result in diagnostics:

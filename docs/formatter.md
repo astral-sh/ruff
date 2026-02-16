@@ -440,6 +440,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`bad-quotes-multiline-string`](rules/bad-quotes-multiline-string.md) (`Q001`)
 - [`bad-quotes-docstring`](rules/bad-quotes-docstring.md) (`Q002`)
 - [`avoidable-escaped-quote`](rules/avoidable-escaped-quote.md) (`Q003`)
+- [`unnecessary-escaped-quote`](rules/unnecessary-escaped-quote.md) (`Q004`)
 - [`missing-trailing-comma`](rules/missing-trailing-comma.md) (`COM812`)
 - [`prohibited-trailing-comma`](rules/prohibited-trailing-comma.md) (`COM819`)
 - [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`) if used without `ISC001` and `flake8-implicit-str-concat.allow-multiline = false`

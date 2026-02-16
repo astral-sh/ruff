@@ -176,10 +176,10 @@ flipped to covariant, invariant remains invariant.
 type C3 = Callable[[Any, Callable[[Unknown], Any]], Callable[[Any, int], Any]]
 
 def _(top: Top[C3], bottom: Bottom[C3]) -> None:
-    # revealed: (Never, (object, /) -> Never, /) -> (Never, int, /) -> object
+    # revealed: (Never, (object, /) -> Never, /) -> ((Never, int, /) -> object)
     reveal_type(top)
 
-    # revealed: (object, (Never, /) -> object, /) -> (object, int, /) -> Never
+    # revealed: (object, (Never, /) -> object, /) -> ((object, int, /) -> Never)
     reveal_type(bottom)
 ```
 

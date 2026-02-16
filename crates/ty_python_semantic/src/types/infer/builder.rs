@@ -94,11 +94,11 @@ use crate::types::diagnostic::{
     report_cannot_pop_required_field_on_typed_dict, report_conflicting_metaclass_from_bases,
     report_duplicate_bases, report_implicit_return_type, report_instance_layout_conflict,
     report_invalid_arguments_to_annotated, report_invalid_assignment,
-    report_invalid_attribute_assignment, report_invalid_exception_caught,
-    report_invalid_exception_cause, report_invalid_exception_raised,
-    report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
-    report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
-    report_invalid_return_type, report_invalid_total_ordering,
+    report_invalid_attribute_assignment, report_invalid_class_match_pattern,
+    report_invalid_exception_caught, report_invalid_exception_cause,
+    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
+    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
+    report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
     report_match_pattern_against_non_runtime_checkable_protocol,
     report_match_pattern_against_typed_dict, report_named_tuple_field_with_leading_underscore,
@@ -5070,8 +5070,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     protocol_class,
                 );
             }
-        } else {
-            // TODO: emit diagnostic
+        } else if !cls_ty.is_assignable_to(self.db(), KnownClass::Type.to_instance(self.db())) {
+            report_invalid_class_match_pattern(&self.context, &*pattern.cls, cls_ty);
         }
     }
 
@@ -13679,7 +13679,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             (ast::UnaryOp::UAdd, Type::IntLiteral(value)) => Type::IntLiteral(value),
-            (ast::UnaryOp::USub, Type::IntLiteral(value)) => Type::IntLiteral(-value),
+            (ast::UnaryOp::USub, Type::IntLiteral(value)) => value
+                .checked_neg()
+                .map(Type::IntLiteral)
+                .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
             (ast::UnaryOp::Invert, Type::IntLiteral(value)) => Type::IntLiteral(!value),
 
             (ast::UnaryOp::UAdd, Type::BooleanLiteral(bool)) => Type::IntLiteral(i64::from(bool)),
@@ -14260,6 +14263,44 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::BitXor) => {
                 Some(Type::IntLiteral(n ^ m))
+            }
+
+            (Type::IntLiteral(0), Type::IntLiteral(m), ast::Operator::LShift) if m >= 0 => {
+                Some(Type::IntLiteral(0))
+            }
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::LShift) => {
+                // An additional overflow check beyond `checked_shl` is necessary
+                // here, because `checked_shl` only rejects shift amounts >= 64;
+                // it does not detect when significant bits are shifted into (or
+                // past) the sign bit. For example, `1i64.checked_shl(63)` returns
+                // `Some(i64::MIN)`, but Python's `1 << 63` is a large positive int.
+                //
+                // We compute the "headroom": the number of redundant sign-extension
+                // bits minus one (for the sign bit itself). A shift is safe iff
+                // `m <= headroom`.
+                let headroom = if n >= 0 {
+                    n.leading_zeros().saturating_sub(1)
+                } else {
+                    n.leading_ones().saturating_sub(1)
+                };
+                Some(
+                    u32::try_from(m)
+                        .ok()
+                        .filter(|&m| m <= headroom)
+                        .and_then(|m| n.checked_shl(m))
+                        .map(Type::IntLiteral)
+                        .unwrap_or_else(|| KnownClass::Int.to_instance(self.db())),
+                )
+            }
+
+            (Type::IntLiteral(n), Type::IntLiteral(m), ast::Operator::RShift) => {
+                let result = match u32::try_from(m) {
+                    Ok(m) => Type::IntLiteral(n >> m.clamp(0, 63)),
+                    Err(_) if m > 0 => Type::IntLiteral(if n >= 0 { 0 } else { -1 }),
+                    Err(_) => KnownClass::Int.to_instance(self.db()),
+                };
+                Some(result)
             }
 
             (Type::BytesLiteral(lhs), Type::BytesLiteral(rhs), ast::Operator::Add) => {

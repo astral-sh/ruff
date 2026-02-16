@@ -707,6 +707,32 @@ reveal_type(Derived.f(1))  # revealed: str
 reveal_type(Derived().f(1))  # revealed: str
 ```
 
+### Staticmethod assigned in class body
+
+Assigning a `staticmethod(...)` object directly in the class body should preserve the callable
+behavior of the wrapped function when accessed on both classes and instances.
+
+```py
+def foo(*args, **kwargs) -> None:
+    print("foo", args, kwargs)
+
+class A:
+    __call__ = staticmethod(foo)
+    bar = staticmethod(foo)
+
+a = A()
+a()
+a.bar()
+a(5)
+a.bar(5)
+a(x=10)
+a.bar(x=10)
+
+A.bar()
+A.bar(5)
+A.bar(x=10)
+```
+
 ### Accessing the staticmethod as a static member
 
 ```py
