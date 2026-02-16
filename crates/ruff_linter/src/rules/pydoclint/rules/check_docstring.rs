@@ -55,7 +55,7 @@ use crate::Violation;
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.15")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct DocstringClassExtraneousYields;
 
 impl Violation for DocstringClassExtraneousYields {
@@ -120,7 +120,7 @@ impl Violation for DocstringClassExtraneousYields {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.15")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct DocstringClassExtraneousRaises;
 
 impl Violation for DocstringClassExtraneousRaises {
@@ -181,7 +181,7 @@ impl Violation for DocstringClassExtraneousRaises {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.15")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct DocstringClassExtraneousArguments;
 
 impl Violation for DocstringClassExtraneousArguments {
@@ -231,7 +231,7 @@ impl Violation for DocstringClassExtraneousArguments {
 /// - `lint.pydoclint.ignore-one-line-docstrings`
 /// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.15")]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct DocstringClassExtraneousReturns;
 
 impl Violation for DocstringClassExtraneousReturns {
