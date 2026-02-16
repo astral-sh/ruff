@@ -229,7 +229,7 @@ fn should_be_fstring(
             // Check if the interpolation expression contains backslashes
             // F-strings with backslashes in interpolations are only valid in Python 3.12+
             let interpolation_text = &fstring_expr[element.range()];
-            if interpolation_text.contains('\\') && target_version < PythonVersion::PY312 {
+            if target_version < PythonVersion::PY312 && interpolation_text.contains('\\') {
                 return false;
             }
 
