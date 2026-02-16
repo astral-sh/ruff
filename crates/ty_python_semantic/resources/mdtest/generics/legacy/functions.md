@@ -896,4 +896,7 @@ reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
 
 def literal_string_case(literal_string: LiteralString):
     reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+
+reveal_type(flatten(b"abc"))  # revealed: list[int]
+reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
 ```

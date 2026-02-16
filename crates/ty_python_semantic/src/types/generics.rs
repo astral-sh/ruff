@@ -2256,10 +2256,12 @@ impl<'db> SpecializationBuilder<'db> {
 
             (
                 formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
-                actual_literal @ (Type::StringLiteral(_) | Type::LiteralString),
+                actual_literal @ (Type::StringLiteral(_)
+                | Type::LiteralString
+                | Type::BytesLiteral(_)),
             ) => {
-                // Retry specialization with the literal's fallback instance (`str`) so calls
-                // like `itertools.chain("abc", (1, 2, 3))` can infer `T` correctly.
+                // Retry specialization with the literal's fallback instance (`str` / `bytes`)
+                // so literal iterables can contribute to generic inference.
                 if let Some(actual_instance) = actual_literal.literal_fallback_instance(self.db) {
                     return self.infer_map_impl(formal, actual_instance, polarity, f, seen);
                 }
