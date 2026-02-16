@@ -236,7 +236,6 @@ pub(super) struct Bindings {
     /// "unbound" binding.
     unbound_narrowing_constraint: Option<ScopedNarrowingConstraint>,
     /// A list of live bindings for this place, sorted by their `ScopedDefinitionId`
-    #[expect(clippy::struct_field_names)]
     live_bindings: SmallVec<[LiveBinding; 2]>,
 }
 

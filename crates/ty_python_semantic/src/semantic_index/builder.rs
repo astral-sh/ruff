@@ -912,6 +912,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
+        /// Returns if the expression is a `TYPE_CHECKING` expression.
+        fn is_if_type_checking(expr: &ast::Expr) -> bool {
+            fn is_dotted_name(expr: &ast::Expr) -> bool {
+                match expr {
+                    ast::Expr::Name(_) => true,
+                    ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+                    _ => false,
+                }
+            }
+
+            match expr {
+                ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
+                ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                    attr == "TYPE_CHECKING" && is_dotted_name(value)
+                }
+                _ => false,
+            }
+        }
+
         // Some commonly used test expressions are eagerly evaluated as `true`
         // or `false` here for performance reasons. This list does not need to
         // be exhaustive. More complex expressions will still evaluate to the
@@ -949,15 +968,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
                         Some(ConstExpr::Bool(*value))
                     }
-                    ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => {
-                        Some(ConstExpr::Bool(true))
-                    }
                     ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
                         value: ast::Number::Int(n),
                         ..
                     }) => n.as_i64().map(ConstExpr::Int),
                     ast::Expr::EllipsisLiteral(_) => Some(ConstExpr::Ellipsis),
                     ast::Expr::NoneLiteral(_) => Some(ConstExpr::None),
+                    // See also: `TypeInferenceBuilder::infer_unary_expression_type`
                     ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => {
                         let operand = resolve_const_expr(operand)?;
                         match op {
@@ -969,6 +986,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             ast::UnaryOp::Invert => Some(ConstExpr::Int(!operand.as_int()?)),
                         }
                     }
+                    // See also: `TypeInferenceBuilder::infer_binary_expression_type`
                     ast::Expr::BinOp(ast::ExprBinOp {
                         left, op, right, ..
                     }) => {
@@ -979,16 +997,26 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             ast::Operator::Sub => left.checked_sub(right)?,
                             ast::Operator::Mult => left.checked_mul(right)?,
                             ast::Operator::FloorDiv => {
-                                if right == 0 {
-                                    return None;
+                                let mut q = left.checked_div(right);
+                                let r = left.checked_rem(right);
+                                // Division works differently in Python than in Rust. If the
+                                // result is negative and there is a remainder, floor division
+                                // rounds down (instead of toward zero).
+                                if left.is_negative() != right.is_negative() && r.unwrap_or(0) != 0
+                                {
+                                    q = q.map(|q| q - 1);
                                 }
-                                left.div_euclid(right)
+                                q?
                             }
                             ast::Operator::Mod => {
-                                if right == 0 {
-                                    return None;
+                                let mut r = left.checked_rem(right);
+                                // Python's modulo keeps the sign of the divisor. Adjust the Rust
+                                // remainder accordingly so that `q * right + r == left`.
+                                if left.is_negative() != right.is_negative() && r.unwrap_or(0) != 0
+                                {
+                                    r = r.map(|x| x + right);
                                 }
-                                left.rem_euclid(right)
+                                r?
                             }
                             ast::Operator::BitAnd => left & right,
                             ast::Operator::BitOr => left | right,
@@ -1043,18 +1071,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         let mut left_value = resolve_const_expr(left)?;
                         for (op, comparator) in ops.iter().zip(comparators.iter()) {
                             let right_value = resolve_const_expr(comparator)?;
-                            let eq = |left: ConstExpr, right: ConstExpr| match (
-                                left.as_int(),
-                                right.as_int(),
-                            ) {
-                                (Some(left), Some(right)) => Some(left == right),
-                                _ => match (left, right) {
-                                    (ConstExpr::None, ConstExpr::None)
-                                    | (ConstExpr::Ellipsis, ConstExpr::Ellipsis) => Some(true),
-                                    (ConstExpr::None | ConstExpr::Ellipsis, _)
-                                    | (_, ConstExpr::None | ConstExpr::Ellipsis) => Some(false),
-                                    _ => None,
-                                },
+                            let eq = |left: ConstExpr, right: ConstExpr| match (left, right) {
+                                (ConstExpr::Int(left), ConstExpr::Int(right)) => {
+                                    Some(left == right)
+                                }
+                                (ConstExpr::None, ConstExpr::None)
+                                | (ConstExpr::Ellipsis, ConstExpr::Ellipsis) => Some(true),
+                                (ConstExpr::None | ConstExpr::Ellipsis, _)
+                                | (_, ConstExpr::None | ConstExpr::Ellipsis) => Some(false),
+                                _ => None,
                             };
                             let result = match op {
                                 ast::CmpOp::Eq => eq(left_value, right_value)?,
@@ -1102,6 +1127,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         }
                         Some(ConstExpr::Bool(true))
                     }
+                    _ if is_if_type_checking(node) => Some(ConstExpr::Bool(true)),
                     _ => None,
                 }
             }
