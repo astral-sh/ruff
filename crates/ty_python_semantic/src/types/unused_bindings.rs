@@ -1,11 +1,14 @@
+//! Collects unused local bindings for IDE-facing diagnostics.
+//!
+//! This intentionally reports only function-, lambda-, and comprehension-scope bindings.
+//! Module and class bindings can be observed indirectly (e.g., imports, attribute access), so
+//! reporting them here risks false positives without cross-file/reference analysis.
+
+use crate::semantic_index::definition::{DefinitionKind, DefinitionState};
+use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeKind;
-use crate::{Db, SemanticModel};
+use crate::{Db, semantic_index};
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::visitor::source_order::{
-    SourceOrderVisitor, walk_expr, walk_parameter, walk_parameter_with_default, walk_pattern,
-    walk_stmt,
-};
-use ruff_python_ast::{self as ast};
 use ruff_text_size::{Ranged, TextRange};
 
 fn is_dunder_name(name: &str) -> bool {
@@ -17,8 +20,6 @@ fn should_mark_unnecessary(scope_kind: ScopeKind, name: &str) -> bool {
         return false;
     }
 
-    // Keep this local-scope only to avoid false positives for bindings that can
-    // be observed or referenced indirectly from module/class contexts.
     match scope_kind {
         ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension => true,
         ScopeKind::Module | ScopeKind::Class | ScopeKind::TypeParams | ScopeKind::TypeAlias => {
@@ -27,33 +28,21 @@ fn should_mark_unnecessary(scope_kind: ScopeKind, name: &str) -> bool {
     }
 }
 
-/// Check whether a symbol is unused within its containing scope and should be marked as unnecessary.
-/// Returns `Some(true)` if unused and should be marked, `Some(false)` otherwise, or `None` if the symbol cannot be found.
-fn is_symbol_unnecessary_in_scope(
-    model: &SemanticModel<'_>,
-    scope_node: ast::AnyNodeRef<'_>,
-    name: &str,
-) -> Option<bool> {
-    let file = model.file();
-    let file_scope = model.scope(scope_node)?;
-    let index = crate::semantic_index::semantic_index(model.db(), file);
-    let scope = index.scope(file_scope);
-
-    if !should_mark_unnecessary(scope.kind(), name) {
-        return Some(false);
-    }
-
-    let place_table = index.place_table(file_scope);
-    let symbol_id = place_table.symbol_id(name)?;
-    let symbol = place_table.symbol(symbol_id);
-
-    // Global and nonlocal assignments target bindings from outer scopes.
-    // Treat them as externally managed to avoid false positives here.
-    if symbol.is_global() || symbol.is_nonlocal() {
-        return Some(false);
-    }
-
-    Some(!symbol.is_used())
+fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
+    matches!(
+        kind,
+        DefinitionKind::NamedExpression(_)
+            | DefinitionKind::Assignment(_)
+            | DefinitionKind::AnnotatedAssignment(_)
+            | DefinitionKind::For(_)
+            | DefinitionKind::Comprehension(_)
+            | DefinitionKind::VariadicPositionalParameter(_)
+            | DefinitionKind::VariadicKeywordParameter(_)
+            | DefinitionKind::Parameter(_)
+            | DefinitionKind::WithItem(_)
+            | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::ExceptHandler(_)
+    )
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash)]
@@ -69,222 +58,75 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
         return Vec::new();
     }
 
-    let model = SemanticModel::new(db, file);
+    let index = semantic_index::semantic_index(db, file);
+    let mut unused = Vec::new();
 
-    let mut collector = UnusedBindingCollector::new(&model);
-    collector.visit_body(parsed.suite());
-    collector
-        .unused_bindings
-        .sort_unstable_by_key(|binding| binding.range.start());
-    collector
-        .unused_bindings
-        .dedup_by_key(|binding| binding.range);
+    for scope_id in index.scope_ids() {
+        let file_scope = scope_id.file_scope_id(db);
+        let scope = index.scope(file_scope);
 
-    collector.unused_bindings
-}
-
-struct UnusedBindingCollector<'db> {
-    model: &'db SemanticModel<'db>,
-    unused_bindings: Vec<UnusedBinding>,
-    in_target_creating_definition: bool,
-}
-
-impl<'db> UnusedBindingCollector<'db> {
-    fn new(model: &'db SemanticModel<'db>) -> Self {
-        Self {
-            model,
-            unused_bindings: Vec::new(),
-            in_target_creating_definition: false,
-        }
-    }
-
-    fn add_unused_binding(&mut self, range: TextRange, name: &str) {
-        self.unused_bindings.push(UnusedBinding {
-            range,
-            name: name.to_string(),
-        });
-    }
-
-    fn mark_pattern_binding_if_unused(&mut self, name: &ast::Identifier) {
-        if let Some(true) = is_symbol_unnecessary_in_scope(
-            self.model,
-            ast::AnyNodeRef::from(name),
-            name.id.as_str(),
+        if !matches!(
+            scope.kind(),
+            ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension
         ) {
-            self.add_unused_binding(name.range(), name.id.as_str());
+            continue;
+        }
+
+        let place_table = index.place_table(file_scope);
+        let use_def_map = index.use_def_map(file_scope);
+
+        for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
+            let DefinitionState::Defined(definition) = state else {
+                continue;
+            };
+
+            if is_used {
+                continue;
+            }
+
+            let ScopedPlaceId::Symbol(symbol_id) = definition.place(db) else {
+                continue;
+            };
+
+            let symbol = place_table.symbol(symbol_id);
+            let name = symbol.name().as_str();
+
+            if !should_mark_unnecessary(scope.kind(), name) {
+                continue;
+            }
+
+            // Global and nonlocal assignments target bindings from outer scopes.
+            // Treat them as externally managed to avoid false positives here.
+            if symbol.is_global() || symbol.is_nonlocal() {
+                continue;
+            }
+
+            let kind = definition.kind(db);
+            if !should_consider_definition(kind) {
+                continue;
+            }
+
+            let range = match kind {
+                DefinitionKind::ExceptHandler(handler) => {
+                    let Some(name) = &handler.node(&parsed).name else {
+                        continue;
+                    };
+                    name.range()
+                }
+                _ => kind.target_range(&parsed),
+            };
+
+            unused.push(UnusedBinding {
+                range,
+                name: name.to_string(),
+            });
         }
     }
 
-    fn with_target_creating_definition(&mut self, f: impl FnOnce(&mut Self)) {
-        let prev = self.in_target_creating_definition;
-        self.in_target_creating_definition = true;
-        f(self);
-        self.in_target_creating_definition = prev;
-    }
-}
+    unused.sort_unstable_by_key(|binding| binding.range.start());
+    unused.dedup_by_key(|binding| binding.range);
 
-impl SourceOrderVisitor<'_> for UnusedBindingCollector<'_> {
-    fn visit_stmt(&mut self, stmt: &ast::Stmt) {
-        match stmt {
-            ast::Stmt::Assign(assignment) => {
-                self.with_target_creating_definition(|this| {
-                    for target in &assignment.targets {
-                        this.visit_expr(target);
-                    }
-                });
-
-                self.visit_expr(&assignment.value);
-            }
-            ast::Stmt::AnnAssign(assignment) => {
-                self.with_target_creating_definition(|this| {
-                    this.visit_expr(&assignment.target);
-                });
-
-                self.visit_expr(&assignment.annotation);
-                if let Some(value) = &assignment.value {
-                    self.visit_expr(value);
-                }
-            }
-            ast::Stmt::For(for_stmt) => {
-                self.with_target_creating_definition(|this| {
-                    this.visit_expr(&for_stmt.target);
-                });
-
-                self.visit_expr(&for_stmt.iter);
-                self.visit_body(&for_stmt.body);
-                self.visit_body(&for_stmt.orelse);
-            }
-            ast::Stmt::With(with_stmt) => {
-                for item in &with_stmt.items {
-                    self.visit_expr(&item.context_expr);
-                    if let Some(expr) = &item.optional_vars {
-                        self.with_target_creating_definition(|this| {
-                            this.visit_expr(expr);
-                        });
-                    }
-                }
-
-                self.visit_body(&with_stmt.body);
-            }
-            ast::Stmt::Try(try_stmt) => {
-                self.visit_body(&try_stmt.body);
-                for handler in &try_stmt.handlers {
-                    match handler {
-                        ast::ExceptHandler::ExceptHandler(except_handler) => {
-                            if let Some(expr) = &except_handler.type_ {
-                                self.visit_expr(expr);
-                            }
-                            if let Some(name) = &except_handler.name
-                                && let Some(true) = is_symbol_unnecessary_in_scope(
-                                    self.model,
-                                    ast::AnyNodeRef::from(except_handler),
-                                    name.id.as_str(),
-                                )
-                            {
-                                self.add_unused_binding(name.range(), name.id.as_str());
-                            }
-                            self.visit_body(&except_handler.body);
-                        }
-                    }
-                }
-                self.visit_body(&try_stmt.orelse);
-                self.visit_body(&try_stmt.finalbody);
-            }
-            _ => walk_stmt(self, stmt),
-        }
-    }
-
-    fn visit_expr(&mut self, expr: &ast::Expr) {
-        match expr {
-            ast::Expr::Name(name) => {
-                if self.in_target_creating_definition
-                    && name.ctx.is_store()
-                    && let Some(true) = is_symbol_unnecessary_in_scope(
-                        self.model,
-                        ast::AnyNodeRef::from(name),
-                        name.id.as_str(),
-                    )
-                {
-                    self.add_unused_binding(name.range(), name.id.as_str());
-                }
-                walk_expr(self, expr);
-            }
-            ast::Expr::Named(named) => {
-                self.with_target_creating_definition(|this| {
-                    this.visit_expr(&named.target);
-                });
-
-                self.visit_expr(&named.value);
-            }
-            _ => walk_expr(self, expr),
-        }
-    }
-
-    fn visit_pattern(&mut self, pattern: &ast::Pattern) {
-        match pattern {
-            ast::Pattern::MatchAs(pattern_as) => {
-                if let Some(nested_pattern) = &pattern_as.pattern {
-                    self.visit_pattern(nested_pattern);
-                }
-                if let Some(name) = &pattern_as.name {
-                    self.mark_pattern_binding_if_unused(name);
-                }
-            }
-            ast::Pattern::MatchMapping(pattern_mapping) => {
-                for (key, nested_pattern) in
-                    pattern_mapping.keys.iter().zip(&pattern_mapping.patterns)
-                {
-                    self.visit_expr(key);
-                    self.visit_pattern(nested_pattern);
-                }
-                if let Some(rest_name) = &pattern_mapping.rest {
-                    self.mark_pattern_binding_if_unused(rest_name);
-                }
-            }
-            ast::Pattern::MatchStar(pattern_star) => {
-                if let Some(rest_name) = &pattern_star.name {
-                    self.mark_pattern_binding_if_unused(rest_name);
-                }
-            }
-            _ => walk_pattern(self, pattern),
-        }
-    }
-
-    fn visit_comprehension(&mut self, comprehension: &ast::Comprehension) {
-        self.with_target_creating_definition(|this| {
-            this.visit_expr(&comprehension.target);
-        });
-
-        self.visit_expr(&comprehension.iter);
-        for if_clause in &comprehension.ifs {
-            self.visit_expr(if_clause);
-        }
-    }
-
-    fn visit_parameter(&mut self, parameter: &ast::Parameter) {
-        if let Some(true) = is_symbol_unnecessary_in_scope(
-            self.model,
-            ast::AnyNodeRef::from(parameter),
-            parameter.name.id.as_str(),
-        ) {
-            self.add_unused_binding(parameter.name.range(), parameter.name.id.as_str());
-        }
-        walk_parameter(self, parameter);
-    }
-
-    fn visit_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
-        if let Some(true) = is_symbol_unnecessary_in_scope(
-            self.model,
-            ast::AnyNodeRef::from(parameter_with_default),
-            parameter_with_default.name().id.as_str(),
-        ) {
-            self.add_unused_binding(
-                parameter_with_default.name().range(),
-                parameter_with_default.name().id.as_str(),
-            );
-        }
-        walk_parameter_with_default(self, parameter_with_default);
-    }
+    unused
 }
 
 #[cfg(test)]
