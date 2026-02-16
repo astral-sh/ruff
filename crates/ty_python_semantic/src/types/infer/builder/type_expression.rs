@@ -1197,6 +1197,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.inner_expression_inference_state = previous_slice_inference_state;
                 union
             }
+            Type::Intersection(intersection) => {
+                self.infer_type_expression(slice);
+                let previous_slice_inference_state = std::mem::replace(
+                    &mut self.inner_expression_inference_state,
+                    InnerExpressionInferenceState::Get,
+                );
+                let intersection = intersection.map_positive(self.db(), |element| {
+                    self.infer_subscript_type_expression(subscript, *element)
+                });
+                self.inner_expression_inference_state = previous_slice_inference_state;
+                intersection
+            }
             _ => {
                 self.infer_type_expression(slice);
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
