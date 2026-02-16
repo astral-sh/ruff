@@ -631,8 +631,8 @@ impl<'db> Bindings<'db> {
             .and_then(|inst| inst.class(db).static_class_literal(db))
             .map(|(lit, _)| lit);
 
-        // If any matched overload's pre-override signature return type, when specialized,
-        // resolves to a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
+        // If any matched overload's signature return type, when resolved with the inferred
+        // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
         // `str`), use that resolved type directly. This handles arbitrary `__new__` return
         // types like `S`, `list[S]`, etc.
         let constructor_class = constructor_instance_type
@@ -646,16 +646,11 @@ impl<'db> Bindings<'db> {
             if !sig_return.has_typevar(db) {
                 continue;
             }
-            if class_literal
-                .and_then(|lit| sig_return.specialization_of(db, lit))
-                .is_some()
-            {
-                continue;
-            }
-            let Some(specialization) = overload.specialization else {
-                continue;
-            };
-            let resolved = sig_return.apply_specialization(db, specialization);
+            let resolved = overload
+                .specialization
+                .map_or(sig_return, |specialization| {
+                    sig_return.apply_specialization(db, specialization)
+                });
             if resolved.has_typevar(db) || resolved.is_unknown() {
                 continue;
             }
@@ -689,13 +684,22 @@ impl<'db> Bindings<'db> {
             let Some((_, overload)) = binding.matching_overloads().next() else {
                 continue;
             };
-            // Prefer extracting the class specialization from the resolved return type
+            // Prefer extracting the class specialization from the resolved signature return type
             // (handles `__new__[S](cls, x: S) -> C[tuple[S, S]]` where method-level type
             // variables map to the class specialization through the return type).
             // Fall back to restricting the inferred specialization to class-level type
             // variables.
+            let resolved_return =
+                overload
+                    .specialization
+                    .map_or(overload.signature.return_ty, |specialization| {
+                        overload
+                            .signature
+                            .return_ty
+                            .apply_specialization(db, specialization)
+                    });
             let specialization = class_literal
-                .and_then(|lit| overload.return_ty.specialization_of(db, lit))
+                .and_then(|lit| resolved_return.specialization_of(db, lit))
                 .or_else(|| {
                     overload
                         .specialization

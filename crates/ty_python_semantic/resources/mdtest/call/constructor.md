@@ -296,6 +296,22 @@ reveal_type(C("foo"))  # revealed: Literal["foo"]
 reveal_type(C(1))  # revealed: Literal[1]
 ```
 
+## `__new__` returning non-instance generic containers
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C:
+    def __new__[S](cls, x: S) -> list[S]:
+        return [x]
+
+reveal_type(C("foo"))  # revealed: list[Literal["foo"]]
+reveal_type(C(1))  # revealed: list[Literal[1]]
+```
+
 ## Overloaded `__new__` with generic return types
 
 Overloaded `__new__` methods should correctly resolve to the matching overload and infer the class
