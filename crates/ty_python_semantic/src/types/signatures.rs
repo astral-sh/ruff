@@ -102,8 +102,7 @@ impl<'db> CallableSignature<'db> {
     /// of exactly `str`). When checking if `MyStr(str).__iter__` is a valid override, we should
     /// ignore that overload.
     ///
-    /// Returns `None` if all overloads are filtered out (which would indicate a bug, since
-    /// at least one overload should be applicable).
+    /// Returns `None` if all overloads are filtered out.
     pub(crate) fn filter_overloads_for_receiver(
         &self,
         db: &'db dyn Db,

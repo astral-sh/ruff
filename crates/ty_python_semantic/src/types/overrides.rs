@@ -378,8 +378,11 @@ fn check_class_declaration<'db>(
                         CallableTypeKind::FunctionLike,
                     ))
                 } else {
-                    // If all overloads were filtered out, use the original type
-                    superclass_type
+                    // If all overloads were filtered out, the base class effectively
+                    // has no applicable signature for this subclass, so no override
+                    // could violate Liskov. Skip the check for this superclass and
+                    // continue to the next in the MRO.
+                    continue;
                 }
             } else {
                 superclass_type

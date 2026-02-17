@@ -785,8 +785,8 @@ class Sub2(Base2):
         raise NotImplementedError
 ```
 
-When all overloads have disjoint self types (an unlikely but possible edge case), the fallback
-behavior uses the original unfiltered type for the override check:
+When all overloads have disjoint self types (unlikely but possible edge case), the base class
+effectively has no applicable signature for the subclass, so any override is allowed:
 
 ```py
 from collections.abc import Iterator
@@ -810,7 +810,45 @@ class Base3:
         raise NotImplementedError
 
 class Sub3(Base3):
+    # No error: all overloads are disjoint from Sub3, so the base class
+    # effectively has no applicable method for Sub3 to override.
     @classmethod
-    def make(cls) -> Iterator[str]:  # error: [invalid-method-override]
+    def make(cls) -> Iterator[str]:
+        raise NotImplementedError
+```
+
+The same filtering should apply to generic classes. When a base class has an overload with a
+specialized self type (e.g., `self: Base[int]`), subclasses that specialize to a different type
+parameter should ideally ignore that overload. However, the self-type annotation currently resolves
+to a union containing a `Todo` placeholder, which prevents the disjointness check from filtering the
+overload:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterator
+from typing import overload
+
+class Base[T]:
+    @overload
+    def method(self: "Base[int]") -> Iterator[int]: ...
+    @overload
+    def method(self) -> Iterator[str]: ...
+    def method(self) -> Iterator[str] | Iterator[int]:
+        raise NotImplementedError
+
+class Sub(Base[str]):
+    # TODO: this should not be an error, since `Base[int]` is disjoint from `Sub`
+    # (which inherits from `Base[str]`). Currently, the self-type annotation `Base[int]`
+    # resolves with a `Todo` placeholder that prevents disjointness detection.
+    def method(self) -> Iterator[str]:  # error: [invalid-method-override]
+        raise NotImplementedError
+
+class SubInt(Base[int]):
+    # error: [invalid-method-override]
+    def method(self) -> Iterator[str]:
         raise NotImplementedError
 ```
