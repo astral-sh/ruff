@@ -9301,8 +9301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         // For attribute and subscript targets, validate that the result type is
-        // assignable to the declared type of the target. Name targets don't need
-        // this because they go through `add_binding().insert()` which validates.
+        // assignable to the declared type of the target.
         match &**target {
             ast::Expr::Attribute(attr) => {
                 if let Some(object_ty) = self.try_expression_type(&attr.value) {
