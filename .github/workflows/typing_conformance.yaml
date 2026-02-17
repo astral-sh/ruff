@@ -19,8 +19,8 @@ on:
       - "Cargo.lock"
       - "!**.md"
       - "!**.snap"
-      - "!**.py"
-      - "!**.pyi"
+      # Don't skip all .py/.pyi files: ty_vendored stubs are load-bearing.
+      - "!crates/ty_python_semantic/resources/corpus/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
