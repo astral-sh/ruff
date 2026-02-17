@@ -3717,12 +3717,117 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             promoted
         };
 
-        let specialization = builder
-            .mapped(generic_context, maybe_promote)
-            .build(generic_context);
+        let mapped_builder = builder.mapped(generic_context, maybe_promote);
+        let specialization = if self.constructor_instance_type.is_some() {
+            // Constructor inference needs a nested specialization (fresh constructor-local mappings
+            // plus an enclosing parent specialization). `build` only constructs a single-level
+            // specialization, so constructors use the dedicated path below.
+            self.build_constructor_specialization_separating_enclosing_typevars(
+                generic_context,
+                &mapped_builder,
+            )
+        } else {
+            let mut mapped_builder = mapped_builder;
+            mapped_builder.build(generic_context)
+        };
 
         self.return_ty = self.return_ty.apply_specialization(self.db, specialization);
         self.specialization = Some(specialization);
+    }
+
+    /// Constructor-local solving needs fresh typevars so we do not conflate constructor-generated
+    /// mappings with same-named typevars from the enclosing instance context.
+    fn build_constructor_specialization_separating_enclosing_typevars(
+        &self,
+        generic_context: GenericContext<'db>,
+        mapped_builder: &SpecializationBuilder<'db>,
+    ) -> Specialization<'db> {
+        let original_typevars: Vec<_> = generic_context.variables(self.db).collect();
+        let types = original_typevars.iter().map(|typevar| {
+            mapped_builder
+                .type_mappings()
+                .get(&typevar.identity(self.db))
+                .copied()
+        });
+        let defaults_filled: Vec<_> = generic_context
+            .specialize_partial(self.db, types)
+            .types(self.db)
+            .to_vec();
+
+        let fresh_typevars: Vec<_> = original_typevars
+            .iter()
+            .map(|typevar| typevar.with_name_suffix(self.db, "constructor"))
+            .collect();
+        let fresh_context =
+            GenericContext::from_typevar_instances(self.db, fresh_typevars.iter().copied());
+        let fresh_types = defaults_filled.into_iter().map(Some);
+        // Fresh constructor typevars are independent of the enclosing context, so recursive
+        // expansion here preserves transitive precision (e.g. `T := U`, `U := int`).
+        let fresh_specialization = fresh_context.specialize_recursive(self.db, fresh_types);
+        let fresh_to_original = fresh_context.specialize(
+            self.db,
+            original_typevars
+                .iter()
+                .copied()
+                .map(Type::TypeVar)
+                .collect::<Vec<_>>(),
+        );
+
+        let parent_types = fresh_specialization
+            .types(self.db)
+            .iter()
+            .map(|ty| ty.apply_specialization(self.db, fresh_to_original))
+            .collect::<Vec<_>>();
+        let parent_partial = generic_context.specialize(self.db, parent_types.as_slice());
+        let parent_recursive_with_metadata = generic_context
+            .specialize_recursive_with_metadata(self.db, parent_types.iter().copied().map(Some));
+        let parent_recursive = parent_recursive_with_metadata.specialization();
+        let merged_parent_types: Vec<_> = parent_recursive
+            .types(self.db)
+            .iter()
+            .zip(parent_partial.types(self.db).iter())
+            .enumerate()
+            .map(|(index, (recursive_ty, partial_ty))| {
+                Self::choose_constructor_parent_type(
+                    self.db,
+                    *recursive_ty,
+                    *partial_ty,
+                    parent_recursive_with_metadata.cycle_broken_to_never_at(index),
+                    original_typevars[index].identity(self.db),
+                )
+            })
+            .collect();
+        let parent_specialization = generic_context.specialize(self.db, merged_parent_types);
+        fresh_specialization.with_parent(self.db, Some(parent_specialization))
+    }
+
+    fn choose_constructor_parent_type(
+        db: &'db dyn Db,
+        recursive_ty: Type<'db>,
+        partial_ty: Type<'db>,
+        cycle_broken_to_never: bool,
+        current_typevar: BoundTypeVarIdentity<'db>,
+    ) -> Type<'db> {
+        // Precedence matters: cycle-break fallback beats cross-typevar preservation, both beat
+        // taking the recursive result.
+        let fallback_from_cycle_break =
+            recursive_ty.is_never() && !partial_ty.is_never() && cycle_broken_to_never;
+        let preserves_cross_typevar_mapping = partial_ty.as_typevar().is_some_and(|typevar| {
+            let partial_typevar = typevar.identity(db);
+            partial_typevar.binding_context == current_typevar.binding_context
+                && partial_typevar != current_typevar
+        });
+        if fallback_from_cycle_break {
+            // Only fall back to partial when recursive substitution produced `Never` via
+            // cycle breaking.
+            partial_ty
+        } else if preserves_cross_typevar_mapping {
+            // Preserve bare typevar->typevar mappings across distinct typevars to avoid leaking
+            // one inferred constructor parameter into another through eager chasing.
+            partial_ty
+        } else {
+            recursive_ty
+        }
     }
 
     fn infer_argument_types(

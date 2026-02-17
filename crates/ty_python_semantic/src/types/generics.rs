@@ -7,6 +7,7 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
+use salsa::plumbing::AsId;
 
 use crate::node_key::NodeKey;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
@@ -292,6 +293,24 @@ pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for GenericContext<'_> {}
+
+pub(crate) struct RecursiveSpecializationWithMetadata<'db> {
+    specialization: Specialization<'db>,
+    cycle_broken_to_never: Box<[bool]>,
+}
+
+impl<'db> RecursiveSpecializationWithMetadata<'db> {
+    pub(crate) fn specialization(&self) -> Specialization<'db> {
+        self.specialization
+    }
+
+    pub(crate) fn cycle_broken_to_never_at(&self, index: usize) -> bool {
+        self.cycle_broken_to_never
+            .get(index)
+            .copied()
+            .unwrap_or(false)
+    }
+}
 
 impl<'db> GenericContext<'db> {
     /// Creates a generic context from a list of PEP-695 type parameters.
@@ -758,6 +777,7 @@ impl<'db> GenericContext<'db> {
                 partial.types(db),
                 None,
                 Some(TupleType::homogeneous(db, Type::unknown())),
+                None,
             )
         } else {
             partial
@@ -776,6 +796,75 @@ impl<'db> GenericContext<'db> {
             1 => self.specialize(db, &[Type::unknown(); 1]),
             2 => self.specialize(db, &[Type::unknown(); 2]),
             len => self.specialize(db, vec![Type::unknown(); len]),
+        }
+    }
+
+    fn specialize_recursive_impl(
+        db: &'db dyn Db,
+        context: GenericContext<'db>,
+        mut types: Box<[Type<'db>]>,
+        mut cycle_broken_to_never: Option<&mut [bool]>,
+    ) -> Box<[Type<'db>]> {
+        let len = types.len();
+        if let Some(cycle_broken_to_never) = cycle_broken_to_never.as_deref_mut() {
+            debug_assert_eq!(cycle_broken_to_never.len(), len);
+        }
+
+        loop {
+            let mut any_changed = false;
+            if let Some(cycle_broken_to_never) = cycle_broken_to_never.as_deref_mut() {
+                // Keep metadata aligned with the final fixed point.
+                cycle_broken_to_never.fill(false);
+            }
+            for i in 0..len {
+                let specialization = ApplySpecialization::Partial {
+                    generic_context: context,
+                    types: &types,
+                    // Don't recursively substitute type[i] in itself. Ideally, we could instead
+                    // check if the result is self-referential after we're done applying the
+                    // partial specialization. But when we apply a paramspec, we don't use the
+                    // callable that it maps to directly; we create a new callable that reuses
+                    // parts of it. That means we can't look for the previous type directly.
+                    // Instead we use this to skip specializing the type in itself in the first
+                    // place.
+                    skip: Some(i),
+                };
+                let before = types[i];
+                let updated = before.apply_type_mapping(
+                    db,
+                    &TypeMapping::ApplySpecialization(specialization),
+                    TypeContext::default(),
+                );
+
+                if let Some(cycle_broken_to_never) = cycle_broken_to_never.as_deref_mut()
+                    && updated.is_never()
+                {
+                    let no_skip_specialization = ApplySpecialization::Partial {
+                        generic_context: context,
+                        types: &types,
+                        skip: None,
+                    };
+                    // Compare the same pre-update input under `skip: Some(i)` vs `skip: None` to
+                    // detect when `Never` is introduced specifically by cycle breaking.
+                    let updated_without_skip = before.apply_type_mapping(
+                        db,
+                        &TypeMapping::ApplySpecialization(no_skip_specialization),
+                        TypeContext::default(),
+                    );
+                    if !updated_without_skip.is_never() {
+                        cycle_broken_to_never[i] = true;
+                    }
+                }
+
+                if updated != before {
+                    types[i] = updated;
+                    any_changed = true;
+                }
+            }
+
+            if !any_changed {
+                return types;
+            }
         }
     }
 
@@ -823,7 +912,7 @@ impl<'db> GenericContext<'db> {
         let types = types.into();
 
         assert_eq!(self.len(db), types.len());
-        Specialization::new(db, self, types, None, None)
+        Specialization::new(db, self, types, None, None, None)
     }
 
     /// Creates a specialization of this generic context. Panics if the length of `types` does not
@@ -836,46 +925,30 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        fn specialize_recursive_impl<'db>(
-            db: &'db dyn Db,
-            context: GenericContext<'db>,
-            mut types: Box<[Type<'db>]>,
-        ) -> Specialization<'db> {
-            let len = types.len();
-            loop {
-                let mut any_changed = false;
-                for i in 0..len {
-                    let specialization = ApplySpecialization::Partial {
-                        generic_context: context,
-                        types: &types,
-                        // Don't recursively substitute type[i] in itself. Ideally, we could instead
-                        // check if the result is self-referential after we're done applying the
-                        // partial specialization. But when we apply a paramspec, we don't use the
-                        // callable that it maps to directly; we create a new callable that reuses
-                        // parts of it. That means we can't look for the previous type directly.
-                        // Instead we use this to skip specializing the type in itself in the first
-                        // place.
-                        skip: Some(i),
-                    };
-                    let updated = types[i].apply_type_mapping(
-                        db,
-                        &TypeMapping::ApplySpecialization(specialization),
-                        TypeContext::default(),
-                    );
-                    if updated != types[i] {
-                        types[i] = updated;
-                        any_changed = true;
-                    }
-                }
-
-                if !any_changed {
-                    return Specialization::new(db, context, types, None, None);
-                }
-            }
-        }
-
         let types = self.fill_in_defaults(db, types);
-        specialize_recursive_impl(db, self, types)
+        let types = Self::specialize_recursive_impl(db, self, types, None);
+        Specialization::new(db, self, types, None, None, None)
+    }
+
+    /// Creates a recursive specialization and records whether each resulting type was reduced to
+    /// `Never` because of cycle breaking in recursive substitution.
+    pub(crate) fn specialize_recursive_with_metadata<I>(
+        self,
+        db: &'db dyn Db,
+        types: I,
+    ) -> RecursiveSpecializationWithMetadata<'db>
+    where
+        I: IntoIterator<Item = Option<Type<'db>>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let types = self.fill_in_defaults(db, types);
+        let mut cycle_broken_to_never = vec![false; types.len()];
+        let types =
+            Self::specialize_recursive_impl(db, self, types, Some(&mut cycle_broken_to_never));
+        RecursiveSpecializationWithMetadata {
+            specialization: Specialization::new(db, self, types, None, None, None),
+            cycle_broken_to_never: cycle_broken_to_never.into_boxed_slice(),
+        }
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -885,7 +958,7 @@ impl<'db> GenericContext<'db> {
         element_type: Type<'db>,
         tuple: TupleType<'db>,
     ) -> Specialization<'db> {
-        Specialization::new(db, self, Box::from([element_type]), None, Some(tuple))
+        Specialization::new(db, self, Box::from([element_type]), None, Some(tuple), None)
     }
 
     fn fill_in_defaults<I>(self, db: &'db dyn Db, types: I) -> Box<[Type<'db>]>
@@ -951,7 +1024,7 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        Specialization::new(db, self, self.fill_in_defaults(db, types), None, None)
+        Specialization::new(db, self, self.fill_in_defaults(db, types), None, None, None)
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -964,9 +1037,6 @@ impl<'db> GenericContext<'db> {
 }
 
 /// An assignment of a specific type to each type variable in a generic scope.
-///
-/// TODO: Handle nested specializations better, with actual parent links to the specialization of
-/// the lexically containing context.
 ///
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
@@ -989,16 +1059,32 @@ pub struct Specialization<'db> {
     /// For specializations of `tuple`, we also store more detailed information about the tuple's
     /// elements, above what the class's (single) typevar can represent.
     tuple_inner: Option<TupleType<'db>>,
+
+    /// If this specialization is nested in another generic scope, this points at the
+    /// specialization for the lexically containing scope.
+    ///
+    /// Parent chains are lexical and typically shallow. They are expected to be acyclic; we
+    /// defensively guard against cycles when walking.
+    parent: Option<Specialization<'db>>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Specialization<'_> {}
 
-pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
+fn specialization_id(specialization: Specialization<'_>) -> salsa::Id {
+    specialization.as_id()
+}
+
+fn walk_specialization_impl<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
     visitor: &V,
+    seen: &mut FxHashSet<salsa::Id>,
 ) {
+    if !seen.insert(specialization_id(specialization)) {
+        return;
+    }
+
     walk_generic_context(db, specialization.generic_context(db), visitor);
     for ty in specialization.types(db) {
         visitor.visit_type(db, *ty);
@@ -1006,6 +1092,30 @@ pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     if let Some(tuple) = specialization.tuple_inner(db) {
         walk_tuple_type(db, tuple, visitor);
     }
+    if let Some(parent) = specialization.parent(db) {
+        walk_specialization_impl(db, parent, visitor, seen);
+    }
+}
+
+pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    specialization: Specialization<'db>,
+    visitor: &V,
+) {
+    // Fast path for the common case: no parent chain means no cycle guard bookkeeping.
+    if specialization.parent(db).is_none() {
+        walk_generic_context(db, specialization.generic_context(db), visitor);
+        for ty in specialization.types(db) {
+            visitor.visit_type(db, *ty);
+        }
+        if let Some(tuple) = specialization.tuple_inner(db) {
+            walk_tuple_type(db, tuple, visitor);
+        }
+        return;
+    }
+
+    let mut seen = FxHashSet::default();
+    walk_specialization_impl(db, specialization, visitor, &mut seen);
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -1204,6 +1314,28 @@ fn has_relation_in_invariant_position<'db>(
 }
 
 impl<'db> Specialization<'db> {
+    pub(crate) fn with_parent(self, db: &'db dyn Db, parent: Option<Specialization<'db>>) -> Self {
+        #[cfg(debug_assertions)]
+        if let Some(parent) = parent {
+            let mut current = Some(parent);
+            let mut seen = FxHashSet::default();
+            while let Some(parent) = current {
+                let inserted = seen.insert(specialization_id(parent));
+                debug_assert!(inserted);
+                current = parent.parent(db);
+            }
+        }
+
+        Self::new(
+            db,
+            self.generic_context(db),
+            self.types(db),
+            self.materialization_kind(db),
+            self.tuple_inner(db),
+            parent,
+        )
+    }
+
     /// Restricts this specialization to only include the typevars in a generic context. If the
     /// specialization does not include all of those typevars, returns `None`.
     pub(crate) fn restrict(
@@ -1211,21 +1343,28 @@ impl<'db> Specialization<'db> {
         db: &'db dyn Db,
         generic_context: GenericContext<'db>,
     ) -> Option<Self> {
-        let self_variables = self.generic_context(db).variables_inner(db);
-        let self_types = self.types(db);
         let restricted_variables = generic_context.variables(db);
         let restricted_types: Option<Box<[_]>> = restricted_variables
-            .map(|variable| {
-                let index = self_variables.get_index_of(&variable.identity(db))?;
-                self_types.get(index).copied()
-            })
+            .map(|variable| self.get(db, variable))
             .collect();
+        let mut parent = self.parent(db);
+        while let Some(current_parent) = parent {
+            // If the restricted specialization and its parent have the same context, skip the
+            // parent layer to avoid redundant lookup hops for every `get`.
+            if current_parent.generic_context(db) == generic_context {
+                parent = current_parent.parent(db);
+            } else {
+                break;
+            }
+        }
+
         Some(Self::new(
             db,
             generic_context,
             restricted_types?,
             self.materialization_kind(db),
             None,
+            parent,
         ))
     }
 
@@ -1234,18 +1373,26 @@ impl<'db> Specialization<'db> {
         self.tuple_inner(db).map(|tuple_type| tuple_type.tuple(db))
     }
 
-    /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
-    /// mapping.
+    /// Returns the type that a typevar is mapped to, looking in this specialization and then in
+    /// parent specializations. Returns `None` if the typevar isn't present in the chain.
     pub(crate) fn get(
         self,
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
-        let index = self
-            .generic_context(db)
-            .variables_inner(db)
-            .get_index_of(&bound_typevar.identity(db))?;
-        self.types(db).get(index).copied()
+        let identity = bound_typevar.identity(db);
+        let mut current = Some(self);
+        while let Some(specialization) = current {
+            if let Some(index) = specialization
+                .generic_context(db)
+                .variables_inner(db)
+                .get_index_of(&identity)
+            {
+                return specialization.types(db).get(index).copied();
+            }
+            current = specialization.parent(db);
+        }
+        None
     }
 
     /// Applies a specialization to this specialization. This is used, for instance, when a generic
@@ -1332,6 +1479,9 @@ impl<'db> Specialization<'db> {
         let tuple_inner = self.tuple_inner(db).and_then(|tuple| {
             tuple.apply_type_mapping_impl(db, type_mapping, TypeContext::default(), visitor)
         });
+        let parent = self
+            .parent(db)
+            .map(|parent| parent.apply_type_mapping_impl(db, type_mapping, &[], visitor));
 
         Specialization::new(
             db,
@@ -1339,6 +1489,7 @@ impl<'db> Specialization<'db> {
             types,
             self.materialization_kind(db),
             tuple_inner,
+            parent,
         )
     }
 
@@ -1376,9 +1527,22 @@ impl<'db> Specialization<'db> {
                 _ => UnionType::from_elements(db, [self_type, other_type]),
             })
             .collect();
+        let parent = match (self.parent(db), other.parent(db)) {
+            (None, None) => None,
+            (Some(parent), None) | (None, Some(parent)) => Some(parent),
+            (Some(left), Some(right)) => {
+                if left.generic_context(db) == right.generic_context(db) {
+                    Some(left.combine(db, right))
+                } else {
+                    // Parent chains with different contexts are incomparable at this level; drop
+                    // instead of combining unrelated lexical scopes.
+                    None
+                }
+            }
+        };
         // TODO: Combine the tuple specs too
         // TODO(jelle): specialization type?
-        Specialization::new(db, self.generic_context(db), types, None, None)
+        Specialization::new(db, self.generic_context(db), types, None, None, parent)
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -1390,6 +1554,9 @@ impl<'db> Specialization<'db> {
         let tuple_inner = self
             .tuple_inner(db)
             .and_then(|tuple| tuple.normalized_impl(db, visitor));
+        let parent = self
+            .parent(db)
+            .map(|parent| parent.normalized_impl(db, visitor));
         let context = self.generic_context(db).normalized_impl(db, visitor);
         Self::new(
             db,
@@ -1397,6 +1564,7 @@ impl<'db> Specialization<'db> {
             types,
             self.materialization_kind(db),
             tuple_inner,
+            parent,
         )
     }
 
@@ -1424,6 +1592,10 @@ impl<'db> Specialization<'db> {
             Some(tuple) => Some(tuple.recursive_type_normalized_impl(db, div, nested)?),
             None => None,
         };
+        let parent = match self.parent(db) {
+            Some(parent) => Some(parent.recursive_type_normalized_impl(db, div, nested)?),
+            None => None,
+        };
         let context = self.generic_context(db);
         Some(Self::new(
             db,
@@ -1431,6 +1603,7 @@ impl<'db> Specialization<'db> {
             types,
             self.materialization_kind(db),
             tuple_inner,
+            parent,
         ))
     }
 
@@ -1488,12 +1661,16 @@ impl<'db> Specialization<'db> {
         } else {
             None
         };
+        let parent = self
+            .parent(db)
+            .map(|parent| parent.materialize_impl(db, materialization_kind, visitor));
         Specialization::new(
             db,
             self.generic_context(db),
             types,
             new_materialization_kind,
             tuple_inner,
+            parent,
         )
     }
 
