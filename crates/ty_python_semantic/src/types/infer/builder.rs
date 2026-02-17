@@ -1715,10 +1715,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let module = parsed_module(db, definition.file(db)).load(db);
         let span = Span::from(definition.focus_range(db, &module));
         let defining_class_name = defining_class.name(db);
-        let secondary_annotation = Annotation::secondary(span).message(format_args!(
-            "`{first_method_name}` defined as abstract on superclass `{defining_class_name}`",
-        ));
+
+        let mut secondary_annotation = Annotation::secondary(span);
+        secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
+            secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
+        } else {
+            secondary_annotation.message(format_args!(
+                "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
+            ))
+        };
         diagnostic.annotate(secondary_annotation);
+
         if !kind.is_explicit() {
             let mut sub = SubDiagnostic::new(
                 SubDiagnosticSeverity::Info,
@@ -1729,7 +1736,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ),
             );
             sub.annotate(
-                Annotation::primary(defining_class.definition_span(db))
+                Annotation::secondary(defining_class.definition_span(db))
                     .message(format_args!("`{defining_class_name}` declared here")),
             );
             diagnostic.sub(sub);

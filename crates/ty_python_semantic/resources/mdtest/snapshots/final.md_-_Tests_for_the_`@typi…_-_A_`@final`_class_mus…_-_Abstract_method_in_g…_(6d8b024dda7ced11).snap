@@ -44,7 +44,7 @@ error[abstract-method-in-final-class]: Final class `Child` does not implement ab
  4 | class GrandParent(ABC):
  5 |     @abstractmethod
  6 |     def method(self) -> int: ...
-   |         ------ `method` defined as abstract on superclass `GrandParent`
+   |         ------ `method` declared as abstract on superclass `GrandParent`
  7 |
  8 | class Parent(GrandParent):
    |
