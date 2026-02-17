@@ -1200,6 +1200,18 @@ class BadChild(Base):  # error: [abstract-method-in-final-class]
     f: int
 ```
 
+But we make an exception here for `ClassVar` annotations: we assume in this case that the user will
+dynamically patch the attribute onto the class (e.g., using a metaclass):
+
+```py
+from typing import ClassVar
+
+# TODO: this should not emit an error
+@final
+class GoodChild(Base):  # error: [abstract-method-in-final-class]
+    f: ClassVar[int]
+```
+
 ### Abstract classmethod
 
 A `@final` class must also implement abstract classmethods.
@@ -1279,4 +1291,38 @@ class Base(ABC):
 # TODO: should emit [abstract-method-in-final-class] for `value`, `make`, and `create`
 class Bad(Base):
     pass
+```
+
+### Diagnostic when there are many abstract methods
+
+<!-- snapshot-diagnostics -->
+
+A test for our diagnostic when a class has many unimplemented abstract methods:
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+@final
+class Abstract(ABC):  # error: [abstract-method-in-final-class]
+    @abstractmethod
+    def aaaaaaaaaa(self) -> int: ...
+    @abstractmethod
+    def bbbbbbbb(self) -> int: ...
+    @abstractmethod
+    def cccccccc(self) -> int: ...
+    @abstractmethod
+    def ddddddddd(self) -> int: ...
+    @abstractmethod
+    def eeeeeeeee(self) -> int: ...
+    @abstractmethod
+    def ffffffff(self) -> int: ...
+    @abstractmethod
+    def ggggggg(self) -> int: ...
+    @abstractmethod
+    def hhhhhhhh(self) -> int: ...
+    @abstractmethod
+    def iiiiiiiii(self) -> int: ...
+    @abstractmethod
+    def kkkkkkkkkk(self) -> int: ...
 ```

@@ -1,0 +1,60 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - A `@final` class must implement all abstract methods - Diagnostic when there are many abstract methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from abc import ABC, abstractmethod
+ 2 | from typing import final
+ 3 | 
+ 4 | @final
+ 5 | class Abstract(ABC):  # error: [abstract-method-in-final-class]
+ 6 |     @abstractmethod
+ 7 |     def aaaaaaaaaa(self) -> int: ...
+ 8 |     @abstractmethod
+ 9 |     def bbbbbbbb(self) -> int: ...
+10 |     @abstractmethod
+11 |     def cccccccc(self) -> int: ...
+12 |     @abstractmethod
+13 |     def ddddddddd(self) -> int: ...
+14 |     @abstractmethod
+15 |     def eeeeeeeee(self) -> int: ...
+16 |     @abstractmethod
+17 |     def ffffffff(self) -> int: ...
+18 |     @abstractmethod
+19 |     def ggggggg(self) -> int: ...
+20 |     @abstractmethod
+21 |     def hhhhhhhh(self) -> int: ...
+22 |     @abstractmethod
+23 |     def iiiiiiiii(self) -> int: ...
+24 |     @abstractmethod
+25 |     def kkkkkkkkkk(self) -> int: ...
+```
+
+# Diagnostics
+
+```
+error[abstract-method-in-final-class]: Final class `Abstract` does not implement abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk`
+ --> src/mdtest_snippet.py:5:7
+  |
+4 | @final
+5 | class Abstract(ABC):  # error: [abstract-method-in-final-class]
+  |       ^^^^^^^^
+6 |     @abstractmethod
+7 |     def aaaaaaaaaa(self) -> int: ...
+  |         ---------- `aaaaaaaaaa` defined as abstract on superclass `Abstract`
+8 |     @abstractmethod
+9 |     def bbbbbbbb(self) -> int: ...
+  |
+info: rule `abstract-method-in-final-class` is enabled by default
+
+```
