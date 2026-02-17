@@ -3,6 +3,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Locator;
 use crate::checkers::ast::LintContext;
+use crate::fix::edits::delete_comment;
 use crate::noqa::{Code, Directive};
 use crate::noqa::{Codes, NoqaDirectives};
 use crate::registry::Rule;
@@ -99,7 +100,7 @@ pub(crate) fn invalid_noqa_code(
             .partition(|&code| code_is_valid(code.as_str(), external));
 
         if valid_codes.is_empty() {
-            all_codes_invalid_diagnostic(directive, invalid_codes, context);
+            all_codes_invalid_diagnostic(directive, invalid_codes, locator, context);
         } else {
             for invalid_code in invalid_codes {
                 some_codes_are_invalid_diagnostic(directive, invalid_code, locator, context);
@@ -116,6 +117,7 @@ pub(crate) fn code_is_valid(code: &str, external: &[String]) -> bool {
 fn all_codes_invalid_diagnostic(
     directive: &Codes<'_>,
     invalid_codes: Vec<&Code<'_>>,
+    locator: &Locator,
     context: &LintContext,
 ) {
     context
@@ -131,7 +133,7 @@ fn all_codes_invalid_diagnostic(
             },
             directive.range(),
         )
-        .set_fix(Fix::safe_edit(Edit::range_deletion(directive.range())));
+        .set_fix(Fix::safe_edit(delete_comment(directive.range(), locator)));
 }
 
 fn some_codes_are_invalid_diagnostic(
