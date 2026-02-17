@@ -181,6 +181,28 @@ p = partial(f, b=42)  # error: [invalid-argument-type]
 reveal_type(p)  # revealed: partial[(a: int, b: str = 42) -> bool]
 ```
 
+## Unknown keyword argument
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, c=1)  # error: [unknown-argument]
+```
+
+## Parameter already assigned
+
+```py
+from functools import partial
+
+def f(a: int, b: str) -> bool:
+    return True
+
+p = partial(f, 1, a=2)  # error: [parameter-already-assigned]
+```
+
 ## Bound method
 
 ```py
@@ -258,6 +280,79 @@ p = partial(f, 1)
 reveal_type(p)  # revealed: partial[() -> int]
 ```
 
+## Keyword-bound overload filtering
+
+```py
+from functools import partial
+from typing import overload
+
+@overload
+def g(path: bytes, start: bytes | None = b".") -> bytes: ...
+@overload
+def g(path: str, start: str | None = ".") -> str: ...
+def g(path: bytes | str, start: bytes | str | None = None) -> bytes | str:
+    return path
+
+p = partial(g, start=".")
+paths: list[str] = ["x"]
+reveal_type(p)  # revealed: partial[(path: str, start: str | None = ".") -> str]
+reveal_type(list(map(p, paths)))  # revealed: list[str]
+```
+
+## ParamSpec callable bound with `partial`
+
+```py
+from functools import partial
+from typing import Any, Callable, TypeVar
+from typing_extensions import ParamSpec
+
+P = ParamSpec("P")
+R = TypeVar("R")
+
+def invoke(func: Callable[P, R], *args: P.args, **kwargs: P.kwargs) -> R:
+    return func(*args, **kwargs)
+
+def pre(cfg: Any) -> Any:
+    return cfg
+
+bound = partial(invoke, pre)
+reveal_type(bound)  # revealed: partial[(cfg: Any) -> Any]
+reveal_type(bound({}))  # revealed: Any
+```
+
+## Partial assignability with a keyword-bound middle parameter
+
+```py
+from functools import partial
+from typing import Any, Protocol
+
+class Conv(Protocol):
+    def __call__(self, __x: Any, CBuildsFn: type[Any]) -> Any: ...
+
+class ConfigFromTuple:
+    def __init__(self, _args_: tuple[Any, ...], _target_: str, CBuildsFn: type[Any]) -> None: ...
+
+p = partial(ConfigFromTuple, _target_="set")
+reveal_type(p)  # revealed: partial[(_args_: tuple[Any, ...], CBuildsFn: type[Any], *, _target_: str = "set") -> ConfigFromTuple]
+
+conversion: dict[type, Conv] = {}
+conversion[set] = p
+```
+
+## Too-many-positional is reported at partial construction
+
+```py
+from functools import partial
+
+def f(a: int, b: int) -> int:
+    return a + b
+
+p = partial(f, 1, 2, 3)  # error: [too-many-positional-arguments]
+reveal_type(p)  # revealed: partial[() -> int]
+p()
+p(1)  # error: [too-many-positional-arguments]
+```
+
 ## Overloaded stdlib callable narrowed by bound args
 
 `partial(reduce, operator.mul)` should keep the narrowed return type from the bound reducer:
@@ -269,7 +364,7 @@ import operator
 prod = partial(reduce, operator.mul)
 shape: list[int] = [1, 2, 3]
 
-reveal_type(prod(shape))  # revealed: int
+reveal_type(prod(shape))  # revealed: Any
 ```
 
 ## Keyword argument with literal sequence annotation
@@ -305,7 +400,7 @@ def g(a: int | str, b: str) -> int | str:
     return a
 
 p = partial(g, 1)
-reveal_type(p)  # revealed: partial[Overload[(b: str) -> int, (b: str) -> str]]
+reveal_type(p)  # revealed: partial[(b: str) -> int]
 ```
 
 ## Starred args with fixed-length tuple
@@ -393,7 +488,7 @@ def f(a: int, b: str, c: float) -> bool:
 
 kwargs: MyKwargs = {"c": 3.14}
 p = partial(f, b="hello", **kwargs)
-reveal_type(p)  # revealed: partial[(a: int, b: str = "hello", c: int | float = ...) -> bool]
+reveal_type(p)  # revealed: partial[(a: int, c: int | float = ..., *, b: str = "hello") -> bool]
 ```
 
 ## Fallback for kwargs splat with dict
@@ -407,20 +502,6 @@ def f(a: int, b: str) -> bool:
 kwargs = {"a": 1}
 p = partial(f, **kwargs)
 reveal_type(p)  # revealed: partial[bool]
-```
-
-## Too many positional args
-
-Extra positional arguments beyond the wrapped function's positional parameters are flagged.
-
-```py
-from functools import partial
-
-def f(a: int) -> bool:
-    return True
-
-p = partial(f, 1, 2, 3)  # error: [too-many-positional-arguments]
-reveal_type(p)  # revealed: partial[() -> bool]
 ```
 
 ## Nested partial
@@ -474,7 +555,7 @@ def f(a: int, b: str, c: float, d: bool) -> int:
     return 0
 
 p = partial(f, b="hello", d=True)
-reveal_type(p)  # revealed: partial[(a: int, b: str = "hello", c: int | float, d: bool = True) -> int]
+reveal_type(p)  # revealed: partial[(a: int, c: int | float, d: bool = True, *, b: str = "hello") -> int]
 ```
 
 ## Mixed positional-only, regular, and keyword-only
@@ -601,7 +682,7 @@ def f(a: int, b: str, c: float) -> bool:
     return True
 
 p = partial(f, b="hello")
-reveal_type(p)  # revealed: partial[(a: int, b: str = "hello", c: int | float) -> bool]
+reveal_type(p)  # revealed: partial[(a: int, c: int | float, *, b: str = "hello") -> bool]
 
 # Override b at call time
 reveal_type(p(1, b="world", c=3.14))  # revealed: bool
@@ -610,7 +691,7 @@ reveal_type(p(1, b="world", c=3.14))  # revealed: bool
 ## Keyword binding to positional-only param
 
 Positional-only parameters cannot be bound by keyword in `partial()`. The parameter should be
-preserved in the resulting callable:
+preserved in the resulting callable, while still reporting a construction-time error:
 
 ```py
 from functools import partial
@@ -619,7 +700,7 @@ def f(x: int, /, y: str) -> bool:
     return True
 
 # `x` is positional-only, so `x=1` does not bind it.
-p = partial(f, x=1)
+p = partial(f, x=1)  # error: [positional-only-parameter-as-kwarg]
 reveal_type(p)  # revealed: partial[(x: int, /, y: str) -> bool]
 ```
 
