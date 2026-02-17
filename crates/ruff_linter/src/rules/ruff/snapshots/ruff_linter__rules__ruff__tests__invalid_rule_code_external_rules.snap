@@ -176,3 +176,19 @@ help: Remove the rule code `INVALID400`
 18 + import json  # noqa: E402, V100
 19 | # Test for rule redirects
 20 | import pandas as pd  # noqa: TCH002
+21 | # Invalid code with trailing reason (single comment)
+
+RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+  --> RUF102.py:22:17
+   |
+20 | import pandas as pd  # noqa: TCH002
+21 | # Invalid code with trailing reason (single comment)
+22 | import pathlib  # noqa: INVALID123 some reason
+   |                 ^^^^^^^^^^^^^^^^^^
+   |
+help: Remove the `# noqa` comment
+19 | # Test for rule redirects
+20 | import pandas as pd  # noqa: TCH002
+21 | # Invalid code with trailing reason (single comment)
+   - import pathlib  # noqa: INVALID123 some reason
+22 + import pathlib
