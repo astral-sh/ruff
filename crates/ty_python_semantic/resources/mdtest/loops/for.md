@@ -415,6 +415,12 @@ def _(x: Intersection[tuple[int, str], tuple[object, object]]):
     # The intersection should yield `(int & object) | (str & object)` = `int | str`.
     for item in x:
         reveal_type(item)  # revealed: int | str
+
+    # When unpacking, we can see the per-position intersected types:
+    # `tuple[int & object, str & object]` = `tuple[int, str]`
+    a, b = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: str
 ```
 
 ## Intersection of variable-length and fixed-length tuple
@@ -432,6 +438,12 @@ def _(x: Intersection[tuple[str, ...], tuple[object, object]]):
     # The intersection should yield `(str & object) | (str & object)` = `str`.
     for item in x:
         reveal_type(item)  # revealed: str
+
+    # When unpacking, we can see the fixed-length structure is preserved:
+    # `tuple[str & object, str & object]` = `tuple[str, str]`
+    a, b = x
+    reveal_type(a)  # revealed: str
+    reveal_type(b)  # revealed: str
 ```
 
 ## Intersection of variable-length tuples
@@ -454,6 +466,13 @@ def _(x: Intersection[tuple[int, *tuple[str, ...], bytes], tuple[object, *tuple[
     # Iterating yields: int | str | Never = int | str
     for item in x:
         reveal_type(item)  # revealed: int | str
+
+    # When unpacking, we can see the per-position intersected types:
+    a, *b, c = x
+    reveal_type(a)  # revealed: int
+    reveal_type(b)  # revealed: list[str]
+    # TODO: should be `Never` (`bytes & str`)
+    reveal_type(c)  # revealed: Unknown
 ```
 
 ## Intersection of fixed-length tuple with homogeneous iterable
