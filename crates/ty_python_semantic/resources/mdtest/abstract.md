@@ -9,36 +9,36 @@ detect possible attempts to instantiate abstract classes:
 import abc
 from typing import Protocol
 
-class Foo(abc.ABC):
+class AbstractBase(abc.ABC):
     @abc.abstractmethod
     def bar(self): ...
 
-class Spam(Foo): ...
+class StillAbstract(AbstractBase): ...
 
 # TODO: should emit diagnostic
-Spam()
+StillAbstract()
 
-class Foo2(abc.ABC):
+class AbstractBase2(abc.ABC):
     @abc.abstractmethod
     def bar(self): ...
     @abc.abstractmethod
     def bar2(self): ...
 
 # TODO: should emit diagnostic
-Foo2()
+AbstractBase2()
 
-class Spam2(Foo2): ...
+class StillAbstract2(AbstractBase2): ...
 
 # TODO: should emit diagnostic
-Spam2()
+StillAbstract2()
 
-class Foo3(Protocol):
+class AbstractBase3(Protocol):
     def bar(self) -> int: ...
 
-class Spam3(Foo3): ...
+class StillAbstract3(AbstractBase3): ...
 
 # TODO: should emit diagnostic
-Spam3()
+StillAbstract3()
 ```
 
 Abstract methods can be concretely overridden by synthesized methods:
@@ -69,20 +69,23 @@ class AlsoConreteOrdered(AbstractOrdered):
 AlsoConreteOrdered()
 ```
 
-We also allow abstract methods to be "overridden" by a `ClassVar` annotation, even if it is not
-accompanied by a binding in the class body: we assume that a class like this will have the override
-added dynamically (e.g., by a metaclass):
+We also allow abstract methods or properties to be "overridden" by a `ClassVar` annotation, even if
+it is not accompanied by a binding in the class body: we assume that a class like this will have the
+override added dynamically (e.g., by a metaclass):
 
 ```py
-from typing import ClassVar
+from typing import ClassVar, Callable
 
 class AbstractDynamic(ABC):
     @property
     @abstractmethod
     def f(self) -> int: ...
+    @abstractmethod
+    def g(self) -> str: ...
 
 class ConcreteDynamic(AbstractDynamic):
     f: ClassVar[int]
+    g: ClassVar[Callable[..., str]]
 
 ConcreteDynamic()  # no error
 ```
