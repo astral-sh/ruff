@@ -54,6 +54,10 @@ impl Db {
         self.settings.unwrap()
     }
 
+    pub(crate) fn set_verbosity(&mut self, verbose: bool) {
+        self.settings().set_verbose(self).to(verbose);
+    }
+
     pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
         let analysis = if let Some(options) = options {
             let AnalysisSettings {
@@ -163,7 +167,7 @@ impl SemanticDb for Db {
     }
 
     fn verbose(&self) -> bool {
-        false
+        self.settings().verbose(self)
     }
 
     fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
@@ -186,6 +190,8 @@ struct Settings {
     #[default]
     #[returns(ref)]
     analysis: AnalysisSettings,
+    #[default]
+    verbose: bool,
 }
 
 #[derive(Debug, Clone)]

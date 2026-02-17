@@ -4,7 +4,7 @@ expression: snapshot
 ---
 
 ---
-mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - A `@final` class must implement all abstract methods - Diagnostic when there are many abstract methods
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - A `@final` class must implement all abstract methods - Diagnostic when there are many abstract methods and `--verbose` has been specified
 mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 ---
 
@@ -17,7 +17,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
  2 | from typing import final
  3 | 
  4 | @final
- 5 | # error: [abstract-method-in-final-class] "Final class `Abstract` has 10 unimplemented abstract methods, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`"
+ 5 | # error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk`"
  6 | class Abstract(ABC):
  7 |     @abstractmethod
  8 |     def aaaaaaaaaa(self) -> int: ...
@@ -48,16 +48,15 @@ error[abstract-method-in-final-class]: Final class `Abstract` has unimplemented 
   --> src/mdtest_snippet.py:6:7
    |
  4 | @final
- 5 | # error: [abstract-method-in-final-class] "Final class `Abstract` has 10 unimplemented abstract methods, including `aaaaaaaaaa`, `bbbb…
+ 5 | # error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccc…
  6 | class Abstract(ABC):
-   |       ^^^^^^^^ 10 abstract methods are unimplemented, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`
+   |       ^^^^^^^^ Abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk` are unimplemented
  7 |     @abstractmethod
  8 |     def aaaaaaaaaa(self) -> int: ...
    |         ---------- `aaaaaaaaaa` declared as abstract
  9 |     @abstractmethod
 10 |     def bbbbbbbb(self) -> int: ...
    |
-info: Use `--verbose` to see all 10 unimplemented abstract methods
 info: rule `abstract-method-in-final-class` is enabled by default
 
 ```
