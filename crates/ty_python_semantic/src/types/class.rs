@@ -1088,6 +1088,7 @@ impl<'db> ClassType<'db> {
             let ClassBase::Class(class) = supercls else {
                 continue;
             };
+
             // Currently we do not recognize dynamic classes as being able to define abstract methods,
             // but we do recognise them as being able to override abstract methods defined in static classes.
             let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
@@ -1095,11 +1096,32 @@ impl<'db> ClassType<'db> {
                     .retain(|name, _| class.own_class_member(db, None, name).is_undefined());
                 continue;
             };
+
             let scope = class_literal.body_scope(db);
             let place_table = place_table(db, scope);
-            for (symbol_id, bindings_iterator) in
-                use_def_map(db, class_literal.body_scope(db)).all_end_of_scope_symbol_bindings()
-            {
+            let use_def_map = use_def_map(db, class_literal.body_scope(db));
+
+            // Treat abstract methods from superclasses as having been overridden
+            // if this class has a synthesized method by that name,
+            // or this class has a `ClassVar` declaration by that name
+            abstract_methods.retain(|name, _| {
+                if class_literal
+                    .own_synthesized_member(db, None, None, name)
+                    .is_some()
+                {
+                    return false;
+                }
+
+                place_table.symbol_id(name).is_none_or(|symbol_id| {
+                    let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+                    !place_from_declarations(db, declarations)
+                        .ignore_conflicting_declarations()
+                        .qualifiers
+                        .contains(TypeQualifiers::CLASS_VAR)
+                })
+            });
+
+            for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
                 let name = place_table.symbol(symbol_id).name();
                 let place_and_definition = place_from_bindings(db, bindings_iterator);
                 let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
