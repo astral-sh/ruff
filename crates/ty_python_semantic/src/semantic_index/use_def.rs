@@ -261,8 +261,8 @@ use crate::semantic_index::reachability_constraints::{
 use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::place_state::{
-    Bindings, BuilderPlaceState, Declarations, EnclosingSnapshot, LiveBindingsIterator,
-    LiveDeclaration, LiveDeclarationsIterator, PlaceState,
+    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
+    LiveDeclarationsIterator, PlaceState,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{PossiblyNarrowedPlaces, Truthiness, Type};
@@ -849,16 +849,16 @@ struct ReachableDefinitions {
 /// A snapshot of the definitions and constraints state at a particular point in control flow.
 #[derive(Clone, Debug)]
 pub(super) struct FlowSnapshot {
-    symbol_states: IndexVec<ScopedSymbolId, BuilderPlaceState>,
-    member_states: IndexVec<ScopedMemberId, BuilderPlaceState>,
+    symbol_states: IndexVec<ScopedSymbolId, PlaceState>,
+    member_states: IndexVec<ScopedMemberId, PlaceState>,
     reachability: ScopedReachabilityConstraintId,
 }
 
 /// A snapshot of the state of a single symbol (e.g. `obj`) and all of its associated members
 /// (e.g. `obj.attr`, `obj["key"]`).
 pub(super) struct SingleSymbolSnapshot {
-    symbol_state: BuilderPlaceState,
-    associated_member_states: FxHashMap<ScopedMemberId, BuilderPlaceState>,
+    symbol_state: PlaceState,
+    associated_member_states: FxHashMap<ScopedMemberId, PlaceState>,
 }
 
 #[derive(Debug)]
@@ -895,9 +895,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     bindings_by_definition: FxHashMap<Definition<'db>, Bindings>,
 
     /// Currently live bindings and declarations for each place.
-    symbol_states: IndexVec<ScopedSymbolId, BuilderPlaceState>,
+    symbol_states: IndexVec<ScopedSymbolId, PlaceState>,
 
-    member_states: IndexVec<ScopedMemberId, BuilderPlaceState>,
+    member_states: IndexVec<ScopedMemberId, PlaceState>,
 
     /// All potentially reachable bindings and declarations, for each place.
     reachable_symbol_definitions: IndexVec<ScopedSymbolId, ReachableDefinitions>,
@@ -957,7 +957,7 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Symbol(symbol) => {
                 let new_place = self
                     .symbol_states
-                    .push(BuilderPlaceState::undefined(self.reachability));
+                    .push(PlaceState::undefined(self.reachability));
                 debug_assert_eq!(symbol, new_place);
                 let new_place = self
                     .reachable_symbol_definitions
@@ -970,7 +970,7 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Member(member) => {
                 let new_place = self
                     .member_states
-                    .push(BuilderPlaceState::undefined(self.reachability));
+                    .push(PlaceState::undefined(self.reachability));
                 debug_assert_eq!(member, new_place);
                 let new_place = self
                     .reachable_member_definitions
@@ -1030,7 +1030,6 @@ impl<'db> UseDefMapBuilder<'db> {
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreKept,
-            place_version,
         );
     }
 
@@ -1098,14 +1097,12 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         for place in places {
             let bindings = match place {
-                ScopedPlaceId::Symbol(symbol_id) => self
-                    .symbol_states
-                    .get(*symbol_id)
-                    .map(BuilderPlaceState::bindings),
-                ScopedPlaceId::Member(member_id) => self
-                    .member_states
-                    .get(*member_id)
-                    .map(BuilderPlaceState::bindings),
+                ScopedPlaceId::Symbol(symbol_id) => {
+                    self.symbol_states.get(*symbol_id).map(PlaceState::bindings)
+                }
+                ScopedPlaceId::Member(member_id) => {
+                    self.member_states.get(*member_id).map(PlaceState::bindings)
+                }
             };
             let Some(bindings) = bindings else {
                 continue;
@@ -1364,7 +1361,6 @@ impl<'db> UseDefMapBuilder<'db> {
             self.is_class_scope,
             place.is_symbol(),
             PreviousDefinitions::AreKept,
-            place_version,
         );
     }
 
@@ -1498,10 +1494,10 @@ impl<'db> UseDefMapBuilder<'db> {
         // to fill them in so the place IDs continue to line up. Since they don't exist in the
         // snapshot, the correct state to fill them in with is "undefined".
         self.symbol_states
-            .resize(num_symbols, BuilderPlaceState::undefined(self.reachability));
+            .resize(num_symbols, PlaceState::undefined(self.reachability));
 
         self.member_states
-            .resize(num_members, BuilderPlaceState::undefined(self.reachability));
+            .resize(num_members, PlaceState::undefined(self.reachability));
     }
 
     /// Merge the given snapshot into the current state, reflecting that we might have taken either
@@ -1535,7 +1531,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 current.merge(snapshot, &mut self.reachability_constraints);
             } else {
                 current.merge(
-                    BuilderPlaceState::undefined(snapshot.reachability),
+                    PlaceState::undefined(snapshot.reachability),
                     &mut self.reachability_constraints,
                 );
                 // Place not present in snapshot, so it's unbound/undeclared from that path.
@@ -1548,7 +1544,7 @@ impl<'db> UseDefMapBuilder<'db> {
                 current.merge(snapshot, &mut self.reachability_constraints);
             } else {
                 current.merge(
-                    BuilderPlaceState::undefined(snapshot.reachability),
+                    PlaceState::undefined(snapshot.reachability),
                     &mut self.reachability_constraints,
                 );
                 // Place not present in snapshot, so it's unbound/undeclared from that path.
@@ -1619,17 +1615,6 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_definition.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
 
-        let end_of_scope_symbols: IndexVec<ScopedSymbolId, PlaceState> = self
-            .symbol_states
-            .into_iter()
-            .map(BuilderPlaceState::into_place_state)
-            .collect();
-        let end_of_scope_members: IndexVec<ScopedMemberId, PlaceState> = self
-            .member_states
-            .into_iter()
-            .map(BuilderPlaceState::into_place_state)
-            .collect();
-
         UseDefMap {
             all_definitions: self.all_definitions,
             predicates: self.predicates.build(),
@@ -1638,8 +1623,8 @@ impl<'db> UseDefMapBuilder<'db> {
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,
-            end_of_scope_symbols,
-            end_of_scope_members,
+            end_of_scope_symbols: self.symbol_states,
+            end_of_scope_members: self.member_states,
             reachable_definitions_by_symbol: self.reachable_symbol_definitions,
             reachable_definitions_by_member: self.reachable_member_definitions,
             declarations_by_binding: self.declarations_by_binding,
