@@ -9,7 +9,7 @@ use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeKind;
 use crate::{Db, semantic_index};
 use ruff_db::parsed::parsed_module;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::TextRange;
 
 fn is_dunder_name(name: &str) -> bool {
     name.len() > 4 && name.starts_with("__") && name.ends_with("__")
@@ -62,18 +62,19 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
     let mut unused = Vec::new();
 
     for scope_id in index.scope_ids() {
-        let file_scope = scope_id.file_scope_id(db);
-        let scope = index.scope(file_scope);
+        let file_scope_id = scope_id.file_scope_id(db);
+        let scope = index.scope(file_scope_id);
+        let scope_kind = scope.kind();
 
         if !matches!(
-            scope.kind(),
+            scope_kind,
             ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension
         ) {
             continue;
         }
 
-        let place_table = index.place_table(file_scope);
-        let use_def_map = index.use_def_map(file_scope);
+        let place_table = index.place_table(file_scope_id);
+        let use_def_map = index.use_def_map(file_scope_id);
 
         for (_, state, is_used) in use_def_map.all_definitions_with_usage() {
             let DefinitionState::Defined(definition) = state else {
@@ -84,6 +85,11 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                 continue;
             }
 
+            let kind = definition.kind(db);
+            if !should_consider_definition(kind) {
+                continue;
+            }
+
             let ScopedPlaceId::Symbol(symbol_id) = definition.place(db) else {
                 continue;
             };
@@ -91,7 +97,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
             let symbol = place_table.symbol(symbol_id);
             let name = symbol.name().as_str();
 
-            if !should_mark_unnecessary(scope.kind(), name) {
+            if !should_mark_unnecessary(scope_kind, name) {
                 continue;
             }
 
@@ -101,19 +107,8 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
                 continue;
             }
 
-            let kind = definition.kind(db);
-            if !should_consider_definition(kind) {
+            let Some(range) = kind.binding_name_range(&parsed) else {
                 continue;
-            }
-
-            let range = match kind {
-                DefinitionKind::ExceptHandler(handler) => {
-                    let Some(name) = &handler.node(&parsed).name else {
-                        continue;
-                    };
-                    name.range()
-                }
-                _ => kind.target_range(&parsed),
             };
 
             unused.push(UnusedBinding {
@@ -123,7 +118,7 @@ pub fn unused_bindings(db: &dyn Db, file: ruff_db::files::File) -> Vec<UnusedBin
         }
     }
 
-    unused.sort_unstable_by_key(|binding| binding.range.start());
+    unused.sort_unstable_by_key(|binding| (binding.range.start(), binding.range.end()));
     unused.dedup_by_key(|binding| binding.range);
 
     unused
