@@ -18,6 +18,9 @@ on:
       - "scripts/mypy_primer.sh"
       - "Cargo.lock"
       - "!**.md"
+      - "!**.snap"
+      - "!**.py"
+      - "!**.pyi"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
