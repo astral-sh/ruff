@@ -799,7 +799,7 @@ impl ReachabilityConstraints {
     ) -> Type<'db> {
         let mut memo = FxHashMap::default();
         let mut truthiness_memo = FxHashMap::default();
-        self.narrow_by_constraint_inner(
+        let redundant_union = self.narrow_by_constraint_inner(
             db,
             predicates,
             predicate_place_versions,
@@ -810,7 +810,11 @@ impl ReachabilityConstraints {
             None,
             &mut memo,
             &mut truthiness_memo,
-        )
+        );
+        UnionBuilder::new(db)
+            .unpack_aliases(false)
+            .add(redundant_union)
+            .build()
     }
 
     /// Inner recursive helper that accumulates narrowing constraints along each TDD path.
@@ -928,7 +932,8 @@ impl ReachabilityConstraints {
                 let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                 let false_ty = narrow!(node.if_false, false_accumulated);
 
-                UnionType::from_elements(db, [true_ty, false_ty])
+                // We won't do a union type redundancy check here, as it only needs to be performed once for the final result.
+                UnionType::from_elements_no_redundancy_check(db, [true_ty, false_ty])
             }
         };
 
