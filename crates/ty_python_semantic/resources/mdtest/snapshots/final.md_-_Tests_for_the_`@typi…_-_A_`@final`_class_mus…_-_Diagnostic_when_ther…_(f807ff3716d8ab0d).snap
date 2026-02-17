@@ -51,7 +51,7 @@ error[abstract-method-in-final-class]: Final class `Abstract` does not implement
   |       ^^^^^^^^
 6 |     @abstractmethod
 7 |     def aaaaaaaaaa(self) -> int: ...
-  |         ---------- `aaaaaaaaaa` defined as abstract on superclass `Abstract`
+  |         ---------- `aaaaaaaaaa` declared as abstract
 8 |     @abstractmethod
 9 |     def bbbbbbbb(self) -> int: ...
   |
