@@ -193,6 +193,12 @@ class Base:
     @classmethod
     def cls_method(cls):
         reveal_type(cls.all_instances)  # revealed: list[Self@cls_method]
+
+reveal_type(Base.all_instances)  # revealed: list[Base]
+
+class Sub(Base): ...
+
+reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ```
 
 ## Illegal `ClassVar` in type expression
