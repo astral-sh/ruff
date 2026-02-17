@@ -747,9 +747,13 @@ If a class variable is additionally qualified as `Final`, we do not union with `
 from typing import Final
 
 class D:
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final1: Final[ClassVar] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final2: ClassVar[Final] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final3: ClassVar[Final[int]] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final4: Final[ClassVar[int]] = 1
 
 reveal_type(D.final1)  # revealed: Literal[1]
