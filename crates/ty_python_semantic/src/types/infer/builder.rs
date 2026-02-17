@@ -9301,10 +9301,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             });
 
         // For attribute and subscript targets, validate that the result type is
-        // assignable to the declared type of the target.
+        // assignable to the declared type of the target. Skip validation when
+        // the load already failed (e.g. nonexistent attribute, wrong key type),
+        // to avoid duplicate diagnostics.
+        let db = self.db();
         match &**target {
             ast::Expr::Attribute(attr) => {
-                if let Some(object_ty) = self.try_expression_type(&attr.value) {
+                if let Some(object_ty) = self.try_expression_type(&attr.value)
+                    && !object_ty.member(db, &attr.attr.id).place.is_undefined()
+                {
                     self.validate_attribute_assignment(
                         attr,
                         object_ty,
@@ -9316,19 +9321,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Subscript(subscript) => {
                 if let Some(object_ty) = self.try_expression_type(&subscript.value) {
-                    self.validate_subscript_assignment_impl(
-                        subscript,
-                        None,
-                        object_ty,
-                        &mut |builder, _| {
-                            builder
-                                .try_expression_type(&subscript.slice)
-                                .unwrap_or(Type::unknown())
-                        },
-                        value,
-                        &mut |_, _| result_type,
-                        true,
-                    );
+                    let slice_ty = self
+                        .try_expression_type(&subscript.slice)
+                        .unwrap_or(Type::unknown());
+
+                    let getitem_ok = object_ty
+                        .try_call_dunder(
+                            db,
+                            "__getitem__",
+                            CallArguments::positional([slice_ty]),
+                            TypeContext::default(),
+                        )
+                        .is_ok();
+
+                    let setitem_ok = object_ty
+                        .try_call_dunder(
+                            db,
+                            "__setitem__",
+                            CallArguments::positional([slice_ty, target_type]),
+                            TypeContext::default(),
+                        )
+                        .is_ok();
+
+                    if getitem_ok && setitem_ok {
+                        self.validate_subscript_assignment_impl(
+                            subscript,
+                            None,
+                            object_ty,
+                            &mut |_, _| slice_ty,
+                            value,
+                            &mut |_, _| result_type,
+                            true,
+                        );
+                    }
                 }
             }
             _ => {}
