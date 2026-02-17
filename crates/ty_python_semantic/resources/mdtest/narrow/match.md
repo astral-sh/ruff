@@ -228,12 +228,14 @@ def _(x: A | B | C):
         case _:
             reveal_type(x)  # revealed: Never
 
+def _(x: A | B | C):
     match x:
         case A() | B() | C():
             reveal_type(x)  # revealed: A | B | C
         case _:
             reveal_type(x)  # revealed: Never
 
+def _(x: A | B | C):
     match x:
         case A():
             reveal_type(x)  # revealed: A
