@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: augmented.md - Augmented assignment - Subscript target with incompatible result type
+mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/augmented.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A:
+ 2 |     def __add__(self, other: object) -> object:
+ 3 |         return other
+ 4 | 
+ 5 | class C:
+ 6 |     def __getitem__(self, key: int) -> A:
+ 7 |         return A()
+ 8 |     def __setitem__(self, key: int, value: A) -> None:
+ 9 |         pass
+10 | 
+11 | c = C()
+12 | # error: [invalid-assignment]
+13 | c[0] += 1
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal[0]` and value of type `object` on object of type `C`
+  --> src/mdtest_snippet.py:13:1
+   |
+11 | c = C()
+12 | # error: [invalid-assignment]
+13 | c[0] += 1
+   | ^^^^^^^^^
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```

@@ -169,6 +169,60 @@ def f(flag: bool, flag2: bool):
     reveal_type(f)  # revealed: int | str | float
 ```
 
+## Attribute target with incompatible result type
+
+<!-- snapshot-diagnostics -->
+
+```py
+class A:
+    def __add__(self, other: object) -> object:
+        return other
+
+class B:
+    def __init__(self, x: A):
+        self.x: A = x
+
+c = B(A())
+# error: [invalid-assignment]
+c.x += 1
+```
+
+## Attribute target with compatible result type
+
+```py
+class Addable:
+    def __iadd__(self, other: int) -> "Addable":
+        return self
+
+class Container:
+    y: Addable
+
+c = Container()
+c.y = Addable()
+c.y += 1  # OK
+reveal_type(c.y)  # revealed: Addable
+```
+
+## Subscript target with incompatible result type
+
+<!-- snapshot-diagnostics -->
+
+```py
+class A:
+    def __add__(self, other: object) -> object:
+        return other
+
+class C:
+    def __getitem__(self, key: int) -> A:
+        return A()
+    def __setitem__(self, key: int, value: A) -> None:
+        pass
+
+c = C()
+# error: [invalid-assignment]
+c[0] += 1
+```
+
 ## Implicit dunder calls on class objects
 
 ```py

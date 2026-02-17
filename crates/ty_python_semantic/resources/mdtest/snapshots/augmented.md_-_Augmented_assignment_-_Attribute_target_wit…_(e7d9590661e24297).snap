@@ -1,0 +1,42 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: augmented.md - Augmented assignment - Attribute target with incompatible result type
+mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/augmented.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A:
+ 2 |     def __add__(self, other: object) -> object:
+ 3 |         return other
+ 4 | 
+ 5 | class B:
+ 6 |     def __init__(self, x: A):
+ 7 |         self.x: A = x
+ 8 | 
+ 9 | c = B(A())
+10 | # error: [invalid-assignment]
+11 | c.x += 1
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `object` is not assignable to attribute `x` of type `A`
+  --> src/mdtest_snippet.py:11:1
+   |
+ 9 | c = B(A())
+10 | # error: [invalid-assignment]
+11 | c.x += 1
+   | ^^^
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```

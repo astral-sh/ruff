@@ -9295,9 +9295,51 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => self.infer_expression(target, TypeContext::default()),
         };
 
-        self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
-            builder.infer_expression(value, tcx)
-        })
+        let result_type =
+            self.infer_augmented_op(assignment, target_type, value, &mut |builder, tcx| {
+                builder.infer_expression(value, tcx)
+            });
+
+        // For attribute and subscript targets, validate that the result type is
+        // assignable to the declared type of the target. Name targets don't need
+        // this because they go through `add_binding().insert()` which validates.
+        match &**target {
+            ast::Expr::Attribute(attr) => {
+                if let Some(object_ty) = self.try_expression_type(&attr.value) {
+                    self.validate_attribute_assignment(
+                        attr,
+                        object_ty,
+                        attr.attr.id(),
+                        &mut |_, _| result_type,
+                        true,
+                    );
+                }
+            }
+            ast::Expr::Subscript(subscript) => {
+                if let Some(object_ty) = self.try_expression_type(&subscript.value) {
+                    let mut slice_ty_cached = None;
+                    let mut infer_slice_ty = |builder: &mut Self, _tcx: TypeContext<'db>| {
+                        *slice_ty_cached.get_or_insert_with(|| {
+                            builder
+                                .try_expression_type(&subscript.slice)
+                                .unwrap_or(Type::unknown())
+                        })
+                    };
+                    self.validate_subscript_assignment_impl(
+                        subscript,
+                        None,
+                        object_ty,
+                        &mut infer_slice_ty,
+                        value,
+                        &mut |_, _| result_type,
+                        true,
+                    );
+                }
+            }
+            _ => {}
+        }
+
+        result_type
     }
 
     fn infer_dict_key_assignment_definition(
