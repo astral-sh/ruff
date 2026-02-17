@@ -4831,6 +4831,7 @@ impl<'db> Type<'db> {
         // that would be called from `constructor_bindings` for better consistency, but that causes
         // some test failures deserving separate investigation.
         let known = class.known(db);
+
         if matches!(
             known,
             Some(
