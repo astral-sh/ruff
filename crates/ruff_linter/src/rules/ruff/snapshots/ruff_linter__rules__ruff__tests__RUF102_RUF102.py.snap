@@ -13,7 +13,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 help: Remove the `# noqa` comment
 1 | # Invalid code
   - import os  # noqa: INVALID123
-2 + import os  
+2 + import os
 3 | # External code
 4 | import re  # noqa: V123
 5 | # Valid noqa
@@ -33,7 +33,7 @@ help: Remove the `# noqa` comment
 2 | import os  # noqa: INVALID123
 3 | # External code
   - import re  # noqa: V123
-4 + import re  
+4 + import re
 5 | # Valid noqa
 6 | import sys  # noqa: E402
 7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
@@ -73,7 +73,7 @@ help: Remove the `# noqa` comment
 6  | import sys  # noqa: E402
 7  | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
    - from itertools import product  # Preceeding comment # noqa: INVALID789
-8  + from itertools import product  # Preceeding comment 
+8  + from itertools import product  # Preceeding comment
 9  | # Succeeding comment
 10 | import math # noqa: INVALID000 # Succeeding comment
 11 | # Mixed valid and invalid
@@ -93,7 +93,7 @@ help: Remove the `# noqa` comment
 8  | from itertools import product  # Preceeding comment # noqa: INVALID789
 9  | # Succeeding comment
    - import math # noqa: INVALID000 # Succeeding comment
-10 + import math  # Succeeding comment
+10 + import math # Succeeding comment
 11 | # Mixed valid and invalid
 12 | from typing import List  # noqa: F401, INVALID123
 13 | # Test for multiple invalid
@@ -196,6 +196,7 @@ help: Remove the rule code `INVALID400`
 18 + import json  # noqa: E402, V100
 19 | # Test for rule redirects
 20 | import pandas as pd  # noqa: TCH002
+21 | # Invalid code with trailing reason (single comment)
 
 RUF102 [*] Invalid rule code in `# noqa`: V100
   --> RUF102.py:18:40
@@ -215,3 +216,19 @@ help: Remove the rule code `V100`
 18 + import json  # noqa: E402, INVALID400
 19 | # Test for rule redirects
 20 | import pandas as pd  # noqa: TCH002
+21 | # Invalid code with trailing reason (single comment)
+
+RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+  --> RUF102.py:22:17
+   |
+20 | import pandas as pd  # noqa: TCH002
+21 | # Invalid code with trailing reason (single comment)
+22 | import pathlib  # noqa: INVALID123 some reason
+   |                 ^^^^^^^^^^^^^^^^^^
+   |
+help: Remove the `# noqa` comment
+19 | # Test for rule redirects
+20 | import pandas as pd  # noqa: TCH002
+21 | # Invalid code with trailing reason (single comment)
+   - import pathlib  # noqa: INVALID123 some reason
+22 + import pathlib
