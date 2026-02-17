@@ -82,7 +82,7 @@ use crate::types::diagnostic::{
     INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER,
     INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
-    NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
+    NO_PARENT_PACKAGE, NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
     POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
     TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
@@ -9536,6 +9536,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         );
     }
 
+    fn report_no_parent_package(
+        &self,
+        import_node: AnyNodeRef<'_>,
+        range: TextRange,
+        level: u32,
+        module: Option<&str>,
+    ) {
+        if !self.is_reachable(import_node) {
+            return;
+        }
+
+        let Some(builder) = self.context.report_lint(&NO_PARENT_PACKAGE, range) else {
+            return;
+        };
+
+        let mut diagnostic = builder.into_diagnostic(format_args!(
+            "Relative import `{}` is not possible because the importing file is not part of a package",
+            format_import_from_module(level, module)
+        ));
+
+        diagnostic.info(format_args!(
+            "The file `{}` is not part of a package",
+            self.file().path(self.db()),
+        ));
+        diagnostic.info(
+            "make sure your Python environment is properly configured: \
+                https://docs.astral.sh/ty/modules/#python-environment",
+        );
+    }
+
     fn infer_import_definition(
         &mut self,
         node: &ast::StmtImport,
@@ -9719,13 +9749,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
-                self.report_unresolved_import(
-                    import_from.into(),
-                    module_ref.range(),
-                    *level,
-                    module,
-                    None,
-                );
+
+                // Check if the root cause is that the file is not part of any package
+                // (top-level non-package module), as opposed to a genuine "too many dots"
+                // error inside a package.
+                let no_parent_package = file_to_module(self.db(), self.file()).is_some_and(|m| {
+                    !m.kind(self.db()).is_package() && m.name(self.db()).parent().is_none()
+                });
+
+                if no_parent_package {
+                    self.report_no_parent_package(
+                        import_from.into(),
+                        module_ref.range(),
+                        *level,
+                        module,
+                    );
+                } else {
+                    self.report_unresolved_import(
+                        import_from.into(),
+                        module_ref.range(),
+                        *level,
+                        module,
+                        None,
+                    );
+                }
                 return;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
@@ -9735,12 +9782,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     format_import_from_module(*level, module),
                     self.file().path(self.db())
                 );
-                self.report_unresolved_import(
+                self.report_no_parent_package(
                     import_from.into(),
                     module_ref.range(),
                     *level,
                     module,
-                    None,
                 );
                 return;
             }

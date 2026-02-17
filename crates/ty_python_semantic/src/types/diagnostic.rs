@@ -110,6 +110,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_DEFAULT);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
+    registry.register_lint(&NO_PARENT_PACKAGE);
     registry.register_lint(&NOT_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
@@ -1846,6 +1847,31 @@ declare_lint! {
         summary: "detects calls that do not match any overload",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for relative imports from files that are not part of a package.
+    ///
+    /// ## Why is this bad?
+    /// A relative import requires the importing file to be part of a package.
+    /// If the file is at the top level of a source root or is otherwise not recognized
+    /// as belonging to a package, the import will fail at runtime with
+    /// `ImportError: attempted relative import with no known parent package`.
+    ///
+    /// Some frameworks modify the import system at runtime so that these imports
+    /// succeed despite the file not being part of a package. If you are using such
+    /// a framework, you can suppress this warning on a per-project basis.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from .foo import bar  # ImportError: attempted relative import with no known parent package
+    /// ```
+    pub(crate) static NO_PARENT_PACKAGE = {
+        summary: "detects relative imports from files that are not part of a package",
+        status: LintStatus::stable("0.0.18"),
+        default_level: Level::Warn,
     }
 }
 

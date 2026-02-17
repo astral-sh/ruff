@@ -110,10 +110,10 @@ case, it could be imported via `importlib.import_module`).
 ```py
 # TODO: there should be no errors in this file
 
-# error: [unresolved-import]
+# error: [no-parent-package]
 from .mod1 import x
 
-# error: [unresolved-import]
+# error: [no-parent-package]
 from . import mod2
 import mod3
 
@@ -152,10 +152,10 @@ a canary in the coal mine.
 `my-tests/mymod.py`:
 
 ```py
-# error: [unresolved-import]
+# error: [no-parent-package]
 from .mod1 import x
 
-# error: [unresolved-import]
+# error: [no-parent-package]
 from . import mod2
 import mod3
 
@@ -204,10 +204,10 @@ worse experience because a directory happened to *not* be invalid as a module na
 ```py
 # TODO: it would be *nice* if there were no errors in this file
 
-# error: [unresolved-import]
+# error: [no-parent-package]
 from .mod1 import x
 
-# error: [unresolved-import]
+# error: [no-parent-package]
 from . import mod2
 import mod3
 

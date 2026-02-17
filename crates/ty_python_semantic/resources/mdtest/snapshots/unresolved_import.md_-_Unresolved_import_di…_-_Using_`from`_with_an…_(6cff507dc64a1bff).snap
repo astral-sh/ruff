@@ -13,7 +13,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_i
 ## mdtest_snippet.py
 
 ```
-1 | from .does_not_exist.foo.bar import add  # error: [unresolved-import]
+1 | from .does_not_exist.foo.bar import add  # error: [no-parent-package]
 2 | 
 3 | stat = add(10, 15)
 ```
@@ -21,18 +21,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_i
 # Diagnostics
 
 ```
-error[unresolved-import]: Cannot resolve imported module `.does_not_exist.foo.bar`
+warning[no-parent-package]: Relative import `.does_not_exist.foo.bar` is not possible because the importing file is not part of a package
  --> src/mdtest_snippet.py:1:7
   |
-1 | from .does_not_exist.foo.bar import add  # error: [unresolved-import]
+1 | from .does_not_exist.foo.bar import add  # error: [no-parent-package]
   |       ^^^^^^^^^^^^^^^^^^^^^^
 2 |
 3 | stat = add(10, 15)
   |
-info: Searched in the following paths during module resolution:
-info:   1. /src (first-party code)
-info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+info: The file `/src/mdtest_snippet.py` is not part of a package
 info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
-info: rule `unresolved-import` is enabled by default
+info: rule `no-parent-package` is enabled by default
 
 ```

@@ -266,7 +266,7 @@ X: int = 42
 `__main__.py`:
 
 ```py
-from .parser import X  # error: [unresolved-import]
+from .parser import X  # error: [no-parent-package]
 ```
 
 ## Relative imports in `site-packages`
