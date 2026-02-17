@@ -190,6 +190,7 @@ class Base:
     def method(self):
         reveal_type(self.all_instances)  # revealed: list[Self@method]
 
+    @classmethod
     def cls_method(cls):
         reveal_type(cls.all_instances)  # revealed: list[Self@cls_method]
 ```
