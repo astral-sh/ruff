@@ -432,8 +432,8 @@ impl<'db> Bindings<'db> {
 
     /// Builds matched bindings for the callable wrapped by `functools.partial(...)`.
     ///
-    /// This handles the shared partial-specific preprocessing (callable validation, argument
-    /// normalization, and bound-type baking) used by both inference and known-call evaluation.
+    /// This handles the shared partial-specific preprocessing (callable validation and argument
+    /// normalization) used by both inference and known-call evaluation.
     pub(crate) fn functools_partial_matched_bindings<'a>(
         db: &'db dyn Db,
         wrapped_callable_ty: Type<'db>,
@@ -444,12 +444,9 @@ impl<'db> Bindings<'db> {
 
         let bound_call_arguments = call_arguments.functools_partial_bound_arguments(db)?;
 
-        let mut partial_bindings = wrapped_callable_ty.bindings(db);
-        for binding in partial_bindings.iter_flat_mut() {
-            binding.bake_bound_type_into_overloads(db);
-        }
-
-        let mut partial_bindings = partial_bindings.match_parameters(db, &bound_call_arguments);
+        let mut partial_bindings = wrapped_callable_ty
+            .bindings(db)
+            .match_parameters(db, &bound_call_arguments);
         for binding in partial_bindings.iter_flat_mut() {
             binding.clear_missing_argument_errors_for_partial_application();
         }
@@ -2064,20 +2061,19 @@ impl<'db> Bindings<'db> {
                                 MatchingOverloadIndex::Single(index) => vec![index],
                                 MatchingOverloadIndex::Multiple(indexes) => indexes,
                                 MatchingOverloadIndex::None => {
+                                    if partial_binding.overloads().is_empty() {
+                                        continue;
+                                    }
+
+                                    let source_overload_index = partial_binding
+                                        .best_failing_overload_index(
+                                            FailingOverloadSelection::ReportableForPartial,
+                                        )
+                                        .unwrap_or(0);
                                     let source_errors =
-                                        if let [single_overload] = partial_binding.overloads() {
-                                            &single_overload.errors
-                                        } else {
-                                            if partial_binding.overloads().is_empty() {
-                                                continue;
-                                            }
-                                            let index = partial_binding
-                                                .matching_overload_before_type_checking
-                                                .unwrap_or(0);
-                                            &partial_binding.overloads()[index].errors
-                                        };
+                                        &partial_binding.overloads()[source_overload_index].errors;
                                     for error in source_errors {
-                                        if error.is_reportable_for_partial_application() {
+                                        if error.is_relevant_for_partial_application() {
                                             overload.errors.push(
                                                 error
                                                     .clone()
@@ -2091,14 +2087,18 @@ impl<'db> Bindings<'db> {
 
                             let mut new_overloads =
                                 Vec::with_capacity(selected_overload_indexes.len());
+                            let signature_arguments =
+                                bound_call_arguments.with_self(partial_binding.bound_type);
                             for index in selected_overload_indexes {
                                 let Some(bound_overload) = partial_binding.overloads().get(index)
                                 else {
                                     continue;
                                 };
                                 new_overloads.push(
-                                    bound_overload
-                                        .partially_applied_signature(db, &bound_call_arguments),
+                                    bound_overload.partially_applied_signature(
+                                        db,
+                                        signature_arguments.as_ref(),
+                                    ),
                                 );
                             }
                             if new_overloads.is_empty() {
@@ -2255,6 +2255,23 @@ pub(crate) struct CallableBinding<'db> {
     overloads: SmallVec<[Binding<'db>; 1]>,
 }
 
+#[derive(Copy, Clone)]
+enum FailingOverloadSelection {
+    /// Consider all errors that participate in overload filtering.
+    AffectsOverloadResolution,
+    /// Consider only errors that are reported during `functools.partial(...)` construction.
+    ReportableForPartial,
+}
+
+impl FailingOverloadSelection {
+    fn includes(self, error: &BindingError<'_>) -> bool {
+        match self {
+            Self::AffectsOverloadResolution => error.affects_overload_resolution(),
+            Self::ReportableForPartial => error.is_relevant_for_partial_application(),
+        }
+    }
+}
+
 impl<'db> CallableBinding<'db> {
     pub(crate) fn from_overloads(
         signature_type: Type<'db>,
@@ -2289,6 +2306,8 @@ impl<'db> CallableBinding<'db> {
         }
     }
 
+    /// Rewrites overload signatures as if an implicit bound receiver argument had already been
+    /// consumed.
     pub(crate) fn bake_bound_type_into_overloads(&mut self, db: &'db dyn Db) {
         let Some(bound_self) = self.bound_type.take() else {
             return;
@@ -2306,6 +2325,39 @@ impl<'db> CallableBinding<'db> {
         for overload in &mut self.overloads {
             overload.clear_missing_argument_errors_for_partial_application();
         }
+    }
+
+    /// Chooses which overload to use as the source for diagnostics when no overload fully matches.
+    ///
+    /// If step 1 of overload resolution identified a single arity match, we keep using that
+    /// overload as the diagnostic source. Otherwise, we rank failing overloads by error quality:
+    /// fewer unknown-argument errors and fewer relevant errors are preferred.
+    fn best_failing_overload_index(&self, selection: FailingOverloadSelection) -> Option<usize> {
+        self.matching_overload_before_type_checking.or_else(|| {
+            self.overloads
+                .iter()
+                .enumerate()
+                .filter_map(|(index, overload)| {
+                    let mut relevant_count = 0;
+                    let mut unknown_argument_count = 0;
+
+                    for error in &overload.errors {
+                        if !selection.includes(error) {
+                            continue;
+                        }
+                        relevant_count += 1;
+                        if matches!(error, BindingError::UnknownArgument { .. }) {
+                            unknown_argument_count += 1;
+                        }
+                    }
+
+                    (relevant_count > 0).then_some((index, unknown_argument_count, relevant_count))
+                })
+                .min_by_key(|(_, unknown_argument_count, relevant_count)| {
+                    (*unknown_argument_count, *relevant_count)
+                })
+                .map(|(index, _, _)| index)
+        })
     }
 
     pub(crate) fn with_bound_type(mut self, bound_type: Type<'db>) -> Self {
@@ -4276,7 +4328,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     );
                 } else {
                     let index = callable_binding
-                        .matching_overload_before_type_checking
+                        .best_failing_overload_index(
+                            FailingOverloadSelection::AffectsOverloadResolution,
+                        )
                         .unwrap_or(0);
                     // TODO: We should also update the specialization for the `ParamSpec` to reflect
                     // the matching overload here.
@@ -5232,26 +5286,12 @@ pub(crate) enum BindingError<'db> {
 }
 
 impl BindingError<'_> {
-    /// Returns whether this error should be used to filter incompatible wrapped overloads when
-    /// constructing `functools.partial(...)`.
-    fn is_relevant_for_partial_application(&self) -> bool {
-        matches!(
-            self,
-            Self::InvalidArgumentType { .. }
-                | Self::InvalidKeyType { .. }
-                | Self::UnknownArgument { .. }
-                | Self::PositionalOnlyParameterAsKwarg { .. }
-                | Self::TooManyPositionalArguments { .. }
-                | Self::ParameterAlreadyAssigned { .. }
-                | Self::SpecializationError { .. }
-        )
-    }
-
-    /// Returns whether this error should be reported at `partial(...)` construction time.
+    /// Returns whether this error is relevant to `functools.partial(...)` construction.
     ///
-    /// Runtime `functools.partial` can defer some call-shape errors until invocation. We report
-    /// statically-detectable call-shape errors at construction time.
-    fn is_reportable_for_partial_application(&self) -> bool {
+    /// These errors are used both to filter incompatible wrapped overloads and to report
+    /// statically-detectable call-shape errors at construction time. (Runtime `functools.partial`
+    /// can defer some call-shape errors until invocation.)
+    fn is_relevant_for_partial_application(&self) -> bool {
         matches!(
             self,
             Self::InvalidArgumentType { .. }
