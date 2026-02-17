@@ -917,6 +917,19 @@ impl DefinitionKind<'_> {
         }
     }
 
+    /// Returns the best target range for binding-oriented diagnostics.
+    ///
+    /// Most definition kinds use [`Self::target_range`], but some kinds require
+    /// special handling to point at the exact bound name.
+    pub(crate) fn binding_name_range(&self, module: &ParsedModuleRef) -> Option<TextRange> {
+        match self {
+            DefinitionKind::ExceptHandler(handler) => {
+                handler.node(module).name.as_ref().map(|name| name.range())
+            }
+            _ => Some(self.target_range(module)),
+        }
+    }
+
     /// Returns the [`TextRange`] of the entire definition.
     pub(crate) fn full_range(&self, module: &ParsedModuleRef) -> TextRange {
         match self {
