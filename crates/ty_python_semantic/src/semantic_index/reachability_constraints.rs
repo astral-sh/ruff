@@ -876,37 +876,26 @@ impl ReachabilityConstraints {
                     is_positive: !predicate.is_positive,
                 };
                 let place_version_info = predicate_place_versions.get(&(node.atom, place));
-                let (pos_constraint, neg_constraint) = if place_version_info.is_some() {
+                let can_apply_narrowing = place_version_info.is_some()
+                    && Self::predicate_applies_to_place_version(
+                        place_version_info,
+                        binding_place_version,
+                    );
+                let (pos_constraint, neg_constraint) = if can_apply_narrowing {
                     (
                         infer_narrowing_constraint(db, predicate, place),
                         infer_narrowing_constraint(db, neg_predicate, place),
                     )
                 } else {
                     // No recorded place-version metadata means this predicate cannot narrow
-                    // this place, so skip the expensive narrowing-inference queries.
+                    // this place, or the narrowing belongs to a different place version.
+                    // In either case, skip the expensive narrowing-inference queries.
                     (None, None)
                 };
 
-                // Only gate by place version if this predicate can narrow the current place.
-                // Predicates unrelated to `place` are still useful for reachability pruning.
-                let has_narrowing_constraints =
-                    pos_constraint.is_some() || neg_constraint.is_some();
-                if has_narrowing_constraints
-                    && !Self::predicate_applies_to_place_version(
-                        place_version_info,
-                        binding_place_version,
-                    )
-                {
-                    // This narrowing predicate belongs to an older/newer place version and
-                    // must not influence narrowing for the current binding.
-                    let true_ty = narrow!(node.if_true, accumulated.clone());
-                    let false_ty = narrow!(node.if_false, accumulated);
-                    return UnionType::from_elements(db, [true_ty, false_ty]);
-                }
-
                 // If this predicate does not narrow the current place and we can statically
                 // determine its truthiness, follow only the reachable branch.
-                if !has_narrowing_constraints {
+                if pos_constraint.is_none() && neg_constraint.is_none() {
                     match Self::analyze_single_cached(db, predicate, truthiness_memo) {
                         Truthiness::AlwaysTrue => {
                             return narrow!(node.if_true, accumulated);
