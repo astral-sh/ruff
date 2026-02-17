@@ -952,13 +952,7 @@ impl ReachabilityConstraints {
         binding_place_version: Option<PlaceVersion>,
     ) -> bool {
         binding_place_version.is_none_or(|binding_place_version| {
-            place_version_info.is_some_and(|info| {
-                info.versions.contains(&binding_place_version)
-                    || info.allow_future_versions
-                        && info
-                            .max_version
-                            .is_some_and(|max| binding_place_version > max)
-            })
+            place_version_info.is_some_and(|info| info.versions.contains(&binding_place_version))
         })
     }
 

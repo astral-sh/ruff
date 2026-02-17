@@ -274,8 +274,6 @@ pub(crate) use place_state::{LiveBinding, PlaceVersion, ScopedDefinitionId};
 #[derive(Clone, Debug, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PredicatePlaceVersionInfo {
     pub(crate) versions: SmallVec<[PlaceVersion; 2]>,
-    pub(crate) max_version: Option<PlaceVersion>,
-    pub(crate) allow_future_versions: bool,
 }
 
 pub(crate) type PredicatePlaceVersions =
@@ -1104,10 +1102,9 @@ impl<'db> UseDefMapBuilder<'db> {
                 continue;
             };
 
-            let versions: SmallVec<[PlaceVersion; 2]> = bindings
+            let versions = bindings
                 .iter()
-                .map(|binding| self.definition_place_versions[binding.binding])
-                .collect();
+                .map(|binding| self.definition_place_versions[binding.binding]);
             let entry = self
                 .predicate_place_versions
                 .entry((predicate, *place))
@@ -1115,8 +1112,6 @@ impl<'db> UseDefMapBuilder<'db> {
             for version in versions {
                 if !entry.versions.contains(&version) {
                     entry.versions.push(version);
-                    entry.max_version =
-                        Some(entry.max_version.map_or(version, |max| max.max(version)));
                 }
             }
         }

@@ -264,10 +264,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Push a new loop, returning the outer loop, if any.
     fn push_loop(&mut self) -> Option<Loop> {
-        self.current_scope_info_mut().current_loop.replace(Loop {
-            break_states: Vec::default(),
-            continue_states: Vec::default(),
-        })
+        self.current_scope_info_mut()
+            .current_loop
+            .replace(Loop::default())
     }
 
     /// Pop a loop, replacing with the previous saved outer loop, if any.
