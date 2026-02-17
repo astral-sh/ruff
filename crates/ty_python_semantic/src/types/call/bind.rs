@@ -4474,6 +4474,10 @@ impl<'db> Binding<'db> {
         &self.argument_matches
     }
 
+    pub(crate) fn specialization(&self) -> Option<Specialization<'db>> {
+        self.specialization
+    }
+
     pub(crate) fn errors(&self) -> &[BindingError<'db>] {
         &self.errors
     }
