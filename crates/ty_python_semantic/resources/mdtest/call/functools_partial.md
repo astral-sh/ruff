@@ -753,6 +753,53 @@ def make_partial(x):
 p = make_partial(1)
 ```
 
+## Partial of bound classmethod is assignable to zero-arg callable
+
+```py
+from functools import partial
+from typing import Callable
+from typing_extensions import Self
+
+class C:
+    @classmethod
+    def make(cls, *, x: int = 0) -> Self:
+        raise RuntimeError
+
+factory: Callable[[], C] = partial(C.make, x=0)
+```
+
+## Overloaded partial reports type mismatch, not unknown keyword
+
+```py
+from functools import partial
+from typing import Callable, Literal, Optional, cast, overload
+
+@overload
+def task(__fn: Callable[[], int]) -> int: ...
+@overload
+def task(
+    __fn: Literal[None] = None,
+    *,
+    retries: int = 0,
+) -> Callable[[Callable[[], int]], int]: ...
+@overload
+def task(
+    *,
+    retries: int = 0,
+) -> Callable[[Callable[[], int]], int]: ...
+def task(
+    __fn: Optional[Callable[[], int]] = None,
+    *,
+    retries: Optional[int] = None,
+):
+    if __fn:
+        return 1
+    return cast(
+        Callable[[Callable[[], int]], int],
+        partial(task, retries=retries),  # error: [invalid-argument-type]
+    )
+```
+
 ## Bound classmethod callback with weakref
 
 Binding the first explicit parameter of a bound classmethod callback should preserve assignability

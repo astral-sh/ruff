@@ -6529,7 +6529,6 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 }
 
-
 /// A type that is determined to be divergent during recursive type inference.
 /// This type must never be eliminated by dynamic type reduction
 /// (e.g. `Divergent` is assignable to `@Todo`, but `@Todo | Divergent` must not be reducted to `@Todo`).
