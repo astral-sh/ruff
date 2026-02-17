@@ -171,56 +171,53 @@ def f(flag: bool, flag2: bool):
 
 ## Attribute target with incompatible result type
 
-<!-- snapshot-diagnostics -->
-
 ```py
-class A:
+class Foo:
     def __add__(self, other: object) -> object:
         return other
 
-class B:
-    def __init__(self, x: A):
-        self.x: A = x
+class Bar:
+    x: Foo
 
-c = B(A())
-# error: [invalid-assignment]
-c.x += 1
+b = Bar()
+b.x = Foo()
+# error: [invalid-assignment] "Object of type `object` is not assignable to attribute `x` of type `Foo`"
+b.x += 1
 ```
 
 ## Attribute target with compatible result type
 
 ```py
-class Addable:
-    def __iadd__(self, other: int) -> "Addable":
+class Foo:
+    def __iadd__(self, other: int) -> "Foo":
         return self
 
-class Container:
-    y: Addable
+class Bar:
+    x: Foo
 
-c = Container()
-c.y = Addable()
-c.y += 1  # OK
-reveal_type(c.y)  # revealed: Addable
+b = Bar()
+b.x = Foo()
+b.x += 1
+
+reveal_type(b.x)  # revealed: Foo
 ```
 
 ## Subscript target with incompatible result type
 
-<!-- snapshot-diagnostics -->
-
 ```py
-class A:
+class Foo:
     def __add__(self, other: object) -> object:
         return other
 
-class C:
-    def __getitem__(self, key: int) -> A:
-        return A()
-    def __setitem__(self, key: int, value: A) -> None:
+class Bar:
+    def __getitem__(self, key: int) -> Foo:
+        return Foo()
+    def __setitem__(self, key: int, value: Foo) -> None:
         pass
 
-c = C()
-# error: [invalid-assignment]
-c[0] += 1
+b = Bar()
+# error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `object` on object of type `Bar`"
+b[0] += 1
 ```
 
 ## Implicit dunder calls on class objects
