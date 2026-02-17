@@ -1117,7 +1117,7 @@
         },
         "no-parent-package": {
           "title": "detects relative imports from files that are not part of a package",
-          "description": "## What it does\nChecks for relative imports from files that are not part of a package.\n\n## Why is this bad?\nA relative import requires the importing file to be part of a package.\nIf the file is at the top level of a source root or is otherwise not recognized\nas belonging to a package, the import will fail at runtime with\n`ImportError: attempted relative import with no known parent package`.\n\nSome frameworks modify the import system at runtime so that these imports\nsucceed despite the file not being part of a package. If you are using such\na framework, you can suppress this warning on a per-project basis.\n\n## Examples\n```python\nfrom .foo import bar  # ImportError: attempted relative import with no known parent package\n```",
+          "description": "## What it does\nChecks for relative imports from files that are not part of a package.\n\n## Why is this bad?\nA relative import requires the importing file to be part of a package.\nIf the file is at the top level of a source root or is otherwise not recognized\nas belonging to a package, the import will fail at runtime with\n`ImportError: attempted relative import with no known parent package`.\n\n## Examples\n```python\nfrom .foo import bar  # ImportError: attempted relative import with no known parent package\n```",
           "default": "warn",
           "oneOf": [
             {

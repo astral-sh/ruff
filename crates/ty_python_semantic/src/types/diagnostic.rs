@@ -1860,10 +1860,6 @@ declare_lint! {
     /// as belonging to a package, the import will fail at runtime with
     /// `ImportError: attempted relative import with no known parent package`.
     ///
-    /// Some frameworks modify the import system at runtime so that these imports
-    /// succeed despite the file not being part of a package. If you are using such
-    /// a framework, you can suppress this warning on a per-project basis.
-    ///
     /// ## Examples
     /// ```python
     /// from .foo import bar  # ImportError: attempted relative import with no known parent package
