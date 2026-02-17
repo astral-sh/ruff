@@ -924,7 +924,7 @@ impl DefinitionKind<'_> {
     pub(crate) fn binding_name_range(&self, module: &ParsedModuleRef) -> Option<TextRange> {
         match self {
             DefinitionKind::ExceptHandler(handler) => {
-                handler.node(module).name.as_ref().map(|name| name.range())
+                handler.node(module).name.as_ref().map(Ranged::range)
             }
             _ => Some(self.target_range(module)),
         }
