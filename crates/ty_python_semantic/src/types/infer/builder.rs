@@ -9316,14 +9316,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Subscript(subscript) => {
                 if let Some(object_ty) = self.try_expression_type(&subscript.value) {
-                    let mut infer_slice_ty =
-                        |builder: &mut Self, tcx| builder.infer_expression(&subscript.slice, tcx);
-
                     self.validate_subscript_assignment_impl(
                         subscript,
                         None,
                         object_ty,
-                        &mut infer_slice_ty,
+                        &mut |builder, _| {
+                            builder
+                                .try_expression_type(&subscript.slice)
+                                .unwrap_or(Type::unknown())
+                        },
                         value,
                         &mut |_, _| result_type,
                         true,
