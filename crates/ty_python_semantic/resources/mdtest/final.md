@@ -1018,6 +1018,31 @@ class Final(DynamicMiddle):  # No error; `foo` is implemented by `DynamicMiddle`
     pass
 ```
 
+### Abstract method implemented via a synthesized method
+
+```py
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from functools import total_ordering
+from typing import final
+
+class AbstractOrdered(ABC):
+    @abstractmethod
+    def __lt__(self, other): ...
+
+@final
+@dataclass(order=True)
+class ConcreteOrdered(AbstractOrdered): ...  # fine
+
+# total_ordering does not override a comparison method
+# if it already exists in the MRO, even if the one that
+# exists in the MRO is abstract!
+@final
+@total_ordering
+class AlsoConreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
+    def __gt__(self, other): ...
+```
+
 ### Non-final class with unimplemented abstract methods is fine
 
 Non-final classes are allowed to have unimplemented abstract methods, as they can be implemented by
@@ -1206,9 +1231,8 @@ dynamically patch the attribute onto the class (e.g., using a metaclass):
 ```py
 from typing import ClassVar
 
-# TODO: this should not emit an error
 @final
-class GoodChild(Base):  # error: [abstract-method-in-final-class]
+class GoodChild(Base):  # fine
     f: ClassVar[int]
 ```
 
