@@ -2373,7 +2373,13 @@ impl<'db> InteriorNode<'db> {
             let mut sorted_paths = Vec::new();
             Node::Interior(interior).for_each_path(db, |path| {
                 let mut path: Vec<_> = path.positive_constraints().collect();
-                path.sort_by_key(|(_, source_order)| *source_order);
+                path.sort_by(|(a, _), (b, _)| {
+                    super::type_ordering::union_or_intersection_elements_ordering(
+                        db,
+                        &a.lower(db).normalized(db),
+                        &b.lower(db).normalized(db),
+                    )
+                });
                 sorted_paths.push(path);
             });
             sorted_paths.sort_by(|path1, path2| {
