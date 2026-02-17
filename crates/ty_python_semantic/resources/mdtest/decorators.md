@@ -365,3 +365,246 @@ class Baz: ...
 # TODO: the revealed type should ideally be `type[int]` (the decorator's return type)
 reveal_type(Baz)  # revealed: <class 'Baz'>
 ```
+
+## Decorated overloaded functions
+
+Decorators using `ParamSpec` and `TypeVar` should preserve overload return types.
+
+### Basic ParamSpec decorator
+
+```py
+from typing import overload, ParamSpec, TypeVar, Callable
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def decorator(f: Callable[P, T]) -> Callable[P, T]:
+    return f
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(x: str) -> str: ...
+@decorator
+def test(x: int | str) -> int | str:
+    return x
+
+# revealed: Overload[(x: int) -> int, (x: str) -> str]
+reveal_type(test)
+
+# The decorated function should preserve overload return types
+reveal_type(test(1))  # revealed: int
+reveal_type(test("hello"))  # revealed: str
+```
+
+### ParamSpec decorator with keyword-only overloads
+
+```py
+from typing import overload, ParamSpec, TypeVar, Callable
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def decorator(f: Callable[P, T]) -> Callable[P, T]:
+    return f
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(*, y: str) -> str: ...
+@decorator
+def test(x: int | None = None, *, y: str | None = None) -> int | str:
+    raise NotImplementedError
+
+# revealed: Overload[(x: int) -> int, (*, y: str) -> str]
+reveal_type(test)
+
+reveal_type(test(1))  # revealed: int
+reveal_type(test(y="hello"))  # revealed: str
+```
+
+### Multiple decorators with ParamSpec
+
+```py
+from typing import overload, ParamSpec, TypeVar, Callable
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def decorator1(f: Callable[P, T]) -> Callable[P, T]:
+    return f
+
+def decorator2(f: Callable[P, T]) -> Callable[P, T]:
+    return f
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(x: str) -> str: ...
+@decorator1
+@decorator2
+def test(x: int | str) -> int | str:
+    return x
+
+# revealed: Overload[(x: int) -> int, (x: str) -> str]
+reveal_type(test)
+
+reveal_type(test(1))  # revealed: int
+reveal_type(test("hello"))  # revealed: str
+```
+
+### `functools.wraps` with overloads
+
+```py
+from typing import overload, ParamSpec, TypeVar, Callable
+import functools
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def decorator(f: Callable[P, T]) -> Callable[P, T]:
+    @functools.wraps(f)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
+        return f(*args, **kwargs)
+    return wrapper
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(x: str) -> str: ...
+@decorator
+def test(x: int | str) -> int | str:
+    return x
+
+reveal_type(test(1))  # revealed: int
+reveal_type(test("hello"))  # revealed: str
+```
+
+### Method overloads with decorator
+
+```py
+from typing import overload, ParamSpec, TypeVar, Callable
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def decorator(f: Callable[P, T]) -> Callable[P, T]:
+    return f
+
+class MyClass:
+    @overload
+    def method(self, x: int) -> int: ...
+    @overload
+    def method(self, x: str) -> str: ...
+    @decorator
+    def method(self, x: int | str) -> int | str:
+        return x
+
+obj = MyClass()
+reveal_type(obj.method(1))  # revealed: int
+reveal_type(obj.method("hello"))  # revealed: str
+```
+
+### Non-ParamSpec decorator (should use implementation return type)
+
+When a decorator doesn't use ParamSpec, it cannot preserve overload signatures, so the
+implementation's return type is used:
+
+```py
+from typing import overload, Callable
+
+def simple_decorator(f: Callable[..., object]) -> Callable[..., object]:
+    return f
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(x: str) -> str: ...
+@simple_decorator
+def test(x: int | str) -> int | str:
+    return x
+
+# Without ParamSpec, overloads are not preserved
+reveal_type(test(1))  # revealed: object
+```
+
+### Decorator that transforms return type
+
+When a decorator transforms the return type (e.g., `T` to `list[T]`), the transformed type should be
+applied to each overload's return type:
+
+```py
+from typing import overload, ParamSpec, TypeVar, Callable
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+def wrap_in_list(f: Callable[P, T]) -> Callable[P, list[T]]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> list[T]:
+        return [f(*args, **kwargs)]
+    return wrapper
+
+@overload
+def test(x: int) -> int: ...
+@overload
+def test(x: str) -> str: ...
+@wrap_in_list
+def test(x: int | str) -> int | str:
+    return x
+
+reveal_type(test(1))  # revealed: list[int]
+reveal_type(test("hello"))  # revealed: list[str]
+```
+
+### Decorator with multiple type variables
+
+When a decorator has multiple type variables, we should correctly identify and substitute the one
+that corresponds to the return type:
+
+```py
+from typing import overload, ParamSpec, TypeVar, Callable
+
+P = ParamSpec("P")
+T = TypeVar("T")
+U = TypeVar("U")
+
+# T is used multiple times in the return type
+def double_wrap(f: Callable[P, T]) -> Callable[P, tuple[T, T]]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> tuple[T, T]:
+        result = f(*args, **kwargs)
+        return (result, result)
+    return wrapper
+
+@overload
+def test1(x: int) -> int: ...
+@overload
+def test1(x: str) -> str: ...
+@double_wrap
+def test1(x: int | str) -> int | str:
+    return x
+
+reveal_type(test1(1))  # revealed: tuple[int, int]
+reveal_type(test1("hello"))  # revealed: tuple[str, str]
+
+# Multiple TypeVars where only one is related to overload return types
+def with_default(f: Callable[P, T], default: U) -> Callable[P, T | U]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> T | U:
+        try:
+            return f(*args, **kwargs)
+        except Exception:
+            raise  # Just for type checking
+    return wrapper
+
+@overload
+def test2(x: int) -> int: ...
+@overload
+def test2(x: str) -> str: ...
+def test2(x: int | str) -> int | str:
+    return x
+
+# When decorating with a specific default type, U is bound to that type
+# T should still preserve per-overload return types
+wrapped = with_default(test2, None)
+reveal_type(wrapped(1))  # revealed: int | None
+reveal_type(wrapped("hello"))  # revealed: str | None
+```
