@@ -68,8 +68,6 @@ struct Loop {
     break_states: Vec<FlowSnapshot>,
     /// Flow states at each `continue` in the current loop.
     continue_states: Vec<FlowSnapshot>,
-    /// Places that are bound within this loop body.
-    bound_places: FxHashSet<ScopedPlaceId>,
 }
 
 impl Loop {
@@ -265,11 +263,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     /// Push a new loop, returning the outer loop, if any.
-    fn push_loop(&mut self, bound_places: FxHashSet<ScopedPlaceId>) -> Option<Loop> {
+    fn push_loop(&mut self) -> Option<Loop> {
         self.current_scope_info_mut().current_loop.replace(Loop {
             break_states: Vec::default(),
             continue_states: Vec::default(),
-            bound_places,
         })
     }
 
@@ -1192,19 +1189,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         predicate: ScopedPredicateId,
         places: &PossiblyNarrowedPlaces,
     ) {
-        let allow_future_versions_for = self
-            .current_scope_info()
-            .current_loop
-            .as_ref()
-            .map_or_else(FxHashSet::default, |current_loop| {
-                places
-                    .iter()
-                    .copied()
-                    .filter(|place| current_loop.bound_places.contains(place))
-                    .collect()
-            });
         self.current_use_def_map_mut()
-            .record_narrowing_constraint_for_places(predicate, places, &allow_future_versions_for);
+            .record_narrowing_constraint_for_places(predicate, places);
     }
 
     /// Adds and records a narrowing constraint for only the places that could possibly be narrowed.
@@ -1216,24 +1202,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         predicate: PredicateOrLiteral<'db>,
     ) -> ScopedPredicateId {
         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
-        let allow_future_versions_for = self
-            .current_scope_info()
-            .current_loop
-            .as_ref()
-            .map_or_else(FxHashSet::default, |current_loop| {
-                possibly_narrowed
-                    .iter()
-                    .copied()
-                    .filter(|place| current_loop.bound_places.contains(place))
-                    .collect()
-            });
         let use_def = self.current_use_def_map_mut();
         let predicate_id = use_def.add_predicate(predicate);
-        use_def.record_narrowing_constraint_for_places(
-            predicate_id,
-            &possibly_narrowed,
-            &allow_future_versions_for,
-        );
+        use_def.record_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
         predicate_id
     }
 
@@ -1285,23 +1256,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         predicate_id: ScopedPredicateId,
     ) {
         let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
-        let allow_future_versions_for = self
-            .current_scope_info()
-            .current_loop
-            .as_ref()
-            .map_or_else(FxHashSet::default, |current_loop| {
-                possibly_narrowed
-                    .iter()
-                    .copied()
-                    .filter(|place| current_loop.bound_places.contains(place))
-                    .collect()
-            });
         self.current_use_def_map_mut()
-            .record_negated_narrowing_constraint_for_places(
-                predicate_id,
-                &possibly_narrowed,
-                &allow_future_versions_for,
-            );
+            .record_negated_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
     }
 
     /// Records that all remaining statements in the current block are unreachable.
@@ -2468,12 +2424,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint_id(predicate_id);
 
-                let loop_bound_places = maybe_loop_header_info
-                    .as_ref()
-                    .map_or_else(FxHashSet::default, |(_, bound_place_ids)| {
-                        bound_place_ids.clone()
-                    });
-                let outer_loop = self.push_loop(loop_bound_places);
+                let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 
@@ -2581,12 +2532,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
 
-                let loop_bound_places = maybe_loop_header_info
-                    .as_ref()
-                    .map_or_else(FxHashSet::default, |(_, bound_place_ids)| {
-                        bound_place_ids.clone()
-                    });
-                let outer_loop = self.push_loop(loop_bound_places);
+                let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 

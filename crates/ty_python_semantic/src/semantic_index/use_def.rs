@@ -242,7 +242,6 @@
 
 use ruff_index::{IndexVec, newtype_index};
 use rustc_hash::FxHashMap;
-use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 use crate::node_key::NodeKey;
@@ -1049,7 +1048,6 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         predicate: ScopedPredicateId,
         places: &PossiblyNarrowedPlaces,
-        allow_future_versions_for: &FxHashSet<ScopedPlaceId>,
     ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
@@ -1058,7 +1056,7 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        self.record_predicate_place_versions(predicate, places, allow_future_versions_for);
+        self.record_predicate_place_versions(predicate, places);
 
         let atom = self.reachability_constraints.add_atom(predicate);
         self.record_narrowing_constraint_node_for_places(atom, places);
@@ -1074,7 +1072,6 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         predicate: ScopedPredicateId,
         places: &PossiblyNarrowedPlaces,
-        allow_future_versions_for: &FxHashSet<ScopedPlaceId>,
     ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
@@ -1082,7 +1079,7 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        self.record_predicate_place_versions(predicate, places, allow_future_versions_for);
+        self.record_predicate_place_versions(predicate, places);
 
         let atom = self.reachability_constraints.add_atom(predicate);
         let negated = self.reachability_constraints.add_not_constraint(atom);
@@ -1093,7 +1090,6 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         predicate: ScopedPredicateId,
         places: &PossiblyNarrowedPlaces,
-        allow_future_versions_for: &FxHashSet<ScopedPlaceId>,
     ) {
         for place in places {
             let bindings = match place {
@@ -1116,9 +1112,6 @@ impl<'db> UseDefMapBuilder<'db> {
                 .predicate_place_versions
                 .entry((predicate, *place))
                 .or_default();
-            if allow_future_versions_for.contains(place) {
-                entry.allow_future_versions = true;
-            }
             for version in versions {
                 if !entry.versions.contains(&version) {
                     entry.versions.push(version);
