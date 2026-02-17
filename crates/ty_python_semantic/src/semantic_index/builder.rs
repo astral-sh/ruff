@@ -748,17 +748,27 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if category.is_binding() && !is_loop_header {
             self.mark_place_bound(place);
         }
-        if category.is_declaration() {
+        if category.is_declaration() && !is_loop_header {
             self.mark_place_declared(place);
         }
 
         let use_def = self.current_use_def_map_mut();
         match category {
             DefinitionCategory::DeclarationAndBinding => {
-                use_def.record_declaration_and_binding(place, definition);
-                self.delete_associated_bindings(place);
+                if is_loop_header {
+                    use_def.record_loop_header_declaration_and_binding(place, definition);
+                } else {
+                    use_def.record_declaration_and_binding(place, definition);
+                    self.delete_associated_bindings(place);
+                }
             }
-            DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
+            DefinitionCategory::Declaration => {
+                if is_loop_header {
+                    use_def.record_loop_header_declaration(place, definition);
+                } else {
+                    use_def.record_declaration(place, definition);
+                }
+            }
             DefinitionCategory::Binding => {
                 // Loop-header bindings don't shadow prior bindings.
                 let previous_definitions = if is_loop_header {
@@ -839,49 +849,80 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
     }
 
-    /// Create loop header definitions for all places that are bound within a loop. Return the
-    /// `LoopToken` referenced by those definitions, and the set of bound place IDs.
+    /// Create loop header definitions for all places that are bound and/or declared within a loop.
+    /// Return the `LoopToken` referenced by those definitions, the set of bound place IDs, and
+    /// the set of declared place IDs.
     fn synthesize_loop_header_definitions(
         &mut self,
         loop_stmt: LoopStmtRef<'ast>,
         bound_places: Vec<PlaceExpr>,
-    ) -> (LoopToken<'db>, FxHashSet<ScopedPlaceId>) {
+        declared_places: Vec<PlaceExpr>,
+    ) -> (
+        LoopToken<'db>,
+        FxHashSet<ScopedPlaceId>,
+        FxHashSet<ScopedPlaceId>,
+    ) {
         let loop_token = LoopToken::new(self.db);
         let mut bound_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
-        for place_expr in bound_places {
-            let place_id = self.add_place(place_expr);
-            if bound_place_ids.insert(place_id) {
+        let mut declared_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
+        // First pass: resolve all place expressions to IDs to know the category of each.
+        let bound_ids: Vec<_> = bound_places
+            .into_iter()
+            .map(|p| self.add_place(p))
+            .collect();
+        let declared_ids: Vec<_> = declared_places
+            .into_iter()
+            .map(|p| self.add_place(p))
+            .collect();
+        for &id in &bound_ids {
+            bound_place_ids.insert(id);
+        }
+        for &id in &declared_ids {
+            declared_place_ids.insert(id);
+        }
+        // Second pass: create a loop header definition for each unique place.
+        let mut seen: FxHashSet<ScopedPlaceId> = FxHashSet::default();
+        for place_id in bound_ids.iter().chain(&declared_ids).copied() {
+            if seen.insert(place_id) {
                 let loop_header_ref = LoopHeaderDefinitionNodeRef {
                     loop_stmt,
                     place: place_id,
                     loop_token,
+                    is_binding: bound_place_ids.contains(&place_id),
+                    is_declaration: declared_place_ids.contains(&place_id),
                 };
-                // Note that `DefinitionKind::LoopHeader` doesn't shadow prior bindings.
                 self.push_additional_definition(place_id, loop_header_ref);
             }
         }
-        (loop_token, bound_place_ids)
+        (loop_token, bound_place_ids, declared_place_ids)
     }
 
-    /// Build a `LoopHeader` that tracks all the variables bound in a loop, which will be visible
-    /// to uses in the same loop via "loop header definitions". We call this after merging control
-    /// flow from all the loop-back edges, most importantly at the end of the loop body, and also
-    /// at any `continue` statements.
+    /// Build a `LoopHeader` that tracks all the variables bound and/or declared in a loop, which
+    /// will be visible to uses in the same loop via "loop header definitions". We call this after
+    /// merging control flow from all the loop-back edges, most importantly at the end of the loop
+    /// body, and also at any `continue` statements.
     fn populate_loop_header(
         &mut self,
-        loop_header_places: &FxHashSet<ScopedPlaceId>,
+        bound_place_ids: &FxHashSet<ScopedPlaceId>,
+        declared_place_ids: &FxHashSet<ScopedPlaceId>,
         loop_token: LoopToken<'db>,
     ) {
         let mut loop_header = LoopHeader::new();
         let use_def = self.current_use_def_map_mut();
         // Collect bindings.
-        for place_id in loop_header_places {
+        for place_id in bound_place_ids {
             for live_binding in use_def.loop_back_bindings(*place_id) {
                 loop_header.add_binding(*place_id, live_binding);
             }
         }
+        // Collect declarations.
+        for place_id in declared_place_ids {
+            for live_declaration in use_def.loop_back_declarations(*place_id) {
+                loop_header.add_declaration(*place_id, live_declaration);
+            }
+        }
         // Mark the reachability and narrowing constraints as used.
-        for place_id in loop_header_places {
+        for place_id in bound_place_ids {
             for live_binding in loop_header.bindings_for_place(*place_id) {
                 use_def
                     .reachability_constraints
@@ -889,6 +930,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 use_def
                     .reachability_constraints
                     .mark_used(live_binding.narrowing_constraint);
+            }
+        }
+        for place_id in declared_place_ids {
+            for live_declaration in loop_header.declarations_for_place(*place_id) {
+                use_def
+                    .reachability_constraints
+                    .mark_used(live_declaration.reachability_constraint);
             }
         }
         // The `LoopHeader` needs to be visible to uses within the loop body that we've already
@@ -2172,17 +2220,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     node_index: _,
                 },
             ) => {
-                // Pre-walk the loop to collect all the bound places, then create a loop header
-                // definition for each bound place. See `struct LoopHeader` for more on this. Loop
+                // Pre-walk the loop to collect all the bound and declared places, then create a
+                // loop header definition for each. See `struct LoopHeader` for more on this. Loop
                 // header definitions stash a token to look up the `LoopHeader` later, so that we
                 // can populate the header lazily.
-                let bound_places = loop_bindings_visitor::collect_while_loop_bindings(while_stmt);
+                let loop_defs = loop_bindings_visitor::collect_while_loop_definitions(while_stmt);
                 let mut maybe_loop_header_info = None;
-                // Avoid allocating a `LoopToken` if there are no bound places in this loop.
-                if !bound_places.is_empty() {
+                // Avoid allocating a `LoopToken` if there are no definitions in this loop.
+                if !loop_defs.bound_places.is_empty() || !loop_defs.declared_places.is_empty() {
                     maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
                         LoopStmtRef::While(while_stmt),
-                        bound_places,
+                        loop_defs.bound_places,
+                        loop_defs.declared_places,
                     ));
                 }
 
@@ -2208,10 +2257,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_merge(continue_state);
                 }
 
-                // Collect all the loop-back bindings (including the `continue` states we just
-                // merged) and populate the `LoopHeader`.
-                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
-                    self.populate_loop_header(&bound_place_ids, loop_token);
+                // Collect all the loop-back bindings and declarations (including the `continue`
+                // states we just merged) and populate the `LoopHeader`.
+                if let Some((loop_token, bound_place_ids, declared_place_ids)) =
+                    maybe_loop_header_info
+                {
+                    self.populate_loop_header(&bound_place_ids, &declared_place_ids, loop_token);
                 }
 
                 // We execute the `else` branch once the condition evaluates to false. This could
@@ -2289,17 +2340,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 let pre_loop = self.flow_snapshot();
 
-                // Pre-walk the loop to collect all the bound places, then create a loop header
-                // definition for each bound place. See `struct LoopHeader` for more on this. Loop
+                // Pre-walk the loop to collect all the bound and declared places, then create a
+                // loop header definition for each. See `struct LoopHeader` for more on this. Loop
                 // header definitions stash a token to look up the `LoopHeader` later, so that we
                 // can populate the header lazily.
-                let bound_places = loop_bindings_visitor::collect_for_loop_bindings(for_stmt);
+                let loop_defs = loop_bindings_visitor::collect_for_loop_definitions(for_stmt);
                 let mut maybe_loop_header_info = None;
-                // Avoid allocating a `LoopToken` if there are no bound places in this loop.
-                if !bound_places.is_empty() {
+                // Avoid allocating a `LoopToken` if there are no definitions in this loop.
+                if !loop_defs.bound_places.is_empty() || !loop_defs.declared_places.is_empty() {
                     maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
                         LoopStmtRef::For(for_stmt),
-                        bound_places,
+                        loop_defs.bound_places,
+                        loop_defs.declared_places,
                     ));
                 }
 
@@ -2316,10 +2368,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_merge(continue_state);
                 }
 
-                // Collect all the loop-back bindings (including the `continue` states we just
-                // merged) and populate the `LoopHeader`.
-                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
-                    self.populate_loop_header(&bound_place_ids, loop_token);
+                // Collect all the loop-back bindings and declarations (including the `continue`
+                // states we just merged) and populate the `LoopHeader`.
+                if let Some((loop_token, bound_place_ids, declared_place_ids)) =
+                    maybe_loop_header_info
+                {
+                    self.populate_loop_header(&bound_place_ids, &declared_place_ids, loop_token);
                 }
 
                 // We may execute the `else` clause without ever executing the body, so merge in
