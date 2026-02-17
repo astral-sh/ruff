@@ -371,6 +371,23 @@ pub const DEFAULT_SELECTORS: &[RuleSelector] = &[
     },
 ];
 
+pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
+    RuleSelector::Linter(Linter::Pyflakes),
+    // Only include pycodestyle rules that do not overlap with the formatter
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E4),
+        redirected_from: None,
+    },
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E7),
+        redirected_from: None,
+    },
+    RuleSelector::Prefix {
+        prefix: RuleCodePrefix::Pycodestyle(codes::Pycodestyle::E9),
+        redirected_from: None,
+    },
+];
+
 pub const TASK_TAGS: &[&str] = &["TODO", "FIXME", "XXX"];
 
 pub static DUMMY_VARIABLE_RGX: LazyLock<Regex> =

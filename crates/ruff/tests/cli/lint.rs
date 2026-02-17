@@ -3939,3 +3939,81 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
     ");
     Ok(())
 }
+
+#[test]
+fn preview_default_rules() -> Result<()> {
+    let test = CliTest::with_settings(|_path, mut settings| {
+        settings.add_filter(r"(?s).*(linter\.rules\.enabled[^]]+]).*", "$1");
+        settings
+    })?;
+
+    test.write_file("try.py", "1")?;
+
+    assert_cmd_snapshot!(
+        test.check_command().args(["--preview", "--show-settings"]),
+        @"
+    linter.rules.enabled = [
+    	multiple-imports-on-one-line (E401),
+    	module-import-not-at-top-of-file (E402),
+    	multiple-statements-on-one-line-colon (E701),
+    	multiple-statements-on-one-line-semicolon (E702),
+    	useless-semicolon (E703),
+    	none-comparison (E711),
+    	true-false-comparison (E712),
+    	not-in-test (E713),
+    	not-is-test (E714),
+    	type-comparison (E721),
+    	bare-except (E722),
+    	lambda-assignment (E731),
+    	ambiguous-variable-name (E741),
+    	ambiguous-class-name (E742),
+    	ambiguous-function-name (E743),
+    	io-error (E902),
+    	unused-import (F401),
+    	import-shadowed-by-loop-var (F402),
+    	undefined-local-with-import-star (F403),
+    	late-future-import (F404),
+    	undefined-local-with-import-star-usage (F405),
+    	undefined-local-with-nested-import-star-usage (F406),
+    	future-feature-not-defined (F407),
+    	percent-format-invalid-format (F501),
+    	percent-format-expected-mapping (F502),
+    	percent-format-expected-sequence (F503),
+    	percent-format-extra-named-arguments (F504),
+    	percent-format-missing-argument (F505),
+    	percent-format-mixed-positional-and-named (F506),
+    	percent-format-positional-count-mismatch (F507),
+    	percent-format-star-requires-sequence (F508),
+    	percent-format-unsupported-format-character (F509),
+    	string-dot-format-invalid-format (F521),
+    	string-dot-format-extra-named-arguments (F522),
+    	string-dot-format-extra-positional-arguments (F523),
+    	string-dot-format-missing-arguments (F524),
+    	string-dot-format-mixing-automatic (F525),
+    	f-string-missing-placeholders (F541),
+    	multi-value-repeated-key-literal (F601),
+    	multi-value-repeated-key-variable (F602),
+    	expressions-in-star-assignment (F621),
+    	multiple-starred-expressions (F622),
+    	assert-tuple (F631),
+    	is-literal (F632),
+    	invalid-print-syntax (F633),
+    	if-tuple (F634),
+    	break-outside-loop (F701),
+    	continue-outside-loop (F702),
+    	yield-outside-function (F704),
+    	return-outside-function (F706),
+    	default-except-not-last (F707),
+    	forward-annotation-syntax-error (F722),
+    	redefined-while-unused (F811),
+    	undefined-name (F821),
+    	undefined-export (F822),
+    	undefined-local (F823),
+    	unused-variable (F841),
+    	unused-annotation (F842),
+    	raise-not-implemented (F901),
+    ]
+    ",
+    );
+    Ok(())
+}
