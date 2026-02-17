@@ -20,9 +20,9 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/directives/assert_type.m
  5 | class Baz: ...
  6 | 
  7 | def f(x: Foo):
- 8 |     assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Bar` does not match asserted type `Foo`"
+ 8 |     assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Foo` does not match asserted type `Bar`"
  9 |     if isinstance(x, Bar):
-10 |         assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Bar` does not match asserted type `Foo & Bar`"
+10 |         assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Foo & Bar` does not match asserted type `Bar`"
 11 | 
 12 |         # The actual type must be a subtype of the asserted type, as well as being unspellable,
 13 |         # in order for `assert-type-unspellable-subtype` to be emitted instead of `type-assertion-failure`
@@ -36,12 +36,12 @@ error[type-assertion-failure]: Argument does not have asserted type `Bar`
   --> src/mdtest_snippet.py:8:5
    |
  7 | def f(x: Foo):
- 8 |     assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Bar` does not match asserted type `Foo`"
+ 8 |     assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Foo` does not match asserted type `Bar`"
    |     ^^^^^^^^^^^^-^^^^^^
    |                 |
    |                 Inferred type is `Foo`
  9 |     if isinstance(x, Bar):
-10 |         assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Bar` does not match asserted type `Foo & Bar`"
+10 |         assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Foo & Bar` does not match asserted type `Bar`"
    |
 info: `Bar` and `Foo` are not equivalent types
 info: rule `type-assertion-failure` is enabled by default
@@ -52,9 +52,9 @@ info: rule `type-assertion-failure` is enabled by default
 error[assert-type-unspellable-subtype]: Argument does not have asserted type `Bar`
   --> src/mdtest_snippet.py:10:9
    |
- 8 |     assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Bar` does not match asserted type `Foo`"
+ 8 |     assert_type(x, Bar)  # error: [type-assertion-failure] "Type `Foo` does not match asserted type `Bar`"
  9 |     if isinstance(x, Bar):
-10 |         assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Bar` does not match asserted type `Foo & Bar`"
+10 |         assert_type(x, Bar)  # error: [assert-type-unspellable-subtype] "Type `Foo & Bar` does not match asserted type `Bar`"
    |         ^^^^^^^^^^^^-^^^^^^
    |                     |
    |                     Inferred type is `Foo & Bar`
