@@ -1696,15 +1696,49 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
+        let class_name = class.name(db);
+
         let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Final class `{}` does not implement abstract {}",
-            class.name(db),
-            if abstract_methods.len() == 1 {
-                format!("method `{first_method_name}`")
-            } else {
-                format!("methods {}", format_enumeration(abstract_methods.keys()))
-            }
+            "Final class `{class_name}` has unimplemented abstract methods",
         ));
+
+        let num_abstract_methods = abstract_methods.len();
+
+        if num_abstract_methods == 1 {
+            diagnostic.set_concise_message(format_args!(
+                "Final class `{class_name}` has unimplemented abstract method \
+                `{first_method_name}`",
+            ));
+            diagnostic.set_primary_message(format_args!("`{first_method_name}` is unimplemented"));
+        } else {
+            let verbose = db.verbose();
+            let max_abstract_methods_to_print = if verbose { num_abstract_methods } else { 3 };
+            let formatted_methods =
+                format_enumeration(abstract_methods.keys().take(max_abstract_methods_to_print));
+
+            if num_abstract_methods > max_abstract_methods_to_print {
+                diagnostic.set_primary_message(format_args!(
+                    "{num_abstract_methods} abstract methods are unimplemented, \
+                        including {formatted_methods}",
+                ));
+                diagnostic.set_concise_message(format_args!(
+                    "Final class `{class_name}` has {num_abstract_methods} unimplemented \
+                    abstract methods, including {formatted_methods}",
+                ));
+                diagnostic.info(format_args!(
+                    "Use `--verbose` to see all {num_abstract_methods} \
+                    unimplemented abstract methods",
+                ));
+            } else {
+                diagnostic.set_concise_message(format_args!(
+                    "Final class `{class_name}` has unimplemented \
+                    abstract methods {formatted_methods}",
+                ));
+                diagnostic.set_primary_message(format_args!(
+                    "Abstract methods {formatted_methods} are unimplemented"
+                ));
+            }
+        }
 
         let AbstractMethod {
             defining_class,

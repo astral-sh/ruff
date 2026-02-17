@@ -646,7 +646,7 @@ class Base(ABC):
         raise NotImplementedError
 
 @final
-class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
+class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` has unimplemented abstract method `foo`"
     pass
 ```
 
@@ -1297,14 +1297,60 @@ class Bad(Base):
 
 <!-- snapshot-diagnostics -->
 
-A test for our diagnostic when a class has many unimplemented abstract methods:
+If the class has many unimplemented abstract methods, we do not list them all unless the user has
+specified `--verbose`:
+
+```toml
+verbose = false
+```
 
 ```py
 from abc import ABC, abstractmethod
 from typing import final
 
 @final
-class Abstract(ABC):  # error: [abstract-method-in-final-class]
+# error: [abstract-method-in-final-class] "Final class `Abstract` has 10 unimplemented abstract methods, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`"
+class Abstract(ABC):
+    @abstractmethod
+    def aaaaaaaaaa(self) -> int: ...
+    @abstractmethod
+    def bbbbbbbb(self) -> int: ...
+    @abstractmethod
+    def cccccccc(self) -> int: ...
+    @abstractmethod
+    def ddddddddd(self) -> int: ...
+    @abstractmethod
+    def eeeeeeeee(self) -> int: ...
+    @abstractmethod
+    def ffffffff(self) -> int: ...
+    @abstractmethod
+    def ggggggg(self) -> int: ...
+    @abstractmethod
+    def hhhhhhhh(self) -> int: ...
+    @abstractmethod
+    def iiiiiiiii(self) -> int: ...
+    @abstractmethod
+    def kkkkkkkkkk(self) -> int: ...
+```
+
+### Diagnostic when there are many abstract methods and `--verbose` has been specified
+
+<!-- snapshot-diagnostics -->
+
+If the class has many unimplemented abstract methods, we still list them all if the user has
+specified `--verbose`:
+
+```toml
+verbose = true
+```
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+@final
+# error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk`"
+class Abstract(ABC):
     @abstractmethod
     def aaaaaaaaaa(self) -> int: ...
     @abstractmethod

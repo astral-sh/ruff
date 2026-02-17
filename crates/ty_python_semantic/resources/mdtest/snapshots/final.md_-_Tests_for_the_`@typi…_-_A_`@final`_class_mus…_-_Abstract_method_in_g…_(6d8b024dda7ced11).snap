@@ -31,12 +31,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 # Diagnostics
 
 ```
-error[abstract-method-in-final-class]: Final class `Child` does not implement abstract method `method`
+error[abstract-method-in-final-class]: Final class `Child` has unimplemented abstract methods
   --> src/mdtest_snippet.py:12:7
    |
 11 | @final
 12 | class Child(Parent):  # error: [abstract-method-in-final-class]
-   |       ^^^^^
+   |       ^^^^^ `method` is unimplemented
 13 |     pass
    |
   ::: src/mdtest_snippet.py:6:9
