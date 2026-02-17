@@ -132,7 +132,7 @@ class D:
 reveal_type(D.a)  # revealed: int
 ```
 
-## `ClassVar` cannot contain type variables
+## `ClassVar` cannot contain non-self type variables
 
 `ClassVar` cannot include type variables at any level of nesting.
 
@@ -174,7 +174,7 @@ class D[T]:
 
 ## `ClassVar` can contain `Self`
 
-`Self` is permitted inside `ClassVar` because it is not a class-scoped type parameter.
+`Self` is allowed inside `ClassVar`.
 
 ```toml
 [environment]
