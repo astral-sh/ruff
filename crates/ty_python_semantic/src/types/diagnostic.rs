@@ -14,7 +14,9 @@ use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
-use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
+use crate::types::class::{
+    AbstractMethods, CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator,
+};
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
 use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
@@ -4233,6 +4235,93 @@ pub(crate) fn report_call_to_abstract_method(
     );
     sub.annotate(Annotation::primary(spans.name));
     diag.sub(sub);
+}
+
+pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
+    context: &'db InferContext<'db, '_>,
+    call: &ast::ExprCall,
+    class: ClassType<'db>,
+    abstract_methods: &AbstractMethods<'db>,
+) {
+    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = class.name(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot instantiate abstract class `{class_name}`"
+    ));
+
+    if let Some(method) = abstract_methods.first(db) {
+        let name = method.name;
+        let secondary_annotation = Annotation::secondary(method.span(db));
+        if abstract_methods.len() == 1 {
+            diagnostic
+                .set_primary_message(format_args!("Abstract method `{name}` is unimplemented"));
+            diagnostic.set_concise_message(format_args!(
+                "Cannot instantiate `{class_name}` with unimplemented \
+                abstract method `{name}`"
+            ));
+            if method.defining_class == class {
+                diagnostic.annotate(
+                    secondary_annotation.message(format_args!("`{name}` declared as abstract")),
+                );
+            } else {
+                diagnostic.annotate(secondary_annotation.message(format_args!(
+                    "`{name}` declared as abstract on superclass `{}`",
+                    method.defining_class.name(db)
+                )));
+            }
+        } else {
+            diagnostic.set_primary_message(format_args!(
+                "`{class_name}` has unimplemented abstract methods",
+            ));
+            let verbose = db.verbose();
+            let num_abstract_methods = abstract_methods.len();
+            let max_abstract_methods_to_print = if verbose { num_abstract_methods } else { 3 };
+            let formatted_methods =
+                format_enumeration(abstract_methods.names().take(max_abstract_methods_to_print));
+            diagnostic.set_concise_message(format_args!(
+                "Cannot instantiate `{class_name}` with unimplemented \
+                abstract methods {formatted_methods}"
+            ));
+            let mut class_def_sub = if num_abstract_methods > max_abstract_methods_to_print {
+                SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format_args!(
+                        "{num_abstract_methods} abstract methods are unimplemented, \
+                        including {formatted_methods}",
+                    ),
+                )
+            } else {
+                SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format_args!("Abstract methods {formatted_methods} are unimplemented"),
+                )
+            };
+            if method.defining_class == class {
+                class_def_sub.annotate(
+                    secondary_annotation.message(format_args!("`{name}` declared as abstract")),
+                );
+            } else {
+                class_def_sub.annotate(secondary_annotation.message(format_args!(
+                    "`{name}` declared as abstract on superclass `{}`",
+                    method.defining_class.name(db)
+                )));
+            }
+            diagnostic.sub(class_def_sub);
+            if num_abstract_methods > max_abstract_methods_to_print {
+                diagnostic.info(format_args!(
+                    "Use `--verbose` to see all {num_abstract_methods} \
+                    unimplemented abstract methods",
+                ));
+            }
+        }
+
+        if let Some(subdiagnostic) = method.explanatory_subdiagnostic(db) {
+            diagnostic.sub(subdiagnostic);
+        }
+    }
 }
 
 pub(crate) fn report_undeclared_protocol_member(

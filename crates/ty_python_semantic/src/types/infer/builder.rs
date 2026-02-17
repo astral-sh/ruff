@@ -1,9 +1,7 @@
 use std::borrow::Cow;
 
 use itertools::{Either, EitherOrBoth, Itertools};
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Severity, Span, SubDiagnostic, SubDiagnosticSeverity,
-};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::source_text;
@@ -63,7 +61,7 @@ use crate::types::builder::RecursivelyDefined;
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    AbstractMethod, ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
+    ClassLiteral, CodeGeneratorKind, DynamicClassAnchor, DynamicClassLiteral,
     DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
     MetaclassErrorKind, MethodDecorator, NamedTupleField, NamedTupleSpec,
 };
@@ -88,7 +86,8 @@ use crate::types::diagnostic::{
     UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
     UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
-    hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
+    hint_if_stdlib_submodule_exists_on_other_versions,
+    report_attempted_instantiation_of_abstract_class, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_call_to_abstract_method, report_cannot_delete_typed_dict_key,
     report_cannot_pop_required_field_on_typed_dict, report_conflicting_metaclass_from_bases,
@@ -1685,9 +1684,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let abstract_methods = class_type.abstract_methods(db);
 
         // If there are no abstract methods, we're done.
-        let Some((first_method_name, abstract_method)) = abstract_methods.iter().next() else {
+        let Some(abstract_method) = abstract_methods.first(db) else {
             return;
         };
+        let method_name = abstract_method.name;
 
         let Some(builder) = self
             .context
@@ -1699,88 +1699,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_name = class.name(db);
 
         let mut diagnostic = builder.into_diagnostic(format_args!(
-            "Final class `{class_name}` has unimplemented abstract methods",
+            "Final class `{}` does not implement abstract {}",
+            class.name(db),
+            if abstract_methods.len() == 1 {
+                format!("method `{method_name}`")
+            } else {
+                format!("methods {}", format_enumeration(abstract_methods.names()))
+            }
         ));
 
-        let num_abstract_methods = abstract_methods.len();
-
-        if num_abstract_methods == 1 {
-            diagnostic.set_concise_message(format_args!(
-                "Final class `{class_name}` has unimplemented abstract method \
-                `{first_method_name}`",
-            ));
-            diagnostic.set_primary_message(format_args!("`{first_method_name}` is unimplemented"));
-        } else {
-            let verbose = db.verbose();
-            let max_abstract_methods_to_print = if verbose { num_abstract_methods } else { 3 };
-            let formatted_methods =
-                format_enumeration(abstract_methods.keys().take(max_abstract_methods_to_print));
-
-            if num_abstract_methods > max_abstract_methods_to_print {
-                diagnostic.set_primary_message(format_args!(
-                    "{num_abstract_methods} abstract methods are unimplemented, \
-                        including {formatted_methods}",
-                ));
-                diagnostic.set_concise_message(format_args!(
-                    "Final class `{class_name}` has {num_abstract_methods} unimplemented \
-                    abstract methods, including {formatted_methods}",
-                ));
-                diagnostic.info(format_args!(
-                    "Use `--verbose` to see all {num_abstract_methods} \
-                    unimplemented abstract methods",
-                ));
-            } else {
-                diagnostic.set_concise_message(format_args!(
-                    "Final class `{class_name}` has unimplemented \
-                    abstract methods {formatted_methods}",
-                ));
-                diagnostic.set_primary_message(format_args!(
-                    "Abstract methods {formatted_methods} are unimplemented"
-                ));
-            }
-        }
-
-        let AbstractMethod {
-            defining_class,
-            definition,
-            kind,
-        } = abstract_method;
-
-        let module = parsed_module(db, definition.file(db)).load(db);
-        let span = Span::from(definition.focus_range(db, &module));
+        let defining_class = abstract_method.defining_class;
         let defining_class_name = defining_class.name(db);
-
-        let mut secondary_annotation = Annotation::secondary(span);
-        secondary_annotation = if defining_class.class_literal(db) == ClassLiteral::Static(class) {
-            secondary_annotation.message(format_args!("`{first_method_name}` declared as abstract"))
+        let secondary_annotation = Annotation::secondary(abstract_method.span(db));
+        let secondary_annotation = if defining_class.class_literal(db).as_static() == Some(class) {
+            secondary_annotation.message(format_args!("`{method_name}` declared as abstract",))
         } else {
             secondary_annotation.message(format_args!(
-                "`{first_method_name}` declared as abstract on superclass `{defining_class_name}`",
+                "`{method_name}` declared as abstract on superclass `{defining_class_name}`",
             ))
         };
         diagnostic.annotate(secondary_annotation);
-
-        if !kind.is_explicit() {
-            let mut sub = SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format_args!(
-                    "`{defining_class_name}.{first_method_name}` is implicitly abstract \
-                    because `{defining_class_name}` is a `Protocol` class \
-                    and `{first_method_name}` lacks an implementation",
-                ),
-            );
-            sub.annotate(
-                Annotation::secondary(defining_class.definition_span(db))
-                    .message(format_args!("`{defining_class_name}` declared here")),
-            );
+        if let Some(sub) = abstract_method.explanatory_subdiagnostic(db) {
             diagnostic.sub(sub);
+            let definition = abstract_method.definition;
 
             // If the implicitly abstract method is defined in first-party code
             // and the return type is assignable to `None`, they may not have intended
             // for it to be implicitly abstract; add a clarificatory note:
-            if kind.is_implicit_due_to_stub_body() && db.should_check_file(definition.file(db)) {
-                let function_type_as_callable = infer_definition_types(db, *definition)
-                    .binding_type(*definition)
+            if abstract_method.kind.is_implicit_due_to_stub_body()
+                && db.should_check_file(definition.file(db))
+            {
+                let function_type_as_callable = infer_definition_types(db, definition)
+                    .binding_type(definition)
                     .try_upcast_to_callable(db);
 
                 if let Some(callables) = function_type_as_callable
@@ -1792,7 +1742,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 {
                     diagnostic.help(format_args!(
                         "Change the body of `{first_method_name}` to `return` \
-                        or `return None` if it was not intended to be abstract"
+                        or `return None` if it was not intended to be abstract",
+                        first_method_name = abstract_method.name
                     ));
                 }
             }
@@ -12461,10 +12412,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // that protocol -- and indeed, according to the spec, type checkers must disallow abstract
             // subclasses of the protocol to be passed to parameters that accept `type[SomeProtocol]`.
             // <https://typing.python.org/en/latest/spec/protocol.html#type-and-class-objects-vs-protocols>.
-            if !callable_type.is_subclass_of()
-                && let Some(protocol) = class.into_protocol_class(self.db())
-            {
-                report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
+            if !callable_type.is_subclass_of() {
+                if let Some(protocol) = class.into_protocol_class(self.db()) {
+                    report_attempted_protocol_instantiation(
+                        &self.context,
+                        call_expression,
+                        protocol,
+                    );
+                } else {
+                    let abstract_methods = class.abstract_methods(self.db());
+                    if !abstract_methods.is_empty() {
+                        report_attempted_instantiation_of_abstract_class(
+                            &self.context,
+                            call_expression,
+                            class,
+                            &abstract_methods,
+                        );
+                    }
+                }
             }
 
             // Inference of correctly-placed `TypeVar`, `ParamSpec`, and `NewType` definitions
