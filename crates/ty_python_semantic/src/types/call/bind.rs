@@ -449,7 +449,10 @@ impl<'db> Bindings<'db> {
             binding.bake_bound_type_into_overloads(db);
         }
 
-        let partial_bindings = partial_bindings.match_parameters(db, &bound_call_arguments);
+        let mut partial_bindings = partial_bindings.match_parameters(db, &bound_call_arguments);
+        for binding in partial_bindings.iter_flat_mut() {
+            binding.clear_missing_argument_errors_for_partial_application();
+        }
         Some((bound_call_arguments, partial_bindings))
     }
 
@@ -2292,6 +2295,16 @@ impl<'db> CallableBinding<'db> {
         };
         for overload in &mut self.overloads {
             overload.signature = overload.signature.bind_self(db, Some(bound_self));
+        }
+    }
+
+    /// Ignore missing-argument errors when constructing `functools.partial(...)`.
+    ///
+    /// Partial application intentionally leaves some parameters unbound, so we still want to
+    /// type-check all explicitly bound arguments against each overload.
+    fn clear_missing_argument_errors_for_partial_application(&mut self) {
+        for overload in &mut self.overloads {
+            overload.clear_missing_argument_errors_for_partial_application();
         }
     }
 
@@ -4613,6 +4626,12 @@ impl<'db> Binding<'db> {
             .retain(BindingError::is_relevant_for_partial_application);
     }
 
+    /// `functools.partial(...)` is allowed to leave required parameters unbound.
+    fn clear_missing_argument_errors_for_partial_application(&mut self) {
+        self.errors
+            .retain(|error| !matches!(error, BindingError::MissingArguments { .. }));
+    }
+
     /// Returns the callable signature produced by partially applying this bound overload.
     fn partially_applied_signature(
         &self,
@@ -4649,6 +4668,7 @@ impl<'db> Binding<'db> {
             .unwrap_or(signature.return_ty);
         let mut remove_positionally_bound = vec![false; parameters.len()];
         let mut keyword_defaults = vec![None; parameters.len()];
+        let mut keyword_bound = vec![false; parameters.len()];
 
         for ((argument, argument_ty), argument_matches) in
             arguments.iter().zip(&self.argument_matches)
@@ -4679,6 +4699,7 @@ impl<'db> Binding<'db> {
                             continue;
                         }
 
+                        keyword_bound[parameter_index] = true;
                         keyword_defaults[parameter_index] = Some(
                             matched_ty.unwrap_or_else(|| argument_ty.unwrap_or_else(Type::unknown)),
                         );
@@ -4688,17 +4709,44 @@ impl<'db> Binding<'db> {
         }
 
         let mut remaining = Vec::with_capacity(parameters.len());
+        let mut keyword_only = Vec::new();
+        let mut keyword_variadic = Vec::new();
         for (index, parameter) in parameters.iter().enumerate() {
             if remove_positionally_bound[index] {
                 continue;
             }
 
-            let parameter = keyword_defaults[index].map_or_else(
+            let mut parameter = keyword_defaults[index].map_or_else(
                 || parameter.clone(),
                 |default_ty| parameter.clone().with_default_type(default_ty),
             );
-            remaining.push(parameter);
+
+            // If a positional-or-keyword parameter was bound via keyword and there are still
+            // unbound positional parameters after it, model it as keyword-only.
+            if keyword_bound[index]
+                && matches!(parameter.kind(), ParameterKind::PositionalOrKeyword { .. })
+                && parameters
+                    .iter()
+                    .enumerate()
+                    .skip(index + 1)
+                    .any(|(idx, param)| !remove_positionally_bound[idx] && param.is_positional())
+            {
+                parameter = positional_or_keyword_to_keyword_only(&parameter);
+            }
+
+            if parameter.is_keyword_variadic() {
+                keyword_variadic.push(parameter);
+            } else if parameter.is_keyword_only() {
+                keyword_only.push(parameter);
+            } else {
+                remaining.push(parameter);
+            }
         }
+
+        remaining.extend(keyword_only);
+        remaining.extend(keyword_variadic);
+
+        let remaining = expand_paramspec_variadics(db, remaining);
 
         signature
             .with_parameters(Parameters::new(db, remaining))
@@ -4832,6 +4880,82 @@ impl<'db> Binding<'db> {
         self.parameter_tys = Box::from([]);
         self.errors.clear();
     }
+}
+
+fn positional_or_keyword_to_keyword_only<'db>(parameter: &Parameter<'db>) -> Parameter<'db> {
+    let ParameterKind::PositionalOrKeyword { name, .. } = parameter.kind() else {
+        return parameter.clone();
+    };
+
+    let was_type_form = matches!(parameter.form, ParameterForm::Type);
+
+    let mut parameter = Parameter::keyword_only(name.clone())
+        .with_annotated_type(parameter.annotated_type())
+        .with_optional_default_type(parameter.default_type());
+
+    if was_type_form {
+        parameter = parameter.type_form();
+    }
+
+    parameter
+}
+
+fn expand_paramspec_variadics<'db>(
+    db: &'db dyn Db,
+    parameters: Vec<Parameter<'db>>,
+) -> Vec<Parameter<'db>> {
+    let mut variadic_index = None;
+    let mut paramspec_callable = None;
+
+    for (index, parameter) in parameters.iter().enumerate() {
+        if !parameter.is_variadic() {
+            continue;
+        }
+
+        let Type::Callable(callable) = parameter.annotated_type() else {
+            continue;
+        };
+        if callable.kind(db) != CallableTypeKind::ParamSpecValue {
+            continue;
+        }
+
+        variadic_index = Some(index);
+        paramspec_callable = Some(callable);
+        break;
+    }
+
+    let Some(variadic_index) = variadic_index else {
+        return parameters;
+    };
+    let Some(paramspec_callable) = paramspec_callable else {
+        return parameters;
+    };
+
+    let Some(keyword_variadic) = parameters.get(variadic_index + 1) else {
+        return parameters;
+    };
+    if !keyword_variadic.is_keyword_variadic() {
+        return parameters;
+    }
+
+    let Type::Callable(keyword_callable) = keyword_variadic.annotated_type() else {
+        return parameters;
+    };
+    if keyword_callable.kind(db) != CallableTypeKind::ParamSpecValue
+        || keyword_callable != paramspec_callable
+    {
+        return parameters;
+    }
+
+    let [mapped_signature] = paramspec_callable.signatures(db).overloads.as_slice() else {
+        return parameters;
+    };
+
+    let mut expanded = Vec::with_capacity(parameters.len());
+    expanded.extend_from_slice(&parameters[..variadic_index]);
+    expanded.extend_from_slice(mapped_signature.parameters().as_slice());
+    expanded.extend_from_slice(&parameters[variadic_index + 2..]);
+    expanded
 }
 
 #[derive(Clone, Debug)]
@@ -5125,15 +5249,17 @@ impl BindingError<'_> {
 
     /// Returns whether this error should be reported at `partial(...)` construction time.
     ///
-    /// Some call-shape errors are deferred by runtime `functools.partial` until the partial is
-    /// invoked (for example, positional-only parameters passed by keyword). We still keep those
-    /// errors for overload filtering, but avoid reporting them during construction.
+    /// Runtime `functools.partial` can defer some call-shape errors until invocation. We report
+    /// statically-detectable call-shape errors at construction time.
     fn is_reportable_for_partial_application(&self) -> bool {
         matches!(
             self,
             Self::InvalidArgumentType { .. }
                 | Self::InvalidKeyType { .. }
+                | Self::UnknownArgument { .. }
+                | Self::PositionalOnlyParameterAsKwarg { .. }
                 | Self::TooManyPositionalArguments { .. }
+                | Self::ParameterAlreadyAssigned { .. }
                 | Self::SpecializationError { .. }
         )
     }
