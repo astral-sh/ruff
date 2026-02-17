@@ -3255,7 +3255,6 @@ fn walrus_before_py38() {
         .args(STDIN_BASE_OPTIONS)
         .args(["--stdin-filename", "test.py"])
         .arg("--target-version=py37")
-        .arg("--preview")
         .arg("-")
         .pass_stdin(r#"(x := 1)"#),
         @"

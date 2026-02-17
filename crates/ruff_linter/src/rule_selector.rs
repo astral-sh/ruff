@@ -38,7 +38,7 @@ pub enum RuleSelector {
 impl RuleSelector {
     pub(crate) const fn rule(prefix: RuleCodePrefix) -> Self {
         Self::Rule {
-            prefix: prefix,
+            prefix,
             redirected_from: None,
         }
     }
