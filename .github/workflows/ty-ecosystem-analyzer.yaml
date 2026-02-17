@@ -28,7 +28,7 @@ jobs:
   ty-ecosystem-analyzer:
     name: Compute diagnostic diff
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
-    timeout-minutes: 20
+    timeout-minutes: 30
     if: contains( github.event.pull_request.labels.*.name, 'ecosystem-analyzer')
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
