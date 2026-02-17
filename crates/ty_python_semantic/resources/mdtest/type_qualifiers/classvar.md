@@ -172,6 +172,28 @@ class D[T]:
     y: ClassVar[dict[str, T]]
 ```
 
+## `ClassVar` can contain `Self`
+
+`Self` is permitted inside `ClassVar` because it is not a class-scoped type parameter.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import ClassVar, Self
+
+class Base:
+    all_instances: ClassVar[list[Self]]
+
+    def method(self):
+        reveal_type(self.all_instances)  # revealed: list[Self@method]
+
+    def cls_method(cls):
+        reveal_type(cls.all_instances)  # revealed: list[Self@cls_method]
+```
+
 ## Illegal `ClassVar` in type expression
 
 ```py

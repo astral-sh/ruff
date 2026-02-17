@@ -1242,6 +1242,15 @@ impl<'db> Type<'db> {
         any_over_type(db, self, false, |ty| matches!(ty, Type::TypeVar(_)))
     }
 
+    pub(crate) fn has_non_self_typevar(self, db: &'db dyn Db) -> bool {
+        any_over_type(
+            db,
+            self,
+            false,
+            |ty| matches!(ty, Type::TypeVar(tv) if !tv.typevar(db).is_self(db)),
+        )
+    }
+
     pub(crate) fn has_unspecialized_type_var(self, db: &'db dyn Db) -> bool {
         any_over_type(db, self, false, |ty| {
             matches!(ty, Type::Dynamic(DynamicType::UnspecializedTypeVar))
