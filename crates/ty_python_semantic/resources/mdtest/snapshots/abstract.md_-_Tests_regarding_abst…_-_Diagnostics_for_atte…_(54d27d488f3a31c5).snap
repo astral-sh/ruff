@@ -1,0 +1,66 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: abstract.md - Tests regarding abstract classes - Diagnostics for attempted instantiation when `--verbose` is specified
+mdtest path: crates/ty_python_semantic/resources/mdtest/abstract.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Protocol
+ 2 | 
+ 3 | class Abstract(Protocol):
+ 4 |     def aaaaaaaaa(self) -> int: ...
+ 5 |     def bbbbbbbb(self) -> int: ...
+ 6 |     def cccccccc(self) -> int: ...
+ 7 |     def dddddddddd(self) -> int: ...
+ 8 |     def eeeeeeee(self) -> int: ...
+ 9 |     def fffffff(self) -> int: ...
+10 |     def ggggggggg(self) -> int: ...
+11 |     def hhhhhhhhh(self) -> int: ...
+12 |     def iiiiiiiiii(self) -> int: ...
+13 |     def kkkkkkkkk(self) -> int: ...
+14 | 
+15 | class StillSadlyAbstract(Abstract): ...
+16 | 
+17 | StillSadlyAbstract()  # error: [call-non-callable]
+```
+
+# Diagnostics
+
+```
+error[call-non-callable]: Cannot instantiate abstract class `StillSadlyAbstract`
+  --> src/mdtest_snippet.py:17:1
+   |
+15 | class StillSadlyAbstract(Abstract): ...
+16 |
+17 | StillSadlyAbstract()  # error: [call-non-callable]
+   | ^^^^^^^^^^^^^^^^^^^^ Abstract methods `aaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `dddddddddd`, `eeeeeeee`, `fffffff`, `ggggggggg`, `hhhhhhhhh`, `iiiiiiiiii` and `kkkkkkkkk` are unimplemented
+   |
+  ::: src/mdtest_snippet.py:4:9
+   |
+ 3 | class Abstract(Protocol):
+ 4 |     def aaaaaaaaa(self) -> int: ...
+   |         --------- `aaaaaaaaa` declared as abstract on superclass `Abstract`
+ 5 |     def bbbbbbbb(self) -> int: ...
+ 6 |     def cccccccc(self) -> int: ...
+   |
+info: `Abstract.aaaaaaaaa` is implicitly abstract because `Abstract` is a `Protocol` class and `aaaaaaaaa` lacks an implementation
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing import Protocol
+2 |
+3 | class Abstract(Protocol):
+  |       ------------------ `Abstract` declared here
+4 |     def aaaaaaaaa(self) -> int: ...
+5 |     def bbbbbbbb(self) -> int: ...
+  |
+info: rule `call-non-callable` is enabled by default
+
+```

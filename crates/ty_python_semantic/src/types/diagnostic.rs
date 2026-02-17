@@ -13,6 +13,7 @@ use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
+use crate::types::abstract_methods::AbstractMethods;
 use crate::types::call::CallError;
 use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
@@ -4233,6 +4234,49 @@ pub(crate) fn report_call_to_abstract_method(
     );
     sub.annotate(Annotation::primary(spans.name));
     diag.sub(sub);
+}
+
+pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
+    context: &'db InferContext<'db, '_>,
+    call: &ast::ExprCall,
+    class: ClassType<'db>,
+    abstract_methods: &AbstractMethods<'db>,
+) {
+    let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, call) else {
+        return;
+    };
+    let db = context.db();
+    let class_name = class.name(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Cannot instantiate abstract class `{class_name}`"
+    ));
+
+    abstract_methods.annotate_diagnostic(db, &mut diagnostic);
+
+    let num_abstract_methods = abstract_methods.len();
+
+    if num_abstract_methods == 1 {
+        diagnostic.set_concise_message(format_args!(
+            "Cannot instantiate `{class_name}` with unimplemented \
+                abstract method `{name}`",
+            name = abstract_methods.first_name().unwrap(),
+        ));
+    } else {
+        let formatted_methods = abstract_methods.formatted_names(db);
+        if formatted_methods.truncation_occurred {
+            diagnostic.set_concise_message(format_args!(
+                "Cannot instantiate `{class_name}` with {num_abstract_methods} unimplemented \
+                abstract methods, including {formatted_methods}",
+                formatted_methods = abstract_methods.formatted_names(db)
+            ));
+        } else {
+            diagnostic.set_concise_message(format_args!(
+                "Cannot instantiate `{class_name}` with unimplemented \
+                abstract methods {formatted_methods}",
+                formatted_methods = abstract_methods.formatted_names(db)
+            ));
+        }
+    }
 }
 
 pub(crate) fn report_undeclared_protocol_member(

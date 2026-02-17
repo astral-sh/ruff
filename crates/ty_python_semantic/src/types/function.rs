@@ -64,6 +64,7 @@ use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
+use crate::types::abstract_methods::AbstractMethodKind;
 use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
@@ -791,43 +792,12 @@ impl<'db> FunctionLiteral<'db> {
         self.last_definition(db).raw_signature(db)
     }
 
-    /// Return `Some()` if this function is an abstract method.
-    ///
-    /// A method can be abstract if it is explicitly decorated with `@abstractmethod`,
-    /// or if it is an overloaded `Protocol` method without an implementation,
-    /// or if it is a `Protocol` method with a body that solely consists of `pass`/`...`
-    /// statements, or if it is a `Protocol` method that only has a docstring,
-    /// or if it is a `Protocol` method whose body only consists of a single
-    /// `raise NotImplementedError` statement.
-    pub(super) fn as_abstract_method(
-        self,
-        db: &'db dyn Db,
-        enclosing_class: ClassType<'db>,
-    ) -> Option<AbstractMethodKind> {
-        if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
-            return Some(AbstractMethodKind::Explicit);
-        }
-        if self.definition(db).file(db).is_stub(db) {
-            return None;
-        }
-        if !enclosing_class.is_protocol(db) {
-            return None;
-        }
-        match self.body_kind(db) {
-            FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
-            FunctionBodyKind::AlwaysRaisesNotImplementedError => {
-                Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
-            }
-            FunctionBodyKind::Regular => None,
-        }
-    }
-
     /// Returns the [`FunctionBodyKind`] of this function.
     ///
     /// For functions without an implementation (e.g., overloaded functions),
     /// returns [`FunctionBodyKind::Stub`].
     #[salsa::tracked]
-    fn body_kind(self, db: &'db dyn Db) -> FunctionBodyKind {
+    pub(super) fn body_kind(self, db: &'db dyn Db) -> FunctionBodyKind {
         let (_, implementation) = self.overloads_and_implementation(db);
         let Some(implementation) = implementation else {
             return FunctionBodyKind::Stub;
@@ -854,29 +824,6 @@ impl<'db> FunctionLiteral<'db> {
                 self.body_kind(db),
                 FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
             )
-    }
-}
-
-/// Indicates whether a method is explicitly or implicitly abstract.
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(super) enum AbstractMethodKind {
-    /// The method is explicitly marked as abstract using `@abstractmethod`.
-    Explicit,
-    /// The method is implicitly abstract due to being in a `Protocol` class without an
-    /// implementation.
-    ImplicitDueToStubBody,
-    /// The method is implicitly abstract due to being in a `Protocol` class with a body that
-    /// solely consists of `raise NotImplementedError` statements.
-    ImplicitDueToAlwaysRaising,
-}
-
-impl AbstractMethodKind {
-    pub(super) const fn is_explicit(self) -> bool {
-        matches!(self, AbstractMethodKind::Explicit)
-    }
-
-    pub(super) const fn is_implicit_due_to_stub_body(self) -> bool {
-        matches!(self, AbstractMethodKind::ImplicitDueToStubBody)
     }
 }
 
@@ -1294,12 +1241,8 @@ impl<'db> FunctionType<'db> {
         ))
     }
 
-    pub(super) fn as_abstract_method(
-        self,
-        db: &'db dyn Db,
-        enclosing_class: ClassType<'db>,
-    ) -> Option<AbstractMethodKind> {
-        self.literal(db).as_abstract_method(db, enclosing_class)
+    pub(super) fn is_abstract(self, db: &'db dyn Db, enclosing_class: ClassType<'db>) -> bool {
+        AbstractMethodKind::of_function(db, self, enclosing_class).is_some()
     }
 }
 

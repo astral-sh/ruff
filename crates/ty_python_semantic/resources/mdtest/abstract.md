@@ -2,6 +2,8 @@
 
 ## Instantiation is forbidden
 
+<!-- snapshot-diagnostics -->
+
 Classes with unimplemented abstract methods cannot be instantiated. Type checkers are expected to
 detect possible attempts to instantiate abstract classes:
 
@@ -15,7 +17,7 @@ class AbstractBase(abc.ABC):
 
 class StillAbstract(AbstractBase): ...
 
-# TODO: should emit diagnostic
+# error: [call-non-callable] "Cannot instantiate `StillAbstract` with unimplemented abstract method `bar`"
 StillAbstract()
 
 class AbstractBase2(abc.ABC):
@@ -24,20 +26,20 @@ class AbstractBase2(abc.ABC):
     @abc.abstractmethod
     def bar2(self): ...
 
-# TODO: should emit diagnostic
+# error: [call-non-callable] "Cannot instantiate `AbstractBase2` with unimplemented abstract methods `bar` and `bar2`"
 AbstractBase2()
 
 class StillAbstract2(AbstractBase2): ...
 
-# TODO: should emit diagnostic
+# error: [call-non-callable]
 StillAbstract2()
 
 class AbstractBase3(Protocol):
-    def bar(self) -> int: ...
+    def bar(self) -> None: ...
 
 class StillAbstract3(AbstractBase3): ...
 
-# TODO: should emit diagnostic
+# error: [call-non-callable]
 StillAbstract3()
 ```
 
@@ -65,7 +67,7 @@ class AlsoConreteOrdered(AbstractOrdered):
 # if it already exists in the MRO, even if the one that
 # exists in the MRO is abstract!
 #
-# TODO: should emit diagnostic
+# error: [call-non-callable]
 AlsoConreteOrdered()
 ```
 
@@ -96,7 +98,7 @@ But if the annotation does not use `ClassVar`, we do not see that as overriding 
 class StillAbstractDynamic(AbstractDynamic):
     f: int
 
-StillAbstractDynamic()  # TODO: should emit an error!
+StillAbstractDynamic()  # error: [call-non-callable]
 ```
 
 Abstract methods can be overridden by mixin classes, but the concrete override on the mixin must
@@ -113,11 +115,12 @@ class ConcreteMixin:
 class Sub1(AbstractMixin, ConcreteMixin): ...
 class Sub2(ConcreteMixin, AbstractMixin): ...
 
-Sub1()  # TODO: should emit diagnostic
+Sub1()  # error: [call-non-callable]
 Sub2()  # fine
 ```
 
-A test for our diagnostic when a class has many unimplemented abstract methods:
+If the class has many unimplemented abstract methods, we do not list them all the diagnostic unless
+the user has specified `--verbose`:
 
 ```py
 from typing import Protocol
@@ -136,5 +139,33 @@ class Abstract(Protocol):
 
 class StillSadlyAbstract(Abstract): ...
 
-StillSadlyAbstract()  # TODO: should emit diagnostic
+StillSadlyAbstract()  # error: [call-non-callable]
+```
+
+## Diagnostics for attempted instantiation when `--verbose` is specified
+
+<!-- snapshot-diagnostics -->
+
+```toml
+verbose = true
+```
+
+```py
+from typing import Protocol
+
+class Abstract(Protocol):
+    def aaaaaaaaa(self) -> int: ...
+    def bbbbbbbb(self) -> int: ...
+    def cccccccc(self) -> int: ...
+    def dddddddddd(self) -> int: ...
+    def eeeeeeee(self) -> int: ...
+    def fffffff(self) -> int: ...
+    def ggggggggg(self) -> int: ...
+    def hhhhhhhhh(self) -> int: ...
+    def iiiiiiiiii(self) -> int: ...
+    def kkkkkkkkk(self) -> int: ...
+
+class StillSadlyAbstract(Abstract): ...
+
+StillSadlyAbstract()  # error: [call-non-callable]
 ```

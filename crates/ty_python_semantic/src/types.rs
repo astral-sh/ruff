@@ -89,6 +89,7 @@ use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
 
+mod abstract_methods;
 mod bound_super;
 mod builder;
 mod call;
