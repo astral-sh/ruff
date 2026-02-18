@@ -1148,6 +1148,39 @@ mod tests {
     }
 
     #[test]
+    fn semantic_tokens_match_class_pattern_keyword_before_positional() {
+        // Regression test for https://github.com/astral-sh/ty/issues/2417
+        // This used to cause a panic because keyword patterns and positional
+        // patterns in a match class were not visited in source order.
+        let test = SemanticTokenTest::new(
+            "
+import ast
+def f(x: ast.AST):
+    match x:
+        case ast.Attribute(value=ast.Name(id), attr):
+            pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "ast" @ 8..11: Namespace
+        "f" @ 16..17: Function [definition]
+        "x" @ 18..19: Parameter [definition]
+        "ast" @ 21..24: Namespace
+        "AST" @ 25..28: Variable [readonly]
+        "x" @ 41..42: Parameter
+        "ast" @ 57..60: Namespace
+        "Attribute" @ 61..70: Class
+        "ast" @ 77..80: Namespace
+        "Name" @ 81..85: Class
+        "id" @ 86..88: Variable
+        "attr" @ 91..95: Variable
+        "#);
+    }
+
+    #[test]
     fn semantic_tokens_variables() {
         let test = SemanticTokenTest::new(
             "

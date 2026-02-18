@@ -2877,6 +2877,57 @@ pub struct PatternKeyword {
     pub pattern: Pattern,
 }
 
+impl PatternArguments {
+    /// Returns an iterator over the patterns and keywords in source order.
+    pub fn patterns_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
+        PatternArgumentsSourceOrder {
+            patterns: &self.patterns,
+            keywords: &self.keywords,
+            next_pattern: 0,
+            next_keyword: 0,
+        }
+    }
+}
+
+/// The iterator returned by [`PatternArguments::patterns_source_order`].
+#[derive(Clone)]
+pub struct PatternArgumentsSourceOrder<'a> {
+    patterns: &'a [Pattern],
+    keywords: &'a [PatternKeyword],
+    next_pattern: usize,
+    next_keyword: usize,
+}
+
+/// An entry in the argument list of a class pattern.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PatternOrKeyword<'a> {
+    Pattern(&'a Pattern),
+    Keyword(&'a PatternKeyword),
+}
+
+impl<'a> Iterator for PatternArgumentsSourceOrder<'a> {
+    type Item = PatternOrKeyword<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let pattern = self.patterns.get(self.next_pattern);
+        let keyword = self.keywords.get(self.next_keyword);
+
+        if let Some(pattern) = pattern
+            && keyword.is_none_or(|keyword| pattern.start() <= keyword.start())
+        {
+            self.next_pattern += 1;
+            Some(PatternOrKeyword::Pattern(pattern))
+        } else if let Some(keyword) = keyword {
+            self.next_keyword += 1;
+            Some(PatternOrKeyword::Keyword(keyword))
+        } else {
+            None
+        }
+    }
+}
+
+impl FusedIterator for PatternArgumentsSourceOrder<'_> {}
+
 impl TypeParam {
     pub const fn name(&self) -> &Identifier {
         match self {
