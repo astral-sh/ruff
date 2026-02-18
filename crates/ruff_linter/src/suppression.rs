@@ -5,6 +5,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_index::Indexer;
+use ruff_source_file::LineRanges;
 use rustc_hash::FxHashSet;
 use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
@@ -28,6 +29,7 @@ use crate::{Locator, Violation};
 enum SuppressionAction {
     Disable,
     Enable,
+    Ignore,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -510,6 +512,31 @@ impl<'a> SuppressionsBuilder<'a> {
         'comments: while let Some(suppression) = suppressions.peek() {
             indents.clear();
 
+            // Standalone suppression comments
+
+            if suppression.action == SuppressionAction::Ignore {
+                if let Some(_indent) = indentation_at_offset(suppression.range.start(), self.source)
+                {
+                    // own-line ignore
+                    todo!()
+                } else {
+                    // trailing ignore
+                    let line_range = self.source.line_range(suppression.range.start());
+                    for code in suppression.codes_as_str(self.source) {
+                        self.valid.push(Suppression {
+                            code: code.into(),
+                            range: line_range,
+                            used: false.into(),
+                            comments: SuppressionComments::Single(suppression.clone()),
+                        });
+                    }
+                }
+                suppressions.next();
+                continue;
+            }
+
+            // Matched suppression comments
+
             let (before, after) = tokens.split_at(suppression.range.start());
             let mut count = 0;
             let last_indent = before
@@ -764,6 +791,9 @@ impl<'src> SuppressionParser<'src> {
         } else if self.cursor.as_str().starts_with("enable") {
             self.cursor.skip_bytes("enable".len());
             Ok(SuppressionAction::Enable)
+        } else if self.cursor.as_str().starts_with("ignore") {
+            self.cursor.skip_bytes("ignore".len());
+            Ok(SuppressionAction::Ignore)
         } else if self.cursor.as_str().starts_with("noqa")
             || self.cursor.as_str().starts_with("isort")
         {
@@ -893,6 +923,37 @@ print('hello')
             errors: [],
         }
         ",
+        );
+    }
+
+    #[test]
+    fn single_ignore_suppression() {
+        let source = "
+print('hello')  # ruff:ignore[code]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "print('hello')  # ruff:ignore[code]",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[code]",
+                        action: Ignore,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
         );
     }
 
@@ -1723,6 +1784,25 @@ def bar():
                 action: Enable,
                 codes: [
                     "some-thing",
+                ],
+                reason: "",
+            },
+        )
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_single_code() {
+        assert_debug_snapshot!(
+            parse_suppression_comment("# ruff: ignore[code]"),
+            @r##"
+        Ok(
+            SuppressionComment {
+                text: "# ruff: ignore[code]",
+                action: Ignore,
+                codes: [
+                    "code",
                 ],
                 reason: "",
             },
