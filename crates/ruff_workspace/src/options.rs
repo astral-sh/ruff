@@ -288,7 +288,7 @@ pub struct Options {
     /// Supported file types include `python`, `pyi`, `ipynb`, and `markdown`.
     #[option(
         default = "{}",
-        value_type = "dict[str, str]",
+        value_type = "dict[str, Language]",
         example = r#"
             # Add a custom file extension mapped to Python
             extension = {"rpy"="python"}
