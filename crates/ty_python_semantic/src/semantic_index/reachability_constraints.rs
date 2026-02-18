@@ -752,6 +752,41 @@ fn accumulate_constraint<'db>(
     }
 }
 
+/// Reachability-gated narrowing constraints
+#[derive(Clone)]
+enum GatedNarrowingConstraint<'db> {
+    Unreachable,
+    Reachable(Option<NarrowingConstraint<'db>>),
+}
+
+impl<'db> GatedNarrowingConstraint<'db> {
+    fn merge_constraint_or(
+        self,
+        other: GatedNarrowingConstraint<'db>,
+    ) -> GatedNarrowingConstraint<'db> {
+        match (self, other) {
+            (GatedNarrowingConstraint::Unreachable, other)
+            | (other, GatedNarrowingConstraint::Unreachable) => other,
+            (
+                GatedNarrowingConstraint::Reachable(None),
+                GatedNarrowingConstraint::Reachable(None),
+            ) => GatedNarrowingConstraint::Reachable(None),
+            (
+                GatedNarrowingConstraint::Reachable(left_constraint),
+                GatedNarrowingConstraint::Reachable(right_constraint),
+            ) => {
+                let left_constraint = left_constraint
+                    .unwrap_or_else(|| NarrowingConstraint::intersection(Type::object()));
+                let right_constraint = right_constraint
+                    .unwrap_or_else(|| NarrowingConstraint::intersection(Type::object()));
+                GatedNarrowingConstraint::Reachable(Some(
+                    left_constraint.merge_constraint_or(right_constraint),
+                ))
+            }
+        }
+    }
+}
+
 impl ReachabilityConstraints {
     /// Look up an interior node by its constraint ID.
     fn get_interior_node(&self, id: ScopedReachabilityConstraintId) -> InteriorNode {
@@ -799,22 +834,26 @@ impl ReachabilityConstraints {
     ) -> Type<'db> {
         let mut memo = FxHashMap::default();
         let mut truthiness_memo = FxHashMap::default();
-        let redundant_union = self.narrow_by_constraint_inner(
+        let constraint = self.narrow_by_constraint_inner(
             db,
             predicates,
             predicate_place_versions,
             id,
-            base_ty,
             place,
             binding_place_version,
             None,
             &mut memo,
             &mut truthiness_memo,
         );
-        UnionBuilder::new(db)
-            .unpack_aliases(false)
-            .add(redundant_union)
-            .build()
+        match constraint {
+            GatedNarrowingConstraint::Unreachable => Type::Never,
+            GatedNarrowingConstraint::Reachable(Some(constraint)) => {
+                NarrowingConstraint::intersection(base_ty)
+                    .merge_constraint_and(constraint)
+                    .evaluate_constraint_type(db)
+            }
+            GatedNarrowingConstraint::Reachable(None) => base_ty,
+        }
     }
 
     /// Inner recursive helper that accumulates narrowing constraints along each TDD path.
@@ -825,16 +864,15 @@ impl ReachabilityConstraints {
         predicates: &Predicates<'db>,
         predicate_place_versions: &PredicatePlaceVersions,
         id: ScopedNarrowingConstraint,
-        base_ty: Type<'db>,
         place: ScopedPlaceId,
         binding_place_version: Option<PlaceVersion>,
         accumulated: Option<NarrowingConstraint<'db>>,
         memo: &mut FxHashMap<
             (ScopedNarrowingConstraint, Option<NarrowingConstraint<'db>>),
-            Type<'db>,
+            GatedNarrowingConstraint<'db>,
         >,
         truthiness_memo: &mut FxHashMap<Predicate<'db>, Truthiness>,
-    ) -> Type<'db> {
+    ) -> GatedNarrowingConstraint<'db> {
         // `ALWAYS_TRUE` and `AMBIGUOUS` are equivalent for narrowing purposes.
         // Canonicalize to improve memo hits across terminal leaves.
         let memo_id = match id {
@@ -842,32 +880,25 @@ impl ReachabilityConstraints {
             _ => id,
         };
         let key = (memo_id, accumulated.clone());
-        if let Some(cached) = memo.get(&key).copied() {
-            return cached;
+        if let Some(cached) = memo.get(&key) {
+            return cached.clone();
         }
 
-        let narrowed = match id {
-            ALWAYS_TRUE | AMBIGUOUS => {
-                // Apply all accumulated narrowing constraints to the base type
-                match accumulated {
-                    Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                        .merge_constraint_and(constraint)
-                        .evaluate_constraint_type(db, false),
-                    None => base_ty,
-                }
-            }
-            ALWAYS_FALSE => Type::Never,
+        let constraint = match id {
+            // Return accumulated narrowing constraints and defer actual type construction
+            // until `narrow_by_constraint`.
+            ALWAYS_TRUE | AMBIGUOUS => GatedNarrowingConstraint::Reachable(accumulated),
+            ALWAYS_FALSE => GatedNarrowingConstraint::Unreachable,
             _ => {
                 let node = self.get_interior_node(id);
                 let predicate = predicates[node.atom];
-                macro_rules! narrow {
+                macro_rules! get_constraint {
                     ($next_id:expr, $next_accumulated:expr) => {
                         self.narrow_by_constraint_inner(
                             db,
                             predicates,
                             predicate_place_versions,
                             $next_id,
-                            base_ty,
                             place,
                             binding_place_version,
                             $next_accumulated,
@@ -905,14 +936,14 @@ impl ReachabilityConstraints {
                 if pos_constraint.is_none() && neg_constraint.is_none() {
                     match Self::analyze_single_cached(db, predicate, truthiness_memo) {
                         Truthiness::AlwaysTrue => {
-                            let narrowed = narrow!(node.if_true, accumulated);
-                            memo.insert(key, narrowed);
-                            return narrowed;
+                            let constraint = get_constraint!(node.if_true, accumulated);
+                            memo.insert(key, constraint.clone());
+                            return constraint;
                         }
                         Truthiness::AlwaysFalse => {
-                            let narrowed = narrow!(node.if_false, accumulated);
-                            memo.insert(key, narrowed);
-                            return narrowed;
+                            let constraint = get_constraint!(node.if_false, accumulated);
+                            memo.insert(key, constraint.clone());
+                            return constraint;
                         }
                         Truthiness::Ambiguous => {}
                     }
@@ -921,34 +952,33 @@ impl ReachabilityConstraints {
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
                     let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-                    let narrowed = narrow!(node.if_false, false_accumulated);
-                    memo.insert(key, narrowed);
-                    return narrowed;
+                    let constraint = get_constraint!(node.if_false, false_accumulated);
+                    memo.insert(key, constraint.clone());
+                    return constraint;
                 }
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
                     let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
-                    let narrowed = narrow!(node.if_true, true_accumulated);
-                    memo.insert(key, narrowed);
-                    return narrowed;
+                    let constraint = get_constraint!(node.if_true, true_accumulated);
+                    memo.insert(key, constraint.clone());
+                    return constraint;
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
                 let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
-                let true_ty = narrow!(node.if_true, true_accumulated);
+                let true_constraint = get_constraint!(node.if_true, true_accumulated);
 
                 // False branch: predicate doesn't hold → accumulate negative narrowing
                 let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
-                let false_ty = narrow!(node.if_false, false_accumulated);
+                let false_constraint = get_constraint!(node.if_false, false_accumulated);
 
-                // We won't do a union type redundancy check here, as it only needs to be performed once for the final result.
-                UnionType::from_elements_no_redundancy_check(db, [true_ty, false_ty])
+                true_constraint.merge_constraint_or(false_constraint)
             }
         };
 
-        memo.insert(key, narrowed);
-        narrowed
+        memo.insert(key, constraint.clone());
+        constraint
     }
 
     fn predicate_applies_to_place_version(

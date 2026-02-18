@@ -479,15 +479,20 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    /// Merge two constraints with OR semantics (union/disjunction).
+    pub(crate) fn merge_constraint_or(mut self, other: Self) -> Self {
+        self.intersection_disjuncts
+            .extend(other.intersection_disjuncts);
+        self.replacement_disjuncts
+            .extend(other.replacement_disjuncts);
+        self
+    }
+
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(
-        self,
-        db: &'db dyn Db,
-        check_redundancy: bool,
-    ) -> Type<'db> {
-        let mut union = UnionBuilder::new(db).check_redundancy(check_redundancy);
+    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
+        let mut union = UnionBuilder::new(db);
         for conjunctions in self
             .replacement_disjuncts
             .into_iter()

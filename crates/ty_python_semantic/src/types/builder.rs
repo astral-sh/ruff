@@ -354,11 +354,6 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn check_redundancy(mut self, val: bool) -> Self {
-        self.check_redundancy = val;
-        self
-    }
-
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
         if self.cycle_recovery {
