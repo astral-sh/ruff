@@ -222,7 +222,7 @@ impl Suppressions {
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
         fn process_pending_diagnostics(
             key: Option<TextRange>,
-            grouped_diagnostic: &Option<(TextRange, SuppressionDiagnostic)>,
+            grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
             context: &LintContext,
             locator: &Locator,
         ) -> bool {
@@ -292,7 +292,8 @@ impl Suppressions {
         for suppression in &self.valid {
             let key = suppression.comments.disable_comment().range;
 
-            if process_pending_diagnostics(Some(key), &grouped_diagnostic, context, locator) {
+            if process_pending_diagnostics(Some(key), grouped_diagnostic.as_ref(), context, locator)
+            {
                 grouped_diagnostic = None;
             }
 
@@ -341,7 +342,7 @@ impl Suppressions {
             }
         }
 
-        process_pending_diagnostics(None, &grouped_diagnostic, context, locator);
+        process_pending_diagnostics(None, grouped_diagnostic.as_ref(), context, locator);
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {
