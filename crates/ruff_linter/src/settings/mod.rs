@@ -391,7 +391,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_008)), // B008
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_009)), // B009
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_010)), // B010
-    RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_011)), // B011
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_012)), // B012
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_013)), // B013
     RuleSelector::rule(RuleCodePrefix::Flake8Bugbear(codes::Flake8Bugbear::_014)), // B014
@@ -601,7 +600,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1733)), // PLR1733
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R1736)), // PLR1736
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R2044)), // PLR2044
-    RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::R5501)), // PLR5501
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::W0120)), // PLW0120
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::W0127)), // PLW0127
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::W0128)), // PLW0128
@@ -622,7 +620,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::W1509)), // PLW1509
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::W1510)), // PLW1510
     RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::W2101)), // PLW2101
-    RuleSelector::rule(RuleCodePrefix::Pylint(codes::Pylint::W2901)), // PLW2901
     RuleSelector::rule(RuleCodePrefix::Flake8PytestStyle(codes::Flake8PytestStyle::_010)), // PT010
     RuleSelector::rule(RuleCodePrefix::Flake8PytestStyle(codes::Flake8PytestStyle::_012)), // PT012
     RuleSelector::rule(RuleCodePrefix::Flake8PytestStyle(codes::Flake8PytestStyle::_014)), // PT014
@@ -695,7 +692,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_018)), // RUF018
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_019)), // RUF019
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_020)), // RUF020
-    RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_021)), // RUF021
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_022)), // RUF022
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_023)), // RUF023
     RuleSelector::rule(RuleCodePrefix::Ruff(codes::Ruff::_024)), // RUF024
@@ -724,7 +720,6 @@ pub const PREVIEW_DEFAULT_SELECTORS: &[RuleSelector] = &[
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_101)), // SIM101
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_102)), // SIM102
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_103)), // SIM103
-    RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_105)), // SIM105
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_107)), // SIM107
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_113)), // SIM113
     RuleSelector::rule(RuleCodePrefix::Flake8Simplify(codes::Flake8Simplify::_114)), // SIM114
