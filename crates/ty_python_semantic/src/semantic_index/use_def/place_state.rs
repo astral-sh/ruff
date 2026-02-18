@@ -364,28 +364,14 @@ impl Bindings {
         for zipped in a.merge_join_by(b, |a, b| a.binding.cmp(&b.binding)) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {
+                    // If the same definition is visible through both paths, we OR the narrowing
+                    // constraints: the type should be narrowed by whichever path was taken.
+                    let narrowing_constraint = reachability_constraints
+                        .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint);
+
                     // For reachability constraints, we also merge using a ternary OR operation:
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
-
-                    let narrowing_constraint = if a.narrowing_constraint
-                        == ScopedNarrowingConstraint::ALWAYS_TRUE
-                        && b.narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
-                    {
-                        // short-circuit: if both sides are ALWAYS_TRUE, the result is ALWAYS_TRUE without needing to create a new TDD node.
-                        ScopedNarrowingConstraint::ALWAYS_TRUE
-                    } else {
-                        // A branch contributes narrowing only when it is reachable.
-                        // Without this gating, `OR(a_narrowing, b_narrowing)` allows an unreachable
-                        // branch with `ALWAYS_TRUE` narrowing to cancel useful narrowing from the
-                        // reachable branch.
-                        let a_narrowing_gated = reachability_constraints
-                            .add_and_constraint(a.narrowing_constraint, a.reachability_constraint);
-                        let b_narrowing_gated = reachability_constraints
-                            .add_and_constraint(b.narrowing_constraint, b.reachability_constraint);
-                        reachability_constraints
-                            .add_or_constraint(a_narrowing_gated, b_narrowing_gated)
-                    };
 
                     self.live_bindings.push(LiveBinding {
                         binding: a.binding,
@@ -680,31 +666,6 @@ mod tests {
         assert_eq!(bindings[1].1, atom0);
         assert_eq!(bindings[2].0, 3);
         assert_eq!(bindings[2].1, atom3);
-
-        // An unreachable branch should not dilute narrowing from the reachable branch.
-        let mut sym4a = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
-        sym4a.record_binding(
-            ScopedDefinitionId::from_u32(4),
-            ScopedReachabilityConstraintId::ALWAYS_FALSE,
-            false,
-            true,
-            PreviousDefinitions::AreShadowed,
-        );
-
-        let mut sym4b = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
-        sym4b.record_binding(
-            ScopedDefinitionId::from_u32(4),
-            ScopedReachabilityConstraintId::ALWAYS_TRUE,
-            false,
-            true,
-            PreviousDefinitions::AreShadowed,
-        );
-        let atom4 = reachability_constraints.add_atom(ScopedPredicateId::new(4));
-        sym4b.record_narrowing_constraint(&mut reachability_constraints, atom4);
-
-        sym4a.merge(sym4b, &mut reachability_constraints);
-        let merged_constraint = sym4a.bindings().iter().next().unwrap().narrowing_constraint;
-        assert_eq!(merged_constraint, atom4);
     }
 
     #[test]
