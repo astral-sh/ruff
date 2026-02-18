@@ -1,0 +1,88 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..32,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 0..31,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("f"),
+                        range: 4..5,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 5..7,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kwarg: None,
+                    },
+                    returns: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                node_index: NodeIndex(None),
+                                range: 13..17,
+                            },
+                        ),
+                        Assign(
+                            StmtAssign {
+                                node_index: NodeIndex(None),
+                                range: 26..31,
+                                targets: [
+                                    Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 26..27,
+                                            id: Name("x"),
+                                            ctx: Store,
+                                        },
+                                    ),
+                                ],
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 30..31,
+                                        value: Int(
+                                            1,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 |   def f():
+2 |       pass
+3 | /   \
+4 | |     x = 1
+  | |____^ Syntax Error: unindent does not match any outer indentation level
+  |
+
+
+  |
+3 |   \
+4 |     x = 1
+  |          ^ Syntax Error: Expected dedent, found end of file
+  |

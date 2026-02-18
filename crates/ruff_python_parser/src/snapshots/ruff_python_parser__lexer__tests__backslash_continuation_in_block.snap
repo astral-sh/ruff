@@ -1,0 +1,68 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: lex_source(source)
+---
+## Tokens
+```
+[
+    (
+        If,
+        0..2,
+    ),
+    (
+        True,
+        3..7,
+    ),
+    (
+        Colon,
+        7..8,
+    ),
+    (
+        Newline,
+        8..9,
+    ),
+    (
+        Indent,
+        9..13,
+    ),
+    (
+        Pass,
+        13..17,
+    ),
+    (
+        Newline,
+        17..18,
+    ),
+    (
+        Name(
+            Name("print"),
+        ),
+        32..37,
+    ),
+    (
+        Lpar,
+        37..38,
+    ),
+    (
+        String(
+            "1",
+        ),
+        38..41,
+        TokenFlags(
+            DOUBLE_QUOTES,
+        ),
+    ),
+    (
+        Rpar,
+        41..42,
+    ),
+    (
+        Newline,
+        42..43,
+    ),
+    (
+        Dedent,
+        43..43,
+    ),
+]
+```

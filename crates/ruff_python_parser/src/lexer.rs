@@ -263,7 +263,42 @@ impl<'src> Lexer<'src> {
                             self.token_range(),
                         )));
                     }
-                    indentation = Indentation::root();
+                    // test_ok backslash_continuation_indentation
+                    // if True:
+                    //     pass
+                    //     \
+                    //         print("1")
+                    // def f():
+                    //     if True:
+                    //         return True
+                    //     else:
+                    // \
+                    //         return False
+                    // # Multiple consecutive continuations
+                    // if True:
+                    //     x = 1
+                    //     \
+                    //     \
+                    //         print(x)
+
+                    // test_err backslash_continuation_indentation_error
+                    // def f():
+                    //     pass
+                    //   \
+                    //     x = 1
+
+                    // Per Python spec [1], the whitespace up to the first
+                    // backslash determines the line's indentation. Skip
+                    // continuation-line whitespace without accumulating it
+                    // into `indentation`. However, if the backslash is at
+                    // column 0 (no prior indentation), let the loop continue
+                    // so the next line's whitespace is accumulated normally.
+                    //
+                    // [1]: https://docs.python.org/3/reference/lexical_analysis.html#indentation
+                    // See also: https://github.com/python/cpython/issues/90249
+                    if indentation != Indentation::root() {
+                        self.cursor.eat_while(is_python_whitespace);
+                    }
                 }
                 // Form feed
                 '\x0C' => {
@@ -3060,5 +3095,49 @@ t"{(lambda x:{x})}"
             lex_tstring_error(r#"t""""""#),
             UnterminatedTripleQuotedString
         );
+    }
+
+    // Backslash continuation at block indent level: the whitespace before `\`
+    // determines indentation (4 spaces, matching the block), so the continuation
+    // line's whitespace is skipped and the logical line stays at the same level.
+    #[test]
+    fn backslash_continuation_in_block() {
+        let source = "if True:\n    pass\n    \\\n        print(\"1\")\n";
+        assert_snapshot!(lex_source(source));
+    }
+
+    // Backslash at column 0: since indentation is root, the loop continues
+    // and picks up the next line's whitespace as the indentation.
+    #[test]
+    fn backslash_continuation_at_column_zero() {
+        let source =
+            "def f():\n    if True:\n        return True\n    else:\n\\\n        return False\n";
+        assert_snapshot!(lex_source(source));
+    }
+
+    // Multiple consecutive backslash continuations: each `\` is processed
+    // independently, indentation is preserved from before the first `\`.
+    #[test]
+    fn backslash_continuation_multiple() {
+        let source = "if True:\n    x = 1\n    \\\n    \\\n        print(x)\n";
+        assert_snapshot!(lex_source(source));
+    }
+
+    // Backslash at deeper indent than the block level: indentation freezes
+    // at 6 (from `      \`) while the block level is 4, so the lexer emits
+    // an Indent token from 4→6 which the parser rejects as unexpected.
+    #[test]
+    fn backslash_continuation_overindented() {
+        let source = "if True:\n    1\n      \\\n    2\n";
+        assert_snapshot!(lex_source(source));
+    }
+
+    // Backslash continuation with mismatched indentation: 2 spaces before `\`
+    // doesn't match any level in the indent stack [0, 4], producing a lexer
+    // IndentationError.
+    #[test]
+    fn backslash_continuation_mismatch() {
+        let source = "def f():\n    pass\n  \\\n    x = 1\n";
+        assert_snapshot!(lex_invalid(source, Mode::Module));
     }
 }
