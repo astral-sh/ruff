@@ -10,7 +10,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 3 | # External code
 4 | import re  # noqa: V123
   |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the `# noqa` comment
 1 | # Invalid code
   - import os  # noqa: INVALID123
@@ -29,7 +29,7 @@ RUF102 [*] Invalid rule code in `# noqa`: V123
 5 | # Valid noqa
 6 | import sys  # noqa: E402
   |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the `# noqa` comment
 1 | # Invalid code
 2 | import os  # noqa: INVALID123
@@ -50,7 +50,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID456
 8 | from itertools import product  # Preceeding comment # noqa: INVALID789
 9 | # Succeeding comment
   |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `INVALID456`
 4  | import re  # noqa: V123
 5  | # Valid noqa
@@ -71,7 +71,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID789
  9 | # Succeeding comment
 10 | import math # noqa: INVALID000 # Succeeding comment
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the `# noqa` comment
 5  | # Valid noqa
 6  | import sys  # noqa: E402
@@ -92,7 +92,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID000
 11 | # Mixed valid and invalid
 12 | from typing import List  # noqa: F401, INVALID123
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the `# noqa` comment
 7  | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
 8  | from itertools import product  # Preceeding comment # noqa: INVALID789
@@ -113,7 +113,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 13 | # Test for multiple invalid
 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `INVALID123`
 9  | # Succeeding comment
 10 | import math # noqa: INVALID000 # Succeeding comment
@@ -134,7 +134,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID100
 15 | # Test for preserving valid codes when fixing
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `INVALID100`
 11 | # Mixed valid and invalid
 12 | from typing import List  # noqa: F401, INVALID123
@@ -155,7 +155,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID200
 15 | # Test for preserving valid codes when fixing
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `INVALID200`
 11 | # Mixed valid and invalid
 12 | from typing import List  # noqa: F401, INVALID123
@@ -176,7 +176,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID300
 17 | # Test for mixed code types
 18 | import json  # noqa: E402, INVALID400, V100
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `INVALID300`
 13 | # Test for multiple invalid
 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
@@ -197,7 +197,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID400
 19 | # Test for rule redirects
 20 | import pandas as pd  # noqa: TCH002
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `INVALID400`
 15 | # Test for preserving valid codes when fixing
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
@@ -218,7 +218,7 @@ RUF102 [*] Invalid rule code in `# noqa`: V100
 19 | # Test for rule redirects
 20 | import pandas as pd  # noqa: TCH002
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `V100`
 15 | # Test for preserving valid codes when fixing
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
@@ -237,7 +237,7 @@ RUF102 [*] Invalid rule code in `# noqa`: INVALID123
 22 | import pathlib  # noqa: INVALID123 some reason
    |                 ^^^^^^^^^^^^^^^^^^
    |
-help: If this is a non-Ruff rule code, consider using the `lint.external` configuration option
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the `# noqa` comment
 19 | # Test for rule redirects
 20 | import pandas as pd  # noqa: TCH002

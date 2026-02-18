@@ -138,9 +138,7 @@ fn all_codes_invalid_diagnostic(
         directive.range(),
     );
     diagnostic.set_fix(Fix::safe_edit(delete_comment(directive.range(), locator)));
-    diagnostic.help(
-        "If this is a non-Ruff rule code, consider using the `lint.external` configuration option",
-    );
+    diagnostic.help("Add non-Ruff rule codes to the `lint.external` configuration option");
 }
 
 fn some_codes_are_invalid_diagnostic(
@@ -162,9 +160,7 @@ fn some_codes_are_invalid_diagnostic(
         invalid_code,
         locator,
     )));
-    diagnostic.help(
-        "If this is a non-Ruff rule code, consider using the `lint.external` configuration option",
-    );
+    diagnostic.help("Add non-Ruff rule codes to the `lint.external` configuration option");
 }
 
 fn remove_invalid_noqa(codes: &Codes, invalid_code: &Code, locator: &Locator) -> Edit {

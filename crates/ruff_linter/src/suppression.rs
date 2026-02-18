@@ -245,8 +245,7 @@ impl Suppressions {
                             },
                         ) {
                             diagnostic.help(
-                                "If this is a non-Ruff rule code, \
-                                consider using the `lint.external` configuration option",
+                                "Add non-Ruff rule codes to the `lint.external` configuration option",
                             );
                         }
                     }
