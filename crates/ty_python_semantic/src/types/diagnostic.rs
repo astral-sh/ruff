@@ -4262,18 +4262,18 @@ pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
             name = abstract_methods.first_name().unwrap(),
         ));
     } else {
-        let formatted_methods = abstract_methods.formatted_names(db);
+        let formatted_methods = abstract_methods.formatted_names();
         if formatted_methods.truncation_occurred {
             diagnostic.set_concise_message(format_args!(
                 "Cannot instantiate `{class_name}` with {num_abstract_methods} unimplemented \
                 abstract methods, including {formatted_methods}",
-                formatted_methods = abstract_methods.formatted_names(db)
+                formatted_methods = abstract_methods.formatted_names()
             ));
         } else {
             diagnostic.set_concise_message(format_args!(
                 "Cannot instantiate `{class_name}` with unimplemented \
                 abstract methods {formatted_methods}",
-                formatted_methods = abstract_methods.formatted_names(db)
+                formatted_methods = abstract_methods.formatted_names()
             ));
         }
     }
