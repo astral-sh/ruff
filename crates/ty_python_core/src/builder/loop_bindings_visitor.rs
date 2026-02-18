@@ -25,6 +25,27 @@ pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExp
     collector.bound_places
 }
 
+/// Like `collect_while_loop_bindings` above, but for a comprehension scope.
+///
+/// Comprehension target bindings are evaluated before filters and element expressions on every
+/// iteration. Only walrus bindings in filters and output expressions can affect uses during a
+/// subsequent iteration.
+pub(crate) fn collect_comprehension_loop_bindings<'ast>(
+    generators: &'ast [ast::Comprehension],
+    output_expressions: impl IntoIterator<Item = &'ast ast::Expr>,
+) -> Vec<PlaceExpr> {
+    let mut collector = LoopBindingsVisitor::default();
+    for generator in generators {
+        for filter in &generator.ifs {
+            collector.visit_expr(filter);
+        }
+    }
+    for expression in output_expressions {
+        collector.visit_expr(expression);
+    }
+    collector.bound_places
+}
+
 /// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.
 ///
 /// This visitor doesn't walk nested function/class definitions since those are different scopes.
