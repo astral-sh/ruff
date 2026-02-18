@@ -4497,6 +4497,8 @@ dependencies = [
  "ruff_python_ast",
  "ruff_python_trivia",
  "salsa",
+ "serde",
+ "serde_json",
  "tempfile",
  "tikv-jemallocator",
  "toml",

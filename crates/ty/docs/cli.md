@@ -127,13 +127,18 @@ Display ty's version
 <h3 class="cli-reference">Usage</h3>
 
 ```
-ty version
+ty version [OPTIONS]
 ```
 
 <h3 class="cli-reference">Options</h3>
 
 <dl class="cli-reference"><dt id="ty-version--help"><a href="#ty-version--help"><code>--help</code></a>, <code>-h</code></dt><dd><p>Print help</p>
-</dd></dl>
+</dd><dt id="ty-version--output-format"><a href="#ty-version--output-format"><code>--output-format</code></a> <i>output-format</i></dt><dd><p>The format in which to display the version information</p>
+<p>[default: text]</p><p>Possible values:</p>
+<ul>
+<li><code>text</code></li>
+<li><code>json</code></li>
+</ul></dd></dl>
 
 ## ty generate-shell-completion
 
