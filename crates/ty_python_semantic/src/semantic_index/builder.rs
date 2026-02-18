@@ -2305,8 +2305,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let mut no_branch_taken = self.flow_snapshot();
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
-                self.current_use_def_map_mut()
-                    .record_narrowing_predicate_for_all_places(last_narrowing_id);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint_id(last_narrowing_id);
 
@@ -2348,8 +2346,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_restore(no_branch_taken.clone());
 
                     self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
-                    self.current_use_def_map_mut()
-                        .record_negated_narrowing_predicate_for_all_places(last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     if let Some(elif_test) = clause_test {
@@ -2359,8 +2355,6 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                         (last_predicate, last_narrowing_id) =
                             self.record_expression_narrowing_constraint(elif_test);
-                        self.current_use_def_map_mut()
-                            .record_narrowing_predicate_for_all_places(last_narrowing_id);
 
                         last_reachability_constraint =
                             self.record_reachability_constraint_id(last_narrowing_id);
