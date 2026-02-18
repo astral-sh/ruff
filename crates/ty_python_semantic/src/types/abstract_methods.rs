@@ -3,7 +3,6 @@ use ruff_db::{
     parsed::parsed_module,
 };
 use ruff_python_ast::name::Name;
-use smallvec::SmallVec;
 use ty_module_resolver::{SearchPath, file_to_module};
 
 use crate::{
@@ -18,15 +17,9 @@ use crate::{
     },
 };
 
-/// Unless `--verbose` was specified on the command line,
-/// we will only print this number of abstract methods in diagnostics
-/// complaining about abstract class instantiation (and similar)
-const DEFAULT_METHOD_NUMBER_TO_PRINT: usize = 3;
-
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(super) struct AbstractMethods<'db> {
-    methods: &'db SmallVec<[Name; DEFAULT_METHOD_NUMBER_TO_PRINT]>,
-    total_length: usize,
+    methods: &'db AbstractMethodsInner,
     class: ClassType<'db>,
 }
 
@@ -37,12 +30,9 @@ impl<'db> AbstractMethods<'db> {
         #[salsa::tracked(
             returns(ref),
             heap_size=ruff_memory_usage::heap_size,
-            cycle_initial=|_, _, _| (SmallVec::default(), 0)
+            cycle_initial=|_, _, _| AbstractMethodsInner::default()
         )]
-        fn of_class_inner<'db>(
-            db: &'db dyn Db,
-            class: ClassType<'db>,
-        ) -> (SmallVec<[Name; DEFAULT_METHOD_NUMBER_TO_PRINT]>, usize) {
+        fn of_class_inner<'db>(db: &'db dyn Db, class: ClassType<'db>) -> AbstractMethodsInner {
             let mut abstract_methods: FxIndexSet<&Name> = FxIndexSet::default();
 
             // Iterate through the MRO in reverse order,
@@ -102,26 +92,34 @@ impl<'db> AbstractMethods<'db> {
 
             let total_abstract_methods = abstract_methods.len();
 
-            let truncated = if db.verbose() {
-                abstract_methods.into_iter().cloned().collect()
-            } else {
-                abstract_methods
-                    .into_iter()
-                    .take(DEFAULT_METHOD_NUMBER_TO_PRINT)
-                    .cloned()
-                    .collect()
-            };
-
-            (truncated, total_abstract_methods)
+            match total_abstract_methods {
+                0 => AbstractMethodsInner::Empty,
+                1 => AbstractMethodsInner::One(abstract_methods[0].clone()),
+                2 => AbstractMethodsInner::Two([
+                    abstract_methods[0].clone(),
+                    abstract_methods[1].clone(),
+                ]),
+                3 => AbstractMethodsInner::Three([
+                    abstract_methods[0].clone(),
+                    abstract_methods[1].clone(),
+                    abstract_methods[2].clone(),
+                ]),
+                _ if db.verbose() => {
+                    AbstractMethodsInner::Full(abstract_methods.into_iter().cloned().collect())
+                }
+                _ => AbstractMethodsInner::Truncated {
+                    names: [
+                        abstract_methods[0].clone(),
+                        abstract_methods[1].clone(),
+                        abstract_methods[2].clone(),
+                    ],
+                    full_length: total_abstract_methods,
+                },
+            }
         }
 
-        let (methods, total_length) = of_class_inner(db, class);
-
-        Self {
-            methods,
-            class,
-            total_length: *total_length,
-        }
+        let methods = of_class_inner(db, class);
+        Self { methods, class }
     }
 
     /// Attach primary and secondary annotations to a passed in diagnostic that describe
@@ -131,10 +129,10 @@ impl<'db> AbstractMethods<'db> {
         db: &'db dyn Db,
         diagnostic: &mut LintDiagnosticGuard,
     ) {
-        let first_name = self
-            .methods
-            .first()
-            .expect("`annotate_diagnostic()` should not be called on an empty `AbstractMethods`");
+        let first_name =
+            self.methods.iter().next().expect(
+                "`annotate_diagnostic()` should not be called on an empty `AbstractMethods`",
+            );
 
         let mut annotation_override = None;
 
@@ -316,23 +314,73 @@ impl<'db> AbstractMethods<'db> {
     ///
     /// This is useful for diagnostics.
     pub(super) fn formatted_names(&self) -> FormattedAbstractMethods {
-        let truncation_occurred = self.methods.len() < self.len();
         FormattedAbstractMethods {
             inner: format_enumeration(self.methods),
-            truncation_occurred,
+            truncation_occurred: self.methods.is_truncated(),
         }
     }
 
     pub(super) fn first_name(&self) -> Option<&Name> {
-        self.methods.first()
+        self.methods.iter().next()
     }
 
     pub(super) fn len(&self) -> usize {
-        self.total_length
+        self.methods.len()
     }
 
     pub(super) fn is_empty(&self) -> bool {
-        self.methods.is_empty()
+        self.methods.len() == 0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, salsa::Update, get_size2::GetSize)]
+enum AbstractMethodsInner {
+    #[default]
+    Empty,
+    One(Name),
+    Two([Name; 2]),
+    Three([Name; 3]),
+    Truncated {
+        names: [Name; 3],
+        full_length: usize,
+    },
+    Full(Box<[Name]>),
+}
+
+impl AbstractMethodsInner {
+    const fn is_truncated(&self) -> bool {
+        matches!(self, Self::Truncated { .. })
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Empty => 0,
+            Self::One(_) => 1,
+            Self::Two(..) => 2,
+            Self::Three(..) => 3,
+            Self::Truncated { full_length, .. } => *full_length,
+            Self::Full(names) => names.len(),
+        }
+    }
+
+    fn iter(&self) -> std::slice::Iter<'_, Name> {
+        match self {
+            AbstractMethodsInner::Empty => [].iter(),
+            AbstractMethodsInner::One(single) => std::slice::from_ref(single).iter(),
+            AbstractMethodsInner::Two(names) => names.iter(),
+            AbstractMethodsInner::Three(names) => names.iter(),
+            AbstractMethodsInner::Truncated { names, .. } => names.iter(),
+            AbstractMethodsInner::Full(names) => names.iter(),
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a AbstractMethodsInner {
+    type IntoIter = std::slice::Iter<'a, Name>;
+    type Item = &'a Name;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
     }
 }
 
