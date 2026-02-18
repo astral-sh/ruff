@@ -102,6 +102,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_ARGUMENTS);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
+    registry.register_lint(&INVALID_MATCH_PATTERN);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
@@ -1632,6 +1633,28 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_FORM = {
         summary: "detects invalid type forms",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for invalid match patterns.
+    ///
+    /// ## Why is this bad?
+    /// Matching on invalid patterns will lead to a runtime error.
+    ///
+    /// ## Examples
+    /// ```python
+    /// NotAClass = 42
+    ///
+    /// match x:
+    ///     case NotAClass():    # TypeError at runtime: must be a class
+    ///         ...
+    /// ```
+    pub(crate) static INVALID_MATCH_PATTERN = {
+        summary: "detect invalid match patterns",
+        status: LintStatus::stable("0.0.18"),
         default_level: Level::Error,
     }
 }
@@ -3975,6 +3998,22 @@ pub(crate) fn report_invalid_arguments_to_callable(
     ));
 }
 
+pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
+    context: &InferContext,
+    pattern_cls: T,
+    cls_ty: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern_cls) else {
+        return;
+    };
+    let db = context.db();
+    let class_display = cls_ty.display(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "`{class_display}` cannot be used in a class pattern because it is not a type"
+    ));
+    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
+}
+
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
     mut diag: LintDiagnosticGuard<'db, 'ctx>,
 ) -> LintDiagnosticGuard<'db, 'ctx> {
@@ -4521,7 +4560,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         .message(format_args!("TypedDict `{typed_dict_name}`"))
                 });
 
-                let existing_keys = items.keys();
+                let existing_keys = items.keys().map(Name::as_str);
                 if let Some(suggestion) = did_you_mean(existing_keys, key) {
                     if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
                         let quoted_suggestion = format!(

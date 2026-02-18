@@ -37,7 +37,15 @@ pub(crate) enum Command {
     Server,
 
     /// Display ty's version
-    Version,
+    Version {
+        #[arg(
+            long,
+            value_enum,
+            default_value = "text",
+            help = "The format in which to display the version information"
+        )]
+        output_format: VersionFormat,
+    },
 
     /// Generate shell completion
     #[clap(hide = true)]
@@ -71,10 +79,16 @@ pub(crate) struct CheckCommand {
     ///
     /// ty uses your Python environment to resolve third-party imports in your code.
     ///
+    /// This can be a path to:
+    ///
+    /// - A Python interpreter, e.g. `.venv/bin/python3`
+    /// - A virtual environment directory, e.g. `.venv`
+    /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
+    ///
     /// If you're using a project management tool such as uv or you have an activated Conda or virtual
     /// environment, you should not generally need to specify this option.
     ///
-    /// This option can be used to point to virtual or system Python environments.
+    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[arg(long, value_name = "PATH", alias = "venv")]
     pub(crate) python: Option<SystemPathBuf>,
 
@@ -395,6 +409,12 @@ pub(crate) enum TerminalColor {
 
     /// Never display colors.
     Never,
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub(crate) enum VersionFormat {
+    Text,
+    Json,
 }
 
 /// A TOML `<KEY> = <VALUE>` pair

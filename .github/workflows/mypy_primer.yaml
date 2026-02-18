@@ -18,6 +18,11 @@ on:
       - "scripts/mypy_primer.sh"
       - "Cargo.lock"
       - "!**.md"
+      - "!**.snap"
+      # It's tempting to skip all Python files in every directory,
+      # but changes to Python files in `ty_vendored` can affect the output of mypy_primer,
+      # so we apply a narrow exemption for all files in the corpus directory instead.
+      - "!crates/ty_python_semantic/resources/corpus/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -49,7 +54,7 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
         with:
-          version: "0.10.0"
+          version: "0.10.2"
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
@@ -94,7 +99,7 @@ jobs:
       - name: Install the latest version of uv
         uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
         with:
-          version: "0.10.0"
+          version: "0.10.2"
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:

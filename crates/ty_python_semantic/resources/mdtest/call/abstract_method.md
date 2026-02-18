@@ -225,7 +225,6 @@ class Foo(ABC):
     @classmethod
     @abstractmethod
     def classmethod(cls) -> int: ...
-
     @staticmethod
     @abstractmethod
     def staticmethod() -> int: ...

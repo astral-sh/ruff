@@ -114,6 +114,7 @@ def _(flag: bool) -> None:
     class Foo:
         if flag:
             def __new__(cls, x: int): ...
+
         else:
             def __new__(cls, x: int, y: int = 1): ...
 
@@ -320,6 +321,7 @@ def _(flag: bool) -> None:
     class Foo:
         if flag:
             def __init__(self, x: int): ...
+
         else:
             def __init__(self, x: int, y: int = 1): ...
 

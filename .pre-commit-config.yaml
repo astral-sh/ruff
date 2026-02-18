@@ -29,13 +29,13 @@ repos:
         priority: 0
 
   - repo: https://github.com/abravalheri/validate-pyproject
-    rev: v0.24.1
+    rev: v0.25
     hooks:
       - id: validate-pyproject
         priority: 0
 
   - repo: https://github.com/crate-ci/typos
-    rev: v1.42.3
+    rev: v1.43.3
     hooks:
       - id: typos
         priority: 0
@@ -93,7 +93,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.14
+    rev: v0.15.0
     hooks:
       - id: ruff-format
         priority: 0
@@ -115,20 +115,23 @@ repos:
           )$
         priority: 1
 
-  # Priority 2: blacken-docs runs after markdownlint-fix (both modify markdown).
-  - repo: https://github.com/adamchainz/blacken-docs
-    rev: 1.20.0
+  # Priority 2: ruffen-docs runs after markdownlint-fix (both modify markdown).
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.1
     hooks:
-      - id: blacken-docs
-        language: python # means renovate will also update `additional_dependencies`
-        args: ["--pyi", "--line-length", "130"]
-        files: '^crates/.*/resources/mdtest/.*\.md'
-        exclude: |
-          (?x)^(
-            .*?invalid(_.+)*_syntax\.md
-          )$
-        additional_dependencies:
-          - black==26.1.0
+      - id: ruff-format
+        name: mdtest format
+        args:
+          [
+            "--preview",
+            "--line-length",
+            "130",
+            "--extension",
+            "py:pyi,python:pyi",
+          ]
+        types_or: [markdown]
+        files: '^crates/.*/resources/mdtest/.*\.md$'
+        pass_filenames: true
         priority: 2
 
   # `actionlint` hook, for verifying correct syntax in GitHub Actions workflows.

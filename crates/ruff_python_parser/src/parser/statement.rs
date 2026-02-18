@@ -2448,8 +2448,13 @@ impl<'src> Parser<'src> {
         let subject = self.parse_match_subject_expression();
 
         match self.current_token_kind() {
-            TokenKind::Colon => {
-                // `match` is a keyword
+            // test_ok match_annotated_assignment
+            // match[0]: int
+            // match [x, y, z]: dict
+            TokenKind::Colon if self.peek() == TokenKind::Newline => {
+                // `match` is a keyword — colon followed by newline confirms
+                // this is a match statement, not an annotated assignment like
+                // `match [x, y, z]: {dict}` or `match[0]: int`.
                 self.bump(TokenKind::Colon);
 
                 let cases = self.parse_match_body();

@@ -3,6 +3,8 @@ auto-import-includes-modules,main.py,0,1
 auto-import-includes-modules,main.py,1,2
 auto-import-includes-modules,main.py,2,1
 auto-import-skips-current-module,main.py,0,1
+auto-import-skips-third-party-tests,main.py,0,1
+auto-import-skips-third-party-tests,main.py,1,1
 class-arg-completion,main.py,0,1
 class-arg-completion,main.py,1,1
 deprecated-deprioritized,main.py,0,1
@@ -24,7 +26,7 @@ internal-typeshed-hidden,main.py,0,2
 local-over-auto-import,main.py,0,1
 modules-over-other-symbols,main.py,0,1
 none-completion,main.py,0,1
-numpy-array,main.py,0,59
+numpy-array,main.py,0,13
 numpy-array,main.py,1,1
 object-attr-instance-methods,main.py,0,1
 object-attr-instance-methods,main.py,1,1

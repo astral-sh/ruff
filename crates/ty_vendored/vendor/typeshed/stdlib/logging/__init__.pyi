@@ -1464,6 +1464,7 @@ class FileHandler(StreamHandler[TextIOWrapper]):
     encoding: str | None  # undocumented
     delay: bool  # undocumented
     errors: str | None  # undocumented
+    stream: TextIOWrapper | None  # type: ignore[assignment]  # None when delay=True or after close()
     def __init__(
         self, filename: StrPath, mode: str = "a", encoding: str | None = None, delay: bool = False, errors: str | None = None
     ) -> None:

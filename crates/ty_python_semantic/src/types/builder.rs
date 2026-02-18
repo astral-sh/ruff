@@ -1035,6 +1035,32 @@ struct InnerIntersectionBuilder<'db> {
 impl<'db> InnerIntersectionBuilder<'db> {
     /// Adds a positive type to this intersection.
     fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) {
+        // `Never & T` -> `Never`
+        if self.positive.contains(&Type::Never) {
+            return;
+        }
+
+        // `T & Never` -> `Never`
+        if new_positive.is_never() {
+            *self = Self::default();
+            self.positive.insert(Type::Never);
+            return;
+        }
+
+        // `T & Divergent` -> `Divergent`. Conceptually, `Divergent` behaves like `Never` here and
+        // dominates intersections. However, `Divergent` is actually a dynamic/gradual type, so
+        // `~Divergent` acts like `Divergent` rather than dropping out like `~Never` does.
+        // `Divergent` also gets a lot of special handling in cycle recovery.
+        if new_positive.is_divergent() {
+            *self = Self::default();
+            self.positive.insert(new_positive);
+            return;
+        }
+        // `Divergent & T` -> `Divergent`
+        if self.positive.iter().any(Type::is_divergent) {
+            return;
+        }
+
         match new_positive {
             // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::LiteralString) => {
@@ -1175,6 +1201,13 @@ impl<'db> InnerIntersectionBuilder<'db> {
 
     /// Adds a negative type to this intersection.
     fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
+        // `Divergent & ~T` -> `Divergent`. Note that `~Divergent` becomes `Divergent` via the
+        // `Type::Dynamic` branch below, so we don't need a special case for that.
+        if self.positive.iter().any(Type::is_divergent) {
+            debug_assert_eq!(self.positive.len(), 1, "`Divergent` should be alone");
+            return;
+        }
+
         let contains_bool = || {
             self.positive
                 .iter()
