@@ -1,0 +1,82 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP051 [*] Replace aliased error with `BadZipFile`
+ --> UP051.py:5:8
+  |
+3 | try:
+4 |     pass
+5 | except zipfile.BadZipfile:
+  |        ^^^^^^^^^^^^^^^^^^
+6 |     pass
+  |
+help: Replace `zipfile.BadZipfile` with `zipfile.BadZipFile`
+2 | 
+3 | try:
+4 |     pass
+  - except zipfile.BadZipfile:
+5 + except zipfile.BadZipFile:
+6 |     pass
+7 | 
+8 | try:
+
+UP051 [*] Replace aliased error with `BadZipFile`
+  --> UP051.py:10:8
+   |
+ 8 | try:
+ 9 |     pass
+10 | except (zipfile.BadZipfile,):
+   |        ^^^^^^^^^^^^^^^^^^^^^
+11 |     pass
+   |
+help: Replace with `zipfile.BadZipFile`
+7  | 
+8  | try:
+9  |     pass
+   - except (zipfile.BadZipfile,):
+10 + except zipfile.BadZipFile:
+11 |     pass
+12 | 
+13 | raise (
+
+UP051 [*] Replace aliased error with `BadZipFile`
+  --> UP051.py:14:5
+   |
+13 |   raise (
+14 | /     zipfile.
+15 | |     # text
+16 | |         BadZipfile
+   | |__________________^
+17 |   )
+   |
+help: Replace `zipfile.BadZipfile` with `zipfile.BadZipFile`
+11 |     pass
+12 | 
+13 | raise (
+   -     zipfile.
+   -     # text
+   -         BadZipfile
+14 +     zipfile.BadZipFile
+15 | )
+16 | 
+17 | 
+note: This is an unsafe fix and may change runtime behavior
+
+UP051 [*] Replace aliased error with `BadZipFile`
+  --> UP051.py:24:8
+   |
+22 | try:
+23 |     pass
+24 | except (zipfile.BadZipfile, error):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |     pass
+   |
+help: Replace with `zipfile.BadZipFile`
+21 | from .mmap import error
+22 | try:
+23 |     pass
+   - except (zipfile.BadZipfile, error):
+24 + except (zipfile.BadZipFile, error):
+25 |     pass
+26 | 
+27 |

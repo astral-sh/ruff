@@ -962,6 +962,11 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                     }
                 }
             }
+            if checker.is_rule_enabled(Rule::BadZipFileAlias) {
+                if let Some(item) = exc {
+                    pyupgrade::rules::badzipfile_alias_raise(checker, item);
+                }
+            }
             if checker.is_rule_enabled(Rule::RaiseVanillaClass) {
                 if let Some(expr) = exc {
                     tryceratops::rules::raise_vanilla_class(checker, expr);
@@ -1372,6 +1377,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
                 if checker.target_version() >= PythonVersion::PY310 {
                     pyupgrade::rules::timeout_error_alias_handlers(checker, handlers);
                 }
+            }
+            if checker.is_rule_enabled(Rule::BadZipFileAlias) {
+                pyupgrade::rules::badzipfile_alias_handlers(checker, handlers);
             }
             if checker.is_rule_enabled(Rule::PytestAssertInExcept) {
                 flake8_pytest_style::rules::assert_in_exception_handler(checker, handlers);

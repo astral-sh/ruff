@@ -694,6 +694,9 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     pyupgrade::rules::timeout_error_alias_call(checker, func);
                 }
             }
+            if checker.is_rule_enabled(Rule::BadZipFileAlias) {
+                pyupgrade::rules::badzipfile_alias_call(checker, func);
+            }
             if checker.is_rule_enabled(Rule::NonPEP604Isinstance) {
                 if checker.target_version() >= PythonVersion::PY310 {
                     pyupgrade::rules::use_pep604_isinstance(checker, expr, func, args);
