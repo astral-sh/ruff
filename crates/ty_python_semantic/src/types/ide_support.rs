@@ -684,6 +684,79 @@ pub fn call_signature_details<'db>(
     }
 }
 
+/// Structured signature info for a callable type, without call-site argument mapping.
+///
+/// Used by external tools that embed ty as a library.
+/// Not referenced by production code in this repository.
+/// No backwards compatibility guarantees are made for this API.
+#[derive(Debug, Clone)]
+pub struct SignatureDetails<'db> {
+    /// The display label for this signature (e.g., "(param1: str, param2: int) -> str")
+    pub label: String,
+
+    /// The names of the parameters in the signature, in order.
+    pub parameter_names: Vec<String>,
+
+    /// Annotated types of parameters. If no annotation was provided, this is `Unknown`.
+    pub parameter_types: Vec<Type<'db>>,
+
+    /// Parameter kinds (positional-only, keyword-only, variadic, etc.).
+    pub parameter_kinds: Vec<ParameterKind<'db>>,
+
+    /// The return type of this signature, if known.
+    pub return_type: Option<Type<'db>>,
+
+    /// The definition where this callable was originally defined.
+    pub definition: Option<Definition<'db>>,
+}
+
+/// Returns structured signature details for a callable type.
+///
+/// This is the type-level companion to [`call_signature_details`], which requires
+/// an `ExprCall` node. This function takes a `Type<'db>` directly and returns
+/// signature info for any callable type (function, bound method, callable).
+///
+/// Used by external tools that embed ty as a library.
+/// Not referenced by production code in this repository.
+/// No backwards compatibility guarantees are made for this API.
+pub fn signature_details_for_callable<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Vec<SignatureDetails<'db>> {
+    fn details_from_signature<'db>(
+        db: &'db dyn Db,
+        signature: &Signature<'db>,
+    ) -> SignatureDetails<'db> {
+        let display_details = signature.display(db).to_string_parts();
+        let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Type>) = signature
+            .parameters()
+            .iter()
+            .map(|param| (param.kind().clone(), param.annotated_type()))
+            .unzip();
+
+        SignatureDetails {
+            label: display_details.label,
+            parameter_names: display_details.parameter_names,
+            parameter_types,
+            parameter_kinds,
+            return_type: Some(signature.return_ty),
+            definition: signature.definition,
+        }
+    }
+
+    let Some(callables) = ty.try_upcast_to_callable(db) else {
+        return vec![];
+    };
+
+    let mut result = Vec::new();
+    for callable in callables.into_inner() {
+        for signature in &callable.signatures(db).overloads {
+            result.push(details_from_signature(db, signature));
+        }
+    }
+    result
+}
+
 /// Given a call expression that has overloads, and whose overload is resolved to a
 /// single option by its arguments, return the type of the Signature.
 ///
