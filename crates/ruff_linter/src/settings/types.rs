@@ -200,6 +200,7 @@ impl Deref for GlobPath {
 #[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
+    Config(String),
     User(String, GlobPath),
 }
 
@@ -208,6 +209,9 @@ impl FilePattern {
         match self {
             FilePattern::Builtin(pattern) => {
                 builder.add(Glob::from_str(pattern)?);
+            }
+            FilePattern::Config(pattern) => {
+                builder.add(Glob::new(&pattern)?);
             }
             FilePattern::User(pattern, absolute) => {
                 // Add the absolute path.
@@ -230,7 +234,7 @@ impl Display for FilePattern {
             "{:?}",
             match self {
                 Self::Builtin(pattern) => pattern,
-                Self::User(pattern, _) => pattern.as_str(),
+                Self::User(pattern, _) | Self::Config(pattern) => pattern.as_str(),
             }
         )
     }
@@ -498,6 +502,11 @@ impl From<ExtensionPair> for (String, Language) {
 pub struct ExtensionMapping(FxHashMap<String, Language>);
 
 impl ExtensionMapping {
+    /// Return the file extensions in the mapping.
+    pub fn extensions(&self) -> Vec<&String> {
+        self.0.keys().collect()
+    }
+
     /// Return the [`Language`] for the given file.
     pub fn get(&self, path: &Path) -> Option<Language> {
         let ext = path.extension()?.to_str()?;
