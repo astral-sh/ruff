@@ -7,7 +7,6 @@ use std::collections::BTreeMap;
 use std::env::VarError;
 use std::num::{NonZeroU8, NonZeroU16};
 use std::path::{Path, PathBuf};
-use std::str::FromStr;
 
 use anyhow::{Context, Result, anyhow};
 use glob::{GlobError, Paths, PatternError, glob};
@@ -29,9 +28,9 @@ use ruff_linter::rules::{flake8_import_conventions, isort, pycodestyle};
 use ruff_linter::settings::fix_safety_table::FixSafetyTable;
 use ruff_linter::settings::rule_table::RuleTable;
 use ruff_linter::settings::types::{
-    CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, ExtensionPair,
-    FilePattern, FilePatternSet, GlobPath, Language, OutputFormat, PerFileIgnore,
-    PerFileTargetVersion, PreviewMode, RequiredVersion, UnsafeFixes,
+    CompiledPerFileIgnoreList, CompiledPerFileTargetVersionList, ExtensionMapping, FilePattern,
+    FilePatternSet, GlobPath, OutputFormat, PerFileIgnore, PerFileTargetVersion, PreviewMode,
+    RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
     DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
