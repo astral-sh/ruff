@@ -220,9 +220,6 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
-        let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
-        let mut unmatched_ranges = FxHashSet::default();
-
         fn process_pending_diagnostics(
             key: Option<TextRange>,
             grouped_diagnostic: &Option<(TextRange, SuppressionDiagnostic)>,
@@ -288,6 +285,9 @@ impl Suppressions {
                 false
             }
         }
+
+        let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
+        let mut unmatched_ranges = FxHashSet::default();
 
         for suppression in &self.valid {
             let key = suppression.comments.disable_comment().range;
