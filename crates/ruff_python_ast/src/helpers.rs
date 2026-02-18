@@ -2333,14 +2333,14 @@ mod tests {
     }
 
     #[test]
-    fn side_effect_fstring_interpolation_is_classified() {
-        let safe = fstring_expr(number_expr(1));
-        assert_eq!(side_effect(&safe, |_id| false), SideEffect::No);
+    fn side_effect_fstring_yes_maybe_no_matrix() {
+        let no = fstring_expr(number_expr(1));
+        assert_eq!(side_effect(&no, |_id| false), SideEffect::No);
 
-        let uncertain = fstring_expr(name_expr("value"));
-        assert_eq!(side_effect(&uncertain, |_id| false), SideEffect::Maybe);
+        let maybe = fstring_expr(name_expr("value"));
+        assert_eq!(side_effect(&maybe, |_id| false), SideEffect::Maybe);
 
-        let effectful = fstring_expr(call_expr("fn_name"));
-        assert_eq!(side_effect(&effectful, |_id| false), SideEffect::Yes);
+        let yes = fstring_expr(call_expr("fn_name"));
+        assert_eq!(side_effect(&yes, |_id| false), SideEffect::Yes);
     }
 }

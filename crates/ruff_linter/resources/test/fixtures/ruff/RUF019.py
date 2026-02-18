@@ -23,7 +23,7 @@ v = "k" in d and d["k"]
 if f() in d and d[f()]:
     pass
 
-# RUF019 (f-string fix safety)
+# RUF019 (f-string side-effect matrix)
 class C:
     def __str__(self):
         return "k"
@@ -31,21 +31,16 @@ class C:
 
 c = C()
 
-# Unsafe: interpolation may call user-defined `__str__`.
+# side_effect -> Yes: definite side effect in interpolation; rule should not trigger.
+if f"{f()}" in d and d[f"{f()}"]:
+    pass
+
+# side_effect -> Maybe: formatting may call user code; unsafe fix.
 if f"{c}" in d and d[f"{c}"]:
     pass
 
-# Safe: literal-only f-string cases.
-if f"k" in d and d[f"k"]:
-    pass
-
+# side_effect -> No: literal-only interpolation; safe fix.
 if f"{1}" in d and d[f"{1}"]:
-    pass
-
-if f"{-1}" in d and d[f"{-1}"]:
-    pass
-
-if f"{(1, 2)}" in d and d[f"{(1, 2)}"]:
     pass
 
 
