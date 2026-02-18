@@ -433,13 +433,20 @@ impl<'db> NarrowingConstraint<'db> {
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements(
-            db,
-            self.replacement_disjuncts
-                .into_iter()
-                .chain(self.intersection_disjunct),
-        )
+    pub(crate) fn evaluate_constraint_type(
+        self,
+        db: &'db dyn Db,
+        check_redundancy: bool,
+    ) -> Type<'db> {
+        let mut union = UnionBuilder::new(db).check_redundancy(check_redundancy);
+        for ty in self
+            .replacement_disjuncts
+            .into_iter()
+            .chain(self.intersection_disjunct)
+        {
+            union = union.add(ty);
+        }
+        union.build()
     }
 }
 
