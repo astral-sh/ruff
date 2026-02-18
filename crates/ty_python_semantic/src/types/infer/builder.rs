@@ -130,14 +130,14 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    LintDiagnosticGuard, ManualPEP695TypeAliasType, MemberLookupPolicy, MetaclassCandidate,
+    PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -6770,6 +6770,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // This returns `None` if it's not a three-arg call to `type()`,
                                 // signalling that we must fall back to normal call inference.
                                 self.infer_builtins_type_call(call_expr, Some(definition))
+                            }
+                            Some(KnownClass::TypeAliasType) => {
+                                // Do normal call inference, then patch up the result
+                                // with the definition. `check_call` can't find the
+                                // definition via `try_expression` for simple assignments,
+                                // so we supply it here.
+                                let ty =
+                                    self.infer_call_expression_impl(call_expr, callable_type, tcx);
+                                if let Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                    TypeAliasType::ManualPEP695(alias),
+                                )) = ty
+                                {
+                                    let db = self.db();
+                                    Type::KnownInstance(KnownInstanceType::TypeAliasType(
+                                        TypeAliasType::ManualPEP695(
+                                            ManualPEP695TypeAliasType::new(
+                                                db,
+                                                alias.name(db).clone(),
+                                                Some(definition),
+                                            ),
+                                        ),
+                                    ))
+                                } else {
+                                    ty
+                                }
                             }
                             Some(_) | None => {
                                 self.infer_call_expression_impl(call_expr, callable_type, tcx)

@@ -241,6 +241,24 @@ def get_name() -> str:
 IntOrStr = TypeAliasType(get_name(), int | str)
 ```
 
+### Mutually recursive `TypeAliasType` definitions
+
+Mutually recursive type aliases created via the `TypeAliasType` constructor should not cause the
+type checker to hang. The value type is computed lazily to break cycles.
+
+```py
+from typing_extensions import TypeAliasType, Union
+
+A = TypeAliasType("A", Union[str, "B"])
+B = TypeAliasType("B", list[A])
+
+def f(x: A) -> None:
+    reveal_type(x)  # revealed: str | list[A]
+
+def g(x: B) -> None:
+    reveal_type(x)  # revealed: list[A]
+```
+
 ## Cyclic aliases
 
 ### Self-referential

@@ -8192,7 +8192,7 @@ impl KnownClass {
                     }
                 });
 
-                let [Some(name), Some(value), ..] = overload.parameter_types() else {
+                let [Some(name), Some(_value), ..] = overload.parameter_types() else {
                     return;
                 };
 
@@ -8211,7 +8211,6 @@ impl KnownClass {
                         db,
                         ast::name::Name::new(name.value(db)),
                         containing_assignment,
-                        value,
                     )),
                 )));
             }

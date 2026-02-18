@@ -12007,6 +12007,13 @@ impl<'db> PEP695TypeAliasType<'db> {
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
 ///
+/// Unlike [`PEP695TypeAliasType`], the value type is NOT stored in the struct. Instead,
+/// it is computed lazily via [`ManualPEP695TypeAliasType::value_type()`]. This prevents
+/// Salsa cycle non-convergence when mutually recursive `TypeAliasType` definitions
+/// reference each other (e.g. `A = TypeAliasType('A', Union[str, 'B'])`,
+/// `B = TypeAliasType('B', list[A])`), since the interned struct's identity does not
+/// depend on the value type.
+///
 /// # Ordering
 /// Ordering is based on the type alias's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the alias was garbage collected and recreated.
@@ -12016,7 +12023,6 @@ pub struct ManualPEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
     pub definition: Option<Definition<'db>>,
-    pub value: Type<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -12027,28 +12033,51 @@ fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value(db));
+    visitor.visit_type(db, type_alias.value_type(db));
+}
+
+#[salsa::tracked]
+impl<'db> ManualPEP695TypeAliasType<'db> {
+    /// The value type of this manual type alias.
+    ///
+    /// Computed lazily from the definition to avoid including the value in the interned
+    /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let Some(definition) = self.definition(db) else {
+            return Type::unknown();
+        };
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+            return Type::unknown();
+        };
+        let value_node = assignment.value(&module);
+        let ast::Expr::Call(call) = value_node else {
+            return Type::unknown();
+        };
+        // The value is the second positional argument to TypeAliasType(name, value).
+        let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
+            return Type::unknown();
+        };
+        definition_expression_type(db, definition, value_arg)
+    }
 }
 
 impl<'db> ManualPEP695TypeAliasType<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
-            db,
-            self.name(db),
-            self.definition(db),
-            self.value(db).normalized_impl(db, visitor),
-        )
+    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
+        self
     }
 
-    // TODO: with full support for manual PEP-695 style type aliases, this method should become unnecessary.
-    fn recursive_type_normalized_impl(self, db: &'db dyn Db, div: Type<'db>) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.name(db),
-            self.definition(db),
-            self.value(db)
-                .recursive_type_normalized_impl(db, div, true)?,
-        ))
+    #[allow(clippy::unnecessary_wraps)]
+    fn recursive_type_normalized_impl(self, _db: &'db dyn Db, _div: Type<'db>) -> Option<Self> {
+        Some(self)
     }
 }
 
@@ -12118,14 +12147,14 @@ impl<'db> TypeAliasType<'db> {
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
 
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
 
