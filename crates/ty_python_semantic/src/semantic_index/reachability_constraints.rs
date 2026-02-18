@@ -741,12 +741,11 @@ impl ReachabilityConstraintsBuilder {
 
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
-    db: &'db dyn Db,
     accumulated: Option<NarrowingConstraint<'db>>,
     new: Option<NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc, db)),
+        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
         (None, Some(new_c)) => Some(new_c),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
@@ -852,7 +851,7 @@ impl ReachabilityConstraints {
                 // Apply all accumulated narrowing constraints to the base type
                 match accumulated {
                     Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                        .merge_constraint_and(constraint, db)
+                        .merge_constraint_and(constraint)
                         .evaluate_constraint_type(db, false),
                     None => base_ty,
                 }
@@ -921,7 +920,7 @@ impl ReachabilityConstraints {
 
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
-                    let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                    let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                     let narrowed = narrow!(node.if_false, false_accumulated);
                     memo.insert(key, narrowed);
                     return narrowed;
@@ -929,19 +928,18 @@ impl ReachabilityConstraints {
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
-                    let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
+                    let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
                     let narrowed = narrow!(node.if_true, true_accumulated);
                     memo.insert(key, narrowed);
                     return narrowed;
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
-                let true_accumulated =
-                    accumulate_constraint(db, accumulated.clone(), pos_constraint);
+                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
                 let true_ty = narrow!(node.if_true, true_accumulated);
 
                 // False branch: predicate doesn't hold → accumulate negative narrowing
-                let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = narrow!(node.if_false, false_accumulated);
 
                 // We won't do a union type redundancy check here, as it only needs to be performed once for the final result.
