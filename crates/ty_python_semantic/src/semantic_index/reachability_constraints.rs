@@ -838,7 +838,13 @@ impl ReachabilityConstraints {
         >,
         truthiness_memo: &mut FxHashMap<Predicate<'db>, Truthiness>,
     ) -> Type<'db> {
-        let key = (id, accumulated.clone());
+        // `ALWAYS_TRUE` and `AMBIGUOUS` are equivalent for narrowing purposes.
+        // Canonicalize to improve memo hits across terminal leaves.
+        let memo_id = match id {
+            ALWAYS_TRUE | AMBIGUOUS => ALWAYS_TRUE,
+            _ => id,
+        };
+        let key = (memo_id, accumulated.clone());
         if let Some(cached) = memo.get(&key).copied() {
             return cached;
         }
