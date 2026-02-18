@@ -202,6 +202,7 @@ use crate::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{RequiresExplicitReExport, imported_symbol};
 use crate::rank::RankBitBox;
+use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
@@ -792,7 +793,7 @@ impl ReachabilityConstraints {
         db: &'db dyn Db,
         predicates: &Predicates<'db>,
         predicate_place_versions: &PredicatePlaceVersions,
-        id: ScopedReachabilityConstraintId,
+        id: ScopedNarrowingConstraint,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
         binding_place_version: Option<PlaceVersion>,
@@ -824,16 +825,13 @@ impl ReachabilityConstraints {
         db: &'db dyn Db,
         predicates: &Predicates<'db>,
         predicate_place_versions: &PredicatePlaceVersions,
-        id: ScopedReachabilityConstraintId,
+        id: ScopedNarrowingConstraint,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
         binding_place_version: Option<PlaceVersion>,
         accumulated: Option<NarrowingConstraint<'db>>,
         memo: &mut FxHashMap<
-            (
-                ScopedReachabilityConstraintId,
-                Option<NarrowingConstraint<'db>>,
-            ),
+            (ScopedNarrowingConstraint, Option<NarrowingConstraint<'db>>),
             Type<'db>,
         >,
         truthiness_memo: &mut FxHashMap<Predicate<'db>, Truthiness>,
