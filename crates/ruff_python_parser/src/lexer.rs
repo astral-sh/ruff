@@ -263,7 +263,42 @@ impl<'src> Lexer<'src> {
                             self.token_range(),
                         )));
                     }
-                    indentation = Indentation::root();
+                    // test_ok backslash_continuation_indentation
+                    // if True:
+                    //     pass
+                    //     \
+                    //         print("1")
+                    // def f():
+                    //     if True:
+                    //         return True
+                    //     else:
+                    // \
+                    //         return False
+                    // # Multiple consecutive continuations
+                    // if True:
+                    //     x = 1
+                    //     \
+                    //     \
+                    //         print(x)
+
+                    // test_err backslash_continuation_indentation_error
+                    // def f():
+                    //     pass
+                    //   \
+                    //     x = 1
+
+                    // Per Python spec [1], the whitespace up to the first
+                    // backslash determines the line's indentation. Skip
+                    // continuation-line whitespace without accumulating it
+                    // into `indentation`. However, if the backslash is at
+                    // column 0 (no prior indentation), let the loop continue
+                    // so the next line's whitespace is accumulated normally.
+                    //
+                    // [1]: https://docs.python.org/3/reference/lexical_analysis.html#indentation
+                    // See also: https://github.com/python/cpython/issues/90249
+                    if indentation != Indentation::root() {
+                        self.cursor.eat_while(is_python_whitespace);
+                    }
                 }
                 // Form feed
                 '\x0C' => {
@@ -3060,5 +3095,96 @@ t"{(lambda x:{x})}"
             lex_tstring_error(r#"t""""""#),
             UnterminatedTripleQuotedString
         );
+    }
+
+    // Backslash at indented position: continuation whitespace should not
+    // affect indentation level.
+    fn backslash_continuation_indentation_eol(eol: &str) -> LexerOutput {
+        let source = format!("if True:{eol}    pass{eol}    \\{eol}        print(\"1\"){eol}");
+        lex_source(&source)
+    }
+
+    #[test]
+    fn backslash_continuation_indentation_unix_eol() {
+        assert_snapshot!(backslash_continuation_indentation_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn backslash_continuation_indentation_mac_eol() {
+        assert_snapshot!(backslash_continuation_indentation_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn backslash_continuation_indentation_windows_eol() {
+        assert_snapshot!(backslash_continuation_indentation_eol(WINDOWS_EOL));
+    }
+
+    // Backslash at column 0: next line's whitespace becomes the indentation.
+    fn backslash_continuation_at_column_zero_eol(eol: &str) -> LexerOutput {
+        let source = format!(
+            "def f():{eol}    if True:{eol}        return True{eol}    else:{eol}\\{eol}        return False{eol}"
+        );
+        lex_source(&source)
+    }
+
+    #[test]
+    fn backslash_continuation_at_column_zero_unix_eol() {
+        assert_snapshot!(backslash_continuation_at_column_zero_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn backslash_continuation_at_column_zero_mac_eol() {
+        assert_snapshot!(backslash_continuation_at_column_zero_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn backslash_continuation_at_column_zero_windows_eol() {
+        assert_snapshot!(backslash_continuation_at_column_zero_eol(WINDOWS_EOL));
+    }
+
+    // Multiple consecutive backslash continuations: each `\` is processed
+    // independently, indentation preserved from before the first `\`.
+    fn backslash_continuation_multiple_eol(eol: &str) -> LexerOutput {
+        let source =
+            format!("if True:{eol}    x = 1{eol}    \\{eol}    \\{eol}        print(x){eol}");
+        lex_source(&source)
+    }
+
+    #[test]
+    fn backslash_continuation_multiple_unix_eol() {
+        assert_snapshot!(backslash_continuation_multiple_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn backslash_continuation_multiple_mac_eol() {
+        assert_snapshot!(backslash_continuation_multiple_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn backslash_continuation_multiple_windows_eol() {
+        assert_snapshot!(backslash_continuation_multiple_eol(WINDOWS_EOL));
+    }
+
+    // Backslash continuation with mismatched indentation: indentation != root()
+    // is true (2 spaces before `\`), but 2 doesn't match the indent stack [0, 4],
+    // producing an indentation error.
+    fn backslash_continuation_dedent_error_eol(eol: &str) -> LexerOutput {
+        let source = format!("def f():{eol}    pass{eol}  \\{eol}    x = 1{eol}");
+        lex_invalid(&source, Mode::Module)
+    }
+
+    #[test]
+    fn backslash_continuation_dedent_error_unix_eol() {
+        assert_snapshot!(backslash_continuation_dedent_error_eol(UNIX_EOL));
+    }
+
+    #[test]
+    fn backslash_continuation_dedent_error_mac_eol() {
+        assert_snapshot!(backslash_continuation_dedent_error_eol(MAC_EOL));
+    }
+
+    #[test]
+    fn backslash_continuation_dedent_error_windows_eol() {
+        assert_snapshot!(backslash_continuation_dedent_error_eol(WINDOWS_EOL));
     }
 }

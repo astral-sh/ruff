@@ -1,0 +1,80 @@
+---
+source: crates/ruff_python_parser/src/lexer.rs
+expression: backslash_continuation_dedent_error_eol(UNIX_EOL)
+---
+## Tokens
+```
+[
+    (
+        Def,
+        0..3,
+    ),
+    (
+        Name(
+            Name("f"),
+        ),
+        4..5,
+    ),
+    (
+        Lpar,
+        5..6,
+    ),
+    (
+        Rpar,
+        6..7,
+    ),
+    (
+        Colon,
+        7..8,
+    ),
+    (
+        Newline,
+        8..9,
+    ),
+    (
+        Indent,
+        9..13,
+    ),
+    (
+        Pass,
+        13..17,
+    ),
+    (
+        Newline,
+        17..18,
+    ),
+    (
+        Unknown,
+        18..26,
+    ),
+    (
+        Name(
+            Name("x"),
+        ),
+        26..27,
+    ),
+    (
+        Equal,
+        28..29,
+    ),
+    (
+        Int(
+            1,
+        ),
+        30..31,
+    ),
+    (
+        Newline,
+        31..32,
+    ),
+]
+```
+## Errors
+```
+[
+    LexicalError {
+        error: IndentationError,
+        location: 18..26,
+    },
+]
+```
