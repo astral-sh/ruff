@@ -17,97 +17,44 @@ use crate::{
     },
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub(super) struct AbstractMethods<'db> {
-    methods: &'db FxIndexSet<Name>,
     class: ClassType<'db>,
+    is_empty: bool,
 }
 
 impl<'db> AbstractMethods<'db> {
     /// Returns a set of methods on this class that were defined as abstract on a superclass
     /// and have not been overridden with a concrete implementation anywhere in the MRO
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        #[salsa::tracked(
-            returns(ref),
-            heap_size=ruff_memory_usage::heap_size,
-            cycle_initial=|_, _, _| FxIndexSet::default()
-        )]
-        fn of_class_inner<'db>(db: &'db dyn Db, class: ClassType<'db>) -> FxIndexSet<Name> {
-            let mut abstract_methods: FxIndexSet<Name> = FxIndexSet::default();
-
-            // Iterate through the MRO in reverse order,
-            // skipping `object` (we know it doesn't define any abstract methods)
-            for supercls in class.iter_mro(db).rev().skip(1) {
-                let ClassBase::Class(class) = supercls else {
-                    continue;
-                };
-
-                // Currently we do not recognize dynamic classes as being able to define abstract methods,
-                // but we do recognise them as being able to override abstract methods defined in static classes.
-                let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
-                    abstract_methods
-                        .retain(|name| class.own_class_member(db, None, name).is_undefined());
-                    continue;
-                };
-
-                let scope = class_literal.body_scope(db);
-                let place_table = place_table(db, scope);
-                let use_def_map = use_def_map(db, class_literal.body_scope(db));
-
-                // Treat abstract methods from superclasses as having been overridden
-                // if this class has a synthesized method by that name,
-                // or this class has a `ClassVar` declaration by that name
-                abstract_methods.retain(|name| {
-                    if class_literal
-                        .own_synthesized_member(db, None, None, name)
-                        .is_some()
-                    {
-                        return false;
-                    }
-
-                    place_table.symbol_id(name).is_none_or(|symbol_id| {
-                        let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-                        !place_from_declarations(db, declarations)
-                            .ignore_conflicting_declarations()
-                            .qualifiers
-                            .contains(TypeQualifiers::CLASS_VAR)
-                    })
-                });
-
-                for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings()
-                {
-                    let name = place_table.symbol(symbol_id).name();
-                    let place_and_definition = place_from_bindings(db, bindings_iterator);
-                    let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
-                        continue;
-                    };
-                    if type_as_abstract_method(db, ty, class).is_some() {
-                        abstract_methods.insert(name.clone());
-                    } else {
-                        // If this method is concrete, remove it from the map of abstract methods.
-                        abstract_methods.shift_remove(name);
-                    }
-                }
-            }
-
-            abstract_methods
+        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _| true)]
+        fn abstract_methods_is_empty<'db>(db: &'db dyn Db, class: ClassType<'db>) -> bool {
+            abstract_methods_of_class(db, class).is_empty()
         }
 
         Self {
-            methods: of_class_inner(db, class),
             class,
+            is_empty: abstract_methods_is_empty(db, class),
         }
+    }
+
+    fn cached_methods(&self, db: &'db dyn Db) -> &'db FxIndexSet<Name> {
+        #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
+        fn cached_abstract_methods<'db>(
+            db: &'db dyn Db,
+            class: ClassType<'db>,
+        ) -> FxIndexSet<Name> {
+            abstract_methods_of_class(db, class)
+        }
+
+        cached_abstract_methods(db, self.class)
     }
 
     /// Attach primary and secondary annotations to a passed in diagnostic that describe
     /// this set of abstract methods
-    pub(super) fn annotate_diagnostic(
-        &self,
-        db: &'db dyn Db,
-        diagnostic: &mut LintDiagnosticGuard,
-    ) {
+    pub(super) fn annotate_diagnostic(&self, db: &dyn Db, diagnostic: &mut LintDiagnosticGuard) {
         let first_name = self
-            .methods
+            .cached_methods(db)
             .first()
             .expect("`annotate_diagnostic()` should not be called on an empty `AbstractMethods`");
 
@@ -151,8 +98,9 @@ impl<'db> AbstractMethods<'db> {
         let module = parsed_module(db, definition.file(db)).load(db);
         let span = Span::from(definition.focus_range(db, &module));
         let secondary_annotation = Annotation::secondary(span);
+        let num_abstract_methods = self.len(db);
 
-        if self.len() == 1 {
+        if num_abstract_methods == 1 {
             diagnostic.set_primary_message(format_args!(
                 "Abstract method `{first_name}` is unimplemented"
             ));
@@ -168,7 +116,6 @@ impl<'db> AbstractMethods<'db> {
                 )));
             }
         } else {
-            let num_abstract_methods = self.len();
             let formatted_methods = self.formatted_names(db);
 
             if formatted_methods.truncation_occurred {
@@ -296,7 +243,7 @@ impl<'db> AbstractMethods<'db> {
     ///
     /// This is useful for diagnostics.
     pub(super) fn formatted_names(&self, db: &'db dyn Db) -> FormattedAbstractMethods {
-        let len = self.methods.len();
+        let len = self.cached_methods(db).len();
         let max_abstract_methods_to_print = if db.verbose() {
             len
         } else {
@@ -304,22 +251,93 @@ impl<'db> AbstractMethods<'db> {
         };
         let truncation_occurred = max_abstract_methods_to_print < len;
         FormattedAbstractMethods {
-            inner: format_enumeration(self.methods.iter().take(max_abstract_methods_to_print)),
+            inner: format_enumeration(
+                self.cached_methods(db)
+                    .iter()
+                    .take(max_abstract_methods_to_print),
+            ),
             truncation_occurred,
         }
     }
 
-    pub(super) fn first_name(&self) -> Option<&Name> {
-        self.methods.first()
+    pub(super) fn first_name(&self, db: &'db dyn Db) -> Option<&Name> {
+        if self.is_empty {
+            None
+        } else {
+            self.cached_methods(db).first()
+        }
     }
 
-    pub(super) fn len(&self) -> usize {
-        self.methods.len()
+    pub(super) fn len(&self, db: &'db dyn Db) -> usize {
+        if self.is_empty {
+            0
+        } else {
+            self.cached_methods(db).len()
+        }
     }
 
     pub(super) fn is_empty(&self) -> bool {
-        self.methods.is_empty()
+        self.is_empty
     }
+}
+
+fn abstract_methods_of_class<'db>(db: &'db dyn Db, class: ClassType<'db>) -> FxIndexSet<Name> {
+    let mut abstract_methods: FxIndexSet<Name> = FxIndexSet::default();
+
+    // Iterate through the MRO in reverse order,
+    // skipping `object` (we know it doesn't define any abstract methods)
+    for supercls in class.iter_mro(db).rev().skip(1) {
+        let ClassBase::Class(class) = supercls else {
+            continue;
+        };
+
+        // Currently we do not recognize dynamic classes as being able to define abstract methods,
+        // but we do recognise them as being able to override abstract methods defined in static classes.
+        let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
+            abstract_methods.retain(|name| class.own_class_member(db, None, name).is_undefined());
+            continue;
+        };
+
+        let scope = class_literal.body_scope(db);
+        let place_table = place_table(db, scope);
+        let use_def_map = use_def_map(db, class_literal.body_scope(db));
+
+        // Treat abstract methods from superclasses as having been overridden
+        // if this class has a synthesized method by that name,
+        // or this class has a `ClassVar` declaration by that name
+        abstract_methods.retain(|name| {
+            if class_literal
+                .own_synthesized_member(db, None, None, name)
+                .is_some()
+            {
+                return false;
+            }
+
+            place_table.symbol_id(name).is_none_or(|symbol_id| {
+                let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+                !place_from_declarations(db, declarations)
+                    .ignore_conflicting_declarations()
+                    .qualifiers
+                    .contains(TypeQualifiers::CLASS_VAR)
+            })
+        });
+
+        for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
+            let name = place_table.symbol(symbol_id).name();
+            let place_and_definition = place_from_bindings(db, bindings_iterator);
+            let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
+                continue;
+            };
+            if type_as_abstract_method(db, ty, class).is_some() {
+                abstract_methods.insert(name.clone());
+            } else {
+                // If this method is concrete, remove it from the map of abstract methods.
+                abstract_methods.shift_remove(name);
+            }
+        }
+    }
+
+    abstract_methods
 }
 
 fn type_as_abstract_method<'db>(

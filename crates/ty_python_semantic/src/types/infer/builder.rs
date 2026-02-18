@@ -1684,8 +1684,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_type = class.identity_specialization(db);
         let abstract_methods = AbstractMethods::of_class(db, class_type);
 
+        if abstract_methods.is_empty() {
+            return;
+        }
+
         // If there are no abstract methods, we're done.
-        let Some(first_method_name) = abstract_methods.first_name() else {
+        let Some(first_method_name) = abstract_methods.first_name(db) else {
             return;
         };
 
@@ -1703,7 +1707,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ));
 
         abstract_methods.annotate_diagnostic(db, &mut diagnostic);
-        let num_abstract_methods = abstract_methods.len();
+        let num_abstract_methods = abstract_methods.len(db);
 
         if num_abstract_methods == 1 {
             diagnostic.set_concise_message(format_args!(

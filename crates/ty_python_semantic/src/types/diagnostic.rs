@@ -4253,13 +4253,13 @@ pub(crate) fn report_attempted_instantiation_of_abstract_class<'db>(
 
     abstract_methods.annotate_diagnostic(db, &mut diagnostic);
 
-    let num_abstract_methods = abstract_methods.len();
+    let num_abstract_methods = abstract_methods.len(db);
 
     if num_abstract_methods == 1 {
         diagnostic.set_concise_message(format_args!(
             "Cannot instantiate `{class_name}` with unimplemented \
                 abstract method `{name}`",
-            name = abstract_methods.first_name().unwrap(),
+            name = abstract_methods.first_name(db).unwrap(),
         ));
     } else {
         let formatted_methods = abstract_methods.formatted_names(db);
