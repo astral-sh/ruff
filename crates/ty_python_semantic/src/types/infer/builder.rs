@@ -8914,8 +8914,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // We do not use `store_expression_type` here, because it checks that no type
             // has been stored for the expression before. When there's a value, use the
             // inferred type (matching the name-target definition path); otherwise fall
-            // back to the annotated type.
-            let target_ty = value_ty.unwrap_or_else(|| annotated.inner_type());
+            // back to the annotated type. If the value is not assignable to the declared
+            // type, report an error and fall back to the annotated type.
+            let target_ty = if let Some(value_ty) = value_ty {
+                let declared_ty = annotated.inner_type();
+                if value_ty.is_assignable_to(self.db(), declared_ty) {
+                    value_ty
+                } else {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_ASSIGNMENT, value.as_deref().unwrap())
+                    {
+                        let mut diag = builder.into_diagnostic(format_args!(
+                            "Object of type `{}` is not assignable to `{}`",
+                            value_ty.display(self.db()),
+                            declared_ty.display(self.db()),
+                        ));
+                        diag.annotate(
+                            self.context
+                                .secondary(annotation.as_ref())
+                                .message("Declared type"),
+                        );
+                        diag.set_primary_message(format_args!(
+                            "Incompatible value of type `{}`",
+                            value_ty.display(self.db()),
+                        ));
+                    }
+                    declared_ty
+                }
+            } else {
+                annotated.inner_type()
+            };
             self.expressions.insert((&**target).into(), target_ty);
         }
     }
