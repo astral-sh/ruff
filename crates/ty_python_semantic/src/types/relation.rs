@@ -1092,10 +1092,6 @@ impl<'db> Type<'db> {
 
             // A string literal `Literal["abc"]` is assignable to `str` *and* to
             // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
-            //
-            // Note that this strictly holds true for all type relations!
-            // However, as an optimisation (to avoid interning many single-character string-literal types),
-            // we only recognise this as being true for assignability.
             (Type::LiteralValue(literal), Type::NominalInstance(instance))
                 if literal.is_string() =>
             {

@@ -1114,7 +1114,7 @@ impl<'db> Bindings<'db> {
 
                         let kw_only = if Program::get(db).python_version(db) >= PythonVersion::PY310
                         {
-                            match kw_only.and_then(super::super::Type::as_literal_value_kind) {
+                            match kw_only.and_then(Type::as_literal_value_kind) {
                                 // We are more conservative here when turning the type for `kw_only`
                                 // into a bool, because a field specifier in a stub might use
                                 // `kw_only: bool = ...` and the truthiness of `...` is always true.
@@ -1128,7 +1128,7 @@ impl<'db> Bindings<'db> {
                         };
 
                         let alias = alias
-                            .and_then(super::super::Type::as_string_literal)
+                            .and_then(Type::as_string_literal)
                             .map(|literal| Box::from(literal.value(db)));
 
                         // `typeshed` pretends that `dataclasses.field()` returns the type of the

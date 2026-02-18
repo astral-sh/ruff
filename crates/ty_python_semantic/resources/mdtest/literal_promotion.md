@@ -142,6 +142,7 @@ def promote[T](x: T) -> list[T]:
     return [x]
 
 x1 = ((((1),),),)
+reveal_type(x1)  # revealed: tuple[tuple[tuple[Literal[1]]]]
 reveal_type(promote(x1))  # revealed: list[tuple[tuple[tuple[int]]]]
 
 x2 = ([1, 2], [(3,), (4,)], ["5", "6"])
@@ -159,7 +160,7 @@ def in_negated_position(non_zero_number: int):
     reveal_type([non_zero_number])  # revealed: list[Unknown | (int & ~Literal[0])]
 ```
 
-## Literal annnotations are respected
+## Literal annotations are respected
 
 Literal types that are explicitly annotated will not be promoted, even if they are initially
 declared in a promotable position:
@@ -372,7 +373,7 @@ def h(x: TI) -> list[TI]:
 reveal_type(h(1))  # revealed: list[int]
 ```
 
-## Literal annnotations from declaration are respected
+## Literal annotations from declaration are respected
 
 Literal types that are explicitly annotated when declared will not be promoted, even if they are
 later used in a promotable position:

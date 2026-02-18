@@ -5,11 +5,9 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 
 use crate::Db;
-use crate::types::KnownClass;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::Tuple;
-
-use super::Type;
+use crate::types::{KnownClass, Type};
 
 /// Maximum number of expanded types that can be generated from a single tuple's
 /// Cartesian product in [`expand_type`].

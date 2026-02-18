@@ -130,10 +130,10 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, LiteralValueTypeKind, MemberLookupPolicy, MetaclassCandidate,
-    PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
-    SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    LintDiagnosticGuard, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
+    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
     TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
     UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
@@ -14897,7 +14897,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if result
                 .ok()
                 .and_then(Type::as_literal_value)
-                .is_some_and(super::super::literal::LiteralValueType::is_bool)
+                .is_some_and(LiteralValueType::is_bool)
             {
                 return result;
             }
@@ -14914,7 +14914,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .infer_binary_type_comparison(other, op, *neg, range, visitor)
                     .ok(),
             }
-            .and_then(super::super::Type::as_literal_value_kind);
+            .and_then(Type::as_literal_value_kind);
 
             match (op, result) {
                 (ast::CmpOp::Is, Some(LiteralValueTypeKind::Bool(true))) => {
