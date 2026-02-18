@@ -404,9 +404,10 @@ impl<'db> NarrowingConstraint<'db> {
         };
 
         let new_intersection_disjunct = self.intersection_disjunct.map(|intersection_disjunct| {
-            IntersectionType::from_elements(
+            IntersectionType::from_two_elements(
                 db,
-                [intersection_disjunct, other_intersection_disjunct],
+                intersection_disjunct,
+                other_intersection_disjunct,
             )
         });
 
@@ -414,9 +415,10 @@ impl<'db> NarrowingConstraint<'db> {
             self.replacement_disjuncts
                 .iter()
                 .map(|replacement_disjunct| {
-                    IntersectionType::from_elements(
+                    IntersectionType::from_two_elements(
                         db,
-                        [*replacement_disjunct, other_intersection_disjunct],
+                        *replacement_disjunct,
+                        other_intersection_disjunct,
                     )
                 });
 

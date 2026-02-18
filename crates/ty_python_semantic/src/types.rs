@@ -12896,6 +12896,7 @@ pub(super) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
     }
 }
 
+#[salsa::tracked]
 impl<'db> IntersectionType<'db> {
     pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
@@ -12904,6 +12905,19 @@ impl<'db> IntersectionType<'db> {
     {
         IntersectionBuilder::new(db)
             .positive_elements(elements)
+            .build()
+    }
+
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+            result.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
+        IntersectionBuilder::new(db)
+            .positive_elements([a, b])
             .build()
     }
 
