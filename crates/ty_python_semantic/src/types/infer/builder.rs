@@ -1711,18 +1711,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 `{first_method_name}`",
             ));
         } else {
-            let formatted_names = abstract_methods.formatted_names();
+            let formatted_names = abstract_methods.formatted_names(db);
             if formatted_names.truncation_occurred {
                 diagnostic.set_concise_message(format_args!(
                     "Final class `{class_name}` has {num_abstract_methods} unimplemented \
                     abstract methods, including {formatted_methods}",
-                    formatted_methods = abstract_methods.formatted_names()
+                    formatted_methods = abstract_methods.formatted_names(db)
                 ));
             } else {
                 diagnostic.set_concise_message(format_args!(
                     "Final class `{class_name}` has unimplemented \
                     abstract methods {formatted_methods}",
-                    formatted_methods = abstract_methods.formatted_names()
+                    formatted_methods = abstract_methods.formatted_names(db)
                 ));
             }
         }

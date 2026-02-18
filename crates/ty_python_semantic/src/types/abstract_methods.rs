@@ -3,7 +3,6 @@ use ruff_db::{
     parsed::parsed_module,
 };
 use ruff_python_ast::name::Name;
-use smallvec::SmallVec;
 use ty_module_resolver::{SearchPath, file_to_module};
 
 use crate::{
@@ -18,15 +17,9 @@ use crate::{
     },
 };
 
-/// Unless `--verbose` was specified on the command line,
-/// we will only print this number of abstract methods in diagnostics
-/// complaining about abstract class instantiation (and similar)
-const DEFAULT_METHOD_NUMBER_TO_PRINT: usize = 3;
-
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub(super) struct AbstractMethods<'db> {
-    methods: &'db SmallVec<[Name; DEFAULT_METHOD_NUMBER_TO_PRINT]>,
-    total_length: usize,
+    methods: &'db FxIndexSet<Name>,
     class: ClassType<'db>,
 }
 
@@ -37,13 +30,10 @@ impl<'db> AbstractMethods<'db> {
         #[salsa::tracked(
             returns(ref),
             heap_size=ruff_memory_usage::heap_size,
-            cycle_initial=|_, _, _| (SmallVec::default(), 0)
+            cycle_initial=|_, _, _| FxIndexSet::default()
         )]
-        fn of_class_inner<'db>(
-            db: &'db dyn Db,
-            class: ClassType<'db>,
-        ) -> (SmallVec<[Name; DEFAULT_METHOD_NUMBER_TO_PRINT]>, usize) {
-            let mut abstract_methods: FxIndexSet<&Name> = FxIndexSet::default();
+        fn of_class_inner<'db>(db: &'db dyn Db, class: ClassType<'db>) -> FxIndexSet<Name> {
+            let mut abstract_methods: FxIndexSet<Name> = FxIndexSet::default();
 
             // Iterate through the MRO in reverse order,
             // skipping `object` (we know it doesn't define any abstract methods)
@@ -92,7 +82,7 @@ impl<'db> AbstractMethods<'db> {
                         continue;
                     };
                     if type_as_abstract_method(db, ty, class).is_some() {
-                        abstract_methods.insert(name);
+                        abstract_methods.insert(name.clone());
                     } else {
                         // If this method is concrete, remove it from the map of abstract methods.
                         abstract_methods.shift_remove(name);
@@ -100,27 +90,12 @@ impl<'db> AbstractMethods<'db> {
                 }
             }
 
-            let total_abstract_methods = abstract_methods.len();
-
-            let truncated = if db.verbose() {
-                abstract_methods.into_iter().cloned().collect()
-            } else {
-                abstract_methods
-                    .into_iter()
-                    .take(DEFAULT_METHOD_NUMBER_TO_PRINT)
-                    .cloned()
-                    .collect()
-            };
-
-            (truncated, total_abstract_methods)
+            abstract_methods
         }
 
-        let (methods, total_length) = of_class_inner(db, class);
-
         Self {
-            methods,
+            methods: of_class_inner(db, class),
             class,
-            total_length: *total_length,
         }
     }
 
@@ -194,7 +169,7 @@ impl<'db> AbstractMethods<'db> {
             }
         } else {
             let num_abstract_methods = self.len();
-            let formatted_methods = self.formatted_names();
+            let formatted_methods = self.formatted_names(db);
 
             if formatted_methods.truncation_occurred {
                 diagnostic.set_primary_message(format_args!(
@@ -311,14 +286,25 @@ impl<'db> AbstractMethods<'db> {
         }
     }
 
+    /// Unless `--verbose` was specified on the command line,
+    /// we will only print this number of abstract methods in diagnostics
+    /// complaining about abstract class instantiation (and similar)
+    const DEFAULT_METHOD_NUMBER_TO_PRINT: usize = 3;
+
     /// Return a string that contains a formatted subset of the abstract methods
     /// in this map.
     ///
     /// This is useful for diagnostics.
-    pub(super) fn formatted_names(&self) -> FormattedAbstractMethods {
-        let truncation_occurred = self.methods.len() < self.len();
+    pub(super) fn formatted_names(&self, db: &'db dyn Db) -> FormattedAbstractMethods {
+        let len = self.methods.len();
+        let max_abstract_methods_to_print = if db.verbose() {
+            len
+        } else {
+            AbstractMethods::DEFAULT_METHOD_NUMBER_TO_PRINT
+        };
+        let truncation_occurred = max_abstract_methods_to_print < len;
         FormattedAbstractMethods {
-            inner: format_enumeration(self.methods),
+            inner: format_enumeration(self.methods.iter().take(max_abstract_methods_to_print)),
             truncation_occurred,
         }
     }
@@ -328,7 +314,7 @@ impl<'db> AbstractMethods<'db> {
     }
 
     pub(super) fn len(&self) -> usize {
-        self.total_length
+        self.methods.len()
     }
 
     pub(super) fn is_empty(&self) -> bool {
