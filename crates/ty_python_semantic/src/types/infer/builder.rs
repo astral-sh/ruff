@@ -9750,9 +9750,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     format_import_from_module(*level, module),
                 );
 
-                let no_parent_package = file_to_module(self.db(), self.file()).is_some_and(|m| {
-                    !m.kind(self.db()).is_package() && m.name(self.db()).parent().is_none()
-                });
+                let no_parent_package = file_to_module(self.db(), self.file())
+                    .is_some_and(|m| m.name(self.db()).parent().is_none());
 
                 if no_parent_package {
                     self.report_no_parent_package(
