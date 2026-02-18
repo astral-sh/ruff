@@ -4137,7 +4137,7 @@ impl<'db> Type<'db> {
                                     // errors instead of `type-assertion-failure` errors.
                                     .with_annotated_type(Type::any())],
                             ),
-                            Type::none(db),
+                            Type::Never,
                         ),
                     )
                     .into()
