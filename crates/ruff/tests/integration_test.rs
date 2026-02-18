@@ -637,7 +637,7 @@ fn stdin_override_parser_py_config() -> Result<()> {
         &pyproject_toml,
         r#"
 [tool.ruff]
-extension = {"ipynb"="python"}
+extension = {ipynb="python"}
 "#,
     )?;
     let mut cmd = RuffCheck::default()

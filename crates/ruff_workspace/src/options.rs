@@ -291,7 +291,7 @@ pub struct Options {
         value_type = "dict[str, Language]",
         example = r#"
             # Add a custom file extension mapped to Python
-            extension = {"rpy"="python"}
+            extension = {rpy="python"}
         "#
     )]
     pub extension: Option<FxHashMap<String, Language>>,
