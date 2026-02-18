@@ -3,7 +3,7 @@ use ruff_db::{
     parsed::parsed_module,
 };
 use ruff_python_ast::name::Name;
-use ty_module_resolver::file_to_module;
+use ty_module_resolver::{SearchPath, file_to_module};
 
 use crate::{
     Db, FxIndexSet, TypeQualifiers,
@@ -111,6 +111,8 @@ impl<'db> AbstractMethods<'db> {
             .first()
             .expect("`annotate_diagnostic()` should not be called on an empty `AbstractMethods`");
 
+        let mut annotation_override = None;
+
         let (definition, kind, defining_class) = self
             .class
             .iter_mro(db)
@@ -119,11 +121,25 @@ impl<'db> AbstractMethods<'db> {
                 let literal = superclass.class_literal(db).as_static()?;
                 let scope = literal.body_scope(db);
                 let symbol_id = place_table(db, scope).symbol_id(first_name)?;
-                let bindings = use_def_map(db, literal.body_scope(db))
-                    .end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id));
+                let use_def_map = use_def_map(db, literal.body_scope(db));
+                let bindings = use_def_map.end_of_scope_bindings(ScopedPlaceId::Symbol(symbol_id));
                 let place_and_def = place_from_bindings(db, bindings);
+
+                let Some(ty) = place_and_def.place.ignore_possibly_undefined() else {
+                    let declarations_iterator =
+                        use_def_map.end_of_scope_symbol_declarations(symbol_id);
+                    let declarations = place_from_declarations(db, declarations_iterator);
+                    let first_declaration = declarations.first_declaration?;
+                    debug_assert!(
+                        !declarations
+                            .ignore_conflicting_declarations()
+                            .is_class_var()
+                    );
+                    annotation_override = Some((superclass, first_declaration));
+                    return None;
+                };
+
                 let definition = place_and_def.first_definition?;
-                let ty = place_and_def.place.ignore_possibly_undefined()?;
                 let kind = type_as_abstract_method(db, ty, superclass)?;
                 Some((definition, kind, superclass))
             })
@@ -188,45 +204,84 @@ impl<'db> AbstractMethods<'db> {
         // If this method was implicitly abstract (due to being a method with an
         // empty body in a `Protocol` class), we attach additional annotations
         // that explain this feature of the type system.
-        if kind.is_explicit() {
-            return;
-        }
-        let defining_class_name = defining_class.name(db);
-        let mut sub = SubDiagnostic::new(
-            SubDiagnosticSeverity::Info,
-            format_args!(
-                "`{defining_class_name}.{first_name}` is implicitly abstract \
+        if !kind.is_explicit() {
+            let defining_class_name = defining_class.name(db);
+            let mut sub = SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format_args!(
+                    "`{defining_class_name}.{first_name}` is implicitly abstract \
                 because `{defining_class_name}` is a `Protocol` class \
                 and `{first_name}` lacks an implementation",
-            ),
-        );
-        sub.annotate(
-            Annotation::secondary(defining_class.definition_span(db))
-                .message(format_args!("`{defining_class_name}` declared here")),
-        );
-        diagnostic.sub(sub);
+                ),
+            );
+            sub.annotate(
+                Annotation::secondary(defining_class.definition_span(db))
+                    .message(format_args!("`{defining_class_name}` declared here")),
+            );
+            diagnostic.sub(sub);
 
-        // If the implicitly abstract method is defined in first-party code
-        // and the return type is assignable to `None`, they may not have intended
-        // for it to be implicitly abstract; add a clarificatory note:
-        if kind.is_implicit_due_to_stub_body()
-            && file_to_module(db, definition.file(db))
-                .and_then(|module| module.search_path(db))
-                .is_some_and(ty_module_resolver::SearchPath::is_first_party)
-        {
-            let function_type_as_callable = binding_type(db, definition).try_upcast_to_callable(db);
-
-            if let Some(callables) = function_type_as_callable
-                && Type::function_like_callable(
-                    db,
-                    Signature::new(Parameters::gradual_form(), Type::none(db)),
-                )
-                .is_assignable_to(db, callables.into_type(db))
+            // If the implicitly abstract method is defined in first-party code
+            // and the return type is assignable to `None`, they may not have intended
+            // for it to be implicitly abstract; add a clarificatory note:
+            if kind.is_implicit_due_to_stub_body()
+                && file_to_module(db, definition.file(db))
+                    .and_then(|module| module.search_path(db))
+                    .is_some_and(SearchPath::is_first_party)
             {
-                diagnostic.help(format_args!(
-                    "Change the body of `{first_name}` to `return` \
+                let function_type_as_callable =
+                    binding_type(db, definition).try_upcast_to_callable(db);
+
+                if let Some(callables) = function_type_as_callable
+                    && Type::function_like_callable(
+                        db,
+                        Signature::new(Parameters::gradual_form(), Type::none(db)),
+                    )
+                    .is_assignable_to(db, callables.into_type(db))
+                {
+                    diagnostic.help(format_args!(
+                        "Change the body of `{first_name}` to `return` \
                         or `return None` if it was not intended to be abstract",
+                    ));
+                }
+            }
+        }
+
+        if let Some((superclass, declaration)) = annotation_override {
+            if superclass == self.class {
+                diagnostic.info(format_args!(
+                    "`{first_name}` is overridden \
+                        with an instance-attribute annotation,",
                 ));
+            } else {
+                diagnostic.info(format_args!(
+                    "`{first_name}` is overridden on superclass `{}` \
+                        with an instance-attribute annotation,",
+                    superclass.name(db)
+                ));
+            }
+            diagnostic.info(format_args!(
+                "but this is insufficient to make `{}` non-abstract",
+                self.class.name(db)
+            ));
+
+            let file = declaration.file(db);
+
+            if file_to_module(db, file)
+                .and_then(|module| module.search_path(db))
+                .is_some_and(SearchPath::is_first_party)
+            {
+                let mut sub = SubDiagnostic::new(
+                    SubDiagnosticSeverity::Help,
+                    "Either assign a value or add `ClassVar` to this declaration",
+                );
+                let declaration_module = parsed_module(db, file).load(db);
+                sub.annotate(
+                    Annotation::secondary(Span::from(
+                        declaration.focus_range(db, &declaration_module),
+                    ))
+                    .message("Instance-attribute declaration on superclass"),
+                );
+                diagnostic.sub(sub);
             }
         }
     }

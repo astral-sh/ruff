@@ -97,6 +97,7 @@ But if the annotation does not use `ClassVar`, we do not see that as overriding 
 ```py
 class StillAbstractDynamic(AbstractDynamic):
     f: int
+    g: Callable[..., str]
 
 StillAbstractDynamic()  # error: [call-non-callable]
 ```
