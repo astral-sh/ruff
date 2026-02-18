@@ -830,7 +830,7 @@ impl ReachabilityConstraints {
         place: ScopedPlaceId,
         binding_place_version: Option<PlaceVersion>,
         accumulated: Option<NarrowingConstraint<'db>>,
-        terminal_memo: &mut FxHashMap<
+        memo: &mut FxHashMap<
             (ScopedNarrowingConstraint, Option<NarrowingConstraint<'db>>),
             Type<'db>,
         >,
@@ -843,10 +843,7 @@ impl ReachabilityConstraints {
             _ => id,
         };
         let key = (memo_id, accumulated.clone());
-        // Only terminal IDs are recorded in the cache because other IDs have a low cache hit rate.
-        if memo_id.is_terminal()
-            && let Some(cached) = terminal_memo.get(&key).copied()
-        {
+        if let Some(cached) = memo.get(&key).copied() {
             return cached;
         }
 
@@ -875,19 +872,10 @@ impl ReachabilityConstraints {
                             place,
                             binding_place_version,
                             $next_accumulated,
-                            terminal_memo,
+                            memo,
                             truthiness_memo,
                         )
                     };
-                }
-                macro_rules! narrow_cached {
-                    ($next_id:expr, $next_accumulated:expr) => {{
-                        let narrowed = narrow!($next_id, $next_accumulated);
-                        if key.0.is_terminal() {
-                            terminal_memo.insert(key, narrowed);
-                        }
-                        narrowed
-                    }};
                 }
 
                 // Check if this predicate narrows the variable we're interested in.
@@ -918,10 +906,14 @@ impl ReachabilityConstraints {
                 if pos_constraint.is_none() && neg_constraint.is_none() {
                     match Self::analyze_single_cached(db, predicate, truthiness_memo) {
                         Truthiness::AlwaysTrue => {
-                            return narrow_cached!(node.if_true, accumulated);
+                            let narrowed = narrow!(node.if_true, accumulated);
+                            memo.insert(key, narrowed);
+                            return narrowed;
                         }
                         Truthiness::AlwaysFalse => {
-                            return narrow_cached!(node.if_false, accumulated);
+                            let narrowed = narrow!(node.if_false, accumulated);
+                            memo.insert(key, narrowed);
+                            return narrowed;
                         }
                         Truthiness::Ambiguous => {}
                     }
@@ -930,13 +922,17 @@ impl ReachabilityConstraints {
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
                     let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
-                    return narrow_cached!(node.if_false, false_accumulated);
+                    let narrowed = narrow!(node.if_false, false_accumulated);
+                    memo.insert(key, narrowed);
+                    return narrowed;
                 }
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
                     let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
-                    return narrow_cached!(node.if_true, true_accumulated);
+                    let narrowed = narrow!(node.if_true, true_accumulated);
+                    memo.insert(key, narrowed);
+                    return narrowed;
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
@@ -953,9 +949,7 @@ impl ReachabilityConstraints {
             }
         };
 
-        if key.0.is_terminal() {
-            terminal_memo.insert(key, narrowed);
-        }
+        memo.insert(key, narrowed);
         narrowed
     }
 
