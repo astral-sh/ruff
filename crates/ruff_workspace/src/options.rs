@@ -525,6 +525,34 @@ pub struct LintOptions {
     )]
     pub exclude: Option<Vec<String>>,
 
+    /// A list of rule codes or prefixes to enable with severity level
+    /// `warning`. Prefixes can specify exact  rules (like `F841`), entire
+    /// categories (like `F`), or anything in  between.
+    ///
+    /// When breaking ties between enabled and disabled rules (via `select`,
+    /// `warn`, and  `ignore`, respectively), more specific prefixes override
+    /// less  specific prefixes. In case of a tie, the precedence, from highest
+    /// to lowest, is `ignore`, `warn`, and then `select`.
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[RuleSelector]",
+        example = r#"
+            warn = ["PLW"]
+        "#
+    )]
+    pub warn: Option<Vec<RuleSelector>>,
+
+    /// A list of rule codes or prefixes to enable with severity `warning`,
+    /// in addition to those specified by [`warn`](#lint_warn).
+    #[option(
+        default = "[]",
+        value_type = "list[RuleSelector]",
+        example = r#"
+            extend-warn= ["ARG", "PLW"]
+        "#
+    )]
+    pub extend_warn: Option<Vec<RuleSelector>>,
+
     /// Options for the `pydoclint` plugin.
     #[option_group]
     pub pydoclint: Option<PydoclintOptions>,
@@ -4002,6 +4030,7 @@ pub struct LintOptionsWire {
     dummy_variable_rgx: Option<String>,
     extend_ignore: Option<Vec<RuleSelector>>,
     extend_select: Option<Vec<RuleSelector>>,
+    extend_warn: Option<Vec<RuleSelector>>,
     extend_fixable: Option<Vec<RuleSelector>>,
     extend_unfixable: Option<Vec<RuleSelector>>,
     external: Option<Vec<String>>,
@@ -4012,6 +4041,7 @@ pub struct LintOptionsWire {
     ignore_init_module_imports: Option<bool>,
     logger_objects: Option<Vec<String>>,
     select: Option<Vec<RuleSelector>>,
+    warn: Option<Vec<RuleSelector>>,
     explicit_preview_rules: Option<bool>,
     task_tags: Option<Vec<String>>,
     typing_modules: Option<Vec<String>>,
@@ -4059,6 +4089,7 @@ impl From<LintOptionsWire> for LintOptions {
             dummy_variable_rgx,
             extend_ignore,
             extend_select,
+            extend_warn,
             extend_fixable,
             extend_unfixable,
             external,
@@ -4069,6 +4100,7 @@ impl From<LintOptionsWire> for LintOptions {
             ignore_init_module_imports,
             logger_objects,
             select,
+            warn,
             explicit_preview_rules,
             task_tags,
             typing_modules,
@@ -4157,6 +4189,8 @@ impl From<LintOptionsWire> for LintOptions {
                 per_file_ignores,
                 extend_per_file_ignores,
             },
+            extend_warn,
+            warn,
             exclude,
             pydoclint,
             ruff,
