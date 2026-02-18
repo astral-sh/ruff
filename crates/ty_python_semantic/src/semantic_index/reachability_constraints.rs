@@ -830,10 +830,7 @@ impl ReachabilityConstraints {
         place: ScopedPlaceId,
         binding_place_version: Option<PlaceVersion>,
         accumulated: Option<NarrowingConstraint<'db>>,
-        memo: &mut FxHashMap<
-            (ScopedNarrowingConstraint, Option<NarrowingConstraint<'db>>),
-            Type<'db>,
-        >,
+        memo: &mut FxHashMap<ScopedNarrowingConstraint, Type<'db>>,
         truthiness_memo: &mut FxHashMap<Predicate<'db>, Truthiness>,
     ) -> Type<'db> {
         // `ALWAYS_TRUE` and `AMBIGUOUS` are equivalent for narrowing purposes.
@@ -842,12 +839,15 @@ impl ReachabilityConstraints {
             ALWAYS_TRUE | AMBIGUOUS => ALWAYS_TRUE,
             _ => id,
         };
-        let key = (memo_id, accumulated.clone());
-        if let Some(cached) = memo.get(&key).copied() {
+        // The cache is created and referenced only when `accumulated` is `None`.
+        // In the case of `Some(...)`, the hit rate is not good, so it is not very effective.
+        if accumulated.is_none()
+            && let Some(cached) = memo.get(&memo_id).copied()
+        {
             return cached;
         }
 
-        let narrowed = match id {
+        match id {
             ALWAYS_TRUE | AMBIGUOUS => {
                 // Apply all accumulated narrowing constraints to the base type
                 match accumulated {
@@ -876,6 +876,16 @@ impl ReachabilityConstraints {
                             truthiness_memo,
                         )
                     };
+                }
+                macro_rules! narrow_cached {
+                    ($next_id:expr, $next_accumulated:expr) => {{
+                        let no_accumulated = $next_accumulated.is_none();
+                        let narrowed = narrow!($next_id, $next_accumulated);
+                        if no_accumulated {
+                            memo.insert(memo_id, narrowed);
+                        }
+                        narrowed
+                    }};
                 }
 
                 // Check if this predicate narrows the variable we're interested in.
@@ -906,14 +916,10 @@ impl ReachabilityConstraints {
                 if pos_constraint.is_none() && neg_constraint.is_none() {
                     match Self::analyze_single_cached(db, predicate, truthiness_memo) {
                         Truthiness::AlwaysTrue => {
-                            let narrowed = narrow!(node.if_true, accumulated);
-                            memo.insert(key, narrowed);
-                            return narrowed;
+                            return narrow_cached!(node.if_true, accumulated);
                         }
                         Truthiness::AlwaysFalse => {
-                            let narrowed = narrow!(node.if_false, accumulated);
-                            memo.insert(key, narrowed);
-                            return narrowed;
+                            return narrow_cached!(node.if_false, accumulated);
                         }
                         Truthiness::Ambiguous => {}
                     }
@@ -922,35 +928,33 @@ impl ReachabilityConstraints {
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
                     let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
-                    let narrowed = narrow!(node.if_false, false_accumulated);
-                    memo.insert(key, narrowed);
-                    return narrowed;
+                    return narrow_cached!(node.if_false, false_accumulated);
                 }
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
                     let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
-                    let narrowed = narrow!(node.if_true, true_accumulated);
-                    memo.insert(key, narrowed);
-                    return narrowed;
+                    return narrow_cached!(node.if_true, true_accumulated);
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
                 let true_accumulated =
                     accumulate_constraint(db, accumulated.clone(), pos_constraint);
+                let no_true_accumulated = true_accumulated.is_none();
                 let true_ty = narrow!(node.if_true, true_accumulated);
 
                 // False branch: predicate doesn't hold → accumulate negative narrowing
                 let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                let no_accumulated = no_true_accumulated && false_accumulated.is_none();
                 let false_ty = narrow!(node.if_false, false_accumulated);
-
                 // We won't do a union type redundancy check here, as it only needs to be performed once for the final result.
-                UnionType::from_elements_no_redundancy_check(db, [true_ty, false_ty])
+                let union = UnionType::from_elements_no_redundancy_check(db, [true_ty, false_ty]);
+                if no_accumulated {
+                    memo.insert(memo_id, union);
+                }
+                union
             }
-        };
-
-        memo.insert(key, narrowed);
-        narrowed
+        }
     }
 
     fn predicate_applies_to_place_version(
