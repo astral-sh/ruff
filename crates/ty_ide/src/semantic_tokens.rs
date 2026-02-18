@@ -1057,7 +1057,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
             }
             ast::Pattern::MatchMapping(pattern_mapping) => {
                 // `**rest` can appear before or after the key-value pairs
-                // (the parser accepts both, emitting an error for the former).
+                // (the parser can produce either AST, but emits an
+                // invalid-syntax error for the former).
                 let rest_before_keys = pattern_mapping.rest.as_ref().filter(|rest| {
                     pattern_mapping
                         .keys
