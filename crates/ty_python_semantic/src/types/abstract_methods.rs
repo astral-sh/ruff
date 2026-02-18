@@ -27,9 +27,14 @@ impl<'db> AbstractMethods<'db> {
     /// Returns a set of methods on this class that were defined as abstract on a superclass
     /// and have not been overridden with a concrete implementation anywhere in the MRO
     pub(super) fn of_class(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=|_, _, _| true)]
+        fn abstract_methods_is_empty<'db>(db: &'db dyn Db, class: ClassType<'db>) -> bool {
+            abstract_methods_of_class(db, class).is_empty()
+        }
+
         Self {
             class,
-            is_empty: abstract_methods_of_class(db, class).is_empty(),
+            is_empty: abstract_methods_is_empty(db, class),
         }
     }
 
