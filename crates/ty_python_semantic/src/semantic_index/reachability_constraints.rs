@@ -902,10 +902,14 @@ impl ReachabilityConstraints {
                 if pos_constraint.is_none() && neg_constraint.is_none() {
                     match Self::analyze_single_cached(db, predicate, truthiness_memo) {
                         Truthiness::AlwaysTrue => {
-                            return narrow!(node.if_true, accumulated);
+                            let narrowed = narrow!(node.if_true, accumulated);
+                            memo.insert(key, narrowed);
+                            return narrowed;
                         }
                         Truthiness::AlwaysFalse => {
-                            return narrow!(node.if_false, accumulated);
+                            let narrowed = narrow!(node.if_false, accumulated);
+                            memo.insert(key, narrowed);
+                            return narrowed;
                         }
                         Truthiness::Ambiguous => {}
                     }
@@ -914,13 +918,17 @@ impl ReachabilityConstraints {
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
                     let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
-                    return narrow!(node.if_false, false_accumulated);
+                    let narrowed = narrow!(node.if_false, false_accumulated);
+                    memo.insert(key, narrowed);
+                    return narrowed;
                 }
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
                     let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
-                    return narrow!(node.if_true, true_accumulated);
+                    let narrowed = narrow!(node.if_true, true_accumulated);
+                    memo.insert(key, narrowed);
+                    return narrowed;
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
