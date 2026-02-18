@@ -491,22 +491,13 @@ reveal_type(s)  # revealed: Unknown
 # error: [unresolved-reference]
 reveal_type(t)  # revealed: Unknown
 
-# TODO: these should all reveal `Unknown | int` and should not emit errors.
-# (We don't generally model elsewhere in ty that bindings from walruses
-# "leak" from comprehension scopes into outer scopes, but we should.)
-# See https://github.com/astral-sh/ruff/issues/16954
-# error: [unresolved-reference]
-reveal_type(g)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(i)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(k)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(m)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(o)  # revealed: Unknown
-# error: [unresolved-reference]
-reveal_type(q)  # revealed: Unknown
+# PEP 572: walrus targets in comprehensions leak into the enclosing scope.
+reveal_type(g)  # revealed: int
+reveal_type(i)  # revealed: int
+reveal_type(k)  # revealed: int
+reveal_type(m)  # revealed: int
+reveal_type(o)  # revealed: int
+reveal_type(q)  # revealed: int
 ```
 
 ### An annotation without a value is a definition in a stub but not a `.py` file
