@@ -223,74 +223,76 @@ impl Suppressions {
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
         let mut unmatched_ranges = FxHashSet::default();
 
-        let process_pending_diagnostics =
-            |key: Option<TextRange>,
-             grouped_diagnostic: &Option<(TextRange, SuppressionDiagnostic)>|
-             -> bool {
-                if let Some((group_key, group)) = grouped_diagnostic
-                    && key.is_none_or(|key| key != *group_key)
-                {
-                    if group.any_invalid() {
-                        if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
-                            context,
-                            locator,
-                            group.suppression,
-                            &group.invalid_codes,
-                            true,
-                            InvalidRuleCode {
-                                rule_code: group.invalid_codes.iter().join(", "),
-                                kind: InvalidRuleCodeKind::Suppression,
-                                whole_comment: group.suppression.codes().len()
-                                    == group.invalid_codes.len(),
-                            },
-                        ) {
-                            diagnostic.help(
-                                "Add non-Ruff rule codes to the `lint.external` configuration option",
-                            );
-                        }
-                    }
-                    if group.any_unused() {
-                        let mut codes = group.disabled_codes.clone();
-                        codes.extend(group.unused_codes.clone());
-                        Suppressions::report_suppression_codes(
-                            context,
-                            locator,
-                            group.suppression,
-                            &codes,
-                            false,
-                            UnusedNOQA {
-                                codes: Some(UnusedCodes {
-                                    disabled: group
-                                        .disabled_codes
-                                        .iter()
-                                        .map(ToString::to_string)
-                                        .collect_vec(),
-                                    duplicated: group
-                                        .duplicated_codes
-                                        .iter()
-                                        .map(ToString::to_string)
-                                        .collect_vec(),
-                                    unmatched: group
-                                        .unused_codes
-                                        .iter()
-                                        .map(ToString::to_string)
-                                        .collect_vec(),
-                                    ..Default::default()
-                                }),
-                                kind: UnusedNOQAKind::Suppression,
-                            },
+        fn process_pending_diagnostics(
+            key: Option<TextRange>,
+            grouped_diagnostic: &Option<(TextRange, SuppressionDiagnostic)>,
+            context: &LintContext,
+            locator: &Locator,
+        ) -> bool {
+            if let Some((group_key, group)) = grouped_diagnostic
+                && key.is_none_or(|key| key != *group_key)
+            {
+                if group.any_invalid() {
+                    if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
+                        context,
+                        locator,
+                        group.suppression,
+                        &group.invalid_codes,
+                        true,
+                        InvalidRuleCode {
+                            rule_code: group.invalid_codes.iter().join(", "),
+                            kind: InvalidRuleCodeKind::Suppression,
+                            whole_comment: group.suppression.codes().len()
+                                == group.invalid_codes.len(),
+                        },
+                    ) {
+                        diagnostic.help(
+                            "Add non-Ruff rule codes to the `lint.external` configuration option",
                         );
                     }
-                    true
-                } else {
-                    false
                 }
-            };
+                if group.any_unused() {
+                    let mut codes = group.disabled_codes.clone();
+                    codes.extend(group.unused_codes.clone());
+                    Suppressions::report_suppression_codes(
+                        context,
+                        locator,
+                        group.suppression,
+                        &codes,
+                        false,
+                        UnusedNOQA {
+                            codes: Some(UnusedCodes {
+                                disabled: group
+                                    .disabled_codes
+                                    .iter()
+                                    .map(ToString::to_string)
+                                    .collect_vec(),
+                                duplicated: group
+                                    .duplicated_codes
+                                    .iter()
+                                    .map(ToString::to_string)
+                                    .collect_vec(),
+                                unmatched: group
+                                    .unused_codes
+                                    .iter()
+                                    .map(ToString::to_string)
+                                    .collect_vec(),
+                                ..Default::default()
+                            }),
+                            kind: UnusedNOQAKind::Suppression,
+                        },
+                    );
+                }
+                true
+            } else {
+                false
+            }
+        }
 
         for suppression in &self.valid {
             let key = suppression.comments.disable_comment().range;
 
-            if process_pending_diagnostics(Some(key), &grouped_diagnostic) {
+            if process_pending_diagnostics(Some(key), &grouped_diagnostic, context, locator) {
                 grouped_diagnostic = None;
             }
 
@@ -339,7 +341,7 @@ impl Suppressions {
             }
         }
 
-        process_pending_diagnostics(None, &grouped_diagnostic);
+        process_pending_diagnostics(None, &grouped_diagnostic, context, locator);
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {
