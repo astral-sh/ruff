@@ -180,6 +180,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
             }
         }
         PredicateNode::IsNonTerminalCall(_) => return None,
+        PredicateNode::DeferredWalrusReachability(_) => return None,
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
 
@@ -731,6 +732,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.evaluate_pattern_predicate(pattern, self.is_positive)
             }
             PredicateNode::IsNonTerminalCall(_) => return None,
+            PredicateNode::DeferredWalrusReachability(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
 
@@ -912,6 +914,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::IsNonTerminalCall(CallableAndCallExpr { callable, .. }) => {
                 callable.scope(self.db)
             }
+            PredicateNode::DeferredWalrusReachability(predicate) => predicate.scope(self.db),
             PredicateNode::StarImportPlaceholder(definition) => definition.scope(self.db),
         }
     }

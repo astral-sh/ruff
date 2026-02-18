@@ -488,6 +488,10 @@ pub(crate) struct LoopHeaderDefinitionNodeRef<'ast, 'db> {
 pub(crate) enum LoopStmtRef<'ast> {
     While(&'ast ast::StmtWhile),
     For(&'ast ast::StmtFor),
+    ListComprehension(&'ast ast::ExprListComp),
+    SetComprehension(&'ast ast::ExprSetComp),
+    DictComprehension(&'ast ast::ExprDictComp),
+    GeneratorExpression(&'ast ast::ExprGenerator),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -719,6 +723,18 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 loop_stmt: match loop_stmt {
                     LoopStmtRef::While(stmt) => LoopStmtKind::While(AstNodeRef::new(parsed, stmt)),
                     LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
+                    LoopStmtRef::ListComprehension(expr) => {
+                        LoopStmtKind::ListComprehension(AstNodeRef::new(parsed, expr))
+                    }
+                    LoopStmtRef::SetComprehension(expr) => {
+                        LoopStmtKind::SetComprehension(AstNodeRef::new(parsed, expr))
+                    }
+                    LoopStmtRef::DictComprehension(expr) => {
+                        LoopStmtKind::DictComprehension(AstNodeRef::new(parsed, expr))
+                    }
+                    LoopStmtRef::GeneratorExpression(expr) => {
+                        LoopStmtKind::GeneratorExpression(AstNodeRef::new(parsed, expr))
+                    }
                 },
                 place,
             }),
@@ -793,6 +809,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::LoopHeader(LoopHeaderDefinitionNodeRef { loop_stmt, .. }) => match loop_stmt {
                 LoopStmtRef::While(stmt) => stmt.into(),
                 LoopStmtRef::For(stmt) => stmt.into(),
+                LoopStmtRef::ListComprehension(expr) => DefinitionNodeKey(NodeKey::from_node(expr)),
+                LoopStmtRef::SetComprehension(expr) => DefinitionNodeKey(NodeKey::from_node(expr)),
+                LoopStmtRef::DictComprehension(expr) => DefinitionNodeKey(NodeKey::from_node(expr)),
+                LoopStmtRef::GeneratorExpression(expr) => {
+                    DefinitionNodeKey(NodeKey::from_node(expr))
+                }
             },
         }
     }
@@ -1476,6 +1498,10 @@ pub struct LoopHeaderDefinitionKind<'db> {
 pub(crate) enum LoopStmtKind {
     While(AstNodeRef<ast::StmtWhile>),
     For(AstNodeRef<ast::StmtFor>),
+    ListComprehension(AstNodeRef<ast::ExprListComp>),
+    SetComprehension(AstNodeRef<ast::ExprSetComp>),
+    DictComprehension(AstNodeRef<ast::ExprDictComp>),
+    GeneratorExpression(AstNodeRef<ast::ExprGenerator>),
 }
 
 impl<'db> LoopHeaderDefinitionKind<'db> {
@@ -1491,6 +1517,10 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
         match &self.loop_stmt {
             LoopStmtKind::While(stmt) => stmt.node(module).range(),
             LoopStmtKind::For(stmt) => stmt.node(module).range(),
+            LoopStmtKind::ListComprehension(expr) => expr.node(module).range(),
+            LoopStmtKind::SetComprehension(expr) => expr.node(module).range(),
+            LoopStmtKind::DictComprehension(expr) => expr.node(module).range(),
+            LoopStmtKind::GeneratorExpression(expr) => expr.node(module).range(),
         }
     }
 }

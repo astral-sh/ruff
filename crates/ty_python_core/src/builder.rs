@@ -61,6 +61,7 @@ use crate::{
     EvaluationMode, ExpressionsScopeMap, LoopHeader, LoopToken, NarrowingAliasPredicate,
     PossiblyNarrowedPlaces, SemanticIndex, VisibleAncestorsIter, get_loop_header,
 };
+use walrus::DeferredWalrusDefinition;
 
 use super::place::PlaceExprRef;
 
@@ -208,6 +209,15 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
 
     /// Alias metadata for predicate leaf names in the current file.
     alias_predicates: FxHashMap<ExpressionNodeKey, NarrowingAliasPredicate<'db>>,
+
+    /// Named-expression definitions that bind in an enclosing scope from inside a comprehension.
+    ///
+    /// These cannot be recorded in the enclosing scope immediately: doing so would make the
+    /// binding visible to reads that occur earlier in the same comprehension scope. Instead, we
+    /// record the binding locally for ordering inside the current scope, propagate it outward
+    /// through any enclosing comprehension scopes as each scope is popped, and only record it in
+    /// the true target scope once those scopes have been snapshotted.
+    deferred_walrus_definitions: Vec<DeferredWalrusDefinition<'db>>,
 }
 
 impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
@@ -257,6 +267,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             semantic_syntax_errors: RefCell::default(),
             narrowing_aliases: FxHashMap::default(),
             alias_predicates: FxHashMap::default(),
+            deferred_walrus_definitions: Vec::new(),
         };
 
         builder.push_scope_with_parent(NodeWithScopeRef::Module, None);
@@ -1110,10 +1121,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 );
             }
             Some(CurrentAssignment::Named(named)) => {
-                // TODO(dhruvmanila): If the current scope is a comprehension, then the
-                // named expression is implicitly nonlocal. This is yet to be
-                // implemented.
-                self.add_definition(place_id, named);
+                self.record_named_expression_definition(place_id, named);
             }
             Some(CurrentAssignment::Comprehension {
                 unpack,
@@ -1193,8 +1201,35 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_use_def_map_mut().delete_binding(place);
     }
 
+    fn create_definition_in_scope(
+        &mut self,
+        scope: FileScopeId,
+        place: ScopedPlaceId,
+        definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
+    ) -> (Definition<'db>, usize, DefinitionCategory, bool) {
+        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
+
+        // Note `definition_node` is guaranteed to be a child of `self.module`
+        let kind = definition_node.into_owned(self.module);
+        let is_loop_header = kind.is_loop_header();
+
+        let category = kind.category(self.source_type.is_stub(), self.module);
+        let is_reexported = kind.is_reexported();
+
+        let definition: Definition<'db> =
+            Definition::new(self.db, self.file, scope, place, kind, is_reexported);
+
+        let num_definitions = {
+            let definitions = self.add_entry_for_definition_key(definition_node.key());
+            definitions.push(definition);
+            definitions.len()
+        };
+
+        (definition, num_definitions, category, is_loop_header)
+    }
+
     /// Push a new [`Definition`] onto the list of definitions
-    /// associated with the `definition_node` AST node.
+    /// associated with the `definition_node` AST node in the current scope.
     ///
     /// Returns a 2-element tuple, where the first element is the newly created [`Definition`]
     /// and the second element is the number of definitions that are now associated with
@@ -1208,29 +1243,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         place: ScopedPlaceId,
         definition_node: impl Into<DefinitionNodeRef<'ast, 'db>>,
     ) -> (Definition<'db>, usize) {
-        let definition_node: DefinitionNodeRef<'ast, 'db> = definition_node.into();
-
-        // Note `definition_node` is guaranteed to be a child of `self.module`
-        let kind = definition_node.into_owned(self.module);
-        let is_loop_header = kind.is_loop_header();
-
-        let category = kind.category(self.source_type.is_stub(), self.module);
-        let is_reexported = kind.is_reexported();
-
-        let definition: Definition<'db> = Definition::new(
-            self.db,
-            self.file,
-            self.current_scope(),
-            place,
-            kind,
-            is_reexported,
-        );
-
-        let num_definitions = {
-            let definitions = self.add_entry_for_definition_key(definition_node.key());
-            definitions.push(definition);
-            definitions.len()
-        };
+        let (definition, num_definitions, category, is_loop_header) =
+            self.create_definition_in_scope(self.current_scope(), place, definition_node);
 
         // We need to avoid marking places as bound as soon as we encounter a loop header
         // definition for them, because that would lead to false-positive semantic syntax errors in
@@ -1280,6 +1294,25 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.try_node_context_stack_manager = try_node_stack_manager;
 
         (definition, num_definitions)
+    }
+
+    fn record_existing_binding(&mut self, place: ScopedPlaceId, definition: Definition<'db>) {
+        self.mark_place_bound(place);
+        self.invalidate_narrowing_aliases_for(place);
+        self.current_use_def_map_mut().record_binding(
+            place,
+            definition,
+            PreviousDefinitions::AreShadowed,
+        );
+        self.delete_associated_bindings(place);
+
+        if let Some(id) = place.as_symbol() {
+            self.update_lazy_snapshots(id);
+        }
+
+        let mut try_node_stack_manager = std::mem::take(&mut self.try_node_context_stack_manager);
+        try_node_stack_manager.record_definition(self);
+        self.try_node_context_stack_manager = try_node_stack_manager;
     }
 
     // Creates a definition for each key-value assignment in the dictionary.
@@ -1551,6 +1584,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                             .pattern(pattern, module)
                     }
                     PredicateNode::IsNonTerminalCall(_)
+                    | PredicateNode::DeferredWalrusReachability(_)
                     | PredicateNode::StarImportPlaceholder(_) => {
                         // These predicates don't narrow any places
                         PossiblyNarrowedPlaces::default()
@@ -1951,12 +1985,54 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// - It then pops the new scope off the stack
     ///
     /// [`Comprehension`]: ast::Comprehension
+    fn comprehension_loop_bindings(
+        scope: NodeWithScopeRef<'ast>,
+        generators: &'ast [ast::Comprehension],
+    ) -> (LoopStmtRef<'ast>, Vec<PlaceExpr>) {
+        match scope {
+            NodeWithScopeRef::ListComprehension(expression) => (
+                LoopStmtRef::ListComprehension(expression),
+                loop_bindings_visitor::collect_comprehension_loop_bindings(
+                    generators,
+                    std::iter::once(expression.elt.as_ref()),
+                ),
+            ),
+            NodeWithScopeRef::SetComprehension(expression) => (
+                LoopStmtRef::SetComprehension(expression),
+                loop_bindings_visitor::collect_comprehension_loop_bindings(
+                    generators,
+                    std::iter::once(expression.elt.as_ref()),
+                ),
+            ),
+            NodeWithScopeRef::DictComprehension(expression) => (
+                LoopStmtRef::DictComprehension(expression),
+                loop_bindings_visitor::collect_comprehension_loop_bindings(
+                    generators,
+                    expression
+                        .key
+                        .iter()
+                        .map(AsRef::as_ref)
+                        .chain(std::iter::once(expression.value.as_ref())),
+                ),
+            ),
+            NodeWithScopeRef::GeneratorExpression(expression) => (
+                LoopStmtRef::GeneratorExpression(expression),
+                loop_bindings_visitor::collect_comprehension_loop_bindings(
+                    generators,
+                    std::iter::once(expression.elt.as_ref()),
+                ),
+            ),
+            _ => unreachable!("only comprehension scopes are visited through this helper"),
+        }
+    }
+
     fn with_generators_scope(
         &mut self,
-        scope: NodeWithScopeRef,
+        scope: NodeWithScopeRef<'ast>,
         generators: &'ast [ast::Comprehension],
         visit_outer_elt: impl FnOnce(&mut Self),
     ) {
+        let (loop_node, loop_bound_places) = Self::comprehension_loop_bindings(scope, generators);
         let mut generators_iter = generators.iter();
 
         let Some(generator) = generators_iter.next() else {
@@ -1975,6 +2051,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let saved_assignments = std::mem::take(&mut self.current_assignments);
 
         self.push_scope(scope);
+        let mut rejected_states = Vec::new();
+        let loop_header_info = if loop_bound_places.is_empty() {
+            None
+        } else {
+            Some(self.synthesize_loop_header_definitions(loop_node, loop_bound_places))
+        };
 
         self.add_unpackable_assignment(
             &Unpackable::Comprehension {
@@ -1986,7 +2068,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         );
 
         for if_expr in &generator.ifs {
-            self.visit_comprehension_filter(if_expr);
+            self.visit_comprehension_filter(if_expr, &mut rejected_states);
         }
 
         for generator in generators_iter {
@@ -2003,21 +2085,43 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             );
 
             for if_expr in &generator.ifs {
-                self.visit_comprehension_filter(if_expr);
+                self.visit_comprehension_filter(if_expr, &mut rejected_states);
             }
         }
 
         visit_outer_elt(self);
-        self.pop_scope();
+        for rejected_state in rejected_states {
+            self.flow_merge(rejected_state);
+        }
+        if let Some((loop_token, bound_place_ids, loop_min_definition_id)) = loop_header_info {
+            self.populate_loop_header(&bound_place_ids, loop_token, loop_min_definition_id);
+        }
+        let popped_scope = self.pop_scope();
+        // Keep generator expressions consistent with ty's existing eager model for comprehensions.
+        self.propagate_deferred_walrus_definitions(popped_scope);
 
         self.current_assignments = saved_assignments;
     }
 
-    fn visit_comprehension_filter(&mut self, if_expr: &'ast ast::Expr) {
+    fn visit_comprehension_filter(
+        &mut self,
+        if_expr: &'ast ast::Expr,
+        rejected_states: &mut Vec<FlowSnapshot>,
+    ) {
         self.visit_expr(if_expr);
         let condition_flow_snapshot = self.flow_snapshot_for_condition(if_expr);
         self.flow_restore(condition_flow_snapshot.truthy());
-        let _ = self.record_expression_narrowing_constraint(if_expr);
+        let (predicate, predicate_id) = self.record_expression_narrowing_constraint(if_expr);
+        let reachability_constraint = self.record_reachability_constraint(predicate);
+        let accepted_state = self.flow_snapshot();
+
+        self.flow_restore(condition_flow_snapshot.falsy());
+        self.record_negated_narrowing_constraint(predicate, predicate_id);
+        self.record_negated_reachability_constraint(reachability_constraint);
+        let rejected_state = self.flow_snapshot();
+        rejected_states.push(rejected_state);
+
+        self.flow_restore(accepted_state);
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {

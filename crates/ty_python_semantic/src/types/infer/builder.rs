@@ -33,8 +33,8 @@ use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
     explicit_global_symbol, loop_header_reachability, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    module_type_implicit_global_symbol, place, place_from_bindings, place_from_bindings_for_place,
+    place_from_declarations, typing_extensions_symbol,
 };
 use crate::reachability::ReachabilityConstraintsExtension;
 use crate::types::add_inferred_python_version_hint_to_diagnostic;
@@ -441,6 +441,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    fn extend_cross_scope_definition(&mut self, inference: &DefinitionInference<'db>) {
+        self.expressions
+            .extend(inference.expressions.iter().copied());
+
+        if let Some(extra) = &inference.extra {
+            self.context.extend(&extra.diagnostics);
+            self.extend_cycle_recovery(extra.cycle_recovery);
+            self.string_annotations
+                .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
+            self.qualifiers.extend(extra.qualifiers.iter());
+            self.type_expression_flags
+                .extend(extra.type_expression_flags.iter());
+        }
+    }
+
+    fn extend_cross_scope_expression(&mut self, inference: &ExpressionInference<'db>) {
+        self.expressions
+            .extend(inference.expressions.iter().copied());
+
+        if let Some(extra) = &inference.extra {
+            // For a leaked walrus target, the contextual cross-scope inference owns
+            // diagnostics for the value; the uncontextual inner-scope inference is
+            // merged without diagnostics.
+            self.context.extend(&extra.diagnostics);
+            self.extend_cycle_recovery(extra.cycle_recovery);
+            self.string_annotations
+                .extend(extra.string_annotations.iter().copied());
+            self.expected_types.extend(extra.expected_types.iter());
+            self.type_expression_flags
+                .extend(extra.type_expression_flags.iter());
+        }
+    }
+
     fn extend_statement(&mut self, inference: &StatementInference<'db>) {
         let inference = match inference {
             StatementInference::Other(inference) => inference,
@@ -483,12 +517,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.extend_expression_unchecked(inference);
     }
 
+    fn extend_expression_without_diagnostics(&mut self, inference: &ExpressionInference<'db>) {
+        #[cfg(debug_assertions)]
+        assert_eq!(self.scope, inference.scope);
+
+        self.extend_expression_unchecked_impl(inference, false);
+    }
+
     fn extend_expression_unchecked(&mut self, inference: &ExpressionInference<'db>) {
+        self.extend_expression_unchecked_impl(inference, true);
+    }
+
+    fn extend_expression_unchecked_impl(
+        &mut self,
+        inference: &ExpressionInference<'db>,
+        include_diagnostics: bool,
+    ) {
         self.expressions
             .extend(inference.expressions.iter().copied());
 
         if let Some(extra) = &inference.extra {
-            self.context.extend(&extra.diagnostics);
+            if include_diagnostics {
+                self.context.extend(&extra.diagnostics);
+            }
             self.extend_cycle_recovery(extra.cycle_recovery);
             self.string_annotations
                 .extend(extra.string_annotations.iter().copied());
@@ -6997,13 +7048,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = generator;
 
+        self.infer_comprehensions(generators);
         let elt_tcx = if elt.is_starred_expr() {
             tcx.map(|yield_ty| KnownClass::Iterable.to_specialized_instance(self.db(), &[yield_ty]))
         } else {
             tcx
         };
         self.infer_expression(elt, elt_tcx);
-        self.infer_comprehensions(generators);
     }
 
     fn infer_list_comprehension_expression_scope(
@@ -7018,11 +7069,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             generators,
         } = listcomp;
 
+        self.infer_comprehensions(generators);
+
         // Infer the element type using the outer type context.
         let elts = [[Some(elt.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-
         self.infer_collection_literal(
             KnownClass::List,
             Some(listcomp.into()),
@@ -7030,8 +7082,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut infer_elt_ty,
             tcx,
         );
-
-        self.infer_comprehensions(generators);
     }
 
     fn infer_set_comprehension_expression_scope(
@@ -7046,11 +7096,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             generators,
         } = setcomp;
 
+        self.infer_comprehensions(generators);
+
         // Infer the element type using the outer type context.
         let elts = [[Some(elt.as_ref())]];
         let mut infer_elt_ty =
             |builder: &mut Self, (_, elt, tcx)| builder.infer_expression(elt, tcx);
-
         self.infer_collection_literal(
             KnownClass::Set,
             Some(setcomp.into()),
@@ -7058,8 +7109,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             &mut infer_elt_ty,
             tcx,
         );
-
-        self.infer_comprehensions(generators);
     }
 
     fn infer_dict_comprehension_expression_scope(
@@ -7074,6 +7123,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
             generators,
         } = dictcomp;
+
+        self.infer_comprehensions(generators);
 
         if key.is_some() {
             // Infer the key and value types using the outer type context.
@@ -7094,8 +7145,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // mapping diagnostic twice.
             self.infer_expression(value, TypeContext::default());
         }
-
-        self.infer_comprehensions(generators);
     }
 
     fn infer_comprehensions(&mut self, comprehensions: &[ast::Comprehension]) {
@@ -7196,10 +7245,37 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_named_expression(&mut self, named: &ast::ExprNamed) -> Type<'db> {
         // See https://peps.python.org/pep-0572/#differences-between-assignment-expressions-and-assignment-statements
         if named.target.is_name_expr() {
-            let definition = self.index.expect_single_definition(named);
-            let result = infer_definition_types(self.db(), definition);
-            self.extend_definition(result);
-            result.binding_type(definition)
+            let db = self.db();
+            let definition = self
+                .index
+                .try_definitions(named.into())
+                .and_then(|definitions| definitions.first().copied());
+
+            if let Some(expression) = self.index.try_expression(named.value.as_ref()) {
+                // PEP 572: walrus in comprehension binds in the enclosing scope.
+                // Infer the value via its standalone expression in this scope, where
+                // the comprehension iteration variables are visible. When the
+                // enclosing definition exists, its contextual inference owns value
+                // diagnostics as well as assignment diagnostics and declaration fallback.
+                let expression_result =
+                    infer_expression_types(db, expression, TypeContext::default());
+
+                if let Some(definition) = definition {
+                    self.extend_expression_without_diagnostics(expression_result);
+                    let definition_result = infer_definition_types(db, definition);
+                    self.extend_cross_scope_definition(definition_result);
+                    definition_result.binding_type(definition)
+                } else {
+                    self.extend_expression(expression_result);
+                    expression_result.expression_type(named.value.as_ref())
+                }
+            } else if let Some(definition) = definition {
+                let result = infer_definition_types(db, definition);
+                self.extend_definition(result);
+                result.binding_type(definition)
+            } else {
+                self.infer_expression(&named.value, TypeContext::default())
+            }
         } else {
             // For syntactically invalid targets, we still need to run type inference:
             self.infer_expression(&named.target, TypeContext::default());
@@ -7222,7 +7298,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let add = self.add_binding(named.target.as_ref().into(), definition);
 
-        let ty = self.infer_expression(value, add.type_context());
+        // PEP 572: walrus in a comprehension binds in the enclosing scope, but
+        // the value references comprehension-scoped variables. The builder
+        // registers the value as a standalone expression in the comprehension
+        // scope so we can infer it there. This contextual inference owns value
+        // diagnostics; bindings and declarations remain scoped to the
+        // standalone expression's use-def map.
+        let ty = if let Some(expression) = self.index.try_expression(value.as_ref()) {
+            let result = infer_expression_types(self.db(), expression, add.type_context());
+            self.extend_cross_scope_expression(result);
+            result.expression_type(value.as_ref())
+        } else {
+            self.infer_expression(value, add.type_context())
+        };
         self.store_expression_type(target, ty);
         add.insert(self, ty)
     }
@@ -8478,7 +8566,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                place_from_bindings_for_place(db, use_def.reachable_bindings(place_id), place_id)
+                    .place
             } else {
                 assert!(
                     self.in_string_annotation(),
@@ -8500,8 +8589,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // therefore has no `ScopedUseId`, so resolve it from its binding definition instead.
             if let ast::ExprRef::Named(named) = expr_ref {
                 let place = if named.target.is_name_expr() {
-                    let definition = self.index.expect_single_definition(named);
-                    Place::bound(binding_type(db, definition))
+                    if let Some(definition) = self
+                        .index
+                        .try_definitions(named.into())
+                        .and_then(|definitions| definitions.first().copied())
+                    {
+                        Place::bound(binding_type(db, definition))
+                    } else {
+                        Place::bound(self.expression_type(&named.value))
+                    }
                 } else {
                     Place::Undefined
                 };
@@ -8509,7 +8605,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
+            let place_id = place_table.place_id(expr).expect(
+                "Expected the place table to create a place for every valid PlaceExpr node",
+            );
+            let place =
+                place_from_bindings_for_place(db, use_def.bindings_at_use(use_id), place_id).place;
 
             (place, Some(use_id))
         }
@@ -8558,7 +8658,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return Place::Undefined.into();
                 }
                 EnclosingSnapshotResult::FoundBindings(bindings) => {
-                    let mut place_and_qualifiers = place_from_bindings(db, bindings);
+                    let global_place_table = self.index.place_table(FileScopeId::global());
+                    let mut place_and_qualifiers =
+                        if let Some(place_id) = global_place_table.place_id(place_expr) {
+                            place_from_bindings_for_place(db, bindings, place_id)
+                        } else {
+                            place_from_bindings(db, bindings)
+                        };
                     if assume_bound && let Place::Defined(defined) = place_and_qualifiers.place {
                         place_and_qualifiers.place =
                             Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
@@ -8726,7 +8832,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings(db, bindings).place.map_type(|ty| {
+                            let enclosing_place_table =
+                                self.index.place_table(enclosing_scope_file_id);
+                            let place = if let Some(place_id) =
+                                enclosing_place_table.place_id(place_expr)
+                            {
+                                place_from_bindings_for_place(db, bindings, place_id).place
+                            } else {
+                                place_from_bindings(db, bindings).place
+                            }
+                            .map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
                                     ty,
