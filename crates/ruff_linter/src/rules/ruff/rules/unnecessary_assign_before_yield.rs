@@ -4,7 +4,6 @@ use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Identifier, Stmt};
-use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
@@ -102,93 +101,60 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
             _ => continue,
         };
 
-        if assign.targets.len() > 1 {
-            continue;
-        }
-
-        let Some(target) = assign.targets.first() else {
-            continue;
-        };
-
-        let Expr::Name(ast::ExprName {
-            id: assigned_id, ..
-        }) = target
-        else {
-            continue;
-        };
-
-        if yielded_id != assigned_id {
-            continue;
-        }
-
-        if stack.annotations.contains(assigned_id.as_str()) {
-            continue;
-        }
-
-        if stack.non_locals.contains(assigned_id.as_str()) {
-            continue;
-        }
-
-        let Some(assigned_binding) = function_scope
-            .get(assigned_id)
-            .map(|binding_id| checker.semantic().binding(binding_id))
-        else {
-            continue;
-        };
-
-        // Unlike `return`, `yield` doesn't exit the function, so the variable could be
-        // referenced elsewhere. Only flag if the binding has exactly one reference (the
-        // yield itself).
-        if assigned_binding.references().count() != 1 {
-            continue;
-        }
-
-        if assigned_binding
-            .references()
-            .map(|reference_id| checker.semantic().reference(reference_id))
-            .any(|reference| reference.scope_id() != assigned_binding.scope)
+        if assign.targets.len() == 1
+            && let Some(Expr::Name(ast::ExprName {
+                id: assigned_id, ..
+            })) = assign.targets.first()
+            && yielded_id == assigned_id
+            && !stack.annotations.contains(assigned_id.as_str())
+            && !stack.non_locals.contains(assigned_id.as_str())
+            && let Some(assigned_binding) = function_scope
+                .get(assigned_id)
+                .map(|binding_id| checker.semantic().binding(binding_id))
+            // Unlike `return`, `yield` doesn't exit the function, so the variable could be
+            // referenced elsewhere. Only flag if the binding has exactly one reference (the
+            // yield itself).
+            && assigned_binding.references().count() == 1
+            && assigned_binding
+                .references()
+                .map(|reference_id| checker.semantic().reference(reference_id))
+                .all(|reference| reference.scope_id() == assigned_binding.scope)
         {
-            continue;
-        }
-
-        let mut diagnostic = checker.report_diagnostic(
-            UnnecessaryAssignBeforeYield {
-                name: assigned_id.to_string(),
-                is_yield_from,
-            },
-            yield_value_range,
-        );
-        diagnostic.try_set_fix(|| {
-            // Delete the `yield x` expression statement. There's no need to treat this as an
-            // isolated edit, since we're editing the preceding statement, so no conflicting
-            // edit would be allowed to remove that preceding statement.
-            let delete_yield = edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
-
-            let eq_token = checker
-                .tokens()
-                .before(assign.value.start())
-                .iter()
-                .rfind(|token| token.kind() == TokenKind::Equal)
-                .context("Expected an equals token")?;
-
-            let content = checker.source();
-            let keyword = if is_yield_from { "yield from" } else { "yield" };
-
-            let replace_assign = Edit::range_replacement(
-                if content[eq_token.end().to_usize()..]
-                    .chars()
-                    .next()
-                    .is_some_and(is_python_whitespace)
-                {
-                    keyword.to_string()
-                } else {
-                    format!("{keyword} ")
+            let mut diagnostic = checker.report_diagnostic(
+                UnnecessaryAssignBeforeYield {
+                    name: assigned_id.to_string(),
+                    is_yield_from,
                 },
-                TextRange::new(assign.start(), eq_token.range().end()),
+                yield_value_range,
             );
+            diagnostic.try_set_fix(|| {
+                // Delete the `yield x` expression statement. There's no need to treat this as
+                // an isolated edit, since we're editing the preceding statement, so no
+                // conflicting edit would be allowed to remove that preceding statement.
+                let delete_yield =
+                    edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
-            Ok(Fix::unsafe_edits(replace_assign, [delete_yield]))
-        });
+                let eq_token = checker
+                    .tokens()
+                    .before(assign.value.start())
+                    .iter()
+                    .rfind(|token| token.kind() == TokenKind::Equal)
+                    .context("Expected an equals token")?;
+
+                let keyword = if is_yield_from { "yield from" } else { "yield" };
+
+                let replace_assign = Edit::range_replacement(
+                    if eq_token.end() < assign.value.start() {
+                        keyword.to_string()
+                    } else {
+                        format!("{keyword} ")
+                    },
+                    TextRange::new(assign.start(), eq_token.range().end()),
+                );
+
+                Ok(Fix::unsafe_edits(replace_assign, [delete_yield]))
+            });
+        }
     }
 }
 
