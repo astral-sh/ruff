@@ -9334,16 +9334,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                         .is_ok();
 
-                    let setitem_ok = object_ty
-                        .try_call_dunder(
-                            db,
-                            "__setitem__",
-                            CallArguments::positional([slice_ty, target_type]),
-                            TypeContext::default(),
-                        )
-                        .is_ok();
-
-                    if getitem_ok && setitem_ok {
+                    if getitem_ok {
                         self.validate_subscript_assignment_impl(
                             subscript,
                             None,
