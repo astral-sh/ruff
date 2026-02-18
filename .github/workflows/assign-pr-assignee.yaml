@@ -1,0 +1,393 @@
+name: Assign PR assignee
+
+permissions:
+  actions: write
+  contents: read
+  issues: write
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - reopened
+      - ready_for_review
+
+concurrency:
+  group: assign-pr-assignee
+  cancel-in-progress: false
+
+jobs:
+  assign:
+    name: Assign round-robin assignee
+    if: ${{ github.event.pull_request.draft == false }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const CONFIG_PATH = ".github/pr-assignee-pools.json";
+            const FALLBACK_STATE_VARIABLE = "PR_ASSIGNEE_ROUND_ROBIN_STATE";
+            const { randomInt } = require("crypto");
+
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pr = context.payload.pull_request;
+
+            if (!pr) {
+              core.setFailed("This workflow only supports pull request events.");
+              return;
+            }
+
+            if ((pr.assignees ?? []).length > 0) {
+              core.info(`PR #${pr.number} already has assignees; skipping.`);
+              return;
+            }
+
+            const issue = await github.rest.issues.get({
+              owner,
+              repo,
+              issue_number: pr.number,
+            });
+
+            if ((issue.data.assignees ?? []).length > 0) {
+              core.info(`PR #${pr.number} already has assignees (latest API state); skipping.`);
+              return;
+            }
+
+            function normalizePattern(pattern) {
+              const trimmed = String(pattern ?? "").trim();
+              if (!trimmed) {
+                return "";
+              }
+              if (trimmed.startsWith("/")) {
+                return trimmed.slice(1);
+              }
+              return trimmed;
+            }
+
+            function globToRegex(pattern) {
+              let regex = "^";
+
+              for (let index = 0; index < pattern.length; index += 1) {
+                const char = pattern[index];
+
+                if (char === "*") {
+                  if (pattern[index + 1] === "*") {
+                    while (pattern[index + 1] === "*") {
+                      index += 1;
+                    }
+                    regex += ".*";
+                  } else {
+                    regex += "[^/]*";
+                  }
+                } else if (char === "?") {
+                  regex += "[^/]";
+                } else if ("\\^$+?.()|{}[]".includes(char)) {
+                  regex += `\\${char}`;
+                } else {
+                  regex += char;
+                }
+              }
+
+              regex += "$";
+              return new RegExp(regex);
+            }
+
+            const regexCache = new Map();
+            function matchesPattern(filePath, pattern) {
+              const normalized = normalizePattern(pattern);
+              if (!normalized) {
+                return false;
+              }
+
+              let matcher = regexCache.get(normalized);
+              if (!matcher) {
+                matcher = globToRegex(normalized);
+                regexCache.set(normalized, matcher);
+              }
+
+              return matcher.test(filePath);
+            }
+
+            function normalizePoolCandidates(reviewers, prAuthorLogin) {
+              const candidates = [];
+              const seen = new Set();
+              const normalizedAuthor = String(prAuthorLogin ?? "").toLowerCase();
+
+              for (const reviewer of Array.isArray(reviewers) ? reviewers : []) {
+                const normalizedReviewer = String(reviewer).replace(/^@/, "").trim();
+                if (!normalizedReviewer) {
+                  continue;
+                }
+
+                const key = normalizedReviewer.toLowerCase();
+                if (key === normalizedAuthor || seen.has(key)) {
+                  continue;
+                }
+
+                seen.add(key);
+                candidates.push(normalizedReviewer);
+              }
+
+              return candidates;
+            }
+
+            function poolMatchWeight(pool, changedFiles) {
+              const patterns = Array.isArray(pool.paths) ? pool.paths : [];
+              if (patterns.length === 0) {
+                return 0;
+              }
+
+              let weight = 0;
+              for (const filePath of changedFiles) {
+                if (patterns.some((pattern) => matchesPattern(filePath, pattern))) {
+                  weight += 1;
+                }
+              }
+
+              return weight;
+            }
+
+            function pickPoolsForChangedFiles(changedFiles, pools, prAuthorLogin) {
+              const matchedPools = [];
+
+              for (const pool of pools) {
+                const weight = poolMatchWeight(pool, changedFiles);
+                if (weight === 0) {
+                  continue;
+                }
+
+                const candidates = normalizePoolCandidates(pool.reviewers, prAuthorLogin);
+                if (candidates.length === 0) {
+                  continue;
+                }
+
+                matchedPools.push({
+                  name: pool.name,
+                  weight,
+                  candidates,
+                });
+              }
+
+              return matchedPools;
+            }
+
+            function pickWeightedRandomPool(pools) {
+              const totalWeight = pools.reduce((sum, pool) => sum + Math.max(1, pool.weight), 0);
+              if (totalWeight <= 0) {
+                return null;
+              }
+
+              let ticket = randomInt(totalWeight);
+              for (const pool of pools) {
+                const weight = Math.max(1, pool.weight);
+                if (ticket < weight) {
+                  return pool;
+                }
+                ticket -= weight;
+              }
+
+              return pools[pools.length - 1] ?? null;
+            }
+
+            async function loadConfig() {
+              const response = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path: CONFIG_PATH,
+                ref: pr.base.sha,
+              });
+
+              if (Array.isArray(response.data) || !("content" in response.data)) {
+                throw new Error(`Expected ${CONFIG_PATH} to be a file.`);
+              }
+
+              const content = Buffer.from(response.data.content, "base64").toString("utf8");
+              const config = JSON.parse(content);
+
+              if (!config || !Array.isArray(config.pools)) {
+                throw new Error(`${CONFIG_PATH} must define a top-level 'pools' array.`);
+              }
+
+              return config;
+            }
+
+            async function listChangedFiles() {
+              const files = await github.paginate(github.rest.pulls.listFiles, {
+                owner,
+                repo,
+                pull_number: pr.number,
+                per_page: 100,
+              });
+
+              return files.map((file) => file.filename);
+            }
+
+            let statePersistenceEnabled = true;
+
+            async function loadRoundRobinState(variableName) {
+              try {
+                const response = await github.rest.actions.getRepoVariable({
+                  owner,
+                  repo,
+                  name: variableName,
+                });
+
+                if (!response.data.value) {
+                  return {};
+                }
+
+                const state = JSON.parse(response.data.value);
+                if (!state || typeof state !== "object" || Array.isArray(state)) {
+                  core.warning(`${variableName} did not contain an object. Resetting state.`);
+                  return {};
+                }
+
+                return state;
+              } catch (error) {
+                if (error.status === 404) {
+                  return {};
+                }
+
+                if (error.status === 403) {
+                  statePersistenceEnabled = false;
+                  core.warning(`No permission to read ${variableName}; using non-persistent rotation.`);
+                  return {};
+                }
+
+                throw error;
+              }
+            }
+
+            async function saveRoundRobinState(variableName, state) {
+              if (!statePersistenceEnabled) {
+                return;
+              }
+
+              const value = JSON.stringify(state);
+
+              try {
+                await github.rest.actions.updateRepoVariable({
+                  owner,
+                  repo,
+                  name: variableName,
+                  value,
+                });
+              } catch (error) {
+                if (error.status === 404) {
+                  try {
+                    await github.rest.actions.createRepoVariable({
+                      owner,
+                      repo,
+                      name: variableName,
+                      value,
+                    });
+                    return;
+                  } catch (createError) {
+                    if (createError.status === 403) {
+                      statePersistenceEnabled = false;
+                      core.warning(`No permission to create ${variableName}; proceeding without persistence.`);
+                      return;
+                    }
+
+                    throw createError;
+                  }
+                }
+
+                if (error.status === 403) {
+                  statePersistenceEnabled = false;
+                  core.warning(`No permission to update ${variableName}; proceeding without persistence.`);
+                  return;
+                }
+
+                throw error;
+              }
+            }
+
+            function normalizeStartIndex(rawIndex, size) {
+              const parsed = Number.parseInt(String(rawIndex ?? "0"), 10);
+              if (!Number.isFinite(parsed) || parsed < 0) {
+                return 0;
+              }
+              return parsed % size;
+            }
+
+            const config = await loadConfig();
+            const stateVariable = config.state_variable || FALLBACK_STATE_VARIABLE;
+            const changedFiles = await listChangedFiles();
+
+            if (changedFiles.length === 0) {
+              core.info(`PR #${pr.number} does not include changed files; skipping.`);
+              return;
+            }
+
+            const matchedPools = pickPoolsForChangedFiles(changedFiles, config.pools, pr.user.login);
+            if (matchedPools.length === 0) {
+              core.info(`No reviewer pools matched changed files for PR #${pr.number}; skipping.`);
+              return;
+            }
+
+            const state = await loadRoundRobinState(stateVariable);
+
+            let assigned = null;
+            let assignedPoolName = null;
+            const remainingPools = [...matchedPools];
+
+            while (remainingPools.length > 0 && !assigned) {
+              const pool = pickWeightedRandomPool(remainingPools);
+              if (!pool) {
+                break;
+              }
+
+              const startIndex = normalizeStartIndex(state[pool.name], pool.candidates.length);
+              let assignedFromPool = false;
+
+              for (let offset = 0; offset < pool.candidates.length; offset += 1) {
+                const index = (startIndex + offset) % pool.candidates.length;
+                const candidate = pool.candidates[index];
+
+                try {
+                  await github.rest.issues.addAssignees({
+                    owner,
+                    repo,
+                    issue_number: pr.number,
+                    assignees: [candidate],
+                  });
+
+                  state[pool.name] = (index + 1) % pool.candidates.length;
+                  await saveRoundRobinState(stateVariable, state);
+                  assigned = candidate;
+                  assignedPoolName = pool.name;
+                  assignedFromPool = true;
+                  break;
+                } catch (error) {
+                  if (error.status === 422) {
+                    core.warning(`Could not assign @${candidate}; trying next candidate in pool '${pool.name}'.`);
+                    continue;
+                  }
+
+                  throw error;
+                }
+              }
+
+              if (!assignedFromPool) {
+                core.warning(`No assignable reviewers in pool '${pool.name}'. Trying another matched pool.`);
+                const index = remainingPools.findIndex((candidatePool) => candidatePool.name === pool.name);
+                if (index >= 0) {
+                  remainingPools.splice(index, 1);
+                }
+              }
+            }
+
+            if (!assigned) {
+              core.warning(`Unable to assign any candidate for PR #${pr.number}.`);
+              return;
+            }
+
+            const poolNames = matchedPools
+              .map((pool) => `${pool.name} (weight=${pool.weight})`)
+              .join(", ");
+            core.notice(
+              `Assigned @${assigned} from pool '${assignedPoolName}'. Matched pools: ${poolNames}.`,
+            );

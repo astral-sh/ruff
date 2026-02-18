@@ -1,0 +1,35 @@
+{
+  "state_variable": "PR_ASSIGNEE_ROUND_ROBIN_STATE",
+  "pools": [
+    {
+      "name": "ty-semantic",
+      "paths": ["/crates/ty_python_semantic/**", "/crates/ty_module_resolver/**"],
+      "reviewers": ["carljm", "AlexWaygood", "sharkdp", "dcreager", "ibraheemdev", "oconnor663"]
+    },
+    {
+      "name": "ty-infra",
+      "paths": [
+        "/crates/ruff_db/**",
+        "/crates/ty_project/**",
+        "/crates/ty/**",
+        "/crates/ty_benchmark/**"
+      ],
+      "reviewers": ["carljm", "MichaReiser", "BurntSushi"]
+    },
+    {
+      "name": "ty-wasm",
+      "paths": ["/crates/ty_wasm/**"],
+      "reviewers": ["MichaReiser"]
+    },
+    {
+      "name": "ty-ide",
+      "paths": ["/crates/ty_ide/**"],
+      "reviewers": ["MichaReiser", "AlexWaygood", "BurntSushi", "dhruvmanila"]
+    },
+    {
+      "name": "ty-server",
+      "paths": ["/crates/ty_server/**"],
+      "reviewers": ["MichaReiser", "BurntSushi", "dhruvmanila"]
+    }
+  ]
+}
