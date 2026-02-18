@@ -8,15 +8,16 @@ Expression
 ibis
 jax
 materialize
-porcupine
 meson
 openlibrary
 pandas
 pandas-stubs
 pip
+porcupine
 prefect
 pydantic
 PyGithub
+pylox
 rich
 rotki
 scikit-build-core
