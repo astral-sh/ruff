@@ -1056,7 +1056,29 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 }
             }
             ast::Pattern::MatchMapping(pattern_mapping) => {
-                // Visit keys and patterns in source order by interleaving them
+                // `**rest` can appear before or after the key-value pairs
+                // (the parser accepts both, emitting an error for the former).
+                let rest_before_keys = pattern_mapping.rest.as_ref().filter(|rest| {
+                    pattern_mapping
+                        .keys
+                        .first()
+                        .is_some_and(|key| rest.start() < key.start())
+                });
+                let rest_after_keys = pattern_mapping.rest.as_ref().filter(|rest| {
+                    pattern_mapping
+                        .keys
+                        .first()
+                        .is_none_or(|key| rest.start() >= key.start())
+                });
+
+                if let Some(rest_name) = rest_before_keys {
+                    self.add_token(
+                        rest_name.range(),
+                        SemanticTokenType::Variable,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+
                 for (key, nested_pattern) in
                     pattern_mapping.keys.iter().zip(&pattern_mapping.patterns)
                 {
@@ -1064,8 +1086,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.visit_pattern(nested_pattern);
                 }
 
-                // Handle the rest parameter (after "**") - this comes last
-                if let Some(rest_name) = &pattern_mapping.rest {
+                if let Some(rest_name) = rest_after_keys {
                     self.add_token(
                         rest_name.range(),
                         SemanticTokenType::Variable,
@@ -1177,6 +1198,29 @@ def f(x: ast.AST):
         "Name" @ 81..85: Class
         "id" @ 86..88: Variable
         "attr" @ 91..95: Variable
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_match_mapping_pattern_rest_before_keys() {
+        let test = SemanticTokenTest::new(
+            "
+def f(x):
+    match x:
+        case {**rest, 'key': value}:
+            pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "f" @ 5..6: Function [definition]
+        "x" @ 7..8: Parameter [definition]
+        "x" @ 21..22: Parameter
+        "rest" @ 40..44: Variable
+        "'key'" @ 46..51: String
+        "value" @ 53..58: Variable
         "#);
     }
 
