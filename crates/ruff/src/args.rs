@@ -1349,6 +1349,7 @@ struct ExplicitConfigOverrides {
     extend_fixable: Option<Vec<RuleSelector>>,
     extend_ignore: Option<Vec<RuleSelector>>,
     extend_select: Option<Vec<RuleSelector>>,
+    extend_warn: Option<Vec<RuleSelector>>,
     extend_unfixable: Option<Vec<RuleSelector>>,
     fixable: Option<Vec<RuleSelector>>,
     ignore: Option<Vec<RuleSelector>>,
@@ -1358,6 +1359,7 @@ struct ExplicitConfigOverrides {
     preview: Option<PreviewMode>,
     respect_gitignore: Option<bool>,
     select: Option<Vec<RuleSelector>>,
+    warn: Option<Vec<RuleSelector>>,
     target_version: Option<ast::PythonVersion>,
     unfixable: Option<Vec<RuleSelector>>,
     // TODO(charlie): Captured in pyproject.toml as a default, but not part of `Settings`.
@@ -1405,6 +1407,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
         }
         config.lint.rule_selections.push(RuleSelection {
             select: self.select.clone(),
+            warn: self.warn.clone(),
             ignore: self
                 .ignore
                 .iter()
@@ -1413,6 +1416,7 @@ impl ConfigurationTransformer for ExplicitConfigOverrides {
                 .flatten()
                 .collect(),
             extend_select: self.extend_select.clone().unwrap_or_default(),
+            extend_warn: self.extend_warn.clone().unwrap_or_default(),
             fixable: self.fixable.clone(),
             unfixable: self
                 .unfixable

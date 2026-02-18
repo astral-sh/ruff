@@ -65,8 +65,10 @@ use crate::settings::{
 #[derive(Clone, Debug, Default)]
 pub struct RuleSelection {
     pub select: Option<Vec<RuleSelector>>,
+    pub warn: Option<Vec<RuleSelector>>,
     pub ignore: Vec<RuleSelector>,
     pub extend_select: Vec<RuleSelector>,
+    pub extend_warn: Vec<RuleSelector>,
     pub fixable: Option<Vec<RuleSelector>>,
     pub unfixable: Vec<RuleSelector>,
     pub extend_fixable: Vec<RuleSelector>,
@@ -761,6 +763,8 @@ impl LintConfiguration {
 
             rule_selections: vec![RuleSelection {
                 select: options.common.select,
+                warn: options.warn,
+                extend_warn: options.extend_warn.unwrap_or_default(),
                 ignore,
                 extend_select: options.common.extend_select.unwrap_or_default(),
                 fixable: options.common.fixable,
