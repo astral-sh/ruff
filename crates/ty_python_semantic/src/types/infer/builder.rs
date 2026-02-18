@@ -83,10 +83,10 @@ use crate::types::diagnostic::{
     INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER,
     INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
     NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_DATACLASS_WITH_ORDER,
+    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
+    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
@@ -128,16 +128,16 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    CallableTypeKind, ClassType, DataclassFlags, DataclassParams, DynamicType,
+    InternedConstraintSet, InternedType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, KnownUnion, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate,
+    PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
+    SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -1060,23 +1060,58 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if let Some((base_class_literal, _)) = base_class.static_class_literal(self.db())
-                    && let (Some(base_params), Some(class_params)) = (
-                        base_class_literal.dataclass_params(self.db()),
-                        class.dataclass_params(self.db()),
-                    )
+                    && let Some(base_dataclass_params) =
+                        base_class_literal.dataclass_params(self.db())
                 {
-                    let base_params = base_params.flags(self.db());
-                    let class_is_frozen = class_params.flags(self.db()).is_frozen();
+                    let base_flags = base_dataclass_params.flags(self.db());
 
-                    if base_params.is_frozen() != class_is_frozen {
-                        report_bad_frozen_dataclass_inheritance(
-                            &self.context,
-                            class,
-                            class_node,
-                            base_class_literal,
-                            &class_node.bases()[i],
-                            base_params,
-                        );
+                    if let Some(class_params) = class.dataclass_params(self.db()) {
+                        let class_is_frozen = class_params.flags(self.db()).is_frozen();
+
+                        if base_flags.is_frozen() != class_is_frozen {
+                            report_bad_frozen_dataclass_inheritance(
+                                &self.context,
+                                class,
+                                class_node,
+                                base_class_literal,
+                                &class_node.bases()[i],
+                                base_flags,
+                            );
+                        }
+                    }
+
+                    if base_flags.contains(DataclassFlags::ORDER) {
+                        // Suppress the diagnostic if the child class overrides all comparison
+                        // methods, since the user has explicitly fixed the LSP violation.
+                        // This includes the case where the child class also has `order=True`,
+                        // which generates all four comparison methods.
+                        let comparison_methods = ["__lt__", "__le__", "__gt__", "__ge__"];
+                        let child_has_order = class
+                            .dataclass_params(self.db())
+                            .is_some_and(|p| p.flags(self.db()).contains(DataclassFlags::ORDER));
+                        let all_overridden = child_has_order
+                            || comparison_methods.iter().all(|method| {
+                                !class
+                                    .own_class_member(self.db(), None, None, method)
+                                    .is_undefined()
+                            });
+
+                        if !all_overridden {
+                            if let Some(builder) = self.context.report_lint(
+                                &SUBCLASS_OF_DATACLASS_WITH_ORDER,
+                                &class_node.bases()[i],
+                            ) {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Class `{}` inherits from dataclass `{}` which has `order=True`",
+                                    class.name(self.db()),
+                                    base_class.name(self.db()),
+                                ));
+                                diagnostic.info(
+                                    "Comparison of instances of the child class with instances \
+                                    of the parent class will raise `TypeError` at runtime",
+                                );
+                            }
+                        }
                     }
                 }
             }

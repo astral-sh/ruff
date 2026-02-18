@@ -1245,6 +1245,16 @@
             }
           ]
         },
+        "subclass-of-dataclass-with-order": {
+          "title": "detects subclasses of dataclasses with `order=True`",
+          "description": "## What it does\nChecks for classes that inherit from a dataclass with `order=True`.\n\n## Why is this bad?\nWhen a dataclass has `order=True`, comparison methods (`__lt__`, `__le__`, `__gt__`, `__ge__`)\nare generated that compare instances as tuples of their fields. These methods raise a\n`TypeError` at runtime when comparing instances of different classes in the inheritance\nhierarchy, even if one is a subclass of the other.\n\nThis violates the [Liskov Substitution Principle] because child class instances cannot be\nused in all contexts where parent class instances are expected.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass(order=True)\nclass Parent:\n    value: int\n\nclass Child(Parent):  # Ty emits a warning here\n    pass\n\n# At runtime, this raises TypeError:\n# Child(1) < Parent(2)\n```\n\nConsider using [`functools.total_ordering`][total_ordering] instead, which does not have this limitation.\n\n[Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle\n[total_ordering]: https://docs.python.org/3/library/functools.html#functools.total_ordering",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "subclass-of-final-class": {
           "title": "detects subclasses of final classes",
           "description": "## What it does\nChecks for classes that subclass final classes.\n\n## Why is this bad?\nDecorating a class with `@final` declares to the type checker that it should not be subclassed.\n\n## Example\n\n```python\nfrom typing import final\n\n@final\nclass A: ...\nclass B(A): ...  # Error raised here\n```",
