@@ -9308,15 +9308,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         match &**target {
             ast::Expr::Attribute(attr) => {
                 if let Some(object_ty) = self.try_expression_type(&attr.value)
-                    && !object_ty.member(db, &attr.attr.id).place.is_undefined()
+                    && !result_type.is_assignable_to(db, target_type)
                 {
-                    self.validate_attribute_assignment(
-                        attr,
-                        object_ty,
-                        attr.attr.id(),
-                        &mut |_, _| result_type,
-                        true,
-                    );
+                    let should_validate = match object_ty {
+                        Type::Union(union) => union
+                            .elements(db)
+                            .iter()
+                            .all(|elem| !elem.member(db, &attr.attr.id).place.is_undefined()),
+                        _ => !object_ty.member(db, &attr.attr.id).place.is_undefined(),
+                    };
+
+                    if should_validate {
+                        self.validate_attribute_assignment(
+                            attr,
+                            object_ty,
+                            attr.attr.id(),
+                            &mut |_, _| result_type,
+                            true,
+                        );
+                    }
                 }
             }
             ast::Expr::Subscript(subscript) => {

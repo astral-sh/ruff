@@ -247,6 +247,34 @@ f = Foo()
 f.nonexistent += 1
 ```
 
+## Attribute target on union with incompatible member type
+
+```py
+class A:
+    x: str
+
+class B:
+    x: int
+
+def f(o: A | B):
+    # error: [unsupported-operator] "Operator `+=` is not supported between objects of type `str` and `Literal[1]`"
+    o.x += 1
+```
+
+## Attribute target on union with missing attribute
+
+```py
+class A:
+    pass
+
+class B:
+    x: int
+
+def f(o: A | B):
+    # error: [unresolved-attribute]
+    o.x += 1
+```
+
 ## Subscript target with invalid key type
 
 Both `__getitem__` and `__setitem__` fail for the same reason (wrong key type), so only one
