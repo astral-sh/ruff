@@ -40,12 +40,12 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
 # Diagnostics
 
 ```
-error[abstract-method-in-final-class]: Final class `MissingAll` does not implement abstract methods `foo`, `bar` and `baz`
+error[abstract-method-in-final-class]: Final class `MissingAll` has unimplemented abstract methods
   --> src/mdtest_snippet.py:13:7
    |
 12 | @final
 13 | class MissingAll(Base):  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^^
+   |       ^^^^^^^^^^ Abstract methods `foo`, `bar` and `baz` are unimplemented
 14 |     pass
    |
   ::: src/mdtest_snippet.py:6:9
@@ -53,7 +53,7 @@ error[abstract-method-in-final-class]: Final class `MissingAll` does not impleme
  4 | class Base(ABC):
  5 |     @abstractmethod
  6 |     def foo(self) -> int: ...
-   |         --- `foo` defined as abstract on superclass `Base`
+   |         --- `foo` declared as abstract on superclass `Base`
  7 |     @abstractmethod
  8 |     def bar(self) -> str: ...
    |
@@ -62,12 +62,12 @@ info: rule `abstract-method-in-final-class` is enabled by default
 ```
 
 ```
-error[abstract-method-in-final-class]: Final class `PartiallyImplemented` does not implement abstract method `baz`
+error[abstract-method-in-final-class]: Final class `PartiallyImplemented` has unimplemented abstract methods
   --> src/mdtest_snippet.py:17:7
    |
 16 | @final
 17 | class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^^^^^^^^^^^^
+   |       ^^^^^^^^^^^^^^^^^^^^ `baz` is unimplemented
 18 |     def foo(self) -> int:
 19 |         return 42
    |
@@ -76,7 +76,7 @@ error[abstract-method-in-final-class]: Final class `PartiallyImplemented` does n
  8 |     def bar(self) -> str: ...
  9 |     @abstractmethod
 10 |     def baz(self) -> None: ...
-   |         --- `baz` defined as abstract on superclass `Base`
+   |         --- `baz` declared as abstract on superclass `Base`
 11 |
 12 | @final
    |

@@ -2173,6 +2173,78 @@ p = Point<CURSOR>(1, 2)
         ");
     }
 
+    /// Go-to-definition should not point to while-loop header definitions.
+    #[test]
+    fn goto_definition_does_not_point_to_while_loop_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+while True:
+    variable = 1
+
+    vari<CURSOR>able
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        3 |     variable = 1
+        4 |
+        5 |     variable
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        2 | while True:
+        3 |     variable = 1
+          |     --------
+        4 |
+        5 |     variable
+          |
+        ");
+    }
+
+    /// Go-to-definition should not point to for-loop header definitions.
+    #[test]
+    fn goto_definition_does_not_point_to_for_loop_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+for x in range(10):
+    variable = 1
+
+    vari<CURSOR>able
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        3 |     variable = 1
+        4 |
+        5 |     variable
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        2 | for x in range(10):
+        3 |     variable = 1
+          |     --------
+        4 |
+        5 |     variable
+          |
+        ");
+    }
+
     impl CursorTest {
         fn goto_definition(&self) -> String {
             let Some(targets) = salsa::attach(&self.db, || {

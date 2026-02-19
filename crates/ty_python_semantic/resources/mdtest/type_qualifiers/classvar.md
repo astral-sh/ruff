@@ -132,7 +132,7 @@ class D:
 reveal_type(D.a)  # revealed: int
 ```
 
-## `ClassVar` cannot contain type variables
+## `ClassVar` cannot contain non-self type variables
 
 `ClassVar` cannot include type variables at any level of nesting.
 
@@ -170,6 +170,35 @@ class D[T]:
 
     # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
     y: ClassVar[dict[str, T]]
+```
+
+## `ClassVar` can contain `Self`
+
+`Self` is allowed inside `ClassVar`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import ClassVar, Self
+
+class Base:
+    all_instances: ClassVar[list[Self]]
+
+    def method(self):
+        reveal_type(self.all_instances)  # revealed: list[Self@method]
+
+    @classmethod
+    def cls_method(cls):
+        reveal_type(cls.all_instances)  # revealed: list[Self@cls_method]
+
+reveal_type(Base.all_instances)  # revealed: list[Base]
+
+class Sub(Base): ...
+
+reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ```
 
 ## Illegal `ClassVar` in type expression

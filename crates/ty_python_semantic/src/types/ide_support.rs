@@ -95,13 +95,17 @@ pub fn definitions_for_name<'db>(
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
-                        all_definitions.insert(def);
+                        if def.kind(db).is_user_visible() {
+                            all_definitions.insert(def);
+                        }
                     }
                 }
 
                 for declaration in global_declarations {
                     if let Some(def) = declaration.declaration.definition() {
-                        all_definitions.insert(def);
+                        if def.kind(db).is_user_visible() {
+                            all_definitions.insert(def);
+                        }
                     }
                 }
             }
@@ -122,13 +126,17 @@ pub fn definitions_for_name<'db>(
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
-                all_definitions.insert(def);
+                if def.kind(db).is_user_visible() {
+                    all_definitions.insert(def);
+                }
             }
         }
 
         for declaration in declarations {
             if let Some(def) = declaration.declaration.definition() {
-                all_definitions.insert(def);
+                if def.kind(db).is_user_visible() {
+                    all_definitions.insert(def);
+                }
             }
         }
 

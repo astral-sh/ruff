@@ -566,7 +566,7 @@ help: Use `str.split()` and pass `maxsplit=1`
 54 + Bar.split.split(",", maxsplit=1)[0]  # [missing-maxsplit-arg]
 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 56 | 
-57 | ## Test unpacked dict literal kwargs 
+57 | ## Test unpacked dict literal kwargs
 
 PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:55:1
@@ -576,7 +576,7 @@ PLC0207 [*] String is split more times than necessary
 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^
 56 |
-57 | ## Test unpacked dict literal kwargs 
+57 | ## Test unpacked dict literal kwargs
    |
 help: Pass `maxsplit=1` into `str.rsplit()`
 52 | Bar.split.split(",")[0]  # [missing-maxsplit-arg]
@@ -585,121 +585,253 @@ help: Pass `maxsplit=1` into `str.rsplit()`
    - Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 55 + Bar.split.rsplit(",", maxsplit=1)[-1]  # [missing-maxsplit-arg]
 56 | 
-57 | ## Test unpacked dict literal kwargs 
+57 | ## Test unpacked dict literal kwargs
 58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
 
 PLC0207 [*] String is split more times than necessary
   --> missing_maxsplit_arg.py:58:1
    |
-57 | ## Test unpacked dict literal kwargs 
+57 | ## Test unpacked dict literal kwargs
 58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+59 |
+60 | ## Test chained splits
    |
 help: Pass `maxsplit=1` into `str.split()`
 55 | Bar.split.rsplit(",")[-1]  # [missing-maxsplit-arg]
 56 | 
-57 | ## Test unpacked dict literal kwargs 
+57 | ## Test unpacked dict literal kwargs
    - "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
 58 + "1,2,3".split(maxsplit=1, **{"sep": ","})[0]  # [missing-maxsplit-arg]
 59 | 
-60 | 
-61 | # OK
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
 note: This is an unsafe fix and may change runtime behavior
 
 PLC0207 [*] String is split more times than necessary
-   --> missing_maxsplit_arg.py:179:1
-    |
-177 | # Errors
-178 | kwargs_without_maxsplit = {"seq": ","}
-179 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-180 | # OK
-181 | kwargs_with_maxsplit = {"maxsplit": 1}
-    |
+  --> missing_maxsplit_arg.py:61:1
+   |
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+   |
 help: Pass `maxsplit=1` into `str.split()`
-176 | ## TODO: These require the ability to resolve a dict variable name to a value
-177 | # Errors
-178 | kwargs_without_maxsplit = {"seq": ","}
-    - "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
-179 + "1,2,3".split(maxsplit=1, **kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
-180 | # OK
-181 | kwargs_with_maxsplit = {"maxsplit": 1}
-182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-note: This is an unsafe fix and may change runtime behavior
+58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
+59 | 
+60 | ## Test chained splits
+   - SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+61 + SEQ.split("(", maxsplit=1)[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+64 | 
 
 PLC0207 [*] String is split more times than necessary
-   --> missing_maxsplit_arg.py:182:1
-    |
-180 | # OK
-181 | kwargs_with_maxsplit = {"maxsplit": 1}
-182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
-    |
+  --> missing_maxsplit_arg.py:61:1
+   |
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+   |
 help: Pass `maxsplit=1` into `str.split()`
-179 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
-180 | # OK
-181 | kwargs_with_maxsplit = {"maxsplit": 1}
-    - "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-182 + "1,2,3".split(",", maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
-183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
-185 | 
-note: This is an unsafe fix and may change runtime behavior
+58 | "1,2,3".split(**{"sep": ","})[0]  # [missing-maxsplit-arg]
+59 | 
+60 | ## Test chained splits
+   - SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+61 + SEQ.split("(")[0].split("[", maxsplit=1)[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+64 | 
+
+PLC0207 [*] String is split more times than necessary
+  --> missing_maxsplit_arg.py:62:1
+   |
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+   |
+help: Pass `maxsplit=1` into `str.split()`
+59 | 
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+   - SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+62 + SEQ.split("(", maxsplit=1)[0].split("[")[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+64 | 
+65 | 
+
+PLC0207 [*] String is split more times than necessary
+  --> missing_maxsplit_arg.py:62:1
+   |
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+59 | 
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+   - SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+62 + SEQ.split("(")[0].rsplit("[", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+64 | 
+65 | 
+
+PLC0207 [*] String is split more times than necessary
+  --> missing_maxsplit_arg.py:63:1
+   |
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^
+   |
+help: Pass `maxsplit=1` into `str.split()`
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+   - SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+63 + SEQ.split("(", maxsplit=1)[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+64 | 
+65 | 
+66 | # OK
+
+PLC0207 [*] String is split more times than necessary
+  --> missing_maxsplit_arg.py:63:1
+   |
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Pass `maxsplit=1` into `str.split()`
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+   - SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+63 + SEQ.split("(")[0].split("[", maxsplit=1)[0].split(".")[-1]  # [missing-maxsplit-arg]
+64 | 
+65 | 
+66 | # OK
+
+PLC0207 [*] String is split more times than necessary
+  --> missing_maxsplit_arg.py:63:1
+   |
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+63 | SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Use `str.rsplit()` and pass `maxsplit=1`
+60 | ## Test chained splits
+61 | SEQ.split("(")[0].split("[")[0]  # [missing-maxsplit-arg]
+62 | SEQ.split("(")[0].split("[")[-1]  # [missing-maxsplit-arg]
+   - SEQ.split("(")[0].split("[")[0].split(".")[-1]  # [missing-maxsplit-arg]
+63 + SEQ.split("(")[0].split("[")[0].rsplit(".", maxsplit=1)[-1]  # [missing-maxsplit-arg]
+64 | 
+65 | 
+66 | # OK
 
 PLC0207 [*] String is split more times than necessary
    --> missing_maxsplit_arg.py:184:1
     |
-182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-184 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+182 | # Errors
+183 | kwargs_without_maxsplit = {"seq": ","}
+184 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+185 | # OK
+186 | kwargs_with_maxsplit = {"maxsplit": 1}
     |
 help: Pass `maxsplit=1` into `str.split()`
-181 | kwargs_with_maxsplit = {"maxsplit": 1}
-182 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
-183 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
-    - "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
-184 + "1,2,3".split(maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
-185 | 
-186 | 
-187 | ## Test unpacked list literal args (starred expressions)
+181 | ## TODO: These require the ability to resolve a dict variable name to a value
+182 | # Errors
+183 | kwargs_without_maxsplit = {"seq": ","}
+    - "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+184 + "1,2,3".split(maxsplit=1, **kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+185 | # OK
+186 | kwargs_with_maxsplit = {"maxsplit": 1}
+187 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+note: This is an unsafe fix and may change runtime behavior
+
+PLC0207 [*] String is split more times than necessary
+   --> missing_maxsplit_arg.py:187:1
+    |
+185 | # OK
+186 | kwargs_with_maxsplit = {"maxsplit": 1}
+187 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+188 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+189 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+    |
+help: Pass `maxsplit=1` into `str.split()`
+184 | "1,2,3".split(**kwargs_without_maxsplit)[0]  # TODO: [missing-maxsplit-arg]
+185 | # OK
+186 | kwargs_with_maxsplit = {"maxsplit": 1}
+    - "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+187 + "1,2,3".split(",", maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
+188 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+189 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+190 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PLC0207 [*] String is split more times than necessary
    --> missing_maxsplit_arg.py:189:1
     |
-187 | ## Test unpacked list literal args (starred expressions)
-188 | # Errors
-189 | "1,2,3".split(",", *[-1])[0]
-    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-190 |
-191 | ## Test unpacked list variable args
+187 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+188 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+189 | "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Pass `maxsplit=1` into `str.split()`
-186 | 
-187 | ## Test unpacked list literal args (starred expressions)
-188 | # Errors
-    - "1,2,3".split(",", *[-1])[0]
-189 + "1,2,3".split(",", *[-1], maxsplit=1)[0]
+186 | kwargs_with_maxsplit = {"maxsplit": 1}
+187 | "1,2,3".split(",", **kwargs_with_maxsplit)[0]  # TODO: false positive
+188 | kwargs_with_maxsplit = {"sep": ",", "maxsplit": 1}
+    - "1,2,3".split(**kwargs_with_maxsplit)[0]  # TODO: false positive
+189 + "1,2,3".split(maxsplit=1, **kwargs_with_maxsplit)[0]  # TODO: false positive
 190 | 
-191 | ## Test unpacked list variable args
-192 | # Errors
+191 | 
+192 | ## Test unpacked list literal args (starred expressions)
 note: This is an unsafe fix and may change runtime behavior
 
 PLC0207 [*] String is split more times than necessary
    --> missing_maxsplit_arg.py:194:1
     |
-192 | # Errors
-193 | args_list = [-1]
-194 | "1,2,3".split(",", *args_list)[0]
+192 | ## Test unpacked list literal args (starred expressions)
+193 | # Errors
+194 | "1,2,3".split(",", *[-1])[0]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+195 |
+196 | ## Test unpacked list variable args
+    |
+help: Pass `maxsplit=1` into `str.split()`
+191 | 
+192 | ## Test unpacked list literal args (starred expressions)
+193 | # Errors
+    - "1,2,3".split(",", *[-1])[0]
+194 + "1,2,3".split(",", *[-1], maxsplit=1)[0]
+195 | 
+196 | ## Test unpacked list variable args
+197 | # Errors
+note: This is an unsafe fix and may change runtime behavior
+
+PLC0207 [*] String is split more times than necessary
+   --> missing_maxsplit_arg.py:199:1
+    |
+197 | # Errors
+198 | args_list = [-1]
+199 | "1,2,3".split(",", *args_list)[0]
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
     |
 help: Pass `maxsplit=1` into `str.split()`
-191 | ## Test unpacked list variable args
-192 | # Errors
-193 | args_list = [-1]
+196 | ## Test unpacked list variable args
+197 | # Errors
+198 | args_list = [-1]
     - "1,2,3".split(",", *args_list)[0]
-194 + "1,2,3".split(",", *args_list, maxsplit=1)[0]
+199 + "1,2,3".split(",", *args_list, maxsplit=1)[0]
 note: This is an unsafe fix and may change runtime behavior
