@@ -3898,6 +3898,59 @@ impl<'db> StaticClassLiteral<'db> {
                     CallableTypeKind::FunctionLike,
                 )))
             }
+            (CodeGeneratorKind::TypedDict, "__or__" | "__ror__") => {
+                let fields = self.fields(db, specialization, field_policy);
+
+                // Compute the union of all value types from the TypedDict's fields.
+                // For `MyDict(foo: int, bar: str)`, this gives `int | str`.
+                let value_type_union =
+                    UnionType::from_elements(db, fields.iter().map(|(_, field)| field.declared_ty));
+
+                // Return type for the dict case: `dict[str, VT]`
+                let dict_return_ty = KnownClass::Dict.to_specialized_instance(
+                    db,
+                    &[KnownClass::Str.to_instance(db), value_type_union],
+                );
+
+                // Parameter type for the dict case: `dict[str, Any]`
+                let dict_param_ty = KnownClass::Dict
+                    .to_specialized_instance(db, &[KnownClass::Str.to_instance(db), Type::any()]);
+
+                let overloads = [
+                    // Overload 1: `(self, value: Self) -> Self`
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(instance_ty),
+                            ],
+                        ),
+                        instance_ty,
+                    ),
+                    // Overload 2: `(self, value: dict[str, Any]) -> dict[str, VT]`
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("value")))
+                                    .with_annotated_type(dict_param_ty),
+                            ],
+                        ),
+                        dict_return_ty,
+                    ),
+                ];
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    CallableTypeKind::FunctionLike,
+                )))
+            }
             (CodeGeneratorKind::TypedDict, "update") => {
                 // TODO: synthesize a set of overloads with precise types
                 let signature = Signature::new(

@@ -1535,6 +1535,53 @@ def _(p: Person) -> None:
     reveal_type(p.setdefault("extraz", "value"))  # revealed: Unknown
 ```
 
+## PEP 584 merge operator
+
+The `|` operator on `TypedDict` instances (PEP 584) preserves the `TypedDict` type when merging with
+the same type, and returns a more specific `dict[str, VT]` type when merging with a plain `dict`.
+
+### TypedDict merged with same type
+
+```py
+from typing import TypedDict
+
+class MyDict(TypedDict):
+    foo: int
+    bar: str
+
+def _(val: MyDict, other: MyDict) -> None:
+    result = val | other
+    reveal_type(result)  # revealed: MyDict
+```
+
+### TypedDict merged with dict literal
+
+```py
+from typing import TypedDict
+
+class MyDict(TypedDict):
+    foo: int
+    bar: str
+
+def _(val: MyDict) -> None:
+    result = val | {"foo": 2}
+    reveal_type(result)  # revealed: dict[str, int | str]
+```
+
+### Dict merged with TypedDict (reflected)
+
+```py
+from typing import TypedDict
+
+class MyDict(TypedDict):
+    foo: int
+    bar: str
+
+def _(val: MyDict) -> None:
+    result = {"baz": 42} | val
+    reveal_type(result)  # revealed: dict[str, int | str]
+```
+
 ## Unlike normal classes
 
 `TypedDict` types do not act like normal classes. For example, calling `type(..)` on an inhabitant
@@ -1642,8 +1689,7 @@ def combine(p: Person, e: Employee):
     reveal_type(p | p)  # revealed: Person
     reveal_type(e | e)  # revealed: Employee
 
-    # TODO: Should be `Person`; simplifying TypedDicts in Unions is pending better cycle handling
-    reveal_type(p | e)  # revealed: Person | Employee
+    reveal_type(p | e)  # revealed: Person
 ```
 
 When inheriting from a `TypedDict` with a different `total` setting, inherited fields maintain their
