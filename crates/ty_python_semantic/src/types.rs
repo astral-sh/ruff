@@ -12044,7 +12044,6 @@ impl<'db> UnionType<'db> {
         nested: bool,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db)
-            .order_elements(false)
             .unpack_aliases(false)
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
@@ -12224,19 +12223,6 @@ impl<'db> NegativeIntersectionElements<'db> {
         match self {
             Self::Empty | Self::Single(_) => {}
             Self::Multiple(set) => set.shrink_to_fit(),
-        }
-    }
-
-    /// Sort the collection's types in place using the comparison function `cmp`.
-    pub(crate) fn sort_unstable_by(
-        &mut self,
-        compare: impl FnMut(&Type<'db>, &Type<'db>) -> std::cmp::Ordering,
-    ) {
-        match self {
-            Self::Empty | Self::Single(_) => {}
-            Self::Multiple(set) => {
-                set.sort_unstable_by(compare);
-            }
         }
     }
 
