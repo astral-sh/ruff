@@ -573,8 +573,12 @@ impl<'db> NarrowingConstraintBuilder<'db> {
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(&self, db: &'db dyn Db) -> Type<'db> {
-        let mut union = UnionBuilder::new(db);
+    pub(crate) fn evaluate_constraint_type(
+        &self,
+        db: &'db dyn Db,
+        check_redundancy: bool,
+    ) -> Type<'db> {
+        let mut union = UnionBuilder::new(db).check_redundancy(check_redundancy);
         for conjunctions in self
             .replacement_disjuncts
             .iter()
@@ -610,8 +614,13 @@ impl<'db> NarrowingConstraint<'db> {
             .finish(db)
     }
 
-    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        self.inner(db).evaluate_constraint_type(db)
+    pub(crate) fn evaluate_constraint_type(
+        self,
+        db: &'db dyn Db,
+        check_redundancy: bool,
+    ) -> Type<'db> {
+        self.inner(db)
+            .evaluate_constraint_type(db, check_redundancy)
     }
 }
 
