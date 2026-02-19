@@ -408,7 +408,10 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     UnusedImportContext::ExceptHandler
                 } else if in_init
                     && binding.scope.is_global()
-                    && is_first_party(&binding.import, checker)
+                    && isort::categorize::same_package(
+                        checker.package(),
+                        binding.import.source_name()[0],
+                    )
                     // In the situation where we have
                     // ```
                     // import a.b # <-- at this binding
@@ -422,10 +425,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     // So we look up the name `a` and see if it has
                     // a reference in `__all__`.
                     && (!is_refined_submodule_import_match_enabled(checker.settings())||!symbol_used_in_dunder_all(checker.semantic(), &binding))
-                    && isort::categorize::same_package(
-                        checker.package(),
-                        binding.import.source_name()[0],
-                    )
+
                 {
                     UnusedImportContext::DunderInitSamePackage {
                         dunder_all_count: DunderAllCount::from(dunder_all_exprs.len()),
