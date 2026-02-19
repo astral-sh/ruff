@@ -25,12 +25,12 @@ fn setup(input_path: std::path::PathBuf) -> tryfn::Case {
     let expected = Data::read_from(&input_path.with_extension("svg"), None);
     tryfn::Case {
         name,
-        fixture: input_path,
+        input: input_path,
         expected,
     }
 }
 
-fn test(input_path: &std::path::Path) -> Result<Data, Box<dyn Error>> {
+fn test(input_path: &std::path::Path) -> Result<impl Into<Data>, Box<dyn Error>> {
     let src = std::fs::read_to_string(input_path)?;
     let fixture: Fixture = toml::from_str(&src)?;
     let renderer: Renderer = fixture.renderer.into();
