@@ -1352,18 +1352,13 @@ fn is_instance_truthiness<'db>(
             always_true_if(is_instance(&newtype.concrete_base_type(db)))
         }
 
-        Type::BooleanLiteral(..)
-        | Type::BytesLiteral(..)
-        | Type::IntLiteral(..)
-        | Type::StringLiteral(..)
-        | Type::LiteralString
-        | Type::ModuleLiteral(..)
-        | Type::EnumLiteral(..)
-        | Type::FunctionLiteral(..) => always_true_if(
-            ty.literal_fallback_instance(db)
-                .as_ref()
-                .is_some_and(is_instance),
-        ),
+        Type::LiteralValue(..) | Type::ModuleLiteral(..) | Type::FunctionLiteral(..) => {
+            always_true_if(
+                ty.literal_fallback_instance(db)
+                    .as_ref()
+                    .is_some_and(is_instance),
+            )
+        }
 
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
@@ -1725,11 +1720,14 @@ impl KnownFunction {
             }
 
             KnownFunction::HasMember => {
-                let [Some(ty), Some(Type::StringLiteral(member))] = parameter_types else {
+                let [Some(ty), Some(Type::LiteralValue(literal))] = parameter_types else {
+                    return;
+                };
+                let Some(member) = literal.as_string() else {
                     return;
                 };
                 let ty_members = all_members(db, *ty);
-                overload.set_return_type(Type::BooleanLiteral(
+                overload.set_return_type(Type::bool_literal(
                     ty_members.iter().any(|m| m.name == member.value(db)),
                 ));
             }
@@ -1845,7 +1843,7 @@ impl KnownFunction {
                         .map(|s| s.value(db))
                     {
                         builder.into_diagnostic(format_args!("Static assertion error: {message}"))
-                    } else if *parameter_ty == Type::BooleanLiteral(false) {
+                    } else if *parameter_ty == Type::bool_literal(false) {
                         builder.into_diagnostic(
                             "Static assertion error: argument evaluates to `False`",
                         )
@@ -2170,8 +2168,10 @@ impl KnownFunction {
             }
 
             known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
-                let [Some(Type::StringLiteral(full_module_name)), rest @ ..] = parameter_types
-                else {
+                let [Some(first), rest @ ..] = parameter_types else {
+                    return;
+                };
+                let Some(full_module_name) = first.as_string_literal() else {
                     return;
                 };
 

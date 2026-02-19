@@ -4293,7 +4293,7 @@ pub(crate) fn report_undeclared_protocol_member(
     if definition.kind(db).is_unannotated_assignment() {
         let binding_type = binding_type(db, definition);
 
-        let suggestion = binding_type.promote_literals(db, TypeContext::default());
+        let suggestion = binding_type.promote_literals(db);
 
         if should_give_hint(db, suggestion) {
             diagnostic.set_primary_message(format_args!(
@@ -4535,8 +4535,8 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
-        match key_ty {
-            Type::StringLiteral(key) => {
+        match key_ty.as_string_literal() {
+            Some(key) => {
                 let key = key.value(db);
                 let typed_dict_name = typed_dict_ty.display(db);
 
@@ -5334,7 +5334,7 @@ pub(super) fn report_unsupported_comparison<'db>(
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
 
-    if left_ty == right_ty {
+    if left_ty.is_equivalent_to(db, right_ty) {
         diagnostic.set_primary_message(format_args!(
             "Both operands have type `{}`",
             left_ty.display_with(db, display_settings.clone())
@@ -5379,7 +5379,7 @@ pub(super) fn report_unsupported_comparison<'db>(
                 .zip(rhs_spec.all_elements())
                 .position(|tup| tup == (&error.left_ty, &error.right_ty))
         {
-            if error.left_ty == error.right_ty {
+            if error.left_ty.is_equivalent_to(db, error.right_ty) {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported between \
                     the tuple elements at index {} (both of type `{}`)",
@@ -5398,7 +5398,7 @@ pub(super) fn report_unsupported_comparison<'db>(
                 ));
             }
         } else {
-            if error.left_ty == error.right_ty {
+            if error.left_ty.is_equivalent_to(db, error.right_ty) {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported \
                     between two objects of type `{}`",
@@ -5504,7 +5504,7 @@ fn report_unsupported_binary_operation_impl<'a>(
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));
 
-    if left_ty == right_ty {
+    if left_ty.is_equivalent_to(db, right_ty) {
         diagnostic.set_primary_message(format_args!(
             "Both operands have type `{}`",
             left_ty.display_with(db, display_settings.clone())
