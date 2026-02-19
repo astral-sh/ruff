@@ -30,15 +30,8 @@ const UNUSED_BINDING_CODE: &str = "unused-binding";
 #[derive(Debug)]
 pub(super) struct Diagnostics {
     items: Vec<ruff_db::diagnostic::Diagnostic>,
-    unnecessary_items: Vec<UnnecessaryBindingDiagnostic>,
     encoding: PositionEncoding,
     file_or_notebook: File,
-}
-
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-pub(super) struct UnnecessaryBindingDiagnostic {
-    range: ruff_text_size::TextRange,
-    name: String,
 }
 
 impl Diagnostics {
@@ -47,18 +40,15 @@ impl Diagnostics {
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id_from_hash(
         diagnostics: &[ruff_db::diagnostic::Diagnostic],
-        unnecessary_items: &[UnnecessaryBindingDiagnostic],
     ) -> Option<String> {
-        if diagnostics.is_empty() && unnecessary_items.is_empty() {
+        if diagnostics.is_empty() {
             return None;
         }
 
         // Generate result ID based on raw diagnostic content only.
         let mut hasher = DefaultHasher::new();
 
-        // Hash lengths first to ensure different numbers of diagnostics produce different hashes.
         diagnostics.hash(&mut hasher);
-        unnecessary_items.hash(&mut hasher);
 
         Some(format!("{:016x}", hasher.finish()))
     }
@@ -67,7 +57,7 @@ impl Diagnostics {
     ///
     /// Returns `None` if there are no diagnostics.
     pub(super) fn result_id(&self) -> Option<String> {
-        Self::result_id_from_hash(&self.items, &self.unnecessary_items)
+        Self::result_id_from_hash(&self.items)
     }
 
     pub(super) fn to_lsp_diagnostics(
@@ -107,30 +97,9 @@ impl Diagnostics {
                     .push(lsp_diagnostic);
             }
 
-            for unnecessary in &self.unnecessary_items {
-                let Some((url, lsp_diagnostic)) = to_lsp_unnecessary_diagnostic(
-                    db,
-                    self.file_or_notebook,
-                    unnecessary,
-                    self.encoding,
-                ) else {
-                    continue;
-                };
-
-                let Some(url) = url else {
-                    tracing::warn!("Unable to find notebook cell");
-                    continue;
-                };
-
-                cell_diagnostics
-                    .entry(url)
-                    .or_default()
-                    .push(lsp_diagnostic);
-            }
-
             LspDiagnostics::NotebookDocument(cell_diagnostics)
         } else {
-            let mut diagnostics: Vec<Diagnostic> = self
+            let diagnostics: Vec<Diagnostic> = self
                 .items
                 .iter()
                 .filter_map(|diagnostic| {
@@ -146,18 +115,6 @@ impl Diagnostics {
                     )
                 })
                 .collect();
-
-            diagnostics.extend(self.unnecessary_items.iter().filter_map(|unnecessary| {
-                Some(
-                    to_lsp_unnecessary_diagnostic(
-                        db,
-                        self.file_or_notebook,
-                        unnecessary,
-                        self.encoding,
-                    )?
-                    .1,
-                )
-            }));
 
             LspDiagnostics::TextDocument(diagnostics)
         }
@@ -371,30 +328,38 @@ pub(super) fn compute_diagnostics(
         return None;
     };
 
-    let diagnostics = db.check_file(file);
-    let unnecessary_items = if db.project().should_check_file(db, file) {
-        unnecessary_binding_diagnostics(db, file)
-    } else {
-        Vec::new()
-    };
+    let mut diagnostics = db.check_file(file);
+    if db.project().should_check_file(db, file) {
+        diagnostics.extend(unused_binding_diagnostics(db, file));
+    }
 
     Some(Diagnostics {
         items: diagnostics,
-        unnecessary_items,
         encoding,
         file_or_notebook: file,
     })
 }
 
-pub(super) fn unnecessary_binding_diagnostics(
+pub(super) fn unused_binding_diagnostics(
     db: &ProjectDatabase,
     file: File,
-) -> Vec<UnnecessaryBindingDiagnostic> {
+) -> Vec<ruff_db::diagnostic::Diagnostic> {
+    use ruff_db::diagnostic::{Annotation, DiagnosticId, DiagnosticTag};
+    use ruff_db::files::FileRange;
+
     unused_bindings(db, file)
         .iter()
-        .map(|binding| UnnecessaryBindingDiagnostic {
-            range: binding.range,
-            name: binding.name.clone(),
+        .map(|binding| {
+            let mut diagnostic = ruff_db::diagnostic::Diagnostic::new(
+                DiagnosticId::lint(UNUSED_BINDING_CODE),
+                Severity::Hint,
+                format!("Binding `{}` is unused", binding.name),
+            );
+            diagnostic.annotate(
+                Annotation::primary(FileRange::new(file, binding.range).into())
+                    .tag(DiagnosticTag::Unnecessary),
+            );
+            diagnostic
         })
         .collect()
 }
@@ -429,6 +394,7 @@ pub(super) fn to_lsp_diagnostic(
     };
 
     let severity = match diagnostic.severity() {
+        Severity::Hint => DiagnosticSeverity::HINT,
         Severity::Info => DiagnosticSeverity::INFORMATION,
         Severity::Warning => DiagnosticSeverity::WARNING,
         Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,
@@ -509,38 +475,6 @@ pub(super) fn to_lsp_diagnostic(
             },
             related_information,
             data: serde_json::to_value(data).ok(),
-        },
-    ))
-}
-
-pub(super) fn to_lsp_unnecessary_diagnostic(
-    db: &dyn Db,
-    file: File,
-    unnecessary: &UnnecessaryBindingDiagnostic,
-    encoding: PositionEncoding,
-) -> Option<(Option<lsp_types::Url>, Diagnostic)> {
-    let location = unnecessary
-        .range
-        .to_lsp_range(db, file, encoding)?
-        .to_location();
-
-    let (range, url) = match location {
-        Some(location) => (location.range, Some(location.uri)),
-        None => (lsp_types::Range::default(), None),
-    };
-
-    Some((
-        url,
-        Diagnostic {
-            range,
-            severity: Some(DiagnosticSeverity::HINT),
-            tags: Some(vec![DiagnosticTag::UNNECESSARY]),
-            code: Some(NumberOrString::String(UNUSED_BINDING_CODE.into())),
-            code_description: None,
-            source: Some(DIAGNOSTIC_NAME.into()),
-            message: format!("Binding `{}` is unused", unnecessary.name),
-            related_information: None,
-            data: None,
         },
     ))
 }
