@@ -282,7 +282,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             match type_qualifier {
                                 SpecialFormType::ClassVar => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
-                                    if type_and_qualifiers.inner_type().has_typevar(self.db())
+                                    if type_and_qualifiers
+                                        .inner_type()
+                                        .has_non_self_typevar(self.db())
                                         && let Some(builder) =
                                             self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                                     {
@@ -379,7 +381,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         self.store_expression_type(annotation, annotation_ty.inner_type());
-
         annotation_ty
     }
 

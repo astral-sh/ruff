@@ -37,7 +37,15 @@ pub(crate) enum Command {
     Server,
 
     /// Display ty's version
-    Version,
+    Version {
+        #[arg(
+            long,
+            value_enum,
+            default_value = "text",
+            help = "The format in which to display the version information"
+        )]
+        output_format: VersionFormat,
+    },
 
     /// Generate shell completion
     #[clap(hide = true)]
@@ -401,6 +409,12 @@ pub(crate) enum TerminalColor {
 
     /// Never display colors.
     Never,
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub(crate) enum VersionFormat {
+    Text,
+    Json,
 }
 
 /// A TOML `<KEY> = <VALUE>` pair

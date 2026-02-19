@@ -30,7 +30,7 @@ use ty_project::{ProjectDatabase, ProjectMetadata};
 use ty_server::run_server;
 use ty_static::EnvVars;
 
-use crate::args::{CheckCommand, Command, TerminalColor};
+use crate::args::{CheckCommand, Command, TerminalColor, VersionFormat};
 use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 pub use args::Cli;
@@ -47,7 +47,7 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     match args.command {
         Command::Server => run_server().map(|()| ExitStatus::Success),
         Command::Check(check_args) => run_check(check_args),
-        Command::Version => version().map(|()| ExitStatus::Success),
+        Command::Version { output_format } => version(output_format).map(|()| ExitStatus::Success),
         Command::GenerateShellCompletion { shell } => {
             use std::io::stdout;
 
@@ -57,10 +57,18 @@ pub fn run() -> anyhow::Result<ExitStatus> {
     }
 }
 
-pub(crate) fn version() -> Result<()> {
+pub(crate) fn version(output_format: VersionFormat) -> Result<()> {
     let mut stdout = Printer::default().stream_for_requested_summary().lock();
     let version_info = crate::version::version();
-    writeln!(stdout, "ty {}", &version_info)?;
+
+    match output_format {
+        VersionFormat::Text => {
+            writeln!(stdout, "ty {}", &version_info)?;
+        }
+        VersionFormat::Json => {
+            serde_json::to_writer_pretty(&mut stdout, &version_info)?;
+        }
+    }
     Ok(())
 }
 

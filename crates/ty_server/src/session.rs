@@ -567,7 +567,7 @@ impl Session {
             }
         };
 
-        let settings = options.into_settings(&root, client);
+        let settings = options.into_settings(&root, client, &*self.native_system);
         let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
             tracing::debug!("Ignoring workspace `{url}` since it was not registered");
             return;

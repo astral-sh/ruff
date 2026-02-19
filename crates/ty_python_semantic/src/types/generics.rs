@@ -1868,6 +1868,7 @@ impl<'db> SpecializationBuilder<'db> {
                 if bound_typevar.is_paramspec(self.db) {
                     return;
                 }
+
                 *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
             }
             Entry::Vacant(entry) => {
@@ -2252,6 +2253,16 @@ impl<'db> SpecializationBuilder<'db> {
                         seen,
                     );
                 }
+            }
+
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::LiteralValue(literal),
+            ) if literal.is_string() || literal.is_literal_string() || literal.is_bytes() => {
+                // Retry specialization with the literal's fallback instance (`str` / `bytes`)
+                // so literal iterables can contribute to generic inference.
+                let actual_instance = literal.fallback_instance(self.db);
+                return self.infer_map_impl(formal, actual_instance, polarity, f, seen);
             }
 
             (formal, Type::ProtocolInstance(actual_protocol)) => {

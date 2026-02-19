@@ -470,6 +470,7 @@ fn run_test(
 
     Program::init_or_update(db, settings);
     db.update_analysis_options(configuration.analysis.as_ref());
+    db.set_verbosity(test.configuration().verbose());
 
     // When snapshot testing is enabled, this is populated with
     // all diagnostics. Otherwise it remains empty.

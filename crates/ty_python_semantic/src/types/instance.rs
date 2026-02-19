@@ -19,8 +19,8 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor, NormalizedVisitor,
-    TypeContext, TypeMapping, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
+    LiteralValueTypeKind, NormalizedVisitor, TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -239,6 +239,10 @@ impl<'db> NominalInstanceType<'db> {
     /// Returns the name of the class this is an instance of.
     ///
     /// For example, for an instance of `builtins.str`, this returns `"str"`.
+    ///
+    /// As of 2026-02-16, this method is not used in any crates in the Ruff
+    /// repo, but is exposed as a public API for external users of
+    /// `ty_python_semantic`.
     pub fn class_name(&self, db: &'db dyn Db) -> &'db Name {
         self.class(db).name(db)
     }
@@ -249,6 +253,10 @@ impl<'db> NominalInstanceType<'db> {
     /// For example, for an instance of `pathlib.Path`, this returns
     /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
     /// to a known module (e.g. for classes defined in scripts or notebooks).
+    ///
+    /// As of 2026-02-16, this method is not used in any crates in the Ruff
+    /// repo, but is exposed as a public API for external users of
+    /// `ty_python_semantic`.
     pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
         let file = self.class(db).class_literal(db).file(db);
         file_to_module(db, file).map(|module| module.name(db))
@@ -375,8 +383,11 @@ impl<'db> NominalInstanceType<'db> {
         };
 
         let to_u32 = |ty: &Type<'db>| match ty {
-            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
-            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(n) => i32::try_from(n.as_i64()).map(Some).ok(),
+                LiteralValueTypeKind::Bool(b) => Some(Some(i32::from(b))),
+                _ => None,
+            },
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) =>
             {

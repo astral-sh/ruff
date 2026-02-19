@@ -234,7 +234,7 @@ And, as the return type:
 
 ```py
 def _(c: Callable[[int, str], Callable[[int], int]]):
-    reveal_type(c)  # revealed: (int, str, /) -> (int, /) -> int
+    reveal_type(c)  # revealed: (int, str, /) -> ((int, /) -> int)
 ```
 
 ## Gradual form

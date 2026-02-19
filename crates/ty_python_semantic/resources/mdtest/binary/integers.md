@@ -39,6 +39,10 @@ def both(x: int):
     reveal_type(x // x)  # revealed: int
     reveal_type(x / x)  # revealed: int | float
     reveal_type(x % x)  # revealed: int
+
+# Edge case: the runtime value is 9223372036854775808,
+# which doesn't fit into an i64
+reveal_type(-(-9223372036854775807 - 1))  # revealed: int
 ```
 
 ## Power
@@ -138,4 +142,65 @@ class MyInt(int): ...
 
 # No error for a subclass of int
 reveal_type(MyInt(3) / 0)  # revealed: int | float
+```
+
+## Bit-shifting
+
+Literal arithmetic is supported for bit-shifting operations on `int`s:
+
+```py
+reveal_type(42 << 3)  # revealed: Literal[336]
+reveal_type(0 << 3)  # revealed: Literal[0]
+reveal_type(-42 << 3)  # revealed: Literal[-336]
+
+reveal_type(42 >> 3)  # revealed: Literal[5]
+reveal_type(0 >> 3)  # revealed: Literal[0]
+reveal_type(-42 >> 3)  # revealed: Literal[-6]
+reveal_type(1 >> 5000000000)  # revealed: Literal[0]
+reveal_type(-1 >> 5000000000)  # revealed: Literal[-1]
+```
+
+If the result of a left shift overflows the `int` literal type, it becomes `int`. This includes
+cases where a bit is shifted into the sign bit position, since Python integers have arbitrary
+precision and `1 << 63` is a large positive number, not a negative one. Right shifts do not
+overflow:
+
+```py
+# For `0` specifically, we know that any right-shift
+# will produce `0`
+reveal_type(0 << 4000000000000000000)  # revealed: Literal[0]
+
+reveal_type(1 << 62)  # revealed: Literal[4611686018427387904]
+reveal_type(1 << 63)  # revealed: int
+
+reveal_type(2 << 61)  # revealed: Literal[4611686018427387904]
+reveal_type(2 << 63)  # revealed: int
+
+reveal_type(-1 << 63)  # revealed: Literal[-9223372036854775808]
+reveal_type(-1 << 64)  # revealed: int
+
+# Larger values: the headroom depends on the number of significant bits in `n`,
+# not on the value of `n` itself.
+reveal_type(100 << 3)  # revealed: Literal[800]
+reveal_type(100 << 56)  # revealed: Literal[7205759403792793600]
+reveal_type(100 << 57)  # revealed: int
+
+# Negative values with large shifts that would overflow i64:
+reveal_type(-3 << 61)  # revealed: Literal[-6917529027641081856]
+reveal_type(-3 << 62)  # revealed: int
+reveal_type(-100 << 56)  # revealed: Literal[-7205759403792793600]
+reveal_type(-100 << 57)  # revealed: int
+```
+
+Shifting by a negative amount is a `ValueError` at runtime. We don't emit a diagnostic for this
+currently; we simply infer `int` as the result type:
+
+```py
+reveal_type(42 << -3)  # revealed: int
+reveal_type(0 << -3)  # revealed: int
+reveal_type(-42 << -3)  # revealed: int
+
+reveal_type(42 >> -3)  # revealed: int
+reveal_type(0 >> -3)  # revealed: int
+reveal_type(-42 >> -3)  # revealed: int
 ```

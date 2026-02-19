@@ -1088,6 +1088,7 @@ impl<'db> ClassType<'db> {
             let ClassBase::Class(class) = supercls else {
                 continue;
             };
+
             // Currently we do not recognize dynamic classes as being able to define abstract methods,
             // but we do recognise them as being able to override abstract methods defined in static classes.
             let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
@@ -1095,11 +1096,32 @@ impl<'db> ClassType<'db> {
                     .retain(|name, _| class.own_class_member(db, None, name).is_undefined());
                 continue;
             };
+
             let scope = class_literal.body_scope(db);
             let place_table = place_table(db, scope);
-            for (symbol_id, bindings_iterator) in
-                use_def_map(db, class_literal.body_scope(db)).all_end_of_scope_symbol_bindings()
-            {
+            let use_def_map = use_def_map(db, class_literal.body_scope(db));
+
+            // Treat abstract methods from superclasses as having been overridden
+            // if this class has a synthesized method by that name,
+            // or this class has a `ClassVar` declaration by that name
+            abstract_methods.retain(|name, _| {
+                if class_literal
+                    .own_synthesized_member(db, None, None, name)
+                    .is_some()
+                {
+                    return false;
+                }
+
+                place_table.symbol_id(name).is_none_or(|symbol_id| {
+                    let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+                    !place_from_declarations(db, declarations)
+                        .ignore_conflicting_declarations()
+                        .qualifiers
+                        .contains(TypeQualifiers::CLASS_VAR)
+                })
+            });
+
+            for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
                 let name = place_table.symbol(symbol_id).name();
                 let place_and_definition = place_from_bindings(db, bindings_iterator);
                 let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
@@ -1441,7 +1463,7 @@ impl<'db> ClassType<'db> {
                     .and_then(|spec| spec.tuple(db))
                     .and_then(|tuple| tuple.len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
-                    .map(Type::IntLiteral)
+                    .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
                 let parameters = Parameters::new(
@@ -1577,7 +1599,7 @@ impl<'db> ClassType<'db> {
 
                                 let index_annotation = UnionType::from_elements(
                                     db,
-                                    indices.into_iter().map(Type::IntLiteral),
+                                    indices.into_iter().map(Type::int_literal),
                                 );
 
                                 Some(synthesize_getitem_overload_signature(
@@ -3256,21 +3278,26 @@ impl<'db> StaticClassLiteral<'db> {
                         // descriptor attribute, data-classes will (implicitly) call the `__set__` method
                         // of the descriptor. This means that the synthesized `__init__` parameter for
                         // this attribute is determined by possible `value` parameter types with which
-                        // the `__set__` method can be called. We build a union of all possible options
-                        // to account for possible overloads.
-                        let mut value_types = UnionBuilder::new(db);
-                        for binding in &dunder_set.bindings(db) {
+                        // the `__set__` method can be called.
+                        //
+                        // We union parameter types across overloads of a single callable, intersect
+                        // callable bindings inside an intersection element, and union outer elements.
+                        field_ty = dunder_set.bindings(db).map_types(db, |binding| {
+                            let mut value_types = UnionBuilder::new(db);
+                            let mut has_value_type = false;
                             for overload in binding {
                                 if let Some(value_param) =
                                     overload.signature.parameters().get_positional(2)
                                 {
                                     value_types = value_types.add(value_param.annotated_type());
+                                    has_value_type = true;
                                 } else if overload.signature.parameters().is_gradual() {
                                     value_types = value_types.add(Type::unknown());
+                                    has_value_type = true;
                                 }
                             }
-                        }
-                        field_ty = value_types.build();
+                            has_value_type.then(|| value_types.build())
+                        });
 
                         // The default value of the attribute is *not* determined by the right hand side
                         // of the class-body assignment. Instead, the runtime invokes `__get__` on the
@@ -5432,7 +5459,7 @@ impl<'db> DynamicClassLiteral<'db> {
                         spec.len().into_fixed_length().is_some_and(|len| len > 0)
                     }),
                     // __slots__ = "abc"  # Same as ("abc",)
-                    Type::StringLiteral(_) => true,
+                    Type::LiteralValue(literal) if literal.is_string() => true,
                     // Other types are considered dynamic/unknown
                     _ => false,
                 };
@@ -8334,7 +8361,7 @@ impl SlotsKind {
             },
 
             // __slots__ = "abc"  # Same as `("abc",)`
-            Type::StringLiteral(_) => Self::NotEmpty,
+            Type::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
 
             _ => Self::Dynamic,
         }

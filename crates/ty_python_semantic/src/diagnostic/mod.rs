@@ -1,6 +1,7 @@
 use crate::{
     Db, Program, PythonVersionWithSource, lint::lint_documentation_url, types::TypeCheckDiagnostics,
 };
+use levenshtein::{HideUnderscoredSuggestions, find_best_suggestion};
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, SubDiagnostic, SubDiagnosticSeverity},
     files::File,
@@ -8,30 +9,15 @@ use ruff_db::{
 use std::cell::RefCell;
 use std::fmt::Write;
 
-/// Suggest a name from `existing_names` that is similar to `wrong_name`.
-pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
-    existing_names: impl Iterator<Item = S>,
-    wrong_name: T,
-) -> Option<String> {
-    if wrong_name.as_ref().len() < 3 {
-        return None;
-    }
+mod levenshtein;
 
-    existing_names
-        .filter(|ref id| id.as_ref().len() >= 2)
-        .map(|ref id| {
-            (
-                id.as_ref().to_string(),
-                strsim::damerau_levenshtein(
-                    &id.as_ref().to_lowercase(),
-                    &wrong_name.as_ref().to_lowercase(),
-                ),
-            )
-        })
-        .min_by_key(|(_, dist)| *dist)
-        // Heuristic to filter out bad matches
-        .filter(|(_, dist)| *dist <= 3)
-        .map(|(id, _)| id)
+/// Suggest a name from `existing_names` that is similar to `wrong_name`.
+pub(crate) fn did_you_mean<'a, O, I>(options: O, typo: &str) -> Option<&'a str>
+where
+    O: IntoIterator<IntoIter = I>,
+    I: ExactSizeIterator<Item = &'a str>,
+{
+    find_best_suggestion(options, typo, HideUnderscoredSuggestions::Yes)
 }
 
 /// Add a subdiagnostic to `diagnostic` that explains why a certain Python version was inferred.

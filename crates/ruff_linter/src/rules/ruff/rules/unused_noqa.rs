@@ -72,6 +72,11 @@ impl UnusedNOQAKind {
 /// ```
 ///
 /// ## Options
+///
+/// This rule will flag rule codes that are unknown to Ruff, even if they are
+/// valid for other tools. You can tell Ruff to ignore such codes by configuring
+/// the list of known "external" rule codes with the following option:
+///
 /// - `lint.external`
 ///
 /// ## References

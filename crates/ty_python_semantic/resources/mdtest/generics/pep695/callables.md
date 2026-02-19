@@ -56,7 +56,7 @@ reveal_type(generic_context(into_callable(identity)))
 # revealed: Literal[1]
 reveal_type(into_callable(identity)(1))
 
-# revealed: [**P, T](c: (**P) -> T) -> (**P) -> T
+# revealed: [**P, T](c: (**P) -> T) -> ((**P) -> T)
 reveal_type(into_callable(identity2))
 # revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
 reveal_type(generic_context(into_callable(identity2)))
@@ -126,7 +126,7 @@ reveal_type(generic_context(decorator_factory))
 def identity[T](t: T) -> T:
     return t
 
-# revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> (**P'return) -> T'return
+# revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> ((**P'return) -> T'return)
 reveal_type(decorator_factory())
 # revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
@@ -212,7 +212,7 @@ reveal_type(generic_context(decorator_factory))
 def identity[T](t: T) -> T:
     return t
 
-# revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> (**P'return) -> T'return
+# revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> ((**P'return) -> T'return)
 reveal_type(decorator_factory())
 # revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))

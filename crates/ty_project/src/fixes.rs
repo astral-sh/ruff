@@ -421,7 +421,7 @@ mod tests {
             suppress_all_in(r#"
                 a = b + 10"#
         ),
-         @r"
+         @"
         Added 1 suppressions
 
         ## Fixed source
@@ -438,7 +438,7 @@ mod tests {
             suppress_all_in(r#"
                 a = b + 10 + c"#
         ),
-         @r"
+         @"
         Added 2 suppressions
 
         ## Fixed source
@@ -456,7 +456,7 @@ mod tests {
                 import sys
                 a = b + 10 + sys.veeersion"#
         ),
-         @r"
+         @"
         Added 2 suppressions
 
         ## Fixed source
@@ -475,7 +475,7 @@ mod tests {
                 import sys
                 a = 5 + 10  # ty: ignore[unresolved-reference]"#
         ),
-         @r"
+         @"
         Added 0 suppressions
 
         ## Fixed source
@@ -506,7 +506,7 @@ mod tests {
                 a = x +
                 "#
         ),
-         @r"
+         @"
         Added 0 suppressions
 
         ## Fixed source

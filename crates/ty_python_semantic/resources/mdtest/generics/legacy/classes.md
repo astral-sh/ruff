@@ -841,13 +841,13 @@ class GenericProtocol(Protocol[P, T]):
     def hint(self) -> Callable[P, T]: ...
 
 def class_case(x: GenericClass[[int], str]) -> None:
-    # revealed: bound method GenericClass[(int, /), str].hint() -> (int, /) -> str
+    # revealed: bound method GenericClass[(int, /), str].hint() -> ((int, /) -> str)
     reveal_type(x.hint)
     # revealed: (int, /) -> str
     reveal_type(x.hint())
 
 def protocol_case(x: GenericProtocol[[int], str]) -> None:
-    # revealed: bound method GenericProtocol[(int, /), str].hint() -> (int, /) -> str
+    # revealed: bound method GenericProtocol[(int, /), str].hint() -> ((int, /) -> str)
     reveal_type(x.hint)
     # revealed: (int, /) -> str
     reveal_type(x.hint())

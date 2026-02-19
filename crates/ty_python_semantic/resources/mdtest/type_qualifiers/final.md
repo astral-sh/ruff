@@ -627,16 +627,49 @@ class C:
         self.x: Final[int] = 1
 ```
 
-### `Final` in loops
+### Explicit `Final` redeclaration
 
-Using `Final` in a loop is not allowed.
+Explicit `Final` redeclaration in the same scope is accepted (shadowing).
 
 ```py
 from typing import Final
 
+x: Final = 1
+x: Final = "foo"
+```
+
+### `Final` in loops
+
+Assignments to a module-level `Final` symbol in a loop body are treated as reassignments. `Final`
+declarations in loop bodies are allowed.
+
+```py
+from typing import Final
+
+ABC: Final[int]
+
+for i in range(2):
+    ABC = i  # error: [invalid-assignment] "Reassignment of `Final` symbol `ABC` is not allowed"
+
 for _ in range(10):
-    # TODO: This should be an error
     i: Final[int] = 1
+```
+
+### `Final` declaration in loops should enforce non-reassignment
+
+A name declared as `Final` in a loop body should still be treated as the same binding across
+iterations, so reassignments across iterations should be rejected.
+
+```py
+from typing import Final
+
+k = ""
+
+for i in range(10):
+    # TODO: This should be an error; it's a reassignment
+    k += " "
+
+    k: Final[str] = ""
 ```
 
 ### Too many arguments

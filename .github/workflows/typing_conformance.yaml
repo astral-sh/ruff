@@ -18,6 +18,11 @@ on:
       - ".github/workflows/typing_conformance.yaml"
       - "Cargo.lock"
       - "!**.md"
+      - "!**.snap"
+      # It's tempting to skip all Python files in every directory,
+      # but changes to Python files in `ty_vendored` can affect the output of mypy_primer,
+      # so we apply a narrow exemption for all files in the corpus directory instead.
+      - "!crates/ty_python_semantic/resources/corpus/**"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -29,7 +34,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: f98d75ebb241d6f49e1a985a4f259f46b2056626
+  CONFORMANCE_SUITE_COMMIT: ffd520acd116aacbbba793c8f1f1fd51dfda83ae
   PYTHON_VERSION: 3.12
 
 jobs:

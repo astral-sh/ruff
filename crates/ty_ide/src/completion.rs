@@ -1593,8 +1593,8 @@ pub(crate) fn unresolved_fixes(
 fn add_keyword_completions<'db>(db: &'db dyn Db, completions: &mut Completions<'db>) {
     let keyword_values = [
         ("None", Type::none(db)),
-        ("True", Type::BooleanLiteral(true)),
-        ("False", Type::BooleanLiteral(false)),
+        ("True", Type::bool_literal(true)),
+        ("False", Type::bool_literal(false)),
     ];
     for (name, ty) in keyword_values {
         completions.add(CompletionBuilder::keyword(name).ty(ty).builtin(true));
@@ -2473,14 +2473,8 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
             | Type::BoundSuper(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => CompletionKind::Struct,
-            Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::TypeIs(_)
-            | Type::TypeGuard(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
-            | Type::BytesLiteral(_) => CompletionKind::Value,
-            Type::EnumLiteral(_) => CompletionKind::Enum,
+            Type::LiteralValue(literal) if literal.is_enum() => CompletionKind::Enum,
+            Type::LiteralValue(_) | Type::TypeIs(_) | Type::TypeGuard(_) => CompletionKind::Value,
             Type::ProtocolInstance(_) => CompletionKind::Interface,
             Type::TypeVar(_) => CompletionKind::TypeParameter,
             Type::Union(union) => union
@@ -8492,42 +8486,42 @@ raise <CURSOR>
         );
         assert_snapshot!(
             builder.skip_auto_import().skip_builtins().build().snapshot(),
-            @r"
-            and
-            as
-            assert
-            async
-            await
-            break
-            case
-            class
-            continue
-            def
-            del
-            elif
-            else
-            except
-            finally
-            for
-            from
-            global
-            if
-            import
-            in
-            is
-            lambda
-            match
-            nonlocal
-            not
-            or
-            pass
-            raise
-            return
-            try
-            while
-            with
-            yield
-            ",
+            @"
+        and
+        as
+        assert
+        async
+        await
+        break
+        case
+        class
+        continue
+        def
+        del
+        elif
+        else
+        except
+        finally
+        for
+        from
+        global
+        if
+        import
+        in
+        is
+        lambda
+        match
+        nonlocal
+        not
+        or
+        pass
+        raise
+        return
+        try
+        while
+        with
+        yield
+        ",
         );
     }
 

@@ -427,7 +427,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:3:5
           |
@@ -1663,7 +1663,7 @@ x = MyClass<CURSOR>()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:5
           |
@@ -1699,7 +1699,7 @@ x = MyClass(<CURSOR>)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:5
           |
@@ -1761,7 +1761,7 @@ x = MyClass(foo<CURSOR>)
 
         assert_snapshot!(
             test.goto_definition(),
-            @r"
+            @"
         info[goto-definition]: Go to definition
          --> main.py:7:13
           |
@@ -1799,7 +1799,7 @@ x = MyClass<CURSOR>()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:5
           |
@@ -2055,7 +2055,7 @@ p = Point<CURSOR>(1, 2)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:4:5
           |
@@ -2074,7 +2074,7 @@ p = Point<CURSOR>(1, 2)
         263 |     @property
         264 |     def __flags__(self) -> int: ...
             |
-        "#);
+        ");
     }
 
     /// Goto-definition performs lookups on the metaclass when attributes are not found.
@@ -2093,7 +2093,7 @@ p = Point<CURSOR>(1, 2)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:6:5
           |
@@ -2110,7 +2110,7 @@ p = Point<CURSOR>(1, 2)
         4 |
         5 | class Bar(metaclass=Foo): ...
           |
-        "#);
+        ");
     }
 
     /// Goto-definition does not look up instance members on the metaclass.
@@ -2129,7 +2129,7 @@ p = Point<CURSOR>(1, 2)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"No goto target found"#);
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
     /// Check that we don't fall into infinite recursion when e.g.
@@ -2141,7 +2141,7 @@ p = Point<CURSOR>(1, 2)
             .source("main.py", "type.<CURSOR>a")
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r#"No goto target found"#);
+        assert_snapshot!(test.goto_definition(), @"No goto target found");
     }
 
     /// Check that we don't fall into infinite recursion when e.g.
@@ -2170,6 +2170,78 @@ p = Point<CURSOR>(1, 2)
         263 |     @property
         264 |     def __flags__(self) -> int: ...
             |
+        ");
+    }
+
+    /// Go-to-definition should not point to while-loop header definitions.
+    #[test]
+    fn goto_definition_does_not_point_to_while_loop_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+while True:
+    variable = 1
+
+    vari<CURSOR>able
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        3 |     variable = 1
+        4 |
+        5 |     variable
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        2 | while True:
+        3 |     variable = 1
+          |     --------
+        4 |
+        5 |     variable
+          |
+        ");
+    }
+
+    /// Go-to-definition should not point to for-loop header definitions.
+    #[test]
+    fn goto_definition_does_not_point_to_for_loop_header() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+for x in range(10):
+    variable = 1
+
+    vari<CURSOR>able
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+         --> main.py:5:5
+          |
+        3 |     variable = 1
+        4 |
+        5 |     variable
+          |     ^^^^^^^^ Clicking here
+          |
+        info: Found 1 definition
+         --> main.py:3:5
+          |
+        2 | for x in range(10):
+        3 |     variable = 1
+          |     --------
+        4 |
+        5 |     variable
+          |
         ");
     }
 

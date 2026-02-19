@@ -1697,31 +1697,31 @@ result = func(10, y=20)
 
         // Includes all overload declarations plus implementation from usage-site rename.
         assert_snapshot!(test.rename("better_name"), @r#"
-       info[rename]: Rename symbol (found 6 locations)
-         --> main.py:2:17
-          |
-        2 | from lib import test
-          |                 ^^^^
-        3 |
-        4 | test("test")
-          | ----
-          |
-         ::: lib.py:5:5
-          |
-        4 | @overload
-        5 | def test() -> None: ...
-          |     ----
-        6 | @overload
-        7 | def test(a: str) -> str: ...
-          |     ----
-        8 | @overload
-        9 | def test(a: int) -> int: ...
-          |     ----
-       10 |
-       11 | def test(a: Any) -> Any:
-          |     ----
-       12 |     return a
-          |
+        info[rename]: Rename symbol (found 6 locations)
+          --> main.py:2:17
+           |
+         2 | from lib import test
+           |                 ^^^^
+         3 |
+         4 | test("test")
+           | ----
+           |
+          ::: lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ----
+         6 | @overload
+         7 | def test(a: str) -> str: ...
+           |     ----
+         8 | @overload
+         9 | def test(a: int) -> int: ...
+           |     ----
+        10 |
+        11 | def test(a: Any) -> Any:
+           |     ----
+        12 |     return a
+           |
         "#);
     }
 
@@ -2189,7 +2189,7 @@ result = func(10, y=20)
 
         // Only 2 locations should be found (the definition and the decorator reference),
         // not the second `my_func` function definition, because `my_func` is not a property.
-        assert_snapshot!(test.rename("better_name"), @r#"
+        assert_snapshot!(test.rename("better_name"), @"
         info[rename]: Rename symbol (found 2 locations)
           --> lib.py:8:5
            |
@@ -2204,7 +2204,7 @@ result = func(10, y=20)
         12 | def my_func():
         13 |     pass
            |
-        "#);
+        ");
     }
 
     /// When renaming the decorated function (not the one referenced in the decorator),
@@ -2238,7 +2238,7 @@ result = func(10, y=20)
         // `Definition` from the second. The decorator should also be excluded since it
         // semantically refers to the first definition, but fixing this requires using
         // position-aware binding resolution in `definitions_for_name`.
-        assert_snapshot!(test.rename("better_name"), @r#"
+        assert_snapshot!(test.rename("better_name"), @"
         info[rename]: Rename symbol (found 2 locations)
           --> lib.py:11:2
            |
@@ -2250,7 +2250,7 @@ result = func(10, y=20)
            |     ^^^^^^^
         13 |     pass
            |
-        "#);
+        ");
     }
 
     /// A property with differently-named getter and setter should not link them
@@ -2274,7 +2274,7 @@ result = func(10, y=20)
             .build();
 
         // Only the getter should be renamed, not the setter (they have different names).
-        assert_snapshot!(test.rename("new_name"), @r"
+        assert_snapshot!(test.rename("new_name"), @"
         info[rename]: Rename symbol (found 2 locations)
          --> lib.py:4:9
           |

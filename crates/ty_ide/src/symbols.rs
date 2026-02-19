@@ -2013,7 +2013,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         ZQZQZQ :: Constant :: Re-exported from `foo`
         __all__ :: Variable :: Re-exported from `foo`
         ",
@@ -2129,7 +2129,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable :: Re-exported from `foo`
         TRICKSY :: Constant
         ",
@@ -2183,7 +2183,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable :: Re-exported from `foo`
         defaultdict :: Variable :: Re-exported from `collections`
         ",
@@ -2278,7 +2278,7 @@ class X:
         // `from foo import *` will try to import it anyway.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable :: Re-exported from `foo`
         TRICKSY :: Constant
         ",
@@ -2397,7 +2397,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
@@ -2426,7 +2426,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
@@ -2455,7 +2455,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
@@ -2485,7 +2485,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2515,7 +2515,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2545,7 +2545,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2575,7 +2575,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2605,7 +2605,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2637,7 +2637,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("a.py"),
-            @r"
+            @"
         _ZBZBZB :: Constant :: Re-exported from `b`
         _ZAZAZA :: Constant :: Re-exported from `b`
         ",
@@ -2682,7 +2682,7 @@ class X:
         // `_ZBZBZB` instead of `_ZFZFZF`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZFZFZF :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
@@ -2723,7 +2723,7 @@ class X:
         // answer should just be `_ZFZFZF` and `_ZYZYZY`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZFZFZF :: Constant :: Re-exported from `parent.foo`
         foo :: Module :: Re-exported from `parent`
         _ZYZYZY :: Constant
@@ -2765,7 +2765,7 @@ class X:
         // Ideally this would only have `ZQZQZQ`.
         insta::assert_snapshot!(
             test.exports(),
-            @r"
+            @"
         ZQZQZQ :: Constant
         ZYZYZY :: Constant
         ",
@@ -2798,7 +2798,7 @@ class X:
         // Ideally this would only have `ZYZYZY`.
         insta::assert_snapshot!(
             test.exports(),
-            @r"
+            @"
         ZQZQZQ :: Constant
         ZYZYZY :: Constant
         ",

@@ -471,6 +471,7 @@ def collect_ty_diagnostics(
             "--output-format=gitlab",
             "--ignore=assert-type-unspellable-subtype",
             "--error=invalid-legacy-positional-parameter",
+            "--error=deprecated",
             "--exit-zero",
             *extra_search_path_args,
             *map(str, test_files),
@@ -506,7 +507,7 @@ def group_diagnostics_by_key(
 
     for diag in chain(old, new):
         diag.tag = tagged_lines.get(
-            (diag.location.path.name, diag.location.positions.begin.line), None
+            (diag.location.path.name, diag.location.positions.begin.line)
         )
 
     diagnostics = [

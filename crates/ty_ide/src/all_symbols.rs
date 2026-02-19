@@ -652,7 +652,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:27
           |
@@ -698,7 +698,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:37
           |
@@ -743,7 +743,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -794,7 +794,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/io/api.py:2:31
           |
@@ -857,7 +857,7 @@ __all__ = ['zqzqzq']
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -889,7 +889,7 @@ def zqzqzq():
             .source("sub1/sub2/sub3.py", "from pandas import zqzqzq as zqzqzq")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -932,7 +932,7 @@ def zqzqzq():
             .source("sub1/sub2/sub3.py", "from pandas import zqzqzq as zqzqzq")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -1042,7 +1042,7 @@ def test_helper_xyzxyzxyz():
 
         // First-party test symbols should still be available
         // (both test_ prefixed and non-test_ prefixed)
-        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @r"
+        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @"
         info[all-symbols]: AllSymbolInfo
          --> mypackage/tests/test_utils.py:2:5
           |
@@ -1080,7 +1080,7 @@ def test_helper_xyzxyzxyz():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @r"
+        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @"
         info[all-symbols]: AllSymbolInfo
          --> site-packages/thirdparty/utils.py:1:5
           |
@@ -1114,7 +1114,7 @@ def test_helper_xyzxyzxyz():
             .source("mypackage/_foo/__init__.py", "ZQZQZQ = 1")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> mypackage/_foo/__init__.py:1:1
           |
@@ -1162,7 +1162,7 @@ def test_helper_xyzxyzxyz():
             .site_packages("thirdparty/_foo/__init__.py", "ZQZQZQ = 1")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> site-packages/thirdparty/__init__.py:1:1
           |

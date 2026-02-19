@@ -872,6 +872,12 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::LoopHeader(_))
     }
 
+    /// Returns `true` if this definition is user-visible (i.e., not an internal
+    /// control-flow construct like a loop header definition).
+    pub(crate) const fn is_user_visible(&self) -> bool {
+        !self.is_loop_header()
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,

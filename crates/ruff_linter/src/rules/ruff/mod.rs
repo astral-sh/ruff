@@ -134,6 +134,22 @@ mod tests {
     }
 
     #[test]
+    fn missing_fstring_syntax_backslash_py311() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/RUF027_0.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY311.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
     fn prefer_parentheses_getitem_tuple() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF031_prefer_parens.py"),

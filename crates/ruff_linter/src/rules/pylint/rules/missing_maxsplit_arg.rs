@@ -133,10 +133,31 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     }
 
     let mut target_instance = value;
-    // a subscripted value could technically be subscripted further ad infinitum, so we
-    // recurse into the subscript expressions until we find the value being subscripted
-    while let Expr::Subscript(ExprSubscript { value, .. }) = target_instance.as_ref() {
-        target_instance = value;
+    // The value being split on could be the result of a chained split, e.g.
+    // `s.split('(')[0].split('[')[0]`. We recurse through subscripts and
+    // split/rsplit calls to find the original string value, since
+    // `str.split()` returns `list[str]` and subscripting that gives a `str`.
+    loop {
+        match target_instance.as_ref() {
+            Expr::Subscript(ExprSubscript { value, .. }) => {
+                target_instance = value;
+            }
+            Expr::Call(ExprCall { func, .. }) => {
+                if let Expr::Attribute(ExprAttribute {
+                    attr,
+                    value: call_value,
+                    ..
+                }) = func.as_ref()
+                {
+                    if matches!(attr.as_str(), "split" | "rsplit") {
+                        target_instance = call_value;
+                        continue;
+                    }
+                }
+                break;
+            }
+            _ => break,
+        }
     }
 
     // Check the function is called on a string
