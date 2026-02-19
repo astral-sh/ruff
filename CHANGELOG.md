@@ -39,13 +39,13 @@ Released on 2026-02-19.
 
     # ruff.toml
 
-      [lint]
-      select = ["E4", "E7", "E9", "F"]
+    [lint]
+    select = ["E4", "E7", "E9", "F"]
 
     # pyproject.toml
 
-      [tool.ruff.lint]
-      select = ["E4", "E7", "E9", "F"]
+    [tool.ruff.lint]
+    select = ["E4", "E7", "E9", "F"]
     ```
 
     If you do give them a try, feel free to share your feedback in the [GitHub
