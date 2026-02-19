@@ -274,6 +274,12 @@ impl FStringConversion {
             return Ok(Self::EmptyLiteral);
         }
 
+        // Skip conversion if raw string contains \N{
+        // In raw strings, \N is literal, but f-strings would evaluate {name} as a variable
+        if raw && contents.contains(r"\N{") {
+            anyhow::bail!("Cannot convert raw string with \\N{{}} to f-string");
+        }
+
         // Parse the format string.
         let format_string = FormatString::from_str(contents)?;
 

@@ -278,3 +278,6 @@ if __name__ == "__main__":
 
 # Unicode escape
 "\N{angle}AOB = {angle}°".format(angle=180)
+
+# Don't convert raw strings with \N{ patterns
+r"\N{angle}AOB = {angle}°".format(angle=180)
