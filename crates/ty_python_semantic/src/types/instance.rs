@@ -856,14 +856,6 @@ mod synthesized_protocol {
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
-    ///
-    /// Two synthesized protocol types with the same members will share the same Salsa ID,
-    /// making them easy to compare for equivalence. A synthesized protocol type is therefore
-    /// returned by [`super::ProtocolInstanceType::normalized`] so that two protocols with the same members
-    /// will be understood as equivalent even in the context of differently ordered unions or intersections.
-    ///
-    /// The constructor method of this type maintains the invariant that a synthesized protocol type
-    /// is always constructed from a *normalized* protocol interface.
     #[derive(
         Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
     )]
