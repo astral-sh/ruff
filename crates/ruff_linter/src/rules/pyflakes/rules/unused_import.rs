@@ -4,6 +4,15 @@ use std::iter;
 use anyhow::{Result, anyhow, bail};
 use std::collections::BTreeMap;
 
+use crate::checkers::ast::Checker;
+use crate::fix;
+use crate::preview::{
+    is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,
+};
+use crate::registry::Rule;
+use crate::rules::isort;
+use crate::settings::LinterSettings;
+use crate::{Applicability, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::{self as ast, Stmt};
@@ -12,16 +21,6 @@ use ruff_python_semantic::{
     ScopeId, SemanticModel, SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
-
-use crate::checkers::ast::Checker;
-use crate::fix;
-use crate::preview::{
-    is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,
-};
-use crate::registry::Rule;
-use crate::rules::{isort, isort::ImportSection, isort::ImportType};
-use crate::settings::LinterSettings;
-use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for unused imports.
