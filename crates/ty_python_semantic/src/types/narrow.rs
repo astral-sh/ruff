@@ -428,17 +428,18 @@ impl<'db> Conjunctions<'db> {
     }
 
     fn evaluate_constraint_type(&self, db: &'db dyn Db) -> Type<'db> {
-        if self.conjuncts.len() == 1 {
-            return self.conjuncts[0];
-        } else if self.conjuncts.len() == 2 {
-            return IntersectionType::from_two_elements(db, self.conjuncts[0], self.conjuncts[1]);
-        }
-
-        let mut intersection = IntersectionBuilder::new(db);
-        for conjunct in self.conjuncts.iter().copied() {
-            intersection = intersection.add_positive(conjunct);
-        }
-        intersection.build()
+        let mut iter = self.conjuncts.iter().copied();
+        let Some(first) = iter.next() else {
+            return Type::Never;
+        };
+        // Fold conjuncts pairwise using `IntersectionType::from_two_elements`.
+        // When TDD paths share a common prefix of constraints
+        // (e.g., match cases accumulating ~P1 & ~P2 & ... & ~Pn),
+        // intermediate results like `base_ty & ~P1` and `(base_ty & ~P1) & ~P2`
+        // are cached and reused across paths, avoiding redundant recomputation.
+        iter.fold(first, |result, conjunct| {
+            IntersectionType::from_two_elements(db, result, conjunct)
+        })
     }
 }
 
