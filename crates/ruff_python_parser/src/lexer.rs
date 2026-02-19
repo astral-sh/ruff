@@ -275,7 +275,7 @@ impl<'src> Lexer<'src> {
                     // test_err backslash_continuation_indentation_error
                     // if True:
                     //     1
-                    //   \
+                    //       \
                     //     2
 
                     // > Indentation cannot be split over multiple physical lines using backslashes;
@@ -3146,19 +3146,6 @@ else:\
 "
         );
         assert_snapshot!(lex_source(&source));
-    }
-
-    #[test]
-    fn backslash_continuation_unexpected_indent() {
-        // TODO: This should raise a syntax error
-        let source = format!(
-            r"if True:
-    1
-      \
-    2
-"
-        );
-        assert_snapshot!(lex_invalid(&source, Mode::Module));
     }
 
     #[test]
