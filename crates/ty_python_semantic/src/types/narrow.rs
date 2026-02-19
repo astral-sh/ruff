@@ -1376,7 +1376,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .or_insert(constraint);
 
                 // Use the narrowed type for subsequent comparisons in a chain.
-                last_rhs_ty = Some(IntersectionType::from_elements(self.db, [rhs_ty, ty]));
+                last_rhs_ty = Some(IntersectionType::from_two_elements(self.db, rhs_ty, ty));
             } else {
                 last_rhs_ty = Some(rhs_ty);
             }

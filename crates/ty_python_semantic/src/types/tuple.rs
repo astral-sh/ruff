@@ -2136,11 +2136,11 @@ impl<'db> TupleSpecBuilder<'db> {
                     && suffix.len() == var.suffix_elements().len()
                 {
                     for (existing, new) in prefix.iter_mut().zip(var.prefix_elements()) {
-                        *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                        *existing = IntersectionType::from_two_elements(db, *existing, *new);
                     }
-                    *variable = IntersectionType::from_elements(db, [*variable, var.variable()]);
+                    *variable = IntersectionType::from_two_elements(db, *variable, var.variable());
                     for (existing, new) in suffix.iter_mut().zip(var.suffix_elements()) {
-                        *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                        *existing = IntersectionType::from_two_elements(db, *existing, *new);
                     }
                     return Some(self);
                 }
