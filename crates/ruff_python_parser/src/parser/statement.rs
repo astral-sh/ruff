@@ -3192,8 +3192,6 @@ impl<'src> Parser<'src> {
             let param_start = parser.node_start();
 
             if parameters.kwarg.is_some() {
-                // TODO(dhruvmanila): This fails AST validation in tests because
-                // of the pre-order visit
                 // test_err params_follows_var_keyword_param
                 // def foo(**kwargs, a, /, b=10, *, *args): ...
                 parser.add_error(

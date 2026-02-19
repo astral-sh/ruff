@@ -31,7 +31,6 @@
 
 use crate::Db;
 use bitflags::bitflags;
-use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
@@ -541,43 +540,16 @@ impl<'db> SemanticTokenVisitor<'db> {
         parameters: &ast::Parameters,
         func: Option<&ast::StmtFunctionDef>,
     ) {
-        let mut param_index = 0;
-
-        // The `parameters.iter` method does return the parameters in sorted order but only if
-        // the AST is well-formed, but e.g. not for:
-        // ```py
-        // def foo(self, **key, value):
-        //     return
-        // ```
-        // Ideally, the ast would use a single vec for all parameters to avoid this issue as
-        // discussed here https://github.com/astral-sh/ruff/issues/14315 and
-        // here https://github.com/astral-sh/ruff/blob/71f8389f61a243a0c7584adffc49134ccf792aba/crates/ruff_python_parser/src/parser/statement.rs#L3176-L3179
-        let parameters_by_start = parameters
-            .iter()
-            .sorted_by_key(ruff_text_size::Ranged::start);
-
-        for any_param in parameters_by_start {
+        for (param_index, any_param) in parameters.iter_source_order().enumerate() {
             let parameter = any_param.as_parameter();
 
             let token_type = match any_param {
-                ast::AnyParameterRef::NonVariadic(_) => {
-                    // For non-variadic parameters (positional-only, regular, keyword-only),
-                    // check if this should be classified as self/cls parameter
-                    if let Some(func) = func {
-                        let result = self.classify_parameter(parameter, param_index == 0, func);
-                        param_index += 1;
-                        result
-                    } else {
-                        // For lambdas, all parameters are just parameters (no self/cls)
-                        param_index += 1;
-                        SemanticTokenType::Parameter
-                    }
-                }
-                ast::AnyParameterRef::Variadic(_) => {
-                    // Variadic parameters (*args, **kwargs) are always just parameters
-                    param_index += 1;
-                    SemanticTokenType::Parameter
-                }
+                // For non-variadic parameters in function defs, preserve self/cls classification.
+                ast::AnyParameterRef::NonVariadic(_) => func
+                    .map_or(SemanticTokenType::Parameter, |func| {
+                        self.classify_parameter(parameter, param_index == 0, func)
+                    }),
+                ast::AnyParameterRef::Variadic(_) => SemanticTokenType::Parameter,
             };
 
             self.add_token(
