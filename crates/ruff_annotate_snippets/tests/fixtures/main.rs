@@ -22,13 +22,15 @@ fn setup(input_path: std::path::PathBuf) -> tryfn::Case {
         .unwrap();
     let file_name = input_path.file_name().unwrap().to_str().unwrap();
     let name = format!("{parent}/{file_name}");
+    let expected = Data::read_from(&input_path.with_extension("svg"), None);
     tryfn::Case {
         name,
-        input: input_path,
+        fixture: input_path,
+        expected,
     }
 }
 
-fn test(input_path: &std::path::Path) -> Result<impl Into<Data>, Box<dyn Error>> {
+fn test(input_path: &std::path::Path) -> Result<Data, Box<dyn Error>> {
     let src = std::fs::read_to_string(input_path)?;
     let fixture: Fixture = toml::from_str(&src)?;
     let renderer: Renderer = fixture.renderer.into();
