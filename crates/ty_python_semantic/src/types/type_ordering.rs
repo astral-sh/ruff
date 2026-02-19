@@ -9,9 +9,12 @@ use crate::{
 };
 
 use super::{
-    DynamicType, TodoType, Type, TypeGuardLike, TypeGuardType, TypeIsType,
+    BindingContext, DynamicType, KnownBoundMethodType, KnownInstanceType, MaterializationKind,
+    TodoType, Type, TypeGuardLike, TypeGuardType, TypeIsType,
+    class::NamedTupleSpec,
     class_base::ClassBase,
-    signatures::{CallableSignature, Parameters},
+    generics::{GenericContext, Specialization},
+    signatures::{CallableSignature, ParameterKind, Parameters},
     subclass_of::SubclassOfInner,
 };
 
@@ -734,12 +737,7 @@ fn definition_ordering(
     }
 }
 
-fn binding_context_ordering(
-    db: &dyn Db,
-    left: super::BindingContext,
-    right: super::BindingContext,
-) -> Ordering {
-    use super::BindingContext;
+fn binding_context_ordering(db: &dyn Db, left: BindingContext, right: BindingContext) -> Ordering {
     match (left, right) {
         (BindingContext::Definition(l), BindingContext::Definition(r)) => {
             definition_ordering(db, l, r, OrderingPurpose::Determinism)
@@ -756,11 +754,9 @@ fn binding_context_ordering(
 /// For inner types, we use structural comparison rather than Salsa IDs where possible.
 fn known_bound_method_deterministic_ordering<'db>(
     db: &'db dyn Db,
-    left: super::KnownBoundMethodType<'db>,
-    right: super::KnownBoundMethodType<'db>,
+    left: KnownBoundMethodType<'db>,
+    right: KnownBoundMethodType<'db>,
 ) -> Ordering {
-    use super::KnownBoundMethodType;
-
     match (left, right) {
         (
             KnownBoundMethodType::FunctionTypeDunderGet(l),
@@ -868,11 +864,9 @@ fn known_bound_method_deterministic_ordering<'db>(
 /// For inner types, we use structural comparison rather than Salsa IDs where possible.
 fn known_instance_deterministic_ordering<'db>(
     db: &'db dyn Db,
-    left: super::KnownInstanceType<'db>,
-    right: super::KnownInstanceType<'db>,
+    left: KnownInstanceType<'db>,
+    right: KnownInstanceType<'db>,
 ) -> Ordering {
-    use super::KnownInstanceType;
-
     match (left, right) {
         (KnownInstanceType::SubscriptedProtocol(l), KnownInstanceType::SubscriptedProtocol(r)) => {
             generic_context_deterministic_ordering(db, l, r)
@@ -1139,8 +1133,7 @@ fn parameters_deterministic_ordering<'db>(
 }
 
 /// Assign a stable discriminant to each [`ParameterKind`] variant.
-fn parameter_kind_discriminant(kind: &super::signatures::ParameterKind) -> u8 {
-    use super::signatures::ParameterKind;
+fn parameter_kind_discriminant(kind: &ParameterKind) -> u8 {
     match kind {
         ParameterKind::PositionalOnly { .. } => 0,
         ParameterKind::PositionalOrKeyword { .. } => 1,
@@ -1155,8 +1148,8 @@ fn parameter_kind_discriminant(kind: &super::signatures::ParameterKind) -> u8 {
 /// Compares the type variables structurally by name and kind.
 fn generic_context_deterministic_ordering<'db>(
     db: &'db dyn Db,
-    left: super::generics::GenericContext<'db>,
-    right: super::generics::GenericContext<'db>,
+    left: GenericContext<'db>,
+    right: GenericContext<'db>,
 ) -> Ordering {
     let left_vars = left.variables(db);
     let right_vars = right.variables(db);
@@ -1182,8 +1175,8 @@ fn generic_context_deterministic_ordering<'db>(
 /// Compares the generic context, types, and materialization kind structurally.
 fn specialization_deterministic_ordering<'db>(
     db: &'db dyn Db,
-    left: super::generics::Specialization<'db>,
-    right: super::generics::Specialization<'db>,
+    left: Specialization<'db>,
+    right: Specialization<'db>,
 ) -> Ordering {
     generic_context_deterministic_ordering(db, left.generic_context(db), right.generic_context(db))
         .then_with(|| {
@@ -1212,19 +1205,16 @@ fn specialization_deterministic_ordering<'db>(
                 (None, None) => Ordering::Equal,
                 (None, Some(_)) => Ordering::Less,
                 (Some(_), None) => Ordering::Greater,
-                (Some(super::MaterializationKind::Top), Some(super::MaterializationKind::Top))
-                | (
-                    Some(super::MaterializationKind::Bottom),
-                    Some(super::MaterializationKind::Bottom),
-                ) => Ordering::Equal,
-                (
-                    Some(super::MaterializationKind::Top),
-                    Some(super::MaterializationKind::Bottom),
-                ) => Ordering::Less,
-                (
-                    Some(super::MaterializationKind::Bottom),
-                    Some(super::MaterializationKind::Top),
-                ) => Ordering::Greater,
+                (Some(MaterializationKind::Top), Some(MaterializationKind::Top))
+                | (Some(MaterializationKind::Bottom), Some(MaterializationKind::Bottom)) => {
+                    Ordering::Equal
+                }
+                (Some(MaterializationKind::Top), Some(MaterializationKind::Bottom)) => {
+                    Ordering::Less
+                }
+                (Some(MaterializationKind::Bottom), Some(MaterializationKind::Top)) => {
+                    Ordering::Greater
+                }
             }
         })
 }
@@ -1234,8 +1224,8 @@ fn specialization_deterministic_ordering<'db>(
 /// Compares the fields structurally by name and type.
 fn named_tuple_spec_deterministic_ordering<'db>(
     db: &'db dyn Db,
-    left: super::class::NamedTupleSpec<'db>,
-    right: super::class::NamedTupleSpec<'db>,
+    left: NamedTupleSpec<'db>,
+    right: NamedTupleSpec<'db>,
 ) -> Ordering {
     left.has_known_fields(db)
         .cmp(&right.has_known_fields(db))
