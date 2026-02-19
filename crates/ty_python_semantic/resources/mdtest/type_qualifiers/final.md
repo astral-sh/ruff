@@ -460,6 +460,7 @@ class C(B):
 from typing import Final, ClassVar, Annotated
 
 class Base:
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
     X: ClassVar[Final[int]] = 1
     Y: Annotated[Final[int], "metadata"] = 2
 
@@ -581,9 +582,12 @@ LEGAL_D: Final
 LEGAL_D = 1
 
 class C:
-    LEGAL_E: ClassVar[Final[int]] = 1
-    LEGAL_F: Final[ClassVar[int]] = 1
-    LEGAL_G: Annotated[Final[ClassVar[int]], "metadata"] = 1
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
+    ILLEGAL_E: ClassVar[Final[int]] = 1
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
+    ILLEGAL_F: Final[ClassVar[int]] = 1
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
+    ILLEGAL_G: Annotated[Final[ClassVar[int]], "metadata"] = 1
 
     def __init__(self):
         self.LEGAL_H: Final[int] = 1

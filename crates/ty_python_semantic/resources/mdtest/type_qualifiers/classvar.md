@@ -201,6 +201,35 @@ class Sub(Base): ...
 reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ```
 
+## `ClassVar` cannot be combined with `Final`
+
+Per the typing spec, `ClassVar` and `Final` cannot be used together.
+
+```py
+from typing import ClassVar, Final
+
+class C:
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
+    a: ClassVar[Final[int]] = 1
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
+    b: Final[ClassVar[int]] = 1
+```
+
+## `ClassVar[Final[...]]` is allowed in dataclasses
+
+`ClassVar[Final[...]]` is allowed in dataclasses to mark a class variable as both a class variable
+(not a dataclass field) and final.
+
+```py
+from dataclasses import dataclass
+from typing import ClassVar, Final
+
+@dataclass
+class D:
+    # No error: ClassVar[Final[...]] is allowed in dataclasses
+    final_classvar: ClassVar[Final[int]] = 4
+```
+
 ## Illegal `ClassVar` in type expression
 
 ```py

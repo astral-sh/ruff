@@ -747,9 +747,13 @@ If a class variable is additionally qualified as `Final`, we do not union with `
 from typing import Final
 
 class D:
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
     final1: Final[ClassVar] = 1
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
     final2: ClassVar[Final] = 1
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
     final3: ClassVar[Final[int]] = 1
+    # error: [invalid-type-form] "`ClassVar` and `Final` cannot be combined"
     final4: Final[ClassVar[int]] = 1
 
 reveal_type(D.final1)  # revealed: Literal[1]

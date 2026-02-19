@@ -3,6 +3,7 @@ use ruff_python_ast as ast;
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
 use crate::types::diagnostic::{INVALID_TYPE_FORM, report_invalid_arguments_to_annotated};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
@@ -281,6 +282,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                             match type_qualifier {
                                 SpecialFormType::ClassVar => {
+                                    // `ClassVar[Final[...]]` is allowed in dataclasses
+                                    // to mark a class variable as both ClassVar and Final.
+                                    if type_and_qualifiers
+                                        .qualifiers()
+                                        .contains(TypeQualifiers::FINAL)
+                                        && nearest_enclosing_class(
+                                            self.db(),
+                                            self.index,
+                                            self.scope(),
+                                        )
+                                        .is_none_or(
+                                            |class| class.dataclass_params(self.db()).is_none(),
+                                        )
+                                        && let Some(builder) =
+                                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                    {
+                                        builder.into_diagnostic(
+                                            "`ClassVar` and `Final` cannot be combined",
+                                        );
+                                    }
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
                                     if type_and_qualifiers
                                         .inner_type()
@@ -294,6 +315,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                     }
                                 }
                                 SpecialFormType::Final => {
+                                    if type_and_qualifiers
+                                        .qualifiers()
+                                        .contains(TypeQualifiers::CLASS_VAR)
+                                        && let Some(builder) =
+                                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                    {
+                                        builder.into_diagnostic(
+                                            "`ClassVar` and `Final` cannot be combined",
+                                        );
+                                    }
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);
                                 }
                                 SpecialFormType::Required => {
