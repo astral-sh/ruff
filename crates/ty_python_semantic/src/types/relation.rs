@@ -1586,116 +1586,26 @@ impl<'db> Type<'db> {
         other: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
-        self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
-    }
-
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self == other {
-            return ConstraintSet::from(true);
-        }
-
-        match (self, other) {
-            // The `Divergent` type is a special type that is not equivalent to other kinds of dynamic types,
-            // which prevents `Divergent` from being eliminated during union reduction.
-            (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent(_)))
-            | (Type::Dynamic(DynamicType::Divergent(_)), Type::Dynamic(_)) => {
-                ConstraintSet::from(false)
-            }
-            (Type::Dynamic(_), Type::Dynamic(_)) => ConstraintSet::from(true),
-
-            (Type::SubclassOf(first), Type::SubclassOf(second)) => {
-                match (first.subclass_of(), second.subclass_of()) {
-                    (first, second) if first == second => ConstraintSet::from(true),
-                    (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                        ConstraintSet::from(true)
-                    }
-                    _ => ConstraintSet::from(false),
-                }
-            }
-
-            (Type::TypeAlias(self_alias), _) => {
-                let self_alias_ty = self_alias.value_type(db).normalized(db);
-                visitor.visit((self_alias_ty, other), || {
-                    self_alias_ty.is_equivalent_to_impl(db, other, inferable, visitor)
-                })
-            }
-
-            (_, Type::TypeAlias(other_alias)) => {
-                let other_alias_ty = other_alias.value_type(db).normalized(db);
-                visitor.visit((self, other_alias_ty), || {
-                    self.is_equivalent_to_impl(db, other_alias_ty, inferable, visitor)
-                })
-            }
-
-            (Type::NewTypeInstance(self_newtype), Type::NewTypeInstance(other_newtype)) => {
-                ConstraintSet::from(self_newtype.is_equivalent_to_impl(db, other_newtype))
-            }
-
-            (Type::NominalInstance(first), Type::NominalInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::Union(first), Type::Union(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::Intersection(first), Type::Intersection(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.is_equivalent_to_impl(db, target_function, inferable, visitor)
-            }
-            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
-                self_method.is_equivalent_to_impl(db, target_method, inferable, visitor)
-            }
-            (Type::KnownBoundMethod(self_method), Type::KnownBoundMethod(target_method)) => {
-                self_method.is_equivalent_to_impl(db, target_method, inferable, visitor)
-            }
-            (Type::Callable(first), Type::Callable(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                ConstraintSet::from(left.kind() == right.kind())
-            }
-
-            (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
-            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                ConstraintSet::from(n.is_object() && protocol.normalized(db) == nominal)
-            }
-            // An instance of an enum class is equivalent to an enum literal of that class,
-            // if that enum has only has one member.
-            (Type::NominalInstance(instance), Type::LiteralValue(literal))
-            | (Type::LiteralValue(literal), Type::NominalInstance(instance))
-                if literal.is_enum() =>
-            {
-                let literal = literal.as_enum().unwrap();
-                if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
-                    return ConstraintSet::from(false);
-                }
-                ConstraintSet::from(is_single_member_enum(db, instance.class_literal(db)))
-            }
-
-            (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
-                left.is_equivalent_to_impl(db, right, inferable, visitor)
-            }
-
-            (Type::TypedDict(left), Type::TypedDict(right)) => visitor.visit((self, other), || {
-                left.is_equivalent_to_impl(db, right, inferable, visitor)
-            }),
-
-            _ => ConstraintSet::from(false),
-        }
+        let relation_visitor = HasRelationToVisitor::default();
+        let disjointness_visitor = IsDisjointVisitor::default();
+        self.has_relation_to_impl(
+            db,
+            other,
+            inferable,
+            TypeRelation::Redundancy,
+            &relation_visitor,
+            &disjointness_visitor,
+        )
+        .and(db, || {
+            other.has_relation_to_impl(
+                db,
+                self,
+                inferable,
+                TypeRelation::Redundancy,
+                &relation_visitor,
+                &disjointness_visitor,
+            )
+        })
     }
 
     /// Return true if `self & other` should simplify to `Never`:

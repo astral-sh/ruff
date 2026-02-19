@@ -8,8 +8,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicClassLiteral,
     DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
-    NormalizedVisitor, SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypeVarVariance, TypedDictType, UnionType, todo_type,
+    SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarVariance,
+    TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -274,12 +274,6 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self {
-            subclass_of: self.subclass_of.normalized_impl(db, visitor),
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -467,16 +461,6 @@ impl<'db> SubclassOfInner<'db> {
         });
 
         Self::TypeVar(bound_typevar)
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
-            Self::TypeVar(bound_typevar) => {
-                Self::TypeVar(bound_typevar.normalized_impl(db, visitor))
-            }
-        }
     }
 
     pub(super) fn recursive_type_normalized_impl(

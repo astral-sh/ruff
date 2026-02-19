@@ -21,14 +21,11 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::infer_deferred_types;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
-    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, SelfBinding, TypeContext, TypeMapping, VarianceInferable,
-    infer_complete_scope_types, todo_type,
+    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, ParamSpecAttrKind, SelfBinding,
+    TypeContext, TypeMapping, VarianceInferable, infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -104,18 +101,6 @@ impl<'db> CallableSignature<'db> {
                 .clone()
                 .with_inherited_generic_context(db, inherited_generic_context)
         }))
-    }
-
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
-        Self::from_overloads(
-            self.overloads
-                .iter()
-                .map(|signature| signature.normalized_impl(db, visitor)),
-        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -298,22 +283,6 @@ impl<'db> CallableSignature<'db> {
                 .map(|signature| signature.apply_self(db, self_type))
                 .collect(),
         }
-    }
-
-    fn is_subtype_of_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
-        self.has_relation_to_impl(
-            db,
-            other,
-            inferable,
-            TypeRelation::Subtyping,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
-        )
     }
 
     pub(crate) fn has_relation_to_impl(
@@ -543,32 +512,6 @@ impl<'db> CallableSignature<'db> {
             }),
         }
     }
-
-    /// Check whether this callable type is equivalent to another callable type.
-    ///
-    /// See [`Type::is_equivalent_to`] for more details.
-    pub(crate) fn is_equivalent_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match (self.overloads.as_slice(), other.overloads.as_slice()) {
-            ([self_signature], [other_signature]) => {
-                // Common case: both callable types contain a single signature, use the custom
-                // equivalence check instead of delegating it to the subtype check.
-                self_signature.is_equivalent_to_impl(db, other_signature, inferable, visitor)
-            }
-            (_, _) => {
-                if self == other {
-                    return ConstraintSet::from(true);
-                }
-                self.is_subtype_of_impl(db, other, inferable)
-                    .and(db, || other.is_subtype_of_impl(db, self, inferable))
-            }
-        }
-    }
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
@@ -766,28 +709,6 @@ impl<'db> Signature<'db> {
         self
     }
 
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
-        Self {
-            generic_context: self
-                .generic_context
-                .map(|ctx| ctx.normalized_impl(db, visitor)),
-            // Discard the definition when normalizing, so that two equivalent signatures
-            // with different `Definition`s share the same Salsa ID when normalized
-            definition: None,
-            parameters: Parameters::new(
-                db,
-                self.parameters
-                    .iter()
-                    .map(|param| param.normalized_impl(db, visitor)),
-            ),
-            return_ty: self.return_ty.normalized_impl(db, visitor),
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -982,128 +903,6 @@ impl<'db> Signature<'db> {
             Some(generic_context) => generic_context.inferable_typevars(db),
             None => InferableTypeVars::None,
         }
-    }
-
-    /// Return `true` if `self` has exactly the same set of possible static materializations as
-    /// `other` (if `self` represents the same set of possible sets of possible runtime objects as
-    /// `other`).
-    pub(crate) fn is_equivalent_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Signature<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        // If either signature is generic, their typevars should also be considered inferable when
-        // checking whether the signatures are equivalent, since we only need to find one
-        // specialization that causes the check to succeed.
-        //
-        // TODO: We should alpha-rename these typevars, too, to correctly handle when a generic
-        // callable refers to typevars from within the context that defines them. This primarily
-        // comes up when referring to a generic function recursively from within its body:
-        //
-        //     def identity[T](t: T) -> T:
-        //         # Here, TypeOf[identity2] is a generic callable that should consider T to be
-        //         # inferable, even though other uses of T in the function body are non-inferable.
-        //         return t
-        let self_inferable = self.inferable_typevars(db);
-        let other_inferable = other.inferable_typevars(db);
-        let inferable = inferable.merge(&self_inferable);
-        let inferable = inferable.merge(&other_inferable);
-
-        // `inner` will create a constraint set that references these newly inferable typevars.
-        let when = self.is_equivalent_to_inner(db, other, inferable, visitor);
-
-        // But the caller does not need to consider those extra typevars. Whatever constraint set
-        // we produce, we reduce it back down to the inferable set that the caller asked about.
-        // If we introduced new inferable typevars, those will be existentially quantified away
-        // before returning.
-        when.reduce_inferable(db, self_inferable.iter().chain(other_inferable.iter()))
-    }
-
-    fn is_equivalent_to_inner(
-        &self,
-        db: &'db dyn Db,
-        other: &Signature<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        let mut result = ConstraintSet::from(true);
-
-        if self.parameters.is_gradual() != other.parameters.is_gradual() {
-            return ConstraintSet::from(false);
-        }
-
-        if self.parameters.len() != other.parameters.len() {
-            return ConstraintSet::from(false);
-        }
-
-        let mut check_types = |self_type: Type<'db>, other_type: Type<'db>| {
-            !result
-                .intersect(
-                    db,
-                    self_type.is_equivalent_to_impl(db, other_type, inferable, visitor),
-                )
-                .is_never_satisfied(db)
-        };
-
-        if !check_types(self.return_ty, other.return_ty) {
-            return result;
-        }
-
-        for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
-            match (self_parameter.kind(), other_parameter.kind()) {
-                (
-                    ParameterKind::PositionalOnly {
-                        default_type: self_default,
-                        ..
-                    },
-                    ParameterKind::PositionalOnly {
-                        default_type: other_default,
-                        ..
-                    },
-                ) if self_default.is_some() == other_default.is_some() => {}
-
-                (
-                    ParameterKind::PositionalOrKeyword {
-                        name: self_name,
-                        default_type: self_default,
-                    },
-                    ParameterKind::PositionalOrKeyword {
-                        name: other_name,
-                        default_type: other_default,
-                    },
-                ) if self_default.is_some() == other_default.is_some()
-                    && self_name == other_name => {}
-
-                (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {}
-
-                (
-                    ParameterKind::KeywordOnly {
-                        name: self_name,
-                        default_type: self_default,
-                    },
-                    ParameterKind::KeywordOnly {
-                        name: other_name,
-                        default_type: other_default,
-                    },
-                ) if self_default.is_some() == other_default.is_some()
-                    && self_name == other_name => {}
-
-                (ParameterKind::KeywordVariadic { .. }, ParameterKind::KeywordVariadic { .. }) => {}
-
-                _ => return ConstraintSet::from(false),
-            }
-
-            if !check_types(
-                self_parameter.annotated_type(),
-                other_parameter.annotated_type(),
-            ) {
-                return result;
-            }
-        }
-
-        result
     }
 
     pub(crate) fn when_constraint_set_assignable_to_signatures(
@@ -2371,67 +2170,6 @@ impl<'db> Parameter<'db> {
             inferred_annotation: self.inferred_annotation,
             has_starred_annotation: self.has_starred_annotation,
             form: self.form,
-        }
-    }
-
-    /// Strip information from the parameter so that two equivalent parameters compare equal.
-    /// Normalize nested unions and intersections in the annotated type.
-    ///
-    /// See [`Type::normalized`] for more details.
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
-        let Parameter {
-            annotated_type,
-            kind,
-            form,
-            has_starred_annotation,
-            inferred_annotation: _,
-        } = self;
-
-        // Ensure unions and intersections are ordered in the annotated type.
-        // Unknown normalizes to Any.
-        let annotated_type = annotated_type.normalized_impl(db, visitor);
-
-        // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
-        // Ensure that we only record whether a parameter *has* a default
-        // (strip the precise *type* of the default from the parameter, replacing it with `Never`).
-        let kind = match kind {
-            ParameterKind::PositionalOnly {
-                name: _,
-                default_type,
-            } => ParameterKind::PositionalOnly {
-                name: None,
-                default_type: default_type.map(|_| Type::Never),
-            },
-            ParameterKind::PositionalOrKeyword { name, default_type } => {
-                ParameterKind::PositionalOrKeyword {
-                    name: name.clone(),
-                    default_type: default_type.map(|_| Type::Never),
-                }
-            }
-            ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
-                name: name.clone(),
-                default_type: default_type.map(|_| Type::Never),
-            },
-            ParameterKind::Variadic { name: _ } => ParameterKind::Variadic {
-                name: Name::new_static("args"),
-            },
-            ParameterKind::KeywordVariadic { name: _ } => ParameterKind::KeywordVariadic {
-                name: Name::new_static("kwargs"),
-            },
-        };
-
-        Self {
-            annotated_type,
-            // Normalize `inferred_annotation` to `false` since it's a display-only field
-            // that doesn't affect type semantics.
-            inferred_annotation: false,
-            has_starred_annotation: *has_starred_annotation,
-            kind,
-            form: *form,
         }
     }
 

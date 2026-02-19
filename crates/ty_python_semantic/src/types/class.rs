@@ -35,9 +35,7 @@ use crate::types::generics::{
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
 use crate::types::mro::DynamicMroError;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
@@ -46,9 +44,9 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     DeprecatedInstance, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    TypeAliasType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder, VarianceInferable,
-    binding_type, declaration_type, determine_upper_bound,
+    ManualPEP695TypeAliasType, MaterializationKind, PropertyInstanceType, TypeAliasType,
+    TypeContext, TypeMapping, TypedDictParams, UnionBuilder, VarianceInferable, binding_type,
+    declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -295,14 +293,6 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db).normalized_impl(db, visitor),
-        )
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -850,13 +840,6 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -1233,37 +1216,6 @@ impl<'db> ClassType<'db> {
                 },
             }
         })
-    }
-
-    pub(super) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: ClassType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self == other {
-            return ConstraintSet::from(true);
-        }
-
-        match (self, other) {
-            // Two non-generic classes are only equivalent if they are equal (handled above).
-            // A non-generic class is never equivalent to a generic class.
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => {
-                ConstraintSet::from(false)
-            }
-
-            (ClassType::Generic(this), ClassType::Generic(other)) => {
-                ConstraintSet::from(this.origin(db) == other.origin(db)).and(db, || {
-                    this.specialization(db).is_equivalent_to_impl(
-                        db,
-                        other.specialization(db),
-                        inferable,
-                        visitor,
-                    )
-                })
-            }
-        }
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
@@ -6068,20 +6020,6 @@ impl<'db> NamedTupleSpec<'db> {
     /// Create a [`NamedTupleSpec`] that indicates a namedtuple class has unknown fields.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
         Self::new(db, Box::default(), false)
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let fields: Box<_> = self
-            .fields(db)
-            .iter()
-            .map(|f| NamedTupleField {
-                name: f.name.clone(),
-                ty: f.ty.normalized_impl(db, visitor),
-                default: None,
-            })
-            .collect();
-
-        Self::new(db, fields, self.has_known_fields(db))
     }
 
     pub(crate) fn recursive_type_normalized_impl(

@@ -2,7 +2,7 @@ use compact_str::CompactString;
 use ruff_python_ast::name::Name;
 
 use crate::Db;
-use crate::types::{ClassLiteral, KnownClass, NormalizedVisitor, Type};
+use crate::types::{ClassLiteral, KnownClass, Type};
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
 #[derive(
@@ -88,37 +88,6 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeKind::Enum(e) => LiteralValueTypeInner::UnpromotableEnum(e),
             LiteralValueTypeKind::Bytes(bytes) => LiteralValueTypeInner::UnpromotableBytes(bytes),
             LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::UnpromotableLiteralString,
-        };
-
-        Self(repr)
-    }
-
-    /// Returns the promotable form of this literal value.
-    #[must_use]
-    pub(crate) fn to_promotable(self) -> Self {
-        let repr = match self.0 {
-            LiteralValueTypeInner::UnpromotableInt(int) => {
-                LiteralValueTypeInner::PromotableInt(int)
-            }
-            LiteralValueTypeInner::UnpromotableBool(bool) => {
-                LiteralValueTypeInner::PromotableBool(bool)
-            }
-            LiteralValueTypeInner::UnpromotableString(string) => {
-                LiteralValueTypeInner::PromotableString(string)
-            }
-            LiteralValueTypeInner::UnpromotableEnum(e) => LiteralValueTypeInner::PromotableEnum(e),
-            LiteralValueTypeInner::UnpromotableBytes(bytes) => {
-                LiteralValueTypeInner::PromotableBytes(bytes)
-            }
-            LiteralValueTypeInner::UnpromotableLiteralString => {
-                LiteralValueTypeInner::PromotableLiteralString
-            }
-            LiteralValueTypeInner::PromotableInt(_)
-            | LiteralValueTypeInner::PromotableBool(_)
-            | LiteralValueTypeInner::PromotableString(_)
-            | LiteralValueTypeInner::PromotableEnum(_)
-            | LiteralValueTypeInner::PromotableBytes(_)
-            | LiteralValueTypeInner::PromotableLiteralString => self.0,
         };
 
         Self(repr)
@@ -267,14 +236,6 @@ impl<'db> LiteralValueType<'db> {
             LiteralValueTypeKind::Bytes(_) => KnownClass::Bytes.to_instance(db),
             LiteralValueTypeKind::Enum(literal) => literal.enum_class_instance(db),
         }
-    }
-
-    pub(crate) fn normalized_impl(
-        self,
-        _db: &'db dyn Db,
-        _visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
-        self.to_promotable()
     }
 }
 
