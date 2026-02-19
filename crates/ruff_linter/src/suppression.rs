@@ -3,11 +3,12 @@ use core::fmt;
 use itertools::Itertools;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::token::{TokenKind, Tokens};
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
 use rustc_hash::FxHashSet;
 use std::cell::Cell;
+use std::cmp::{max, min};
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -511,6 +512,7 @@ impl<'a> SuppressionsBuilder<'a> {
 
         'comments: while let Some(suppression) = suppressions.peek() {
             indents.clear();
+            let (before, after) = tokens.split_at(suppression.range.start());
 
             // Standalone suppression comments
 
@@ -521,11 +523,11 @@ impl<'a> SuppressionsBuilder<'a> {
                     todo!()
                 } else {
                     // trailing ignore
-                    let line_range = self.source.line_range(suppression.range.start());
+                    let range = self.trailing_comment_range(suppression.range, before, after);
                     for code in suppression.codes_as_str(self.source) {
                         self.valid.push(Suppression {
                             code: code.into(),
-                            range: line_range,
+                            range,
                             used: false.into(),
                             comments: SuppressionComments::Single(suppression.clone()),
                         });
@@ -537,7 +539,6 @@ impl<'a> SuppressionsBuilder<'a> {
 
             // Matched suppression comments
 
-            let (before, after) = tokens.split_at(suppression.range.start());
             let mut count = 0;
             let last_indent = before
                 .iter()
@@ -687,6 +688,65 @@ impl<'a> SuppressionsBuilder<'a> {
                     comment: self.pending.remove(comment_index).comment.clone(),
                 });
             }
+        }
+    }
+
+    fn trailing_comment_range(
+        &self,
+        range: TextRange,
+        before: &[Token],
+        after: &[Token],
+    ) -> TextRange {
+        let mut start = range.start();
+        let mut end = range.end();
+        let mut seen_nonlogical_newline = false;
+        let mut has_line_above = false;
+        let mut has_line_below = false;
+
+        // find previous newline
+        for prev_token in before.iter().rev() {
+            match prev_token.kind() {
+                TokenKind::Comment => {}
+                TokenKind::Newline => {
+                    break;
+                }
+                TokenKind::NonLogicalNewline => {
+                    seen_nonlogical_newline = true;
+                }
+                _ => {
+                    if seen_nonlogical_newline {
+                        has_line_above = true;
+                    }
+
+                    start = prev_token.start();
+                }
+            }
+        }
+
+        seen_nonlogical_newline = false;
+        for next_token in after {
+            match next_token.kind() {
+                TokenKind::Comment => {}
+                TokenKind::Newline => {
+                    break;
+                }
+                TokenKind::NonLogicalNewline => {
+                    seen_nonlogical_newline = true;
+                }
+                _ => {
+                    if seen_nonlogical_newline {
+                        has_line_below = true;
+                    }
+
+                    end = next_token.end();
+                }
+            }
+        }
+
+        if has_line_above && has_line_below {
+            self.source.line_range(range.start())
+        } else {
+            TextRange::new(min(start, range.start()), max(end, range.end()))
         }
     }
 }
