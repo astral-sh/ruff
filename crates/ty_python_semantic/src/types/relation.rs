@@ -925,7 +925,15 @@ impl<'db> Type<'db> {
             (left, Type::AlwaysTruthy) => ConstraintSet::from(left.bool(db).is_always_true()),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                target.when_equivalent_to(db, Type::object(), inferable)
+                relation_visitor.visit((self, target, relation), || {
+                    target.when_equivalent_to_impl(
+                        db,
+                        Type::object(),
+                        inferable,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -1329,7 +1337,15 @@ impl<'db> Type<'db> {
             (Type::Callable(_), _) => ConstraintSet::from(false),
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => {
-                self.when_equivalent_to(db, target, inferable)
+                relation_visitor.visit((self, target, relation), || {
+                    self.when_equivalent_to_impl(
+                        db,
+                        target,
+                        inferable,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
             (Type::BoundSuper(_), _) => KnownClass::Super.to_instance(db).has_relation_to_impl(
                 db,
@@ -1588,13 +1604,30 @@ impl<'db> Type<'db> {
     ) -> ConstraintSet<'db> {
         let relation_visitor = HasRelationToVisitor::default();
         let disjointness_visitor = IsDisjointVisitor::default();
+        self.when_equivalent_to_impl(
+            db,
+            other,
+            inferable,
+            &relation_visitor,
+            &disjointness_visitor,
+        )
+    }
+
+    pub(crate) fn when_equivalent_to_impl(
+        self,
+        db: &'db dyn Db,
+        other: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
             other,
             inferable,
             TypeRelation::Redundancy,
-            &relation_visitor,
-            &disjointness_visitor,
+            relation_visitor,
+            disjointness_visitor,
         )
         .and(db, || {
             other.has_relation_to_impl(
@@ -1602,8 +1635,8 @@ impl<'db> Type<'db> {
                 self,
                 inferable,
                 TypeRelation::Redundancy,
-                &relation_visitor,
-                &disjointness_visitor,
+                relation_visitor,
+                disjointness_visitor,
             )
         })
     }
@@ -2378,9 +2411,17 @@ impl<'db> Type<'db> {
                 )
             }
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
-                self.when_equivalent_to(db, other, inferable).negate(db)
-            }
+            (Type::BoundSuper(_), Type::BoundSuper(_)) => disjointness_visitor
+                .visit((self, other), || {
+                    self.when_equivalent_to_impl(
+                        db,
+                        other,
+                        inferable,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+                .negate(db),
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 KnownClass::Super.to_instance(db).is_disjoint_from_impl(
                     db,

@@ -1726,8 +1726,7 @@ from ty_extensions import is_equivalent_to
 class HasMutableXAttr(Protocol):
     x: int
 
-# TODO: should pass
-static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))  # error: [static-assert-error]
+static_assert(is_equivalent_to(HasMutableXAttr, HasMutableXProperty))
 
 static_assert(is_subtype_of(HasMutableXAttr, HasXProperty))
 static_assert(is_assignable_to(HasMutableXAttr, HasXProperty))
@@ -2064,16 +2063,14 @@ S = TypeVar("S")
 class LegacyClassScoped(Protocol[S]):
     def method(self, input: S) -> None: ...
 
-# TODO: these should pass
-static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))  # error: [static-assert-error]
-static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))  # error: [static-assert-error]
+static_assert(is_equivalent_to(NewStyleClassScoped, LegacyClassScoped))
+static_assert(is_equivalent_to(NewStyleClassScoped[int], LegacyClassScoped[int]))
 
 class NominalGeneric[T]:
     def method(self, input: T) -> None: ...
 
 def _[T](x: T) -> T:
-    # TODO: should pass
-    static_assert(is_equivalent_to(NewStyleClassScoped[T], LegacyClassScoped[T]))  # error: [static-assert-error]
+    static_assert(is_equivalent_to(NewStyleClassScoped[T], LegacyClassScoped[T]))
     static_assert(is_subtype_of(NominalGeneric[T], NewStyleClassScoped[T]))
     static_assert(is_subtype_of(NominalGeneric[T], LegacyClassScoped[T]))
     return x
@@ -2151,9 +2148,7 @@ class NominalReturningOtherClass:
     def g(self) -> Other:
         raise NotImplementedError
 
-# TODO: should pass
-static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
-
+static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
 static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
@@ -2361,9 +2356,7 @@ class P4(Protocol):
     def z(self, value: int) -> None: ...
 
 static_assert(is_equivalent_to(P1, P2))
-
-# TODO: should pass
-static_assert(is_equivalent_to(P3, P4))  # error: [static-assert-error]
+static_assert(is_equivalent_to(P3, P4))
 ```
 
 As with protocols that only have non-method members, this also holds true when they appear in
@@ -2374,9 +2367,7 @@ class A: ...
 class B: ...
 
 static_assert(is_equivalent_to(A | B | P1, P2 | B | A))
-
-# TODO: should pass
-static_assert(is_equivalent_to(A | B | P3, P4 | B | A))  # error: [static-assert-error]
+static_assert(is_equivalent_to(A | B | P3, P4 | B | A))
 ```
 
 ## Subtyping between two protocol types with method members
@@ -2923,8 +2914,6 @@ class Bar(Protocol):
     @property
     def x(self) -> "Bar": ...
 
-# TODO: this should pass
-# error: [static-assert-error]
 static_assert(is_equivalent_to(Foo, Bar))
 
 T = TypeVar("T", bound="TypeVarRecursive")
