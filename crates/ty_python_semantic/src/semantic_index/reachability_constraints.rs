@@ -318,7 +318,7 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 /// operations return `AMBIGUOUS` to prevent exponential blowup on pathological inputs
 /// (e.g., a 5000-line while loop with hundreds of if-branches). This can lead to less precise
 /// reachability analysis and type narrowing.
-const MAX_INTERIOR_NODES: usize = 64 * 1024;
+const MAX_INTERIOR_NODES: usize = 128 * 1024;
 
 fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
     let ty = match singleton {
