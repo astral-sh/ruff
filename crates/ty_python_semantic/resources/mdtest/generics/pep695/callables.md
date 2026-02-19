@@ -24,7 +24,7 @@ reveal_type(identity(1))
 def identity2[**P, T](c: Callable[P, T]) -> Callable[P, T]:
     return c
 
-# revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
+# revealed: ty_extensions.GenericContext[**P@identity2, T@identity2]
 reveal_type(generic_context(identity2))
 # revealed: [T](t: T) -> T
 reveal_type(identity2(identity))
@@ -58,7 +58,7 @@ reveal_type(into_callable(identity)(1))
 
 # revealed: [**P, T](c: (**P) -> T) -> ((**P) -> T)
 reveal_type(into_callable(identity2))
-# revealed: ty_extensions.GenericContext[P@identity2, T@identity2]
+# revealed: ty_extensions.GenericContext[**P@identity2, T@identity2]
 reveal_type(generic_context(into_callable(identity2)))
 # revealed: [T](t: T) -> T
 reveal_type(into_callable(identity2)(identity))
@@ -114,7 +114,7 @@ type IdentityCallable[**P, T] = Callable[[Callable[P, T]], Callable[P, T]]
 def decorator_factory[**P, T]() -> IdentityCallable[P, T]:
     def decorator[**P, T](fn: Callable[P, T]) -> Callable[P, T]:
         return fn
-    # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
+    # revealed: ty_extensions.GenericContext[**P@decorator, T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -128,7 +128,7 @@ def identity[T](t: T) -> T:
 
 # revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> ((**P'return) -> T'return)
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
+# revealed: ty_extensions.GenericContext[**P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: [T](t: T) -> T
 reveal_type(decorator_factory()(identity))
@@ -200,7 +200,7 @@ from ty_extensions import generic_context
 def decorator_factory[**P, T]() -> Callable[[Callable[P, T]], Callable[P, T]]:
     def decorator[**P, T](fn: Callable[P, T]) -> Callable[P, T]:
         return fn
-    # revealed: ty_extensions.GenericContext[P@decorator, T@decorator]
+    # revealed: ty_extensions.GenericContext[**P@decorator, T@decorator]
     reveal_type(generic_context(decorator))
 
     return decorator
@@ -214,7 +214,7 @@ def identity[T](t: T) -> T:
 
 # revealed: [**P'return, T'return]((**P'return) -> T'return, /) -> ((**P'return) -> T'return)
 reveal_type(decorator_factory())
-# revealed: ty_extensions.GenericContext[P'return@decorator_factory, T'return@decorator_factory]
+# revealed: ty_extensions.GenericContext[**P'return@decorator_factory, T'return@decorator_factory]
 reveal_type(generic_context(decorator_factory()))
 # revealed: [T](t: T) -> T
 reveal_type(decorator_factory()(identity))
@@ -229,7 +229,7 @@ If the typevar also appears in a parameter, it is the function that is generic, 
 def outside_callable[**P, T](func: Callable[P, T]) -> Callable[P, T]:
     raise NotImplementedError
 
-# revealed: ty_extensions.GenericContext[P@outside_callable, T@outside_callable]
+# revealed: ty_extensions.GenericContext[**P@outside_callable, T@outside_callable]
 reveal_type(generic_context(outside_callable))
 
 def int_identity(x: int) -> int:
