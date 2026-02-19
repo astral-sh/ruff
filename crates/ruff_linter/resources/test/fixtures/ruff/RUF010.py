@@ -64,3 +64,26 @@ f"{repr(1)=}"
 f"{str('hello')=}"
 f"{ascii('hello')=}"
 f"{repr('hello')=}"
+
+# Comment cases - fix applicability depends on whether comment is preserved
+# Fix is unsafe when comment would be deleted (comment outside arg)
+f"{ascii(
+    # comment outside arg
+    1
+)}"  # RUF010 (unsafe fix)
+
+f"{repr(
+    # comment outside arg
+    'hello'
+)}"  # RUF010 (unsafe fix)
+
+# Fix is safe when comment is preserved (comment inside parenthesized arg)
+f"{ascii((
+    # comment inside parens
+    1
+))}"  # RUF010 (safe fix)
+
+f"{repr((
+    # comment inside parens
+    'hello'
+))}"  # RUF010 (safe fix)
