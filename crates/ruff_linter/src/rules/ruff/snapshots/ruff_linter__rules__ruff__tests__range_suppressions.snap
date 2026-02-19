@@ -327,6 +327,7 @@ RUF102 [*] Invalid rule code in suppression: YF829
 97 |     # ruff: enable[YF829]
    |                    -----
    |
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the suppression comment
 90 | 
 91 | def f():
@@ -352,6 +353,7 @@ RUF102 [*] Invalid rule code in suppression: RQW320
    |                          ------
 97 |     # ruff: enable[YF829]
    |
+help: Add non-Ruff rule codes to the `lint.external` configuration option
 help: Remove the rule code `RQW320`
 91 | def f():
 92 |     # Unknown rule codes

@@ -2,7 +2,10 @@ use std::cmp::Ordering;
 
 use salsa::plumbing::AsId;
 
-use crate::{db::Db, types::bound_super::SuperOwnerKind};
+use crate::{
+    db::Db,
+    types::{LiteralValueTypeKind, bound_super::SuperOwnerKind},
+};
 
 use super::{
     DynamicType, TodoType, Type, TypeGuardLike, TypeGuardType, TypeIsType, class_base::ClassBase,
@@ -47,28 +50,43 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Never, _) => Ordering::Less,
         (_, Type::Never) => Ordering::Greater,
 
-        (Type::LiteralString, _) => Ordering::Less,
-        (_, Type::LiteralString) => Ordering::Greater,
+        (Type::LiteralValue(left), Type::LiteralValue(right)) => {
+            match (left.kind(), right.kind()) {
+                (LiteralValueTypeKind::LiteralString, _) => Ordering::Less,
+                (_, LiteralValueTypeKind::LiteralString) => Ordering::Greater,
 
-        (Type::BooleanLiteral(left), Type::BooleanLiteral(right)) => left.cmp(right),
-        (Type::BooleanLiteral(_), _) => Ordering::Less,
-        (_, Type::BooleanLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::Bool(left), LiteralValueTypeKind::Bool(right)) => {
+                    left.cmp(&right)
+                }
+                (LiteralValueTypeKind::Bool(_), _) => Ordering::Less,
+                (_, LiteralValueTypeKind::Bool(_)) => Ordering::Greater,
 
-        (Type::IntLiteral(left), Type::IntLiteral(right)) => left.cmp(right),
-        (Type::IntLiteral(_), _) => Ordering::Less,
-        (_, Type::IntLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::Int(left), LiteralValueTypeKind::Int(right)) => {
+                    left.cmp(&right)
+                }
+                (LiteralValueTypeKind::Int(_), _) => Ordering::Less,
+                (_, LiteralValueTypeKind::Int(_)) => Ordering::Greater,
 
-        (Type::StringLiteral(left), Type::StringLiteral(right)) => left.cmp(right),
-        (Type::StringLiteral(_), _) => Ordering::Less,
-        (_, Type::StringLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::String(left), LiteralValueTypeKind::String(right)) => {
+                    left.cmp(&right)
+                }
+                (LiteralValueTypeKind::String(_), _) => Ordering::Less,
+                (_, LiteralValueTypeKind::String(_)) => Ordering::Greater,
 
-        (Type::BytesLiteral(left), Type::BytesLiteral(right)) => left.cmp(right),
-        (Type::BytesLiteral(_), _) => Ordering::Less,
-        (_, Type::BytesLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::Bytes(left), LiteralValueTypeKind::Bytes(right)) => {
+                    left.cmp(&right)
+                }
+                (LiteralValueTypeKind::Bytes(_), _) => Ordering::Less,
+                (_, LiteralValueTypeKind::Bytes(_)) => Ordering::Greater,
 
-        (Type::EnumLiteral(left), Type::EnumLiteral(right)) => left.cmp(right),
-        (Type::EnumLiteral(_), _) => Ordering::Less,
-        (_, Type::EnumLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::Enum(left), LiteralValueTypeKind::Enum(right)) => {
+                    left.cmp(&right)
+                }
+            }
+        }
+
+        (Type::LiteralValue(_), _) => Ordering::Less,
+        (_, Type::LiteralValue(_)) => Ordering::Greater,
 
         (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
         (Type::FunctionLiteral(_), _) => Ordering::Less,

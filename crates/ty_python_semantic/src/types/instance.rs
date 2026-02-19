@@ -19,8 +19,8 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor, NormalizedVisitor,
-    TypeContext, TypeMapping, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
+    LiteralValueTypeKind, NormalizedVisitor, TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -383,8 +383,11 @@ impl<'db> NominalInstanceType<'db> {
         };
 
         let to_u32 = |ty: &Type<'db>| match ty {
-            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
-            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(n) => i32::try_from(n.as_i64()).map(Some).ok(),
+                LiteralValueTypeKind::Bool(b) => Some(Some(i32::from(b))),
+                _ => None,
+            },
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) =>
             {

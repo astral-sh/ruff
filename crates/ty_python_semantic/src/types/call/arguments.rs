@@ -5,11 +5,9 @@ use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 
 use crate::Db;
-use crate::types::KnownClass;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::tuple::Tuple;
-
-use super::Type;
+use crate::types::{KnownClass, Type};
 
 /// Maximum number of expanded types that can be generated from a single tuple's
 /// Cartesian product in [`expand_type`].
@@ -383,10 +381,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
             let class = instance.class(db);
 
             if class.is_known(db, KnownClass::Bool) {
-                return Some(vec![
-                    Type::BooleanLiteral(true),
-                    Type::BooleanLiteral(false),
-                ]);
+                return Some(vec![Type::bool_literal(true), Type::bool_literal(false)]);
             }
 
             // If the class is a fixed-length tuple subtype, we expand it to its elements.
@@ -466,7 +461,7 @@ mod tests {
         let db = setup_db();
         let bool_instance = KnownClass::Bool.to_instance(&db);
         let expanded = expand_type(&db, bool_instance).unwrap();
-        let expected_types = [Type::BooleanLiteral(true), Type::BooleanLiteral(false)];
+        let expected_types = [Type::bool_literal(true), Type::bool_literal(false)];
         assert_eq!(expanded.len(), expected_types.len());
         assert_eq!(expanded, expected_types);
     }
@@ -479,8 +474,8 @@ mod tests {
         let str_ty = KnownClass::Str.to_instance(&db);
         let bytes_ty = KnownClass::Bytes.to_instance(&db);
         let bool_ty = KnownClass::Bool.to_instance(&db);
-        let true_ty = Type::BooleanLiteral(true);
-        let false_ty = Type::BooleanLiteral(false);
+        let true_ty = Type::bool_literal(true);
+        let false_ty = Type::bool_literal(false);
 
         // Empty tuple
         let empty_tuple = Type::empty_tuple(&db);
