@@ -9,7 +9,9 @@ use crate::{
 };
 
 use super::{
-    DynamicType, TodoType, Type, TypeGuardLike, TypeGuardType, TypeIsType, class_base::ClassBase,
+    DynamicType, TodoType, Type, TypeGuardLike, TypeGuardType, TypeIsType,
+    class_base::ClassBase,
+    signatures::{CallableSignature, Parameters},
     subclass_of::SubclassOfInner,
 };
 
@@ -237,7 +239,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SubclassOfInner::Class(_), _) => Ordering::Less,
                 (_, SubclassOfInner::Class(_)) => Ordering::Greater,
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
-                    dynamic_elements_ordering(left, right)
+                    dynamic_elements_ordering(db, left, right, ordering_purpose)
                 }
                 (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => {
                     union_or_intersection_elements_ordering(
@@ -336,7 +338,13 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                         (None, None) => Ordering::Equal,
                     }
                 })
-                .then_with(|| left.binding_context(db).cmp(&right.binding_context(db))),
+                .then_with(|| {
+                    binding_context_ordering(
+                        db,
+                        left.binding_context(db),
+                        right.binding_context(db),
+                    )
+                }),
         },
         (Type::TypeVar(_), _) => Ordering::Less,
         (_, Type::TypeVar(_)) => Ordering::Greater,
@@ -370,7 +378,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (_, ClassBase::TypedDict) => Ordering::Greater,
 
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
-                    dynamic_elements_ordering(left, right)
+                    dynamic_elements_ordering(db, left, right, ordering_purpose)
                 }
             })
             .then_with(|| match (left.owner(db), right.owner(db)) {
@@ -416,7 +424,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::ClassTypeVar(..), _) => Ordering::Less,
                 (_, SuperOwnerKind::ClassTypeVar(..)) => Ordering::Greater,
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
-                    dynamic_elements_ordering(left, right)
+                    dynamic_elements_ordering(db, left, right, ordering_purpose)
                 }
             })
         }
@@ -459,7 +467,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::PropertyInstance(_), _) => Ordering::Less,
         (_, Type::PropertyInstance(_)) => Ordering::Greater,
 
-        (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
+        (Type::Dynamic(left), Type::Dynamic(right)) => {
+            dynamic_elements_ordering(db, *left, *right, ordering_purpose)
+        }
         (Type::Dynamic(_), _) => Ordering::Less,
         (_, Type::Dynamic(_)) => Ordering::Greater,
 
@@ -607,7 +617,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 }
 
 /// Determine a canonical order for two instances of [`DynamicType`].
-fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering {
+fn dynamic_elements_ordering<'db>(
+    db: &'db dyn Db,
+    left: DynamicType<'db>,
+    right: DynamicType<'db>,
+    ordering_purpose: OrderingPurpose,
+) -> Ordering {
     match (left, right) {
         (DynamicType::Any, _) => Ordering::Less,
         (_, DynamicType::Any) => Ordering::Greater,
@@ -615,7 +630,14 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (DynamicType::Unknown, _) => Ordering::Less,
         (_, DynamicType::Unknown) => Ordering::Greater,
 
-        (DynamicType::UnknownGeneric(left), DynamicType::UnknownGeneric(right)) => left.cmp(&right),
+        (DynamicType::UnknownGeneric(left), DynamicType::UnknownGeneric(right)) => {
+            match ordering_purpose {
+                OrderingPurpose::Normalization => left.cmp(&right),
+                OrderingPurpose::Determinism => {
+                    generic_context_deterministic_ordering(db, left, right)
+                }
+            }
+        }
         (DynamicType::UnknownGeneric(_), _) => Ordering::Less,
         (_, DynamicType::UnknownGeneric(_)) => Ordering::Greater,
 
@@ -712,6 +734,22 @@ fn definition_ordering(
     }
 }
 
+fn binding_context_ordering(
+    db: &dyn Db,
+    left: super::BindingContext,
+    right: super::BindingContext,
+) -> Ordering {
+    use super::BindingContext;
+    match (left, right) {
+        (BindingContext::Definition(l), BindingContext::Definition(r)) => {
+            definition_ordering(db, l, r, OrderingPurpose::Determinism)
+        }
+        (BindingContext::Definition(_), _) => Ordering::Less,
+        (_, BindingContext::Definition(_)) => Ordering::Greater,
+        (BindingContext::Synthetic, BindingContext::Synthetic) => Ordering::Equal,
+    }
+}
+
 /// Deterministic ordering for [`KnownBoundMethodType`] instances.
 ///
 /// Uses the standard Less/Greater pattern for exhaustive matching without wildcards.
@@ -727,34 +765,24 @@ fn known_bound_method_deterministic_ordering<'db>(
         (
             KnownBoundMethodType::FunctionTypeDunderGet(l),
             KnownBoundMethodType::FunctionTypeDunderGet(r),
-        ) => definition_ordering(
+        ) => union_or_intersection_elements_ordering(
             db,
-            l.definition(db),
-            r.definition(db),
+            &Type::FunctionLiteral(l),
+            &Type::FunctionLiteral(r),
             OrderingPurpose::Determinism,
-        )
-        .then_with(|| {
-            let l_sig = l.signature(db);
-            let r_sig = r.signature(db);
-            signatures_deterministic_ordering(db, l_sig, r_sig)
-        }),
+        ),
         (KnownBoundMethodType::FunctionTypeDunderGet(_), _) => Ordering::Less,
         (_, KnownBoundMethodType::FunctionTypeDunderGet(_)) => Ordering::Greater,
 
         (
             KnownBoundMethodType::FunctionTypeDunderCall(l),
             KnownBoundMethodType::FunctionTypeDunderCall(r),
-        ) => definition_ordering(
+        ) => union_or_intersection_elements_ordering(
             db,
-            l.definition(db),
-            r.definition(db),
+            &Type::FunctionLiteral(l),
+            &Type::FunctionLiteral(r),
             OrderingPurpose::Determinism,
-        )
-        .then_with(|| {
-            let l_sig = l.signature(db);
-            let r_sig = r.signature(db);
-            signatures_deterministic_ordering(db, l_sig, r_sig)
-        }),
+        ),
         (KnownBoundMethodType::FunctionTypeDunderCall(_), _) => Ordering::Less,
         (_, KnownBoundMethodType::FunctionTypeDunderCall(_)) => Ordering::Greater,
 
@@ -1033,42 +1061,35 @@ fn known_instance_deterministic_ordering<'db>(
 /// Compares signatures structurally by comparing their parameters and return types.
 fn signatures_deterministic_ordering<'db>(
     db: &'db dyn Db,
-    left: &super::signatures::CallableSignature<'db>,
-    right: &super::signatures::CallableSignature<'db>,
+    left: &CallableSignature<'db>,
+    right: &CallableSignature<'db>,
 ) -> Ordering {
-    let left_overloads: Vec<_> = left.iter().collect();
-    let right_overloads: Vec<_> = right.iter().collect();
-
-    left_overloads
-        .len()
-        .cmp(&right_overloads.len())
-        .then_with(|| {
-            for (l, r) in left_overloads.iter().zip(right_overloads.iter()) {
-                let params_cmp =
-                    parameters_deterministic_ordering(db, l.parameters(), r.parameters());
-                if params_cmp != Ordering::Equal {
-                    return params_cmp;
-                }
-
-                let ret_cmp = union_or_intersection_elements_ordering(
-                    db,
-                    &l.return_ty,
-                    &r.return_ty,
-                    OrderingPurpose::Determinism,
-                );
-                if ret_cmp != Ordering::Equal {
-                    return ret_cmp;
-                }
+    left.len().cmp(&right.len()).then_with(|| {
+        for (l, r) in left.iter().zip(right.iter()) {
+            let params_cmp = parameters_deterministic_ordering(db, l.parameters(), r.parameters());
+            if params_cmp != Ordering::Equal {
+                return params_cmp;
             }
-            Ordering::Equal
-        })
+
+            let ret_cmp = union_or_intersection_elements_ordering(
+                db,
+                &l.return_ty,
+                &r.return_ty,
+                OrderingPurpose::Determinism,
+            );
+            if ret_cmp != Ordering::Equal {
+                return ret_cmp;
+            }
+        }
+        Ordering::Equal
+    })
 }
 
 /// Deterministic ordering for [`Parameters`] instances.
 fn parameters_deterministic_ordering<'db>(
     db: &'db dyn Db,
-    left: &super::signatures::Parameters<'db>,
-    right: &super::signatures::Parameters<'db>,
+    left: &Parameters<'db>,
+    right: &Parameters<'db>,
 ) -> Ordering {
     left.as_slice()
         .len()
@@ -1137,15 +1158,15 @@ fn generic_context_deterministic_ordering<'db>(
     left: super::generics::GenericContext<'db>,
     right: super::generics::GenericContext<'db>,
 ) -> Ordering {
-    let left_vars: Vec<_> = left.variables(db).collect();
-    let right_vars: Vec<_> = right.variables(db).collect();
+    let left_vars = left.variables(db);
+    let right_vars = right.variables(db);
 
     left_vars.len().cmp(&right_vars.len()).then_with(|| {
-        for (l, r) in left_vars.iter().zip(right_vars.iter()) {
+        for (l, r) in left_vars.zip(right_vars) {
             let cmp = union_or_intersection_elements_ordering(
                 db,
-                &Type::TypeVar(*l),
-                &Type::TypeVar(*r),
+                &Type::TypeVar(l),
+                &Type::TypeVar(r),
                 OrderingPurpose::Determinism,
             );
             if cmp != Ordering::Equal {
