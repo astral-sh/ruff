@@ -12289,6 +12289,7 @@ pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for UnionType<'_> {}
 
+#[salsa::tracked]
 impl<'db> UnionType<'db> {
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
@@ -12305,18 +12306,15 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
-    pub(crate) fn from_elements_no_redundancy_check<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
-    where
-        I: IntoIterator<Item = T>,
-        T: Into<Type<'db>>,
-    {
-        elements
-            .into_iter()
-            .fold(
-                UnionBuilder::new(db).check_redundancy(false),
-                |builder, element| builder.add(element.into()),
-            )
-            .build()
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+            result.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
+        UnionBuilder::new(db).add(a).add(b).build()
     }
 
     /// Create a union from a list of elements without unpacking type aliases.

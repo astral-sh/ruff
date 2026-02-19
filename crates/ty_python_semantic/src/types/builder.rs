@@ -341,13 +341,11 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 
-#[allow(clippy::struct_excessive_bools)]
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
     order_elements: bool,
-    check_redundancy: bool,
     /// This is enabled when joining types in a `cycle_recovery` function.
     /// Since a cycle cannot be created within a `cycle_recovery` function,
     /// execution of `is_redundant_with` is skipped.
@@ -362,7 +360,6 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             order_elements: false,
-            check_redundancy: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
         }
@@ -378,15 +375,9 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
-    pub(crate) fn check_redundancy(mut self, val: bool) -> Self {
-        self.check_redundancy = val;
-        self
-    }
-
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
         if self.cycle_recovery {
-            self.check_redundancy = false;
             self.unpack_aliases = false;
         }
         self
@@ -751,7 +742,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && self.check_redundancy;
+        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();

@@ -853,7 +853,7 @@ impl ReachabilityConstraints {
                 match accumulated {
                     Some(constraint) => NarrowingConstraint::intersection(db, base_ty)
                         .merge_constraint_and(db, constraint)
-                        .evaluate_constraint_type(db, false),
+                        .evaluate_constraint_type(db),
                     None => base_ty,
                 }
             }
@@ -943,8 +943,7 @@ impl ReachabilityConstraints {
                 let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                 let false_ty = narrow!(node.if_false, false_accumulated);
 
-                // We won't do a union type redundancy check here, as it only needs to be performed once for the final result.
-                UnionType::from_elements_no_redundancy_check(db, [true_ty, false_ty])
+                UnionType::from_two_elements(db, true_ty, false_ty)
             }
         };
 
