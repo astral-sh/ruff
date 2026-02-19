@@ -51,7 +51,7 @@ Released on 2026-02-19.
     If you do give them a try, feel free to share your feedback in the [GitHub
     discussion](https://github.com/astral-sh/ruff/discussions/23203)!
 
-    - \[`flake8-pyi`\] Also check string annotations (`PYI041`) ([#19023](https://github.com/astral-sh/ruff/pull/19023))
+- \[`flake8-pyi`\] Also check string annotations (`PYI041`) ([#19023](https://github.com/astral-sh/ruff/pull/19023))
 
 ### Bug fixes
 
