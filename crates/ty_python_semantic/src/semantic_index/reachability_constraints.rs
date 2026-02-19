@@ -314,6 +314,12 @@ const AMBIGUOUS: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId
 const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 
+/// Maximum number of interior TDD nodes per scope. When exceeded, new constraint
+/// operations return `AMBIGUOUS` to prevent exponential blowup on pathological inputs
+/// (e.g., a 5000-line while loop with hundreds of if-branches). This can lead to less precise
+/// reachability analysis and type narrowing.
+const MAX_INTERIOR_NODES: usize = 512 * 1024;
+
 fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
     let ty = match singleton {
         ruff_python_ast::Singleton::None => Type::none(db),
@@ -588,6 +594,11 @@ impl ReachabilityConstraintsBuilder {
         if let Some(cached) = self.not_cache.get(&a) {
             return *cached;
         }
+
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return AMBIGUOUS;
+        }
+
         let a_node = self.interiors[a];
         let if_true = self.add_not_constraint(a_node.if_true);
         let if_ambiguous = self.add_not_constraint(a_node.if_ambiguous);
@@ -619,6 +630,10 @@ impl ReachabilityConstraintsBuilder {
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
         if let Some(cached) = self.or_cache.get(&(a, b)) {
             return *cached;
+        }
+
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return AMBIGUOUS;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
@@ -685,6 +700,10 @@ impl ReachabilityConstraintsBuilder {
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
         if let Some(cached) = self.and_cache.get(&(a, b)) {
             return *cached;
+        }
+
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return AMBIGUOUS;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
