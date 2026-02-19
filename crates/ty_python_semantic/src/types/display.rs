@@ -87,6 +87,9 @@ pub struct DisplaySettings<'db> {
     /// whose type parameters are currently being displayed).
     /// Used to suppress redundant `@{scope}` suffixes for type variables.
     pub active_scopes: Rc<FxHashSet<Definition<'db>>>,
+    /// Function types that are currently being displayed.
+    /// Used to prevent infinite recursion when displaying self-referential function types.
+    pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -1466,6 +1469,19 @@ pub(crate) struct DisplayFunctionType<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        // Detect self-referential function types to prevent infinite recursion.
+        if self.settings.visited_function_types.contains(&self.ty) {
+            f.set_invalid_type_annotation();
+            f.write_str("def ")?;
+            write!(f, "{}", self.ty.name(self.db))?;
+            return f.write_str("(...)");
+        }
+
+        let mut settings = self.settings.clone();
+        let mut visited = (*settings.visited_function_types).clone();
+        visited.insert(self.ty);
+        settings.visited_function_types = Rc::new(visited);
+
         let signature = self.ty.signature(self.db);
 
         match signature.overloads.as_slice() {
@@ -1475,7 +1491,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
-                    settings: self.settings.clone(),
+                    settings: settings.clone(),
                     hide_unused_self,
                 };
                 f.set_invalid_type_annotation();
@@ -1483,24 +1499,24 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 write!(f, "{}", self.ty.name(self.db))?;
                 type_parameters.fmt_detailed(f)?;
                 signature
-                    .display_with(self.db, self.settings.disallow_signature_name())
+                    .display_with(self.db, settings.disallow_signature_name())
                     .fmt_detailed(f)
             }
             signatures => {
                 // TODO: How to display overloads?
-                if !self.settings.multiline {
+                if !settings.multiline {
                     // TODO: This should ideally have a TypeDetail but we actually
                     // don't have a type for @overload (we just detect the decorator)
                     f.write_str("Overload")?;
                     f.write_char('[')?;
                 }
-                let separator = if self.settings.multiline { "\n" } else { ", " };
+                let separator = if settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.db, self.settings.clone()));
+                    join.entry(&signature.display_with(self.db, settings.clone()));
                 }
                 join.finish()?;
-                if !self.settings.multiline {
+                if !settings.multiline {
                     f.write_str("]")?;
                 }
                 Ok(())

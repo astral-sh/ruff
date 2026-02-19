@@ -6408,25 +6408,27 @@ impl<'db> Type<'db> {
                 },
             }
 
-            Type::FunctionLiteral(function) => match type_mapping {
-                // Promote the types within the signature before promoting the signature to its
-                // callable form.
-                TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => {
-                    Type::FunctionLiteral(function.apply_type_mapping_impl(
+            Type::FunctionLiteral(function) => visitor.visit(self, || {
+                match type_mapping {
+                    // Promote the types within the signature before promoting the signature to its
+                    // callable form.
+                    TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => {
+                        Type::FunctionLiteral(function.apply_type_mapping_impl(
+                            db,
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ))
+                        .promote_literals_impl(db)
+                    }
+                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
                         db,
                         type_mapping,
                         tcx,
                         visitor,
-                    ))
-                    .promote_literals_impl(db)
+                    )),
                 }
-                _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
-                    db,
-                    type_mapping,
-                    tcx,
-                    visitor,
-                )),
-            },
+            }),
 
             Type::BoundMethod(method) => Type::BoundMethod(BoundMethodType::new(
                 db,
@@ -6692,7 +6694,9 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(function) => {
-                function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                visitor.visit(self, || {
+                    function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
+                });
             }
 
             Type::BoundMethod(method) => {
