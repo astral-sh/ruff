@@ -8,14 +8,14 @@ use crate::types::{ClassLiteral, KnownClass, NormalizedVisitor, Type};
 #[derive(
     PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
 )]
-pub struct LiteralValueType<'db>(LiteralValueTypeRepr<'db>);
+pub struct LiteralValueType<'db>(LiteralValueTypeInner<'db>);
 
 // This enum effectively contains two variants, `Promotable(LiteralValueKind)` and `Unpromotable(LiteralValueKind)`,
 // but flattened to reduce the size of the type.
 #[derive(
     PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
 )]
-enum LiteralValueTypeRepr<'db> {
+enum LiteralValueTypeInner<'db> {
     PromotableInt(IntLiteralType),
     PromotableBool(bool),
     PromotableString(StringLiteralType<'db>),
@@ -64,12 +64,12 @@ impl<'db> LiteralValueType<'db> {
     /// Creates a literal value that may be promoted during literal promotion.
     pub(crate) fn promotable(kind: impl Into<LiteralValueTypeKind<'db>>) -> LiteralValueType<'db> {
         let repr = match kind.into() {
-            LiteralValueTypeKind::Int(int) => LiteralValueTypeRepr::PromotableInt(int),
-            LiteralValueTypeKind::Bool(bool) => LiteralValueTypeRepr::PromotableBool(bool),
-            LiteralValueTypeKind::String(string) => LiteralValueTypeRepr::PromotableString(string),
-            LiteralValueTypeKind::Enum(e) => LiteralValueTypeRepr::PromotableEnum(e),
-            LiteralValueTypeKind::Bytes(bytes) => LiteralValueTypeRepr::PromotableBytes(bytes),
-            LiteralValueTypeKind::LiteralString => LiteralValueTypeRepr::PromotableLiteralString,
+            LiteralValueTypeKind::Int(int) => LiteralValueTypeInner::PromotableInt(int),
+            LiteralValueTypeKind::Bool(bool) => LiteralValueTypeInner::PromotableBool(bool),
+            LiteralValueTypeKind::String(string) => LiteralValueTypeInner::PromotableString(string),
+            LiteralValueTypeKind::Enum(e) => LiteralValueTypeInner::PromotableEnum(e),
+            LiteralValueTypeKind::Bytes(bytes) => LiteralValueTypeInner::PromotableBytes(bytes),
+            LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::PromotableLiteralString,
         };
 
         Self(repr)
@@ -80,14 +80,14 @@ impl<'db> LiteralValueType<'db> {
         kind: impl Into<LiteralValueTypeKind<'db>>,
     ) -> LiteralValueType<'db> {
         let repr = match kind.into() {
-            LiteralValueTypeKind::Int(int) => LiteralValueTypeRepr::UnpromotableInt(int),
-            LiteralValueTypeKind::Bool(bool) => LiteralValueTypeRepr::UnpromotableBool(bool),
+            LiteralValueTypeKind::Int(int) => LiteralValueTypeInner::UnpromotableInt(int),
+            LiteralValueTypeKind::Bool(bool) => LiteralValueTypeInner::UnpromotableBool(bool),
             LiteralValueTypeKind::String(string) => {
-                LiteralValueTypeRepr::UnpromotableString(string)
+                LiteralValueTypeInner::UnpromotableString(string)
             }
-            LiteralValueTypeKind::Enum(e) => LiteralValueTypeRepr::UnpromotableEnum(e),
-            LiteralValueTypeKind::Bytes(bytes) => LiteralValueTypeRepr::UnpromotableBytes(bytes),
-            LiteralValueTypeKind::LiteralString => LiteralValueTypeRepr::UnpromotableLiteralString,
+            LiteralValueTypeKind::Enum(e) => LiteralValueTypeInner::UnpromotableEnum(e),
+            LiteralValueTypeKind::Bytes(bytes) => LiteralValueTypeInner::UnpromotableBytes(bytes),
+            LiteralValueTypeKind::LiteralString => LiteralValueTypeInner::UnpromotableLiteralString,
         };
 
         Self(repr)
@@ -97,26 +97,28 @@ impl<'db> LiteralValueType<'db> {
     #[must_use]
     pub(crate) fn to_promotable(self) -> Self {
         let repr = match self.0 {
-            LiteralValueTypeRepr::UnpromotableInt(int) => LiteralValueTypeRepr::PromotableInt(int),
-            LiteralValueTypeRepr::UnpromotableBool(bool) => {
-                LiteralValueTypeRepr::PromotableBool(bool)
+            LiteralValueTypeInner::UnpromotableInt(int) => {
+                LiteralValueTypeInner::PromotableInt(int)
             }
-            LiteralValueTypeRepr::UnpromotableString(string) => {
-                LiteralValueTypeRepr::PromotableString(string)
+            LiteralValueTypeInner::UnpromotableBool(bool) => {
+                LiteralValueTypeInner::PromotableBool(bool)
             }
-            LiteralValueTypeRepr::UnpromotableEnum(e) => LiteralValueTypeRepr::PromotableEnum(e),
-            LiteralValueTypeRepr::UnpromotableBytes(bytes) => {
-                LiteralValueTypeRepr::PromotableBytes(bytes)
+            LiteralValueTypeInner::UnpromotableString(string) => {
+                LiteralValueTypeInner::PromotableString(string)
             }
-            LiteralValueTypeRepr::UnpromotableLiteralString => {
-                LiteralValueTypeRepr::PromotableLiteralString
+            LiteralValueTypeInner::UnpromotableEnum(e) => LiteralValueTypeInner::PromotableEnum(e),
+            LiteralValueTypeInner::UnpromotableBytes(bytes) => {
+                LiteralValueTypeInner::PromotableBytes(bytes)
             }
-            LiteralValueTypeRepr::PromotableInt(_)
-            | LiteralValueTypeRepr::PromotableBool(_)
-            | LiteralValueTypeRepr::PromotableString(_)
-            | LiteralValueTypeRepr::PromotableEnum(_)
-            | LiteralValueTypeRepr::PromotableBytes(_)
-            | LiteralValueTypeRepr::PromotableLiteralString => self.0,
+            LiteralValueTypeInner::UnpromotableLiteralString => {
+                LiteralValueTypeInner::PromotableLiteralString
+            }
+            LiteralValueTypeInner::PromotableInt(_)
+            | LiteralValueTypeInner::PromotableBool(_)
+            | LiteralValueTypeInner::PromotableString(_)
+            | LiteralValueTypeInner::PromotableEnum(_)
+            | LiteralValueTypeInner::PromotableBytes(_)
+            | LiteralValueTypeInner::PromotableLiteralString => self.0,
         };
 
         Self(repr)
@@ -126,26 +128,28 @@ impl<'db> LiteralValueType<'db> {
     #[must_use]
     pub(crate) fn to_unpromotable(self) -> Self {
         let repr = match self.0 {
-            LiteralValueTypeRepr::PromotableInt(int) => LiteralValueTypeRepr::UnpromotableInt(int),
-            LiteralValueTypeRepr::PromotableBool(bool) => {
-                LiteralValueTypeRepr::UnpromotableBool(bool)
+            LiteralValueTypeInner::PromotableInt(int) => {
+                LiteralValueTypeInner::UnpromotableInt(int)
             }
-            LiteralValueTypeRepr::PromotableString(string) => {
-                LiteralValueTypeRepr::UnpromotableString(string)
+            LiteralValueTypeInner::PromotableBool(bool) => {
+                LiteralValueTypeInner::UnpromotableBool(bool)
             }
-            LiteralValueTypeRepr::PromotableEnum(e) => LiteralValueTypeRepr::UnpromotableEnum(e),
-            LiteralValueTypeRepr::PromotableBytes(bytes) => {
-                LiteralValueTypeRepr::UnpromotableBytes(bytes)
+            LiteralValueTypeInner::PromotableString(string) => {
+                LiteralValueTypeInner::UnpromotableString(string)
             }
-            LiteralValueTypeRepr::PromotableLiteralString => {
-                LiteralValueTypeRepr::UnpromotableLiteralString
+            LiteralValueTypeInner::PromotableEnum(e) => LiteralValueTypeInner::UnpromotableEnum(e),
+            LiteralValueTypeInner::PromotableBytes(bytes) => {
+                LiteralValueTypeInner::UnpromotableBytes(bytes)
             }
-            LiteralValueTypeRepr::UnpromotableInt(_)
-            | LiteralValueTypeRepr::UnpromotableBool(_)
-            | LiteralValueTypeRepr::UnpromotableString(_)
-            | LiteralValueTypeRepr::UnpromotableEnum(_)
-            | LiteralValueTypeRepr::UnpromotableBytes(_)
-            | LiteralValueTypeRepr::UnpromotableLiteralString => self.0,
+            LiteralValueTypeInner::PromotableLiteralString => {
+                LiteralValueTypeInner::UnpromotableLiteralString
+            }
+            LiteralValueTypeInner::UnpromotableInt(_)
+            | LiteralValueTypeInner::UnpromotableBool(_)
+            | LiteralValueTypeInner::UnpromotableString(_)
+            | LiteralValueTypeInner::UnpromotableEnum(_)
+            | LiteralValueTypeInner::UnpromotableBytes(_)
+            | LiteralValueTypeInner::UnpromotableLiteralString => self.0,
         };
 
         Self(repr)
@@ -154,39 +158,38 @@ impl<'db> LiteralValueType<'db> {
     /// Returns `true` if this literal value should be eagerly promoted to its instance type.
     pub(crate) fn is_promotable(self) -> bool {
         match self.0 {
-            LiteralValueTypeRepr::PromotableInt(_)
-            | LiteralValueTypeRepr::PromotableBool(_)
-            | LiteralValueTypeRepr::PromotableString(_)
-            | LiteralValueTypeRepr::PromotableEnum(_)
-            | LiteralValueTypeRepr::PromotableBytes(_)
-            | LiteralValueTypeRepr::PromotableLiteralString => true,
+            LiteralValueTypeInner::PromotableInt(_)
+            | LiteralValueTypeInner::PromotableBool(_)
+            | LiteralValueTypeInner::PromotableString(_)
+            | LiteralValueTypeInner::PromotableEnum(_)
+            | LiteralValueTypeInner::PromotableBytes(_)
+            | LiteralValueTypeInner::PromotableLiteralString => true,
 
-            LiteralValueTypeRepr::UnpromotableInt(_)
-            | LiteralValueTypeRepr::UnpromotableBool(_)
-            | LiteralValueTypeRepr::UnpromotableString(_)
-            | LiteralValueTypeRepr::UnpromotableEnum(_)
-            | LiteralValueTypeRepr::UnpromotableBytes(_)
-            | LiteralValueTypeRepr::UnpromotableLiteralString => false,
+            LiteralValueTypeInner::UnpromotableInt(_)
+            | LiteralValueTypeInner::UnpromotableBool(_)
+            | LiteralValueTypeInner::UnpromotableString(_)
+            | LiteralValueTypeInner::UnpromotableEnum(_)
+            | LiteralValueTypeInner::UnpromotableBytes(_)
+            | LiteralValueTypeInner::UnpromotableLiteralString => false,
         }
     }
 
     pub(crate) fn kind(self) -> LiteralValueTypeKind<'db> {
         match self.0 {
-            LiteralValueTypeRepr::UnpromotableInt(int)
-            | LiteralValueTypeRepr::PromotableInt(int) => LiteralValueTypeKind::Int(int),
-            LiteralValueTypeRepr::UnpromotableBool(bool)
-            | LiteralValueTypeRepr::PromotableBool(bool) => LiteralValueTypeKind::Bool(bool),
-            LiteralValueTypeRepr::UnpromotableString(string)
-            | LiteralValueTypeRepr::PromotableString(string) => {
+            LiteralValueTypeInner::UnpromotableInt(int)
+            | LiteralValueTypeInner::PromotableInt(int) => LiteralValueTypeKind::Int(int),
+            LiteralValueTypeInner::UnpromotableBool(bool)
+            | LiteralValueTypeInner::PromotableBool(bool) => LiteralValueTypeKind::Bool(bool),
+            LiteralValueTypeInner::UnpromotableString(string)
+            | LiteralValueTypeInner::PromotableString(string) => {
                 LiteralValueTypeKind::String(string)
             }
-            LiteralValueTypeRepr::UnpromotableEnum(e) | LiteralValueTypeRepr::PromotableEnum(e) => {
-                LiteralValueTypeKind::Enum(e)
-            }
-            LiteralValueTypeRepr::UnpromotableBytes(bytes)
-            | LiteralValueTypeRepr::PromotableBytes(bytes) => LiteralValueTypeKind::Bytes(bytes),
-            LiteralValueTypeRepr::UnpromotableLiteralString
-            | LiteralValueTypeRepr::PromotableLiteralString => LiteralValueTypeKind::LiteralString,
+            LiteralValueTypeInner::UnpromotableEnum(e)
+            | LiteralValueTypeInner::PromotableEnum(e) => LiteralValueTypeKind::Enum(e),
+            LiteralValueTypeInner::UnpromotableBytes(bytes)
+            | LiteralValueTypeInner::PromotableBytes(bytes) => LiteralValueTypeKind::Bytes(bytes),
+            LiteralValueTypeInner::UnpromotableLiteralString
+            | LiteralValueTypeInner::PromotableLiteralString => LiteralValueTypeKind::LiteralString,
         }
     }
 

@@ -149,7 +149,8 @@ x2 = ([1, 2], [(3,), (4,)], ["5", "6"])
 reveal_type(x2)  # revealed: tuple[list[Unknown | int], list[Unknown | tuple[int]], list[Unknown | str]]
 ```
 
-However, this promotion should not take place if the literal type appears in contravariant position:
+However, this promotion should not take place if the literal type appears in contravariant position,
+e.g., the negative member of a covariant intersection type:
 
 ```py
 def in_negated_position(non_zero_number: int):
