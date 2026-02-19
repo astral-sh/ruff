@@ -74,7 +74,6 @@ use std::ops::Range;
 use indexmap::map::Entry;
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
-use salsa::plumbing::AsId;
 use smallvec::SmallVec;
 
 use crate::types::class::GenericAlias;
@@ -476,6 +475,89 @@ impl From<bool> for ConstraintSet<'_> {
     }
 }
 
+#[salsa::tracked(returns(ref))]
+fn stable_definition_ordering_key<'db>(
+    db: &'db dyn Db,
+    definition: crate::semantic_index::definition::Definition<'db>,
+) -> String {
+    format!(
+        "{}::{:?}::{:?}",
+        definition.file(db).path(db),
+        definition.file_scope(db),
+        definition.place(db),
+    )
+}
+
+#[salsa::tracked(returns(ref))]
+fn stable_bound_typevar_ordering_key<'db>(
+    db: &'db dyn Db,
+    typevar: BoundTypeVarInstance<'db>,
+) -> String {
+    let identity = typevar.typevar(db).identity(db);
+    let identity_definition = identity
+        .definition(db)
+        .map(|definition| stable_definition_ordering_key(db, definition).as_str())
+        .unwrap_or("<none>");
+    let binding_context = match typevar.binding_context(db) {
+        crate::types::BindingContext::Definition(definition) => {
+            format!(
+                "definition:{}",
+                stable_definition_ordering_key(db, definition)
+            )
+        }
+        crate::types::BindingContext::Synthetic => String::from("synthetic"),
+    };
+
+    format!(
+        "name:{}|kind:{:?}|identity_definition:{identity_definition}|binding_context:{binding_context}|paramspec_attr:{:?}",
+        identity.name(db),
+        identity.kind(db),
+        typevar.paramspec_attr(db),
+    )
+}
+
+fn stable_type_ordering_key<'db>(db: &'db dyn Db, ty: Type<'db>) -> String {
+    match ty {
+        Type::TypeVar(typevar) => {
+            format!(
+                "TypeVar({})",
+                stable_bound_typevar_ordering_key(db, typevar)
+            )
+        }
+        Type::Union(union) => {
+            let mut elements: Vec<_> = union
+                .elements(db)
+                .iter()
+                .map(|element| stable_type_ordering_key(db, *element))
+                .collect();
+            elements.sort_unstable();
+            format!("Union({})", elements.join("|"))
+        }
+        Type::Intersection(intersection) => {
+            let mut positive: Vec<_> = intersection
+                .positive(db)
+                .iter()
+                .map(|element| stable_type_ordering_key(db, *element))
+                .collect();
+            positive.sort_unstable();
+
+            let mut negative: Vec<_> = intersection
+                .negative(db)
+                .iter()
+                .map(|element| stable_type_ordering_key(db, *element))
+                .collect();
+            negative.sort_unstable();
+
+            format!(
+                "Intersection(positive:{};negative:{})",
+                positive.join("&"),
+                negative.join("&"),
+            )
+        }
+        _ => ty.display(db).to_string(),
+    }
+}
+
 impl<'db> BoundTypeVarInstance<'db> {
     /// Returns whether this typevar can be the lower or upper bound of another typevar in a
     /// constraint set.
@@ -487,7 +569,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// within a BDD — it means that if a typevar has another typevar as a bound, all of the
     /// constraints that apply to the bound will appear lower in the BDD.
     fn can_be_bound_for(self, db: &'db dyn Db, typevar: Self) -> bool {
-        self.identity(db) > typevar.identity(db)
+        stable_bound_typevar_ordering_key(db, self) > stable_bound_typevar_ordering_key(db, typevar)
     }
 }
 
@@ -502,6 +584,32 @@ impl IntersectionResult<'_> {
     fn is_disjoint(self) -> bool {
         matches!(self, IntersectionResult::Disjoint)
     }
+}
+
+fn compare_constraints_for_determinism<'db>(
+    db: &'db dyn Db,
+    left: ConstrainedTypeVar<'db>,
+    right: ConstrainedTypeVar<'db>,
+) -> Ordering {
+    left.ordering(db).cmp(&right.ordering(db))
+}
+
+fn compare_constraint_pairs_for_determinism<'db>(
+    db: &'db dyn Db,
+    left: (ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>),
+    right: (ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>),
+) -> Ordering {
+    compare_constraints_for_determinism(db, left.0, right.0)
+        .then_with(|| compare_constraints_for_determinism(db, left.1, right.1))
+}
+
+fn sorted_constraints_for_determinism<'db>(
+    db: &'db dyn Db,
+    constraints: impl IntoIterator<Item = ConstrainedTypeVar<'db>>,
+) -> Vec<ConstrainedTypeVar<'db>> {
+    let mut constraints: Vec<_> = constraints.into_iter().collect();
+    constraints.sort_by(|left, right| compare_constraints_for_determinism(db, *left, *right));
+    constraints
 }
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
@@ -726,23 +834,20 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// and working with BDDs. We don't do that, but we have tried to make some simple choices that
     /// have clear wins.
     ///
-    /// In particular, we use the IDs that salsa assigns to each constraint as it is created. This
-    /// tends to ensure that constraints that are close to each other in the source are also close
-    /// to each other in the BDD structure.
-    ///
-    /// As an optimization, we also _reverse_ this ordering, so that constraints that appear
-    /// earlier in the source appear "lower" (closer to the terminal nodes) in the BDD. Since we
-    /// build up BDDs by combining smaller BDDs (which will have been constructed from expressions
-    /// earlier in the source), this tends to minimize the amount of "node shuffling" that we have
-    /// to do when combining BDDs.
-    ///
-    /// Previously, we tried to be more clever — for instance, by comparing the typevars of each
-    /// constraint first, in an attempt to keep all of the constraints for a single typevar
-    /// adjacent in the BDD structure. However, this proved to be counterproductive; we've found
-    /// empirically that we get smaller BDDs with an ordering that is more aligned with source
-    /// order.
-    fn ordering(self, _db: &'db dyn Db) -> impl Ord {
-        std::cmp::Reverse(self.as_id())
+    /// We use a deterministic structural key rather than Salsa IDs, so that BDD variable
+    /// ordering is stable across runs.
+    #[salsa::tracked(returns(ref))]
+    fn stable_ordering_key(self, db: &'db dyn Db) -> String {
+        format!(
+            "{}|{}|{}",
+            stable_bound_typevar_ordering_key(db, self.typevar(db)),
+            stable_type_ordering_key(db, self.lower(db)),
+            stable_type_ordering_key(db, self.upper(db)),
+        )
+    }
+
+    fn ordering(self, db: &'db dyn Db) -> impl Ord {
+        self.stable_ordering_key(db)
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -2407,7 +2512,12 @@ impl<'db> InteriorNode<'db> {
                 }
 
                 let mut solution = Vec::with_capacity(mappings.len());
-                for (bound_typevar, bounds) in mappings.drain() {
+                let mut sorted_mappings: Vec<_> = mappings.drain().collect();
+                sorted_mappings.sort_by(|(left_typevar, _), (right_typevar, _)| {
+                    stable_bound_typevar_ordering_key(db, *left_typevar)
+                        .cmp(stable_bound_typevar_ordering_key(db, *right_typevar))
+                });
+                for (bound_typevar, bounds) in sorted_mappings {
                     match bound_typevar.typevar(db).require_bound_or_constraints(db) {
                         TypeVarBoundOrConstraints::UpperBound(bound) => {
                             let bound = bound.top_materialization(db);
@@ -2533,9 +2643,11 @@ impl<'db> InteriorNode<'db> {
             seen_constraints.insert(constraint);
             source_orders.insert(constraint, source_order);
         });
-        let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
-            .tuple_combinations()
-            .collect();
+        let mut to_visit: Vec<(_, _)> =
+            sorted_constraints_for_determinism(db, seen_constraints.iter().copied())
+                .into_iter()
+                .tuple_combinations()
+                .collect();
 
         // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
         // be simplified. If we add any derived constraints, we will place them at the end in
@@ -2737,9 +2849,15 @@ impl<'db> InteriorNode<'db> {
                     if seen_constraints.insert(intersection_constraint) {
                         source_orders.insert(intersection_constraint, next_source_order);
                         to_visit.extend(
-                            (seen_constraints.iter().copied())
-                                .filter(|seen| *seen != intersection_constraint)
-                                .map(|seen| (seen, intersection_constraint)),
+                            sorted_constraints_for_determinism(
+                                db,
+                                seen_constraints
+                                    .iter()
+                                    .copied()
+                                    .filter(|seen| *seen != intersection_constraint),
+                            )
+                            .into_iter()
+                            .map(|seen| (seen, intersection_constraint)),
                         );
                     }
                     let positive_intersection_node = Node::new_satisfied_constraint(
@@ -3141,17 +3259,34 @@ impl<'db> SequentMap<'db> {
         self.single_tautologies.extend(&other.single_tautologies);
         self.pair_impossibilities
             .extend(&other.pair_impossibilities);
-        for ((ante1, ante2), post) in &other.pair_implications {
+        let mut pair_implications: Vec<_> = other.pair_implications.iter().collect();
+        pair_implications.sort_by(
+            |((left_ante1, left_ante2), _), ((right_ante1, right_ante2), _)| {
+                compare_constraint_pairs_for_determinism(
+                    db,
+                    (*left_ante1, *left_ante2),
+                    (*right_ante1, *right_ante2),
+                )
+            },
+        );
+        for ((ante1, ante2), posts) in pair_implications {
+            let sorted_posts = sorted_constraints_for_determinism(db, posts.iter().copied());
             self.pair_implications
                 .entry(Self::pair_key(db, *ante1, *ante2))
                 .or_default()
-                .extend(post);
+                .extend(sorted_posts);
         }
-        for (ante, post) in &other.single_implications {
+
+        let mut single_implications: Vec<_> = other.single_implications.iter().collect();
+        single_implications.sort_by(|(left_ante, _), (right_ante, _)| {
+            compare_constraints_for_determinism(db, **left_ante, **right_ante)
+        });
+        for (ante, posts) in single_implications {
+            let sorted_posts = sorted_constraints_for_determinism(db, posts.iter().copied());
             self.single_implications
                 .entry(*ante)
                 .or_default()
-                .extend(post);
+                .extend(sorted_posts);
         }
     }
 
@@ -3836,21 +3971,38 @@ impl<'db> PathAssignments<'db> {
         }
 
         let mut new_constraints = Vec::new();
-        for ((ante1, ante2), posts) in &self.map.pair_implications {
-            for post in posts {
-                if self.assignment_holds(ante1.when_true())
-                    && self.assignment_holds(ante2.when_true())
-                {
-                    new_constraints.push(*post);
-                }
+
+        let mut pair_implications: Vec<_> = self.map.pair_implications.iter().collect();
+        pair_implications.sort_by(
+            |((left_ante1, left_ante2), _), ((right_ante1, right_ante2), _)| {
+                compare_constraint_pairs_for_determinism(
+                    db,
+                    (*left_ante1, *left_ante2),
+                    (*right_ante1, *right_ante2),
+                )
+            },
+        );
+        for ((ante1, ante2), posts) in pair_implications {
+            if self.assignment_holds((*ante1).when_true())
+                && self.assignment_holds((*ante2).when_true())
+            {
+                new_constraints.extend(sorted_constraints_for_determinism(
+                    db,
+                    posts.iter().copied(),
+                ));
             }
         }
 
-        for (ante, posts) in &self.map.single_implications {
-            for post in posts {
-                if self.assignment_holds(ante.when_true()) {
-                    new_constraints.push(*post);
-                }
+        let mut single_implications: Vec<_> = self.map.single_implications.iter().collect();
+        single_implications.sort_by(|(left_ante, _), (right_ante, _)| {
+            compare_constraints_for_determinism(db, **left_ante, **right_ante)
+        });
+        for (ante, posts) in single_implications {
+            if self.assignment_holds((*ante).when_true()) {
+                new_constraints.extend(sorted_constraints_for_determinism(
+                    db,
+                    posts.iter().copied(),
+                ));
             }
         }
 
@@ -4278,7 +4430,7 @@ impl<'db> GenericContext<'db> {
                 // Before constructing the final lower and upper bound, sort the constraints by
                 // their source order. This should give us a consistently ordered specialization,
                 // regardless of the variable ordering of the original BDD.
-                representatives.sort_unstable_by_key(|bounds| bounds.source_order);
+                representatives.sort_by_key(|bounds| bounds.source_order);
                 let greatest_lower_bound =
                     UnionType::from_elements(db, representatives.iter().map(|bounds| bounds.lower));
                 let least_upper_bound = IntersectionType::from_elements(
