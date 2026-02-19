@@ -116,7 +116,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 left.definition(db),
                 right.definition(db),
                 ordering_purpose,
-            ),
+            )
+            .then_with(|| {
+                let left_sig = left.signature(db);
+                let right_sig = right.signature(db);
+                signatures_deterministic_ordering(db, left_sig, right_sig)
+            }),
         },
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
@@ -235,7 +240,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                     dynamic_elements_ordering(left, right)
                 }
                 (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => {
-                    left.as_id().cmp(&right.as_id())
+                    union_or_intersection_elements_ordering(
+                        db,
+                        &Type::TypeVar(left),
+                        &Type::TypeVar(right),
+                        ordering_purpose,
+                    )
                 }
                 (SubclassOfInner::TypeVar(_), _) => Ordering::Less,
                 (_, SubclassOfInner::TypeVar(_)) => Ordering::Greater,
@@ -704,8 +714,8 @@ fn definition_ordering(
 
 /// Deterministic ordering for [`KnownBoundMethodType`] instances.
 ///
-/// The variant discriminant ordering is already stable between runs. For inner types,
-/// we use structural comparison rather than Salsa IDs.
+/// Uses the standard Less/Greater pattern for exhaustive matching without wildcards.
+/// For inner types, we use structural comparison rather than Salsa IDs where possible.
 fn known_bound_method_deterministic_ordering<'db>(
     db: &'db dyn Db,
     left: super::KnownBoundMethodType<'db>,
@@ -713,35 +723,25 @@ fn known_bound_method_deterministic_ordering<'db>(
 ) -> Ordering {
     use super::KnownBoundMethodType;
 
-    // Assign a stable discriminant index to each variant for cross-variant ordering.
-    fn discriminant(method: &KnownBoundMethodType) -> u8 {
-        match method {
-            KnownBoundMethodType::FunctionTypeDunderGet(_) => 0,
-            KnownBoundMethodType::FunctionTypeDunderCall(_) => 1,
-            KnownBoundMethodType::PropertyDunderGet(_) => 2,
-            KnownBoundMethodType::PropertyDunderSet(_) => 3,
-            KnownBoundMethodType::StrStartswith(_) => 4,
-            KnownBoundMethodType::ConstraintSetRange => 5,
-            KnownBoundMethodType::ConstraintSetAlways => 6,
-            KnownBoundMethodType::ConstraintSetNever => 7,
-            KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => 8,
-            KnownBoundMethodType::ConstraintSetSatisfies(_) => 9,
-            KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => 10,
-            KnownBoundMethodType::GenericContextSpecializeConstrained(_) => 11,
-        }
-    }
-
-    let disc_cmp = discriminant(&left).cmp(&discriminant(&right));
-    if disc_cmp != Ordering::Equal {
-        return disc_cmp;
-    }
-
     match (left, right) {
         (
             KnownBoundMethodType::FunctionTypeDunderGet(l),
             KnownBoundMethodType::FunctionTypeDunderGet(r),
+        ) => definition_ordering(
+            db,
+            l.definition(db),
+            r.definition(db),
+            OrderingPurpose::Determinism,
         )
-        | (
+        .then_with(|| {
+            let l_sig = l.signature(db);
+            let r_sig = r.signature(db);
+            signatures_deterministic_ordering(db, l_sig, r_sig)
+        }),
+        (KnownBoundMethodType::FunctionTypeDunderGet(_), _) => Ordering::Less,
+        (_, KnownBoundMethodType::FunctionTypeDunderGet(_)) => Ordering::Greater,
+
+        (
             KnownBoundMethodType::FunctionTypeDunderCall(l),
             KnownBoundMethodType::FunctionTypeDunderCall(r),
         ) => definition_ordering(
@@ -749,13 +749,28 @@ fn known_bound_method_deterministic_ordering<'db>(
             l.definition(db),
             r.definition(db),
             OrderingPurpose::Determinism,
-        ),
+        )
+        .then_with(|| {
+            let l_sig = l.signature(db);
+            let r_sig = r.signature(db);
+            signatures_deterministic_ordering(db, l_sig, r_sig)
+        }),
+        (KnownBoundMethodType::FunctionTypeDunderCall(_), _) => Ordering::Less,
+        (_, KnownBoundMethodType::FunctionTypeDunderCall(_)) => Ordering::Greater,
 
         (
             KnownBoundMethodType::PropertyDunderGet(l),
             KnownBoundMethodType::PropertyDunderGet(r),
-        )
-        | (
+        ) => union_or_intersection_elements_ordering(
+            db,
+            &Type::PropertyInstance(l),
+            &Type::PropertyInstance(r),
+            OrderingPurpose::Determinism,
+        ),
+        (KnownBoundMethodType::PropertyDunderGet(_), _) => Ordering::Less,
+        (_, KnownBoundMethodType::PropertyDunderGet(_)) => Ordering::Greater,
+
+        (
             KnownBoundMethodType::PropertyDunderSet(l),
             KnownBoundMethodType::PropertyDunderSet(r),
         ) => union_or_intersection_elements_ordering(
@@ -764,48 +779,65 @@ fn known_bound_method_deterministic_ordering<'db>(
             &Type::PropertyInstance(r),
             OrderingPurpose::Determinism,
         ),
+        (KnownBoundMethodType::PropertyDunderSet(_), _) => Ordering::Less,
+        (_, KnownBoundMethodType::PropertyDunderSet(_)) => Ordering::Greater,
 
         (KnownBoundMethodType::StrStartswith(l), KnownBoundMethodType::StrStartswith(r)) => {
             l.value(db).cmp(r.value(db))
         }
+        (KnownBoundMethodType::StrStartswith(_), _) => Ordering::Less,
+        (_, KnownBoundMethodType::StrStartswith(_)) => Ordering::Greater,
 
-        // Unit variants: already equal if same discriminant
-        (KnownBoundMethodType::ConstraintSetRange, KnownBoundMethodType::ConstraintSetRange)
-        | (KnownBoundMethodType::ConstraintSetAlways, KnownBoundMethodType::ConstraintSetAlways)
-        | (KnownBoundMethodType::ConstraintSetNever, KnownBoundMethodType::ConstraintSetNever) => {
+        (KnownBoundMethodType::ConstraintSetRange, KnownBoundMethodType::ConstraintSetRange) => {
             Ordering::Equal
         }
+        (KnownBoundMethodType::ConstraintSetRange, _) => Ordering::Less,
+        (_, KnownBoundMethodType::ConstraintSetRange) => Ordering::Greater,
 
-        // For constraint sets and generic contexts, fall back to Salsa ID ordering.
-        // These are primarily used in mdtests and are unlikely to appear in unions
-        // that require deterministic ordering.
+        (KnownBoundMethodType::ConstraintSetAlways, KnownBoundMethodType::ConstraintSetAlways) => {
+            Ordering::Equal
+        }
+        (KnownBoundMethodType::ConstraintSetAlways, _) => Ordering::Less,
+        (_, KnownBoundMethodType::ConstraintSetAlways) => Ordering::Greater,
+
+        (KnownBoundMethodType::ConstraintSetNever, KnownBoundMethodType::ConstraintSetNever) => {
+            Ordering::Equal
+        }
+        (KnownBoundMethodType::ConstraintSetNever, _) => Ordering::Less,
+        (_, KnownBoundMethodType::ConstraintSetNever) => Ordering::Greater,
+
         (
             KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(l),
             KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(r),
-        )
-        | (
+        ) => l.as_id().cmp(&r.as_id()),
+        (KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_), _) => Ordering::Less,
+        (_, KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)) => Ordering::Greater,
+
+        (
             KnownBoundMethodType::ConstraintSetSatisfies(l),
             KnownBoundMethodType::ConstraintSetSatisfies(r),
-        )
-        | (
+        ) => l.as_id().cmp(&r.as_id()),
+        (KnownBoundMethodType::ConstraintSetSatisfies(_), _) => Ordering::Less,
+        (_, KnownBoundMethodType::ConstraintSetSatisfies(_)) => Ordering::Greater,
+
+        (
             KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(l),
             KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(r),
         ) => l.as_id().cmp(&r.as_id()),
+        (KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_), _) => Ordering::Less,
+        (_, KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)) => Ordering::Greater,
 
         (
             KnownBoundMethodType::GenericContextSpecializeConstrained(l),
             KnownBoundMethodType::GenericContextSpecializeConstrained(r),
-        ) => l.as_id().cmp(&r.as_id()),
-
-        // Different variants are handled by discriminant comparison above
-        _ => unreachable!("Same discriminant should mean same variant"),
+        ) => generic_context_deterministic_ordering(db, l, r),
     }
 }
 
 /// Deterministic ordering for [`KnownInstanceType`] instances.
 ///
-/// The variant discriminant ordering is already stable between runs. For inner types,
-/// we use structural comparison where possible.
+/// Uses the standard Less/Greater pattern for exhaustive matching without wildcards.
+/// For inner types, we use structural comparison rather than Salsa IDs where possible.
 fn known_instance_deterministic_ordering<'db>(
     db: &'db dyn Db,
     left: super::KnownInstanceType<'db>,
@@ -813,34 +845,19 @@ fn known_instance_deterministic_ordering<'db>(
 ) -> Ordering {
     use super::KnownInstanceType;
 
-    fn discriminant(instance: &KnownInstanceType) -> u8 {
-        match instance {
-            KnownInstanceType::SubscriptedProtocol(_) => 0,
-            KnownInstanceType::SubscriptedGeneric(_) => 1,
-            KnownInstanceType::TypeVar(_) => 2,
-            KnownInstanceType::TypeAliasType(_) => 3,
-            KnownInstanceType::Deprecated(_) => 4,
-            KnownInstanceType::Field(_) => 5,
-            KnownInstanceType::ConstraintSet(_) => 6,
-            KnownInstanceType::GenericContext(_) => 7,
-            KnownInstanceType::Specialization(_) => 8,
-            KnownInstanceType::UnionType(_) => 9,
-            KnownInstanceType::Literal(_) => 10,
-            KnownInstanceType::Annotated(_) => 11,
-            KnownInstanceType::TypeGenericAlias(_) => 12,
-            KnownInstanceType::Callable(_) => 13,
-            KnownInstanceType::LiteralStringAlias(_) => 14,
-            KnownInstanceType::NewType(_) => 15,
-            KnownInstanceType::NamedTupleSpec(_) => 16,
-        }
-    }
-
-    let disc_cmp = discriminant(&left).cmp(&discriminant(&right));
-    if disc_cmp != Ordering::Equal {
-        return disc_cmp;
-    }
-
     match (left, right) {
+        (KnownInstanceType::SubscriptedProtocol(l), KnownInstanceType::SubscriptedProtocol(r)) => {
+            generic_context_deterministic_ordering(db, l, r)
+        }
+        (KnownInstanceType::SubscriptedProtocol(_), _) => Ordering::Less,
+        (_, KnownInstanceType::SubscriptedProtocol(_)) => Ordering::Greater,
+
+        (KnownInstanceType::SubscriptedGeneric(l), KnownInstanceType::SubscriptedGeneric(r)) => {
+            generic_context_deterministic_ordering(db, l, r)
+        }
+        (KnownInstanceType::SubscriptedGeneric(_), _) => Ordering::Less,
+        (_, KnownInstanceType::SubscriptedGeneric(_)) => Ordering::Greater,
+
         (KnownInstanceType::TypeVar(l), KnownInstanceType::TypeVar(r)) => l
             .name(db)
             .cmp(r.name(db))
@@ -853,6 +870,8 @@ fn known_instance_deterministic_ordering<'db>(
                 (None, Some(_)) => Ordering::Greater,
                 (None, None) => Ordering::Equal,
             }),
+        (KnownInstanceType::TypeVar(_), _) => Ordering::Less,
+        (_, KnownInstanceType::TypeVar(_)) => Ordering::Greater,
 
         (KnownInstanceType::TypeAliasType(l), KnownInstanceType::TypeAliasType(r)) => {
             match (l.definition(db), r.definition(db)) {
@@ -869,13 +888,108 @@ fn known_instance_deterministic_ordering<'db>(
                 ),
             }
         }
+        (KnownInstanceType::TypeAliasType(_), _) => Ordering::Less,
+        (_, KnownInstanceType::TypeAliasType(_)) => Ordering::Greater,
 
-        (KnownInstanceType::NewType(l), KnownInstanceType::NewType(r)) => definition_ordering(
-            db,
-            l.definition(db),
-            r.definition(db),
-            OrderingPurpose::Determinism,
-        ),
+        (KnownInstanceType::Deprecated(l), KnownInstanceType::Deprecated(r)) => {
+            match (l.message(db), r.message(db)) {
+                (Some(l_msg), Some(r_msg)) => l_msg.value(db).cmp(r_msg.value(db)),
+                (Some(_), None) => Ordering::Less,
+                (None, Some(_)) => Ordering::Greater,
+                (None, None) => Ordering::Equal,
+            }
+        }
+        (KnownInstanceType::Deprecated(_), _) => Ordering::Less,
+        (_, KnownInstanceType::Deprecated(_)) => Ordering::Greater,
+
+        (KnownInstanceType::Field(l), KnownInstanceType::Field(r)) => l
+            .init(db)
+            .cmp(&r.init(db))
+            .then_with(|| l.kw_only(db).cmp(&r.kw_only(db)))
+            .then_with(|| l.alias(db).cmp(&r.alias(db)))
+            .then_with(|| match (l.default_type(db), r.default_type(db)) {
+                (Some(l_ty), Some(r_ty)) => union_or_intersection_elements_ordering(
+                    db,
+                    &l_ty,
+                    &r_ty,
+                    OrderingPurpose::Determinism,
+                ),
+                (Some(_), None) => Ordering::Less,
+                (None, Some(_)) => Ordering::Greater,
+                (None, None) => Ordering::Equal,
+            }),
+        (KnownInstanceType::Field(_), _) => Ordering::Less,
+        (_, KnownInstanceType::Field(_)) => Ordering::Greater,
+
+        // ConstraintSets wrap a BDD node that doesn't expose structural data for comparison.
+        // Fall back to Salsa ID ordering. These are primarily used in mdtests.
+        (KnownInstanceType::ConstraintSet(l), KnownInstanceType::ConstraintSet(r)) => {
+            l.as_id().cmp(&r.as_id())
+        }
+        (KnownInstanceType::ConstraintSet(_), _) => Ordering::Less,
+        (_, KnownInstanceType::ConstraintSet(_)) => Ordering::Greater,
+
+        (KnownInstanceType::GenericContext(l), KnownInstanceType::GenericContext(r)) => {
+            generic_context_deterministic_ordering(db, l, r)
+        }
+        (KnownInstanceType::GenericContext(_), _) => Ordering::Less,
+        (_, KnownInstanceType::GenericContext(_)) => Ordering::Greater,
+
+        (KnownInstanceType::Specialization(l), KnownInstanceType::Specialization(r)) => {
+            specialization_deterministic_ordering(db, l, r)
+        }
+        (KnownInstanceType::Specialization(_), _) => Ordering::Less,
+        (_, KnownInstanceType::Specialization(_)) => Ordering::Greater,
+
+        (KnownInstanceType::UnionType(l), KnownInstanceType::UnionType(r)) => {
+            match (l.union_type(db), r.union_type(db)) {
+                (Ok(l_ty), Ok(r_ty)) => union_or_intersection_elements_ordering(
+                    db,
+                    l_ty,
+                    r_ty,
+                    OrderingPurpose::Determinism,
+                ),
+                (Ok(_), Err(_)) => Ordering::Less,
+                (Err(_), Ok(_)) => Ordering::Greater,
+                // Both errors: fall back to Salsa ID
+                (Err(_), Err(_)) => l.as_id().cmp(&r.as_id()),
+            }
+        }
+        (KnownInstanceType::UnionType(_), _) => Ordering::Less,
+        (_, KnownInstanceType::UnionType(_)) => Ordering::Greater,
+
+        (KnownInstanceType::Literal(l), KnownInstanceType::Literal(r)) => {
+            union_or_intersection_elements_ordering(
+                db,
+                &l.inner(db),
+                &r.inner(db),
+                OrderingPurpose::Determinism,
+            )
+        }
+        (KnownInstanceType::Literal(_), _) => Ordering::Less,
+        (_, KnownInstanceType::Literal(_)) => Ordering::Greater,
+
+        (KnownInstanceType::Annotated(l), KnownInstanceType::Annotated(r)) => {
+            union_or_intersection_elements_ordering(
+                db,
+                &l.inner(db),
+                &r.inner(db),
+                OrderingPurpose::Determinism,
+            )
+        }
+        (KnownInstanceType::Annotated(_), _) => Ordering::Less,
+        (_, KnownInstanceType::Annotated(_)) => Ordering::Greater,
+
+        (KnownInstanceType::TypeGenericAlias(l), KnownInstanceType::TypeGenericAlias(r)) => {
+            union_or_intersection_elements_ordering(
+                db,
+                &l.inner(db),
+                &r.inner(db),
+                OrderingPurpose::Determinism,
+            )
+        }
+        (KnownInstanceType::TypeGenericAlias(_), _) => Ordering::Less,
+        (_, KnownInstanceType::TypeGenericAlias(_)) => Ordering::Greater,
 
         (KnownInstanceType::Callable(l), KnownInstanceType::Callable(r)) => {
             union_or_intersection_elements_ordering(
@@ -885,53 +999,38 @@ fn known_instance_deterministic_ordering<'db>(
                 OrderingPurpose::Determinism,
             )
         }
+        (KnownInstanceType::Callable(_), _) => Ordering::Less,
+        (_, KnownInstanceType::Callable(_)) => Ordering::Greater,
 
-        // For all other same-variant pairs, fall back to Salsa ID ordering.
-        // These are either used primarily in mdtests, or contain types that don't
-        // easily lend themselves to structural comparison without further context.
-        (KnownInstanceType::SubscriptedProtocol(l), KnownInstanceType::SubscriptedProtocol(r))
-        | (KnownInstanceType::SubscriptedGeneric(l), KnownInstanceType::SubscriptedGeneric(r))
-        | (KnownInstanceType::GenericContext(l), KnownInstanceType::GenericContext(r)) => {
-            l.as_id().cmp(&r.as_id())
+        (KnownInstanceType::LiteralStringAlias(l), KnownInstanceType::LiteralStringAlias(r)) => {
+            union_or_intersection_elements_ordering(
+                db,
+                &l.inner(db),
+                &r.inner(db),
+                OrderingPurpose::Determinism,
+            )
         }
+        (KnownInstanceType::LiteralStringAlias(_), _) => Ordering::Less,
+        (_, KnownInstanceType::LiteralStringAlias(_)) => Ordering::Greater,
 
-        (KnownInstanceType::Deprecated(l), KnownInstanceType::Deprecated(r)) => {
-            l.as_id().cmp(&r.as_id())
-        }
-
-        (KnownInstanceType::Field(l), KnownInstanceType::Field(r)) => l.as_id().cmp(&r.as_id()),
-
-        (KnownInstanceType::ConstraintSet(l), KnownInstanceType::ConstraintSet(r)) => {
-            l.as_id().cmp(&r.as_id())
-        }
-
-        (KnownInstanceType::Specialization(l), KnownInstanceType::Specialization(r)) => {
-            l.as_id().cmp(&r.as_id())
-        }
-
-        (KnownInstanceType::UnionType(l), KnownInstanceType::UnionType(r)) => {
-            l.as_id().cmp(&r.as_id())
-        }
-
-        (KnownInstanceType::Literal(l), KnownInstanceType::Literal(r))
-        | (KnownInstanceType::Annotated(l), KnownInstanceType::Annotated(r))
-        | (KnownInstanceType::TypeGenericAlias(l), KnownInstanceType::TypeGenericAlias(r))
-        | (KnownInstanceType::LiteralStringAlias(l), KnownInstanceType::LiteralStringAlias(r)) => {
-            l.as_id().cmp(&r.as_id())
-        }
+        (KnownInstanceType::NewType(l), KnownInstanceType::NewType(r)) => definition_ordering(
+            db,
+            l.definition(db),
+            r.definition(db),
+            OrderingPurpose::Determinism,
+        ),
+        (KnownInstanceType::NewType(_), _) => Ordering::Less,
+        (_, KnownInstanceType::NewType(_)) => Ordering::Greater,
 
         (KnownInstanceType::NamedTupleSpec(l), KnownInstanceType::NamedTupleSpec(r)) => {
-            l.as_id().cmp(&r.as_id())
+            named_tuple_spec_deterministic_ordering(db, l, r)
         }
-
-        // Different variants are handled by discriminant comparison above
-        _ => unreachable!("Same discriminant should mean same variant"),
     }
 }
 
 /// Deterministic ordering for [`CallableSignature`] instances.
 ///
-/// Compares signatures structurally by comparing their return types.
+/// Compares signatures structurally by comparing their parameters and return types.
 fn signatures_deterministic_ordering<'db>(
     db: &'db dyn Db,
     left: &super::signatures::CallableSignature<'db>,
@@ -945,6 +1044,12 @@ fn signatures_deterministic_ordering<'db>(
         .cmp(&right_overloads.len())
         .then_with(|| {
             for (l, r) in left_overloads.iter().zip(right_overloads.iter()) {
+                let params_cmp =
+                    parameters_deterministic_ordering(db, l.parameters(), r.parameters());
+                if params_cmp != Ordering::Equal {
+                    return params_cmp;
+                }
+
                 let ret_cmp = union_or_intersection_elements_ordering(
                     db,
                     &l.return_ty,
@@ -956,6 +1061,200 @@ fn signatures_deterministic_ordering<'db>(
                 }
             }
             Ordering::Equal
+        })
+}
+
+/// Deterministic ordering for [`Parameters`] instances.
+fn parameters_deterministic_ordering<'db>(
+    db: &'db dyn Db,
+    left: &super::signatures::Parameters<'db>,
+    right: &super::signatures::Parameters<'db>,
+) -> Ordering {
+    left.as_slice()
+        .len()
+        .cmp(&right.as_slice().len())
+        .then_with(|| {
+            for (l, r) in left.as_slice().iter().zip(right.as_slice()) {
+                let kind_cmp = parameter_kind_discriminant(l.kind())
+                    .cmp(&parameter_kind_discriminant(r.kind()));
+                if kind_cmp != Ordering::Equal {
+                    return kind_cmp;
+                }
+
+                let name_cmp = l.name().cmp(&r.name());
+                if name_cmp != Ordering::Equal {
+                    return name_cmp;
+                }
+
+                let ty_cmp = union_or_intersection_elements_ordering(
+                    db,
+                    &l.annotated_type(),
+                    &r.annotated_type(),
+                    OrderingPurpose::Determinism,
+                );
+                if ty_cmp != Ordering::Equal {
+                    return ty_cmp;
+                }
+
+                match (l.default_type(), r.default_type()) {
+                    (Some(l_default), Some(r_default)) => {
+                        let default_cmp = union_or_intersection_elements_ordering(
+                            db,
+                            &l_default,
+                            &r_default,
+                            OrderingPurpose::Determinism,
+                        );
+                        if default_cmp != Ordering::Equal {
+                            return default_cmp;
+                        }
+                    }
+                    (Some(_), None) => return Ordering::Less,
+                    (None, Some(_)) => return Ordering::Greater,
+                    (None, None) => {}
+                }
+            }
+            Ordering::Equal
+        })
+}
+
+/// Assign a stable discriminant to each [`ParameterKind`] variant.
+fn parameter_kind_discriminant(kind: &super::signatures::ParameterKind) -> u8 {
+    use super::signatures::ParameterKind;
+    match kind {
+        ParameterKind::PositionalOnly { .. } => 0,
+        ParameterKind::PositionalOrKeyword { .. } => 1,
+        ParameterKind::Variadic { .. } => 2,
+        ParameterKind::KeywordOnly { .. } => 3,
+        ParameterKind::KeywordVariadic { .. } => 4,
+    }
+}
+
+/// Deterministic ordering for [`GenericContext`] instances.
+///
+/// Compares the type variables structurally by name and kind.
+fn generic_context_deterministic_ordering<'db>(
+    db: &'db dyn Db,
+    left: super::generics::GenericContext<'db>,
+    right: super::generics::GenericContext<'db>,
+) -> Ordering {
+    let left_vars: Vec<_> = left.variables(db).collect();
+    let right_vars: Vec<_> = right.variables(db).collect();
+
+    left_vars.len().cmp(&right_vars.len()).then_with(|| {
+        for (l, r) in left_vars.iter().zip(right_vars.iter()) {
+            let cmp = union_or_intersection_elements_ordering(
+                db,
+                &Type::TypeVar(*l),
+                &Type::TypeVar(*r),
+                OrderingPurpose::Determinism,
+            );
+            if cmp != Ordering::Equal {
+                return cmp;
+            }
+        }
+        Ordering::Equal
+    })
+}
+
+/// Deterministic ordering for [`Specialization`] instances.
+///
+/// Compares the generic context, types, and materialization kind structurally.
+fn specialization_deterministic_ordering<'db>(
+    db: &'db dyn Db,
+    left: super::generics::Specialization<'db>,
+    right: super::generics::Specialization<'db>,
+) -> Ordering {
+    generic_context_deterministic_ordering(db, left.generic_context(db), right.generic_context(db))
+        .then_with(|| {
+            let left_types = left.types(db);
+            let right_types = right.types(db);
+            left_types.len().cmp(&right_types.len()).then_with(|| {
+                for (l, r) in left_types.iter().zip(right_types.iter()) {
+                    let cmp = union_or_intersection_elements_ordering(
+                        db,
+                        l,
+                        r,
+                        OrderingPurpose::Determinism,
+                    );
+                    if cmp != Ordering::Equal {
+                        return cmp;
+                    }
+                }
+                Ordering::Equal
+            })
+        })
+        .then_with(|| {
+            match (
+                left.materialization_kind(db),
+                right.materialization_kind(db),
+            ) {
+                (None, None) => Ordering::Equal,
+                (None, Some(_)) => Ordering::Less,
+                (Some(_), None) => Ordering::Greater,
+                (Some(super::MaterializationKind::Top), Some(super::MaterializationKind::Top))
+                | (
+                    Some(super::MaterializationKind::Bottom),
+                    Some(super::MaterializationKind::Bottom),
+                ) => Ordering::Equal,
+                (
+                    Some(super::MaterializationKind::Top),
+                    Some(super::MaterializationKind::Bottom),
+                ) => Ordering::Less,
+                (
+                    Some(super::MaterializationKind::Bottom),
+                    Some(super::MaterializationKind::Top),
+                ) => Ordering::Greater,
+            }
+        })
+}
+
+/// Deterministic ordering for [`NamedTupleSpec`] instances.
+///
+/// Compares the fields structurally by name and type.
+fn named_tuple_spec_deterministic_ordering<'db>(
+    db: &'db dyn Db,
+    left: super::class::NamedTupleSpec<'db>,
+    right: super::class::NamedTupleSpec<'db>,
+) -> Ordering {
+    left.has_known_fields(db)
+        .cmp(&right.has_known_fields(db))
+        .then_with(|| {
+            let left_fields = left.fields(db);
+            let right_fields = right.fields(db);
+            left_fields.len().cmp(&right_fields.len()).then_with(|| {
+                for (l, r) in left_fields.iter().zip(right_fields.iter()) {
+                    let name_cmp = l.name.cmp(&r.name);
+                    if name_cmp != Ordering::Equal {
+                        return name_cmp;
+                    }
+                    let ty_cmp = union_or_intersection_elements_ordering(
+                        db,
+                        &l.ty,
+                        &r.ty,
+                        OrderingPurpose::Determinism,
+                    );
+                    if ty_cmp != Ordering::Equal {
+                        return ty_cmp;
+                    }
+                    match (&l.default, &r.default) {
+                        (Some(l_default), Some(r_default)) => {
+                            let default_cmp = union_or_intersection_elements_ordering(
+                                db,
+                                l_default,
+                                r_default,
+                                OrderingPurpose::Determinism,
+                            );
+                            if default_cmp != Ordering::Equal {
+                                return default_cmp;
+                            }
+                        }
+                        (Some(_), None) => return Ordering::Less,
+                        (None, Some(_)) => return Ordering::Greater,
+                        (None, None) => {}
+                    }
+                }
+                Ordering::Equal
+            })
         })
 }
 
