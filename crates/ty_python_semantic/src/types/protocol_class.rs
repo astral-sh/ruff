@@ -758,10 +758,12 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
 
     /// Return `true` if `other` contains an attribute/method/property that satisfies
     /// the part of the interface defined by this protocol member.
+    #[expect(clippy::too_many_arguments)]
     pub(super) fn is_satisfied_by(
         &self,
         db: &'db dyn Db,
         other: Type<'db>,
+        protocol_type: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
@@ -800,17 +802,11 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     attribute_type
                 };
 
-                // TODO: Instances of `typing.Self` in the protocol member should specialize to the
-                // type that we are checking. Without this, we will treat `Self` as an inferable
-                // typevar, and allow it to match against _any_ type.
-                //
-                // It's not very principled, but we also use the literal fallback type, instead of
-                // `other` directly. This lets us check whether things like `Literal[0]` satisfy a
-                // protocol that includes methods that have `typing.Self` annotations, without
-                // overly constraining `Self` to that specific literal.
-                //
-                // With the new solver, we should be to replace all of this with an additional
-                // constraint that enforces what `Self` can specialize to.
+                // Bind `typing.Self` in the protocol member to the protocol instance type.
+                // This ensures that a concrete class's method parameters typed with `Self`
+                // (which binds to the concrete class) are correctly checked for contravariance
+                // against the protocol type. The `HasRelationToVisitor` cycle detector
+                // handles any circularity in return-type checks by returning `true` for cycles.
                 let fallback_other = other.literal_fallback_instance(db).unwrap_or(other);
                 attribute_type
                     .try_upcast_to_callable(db)
@@ -819,7 +815,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                             .map(|callable| callable.apply_self(db, fallback_other))
                             .has_relation_to_impl(
                                 db,
-                                protocol_bind_self(db, *method, Some(fallback_other)),
+                                protocol_bind_self(db, *method, Some(protocol_type)),
                                 inferable,
                                 relation,
                                 relation_visitor,

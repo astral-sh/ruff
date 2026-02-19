@@ -3108,6 +3108,59 @@ def f(x: PGconn):
     isinstance(x, Connection)
 ```
 
+### Protocol methods with `Self` in non-self parameter positions
+
+When a protocol method uses `Self` in a parameter position (other than `self`), callers of the
+protocol-typed variable will pass arguments of the protocol type. A concrete class that uses `Self`
+in the same parameter position binds `Self` to its own type, which is too narrow to accept arbitrary
+protocol-typed arguments.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Self, Protocol
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+
+class CanFoo(Protocol):
+    def foo(self, other: Self) -> None: ...
+
+class CanFoo2:
+    def foo(self, other: Self) -> None: ...
+
+# `CanFoo2.foo(other: Self)` means `other: CanFoo2`, which is too narrow.
+# Through a `CanFoo`-typed variable, callers can pass any `CanFoo` instance,
+# but `CanFoo2.foo` only accepts `CanFoo2`.
+static_assert(not is_assignable_to(CanFoo2, CanFoo))
+static_assert(not is_subtype_of(CanFoo2, CanFoo))
+
+class CanFooValid:
+    def foo(self, other: CanFoo) -> None: ...
+
+# Using the protocol type explicitly is valid: `CanFooValid.foo` accepts any `CanFoo`.
+static_assert(is_assignable_to(CanFooValid, CanFoo))
+static_assert(is_subtype_of(CanFooValid, CanFoo))
+```
+
+A protocol method with `Self` only in return position should still work:
+
+```py
+from typing import Self, Protocol
+from ty_extensions import static_assert, is_assignable_to, is_subtype_of
+
+class Copyable(Protocol):
+    def copy(self) -> Self: ...
+
+class MyCopyable:
+    def copy(self) -> Self:
+        return self
+
+static_assert(is_assignable_to(MyCopyable, Copyable))
+static_assert(is_subtype_of(MyCopyable, Copyable))
+```
+
 ### Recursive protocols used as the first argument to `cast()`
 
 These caused issues in an early version of our `Protocol` implementation due to the fact that we use

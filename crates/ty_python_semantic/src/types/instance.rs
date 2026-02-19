@@ -200,6 +200,7 @@ impl<'db> Type<'db> {
                     member.is_satisfied_by(
                         db,
                         self,
+                        Type::ProtocolInstance(protocol),
                         inferable,
                         relation,
                         relation_visitor,
