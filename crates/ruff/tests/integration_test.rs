@@ -876,7 +876,9 @@ fn parse_error_not_included() {
 
 #[test]
 fn full_output_preview() {
-    let mut cmd = RuffCheck::default().args(["--preview"]).build();
+    let mut cmd = RuffCheck::default()
+        .args(["--preview", "--select=E741"])
+        .build();
     assert_cmd_snapshot!(cmd
         .pass_stdin("l = 1"), @"
     success: false
@@ -907,7 +909,7 @@ preview = true
 ",
     )?;
     let mut cmd = RuffCheck::default().config(&pyproject_toml).build();
-    assert_cmd_snapshot!(cmd.pass_stdin("l = 1"), @"
+    assert_cmd_snapshot!(cmd.arg("--select=E741").pass_stdin("l = 1"), @"
     success: false
     exit_code: 1
     ----- stdout -----
