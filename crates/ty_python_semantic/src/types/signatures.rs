@@ -1125,6 +1125,7 @@ impl<'db> Signature<'db> {
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
         if other.parameters.is_gradual()
+            && !self.parameters.is_top()
             && self
                 .parameters
                 .variadic()
@@ -1148,13 +1149,15 @@ impl<'db> Signature<'db> {
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            result.intersect(
-                db,
-                ConstraintSet::from(
-                    relation.is_assignability() || relation.is_constraint_set_assignability(),
-                ),
-            );
-            return result;
+            return match relation {
+                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
+                    ConstraintSet::from(false)
+                }
+                TypeRelation::Redundancy => {
+                    result.intersect(db, ConstraintSet::from(self.parameters == other.parameters))
+                }
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => result,
+            };
         }
 
         if relation.is_constraint_set_assignability() {
