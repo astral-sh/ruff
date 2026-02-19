@@ -3096,8 +3096,7 @@ t"{(lambda x:{x})}"
         // so the whitespace before `2` is irrelevant and shouldn't produce an indentation error.
         // Similarly, the second `\` is also at the same indentation level, so the `3` line is also
         // valid.
-        let source = format!(
-            r"if True:
+        let source = r"if True:
     1
     \
         2
@@ -3106,7 +3105,7 @@ t"{(lambda x:{x})}"
 else:
     pass
 "
-        );
+        .to_string();
         assert_snapshot!(lex_source(&source));
     }
 
@@ -3116,8 +3115,7 @@ else:
         // level. Then, the whitespaces following it determines the indentation level of the next
         // line, so `1` is indented with 4 spaces and `2` is indented with 8 spaces, and `3` is
         // indented with 4 spaces, all of which are valid.
-        let source = format!(
-            r"if True:
+        let source = r"if True:
 \
     1
     if True:
@@ -3126,7 +3124,7 @@ else:
 else:\
     3
 "
-        );
+        .to_string();
         assert_snapshot!(lex_source(&source));
     }
 
@@ -3135,8 +3133,7 @@ else:\
         // It's only the first backslash character that determines the indentation level of the next
         // line, so all the lines after the first `\` are indented with 4 spaces, and the remaining
         // backslashes are just ignored and don't affect the indentation level.
-        let source = format!(
-            r"if True:
+        let source = r"if True:
     1
     \
             \
@@ -3144,20 +3141,19 @@ else:\
     \
     2
 "
-        );
+        .to_string();
         assert_snapshot!(lex_source(&source));
     }
 
     #[test]
     fn backslash_continuation_mismatch_indentation() {
         // Indentation doesn't match any previous indentation level
-        let source = format!(
-            r"if True:
+        let source = r"if True:
     1
   \
     2
 "
-        );
+        .to_string();
         assert_snapshot!(lex_invalid(&source, Mode::Module));
     }
 }
