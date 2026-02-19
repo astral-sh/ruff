@@ -667,6 +667,12 @@ impl From<DataclassTransformerFlags> for DataclassFlags {
 /// Metadata for a dataclass. Stored inside a `Type::DataclassDecorator(…)`
 /// instance that we use as the return type of a `dataclasses.dataclass` and
 /// dataclass-transformer decorator calls.
+///
+/// ## Ordering
+///
+/// Ordering is based on the dataclass params' salsa-assigned id and not on its values.
+/// The id may change between runs, or when the dataclass params were garbage collected
+/// and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DataclassParams<'db> {
@@ -7857,7 +7863,7 @@ impl std::fmt::Display for DynamicType<'_> {
 
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash, Ord, PartialOrd)]
     pub struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
@@ -8273,7 +8279,7 @@ impl<'db> FieldInstance<'db> {
 
 /// Whether this typevar was created via the legacy `TypeVar` constructor, using PEP 695 syntax,
 /// or an implicit typevar like `Self` was used.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd, get_size2::GetSize)]
 pub enum TypeVarKind {
     /// `T = TypeVar("T")`
     Legacy,
@@ -8884,6 +8890,12 @@ fn lazy_default_cycle_recover<'db>(
 }
 
 /// Where a type variable is bound and usable.
+///
+/// ## Ordering
+///
+/// Ordering is based on the salsa-assigned id of the bound type var instance that defines the context,
+/// and not on the context's values. The id may change between runs, or when the bound type var instance
+/// was garbage collected and recreated.
 #[derive(
     Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
 )]
@@ -11128,6 +11140,13 @@ impl<'db> CallableTypes<'db> {
 ///
 /// Unlike bound methods of user-defined classes, these are not generally instances
 /// of `types.BoundMethodType` at runtime.
+///
+/// ## Ordering
+///
+/// Ordering between variants is guaranteed to be stable between different runs of ty.
+/// Ordering within variants is based on the salsa-assigned ids of the types they contain,
+/// and not on their values. It may change between runs, or when the types they contain
+/// were garbage collected and recreated.
 #[derive(
     Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
 )]
@@ -12963,8 +12982,22 @@ impl<'db> IntersectionType<'db> {
 
         let mut negative = self.negative(db).map(|ty| ty.normalized_impl(db, visitor));
 
-        positive.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
-        negative.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
+        positive.sort_unstable_by(|l, r| {
+            union_or_intersection_elements_ordering(
+                db,
+                l,
+                r,
+                type_ordering::OrderingPurpose::Normalization,
+            )
+        });
+        negative.sort_unstable_by(|l, r| {
+            union_or_intersection_elements_ordering(
+                db,
+                l,
+                r,
+                type_ordering::OrderingPurpose::Normalization,
+            )
+        });
 
         IntersectionType::new(db, positive, negative)
     }
