@@ -267,26 +267,6 @@ enum UnusedImportContext {
     Other,
 }
 
-fn is_first_party(import: &AnyImport, checker: &Checker) -> bool {
-    let source_name = import.source_name().join(".");
-    let category = isort::categorize(
-        &source_name,
-        import.qualified_name().is_unresolved_import(),
-        &checker.settings().src,
-        checker.package(),
-        checker.settings().isort.detect_same_package,
-        &checker.settings().isort.known_modules,
-        checker.target_version(),
-        checker.settings().isort.no_sections,
-        &checker.settings().isort.section_order,
-        &checker.settings().isort.default_section,
-    );
-    matches! {
-        category,
-        ImportSection::Known(ImportType::FirstParty | ImportType::LocalFolder)
-    }
-}
-
 /// Find the `Expr` for top-level `__all__` bindings.
 fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> {
     semantic
