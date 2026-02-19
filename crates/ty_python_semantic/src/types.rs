@@ -10911,10 +10911,12 @@ impl<'db> KnownBoundMethodType<'db> {
             | (
                 KnownBoundMethodType::PropertyDunderSet(self_property),
                 KnownBoundMethodType::PropertyDunderSet(other_property),
-            ) => Type::PropertyInstance(self_property).when_equivalent_to(
+            ) => Type::PropertyInstance(self_property).when_equivalent_to_impl(
                 db,
                 Type::PropertyInstance(other_property),
                 inferable,
+                relation_visitor,
+                disjointness_visitor,
             ),
 
             (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
