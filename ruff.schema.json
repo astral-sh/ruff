@@ -177,6 +177,16 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "extension": {
+      "description": "A mapping of custom file extensions to known file types (overridden\nby the `--extension` command-line flag).\n\nSupported file types include `python`, `pyi`, `ipynb`, and `markdown`.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "$ref": "#/definitions/Language"
+      }
+    },
     "external": {
       "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be\npreserved when (e.g.) validating `# noqa` directives. Useful for\nretaining `# noqa` directives that cover plugins not yet implemented\nby Ruff.",
       "type": [
@@ -1975,6 +1985,15 @@
         }
       },
       "additionalProperties": false
+    },
+    "Language": {
+      "type": "string",
+      "enum": [
+        "python",
+        "pyi",
+        "ipynb",
+        "markdown"
+      ]
     },
     "LineEnding": {
       "oneOf": [

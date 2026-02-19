@@ -630,6 +630,42 @@ fn stdin_override_parser_py() {
 }
 
 #[test]
+fn stdin_override_parser_py_config() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    let pyproject_toml = tempdir.path().join("pyproject.toml");
+    fs::write(
+        &pyproject_toml,
+        r#"
+[tool.ruff]
+extension = {ipynb="python"}
+"#,
+    )?;
+    let mut cmd = RuffCheck::default()
+        .config(&pyproject_toml)
+        .args(["--stdin-filename", "F401.ipynb"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("import os\n"), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    F401 [*] `os` imported but unused
+     --> F401.ipynb:1:8
+      |
+    1 | import os
+      |        ^^
+      |
+    help: Remove unused import: `os`
+
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+    Ok(())
+}
+
+#[test]
 fn stdin_fix_when_not_fixable_should_still_print_contents() {
     let mut cmd = RuffCheck::default().args(["--fix"]).build();
     assert_cmd_snapshot!(cmd
