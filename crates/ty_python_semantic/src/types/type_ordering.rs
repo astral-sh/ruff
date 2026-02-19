@@ -830,6 +830,8 @@ fn known_bound_method_deterministic_ordering<'db>(
         (KnownBoundMethodType::ConstraintSetNever, _) => Ordering::Less,
         (_, KnownBoundMethodType::ConstraintSetNever) => Ordering::Greater,
 
+        // InternedConstraintSets wrap an opaque BDD node that doesn't expose structural data
+        // for comparison. Fall back to Salsa ID ordering. These are primarily used in mdtests.
         (
             KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(l),
             KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(r),
