@@ -318,7 +318,7 @@ const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 /// operations return `AMBIGUOUS` to prevent exponential blowup on pathological inputs
 /// (e.g., a 5000-line while loop with hundreds of if-branches). This can lead to less precise
 /// reachability analysis and type narrowing.
-const MAX_INTERIOR_NODES: usize = 128 * 1024;
+const MAX_INTERIOR_NODES: usize = 512 * 1024;
 
 fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
     let ty = match singleton {
@@ -596,7 +596,7 @@ impl ReachabilityConstraintsBuilder {
         }
 
         if self.interiors.len() >= MAX_INTERIOR_NODES {
-            panic!("Exceeded MAX_INTERIOR_NODES ({MAX_INTERIOR_NODES}) in reachability constraints");
+            return AMBIGUOUS;
         }
 
         let a_node = self.interiors[a];
@@ -633,7 +633,7 @@ impl ReachabilityConstraintsBuilder {
         }
 
         if self.interiors.len() >= MAX_INTERIOR_NODES {
-            panic!("Exceeded MAX_INTERIOR_NODES ({MAX_INTERIOR_NODES}) in reachability constraints");
+            return AMBIGUOUS;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
@@ -703,7 +703,7 @@ impl ReachabilityConstraintsBuilder {
         }
 
         if self.interiors.len() >= MAX_INTERIOR_NODES {
-            panic!("Exceeded MAX_INTERIOR_NODES ({MAX_INTERIOR_NODES}) in reachability constraints");
+            return AMBIGUOUS;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
