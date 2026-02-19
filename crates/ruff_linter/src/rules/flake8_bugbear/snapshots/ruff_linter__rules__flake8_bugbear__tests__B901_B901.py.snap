@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+assertion_line: 83
 ---
 B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
   --> B901.py:9:9
@@ -64,3 +65,21 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 88 |     return [1, 2, 3]
    |     ^^^^^^^^^^^^^^^^
    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   --> B901.py:115:5
+    |
+113 | def broken_wrapper_false() -> Generator[None, int, int]:
+114 |     result = yield
+115 |     return result
+    |     ^^^^^^^^^^^^^
+    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+   --> B901.py:121:5
+    |
+119 | def broken_no_wrapper() -> Generator[None, int, int]:
+120 |     result = yield
+121 |     return result
+    |     ^^^^^^^^^^^^^
+    |

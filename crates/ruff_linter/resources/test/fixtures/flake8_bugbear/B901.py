@@ -86,3 +86,36 @@ async def broken6():
 async def broken7():
     yield 1
     return [1, 2, 3]
+
+
+from collections.abc import Generator
+
+from pytest import TestReport, hookimpl
+
+
+@hookimpl(wrapper=True)
+def pytest_runtest_makereport() -> Generator[None, TestReport, TestReport]:
+    result = yield
+    result.outcome = "passed"
+    return result
+
+
+from pluggy import hookimpl as pluggy_hookimpl
+
+
+@pluggy_hookimpl(wrapper=True)
+def pluggy_hook() -> Generator[None, int, int]:
+    result = yield
+    return result + 1
+
+
+@hookimpl(wrapper=False)
+def broken_wrapper_false() -> Generator[None, int, int]:
+    result = yield
+    return result
+
+
+@hookimpl
+def broken_no_wrapper() -> Generator[None, int, int]:
+    result = yield
+    return result

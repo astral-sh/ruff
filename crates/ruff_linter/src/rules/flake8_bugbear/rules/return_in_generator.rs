@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt, StmtFunctionDef};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::TextRange;
 
 use crate::Violation;
@@ -100,6 +101,10 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
         return;
     }
 
+    if has_hookimpl_wrapper_decorator(&function_def.decorator_list, checker.semantic()) {
+        return;
+    }
+
     let mut visitor = ReturnInGeneratorVisitor::default();
     visitor.visit_body(&function_def.body);
 
@@ -108,6 +113,39 @@ pub(crate) fn return_in_generator(checker: &Checker, function_def: &StmtFunction
             checker.report_diagnostic(ReturnInGenerator, return_);
         }
     }
+}
+
+fn has_hookimpl_wrapper_decorator(
+    decorator_list: &[ast::Decorator],
+    semantic: &SemanticModel,
+) -> bool {
+    decorator_list.iter().any(|decorator| {
+        let Expr::Call(ast::ExprCall {
+            func, arguments, ..
+        }) = &decorator.expression
+        else {
+            return false;
+        };
+
+        if !semantic
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["pytest", "hookimpl"] | ["pluggy", "hookimpl"]
+                )
+            })
+        {
+            return false;
+        }
+
+        arguments.find_keyword("wrapper").is_some_and(|keyword| {
+            matches!(
+                &keyword.value,
+                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })
+            )
+        })
+    })
 }
 
 #[derive(Default)]
