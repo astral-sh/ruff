@@ -1136,7 +1136,10 @@ fn has_relation_in_invariant_position<'db>(
         (
             None,
             Some(base_mat),
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_),
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy
+            | TypeRelation::PureRedundancy
+            | TypeRelation::SubtypingAssuming(_),
         ) => is_subtype_in_invariant_position(
             db,
             derived_type,
@@ -1150,7 +1153,10 @@ fn has_relation_in_invariant_position<'db>(
         (
             Some(derived_mat),
             None,
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_),
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy
+            | TypeRelation::PureRedundancy
+            | TypeRelation::SubtypingAssuming(_),
         ) => is_subtype_in_invariant_position(
             db,
             derived_type,

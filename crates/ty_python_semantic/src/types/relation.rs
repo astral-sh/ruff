@@ -144,6 +144,8 @@ pub(crate) enum TypeRelation<'db> {
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Redundancy,
 
+    PureRedundancy,
+
     /// The "constraint implication" relationship, aka "implies subtype of".
     ///
     /// This relationship tests whether one type is a [subtype][Self::Subtyping] of another,
@@ -208,6 +210,7 @@ impl TypeRelation<'_> {
         match self {
             TypeRelation::Assignability
             | TypeRelation::ConstraintSetAssignability
+            | TypeRelation::PureRedundancy
             | TypeRelation::Redundancy => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
                 ty.subtyping_is_always_reflexive()
@@ -462,7 +465,7 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(match relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                    TypeRelation::Redundancy => match target {
+                    TypeRelation::Redundancy | TypeRelation::PureRedundancy => match target {
                         Type::Dynamic(_) => true,
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
                         _ => false,
@@ -472,7 +475,7 @@ impl<'db> Type<'db> {
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                 TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                TypeRelation::Redundancy => match self {
+                TypeRelation::Redundancy | TypeRelation::PureRedundancy => match self {
                     Type::Dynamic(_) => true,
                     Type::Intersection(intersection) => {
                         // If a `Divergent` type is involved, it must not be eliminated.
@@ -812,6 +815,7 @@ impl<'db> Type<'db> {
                     let self_ty = match relation {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy
+                        | TypeRelation::PureRedundancy
                         | TypeRelation::SubtypingAssuming(_) => self,
                         TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                             self.bottom_materialization(db)
@@ -821,6 +825,7 @@ impl<'db> Type<'db> {
                         let neg_ty = match relation {
                             TypeRelation::Subtyping
                             | TypeRelation::Redundancy
+                            | TypeRelation::PureRedundancy
                             | TypeRelation::SubtypingAssuming(_) => neg_ty,
                             TypeRelation::Assignability
                             | TypeRelation::ConstraintSetAssignability => {
@@ -1692,7 +1697,7 @@ impl<'db> Type<'db> {
             db,
             other,
             inferable,
-            TypeRelation::Redundancy,
+            TypeRelation::PureRedundancy,
             relation_visitor,
             disjointness_visitor,
         )
@@ -1701,7 +1706,7 @@ impl<'db> Type<'db> {
                 db,
                 self,
                 inferable,
-                TypeRelation::Redundancy,
+                TypeRelation::PureRedundancy,
                 relation_visitor,
                 disjointness_visitor,
             )
