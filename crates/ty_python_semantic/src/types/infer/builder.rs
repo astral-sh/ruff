@@ -10815,7 +10815,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // different overloads provide different type context; unioning may be more
                     // correct in those cases.
                     *argument_type = argument_type
-                        .map(|current| IntersectionType::from_elements(db, [inferred_ty, current]))
+                        .map(|current| {
+                            IntersectionType::from_two_elements(db, inferred_ty, current)
+                        })
                         .or(Some(inferred_ty));
                 }
 
@@ -11029,7 +11031,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .annotation
                             .is_none_or(|tcx| ty.is_assignable_to(db, tcx))
                         {
-                            *current = IntersectionType::from_elements(db, [*current, ty]);
+                            *current = IntersectionType::from_two_elements(db, *current, ty);
                         }
                     })
                     .or_insert(ty);

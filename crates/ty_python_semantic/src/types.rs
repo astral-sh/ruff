@@ -4399,7 +4399,7 @@ impl<'db> Type<'db> {
                     .with_annotated_type(typevar_meta)];
                 // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
                 // decorator adds methods to the class
-                let returns = IntersectionType::from_elements(db, [typevar_meta, Type::any()]);
+                let returns = IntersectionType::from_two_elements(db, typevar_meta, Type::any());
                 let signature =
                     Signature::new_generic(Some(context), Parameters::new(db, parameters), returns);
                 Binding::single(self, signature).into()
@@ -6023,12 +6023,10 @@ impl<'db> Type<'db> {
                 // but it appears to be what users often expect, and it improves compatibility with
                 // other type checkers such as mypy.
                 // See conversation in https://github.com/astral-sh/ruff/pull/19915.
-                SpecialFormType::NamedTuple => Ok(IntersectionType::from_elements(
+                SpecialFormType::NamedTuple => Ok(IntersectionType::from_two_elements(
                     db,
-                    [
-                        Type::homogeneous_tuple(db, Type::object()),
-                        KnownClass::NamedTupleLike.to_instance(db),
-                    ],
+                    Type::homogeneous_tuple(db, Type::object()),
+                    KnownClass::NamedTupleLike.to_instance(db),
                 )),
                 SpecialFormType::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
@@ -12944,6 +12942,7 @@ pub(super) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
     }
 }
 
+#[salsa::tracked]
 impl<'db> IntersectionType<'db> {
     pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
@@ -12952,6 +12951,19 @@ impl<'db> IntersectionType<'db> {
     {
         IntersectionBuilder::new(db)
             .positive_elements(elements)
+            .build()
+    }
+
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+            result.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
+        IntersectionBuilder::new(db)
+            .positive_elements([a, b])
             .build()
     }
 

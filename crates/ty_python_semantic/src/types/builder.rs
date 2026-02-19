@@ -120,8 +120,8 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 
     let candidate = UnionType::from_elements(db, [left_core, right_core]);
-    let left_reconstructed = IntersectionType::from_elements(db, [candidate, left_guard]);
-    let right_reconstructed = IntersectionType::from_elements(db, [candidate, right_guard]);
+    let left_reconstructed = IntersectionType::from_two_elements(db, candidate, left_guard);
+    let right_reconstructed = IntersectionType::from_two_elements(db, candidate, right_guard);
     if left_reconstructed == left && right_reconstructed == right {
         Some(candidate)
     } else {

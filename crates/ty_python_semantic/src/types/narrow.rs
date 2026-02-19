@@ -430,6 +430,8 @@ impl<'db> Conjunctions<'db> {
     fn evaluate_constraint_type(&self, db: &'db dyn Db) -> Type<'db> {
         if self.conjuncts.len() == 1 {
             return self.conjuncts[0];
+        } else if self.conjuncts.len() == 2 {
+            return IntersectionType::from_two_elements(db, self.conjuncts[0], self.conjuncts[1]);
         }
 
         let mut intersection = IntersectionBuilder::new(db);
@@ -1622,7 +1624,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .or_insert(constraint);
 
                 // Use the narrowed type for subsequent comparisons in a chain.
-                last_rhs_ty = Some(IntersectionType::from_elements(self.db, [rhs_ty, ty]));
+                last_rhs_ty = Some(IntersectionType::from_two_elements(self.db, rhs_ty, ty));
             } else {
                 last_rhs_ty = Some(rhs_ty);
             }
