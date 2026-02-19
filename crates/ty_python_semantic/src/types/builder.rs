@@ -235,7 +235,7 @@ enum ReduceResult<'db> {
     Type(Type<'db>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub enum RecursivelyDefined {
     Yes,
     No,
@@ -782,7 +782,14 @@ impl<'db> UnionBuilder<'db> {
             }
         }
         if self.order_elements {
-            types.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(self.db, l, r));
+            types.sort_unstable_by(|l, r| {
+                union_or_intersection_elements_ordering(
+                    self.db,
+                    l,
+                    r,
+                    crate::types::type_ordering::OrderingPurpose::Normalization,
+                )
+            });
         }
         match types.len() {
             0 => None,
@@ -1515,10 +1522,22 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.positive.shrink_to_fit();
                 self.negative.shrink_to_fit();
                 if order_elements {
-                    self.positive
-                        .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
-                    self.negative
-                        .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
+                    self.positive.sort_unstable_by(|l, r| {
+                        union_or_intersection_elements_ordering(
+                            db,
+                            l,
+                            r,
+                            crate::types::type_ordering::OrderingPurpose::Normalization,
+                        )
+                    });
+                    self.negative.sort_unstable_by(|l, r| {
+                        union_or_intersection_elements_ordering(
+                            db,
+                            l,
+                            r,
+                            crate::types::type_ordering::OrderingPurpose::Normalization,
+                        )
+                    });
                 }
                 Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
             }
