@@ -741,11 +741,12 @@ impl ReachabilityConstraintsBuilder {
 
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
+    db: &'db dyn Db,
     accumulated: Option<NarrowingConstraint<'db>>,
     new: Option<NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
+        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(db, acc)),
         (None, Some(new_c)) => Some(new_c),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
@@ -753,7 +754,7 @@ fn accumulate_constraint<'db>(
 }
 
 /// Reachability-gated narrowing constraints
-#[derive(Clone)]
+#[derive(Debug, Clone, Copy)]
 enum GatedNarrowingConstraint<'db> {
     Unreachable,
     Reachable(Option<NarrowingConstraint<'db>>),
@@ -762,6 +763,7 @@ enum GatedNarrowingConstraint<'db> {
 impl<'db> GatedNarrowingConstraint<'db> {
     fn merge_constraint_or(
         self,
+        db: &'db dyn Db,
         other: GatedNarrowingConstraint<'db>,
     ) -> GatedNarrowingConstraint<'db> {
         match (self, other) {
@@ -776,11 +778,11 @@ impl<'db> GatedNarrowingConstraint<'db> {
                 GatedNarrowingConstraint::Reachable(right_constraint),
             ) => {
                 let left_constraint = left_constraint
-                    .unwrap_or_else(|| NarrowingConstraint::intersection(Type::object()));
+                    .unwrap_or_else(|| NarrowingConstraint::intersection(db, Type::object()));
                 let right_constraint = right_constraint
-                    .unwrap_or_else(|| NarrowingConstraint::intersection(Type::object()));
+                    .unwrap_or_else(|| NarrowingConstraint::intersection(db, Type::object()));
                 GatedNarrowingConstraint::Reachable(Some(
-                    left_constraint.merge_constraint_or(right_constraint),
+                    left_constraint.merge_constraint_or(db, right_constraint),
                 ))
             }
         }
@@ -848,8 +850,8 @@ impl ReachabilityConstraints {
         match constraint {
             GatedNarrowingConstraint::Unreachable => Type::Never,
             GatedNarrowingConstraint::Reachable(Some(constraint)) => {
-                NarrowingConstraint::intersection(base_ty)
-                    .merge_constraint_and(constraint)
+                NarrowingConstraint::intersection(db, base_ty)
+                    .merge_constraint_and(db, constraint)
                     .evaluate_constraint_type(db)
             }
             GatedNarrowingConstraint::Reachable(None) => base_ty,
@@ -879,9 +881,9 @@ impl ReachabilityConstraints {
             ALWAYS_TRUE | AMBIGUOUS => ALWAYS_TRUE,
             _ => id,
         };
-        let key = (memo_id, accumulated.clone());
+        let key = (memo_id, accumulated);
         if let Some(cached) = memo.get(&key) {
-            return cached.clone();
+            return *cached;
         }
 
         let constraint = match id {
@@ -937,12 +939,12 @@ impl ReachabilityConstraints {
                     match Self::analyze_single_cached(db, predicate, truthiness_memo) {
                         Truthiness::AlwaysTrue => {
                             let constraint = get_constraint!(node.if_true, accumulated);
-                            memo.insert(key, constraint.clone());
+                            memo.insert(key, constraint);
                             return constraint;
                         }
                         Truthiness::AlwaysFalse => {
                             let constraint = get_constraint!(node.if_false, accumulated);
-                            memo.insert(key, constraint.clone());
+                            memo.insert(key, constraint);
                             return constraint;
                         }
                         Truthiness::Ambiguous => {}
@@ -951,33 +953,33 @@ impl ReachabilityConstraints {
 
                 // If the true branch is statically unreachable, skip it entirely.
                 if node.if_true == ALWAYS_FALSE {
-                    let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                    let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                     let constraint = get_constraint!(node.if_false, false_accumulated);
-                    memo.insert(key, constraint.clone());
+                    memo.insert(key, constraint);
                     return constraint;
                 }
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
-                    let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
+                    let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
                     let constraint = get_constraint!(node.if_true, true_accumulated);
-                    memo.insert(key, constraint.clone());
+                    memo.insert(key, constraint);
                     return constraint;
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
-                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
+                let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
                 let true_constraint = get_constraint!(node.if_true, true_accumulated);
 
                 // False branch: predicate doesn't hold → accumulate negative narrowing
-                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                 let false_constraint = get_constraint!(node.if_false, false_accumulated);
 
-                true_constraint.merge_constraint_or(false_constraint)
+                true_constraint.merge_constraint_or(db, false_constraint)
             }
         };
 
-        memo.insert(key, constraint.clone());
+        memo.insert(key, constraint);
         constraint
     }
 
