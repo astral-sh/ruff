@@ -1009,6 +1009,27 @@ fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> O
         .map(|param| param.parameter.name.range())
 }
 
+/// Returns the explicit base classes for a class type.
+///
+/// Given a `Type::ClassLiteral`, returns the types of the explicitly listed
+/// base classes (i.e., what appears in the `class Foo(Base1, Base2):` parentheses).
+/// Returns `None` for non-class types.
+///
+/// Used by external tools that embed ty as a library.
+/// Not referenced by production code in this repository.
+/// No backwards compatibility guarantees are made for this API.
+pub fn explicit_bases_for_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+    let Type::ClassLiteral(class_literal) = ty else {
+        return None;
+    };
+
+    match class_literal {
+        ClassLiteral::Static(static_class) => Some(static_class.explicit_bases(db).to_vec()),
+        ClassLiteral::Dynamic(dynamic_class) => Some(dynamic_class.explicit_bases(db).to_vec()),
+        ClassLiteral::DynamicNamedTuple(_) => None,
+    }
+}
+
 mod resolve_definition {
     //! Resolves an Import, `ImportFrom` or `StarImport` definition to one or more
     //! "resolved definitions". This is done recursively to find the original
