@@ -162,6 +162,8 @@ RUF070 [*] Unnecessary assignment to `x` before `yield from` statement
 40 |     x = some_generator()
 41 |     yield from x  # RUF070
    |                ^
+42 |
+43 | def foo():
    |
 help: Remove unnecessary assignment
 37 |     yield x  # RUF070
@@ -171,6 +173,70 @@ help: Remove unnecessary assignment
    -     yield from x  # RUF070
 40 +     yield from some_generator()
 41 | 
+42 | def foo():
+43 |     x = lambda: 1
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:45:11
+   |
+43 | def foo():
+44 |     x = lambda: 1
+45 |     yield x  # RUF070
+   |           ^
+46 |
+47 | def foo():
+   |
+help: Remove unnecessary assignment
+41 |     yield from x  # RUF070
 42 | 
-43 | ###
+43 | def foo():
+   -     x = lambda: 1
+   -     yield x  # RUF070
+44 +     yield lambda: 1
+45 | 
+46 | def foo():
+47 |     x = (y := 1)
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:49:11
+   |
+47 | def foo():
+48 |     x = (y := 1)
+49 |     yield x  # RUF070
+   |           ^
+50 |
+51 | def foo():
+   |
+help: Remove unnecessary assignment
+45 |     yield x  # RUF070
+46 | 
+47 | def foo():
+   -     x = (y := 1)
+   -     yield x  # RUF070
+48 +     yield (y := 1)
+49 | 
+50 | def foo():
+51 |     x =1
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:53:11
+   |
+51 | def foo():
+52 |     x =1
+53 |     yield x  # RUF070 (no space after `=`)
+   |           ^
+   |
+help: Remove unnecessary assignment
+49 |     yield x  # RUF070
+50 | 
+51 | def foo():
+   -     x =1
+   -     yield x  # RUF070 (no space after `=`)
+52 +     yield 1
+53 | 
+54 | 
+55 | ###
 note: This is an unsafe fix and may change runtime behavior

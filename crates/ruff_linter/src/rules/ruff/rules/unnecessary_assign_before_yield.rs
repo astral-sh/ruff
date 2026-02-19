@@ -34,9 +34,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ```
 ///
 /// ## Fix safety
-/// This fix is always marked as unsafe because, unlike `return`, `yield`
-/// does not exit the function. Removing the assignment could affect
-/// debugging or other subtle behavior.
+/// This fix is always marked as unsafe because removing the intermediate
+/// variable assignment changes the local variable bindings visible to
+/// `locals()` and debuggers when the generator is suspended at the `yield`.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct UnnecessaryAssignBeforeYield {
@@ -73,41 +73,34 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
         return;
     };
 
-    let stack = {
+    let visitor = {
         let mut visitor = YieldVisitor::new();
-        for stmt in &function_def.body {
-            visitor.visit_stmt(stmt);
-        }
+        visitor.visit_body(&function_def.body);
         visitor
     };
 
-    for (assign, yield_expr, stmt) in &stack.assignment_yield {
-        let (yielded_id, is_yield_from, yield_value_range) = match yield_expr {
-            Expr::Yield(expr_yield) => {
-                let Some(value) = expr_yield.value.as_ref() else {
-                    continue;
-                };
-                let Expr::Name(ast::ExprName { id, .. }) = value.as_ref() else {
-                    continue;
-                };
-                (id, false, value.range())
-            }
-            Expr::YieldFrom(expr_yield_from) => {
-                let Expr::Name(ast::ExprName { id, .. }) = expr_yield_from.value.as_ref() else {
-                    continue;
-                };
-                (id, true, expr_yield_from.value.range())
-            }
+    for (assign, yield_expr, stmt) in &visitor.assignment_yield {
+        let (value, is_yield_from) = match yield_expr {
+            Expr::Yield(ast::ExprYield {
+                value: Some(value), ..
+            }) => (value.as_ref(), false),
+            Expr::YieldFrom(ast::ExprYieldFrom { value, .. }) => (value.as_ref(), true),
             _ => continue,
         };
 
-        if assign.targets.len() == 1
-            && let Some(Expr::Name(ast::ExprName {
-                id: assigned_id, ..
-            })) = assign.targets.first()
+        let Expr::Name(ast::ExprName { id: yielded_id, .. }) = value else {
+            continue;
+        };
+
+        if let [Expr::Name(ast::ExprName {
+            id: assigned_id, ..
+        })] = assign.targets.as_slice()
             && yielded_id == assigned_id
-            && !stack.annotations.contains(assigned_id.as_str())
-            && !stack.non_locals.contains(assigned_id.as_str())
+            // Skip when the assigned value is a yield expression, since inlining would
+            // produce `yield yield ...` which is a syntax error.
+            && !matches!(assign.value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
+            && !visitor.annotations.contains(assigned_id.as_str())
+            && !visitor.non_locals.contains(assigned_id.as_str())
             && let Some(assigned_binding) = function_scope
                 .get(assigned_id)
                 .map(|binding_id| checker.semantic().binding(binding_id))
@@ -120,40 +113,42 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
                 .map(|reference_id| checker.semantic().reference(reference_id))
                 .all(|reference| reference.scope_id() == assigned_binding.scope)
         {
-            let mut diagnostic = checker.report_diagnostic(
-                UnnecessaryAssignBeforeYield {
-                    name: assigned_id.to_string(),
-                    is_yield_from,
-                },
-                yield_value_range,
-            );
-            diagnostic.try_set_fix(|| {
-                // Delete the `yield x` expression statement. There's no need to treat this as
-                // an isolated edit, since we're editing the preceding statement, so no
-                // conflicting edit would be allowed to remove that preceding statement.
-                let delete_yield =
-                    edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
-
-                let eq_token = checker
-                    .tokens()
-                    .before(assign.value.start())
-                    .iter()
-                    .rfind(|token| token.kind() == TokenKind::Equal)
-                    .context("Expected an equals token")?;
-
-                let keyword = if is_yield_from { "yield from" } else { "yield" };
-
-                let replace_assign = Edit::range_replacement(
-                    if eq_token.end() < assign.value.start() {
-                        keyword.to_string()
-                    } else {
-                        format!("{keyword} ")
+            checker
+                .report_diagnostic(
+                    UnnecessaryAssignBeforeYield {
+                        name: assigned_id.to_string(),
+                        is_yield_from,
                     },
-                    TextRange::new(assign.start(), eq_token.range().end()),
-                );
+                    value.range(),
+                )
+                .try_set_fix(|| {
+                    // Delete the `yield x` expression statement. There's no need to treat
+                    // this as an isolated edit, since we're editing the preceding statement,
+                    // so no conflicting edit would be allowed to remove that preceding
+                    // statement.
+                    let delete_yield =
+                        edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
-                Ok(Fix::unsafe_edits(replace_assign, [delete_yield]))
-            });
+                    let eq_token = checker
+                        .tokens()
+                        .before(assign.value.start())
+                        .iter()
+                        .rfind(|token| token.kind() == TokenKind::Equal)
+                        .context("Expected an equals token")?;
+
+                    let keyword = if is_yield_from { "yield from" } else { "yield" };
+
+                    let replace_assign = Edit::range_replacement(
+                        if eq_token.end() < assign.value.start() {
+                            keyword.to_string()
+                        } else {
+                            format!("{keyword} ")
+                        },
+                        TextRange::new(assign.start(), eq_token.range().end()),
+                    );
+
+                    Ok(Fix::unsafe_edits(replace_assign, [delete_yield]))
+                });
         }
     }
 }

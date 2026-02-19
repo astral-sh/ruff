@@ -40,6 +40,18 @@ def foo():
     x = some_generator()
     yield from x  # RUF070
 
+def foo():
+    x = lambda: 1
+    yield x  # RUF070
+
+def foo():
+    x = (y := 1)
+    yield x  # RUF070
+
+def foo():
+    x =1
+    yield x  # RUF070 (no space after `=`)
+
 
 ###
 # Non-errors
@@ -161,4 +173,9 @@ def foo():
 # Annotated assignment with value (not a plain assignment)
 def foo():
     x: int = 1
+    yield x
+
+# Yield expression as assigned value (inlining would produce `yield yield 1`)
+def foo():
+    x = yield 1
     yield x
