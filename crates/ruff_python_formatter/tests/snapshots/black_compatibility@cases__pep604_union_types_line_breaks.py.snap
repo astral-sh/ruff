@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/pep604_union_types_line_breaks.py
 ---
 ## Input
 
@@ -121,15 +120,28 @@ def f(
      *,
      s: str,
  ) -> None:
-@@ -88,7 +86,7 @@
+@@ -87,15 +85,18 @@
+ @app.get("/path/")
  async def foo(
      q: str | None = Query(
-         None, title="Some long title", description="Some long description"
+-        None, title="Some long title", description="Some long description"
 -    )
++        None,
++        title="Some long title",
++        description="Some long description",
 +    ),
  ):
      pass
  
+ 
+ def f(
+     max_jobs: int | None = Option(
+-        None, help="Maximum number of jobs to launch. And some additional text."
++        None,
++        help="Maximum number of jobs to launch. And some additional text.",
+     ),
+     another_option: bool = False,
+ ): ...
 ```
 
 ## Ruff Output
@@ -222,7 +234,9 @@ def foo(
 @app.get("/path/")
 async def foo(
     q: str | None = Query(
-        None, title="Some long title", description="Some long description"
+        None,
+        title="Some long title",
+        description="Some long description",
     ),
 ):
     pass
@@ -230,7 +244,8 @@ async def foo(
 
 def f(
     max_jobs: int | None = Option(
-        None, help="Maximum number of jobs to launch. And some additional text."
+        None,
+        help="Maximum number of jobs to launch. And some additional text.",
     ),
     another_option: bool = False,
 ): ...
