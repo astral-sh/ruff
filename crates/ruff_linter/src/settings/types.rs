@@ -503,8 +503,8 @@ pub struct ExtensionMapping(FxHashMap<String, Language>);
 
 impl ExtensionMapping {
     /// Return the file extensions in the mapping.
-    pub fn extensions(&self) -> Vec<&String> {
-        self.0.keys().collect()
+    pub fn extensions(&self) -> impl Iterator<Item = &String> {
+        self.0.keys()
     }
 
     /// Return the [`Language`] for the given file.

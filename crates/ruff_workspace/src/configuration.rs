@@ -286,7 +286,6 @@ impl Configuration {
                                 patterns.extend(
                                     extension_map
                                         .extensions()
-                                        .iter()
                                         .map(|ext| FilePattern::Config(format!("*.{ext}"))),
                                 );
                             }
