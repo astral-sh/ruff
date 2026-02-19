@@ -17,7 +17,7 @@ impl<'a> GithubRenderer<'a> {
     ) -> std::fmt::Result {
         for diagnostic in diagnostics {
             let severity = match diagnostic.severity() {
-                Severity::Info => "notice",
+                Severity::Hint | Severity::Info => "notice",
                 Severity::Warning => "warning",
                 Severity::Error | Severity::Fatal => "error",
             };

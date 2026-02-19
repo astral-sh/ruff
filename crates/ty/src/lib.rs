@@ -497,7 +497,7 @@ fn exit_status_from_diagnostics(
         return ExitStatus::Success;
     }
 
-    let mut max_severity = Severity::Info;
+    let mut max_severity = Severity::Hint;
     let mut io_error = false;
 
     for diagnostic in diagnostics {
@@ -510,7 +510,7 @@ fn exit_status_from_diagnostics(
     }
 
     match max_severity {
-        Severity::Info => ExitStatus::Success,
+        Severity::Hint | Severity::Info => ExitStatus::Success,
         Severity::Warning => {
             if terminal_settings.error_on_warning {
                 ExitStatus::Failure
