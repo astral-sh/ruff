@@ -11,21 +11,15 @@ use crate::{Db, semantic_index};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::TextRange;
 
-fn is_dunder_name(name: &str) -> bool {
-    name.len() > 4 && name.starts_with("__") && name.ends_with("__")
-}
-
 fn should_mark_unnecessary(scope_kind: ScopeKind, name: &str) -> bool {
-    if name.starts_with('_') || matches!(name, "self" | "cls") || is_dunder_name(name) {
+    if !matches!(
+        scope_kind,
+        ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension
+    ) {
         return false;
     }
 
-    match scope_kind {
-        ScopeKind::Function | ScopeKind::Lambda | ScopeKind::Comprehension => true,
-        ScopeKind::Module | ScopeKind::Class | ScopeKind::TypeParams | ScopeKind::TypeAlias => {
-            false
-        }
-    }
+    !name.starts_with('_') && !matches!(name, "self" | "cls")
 }
 
 fn should_consider_definition(kind: &DefinitionKind<'_>) -> bool {
@@ -249,6 +243,87 @@ lam = lambda x, y, z=1: x + z
 
         let names = collect_unused_names(source)?;
         assert_eq!(names, vec!["b", "c", "dead", "y"]);
+        Ok(())
+    }
+
+    #[test]
+    fn skips_closure_captured_bindings() -> anyhow::Result<()> {
+        let source = r#"def outer(flag: bool):
+    captured = 1
+    dead = 2
+
+    def inner():
+        return captured
+
+    if flag:
+        captured = 3
+
+    return inner
+"#;
+
+        let names = collect_unused_names(source)?;
+        assert_eq!(names, vec!["dead"]);
+        Ok(())
+    }
+
+    #[test]
+    fn closure_uses_nearest_shadowed_binding() -> anyhow::Result<()> {
+        let source = r#"def outer():
+    x = 0
+
+    def mid():
+        x = 1
+
+        def inner():
+            return x
+
+        return inner
+
+    return x, mid
+"#;
+
+        let names = collect_unused_names(source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn nested_local_same_name_does_not_mark_outer_used() -> anyhow::Result<()> {
+        let source = r#"def outer():
+    x = 1
+
+    def inner():
+        x = 2
+        return x
+
+    return inner
+"#;
+
+        let names = collect_unused_names(source)?;
+        assert_eq!(names, vec!["x"]);
+        Ok(())
+    }
+
+    #[test]
+    fn comprehension_binding_captured_by_nested_lambda_is_used() -> anyhow::Result<()> {
+        let source = r#"def f():
+    funcs = [lambda: x for x in range(3)]
+    return funcs
+"#;
+
+        let names = collect_unused_names(source)?;
+        assert_eq!(names, Vec::<String>::new());
+        Ok(())
+    }
+
+    #[test]
+    fn skips_unused_binding_analysis_on_syntax_error() -> anyhow::Result<()> {
+        let source = r#"def f(
+    x = 1
+"#;
+
+        let names = collect_unused_names(source)?;
+        assert_eq!(names, Vec::<String>::new());
         Ok(())
     }
 }

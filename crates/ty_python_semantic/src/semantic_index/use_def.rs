@@ -1420,20 +1420,24 @@ impl<'db> UseDefMapBuilder<'db> {
         let new_use = self.bindings_by_use.push(bindings);
         debug_assert_eq!(use_id, new_use);
 
-        for live_binding in bindings.iter() {
-            let definition_id = live_binding.binding;
+        let binding_definition_ids = bindings
+            .iter()
+            .map(|live_binding| live_binding.binding)
+            .collect::<Vec<_>>();
+        self.mark_definition_ids_used(binding_definition_ids.into_iter());
+    }
 
-            if definition_id.is_unbound() {
-                continue;
-            }
+    pub(super) fn mark_enclosing_snapshot_bindings_used(
+        &mut self,
+        snapshot_id: ScopedEnclosingSnapshotId,
+    ) {
+        let Some(EnclosingSnapshot::Bindings(bindings)) = self.enclosing_snapshots.get(snapshot_id)
+        else {
+            return;
+        };
 
-            if matches!(
-                self.all_definitions[definition_id],
-                DefinitionState::Defined(_)
-            ) {
-                self.used_bindings[definition_id] = true;
-            }
-        }
+        let binding_definition_ids = bindings.iter().map(|b| b.binding).collect::<Vec<_>>();
+        self.mark_definition_ids_used(binding_definition_ids.into_iter());
     }
 
     pub(super) fn record_range_reachability(&mut self, range: TextRange) {
@@ -1493,6 +1497,28 @@ impl<'db> UseDefMapBuilder<'db> {
                 *constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
             }
             None => {}
+        }
+    }
+
+    fn mark_definition_ids_used(
+        &mut self,
+        definition_ids: impl Iterator<Item = ScopedDefinitionId>,
+    ) {
+        for definition_id in definition_ids {
+            self.mark_definition_used(definition_id);
+        }
+    }
+
+    fn mark_definition_used(&mut self, definition_id: ScopedDefinitionId) {
+        if definition_id.is_unbound() {
+            return;
+        }
+
+        if matches!(
+            self.all_definitions[definition_id],
+            DefinitionState::Defined(_)
+        ) {
+            self.used_bindings[definition_id] = true;
         }
     }
 
