@@ -1,5 +1,61 @@
 # Changelog
 
+## 0.15.2
+
+Released on 2026-02-19.
+
+### Preview features
+
+- Expand the default rule set ([#23385](https://github.com/astral-sh/ruff/pull/23385))
+- \[`flake8-pyi`\] Also check string annotations (`PYI041`) ([#19023](https://github.com/astral-sh/ruff/pull/19023))
+
+### Bug fixes
+
+- \[`flake8-async`\] Fix `in_async_context` logic ([#23426](https://github.com/astral-sh/ruff/pull/23426))
+- \[`ruff`\] Fix for `RUF102` should delete entire comment ([#23380](https://github.com/astral-sh/ruff/pull/23380))
+- \[`ruff`\] Suppress diagnostic for strings with backslashes in interpolations before Python 3.12 (`RUF027`) ([#21069](https://github.com/astral-sh/ruff/pull/21069))
+- [flake8-bugbear] Fix B023 false positive for immediately-invoked lambdas ([#23294](https://github.com/astral-sh/ruff/pull/23294))
+- [parser] Fix false syntax error for match-like annotated assignments ([#23297](https://github.com/astral-sh/ruff/pull/23297))
+- [parser] Fix indentation tracking after line continuations ([#23417](https://github.com/astral-sh/ruff/pull/23417))
+
+### Rule changes
+
+- \[`pyupgrade`\] Fix handling of `typing.{io,re}` (`UP035`) ([#23131](https://github.com/astral-sh/ruff/pull/23131))
+- \[`ruff`\] Detect `PLC0207` on chained `str.split()` calls ([#23275](https://github.com/astral-sh/ruff/pull/23275))
+
+### CLI
+
+- Remove invalid inline `noqa` warning ([#23270](https://github.com/astral-sh/ruff/pull/23270))
+
+### Configuration
+
+- Add extension mapping to configuration file options ([#23384](https://github.com/astral-sh/ruff/pull/23384))
+
+### Documentation
+
+- Add Q004 to the list of conflicting rules ([#23340](https://github.com/astral-sh/ruff/pull/23340))
+- \[`ruff`\] Expand `lint.external` docs and add sub-diagnostic (`RUF100`, `RUF102`) ([#23268](https://github.com/astral-sh/ruff/pull/23268))
+
+### Other changes
+
+- Add attestations for release artifacts and Docker images ([#23111](https://github.com/astral-sh/ruff/pull/23111))
+- flake8-executable: allow global flags in uv shebangs (EXE003) ([#22582](https://github.com/astral-sh/ruff/pull/22582))
+
+### Contributors
+
+- [@dylwil3](https://github.com/dylwil3)
+- [@Jkhall81](https://github.com/Jkhall81)
+- [@danparizher](https://github.com/danparizher)
+- [@dhruvmanila](https://github.com/dhruvmanila)
+- [@harupy](https://github.com/harupy)
+- [@ngnpope](https://github.com/ngnpope)
+- [@amyreese](https://github.com/amyreese)
+- [@kar-ganap](https://github.com/kar-ganap)
+- [@robsdedude](https://github.com/robsdedude)
+- [@shaanmajid](https://github.com/shaanmajid)
+- [@ntBre](https://github.com/ntBre)
+- [@toslunar](https://github.com/toslunar)
+
 ## 0.15.1
 
 Released on 2026-02-12.
