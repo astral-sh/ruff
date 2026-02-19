@@ -171,6 +171,7 @@ from typing import Sequence, Literal, LiteralString
 
 class Color(Enum):
     RED = "red"
+    BLUE = "blue"
 
 type Y[T] = list[T]
 
@@ -197,7 +198,7 @@ x5: list[list[Literal[1]]] = [[1]]
 reveal_type(x5)  # revealed: list[list[Literal[1]]]
 
 x6: dict[list[Literal[1]], list[Literal[Color.RED]]] = {[1]: [Color.RED, Color.RED]}
-reveal_type(x6)  # revealed: dict[list[Literal[1]], list[Color]]
+reveal_type(x6)  # revealed: dict[list[Literal[1]], list[Literal[Color.RED]]]
 
 x7: X[Literal[1]] = X([1])
 reveal_type(x7)  # revealed: X[Literal[1]]
@@ -379,6 +380,7 @@ Literal types that are explicitly annotated when declared will not be promoted, 
 later used in a promotable position:
 
 ```py
+from enum import Enum
 from typing import Literal
 
 def promote[T](x: T) -> list[T]:
@@ -416,6 +418,15 @@ type X = Literal["hello"]
 x4: X = "hello"
 reveal_type(x4)  # revealed: Literal["hello"]
 reveal_type([x4])  # revealed: list[Unknown | Literal["hello"]]
+
+class MyEnum(Enum):
+    A = 1
+    B = 2
+    C = 3
+
+def _(x: Literal[MyEnum.A, MyEnum.B]):
+    reveal_type(x)  # revealed: Literal[MyEnum.A, MyEnum.B]
+    reveal_type([x])  # revealed: list[Unknown | Literal[MyEnum.A, MyEnum.B]]
 ```
 
 Literal promotability is respected by unions:

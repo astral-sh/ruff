@@ -1847,7 +1847,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     // `Literal[SomeEnum.Member]`
                     Type::LiteralValue(literal) if literal.is_enum() => {
-                        return Ok(subscript_ty);
+                        // Avoid promoting values originating from an explicitly annotated literal type.
+                        return Ok(Type::LiteralValue(literal.to_unpromotable()));
                     }
                     // `Literal[SingletonEnum.Member]`, where `SingletonEnum.Member` simplifies to
                     // just `SingletonEnum`.
