@@ -9,9 +9,8 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
-        MemberLookupPolicy, NominalInstanceType, NormalizedVisitor, SpecialFormType,
-        SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarConstraints,
-        TypeVarInstance, UnionBuilder,
+        MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
+        Type, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarInstance, UnionBuilder,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         todo_type, visitor,
@@ -195,30 +194,6 @@ pub enum SuperOwnerKind<'db> {
 }
 
 impl<'db> SuperOwnerKind<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            SuperOwnerKind::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic.normalized()),
-            SuperOwnerKind::Class(class) => {
-                SuperOwnerKind::Class(class.normalized_impl(db, visitor))
-            }
-            SuperOwnerKind::Instance(instance) => instance
-                .normalized_impl(db, visitor)
-                .as_nominal_instance()
-                .map(Self::Instance)
-                .unwrap_or(Self::Dynamic(DynamicType::Any)),
-            SuperOwnerKind::InstanceTypeVar(bound_typevar, class) => {
-                SuperOwnerKind::InstanceTypeVar(
-                    bound_typevar.normalized_impl(db, visitor),
-                    class.normalized_impl(db, visitor),
-                )
-            }
-            SuperOwnerKind::ClassTypeVar(bound_typevar, class) => SuperOwnerKind::ClassTypeVar(
-                bound_typevar.normalized_impl(db, visitor),
-                class.normalized_impl(db, visitor),
-            ),
-        }
-    }
-
     fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -745,14 +720,6 @@ impl<'db> BoundSuperType<'db> {
                 self.skip_until_after_pivot(db, owner.iter_mro(db)),
             ),
         }
-    }
-
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
-            db,
-            self.pivot_class(db).normalized_impl(db, visitor),
-            self.owner(db).normalized_impl(db, visitor),
-        )
     }
 
     pub(super) fn recursive_type_normalized_impl(

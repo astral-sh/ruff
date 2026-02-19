@@ -31,17 +31,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
     left: &Type<'db>,
     right: &Type<'db>,
 ) -> Ordering {
-    debug_assert_eq!(
-        *left,
-        left.normalized(db),
-        "`left` must be normalized before a meaningful ordering can be established"
-    );
-    debug_assert_eq!(
-        *right,
-        right.normalized(db),
-        "`right` must be normalized before a meaningful ordering can be established"
-    );
-
     if left == right {
         return Ordering::Equal;
     }

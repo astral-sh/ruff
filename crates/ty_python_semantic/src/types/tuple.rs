@@ -28,12 +28,10 @@ use crate::types::builder::RecursivelyDefined;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, IntersectionType,
-    NormalizedVisitor, Type, TypeMapping, UnionBuilder, UnionType,
+    Type, TypeMapping, UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -223,18 +221,6 @@ impl<'db> TupleType<'db> {
         })
     }
 
-    /// Return a normalized version of `self`.
-    ///
-    /// See [`Type::normalized`] for more details.
-    #[must_use]
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Option<Self> {
-        TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -308,17 +294,6 @@ impl<'db> TupleType<'db> {
             disjointness_visitor,
             relation_visitor,
         )
-    }
-
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        self.tuple(db)
-            .is_equivalent_to_impl(db, other.tuple(db), inferable, visitor)
     }
 
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
@@ -425,11 +400,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
         }
-    }
-
-    #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
     }
 
     fn recursive_type_normalized_impl(
@@ -590,22 +560,6 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                 })
             }
         }
-    }
-
-    fn is_equivalent_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
-            (self.0.iter())
-                .zip(&other.0)
-                .when_all(db, |(self_ty, other_ty)| {
-                    self_ty.is_equivalent_to_impl(db, *other_ty, inferable, visitor)
-                })
-        })
     }
 
     fn is_single_valued(&self, db: &'db dyn Db) -> bool {
@@ -919,18 +873,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         }
     }
 
-    #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> TupleSpec<'db> {
-        let prefix = self
-            .prenormalized_prefix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, visitor));
-        let suffix = self
-            .prenormalized_suffix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, visitor));
-        let variable = self.variable().normalized_impl(db, visitor);
-        TupleSpec::Variable(Self::new(prefix, variable, suffix))
-    }
-
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -1215,41 +1157,6 @@ impl<'db> VariableLengthTuple<Type<'db>> {
             }
         }
     }
-
-    fn is_equivalent_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        self.variable()
-            .is_equivalent_to_impl(db, other.variable(), inferable, visitor)
-            .and(db, || {
-                self.prenormalized_prefix_elements(db, None)
-                    .zip_longest(other.prenormalized_prefix_elements(db, None))
-                    .when_all(db, |pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.is_equivalent_to_impl(db, other_ty, inferable, visitor)
-                        }
-                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
-                            ConstraintSet::from(false)
-                        }
-                    })
-            })
-            .and(db, || {
-                self.prenormalized_suffix_elements(db, None)
-                    .zip_longest(other.prenormalized_suffix_elements(db, None))
-                    .when_all(db, |pair| match pair {
-                        EitherOrBoth::Both(self_ty, other_ty) => {
-                            self_ty.is_equivalent_to_impl(db, other_ty, inferable, visitor)
-                        }
-                        EitherOrBoth::Left(_) | EitherOrBoth::Right(_) => {
-                            ConstraintSet::from(false)
-                        }
-                    })
-            })
-    }
 }
 
 impl<'db> PyIndex<'db> for &VariableLengthTuple<Type<'db>> {
@@ -1414,17 +1321,6 @@ impl<'db> Tuple<Type<'db>> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
-        match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
-            Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -1499,26 +1395,6 @@ impl<'db> Tuple<Type<'db>> {
                 relation_visitor,
                 disjointness_visitor,
             ),
-        }
-    }
-
-    fn is_equivalent_to_impl(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match (self, other) {
-            (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => {
-                self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor)
-            }
-            (Tuple::Variable(self_tuple), Tuple::Variable(other_tuple)) => {
-                self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor)
-            }
-            (Tuple::Fixed(_), Tuple::Variable(_)) | (Tuple::Variable(_), Tuple::Fixed(_)) => {
-                ConstraintSet::from(false)
-            }
         }
     }
 
