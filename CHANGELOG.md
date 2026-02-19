@@ -14,12 +14,13 @@ Released on 2026-02-19.
 - \[`flake8-async`\] Fix `in_async_context` logic ([#23426](https://github.com/astral-sh/ruff/pull/23426))
 - \[`ruff`\] Fix for `RUF102` should delete entire comment ([#23380](https://github.com/astral-sh/ruff/pull/23380))
 - \[`ruff`\] Suppress diagnostic for strings with backslashes in interpolations before Python 3.12 (`RUF027`) ([#21069](https://github.com/astral-sh/ruff/pull/21069))
-- [flake8-bugbear] Fix B023 false positive for immediately-invoked lambdas ([#23294](https://github.com/astral-sh/ruff/pull/23294))
+- \[`flake8-bugbear`\] Fix `B023` false positive for immediately-invoked lambdas ([#23294](https://github.com/astral-sh/ruff/pull/23294))
 - [parser] Fix false syntax error for match-like annotated assignments ([#23297](https://github.com/astral-sh/ruff/pull/23297))
 - [parser] Fix indentation tracking after line continuations ([#23417](https://github.com/astral-sh/ruff/pull/23417))
 
 ### Rule changes
 
+- \[`flake8-executable`\] Allow global flags in uv shebangs (`EXE003`) ([#22582](https://github.com/astral-sh/ruff/pull/22582))
 - \[`pyupgrade`\] Fix handling of `typing.{io,re}` (`UP035`) ([#23131](https://github.com/astral-sh/ruff/pull/23131))
 - \[`ruff`\] Detect `PLC0207` on chained `str.split()` calls ([#23275](https://github.com/astral-sh/ruff/pull/23275))
 
@@ -33,13 +34,8 @@ Released on 2026-02-19.
 
 ### Documentation
 
-- Add Q004 to the list of conflicting rules ([#23340](https://github.com/astral-sh/ruff/pull/23340))
+- Add `Q004` to the list of conflicting rules ([#23340](https://github.com/astral-sh/ruff/pull/23340))
 - \[`ruff`\] Expand `lint.external` docs and add sub-diagnostic (`RUF100`, `RUF102`) ([#23268](https://github.com/astral-sh/ruff/pull/23268))
-
-### Other changes
-
-- Add attestations for release artifacts and Docker images ([#23111](https://github.com/astral-sh/ruff/pull/23111))
-- flake8-executable: allow global flags in uv shebangs (EXE003) ([#22582](https://github.com/astral-sh/ruff/pull/22582))
 
 ### Contributors
 
