@@ -7,7 +7,51 @@ Released on 2026-02-19.
 ### Preview features
 
 - Expand the default rule set ([#23385](https://github.com/astral-sh/ruff/pull/23385))
-- \[`flake8-pyi`\] Also check string annotations (`PYI041`) ([#19023](https://github.com/astral-sh/ruff/pull/19023))
+
+    In preview, Ruff now enables a significantly expanded default rule set of 412
+    rules, up from the stable default set of 59 rules. The new rules are mostly a
+    superset of the stable defaults, with the exception of these rules, which are
+    removed from the preview defaults:
+
+    - [`multiple-imports-on-one-line`](https://docs.astral.sh/ruff/rules/multiple-imports-on-one-line) (`E401`)
+    - [`module-import-not-at-top-of-file`](https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file) (`E402`)
+    - [`module-import-not-at-top-of-file`](https://docs.astral.sh/ruff/rules/module-import-not-at-top-of-file) (`E701`)
+    - [`multiple-statements-on-one-line-semicolon`](https://docs.astral.sh/ruff/rules/multiple-statements-on-one-line-semicolon) (`E702`)
+    - [`useless-semicolon`](https://docs.astral.sh/ruff/rules/useless-semicolon) (`E703`)
+    - [`none-comparison`](https://docs.astral.sh/ruff/rules/none-comparison) (`E711`)
+    - [`true-false-comparison`](https://docs.astral.sh/ruff/rules/true-false-comparison) (`E712`)
+    - [`not-in-test`](https://docs.astral.sh/ruff/rules/not-in-test) (`E713`)
+    - [`not-is-test`](https://docs.astral.sh/ruff/rules/not-is-test) (`E714`)
+    - [`type-comparison`](https://docs.astral.sh/ruff/rules/type-comparison) (`E721`)
+    - [`lambda-assignment`](https://docs.astral.sh/ruff/rules/lambda-assignment) (`E731`)
+    - [`ambiguous-variable-name`](https://docs.astral.sh/ruff/rules/ambiguous-variable-name) (`E741`)
+    - [`ambiguous-class-name`](https://docs.astral.sh/ruff/rules/ambiguous-class-name) (`E742`)
+    - [`ambiguous-function-name`](https://docs.astral.sh/ruff/rules/ambiguous-function-name) (`E743`)
+    - [`undefined-local-with-import-star`](https://docs.astral.sh/ruff/rules/undefined-local-with-import-star) (`F403`)
+    - [`undefined-local-with-import-star-usage`](https://docs.astral.sh/ruff/rules/undefined-local-with-import-star-usage) (`F405`)
+    - [`undefined-local-with-nested-import-star-usage`](https://docs.astral.sh/ruff/rules/undefined-local-with-nested-import-star-usage) (`F406`)
+    - [`forward-annotation-syntax-error`](https://docs.astral.sh/ruff/rules/forward-annotation-syntax-error) (`F722`)
+
+    If you use preview and prefer the old defaults, you can restore them with
+    configuration like:
+
+    ```toml
+
+    # ruff.toml
+
+      [lint]
+      select = ["E4", "E7", "E9", "F"]
+
+    # pyproject.toml
+
+      [tool.ruff.lint]
+      select = ["E4", "E7", "E9", "F"]
+    ```
+
+    If you do give them a try, feel free to share your feedback in the [GitHub
+    discussion](https://github.com/astral-sh/ruff/discussions/23203)!
+
+    - \[`flake8-pyi`\] Also check string annotations (`PYI041`) ([#19023](https://github.com/astral-sh/ruff/pull/19023))
 
 ### Bug fixes
 
