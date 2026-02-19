@@ -2084,12 +2084,13 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
         // display them as `**P` instead, so avoid multiline in that case.
-        // TODO: This might change once we support `Concatenate`
+        // For `Gradual` kind without prefix params (len <= 2), display as `...`.
         let multiline = self.settings.multiline
             && self.parameters.len() > 1
+            && !matches!(self.parameters.kind(), ParametersKind::ParamSpec(_))
             && !matches!(
                 self.parameters.kind(),
-                ParametersKind::Gradual | ParametersKind::ParamSpec(_)
+                ParametersKind::Gradual | ParametersKind::Top
             );
         // Opening parenthesis
         f.write_char('(')?;
@@ -2097,7 +2098,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             f.write_str("\n    ")?;
         }
         match self.parameters.kind() {
-            ParametersKind::Standard => {
+            ParametersKind::Standard | ParametersKind::Concatenate(_) => {
                 let mut star_added = false;
                 let mut needs_slash = false;
                 let mut first = true;
@@ -2149,9 +2150,9 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 }
             }
             ParametersKind::Gradual | ParametersKind::Top => {
-                // We represent gradual form as `...` in the signature, internally the parameters still
-                // contain `(*args, **kwargs)` parameters. (Top parameters are displayed the same
-                // as gradual parameters, we just wrap the entire signature in `Top[]`.)
+                // We represent gradual form as `...` in the signature, internally the parameters
+                // still contain `(*args, **kwargs)` parameters. (Top parameters are displayed the
+                // same as gradual parameters, we just wrap the entire signature in `Top[]`.)
                 f.write_str("...")?;
             }
             ParametersKind::ParamSpec(typevar) => {

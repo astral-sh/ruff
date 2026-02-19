@@ -257,8 +257,7 @@ Using `Concatenate` as the first argument to `Callable`:
 from typing_extensions import Callable, Concatenate
 
 def _(c: Callable[Concatenate[int, str, ...], int]):
-    # TODO: Should reveal the correct signature
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (int, str, /, *args: Any, **kwargs: Any) -> int
 ```
 
 And, as one of the parameter types:
