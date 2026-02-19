@@ -2,6 +2,10 @@
 Should emit:
 B901 - on lines 9, 36
 """
+from collections.abc import Generator
+
+from pluggy import hookimpl as pluggy_hookimpl
+from pytest import TestReport, hookimpl
 
 
 def broken():
@@ -88,19 +92,11 @@ async def broken7():
     return [1, 2, 3]
 
 
-from collections.abc import Generator
-
-from pytest import TestReport, hookimpl
-
-
 @hookimpl(wrapper=True)
 def pytest_runtest_makereport() -> Generator[None, TestReport, TestReport]:
     result = yield
     result.outcome = "passed"
     return result
-
-
-from pluggy import hookimpl as pluggy_hookimpl
 
 
 @pluggy_hookimpl(wrapper=True)
