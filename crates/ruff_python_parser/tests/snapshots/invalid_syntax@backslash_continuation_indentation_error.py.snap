@@ -7,55 +7,28 @@ source: crates/ruff_python_parser/tests/fixtures.rs
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..32,
+        range: 0..25,
         body: [
-            FunctionDef(
-                StmtFunctionDef {
+            If(
+                StmtIf {
                     node_index: NodeIndex(None),
-                    range: 0..31,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("f"),
-                        range: 4..5,
-                        node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 5..7,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
+                    range: 0..24,
+                    test: BooleanLiteral(
+                        ExprBooleanLiteral {
+                            node_index: NodeIndex(None),
+                            range: 3..7,
+                            value: true,
+                        },
+                    ),
                     body: [
-                        Pass(
-                            StmtPass {
+                        Expr(
+                            StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 13..17,
-                            },
-                        ),
-                        Assign(
-                            StmtAssign {
-                                node_index: NodeIndex(None),
-                                range: 26..31,
-                                targets: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 26..27,
-                                            id: Name("x"),
-                                            ctx: Store,
-                                        },
-                                    ),
-                                ],
+                                range: 13..14,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
                                         node_index: NodeIndex(None),
-                                        range: 30..31,
+                                        range: 13..14,
                                         value: Int(
                                             1,
                                         ),
@@ -63,7 +36,23 @@ Module(
                                 ),
                             },
                         ),
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 23..24,
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 23..24,
+                                        value: Int(
+                                            2,
+                                        ),
+                                    },
+                                ),
+                            },
+                        ),
                     ],
+                    elif_else_clauses: [],
                 },
             ),
         ],
@@ -73,16 +62,16 @@ Module(
 ## Errors
 
   |
-1 |   def f():
-2 |       pass
+1 |   if True:
+2 |       1
 3 | /   \
-4 | |     x = 1
+4 | |     2
   | |____^ Syntax Error: unindent does not match any outer indentation level
   |
 
 
   |
 3 |   \
-4 |     x = 1
-  |          ^ Syntax Error: Expected dedent, found end of file
+4 |     2
+  |      ^ Syntax Error: Expected dedent, found end of file
   |

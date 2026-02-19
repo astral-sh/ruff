@@ -1,6 +1,6 @@
 ---
 source: crates/ruff_python_parser/src/lexer.rs
-expression: backslash_continuation_multiple_eol(UNIX_EOL)
+expression: lex_source(&source)
 ---
 ## Tokens
 ```
@@ -26,52 +26,66 @@ expression: backslash_continuation_multiple_eol(UNIX_EOL)
         9..13,
     ),
     (
-        Name(
-            Name("x"),
+        Int(
+            1,
         ),
         13..14,
     ),
     (
-        Equal,
-        15..16,
+        Newline,
+        14..15,
     ),
     (
         Int(
-            1,
+            2,
         ),
-        17..18,
+        29..30,
     ),
     (
         Newline,
-        18..19,
+        30..31,
     ),
     (
-        Name(
-            Name("print"),
+        Int(
+            3,
         ),
-        39..44,
-    ),
-    (
-        Lpar,
-        44..45,
-    ),
-    (
-        Name(
-            Name("x"),
-        ),
-        45..46,
-    ),
-    (
-        Rpar,
-        46..47,
+        37..38,
     ),
     (
         Newline,
-        47..48,
+        38..39,
     ),
     (
         Dedent,
-        48..48,
+        39..39,
+    ),
+    (
+        Else,
+        39..43,
+    ),
+    (
+        Colon,
+        43..44,
+    ),
+    (
+        Newline,
+        44..45,
+    ),
+    (
+        Indent,
+        45..49,
+    ),
+    (
+        Pass,
+        49..53,
+    ),
+    (
+        Newline,
+        53..54,
+    ),
+    (
+        Dedent,
+        54..54,
     ),
 ]
 ```

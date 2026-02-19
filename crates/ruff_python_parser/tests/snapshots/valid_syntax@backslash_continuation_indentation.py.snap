@@ -7,12 +7,12 @@ source: crates/ruff_python_parser/tests/fixtures.rs
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..203,
+        range: 0..46,
         body: [
             If(
                 StmtIf {
                     node_index: NodeIndex(None),
-                    range: 0..42,
+                    range: 0..45,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
                             node_index: NodeIndex(None),
@@ -21,174 +21,14 @@ Module(
                         },
                     ),
                     body: [
-                        Pass(
-                            StmtPass {
-                                node_index: NodeIndex(None),
-                                range: 13..17,
-                            },
-                        ),
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 32..42,
-                                value: Call(
-                                    ExprCall {
-                                        node_index: NodeIndex(None),
-                                        range: 32..42,
-                                        func: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 32..37,
-                                                id: Name("print"),
-                                                ctx: Load,
-                                            },
-                                        ),
-                                        arguments: Arguments {
-                                            range: 37..42,
-                                            node_index: NodeIndex(None),
-                                            args: [
-                                                StringLiteral(
-                                                    ExprStringLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 38..41,
-                                                        value: StringLiteralValue {
-                                                            inner: Single(
-                                                                StringLiteral {
-                                                                    range: 38..41,
-                                                                    node_index: NodeIndex(None),
-                                                                    value: "1",
-                                                                    flags: StringLiteralFlags {
-                                                                        quote_style: Double,
-                                                                        prefix: Empty,
-                                                                        triple_quoted: false,
-                                                                        unclosed: false,
-                                                                    },
-                                                                },
-                                                            ),
-                                                        },
-                                                    },
-                                                ),
-                                            ],
-                                            keywords: [],
-                                        },
-                                    },
-                                ),
-                            },
-                        ),
-                    ],
-                    elif_else_clauses: [],
-                },
-            ),
-            FunctionDef(
-                StmtFunctionDef {
-                    node_index: NodeIndex(None),
-                    range: 43..117,
-                    is_async: false,
-                    decorator_list: [],
-                    name: Identifier {
-                        id: Name("f"),
-                        range: 47..48,
-                        node_index: NodeIndex(None),
-                    },
-                    type_params: None,
-                    parameters: Parameters {
-                        range: 48..50,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
-                    body: [
-                        If(
-                            StmtIf {
-                                node_index: NodeIndex(None),
-                                range: 56..117,
-                                test: BooleanLiteral(
-                                    ExprBooleanLiteral {
-                                        node_index: NodeIndex(None),
-                                        range: 59..63,
-                                        value: true,
-                                    },
-                                ),
-                                body: [
-                                    Return(
-                                        StmtReturn {
-                                            node_index: NodeIndex(None),
-                                            range: 73..84,
-                                            value: Some(
-                                                BooleanLiteral(
-                                                    ExprBooleanLiteral {
-                                                        node_index: NodeIndex(None),
-                                                        range: 80..84,
-                                                        value: true,
-                                                    },
-                                                ),
-                                            ),
-                                        },
-                                    ),
-                                ],
-                                elif_else_clauses: [
-                                    ElifElseClause {
-                                        range: 89..117,
-                                        node_index: NodeIndex(None),
-                                        test: None,
-                                        body: [
-                                            Return(
-                                                StmtReturn {
-                                                    node_index: NodeIndex(None),
-                                                    range: 105..117,
-                                                    value: Some(
-                                                        BooleanLiteral(
-                                                            ExprBooleanLiteral {
-                                                                node_index: NodeIndex(None),
-                                                                range: 112..117,
-                                                                value: false,
-                                                            },
-                                                        ),
-                                                    ),
-                                                },
-                                            ),
-                                        ],
-                                    },
-                                ],
-                            },
-                        ),
-                    ],
-                },
-            ),
-            If(
-                StmtIf {
-                    node_index: NodeIndex(None),
-                    range: 155..202,
-                    test: BooleanLiteral(
-                        ExprBooleanLiteral {
-                            node_index: NodeIndex(None),
-                            range: 158..162,
-                            value: true,
-                        },
-                    ),
-                    body: [
-                        Assign(
-                            StmtAssign {
-                                node_index: NodeIndex(None),
-                                range: 168..173,
-                                targets: [
-                                    Name(
-                                        ExprName {
-                                            node_index: NodeIndex(None),
-                                            range: 168..169,
-                                            id: Name("x"),
-                                            ctx: Store,
-                                        },
-                                    ),
-                                ],
+                                range: 23..24,
                                 value: NumberLiteral(
                                     ExprNumberLiteral {
                                         node_index: NodeIndex(None),
-                                        range: 172..173,
+                                        range: 23..24,
                                         value: Int(
                                             1,
                                         ),
@@ -199,40 +39,43 @@ Module(
                         Expr(
                             StmtExpr {
                                 node_index: NodeIndex(None),
-                                range: 194..202,
-                                value: Call(
-                                    ExprCall {
+                                range: 31..32,
+                                value: NumberLiteral(
+                                    ExprNumberLiteral {
                                         node_index: NodeIndex(None),
-                                        range: 194..202,
-                                        func: Name(
-                                            ExprName {
-                                                node_index: NodeIndex(None),
-                                                range: 194..199,
-                                                id: Name("print"),
-                                                ctx: Load,
-                                            },
+                                        range: 31..32,
+                                        value: Int(
+                                            2,
                                         ),
-                                        arguments: Arguments {
-                                            range: 199..202,
-                                            node_index: NodeIndex(None),
-                                            args: [
-                                                Name(
-                                                    ExprName {
-                                                        node_index: NodeIndex(None),
-                                                        range: 200..201,
-                                                        id: Name("x"),
-                                                        ctx: Load,
-                                                    },
-                                                ),
-                                            ],
-                                            keywords: [],
-                                        },
                                     },
                                 ),
                             },
                         ),
                     ],
-                    elif_else_clauses: [],
+                    elif_else_clauses: [
+                        ElifElseClause {
+                            range: 33..45,
+                            node_index: NodeIndex(None),
+                            test: None,
+                            body: [
+                                Expr(
+                                    StmtExpr {
+                                        node_index: NodeIndex(None),
+                                        range: 44..45,
+                                        value: NumberLiteral(
+                                            ExprNumberLiteral {
+                                                node_index: NodeIndex(None),
+                                                range: 44..45,
+                                                value: Int(
+                                                    3,
+                                                ),
+                                            },
+                                        ),
+                                    },
+                                ),
+                            ],
+                        },
+                    ],
                 },
             ),
         ],

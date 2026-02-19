@@ -1,4 +1,4 @@
-def f():
-    pass
+if True:
+    1
   \
-    x = 1
+    2

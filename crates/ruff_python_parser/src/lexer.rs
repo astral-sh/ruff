@@ -265,36 +265,29 @@ impl<'src> Lexer<'src> {
                     }
                     // test_ok backslash_continuation_indentation
                     // if True:
-                    //     pass
                     //     \
-                    //         print("1")
-                    // def f():
-                    //     if True:
-                    //         return True
-                    //     else:
-                    // \
-                    //         return False
-                    // # Multiple consecutive continuations
-                    // if True:
-                    //     x = 1
+                    //         1
                     //     \
-                    //     \
-                    //         print(x)
+                    // 2
+                    // else:\
+                    //     3
 
                     // test_err backslash_continuation_indentation_error
-                    // def f():
-                    //     pass
+                    // if True:
+                    //     1
                     //   \
-                    //     x = 1
+                    //     2
 
-                    // Per Python spec [1], the whitespace up to the first
-                    // backslash determines the line's indentation. Skip
-                    // continuation-line whitespace without accumulating it
-                    // into `indentation`. However, if the backslash is at
-                    // column 0 (no prior indentation), let the loop continue
-                    // so the next line's whitespace is accumulated normally.
+                    // > Indentation cannot be split over multiple physical lines using backslashes;
+                    // > the whitespace up to the first backslash determines the indentation.
+                    // >
+                    // > https://docs.python.org/3/reference/lexical_analysis.html#indentation
                     //
-                    // [1]: https://docs.python.org/3/reference/lexical_analysis.html#indentation
+                    // Skip whitespace after the continuation-line without accumulating it into
+                    // `indentation`. However, if the backslash is at column 0 (no prior
+                    // indentation), let the loop continue so the next line's whitespace is
+                    // accumulated normally.
+                    //
                     // See also: https://github.com/python/cpython/issues/90249
                     if indentation != Indentation::root() {
                         self.cursor.eat_while(is_python_whitespace);
@@ -3097,94 +3090,87 @@ t"{(lambda x:{x})}"
         );
     }
 
-    // Backslash at indented position: continuation whitespace should not
-    // affect indentation level.
-    fn backslash_continuation_indentation_eol(eol: &str) -> LexerOutput {
-        let source = format!("if True:{eol}    pass{eol}    \\{eol}        print(\"1\"){eol}");
-        lex_source(&source)
-    }
-
     #[test]
-    fn backslash_continuation_indentation_unix_eol() {
-        assert_snapshot!(backslash_continuation_indentation_eol(UNIX_EOL));
-    }
-
-    #[test]
-    fn backslash_continuation_indentation_mac_eol() {
-        assert_snapshot!(backslash_continuation_indentation_eol(MAC_EOL));
-    }
-
-    #[test]
-    fn backslash_continuation_indentation_windows_eol() {
-        assert_snapshot!(backslash_continuation_indentation_eol(WINDOWS_EOL));
-    }
-
-    // Backslash at column 0: next line's whitespace becomes the indentation.
-    fn backslash_continuation_at_column_zero_eol(eol: &str) -> LexerOutput {
+    fn backslash_continuation_indentation() {
+        // The first `\` has 4 spaces before it which matches the indentation level at that point,
+        // so the whitespace before `2` is irrelevant and shouldn't produce an indentation error.
+        // Similarly, the second `\` is also at the same indentation level, so the `3` line is also
+        // valid.
         let source = format!(
-            "def f():{eol}    if True:{eol}        return True{eol}    else:{eol}\\{eol}        return False{eol}"
+            r"if True:
+    1
+    \
+        2
+    \
+3
+else:
+    pass
+"
         );
-        lex_source(&source)
+        assert_snapshot!(lex_source(&source));
     }
 
     #[test]
-    fn backslash_continuation_at_column_zero_unix_eol() {
-        assert_snapshot!(backslash_continuation_at_column_zero_eol(UNIX_EOL));
+    fn backslash_continuation_at_root() {
+        // But, it's a different when the backslash character itself is at the root indentation
+        // level. Then, the whitespaces following it determines the indentation level of the next
+        // line, so `1` is indented with 4 spaces and `2` is indented with 8 spaces, and `3` is
+        // indented with 4 spaces, all of which are valid.
+        let source = format!(
+            r"if True:
+\
+    1
+    if True:
+\
+        2
+else:\
+    3
+"
+        );
+        assert_snapshot!(lex_source(&source));
     }
 
     #[test]
-    fn backslash_continuation_at_column_zero_mac_eol() {
-        assert_snapshot!(backslash_continuation_at_column_zero_eol(MAC_EOL));
+    fn multiple_backslash_continuation() {
+        // It's only the first backslash character that determines the indentation level of the next
+        // line, so all the lines after the first `\` are indented with 4 spaces, and the remaining
+        // backslashes are just ignored and don't affect the indentation level.
+        let source = format!(
+            r"if True:
+    1
+    \
+            \
+        \
+    \
+    2
+"
+        );
+        assert_snapshot!(lex_source(&source));
     }
 
     #[test]
-    fn backslash_continuation_at_column_zero_windows_eol() {
-        assert_snapshot!(backslash_continuation_at_column_zero_eol(WINDOWS_EOL));
-    }
-
-    // Multiple consecutive backslash continuations: each `\` is processed
-    // independently, indentation preserved from before the first `\`.
-    fn backslash_continuation_multiple_eol(eol: &str) -> LexerOutput {
-        let source =
-            format!("if True:{eol}    x = 1{eol}    \\{eol}    \\{eol}        print(x){eol}");
-        lex_source(&source)
-    }
-
-    #[test]
-    fn backslash_continuation_multiple_unix_eol() {
-        assert_snapshot!(backslash_continuation_multiple_eol(UNIX_EOL));
+    fn backslash_continuation_unexpected_indent() {
+        // TODO: This should raise a syntax error
+        let source = format!(
+            r"if True:
+    1
+      \
+    2
+"
+        );
+        assert_snapshot!(lex_invalid(&source, Mode::Module));
     }
 
     #[test]
-    fn backslash_continuation_multiple_mac_eol() {
-        assert_snapshot!(backslash_continuation_multiple_eol(MAC_EOL));
-    }
-
-    #[test]
-    fn backslash_continuation_multiple_windows_eol() {
-        assert_snapshot!(backslash_continuation_multiple_eol(WINDOWS_EOL));
-    }
-
-    // Backslash continuation with mismatched indentation: indentation != root()
-    // is true (2 spaces before `\`), but 2 doesn't match the indent stack [0, 4],
-    // producing an indentation error.
-    fn backslash_continuation_dedent_error_eol(eol: &str) -> LexerOutput {
-        let source = format!("def f():{eol}    pass{eol}  \\{eol}    x = 1{eol}");
-        lex_invalid(&source, Mode::Module)
-    }
-
-    #[test]
-    fn backslash_continuation_dedent_error_unix_eol() {
-        assert_snapshot!(backslash_continuation_dedent_error_eol(UNIX_EOL));
-    }
-
-    #[test]
-    fn backslash_continuation_dedent_error_mac_eol() {
-        assert_snapshot!(backslash_continuation_dedent_error_eol(MAC_EOL));
-    }
-
-    #[test]
-    fn backslash_continuation_dedent_error_windows_eol() {
-        assert_snapshot!(backslash_continuation_dedent_error_eol(WINDOWS_EOL));
+    fn backslash_continuation_mismatch_indentation() {
+        // Indentation doesn't match any previous indentation level
+        let source = format!(
+            r"if True:
+    1
+  \
+    2
+"
+        );
+        assert_snapshot!(lex_invalid(&source, Mode::Module));
     }
 }
