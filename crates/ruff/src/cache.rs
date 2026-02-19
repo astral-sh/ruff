@@ -111,7 +111,7 @@ impl Cache {
 
         let mut package: PackageCache =
             match bincode::decode_from_reader(BufReader::new(file), bincode::config::standard()) {
-                Ok(package) => package,
+                Ok((package, _)) => package,
                 Err(err) => {
                     warn_user!("Failed parse cache file `{}`: {err}", path.display());
                     return Cache::empty(path, package_root);
