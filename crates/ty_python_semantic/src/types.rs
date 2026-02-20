@@ -12307,6 +12307,20 @@ impl<'db> UnionType<'db> {
             .build()
     }
 
+    pub(crate) fn from_elements_no_redundancy_check<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        elements
+            .into_iter()
+            .fold(
+                UnionBuilder::new(db).check_redundancy(false),
+                |builder, element| builder.add(element.into()),
+            )
+            .build()
+    }
+
     /// Create a union from a list of elements without unpacking type aliases.
     pub(crate) fn from_elements_leave_aliases<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
