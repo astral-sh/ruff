@@ -313,24 +313,29 @@ class P: ...
 class Q: ...
 class R(Generic[T_co]): ...
 
-def _(
-    i1: Intersection[P, Not[P]],
-    i2: Intersection[Not[P], P],
-    i3: Intersection[P, Q, Not[P]],
-    i4: Intersection[Not[P], Q, P],
-    i5: Intersection[P, Any, Not[P]],
-    i6: Intersection[Not[P], Any, P],
-    i7: Intersection[R[P], Not[R[P]]],
-    i8: Intersection[R[P], Not[R[Q]]],
-) -> None:
-    reveal_type(i1)  # revealed: Never
-    reveal_type(i2)  # revealed: Never
-    reveal_type(i3)  # revealed: Never
-    reveal_type(i4)  # revealed: Never
-    reveal_type(i5)  # revealed: Never
-    reveal_type(i6)  # revealed: Never
-    reveal_type(i7)  # revealed: Never
-    reveal_type(i8)  # revealed: R[P] & ~R[Q]
+def _(i: Intersection[P, Not[P]]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[Not[P], P]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[P, Q, Not[P]]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[Not[P], Q, P]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[P, Any, Not[P]]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[Not[P], Any, P]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[R[P], Not[R[P]]]) -> None:
+    reveal_type(i)  # revealed: Never
+
+def _(i: Intersection[R[P], Not[R[Q]]]) -> None:
+    reveal_type(i)  # revealed: R[P] & ~R[Q]
 ```
 
 ### Union of a type and its negation
@@ -784,41 +789,49 @@ type Red = Literal[Color.RED]
 type Green = Literal[Color.GREEN]
 type Blue = Literal[Color.BLUE]
 
-def f(
-    a: Intersection[Color, Red],
-    b: Intersection[Color, Not[Red]],
-    c: Intersection[Color, Not[Red | Green]],
-    d: Intersection[Color, Not[Red | Green | Blue]],
-    e: Intersection[Red, Not[Color]],
-    f: Intersection[Red | Green, Not[Color]],
-    g: Intersection[Not[Red], Color],
-    h: Intersection[Red, Green],
-    i: Intersection[Red | Green, Green | Blue],
-):
+def _(a: Intersection[Color, Red]) -> None:
     reveal_type(a)  # revealed: Literal[Color.RED]
+
+def _(b: Intersection[Color, Not[Red]]) -> None:
     reveal_type(b)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def _(c: Intersection[Color, Not[Red | Green]]) -> None:
     reveal_type(c)  # revealed: Literal[Color.BLUE]
+
+def _(d: Intersection[Color, Not[Red | Green | Blue]]) -> None:
     reveal_type(d)  # revealed: Never
+
+def _(e: Intersection[Red, Not[Color]]) -> None:
     reveal_type(e)  # revealed: Never
+
+def _(f: Intersection[Red | Green, Not[Color]]) -> None:
     reveal_type(f)  # revealed: Never
+
+def _(g: Intersection[Not[Red], Color]) -> None:
     reveal_type(g)  # revealed: Literal[Color.GREEN, Color.BLUE]
+
+def _(h: Intersection[Red, Green]) -> None:
     reveal_type(h)  # revealed: Never
+
+def _(i: Intersection[Red | Green, Green | Blue]) -> None:
     reveal_type(i)  # revealed: Literal[Color.GREEN]
 
 class Single(Enum):
     VALUE = 0
 
-def g(
-    a: Intersection[Single, Literal[Single.VALUE]],
-    b: Intersection[Single, Not[Literal[Single.VALUE]]],
-    c: Intersection[Not[Literal[Single.VALUE]], Single],
-    d: Intersection[Single, Not[Single]],
-    e: Intersection[Single | int, Not[Single]],
-):
+def _(a: Intersection[Single, Literal[Single.VALUE]]) -> None:
     reveal_type(a)  # revealed: Single
+
+def _(b: Intersection[Single, Not[Literal[Single.VALUE]]]) -> None:
     reveal_type(b)  # revealed: Never
+
+def _(c: Intersection[Not[Literal[Single.VALUE]], Single]) -> None:
     reveal_type(c)  # revealed: Never
+
+def _(d: Intersection[Single, Not[Single]]) -> None:
     reveal_type(d)  # revealed: Never
+
+def _(e: Intersection[Single | int, Not[Single]]) -> None:
     reveal_type(e)  # revealed: int
 ```
 

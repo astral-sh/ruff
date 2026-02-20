@@ -152,8 +152,8 @@ curl -LsSf https://astral.sh/ruff/install.sh | sh
 powershell -c "irm https://astral.sh/ruff/install.ps1 | iex"
 
 # For a specific version.
-curl -LsSf https://astral.sh/ruff/0.15.1/install.sh | sh
-powershell -c "irm https://astral.sh/ruff/0.15.1/install.ps1 | iex"
+curl -LsSf https://astral.sh/ruff/0.15.2/install.sh | sh
+powershell -c "irm https://astral.sh/ruff/0.15.2/install.ps1 | iex"
 ```
 
 You can also install Ruff via [Homebrew](https://formulae.brew.sh/formula/ruff), [Conda](https://anaconda.org/conda-forge/ruff),
@@ -186,7 +186,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com/) hook via [`ruff
 ```yaml
 - repo: https://github.com/astral-sh/ruff-pre-commit
   # Ruff version.
-  rev: v0.15.1
+  rev: v0.15.2
   hooks:
     # Run the linter.
     - id: ruff-check
@@ -300,7 +300,7 @@ ruff check --config "lint.per-file-ignores = {'some_file.py' = ['F841']}"
 ```
 
 To opt in to the latest lint rules, formatter style changes, interface updates, and more, enable
-[preview mode](https://docs.astral.sh/ruff/rules/) by setting `preview = true` in your configuration
+[preview mode](https://docs.astral.sh/ruff/preview/) by setting `preview = true` in your configuration
 file or passing `--preview` on the command line. Preview mode enables a collection of unstable
 features that may change prior to stabilization.
 
@@ -311,7 +311,7 @@ for more on the linting and formatting commands, respectively.
 
 <!-- Begin section: Rules -->
 
-**Ruff supports over 800 lint rules**, many of which are inspired by popular tools like Flake8,
+**Ruff supports over 900 lint rules**, many of which are inspired by popular tools like Flake8,
 isort, pyupgrade, and others. Regardless of the rule's origin, Ruff re-implements every rule in
 Rust as a first-party feature.
 
@@ -321,6 +321,12 @@ stylistic rules that overlap with the use of a formatter, like `ruff format` or
 
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
 catches a wide variety of common errors (like unused imports) with zero configuration.
+
+In [preview](https://docs.astral.sh/ruff/preview/), Ruff enables an expanded set of default rules
+that includes rules from the `B`, `UP`, and `RUF` categories, as well as many more. If you give the
+new defaults a try, feel free to leave feedback in the [GitHub
+discussion](https://github.com/astral-sh/ruff/discussions/23203), where you can also find the new
+rule set listed in full.
 
 <!-- End section: Rules -->
 

@@ -32,7 +32,7 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, Language, OutputFormat, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -281,6 +281,20 @@ pub struct Options {
         "#
     )]
     pub respect_gitignore: Option<bool>,
+
+    /// A mapping of custom file extensions to known file types (overridden
+    /// by the `--extension` command-line flag).
+    ///
+    /// Supported file types include `python`, `pyi`, `ipynb`, and `markdown`.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, Language]",
+        example = r#"
+            # Add a custom file extension mapped to Python
+            extension = {rpy="python"}
+        "#
+    )]
+    pub extension: Option<FxHashMap<String, Language>>,
 
     // Generic python options
     /// A list of builtins to treat as defined references, in addition to the

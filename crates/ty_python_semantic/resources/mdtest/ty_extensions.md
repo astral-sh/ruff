@@ -427,6 +427,18 @@ def f(x: TypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
 
+## Self-referential `TypeOf` in annotations
+
+A function can reference itself via `TypeOf` in a deferred annotation. This should not cause a stack
+overflow:
+
+```py
+from ty_extensions import TypeOf
+
+def foo(x: "TypeOf[foo]"):
+    reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
+```
+
 ## `CallableTypeOf`
 
 The `CallableTypeOf` special form can be used to extract the `Callable` structural type inhabited by
