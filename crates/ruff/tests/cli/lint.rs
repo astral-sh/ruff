@@ -886,7 +886,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args([".", "--config", r#"lint=123"#]),
-        @"
+        @r###"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -923,12 +923,14 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     - `lint.per-file-ignores`
     - `lint.extend-per-file-ignores`
     - `lint.exclude`
+    - `lint.warn`
+    - `lint.extend-warn`
     - `lint.preview`
     - `lint.typing-extensions`
     - `lint.future-annotations`
 
     For more information, try '--help'.
-    ");
+    "###);
 }
 
 #[test]
@@ -4358,5 +4360,32 @@ fn preview_default_rules() -> Result<()> {
     ]
     ",
     );
+    Ok(())
+}
+
+#[test]
+fn warn_rules() -> Result<()> {
+    let test = CliTest::new()?;
+    test.write_file(
+        "ruff.toml",
+        r#"
+lint.warn = ["ARG001"]
+"#,
+    )?;
+
+    assert_cmd_snapshot!(test.check_command()
+            .arg("--config")
+            .arg("ruff.toml")
+            .args(["--stdin-filename", "test.py"])
+            .arg("-")
+            .pass_stdin(r#"def foo(x): print("hello")"#), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###);
+
     Ok(())
 }
