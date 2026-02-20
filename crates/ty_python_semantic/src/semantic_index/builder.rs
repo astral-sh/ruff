@@ -34,8 +34,8 @@ use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
-    PredicateNode, PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
+    ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
+    PredicateOrLiteral, ScopedPredicateId, StarImportPlaceholderPredicate,
 };
 use crate::semantic_index::re_exports::exported_names;
 use crate::semantic_index::reachability_constraints::{
@@ -2721,30 +2721,23 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We also only add these inside function scopes, since considering module-level
                 // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
-                if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
-                    if !self.source_type.is_stub() && self.in_function_scope() {
-                        let callable = self.add_standalone_expression(func);
-                        let call_expr = self.add_standalone_expression(value.as_ref());
+                if value.is_call_expr() && !self.source_type.is_stub() && self.in_function_scope() {
+                    let call_expr = self.add_standalone_expression(value.as_ref());
 
-                        let predicate = Predicate {
-                            node: PredicateNode::ReturnsNever(CallableAndCallExpr {
-                                callable,
-                                call_expr,
-                            }),
-                            is_positive: false,
-                        };
-                        let constraint = self.record_reachability_constraint(
-                            PredicateOrLiteral::Predicate(predicate),
-                        );
+                    let predicate = Predicate {
+                        node: PredicateNode::ReturnsNever(call_expr),
+                        is_positive: false,
+                    };
+                    let constraint = self
+                        .record_reachability_constraint(PredicateOrLiteral::Predicate(predicate));
 
-                        // Also gate narrowing by this constraint: if the call returns
-                        // `Never`, any narrowing in the current branch should be
-                        // invalidated (since this path is unreachable). This enables
-                        // narrowing to be preserved after if-statements where one branch
-                        // calls a `NoReturn` function like `sys.exit()`.
-                        self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_all_places(constraint);
-                    }
+                    // Also gate narrowing by this constraint: if the call returns
+                    // `Never`, any narrowing in the current branch should be
+                    // invalidated (since this path is unreachable). This enables
+                    // narrowing to be preserved after if-statements where one branch
+                    // calls a `NoReturn` function like `sys.exit()`.
+                    self.current_use_def_map_mut()
+                        .record_narrowing_constraint_for_all_places(constraint);
                 }
             }
             _ => {

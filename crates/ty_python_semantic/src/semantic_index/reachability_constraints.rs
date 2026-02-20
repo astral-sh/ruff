@@ -205,12 +205,11 @@ use crate::rank::RankBitBox;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::place_table;
 use crate::semantic_index::predicate::{
-    CallableAndCallExpr, PatternPredicate, PatternPredicateKind, Predicate, PredicateNode,
-    Predicates, ScopedPredicateId,
+    PatternPredicate, PatternPredicateKind, Predicate, PredicateNode, Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, NarrowingConstraint, Truthiness, Type, TypeContext,
-    UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+    IntersectionBuilder, NarrowingConstraint, Truthiness, Type, TypeContext, UnionBuilder,
+    UnionType, infer_expression_type, infer_narrowing_constraint,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -1067,61 +1066,12 @@ impl ReachabilityConstraints {
                     .bool(db)
                     .negate_if(!predicate.is_positive)
             }
-            PredicateNode::ReturnsNever(CallableAndCallExpr {
-                callable,
-                call_expr,
-            }) => {
-                // We first infer just the type of the callable. In the most likely case that the
-                // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
-                // doing so allows us to avoid the more expensive work of inferring the entire call
-                // expression (which could involve inferring argument types to possibly run the overload
-                // selection algorithm).
-                // Avoiding this on the happy-path is important because these constraints can be
-                // very large in number, since we add them on all statement level function calls.
-                let ty = infer_expression_type(db, callable, TypeContext::default());
-
-                // Short-circuit for well known types that are known not to return `Never` when called.
-                // Without the short-circuit, we've seen that threads keep blocking each other
-                // because they all try to acquire Salsa's `CallableType` lock that ensures each type
-                // is only interned once. The lock is so heavily congested because there are only
-                // very few dynamic types, in which case Salsa's sharding the locks by value
-                // doesn't help much.
-                // See <https://github.com/astral-sh/ty/issues/968>.
-                if matches!(ty, Type::Dynamic(_)) {
-                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
-                }
-
-                let overloads_iterator = if let Some(callable) = ty
-                    .try_upcast_to_callable(db)
-                    .and_then(CallableTypes::exactly_one)
-                {
-                    callable.signatures(db).overloads.iter()
-                } else {
-                    return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
-                };
-
-                let mut no_overloads_return_never = true;
-                let mut all_overloads_return_never = true;
-                let mut any_overload_is_generic = false;
-
-                for overload in overloads_iterator {
-                    let returns_never = overload.return_ty.is_equivalent_to(db, Type::Never);
-                    no_overloads_return_never &= !returns_never;
-                    all_overloads_return_never &= returns_never;
-                    any_overload_is_generic |= overload.return_ty.has_typevar(db);
-                }
-
-                if no_overloads_return_never && !any_overload_is_generic {
-                    Truthiness::AlwaysFalse
-                } else if all_overloads_return_never {
+            PredicateNode::ReturnsNever(call_expr) => {
+                let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
+                if call_expr_ty.is_equivalent_to(db, Type::Never) {
                     Truthiness::AlwaysTrue
                 } else {
-                    let call_expr_ty = infer_expression_type(db, call_expr, TypeContext::default());
-                    if call_expr_ty.is_equivalent_to(db, Type::Never) {
-                        Truthiness::AlwaysTrue
-                    } else {
-                        Truthiness::AlwaysFalse
-                    }
+                    Truthiness::AlwaysFalse
                 }
                 .negate_if(!predicate.is_positive)
             }

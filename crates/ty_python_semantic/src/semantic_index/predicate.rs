@@ -99,15 +99,9 @@ impl PredicateOrLiteral<'_> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct CallableAndCallExpr<'db> {
-    pub(crate) callable: Expression<'db>,
-    pub(crate) call_expr: Expression<'db>,
-}
-
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum PredicateNode<'db> {
     Expression(Expression<'db>),
-    ReturnsNever(CallableAndCallExpr<'db>),
+    ReturnsNever(Expression<'db>),
     Pattern(PatternPredicate<'db>),
     StarImportPlaceholder(StarImportPlaceholderPredicate<'db>),
 }
