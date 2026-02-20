@@ -224,9 +224,7 @@ pub(super) fn type_ordering<'db>(
 
         (Type::ClassLiteral(left), Type::ClassLiteral(right)) => match ordering_purpose {
             OrderingPurpose::Normalization => left.cmp(right),
-            OrderingPurpose::Determinism => {
-                class_literal_deterministic_ordering(db, *left, *right)
-            }
+            OrderingPurpose::Determinism => class_literal_deterministic_ordering(db, *left, *right),
         },
         (Type::ClassLiteral(_), _) => Ordering::Less,
         (_, Type::ClassLiteral(_)) => Ordering::Greater,
