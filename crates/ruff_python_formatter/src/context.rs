@@ -2,8 +2,12 @@ use std::fmt::{Debug, Formatter};
 use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
+use ruff_python_ast::Stmt;
+use ruff_python_ast::name::Name;
 use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::Tokens;
+use ruff_python_ast::visitor::{Visitor, walk_stmt};
+use rustc_hash::FxHashSet;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
@@ -27,6 +31,7 @@ pub struct PyFormatContext<'a> {
     docstring: Option<Quote>,
     /// The state of the formatter with respect to f-strings and t-strings.
     interpolated_string_state: InterpolatedStringState,
+    import_aliases: FxHashSet<&'a Name>,
 }
 
 impl<'a> PyFormatContext<'a> {
@@ -35,6 +40,7 @@ impl<'a> PyFormatContext<'a> {
         contents: &'a str,
         comments: Comments<'a>,
         tokens: &'a Tokens,
+        import_aliases: FxHashSet<&'a Name>,
     ) -> Self {
         Self {
             options,
@@ -45,6 +51,7 @@ impl<'a> PyFormatContext<'a> {
             indent_level: IndentLevel::new(0),
             docstring: None,
             interpolated_string_state: InterpolatedStringState::Outside,
+            import_aliases,
         }
     }
 
@@ -83,6 +90,10 @@ impl<'a> PyFormatContext<'a> {
     /// docstring containing the code snippet currently being formatted.
     pub(crate) fn docstring(&self) -> Option<Quote> {
         self.docstring
+    }
+
+    pub(crate) fn is_known_import_alias(&self, name: &Name) -> bool {
+        self.import_aliases.contains(&name)
     }
 
     /// Return a new context suitable for formatting code snippets within a
@@ -449,5 +460,36 @@ where
             .state_mut()
             .context_mut()
             .set_interpolated_string_state(self.saved_location);
+    }
+}
+
+pub(crate) fn collect_import_aliases(body: &[Stmt]) -> FxHashSet<&Name> {
+    let mut visitor = ImportAliasCollector::default();
+    visitor.visit_body(body);
+    visitor.import_aliases
+}
+
+#[derive(Default, Debug)]
+struct ImportAliasCollector<'a> {
+    import_aliases: FxHashSet<&'a Name>,
+}
+
+impl<'a> Visitor<'a> for ImportAliasCollector<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        // We only want to collect names like
+        // `import pandas` and `import pandas as pd`
+        // not `from pandas import read_csv`.
+        if !matches!(stmt, Stmt::ImportFrom(_)) {
+            walk_stmt(self, stmt);
+        }
+    }
+    fn visit_alias(&mut self, alias: &'a ruff_python_ast::Alias) {
+        let ruff_python_ast::Alias { name, asname, .. } = alias;
+
+        self.import_aliases.insert(if let Some(asname) = asname {
+            &asname.id
+        } else {
+            &name.id
+        });
     }
 }
