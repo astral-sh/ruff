@@ -238,7 +238,7 @@ def get_name() -> str:
     return "IntOrStr"
 
 # error: [invalid-type-alias-type] "The name of a `typing.TypeAlias` must be a string literal"
-IntOrStr = TypeAliasType(get_name(), int | str)
+IntOrStr = TypeAliasType(get_name(), "int | str")
 ```
 
 ## Cyclic aliases
@@ -413,7 +413,7 @@ def f(x: A):
 #### With new-style union
 
 ```py
-type A = list["A" | str]
+type A = list[A | str]
 
 def f(x: A):
     reveal_type(x)  # revealed: list[A | str]

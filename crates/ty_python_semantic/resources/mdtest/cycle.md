@@ -42,7 +42,7 @@ python-version = "3.12"  # typing.TypeAliasType
 ```py
 from typing import Union, TypeAliasType, Sequence, Mapping
 
-A = list["A" | None]
+A = list["A | None"]
 
 def f(x: A):
     # TODO: should be `list[A | None]`?

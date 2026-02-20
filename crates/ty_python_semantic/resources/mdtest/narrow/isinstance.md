@@ -139,6 +139,8 @@ python-version = "3.9"
 ```
 
 ```py
+from __future__ import annotations
+
 def _(x: int | str | bytes):
     # error: [unsupported-operator]
     if isinstance(x, int | str):

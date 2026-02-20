@@ -1279,11 +1279,11 @@ from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
 
 class Node1(TypedDict):
     value: int
-    next: "Node1" | None
+    next: "Node1 | None"
 
 class Node2(TypedDict):
     value: int
-    next: "Node2" | None
+    next: "Node2 | None"
 
 static_assert(is_assignable_to(Node1, Node2))
 static_assert(is_equivalent_to(Node1, Node2))

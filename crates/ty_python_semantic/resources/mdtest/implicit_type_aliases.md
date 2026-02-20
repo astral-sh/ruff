@@ -1610,10 +1610,10 @@ python-version = "3.12"
 ```py
 from typing import List, Dict
 
-RecursiveList1 = list["RecursiveList1" | None]
-RecursiveList2 = List["RecursiveList2" | None]
-RecursiveDict1 = dict[str, "RecursiveDict1" | None]
-RecursiveDict2 = Dict[str, "RecursiveDict2" | None]
+RecursiveList1 = list["RecursiveList1 | None"]
+RecursiveList2 = List["RecursiveList2 | None"]
+RecursiveDict1 = dict[str, "RecursiveDict1 | None"]
+RecursiveDict2 = Dict[str, "RecursiveDict2 | None"]
 RecursiveDict3 = dict["RecursiveDict3", int]
 RecursiveDict4 = Dict["RecursiveDict4", int]
 
