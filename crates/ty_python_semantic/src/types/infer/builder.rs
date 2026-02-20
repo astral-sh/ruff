@@ -11162,12 +11162,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     || !conversion.is_none()
                                     || format_spec.is_some()
                                 {
-                                    collector.add_expression();
+                                    collector.add_non_literal_string_expression();
                                 } else {
-                                    if let Some(literal) = ty.str(self.db()).as_string_literal() {
+                                    let str_ty = ty.str(self.db());
+                                    if let Some(literal) = str_ty.as_string_literal() {
                                         collector.push_str(literal.value(self.db()));
+                                    } else if str_ty.is_literal_string() {
+                                        collector.add_literal_string_expression();
                                     } else {
-                                        collector.add_expression();
+                                        collector.add_non_literal_string_expression();
                                     }
                                 }
                             }
@@ -17250,14 +17253,14 @@ fn format_import_from_module(level: u32, module: Option<&str>) -> String {
 #[derive(Debug)]
 struct StringPartsCollector {
     concatenated: Option<String>,
-    expression: bool,
+    contains_non_literal_str: bool,
 }
 
 impl StringPartsCollector {
     fn new() -> Self {
         Self {
             concatenated: Some(String::new()),
-            expression: false,
+            contains_non_literal_str: false,
         }
     }
 
@@ -17274,13 +17277,22 @@ impl StringPartsCollector {
         }
     }
 
-    fn add_expression(&mut self) {
+    /// Add an expression whose `__str__` return type is `LiteralString`.
+    /// The exact value is unknown, so we can't track the concatenated string,
+    /// but the result is still `LiteralString`.
+    fn add_literal_string_expression(&mut self) {
         self.concatenated = None;
-        self.expression = true;
+    }
+
+    /// Add an expression whose `__str__` return type is not `LiteralString`.
+    /// The result will degrade to `str`.
+    fn add_non_literal_string_expression(&mut self) {
+        self.concatenated = None;
+        self.contains_non_literal_str = true;
     }
 
     fn string_type(self, db: &dyn Db) -> Type<'_> {
-        if self.expression {
+        if self.contains_non_literal_str {
             KnownClass::Str.to_instance(db)
         } else if let Some(concatenated) = self.concatenated {
             Type::string_literal(db, &concatenated)
