@@ -125,7 +125,7 @@ pub(super) fn type_ordering<'db>(
             .then_with(|| {
                 let left_sig = left.signature(db);
                 let right_sig = right.signature(db);
-                signatures_deterministic_ordering(db, left_sig, right_sig)
+                signatures_ordering(db, left_sig, right_sig)
             }),
         },
         (Type::FunctionLiteral(_), _) => Ordering::Less,
@@ -153,9 +153,7 @@ pub(super) fn type_ordering<'db>(
 
         (Type::KnownBoundMethod(left), Type::KnownBoundMethod(right)) => match ordering_purpose {
             OrderingPurpose::Normalization => left.cmp(right),
-            OrderingPurpose::Determinism => {
-                known_bound_method_deterministic_ordering(db, *left, *right)
-            }
+            OrderingPurpose::Determinism => known_bound_method_ordering(db, *left, *right),
         },
         (Type::KnownBoundMethod(_), _) => Ordering::Less,
         (_, Type::KnownBoundMethod(_)) => Ordering::Greater,
@@ -212,7 +210,7 @@ pub(super) fn type_ordering<'db>(
             OrderingPurpose::Determinism => left.kind(db).cmp(&right.kind(db)).then_with(|| {
                 let left_sigs = left.signatures(db);
                 let right_sigs = right.signatures(db);
-                signatures_deterministic_ordering(db, left_sigs, right_sigs)
+                signatures_ordering(db, left_sigs, right_sigs)
             }),
         },
         (Type::Callable(_), _) => Ordering::Less,
@@ -224,18 +222,26 @@ pub(super) fn type_ordering<'db>(
 
         (Type::ClassLiteral(left), Type::ClassLiteral(right)) => match ordering_purpose {
             OrderingPurpose::Normalization => left.cmp(right),
-            OrderingPurpose::Determinism => class_literal_deterministic_ordering(db, *left, *right),
+            OrderingPurpose::Determinism => class_literal_ordering(db, *left, *right),
         },
         (Type::ClassLiteral(_), _) => Ordering::Less,
         (_, Type::ClassLiteral(_)) => Ordering::Greater,
 
-        (Type::GenericAlias(left), Type::GenericAlias(right)) => left.cmp(right),
+        (Type::GenericAlias(left), Type::GenericAlias(right)) => match ordering_purpose {
+            OrderingPurpose::Normalization => left.cmp(right),
+            OrderingPurpose::Determinism => generic_alias_ordering(db, *left, *right),
+        },
         (Type::GenericAlias(_), _) => Ordering::Less,
         (_, Type::GenericAlias(_)) => Ordering::Greater,
 
         (Type::SubclassOf(left), Type::SubclassOf(right)) => {
             match (left.subclass_of(), right.subclass_of()) {
-                (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => left.cmp(&right),
+                (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
+                    match ordering_purpose {
+                        OrderingPurpose::Normalization => left.cmp(&right),
+                        OrderingPurpose::Determinism => class_type_ordering(db, left, right),
+                    }
+                }
                 (SubclassOfInner::Class(_), _) => Ordering::Less,
                 (_, SubclassOfInner::Class(_)) => Ordering::Greater,
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
@@ -421,9 +427,7 @@ pub(super) fn type_ordering<'db>(
 
         (Type::KnownInstance(left), Type::KnownInstance(right)) => match ordering_purpose {
             OrderingPurpose::Normalization => left.cmp(right),
-            OrderingPurpose::Determinism => {
-                known_instance_deterministic_ordering(db, *left, *right)
-            }
+            OrderingPurpose::Determinism => known_instance_ordering(db, *left, *right),
         },
         (Type::KnownInstance(_), _) => Ordering::Less,
         (_, Type::KnownInstance(_)) => Ordering::Greater,
@@ -608,9 +612,7 @@ fn dynamic_elements_ordering<'db>(
         (DynamicType::UnknownGeneric(left), DynamicType::UnknownGeneric(right)) => {
             match ordering_purpose {
                 OrderingPurpose::Normalization => left.cmp(&right),
-                OrderingPurpose::Determinism => {
-                    generic_context_deterministic_ordering(db, left, right)
-                }
+                OrderingPurpose::Determinism => generic_context_ordering(db, left, right),
             }
         }
         (DynamicType::UnknownGeneric(_), _) => Ordering::Less,
@@ -705,7 +707,7 @@ fn definition_ordering(
     }
 }
 
-fn class_literal_deterministic_ordering<'db>(
+fn class_literal_ordering<'db>(
     db: &'db dyn Db,
     left: super::class::ClassLiteral<'db>,
     right: super::class::ClassLiteral<'db>,
@@ -723,6 +725,40 @@ fn class_literal_deterministic_ordering<'db>(
         })
 }
 
+fn generic_alias_ordering<'db>(
+    db: &'db dyn Db,
+    left: super::class::GenericAlias<'db>,
+    right: super::class::GenericAlias<'db>,
+) -> Ordering {
+    class_literal_ordering(
+        db,
+        super::class::ClassLiteral::Static(left.origin(db)),
+        super::class::ClassLiteral::Static(right.origin(db)),
+    )
+    .then_with(|| specialization_ordering(db, left.specialization(db), right.specialization(db)))
+}
+
+fn class_type_ordering<'db>(
+    db: &'db dyn Db,
+    left: super::class::ClassType<'db>,
+    right: super::class::ClassType<'db>,
+) -> Ordering {
+    match (left, right) {
+        (super::class::ClassType::NonGeneric(left), super::class::ClassType::NonGeneric(right)) => {
+            class_literal_ordering(db, left, right)
+        }
+        (super::class::ClassType::NonGeneric(_), super::class::ClassType::Generic(_)) => {
+            Ordering::Less
+        }
+        (super::class::ClassType::Generic(_), super::class::ClassType::NonGeneric(_)) => {
+            Ordering::Greater
+        }
+        (super::class::ClassType::Generic(left), super::class::ClassType::Generic(right)) => {
+            generic_alias_ordering(db, left, right)
+        }
+    }
+}
+
 fn binding_context_ordering(db: &dyn Db, left: BindingContext, right: BindingContext) -> Ordering {
     match (left, right) {
         (BindingContext::Definition(l), BindingContext::Definition(r)) => {
@@ -738,7 +774,7 @@ fn binding_context_ordering(db: &dyn Db, left: BindingContext, right: BindingCon
 ///
 /// Uses the standard Less/Greater pattern for exhaustive matching without wildcards.
 /// For inner types, we use structural comparison rather than Salsa IDs where possible.
-fn known_bound_method_deterministic_ordering<'db>(
+fn known_bound_method_ordering<'db>(
     db: &'db dyn Db,
     left: KnownBoundMethodType<'db>,
     right: KnownBoundMethodType<'db>,
@@ -842,7 +878,7 @@ fn known_bound_method_deterministic_ordering<'db>(
         (
             KnownBoundMethodType::GenericContextSpecializeConstrained(l),
             KnownBoundMethodType::GenericContextSpecializeConstrained(r),
-        ) => generic_context_deterministic_ordering(db, l, r),
+        ) => generic_context_ordering(db, l, r),
     }
 }
 
@@ -850,20 +886,20 @@ fn known_bound_method_deterministic_ordering<'db>(
 ///
 /// Uses the standard Less/Greater pattern for exhaustive matching without wildcards.
 /// For inner types, we use structural comparison rather than Salsa IDs where possible.
-fn known_instance_deterministic_ordering<'db>(
+fn known_instance_ordering<'db>(
     db: &'db dyn Db,
     left: KnownInstanceType<'db>,
     right: KnownInstanceType<'db>,
 ) -> Ordering {
     match (left, right) {
         (KnownInstanceType::SubscriptedProtocol(l), KnownInstanceType::SubscriptedProtocol(r)) => {
-            generic_context_deterministic_ordering(db, l, r)
+            generic_context_ordering(db, l, r)
         }
         (KnownInstanceType::SubscriptedProtocol(_), _) => Ordering::Less,
         (_, KnownInstanceType::SubscriptedProtocol(_)) => Ordering::Greater,
 
         (KnownInstanceType::SubscriptedGeneric(l), KnownInstanceType::SubscriptedGeneric(r)) => {
-            generic_context_deterministic_ordering(db, l, r)
+            generic_context_ordering(db, l, r)
         }
         (KnownInstanceType::SubscriptedGeneric(_), _) => Ordering::Less,
         (_, KnownInstanceType::SubscriptedGeneric(_)) => Ordering::Greater,
@@ -937,13 +973,13 @@ fn known_instance_deterministic_ordering<'db>(
         (_, KnownInstanceType::ConstraintSet(_)) => Ordering::Greater,
 
         (KnownInstanceType::GenericContext(l), KnownInstanceType::GenericContext(r)) => {
-            generic_context_deterministic_ordering(db, l, r)
+            generic_context_ordering(db, l, r)
         }
         (KnownInstanceType::GenericContext(_), _) => Ordering::Less,
         (_, KnownInstanceType::GenericContext(_)) => Ordering::Greater,
 
         (KnownInstanceType::Specialization(l), KnownInstanceType::Specialization(r)) => {
-            specialization_deterministic_ordering(db, l, r)
+            specialization_ordering(db, l, r)
         }
         (KnownInstanceType::Specialization(_), _) => Ordering::Less,
         (_, KnownInstanceType::Specialization(_)) => Ordering::Greater,
@@ -1003,7 +1039,7 @@ fn known_instance_deterministic_ordering<'db>(
         (_, KnownInstanceType::NewType(_)) => Ordering::Greater,
 
         (KnownInstanceType::NamedTupleSpec(l), KnownInstanceType::NamedTupleSpec(r)) => {
-            named_tuple_spec_deterministic_ordering(db, l, r)
+            named_tuple_spec_ordering(db, l, r)
         }
     }
 }
@@ -1011,14 +1047,14 @@ fn known_instance_deterministic_ordering<'db>(
 /// Deterministic ordering for [`CallableSignature`] instances.
 ///
 /// Compares signatures structurally by comparing their parameters and return types.
-fn signatures_deterministic_ordering<'db>(
+fn signatures_ordering<'db>(
     db: &'db dyn Db,
     left: &CallableSignature<'db>,
     right: &CallableSignature<'db>,
 ) -> Ordering {
     left.len().cmp(&right.len()).then_with(|| {
         for (l, r) in left.iter().zip(right.iter()) {
-            let params_cmp = parameters_deterministic_ordering(db, l.parameters(), r.parameters());
+            let params_cmp = parameters_ordering(db, l.parameters(), r.parameters());
             if params_cmp != Ordering::Equal {
                 return params_cmp;
             }
@@ -1034,7 +1070,7 @@ fn signatures_deterministic_ordering<'db>(
 }
 
 /// Deterministic ordering for [`Parameters`] instances.
-fn parameters_deterministic_ordering<'db>(
+fn parameters_ordering<'db>(
     db: &'db dyn Db,
     left: &Parameters<'db>,
     right: &Parameters<'db>,
@@ -1096,7 +1132,7 @@ fn parameter_kind_discriminant(kind: &ParameterKind) -> u8 {
 /// Deterministic ordering for [`GenericContext`] instances.
 ///
 /// Compares the type variables structurally by name and kind.
-fn generic_context_deterministic_ordering<'db>(
+fn generic_context_ordering<'db>(
     db: &'db dyn Db,
     left: GenericContext<'db>,
     right: GenericContext<'db>,
@@ -1123,12 +1159,12 @@ fn generic_context_deterministic_ordering<'db>(
 /// Deterministic ordering for [`Specialization`] instances.
 ///
 /// Compares the generic context, types, and materialization kind structurally.
-fn specialization_deterministic_ordering<'db>(
+fn specialization_ordering<'db>(
     db: &'db dyn Db,
     left: Specialization<'db>,
     right: Specialization<'db>,
 ) -> Ordering {
-    generic_context_deterministic_ordering(db, left.generic_context(db), right.generic_context(db))
+    generic_context_ordering(db, left.generic_context(db), right.generic_context(db))
         .then_with(|| {
             let left_types = left.types(db);
             let right_types = right.types(db);
@@ -1167,7 +1203,7 @@ fn specialization_deterministic_ordering<'db>(
 /// Deterministic ordering for [`NamedTupleSpec`] instances.
 ///
 /// Compares the fields structurally by name and type.
-fn named_tuple_spec_deterministic_ordering<'db>(
+fn named_tuple_spec_ordering<'db>(
     db: &'db dyn Db,
     left: NamedTupleSpec<'db>,
     right: NamedTupleSpec<'db>,
