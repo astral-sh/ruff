@@ -73,7 +73,7 @@ pub(crate) use crate::types::narrow::{
     infer_narrowing_constraint,
 };
 use crate::types::newtype::NewType;
-pub(crate) use crate::types::signatures::{Parameter, Parameters};
+pub(crate) use crate::types::signatures::{ConcatenateTail, Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
 use crate::types::typed_dict::TypedDictField;

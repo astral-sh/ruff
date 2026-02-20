@@ -1302,7 +1302,9 @@ class Base(ABC):
     @abstractproperty  # error: [deprecated]
     def value(self) -> int:
         return 0
-
+    # TODO: False positive: `Concatenate` in `classmethod.__init__` signature causes spurious
+    # invalid-argument-type when the type variables are not fully resolved.
+    # error: [invalid-argument-type]
     @abstractclassmethod  # error: [deprecated]
     def make(cls) -> "Base":
         raise NotImplementedError
