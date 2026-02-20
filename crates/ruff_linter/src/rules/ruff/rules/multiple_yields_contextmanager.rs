@@ -40,6 +40,7 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: contextlib.contextmanager](https://docs.python.org/3/library/contextlib.html#contextlib.contextmanager)
 /// - [Python documentation: contextlib.asynccontextmanager](https://docs.python.org/3/library/contextlib.html#contextlib.asynccontextmanager)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.15.3")]
 pub(crate) struct MultipleYieldsInContextManager {
     decorator_name: &'static str,
 }
