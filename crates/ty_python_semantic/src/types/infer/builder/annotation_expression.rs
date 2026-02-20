@@ -284,27 +284,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                             // Emit a diagnostic if ClassVar and Final are combined in a class that is
                             // not a dataclass, since Final already implies the semantics of ClassVar.
-                            let classvar_and_final =
-                                (matches!(type_qualifier, SpecialFormType::Final)
-                                    && type_and_qualifiers
-                                        .qualifiers
-                                        .contains(TypeQualifiers::CLASS_VAR))
-                                    || (matches!(type_qualifier, SpecialFormType::ClassVar)
-                                        && type_and_qualifiers
-                                            .qualifiers
-                                            .contains(TypeQualifiers::FINAL));
-                            let inside_non_dataclass_class =
-                                nearest_enclosing_class(self.db(), self.index, self.scope())
-                                    .is_none_or(|class| !class.is_dataclass_like(self.db()));
-                            if classvar_and_final && inside_non_dataclass_class {
-                                if let Some(builder) = self
+                            let classvar_and_final = match type_qualifier {
+                                SpecialFormType::Final => type_and_qualifiers
+                                    .qualifiers
+                                    .contains(TypeQualifiers::CLASS_VAR),
+                                SpecialFormType::ClassVar => type_and_qualifiers
+                                    .qualifiers
+                                    .contains(TypeQualifiers::FINAL),
+                                _ => false,
+                            };
+                            if classvar_and_final
+                                && nearest_enclosing_class(self.db(), self.index, self.scope())
+                                    .is_none_or(|class| !class.is_dataclass_like(self.db()))
+                                && let Some(builder) = self
                                     .context
                                     .report_lint(&REDUNDANT_FINAL_CLASSVAR, subscript)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "`Combining `ClassVar` and `Final` is redundant"
-                                    ));
-                                }
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "`Combining `ClassVar` and `Final` is redundant"
+                                ));
                             }
 
                             match type_qualifier {

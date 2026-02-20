@@ -204,7 +204,7 @@ reveal_type(Sub.all_instances)  # revealed: list[Sub]
 ## Combining `ClassVar` and `Final` in normal classes
 
 An attribute on a class body that is annotated as `Final` is implicitly treated as a class variable.
-The error message is different, but these attributes can not be written to from instances of the
+The error message is different, but these attributes cannot be written to from instances of the
 class:
 
 ```py
@@ -240,11 +240,15 @@ class D:
     # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     e: ClassVar[Final] = 1
 
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
+    f: Annotated[Final[Annotated[Annotated[ClassVar[int], "a"], "b"]], "c"] = 1
+
 reveal_type(D.a)  # revealed: int
 reveal_type(D.b)  # revealed: int
 reveal_type(D.c)  # revealed: Literal[1]
 reveal_type(D.d)  # revealed: int
 reveal_type(D.e)  # revealed: Literal[1]
+reveal_type(D.f)  # revealed: int
 
 d = D()
 d.a = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `a` from an instance of type `D`"
@@ -252,6 +256,7 @@ d.b = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `b` from
 d.c = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `c` from an instance of type `D`"
 d.d = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `d` from an instance of type `D`"
 d.e = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `e` from an instance of type `D`"
+d.f = 2  # error: [invalid-attribute-access] "Cannot assign to ClassVar `f` from an instance of type `D`"
 ```
 
 ## Combining `ClassVar` and `Final` in dataclasses
