@@ -23,7 +23,7 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec_inline};
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
-use type_ordering::union_or_intersection_elements_ordering;
+use type_ordering::{OrderingPurpose, union_or_intersection_elements_ordering};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::class::DynamicClassLiteral;
@@ -837,7 +837,7 @@ impl Ord for TypeOrdering<'_> {
             self.db,
             &self.ty,
             &other.ty,
-            type_ordering::OrderingPurpose::Determinism,
+            OrderingPurpose::Determinism,
         )
     }
 }
@@ -13019,20 +13019,10 @@ impl<'db> IntersectionType<'db> {
         let mut negative = self.negative(db).map(|ty| ty.normalized_impl(db, visitor));
 
         positive.sort_unstable_by(|l, r| {
-            union_or_intersection_elements_ordering(
-                db,
-                l,
-                r,
-                type_ordering::OrderingPurpose::Normalization,
-            )
+            union_or_intersection_elements_ordering(db, l, r, OrderingPurpose::Normalization)
         });
         negative.sort_unstable_by(|l, r| {
-            union_or_intersection_elements_ordering(
-                db,
-                l,
-                r,
-                type_ordering::OrderingPurpose::Normalization,
-            )
+            union_or_intersection_elements_ordering(db, l, r, OrderingPurpose::Normalization)
         });
 
         IntersectionType::new(db, positive, negative)

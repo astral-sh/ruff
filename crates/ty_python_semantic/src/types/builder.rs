@@ -37,7 +37,7 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use crate::types::enums::{enum_member_literals, enum_metadata};
-use crate::types::type_ordering::union_or_intersection_elements_ordering;
+use crate::types::type_ordering::{OrderingPurpose, union_or_intersection_elements_ordering};
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -787,7 +787,7 @@ impl<'db> UnionBuilder<'db> {
                     self.db,
                     l,
                     r,
-                    crate::types::type_ordering::OrderingPurpose::Normalization,
+                    OrderingPurpose::Normalization,
                 )
             });
         }
@@ -1527,7 +1527,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             db,
                             l,
                             r,
-                            crate::types::type_ordering::OrderingPurpose::Normalization,
+                            OrderingPurpose::Normalization,
                         )
                     });
                     self.negative.sort_unstable_by(|l, r| {
@@ -1535,7 +1535,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             db,
                             l,
                             r,
-                            crate::types::type_ordering::OrderingPurpose::Normalization,
+                            OrderingPurpose::Normalization,
                         )
                     });
                 }
