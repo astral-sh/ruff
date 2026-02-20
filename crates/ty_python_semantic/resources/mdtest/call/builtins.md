@@ -13,54 +13,6 @@ bool(1, 2)
 bool(NotBool())
 ```
 
-## Calls to `type()`
-
-A single-argument call to `type()` returns an object that has the argument's meta-type. (This is
-tested more extensively in `crates/ty_python_semantic/resources/mdtest/attributes.md`, alongside the
-tests for the `__class__` attribute.)
-
-```py
-reveal_type(type(1))  # revealed: <class 'int'>
-```
-
-But a three-argument call to type creates a dynamic instance of the `type` class:
-
-```py
-class Base: ...
-
-reveal_type(type("Foo", (), {}))  # revealed: type
-
-reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: type
-```
-
-Other numbers of arguments are invalid
-
-```py
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-type("Foo", ())
-
-# error: [no-matching-overload] "No overload of class `type` matches arguments"
-type("Foo", (), {}, weird_other_arg=42)
-```
-
-The following calls are also invalid, due to incorrect argument types:
-
-```py
-class Base: ...
-
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `str`, found `Literal[b"Foo"]`"
-type(b"Foo", (), {})
-
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `<class 'Base'>`"
-type("Foo", Base, {})
-
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `tuple[Literal[1], Literal[2]]`"
-type("Foo", (1, 2), {})
-
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `dict[str, Any]`, found `dict[str | bytes, Any]`"
-type("Foo", (Base,), {b"attr": 1})
-```
-
 ## Calls to `str()`
 
 ### Valid calls
@@ -114,6 +66,7 @@ but fall back to `bool` otherwise.
 ```py
 from enum import Enum
 from types import FunctionType
+from typing import TypeVar
 
 class Answer(Enum):
     NO = 0
@@ -137,6 +90,7 @@ reveal_type(isinstance("", int))  # revealed: bool
 
 class A: ...
 class SubclassOfA(A): ...
+class OtherSubclassOfA(A): ...
 class B: ...
 
 reveal_type(isinstance(A, type))  # revealed: Literal[True]
@@ -161,6 +115,29 @@ def _(x: A | B, y: list[int]):
     else:
         reveal_type(x)  # revealed: B & ~A
         reveal_type(isinstance(x, B))  # revealed: Literal[True]
+
+T = TypeVar("T")
+T_bound_A = TypeVar("T_bound_A", bound=A)
+T_constrained = TypeVar("T_constrained", SubclassOfA, OtherSubclassOfA)
+
+def _(
+    x: T,
+    x_bound_a: T_bound_A,
+    x_constrained_sub_a: T_constrained,
+):
+    reveal_type(isinstance(x, object))  # revealed: Literal[True]
+    reveal_type(isinstance(x, A))  # revealed: bool
+
+    reveal_type(isinstance(x_bound_a, object))  # revealed: Literal[True]
+    reveal_type(isinstance(x_bound_a, A))  # revealed: Literal[True]
+    reveal_type(isinstance(x_bound_a, SubclassOfA))  # revealed: bool
+    reveal_type(isinstance(x_bound_a, B))  # revealed: bool
+
+    reveal_type(isinstance(x_constrained_sub_a, object))  # revealed: Literal[True]
+    reveal_type(isinstance(x_constrained_sub_a, A))  # revealed: Literal[True]
+    reveal_type(isinstance(x_constrained_sub_a, SubclassOfA))  # revealed: bool
+    reveal_type(isinstance(x_constrained_sub_a, OtherSubclassOfA))  # revealed: bool
+    reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
 ```
 
 Certain special forms in the typing module are not instances of `type`, so are strictly-speaking

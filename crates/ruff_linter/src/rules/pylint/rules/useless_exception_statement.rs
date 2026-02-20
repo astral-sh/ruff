@@ -36,6 +36,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as converting a useless exception
+/// statement to a `raise` statement will change the program's behavior.
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]

@@ -93,7 +93,7 @@ class A:
         class C: ...
 
 def _(u: type[BasicUser | ProUser | A.B.C]):
-    # revealed: type[BasicUser] | type[ProUser] | type[C]
+    # revealed: type[BasicUser | ProUser | C]
     reveal_type(u)
 ```
 
@@ -110,9 +110,9 @@ class A:
         class C: ...
 
 def f(a: type[Union[BasicUser, ProUser, A.B.C]], b: type[Union[str]], c: type[Union[BasicUser, Union[ProUser, A.B.C]]]):
-    reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(a)  # revealed: type[BasicUser | ProUser | C]
     reveal_type(b)  # revealed: type[str]
-    reveal_type(c)  # revealed: type[BasicUser] | type[ProUser] | type[C]
+    reveal_type(c)  # revealed: type[BasicUser | ProUser | C]
 ```
 
 ## New-style and old-style unions in combination
@@ -128,8 +128,31 @@ class A:
         class C: ...
 
 def f(a: type[BasicUser | Union[ProUser, A.B.C]], b: type[Union[BasicUser | Union[ProUser, A.B.C | str]]]):
-    reveal_type(a)  # revealed: type[BasicUser] | type[ProUser] | type[C]
-    reveal_type(b)  # revealed: type[BasicUser] | type[ProUser] | type[C] | type[str]
+    reveal_type(a)  # revealed: type[BasicUser | ProUser | C]
+    reveal_type(b)  # revealed: type[BasicUser | ProUser | C | str]
+```
+
+## Special case for `None`
+
+The typing conformance suite contains this test case. It's debatable whether it's correct to do so,
+since the spec states that:
+
+> The value corresponding to `type[C]` must be an actual class object that’s a subtype of `C`, not a
+> special form or other kind of type.
+
+However, for now we support this annotation in the way the conformance suite expects, until and
+unless the spec is amended.
+
+```py
+import types
+
+def f(x: type[None]):
+    reveal_type(x)  # revealed: <class 'NoneType'>
+
+f(type(None))
+f(None.__class__)
+f(types.NoneType)
+f(None)  # error: [invalid-argument-type]
 ```
 
 ## Illegal parameters

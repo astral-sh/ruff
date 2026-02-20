@@ -137,9 +137,17 @@ _OtherTag = TypeVar("_OtherTag", default=str, bound=str | _ElementCallable)
 @disjoint_base
 class Element(Generic[_Tag]):
     tag: _Tag
+    """A string identifying what kind of data this element represents"""
+
     attrib: dict[str, str]
+    """A dictionary containing the element's attributes"""
+
     text: str | None
+    """A string of text directly after the start tag, or None"""
+
     tail: str | None
+    """A string of text directly after the end tag, or None"""
+
     def __init__(self, tag: _Tag, attrib: dict[str, str] = {}, **extra: str) -> None: ...
     def append(self, subelement: Element[Any], /) -> None: ...
     def clear(self) -> None: ...
@@ -177,7 +185,7 @@ class Element(Generic[_Tag]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> list[Element]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> list[Element]: ...
     def __len__(self) -> int:
         """Return len(self)."""
     # Doesn't actually exist at runtime, but instance of the class are indeed iterable due to __getitem__.
@@ -187,7 +195,7 @@ class Element(Generic[_Tag]):
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[Element[Any]], /) -> None: ...
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[Element[Any]], /) -> None: ...
 
     # Doesn't really exist in earlier versions, where __len__ is called implicitly instead
     @deprecated("Testing an element's truth value is deprecated.")
@@ -515,7 +523,8 @@ class _IterParseIterator(Iterator[tuple[str, Element]], Protocol):
     if sys.version_info >= (3, 11):
         def __del__(self) -> None: ...
 
-def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XMLParser | None = None) -> _IterParseIterator:
+@overload
+def iterparse(source: _FileRead, events: Sequence[str] | None = None) -> _IterParseIterator:
     """Incrementally parse XML document into ElementTree.
 
     This class also reports what's going on to the user based on the
@@ -530,6 +539,10 @@ def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XM
     Returns an iterator providing (event, elem) pairs.
 
     """
+
+@overload
+@deprecated("The `parser` parameter is deprecated since Python 3.4.")
+def iterparse(source: _FileRead, events: Sequence[str] | None = None, parser: XMLParser | None = None) -> _IterParseIterator: ...
 
 _EventQueue: TypeAlias = tuple[str] | tuple[str, tuple[str, str]] | tuple[str, None]
 

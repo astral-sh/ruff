@@ -79,7 +79,11 @@ T = TypeVar("T")
 class CanIndex(Protocol[T]):
     def __getitem__(self, index: int, /) -> T: ...
 
-class ExplicitlyImplements(CanIndex[T]): ...
+class ExplicitlyImplements(CanIndex[T]):
+    def __getitem__(self, index: int, /) -> T:
+        raise NotImplementedError
+
+class SubProtocol(CanIndex[T], Protocol): ...
 
 def takes_in_list(x: list[T]) -> list[T]:
     return x
@@ -89,18 +93,28 @@ def takes_in_protocol(x: CanIndex[T]) -> T:
 
 def deep_list(x: list[str]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[str]
-    # TODO: revealed: str
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_list(x: list[set[str]]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[set[str]]
-    # TODO: revealed: set[str]
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def deep_subprotocol(x: SubProtocol[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deeper_subprotocol(x: SubProtocol[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def itself(x: CanIndex[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deep_itself(x: CanIndex[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def takes_in_type(x: type[T]) -> type[T]:
@@ -116,12 +130,10 @@ class Sub(list[int]): ...
 class GenericSub(list[T]): ...
 
 reveal_type(takes_in_list(Sub()))  # revealed: list[int]
-# TODO: revealed: int
-reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
+reveal_type(takes_in_protocol(Sub()))  # revealed: int
 
 reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
-# TODO: revealed: str
-reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
+reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub(ExplicitlyImplements[T]): ...
@@ -276,9 +288,36 @@ from typing import TypeVar
 T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
-    # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
     return t1 + t2
+
+S = TypeVar("S", int, float)
+
+def chained_constrained_types(t1: S, t2: S, t3: S) -> S:
+    return (t1 + t2) * t3
+
+def typevar_times_literal(t: S) -> S:
+    return t * 2
+
+def literal_times_typevar(t: S) -> S:
+    return 2 * t
+
+def negate_typevar(t: S) -> S:
+    return -t
+
+def positive_typevar(t: S) -> S:
+    return +t
+```
+
+Unary operations that are not supported by all constraints should error:
+
+```py
+from typing import TypeVar
+
+U = TypeVar("U", int, float)
+
+def invert_typevar(t: U) -> int:
+    # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `U@invert_typevar`"
+    return ~t
 ```
 
 This is _not_ the same as a union type, because of this additional constraint that the two
@@ -287,7 +326,7 @@ and an `int` and a `str` cannot be added together:
 
 ```py
 def unions_are_different(t1: int | str, t2: int | str) -> int | str:
-    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `int | str` and `int | str`"
+    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `int | str`"
     return t1 + t2
 ```
 
@@ -555,8 +594,7 @@ def identity(x: T) -> T:
 def head(xs: list[T]) -> T:
     return xs[0]
 
-# TODO: this should be `Literal[1]`
-reveal_type(invoke(identity, 1))  # revealed: Unknown
+reveal_type(invoke(identity, 1))  # revealed: Literal[1]
 
 # TODO: this should be `Unknown | int`
 reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
@@ -739,4 +777,137 @@ reveal_type(x)  # revealed: list[Sub]
 
 y: list[Sub] = f2(Sub())
 reveal_type(y)  # revealed: list[Sub]
+```
+
+## Bounded TypeVar with callable parameter
+
+When a bounded TypeVar appears in a `Callable` parameter's return type, the inferred type should be
+the actual type from the call, not the TypeVar's upper bound.
+
+See: <https://github.com/astral-sh/ty/issues/2292>
+
+```py
+from typing import Callable, TypeVar
+
+class Base:
+    pass
+
+class Derived(Base):
+    attr: int
+
+T = TypeVar("T", bound=Base)
+
+def takes_factory(factory: Callable[[], T]) -> T:
+    return factory()
+
+# Passing a class as a factory: should infer Derived, not Base
+result = takes_factory(Derived)
+reveal_type(result)  # revealed: Derived
+
+# Accessing an attribute that only exists on Derived should work
+print(result.attr)  # No error
+```
+
+## Passing a constrained TypeVar to a function expecting a compatible constrained TypeVar
+
+A constrained TypeVar should be assignable to a different constrained TypeVar if each constraint of
+the actual TypeVar is equivalent to at least one constraint of the formal TypeVar. This commonly
+arises when wrapping functions from external packages that define private TypeVars with the same
+constraints.
+
+See: <https://github.com/astral-sh/ty/issues/2728>
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+S = TypeVar("S", int, str)
+
+def callee(x: T) -> T:
+    return x
+
+def caller(x: S) -> S:
+    return callee(x)
+
+reveal_type(caller(1))  # revealed: int
+reveal_type(caller("hello"))  # revealed: str
+```
+
+A constrained TypeVar with a subset of constraints is also compatible:
+
+```py
+from typing import TypeVar
+
+Wide = TypeVar("Wide", int, str, bytes)
+Narrow = TypeVar("Narrow", int, str)
+
+def wide(x: Wide) -> Wide:
+    return x
+
+def narrow(x: Narrow) -> Narrow:
+    return wide(x)
+
+reveal_type(narrow(1))  # revealed: int
+reveal_type(narrow("hello"))  # revealed: str
+```
+
+But a constrained TypeVar with constraints not satisfied by the formal TypeVar should still error:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+U = TypeVar("U", int, bytes)
+
+def target(x: T) -> T:
+    return x
+
+def source(x: U) -> U:
+    return target(x)  # error: [invalid-argument-type]
+```
+
+We require equivalence rather than mere assignability when matching constraints. Constrained
+TypeVars allow narrowing via `isinstance` checks in the function body, so a constraint that is a
+strict subtype would be unsound. For example, a function constrained to `(int, str)` may narrow `T`
+to `int` and return `int(x)`, which would violate a caller's `bool` constraint:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T", int, str)
+S = TypeVar("S", bool, str)
+
+def f(x: T) -> T:
+    return x
+
+def g(x: S) -> S:
+    return f(x)  # error: [invalid-argument-type]
+```
+
+## Inferring typevars in iterable parameters from literal string and bytes arguments
+
+```py
+from typing import Iterable, TypeVar
+from typing_extensions import LiteralString
+
+FlatT = TypeVar("FlatT")
+
+def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
+    return [x for iterable in iterables for x in iterable]
+
+def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
+    return tuple(x for iterable in iterables for x in iterable)
+
+reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
+# TODO: we could have `Literal["a", "b", "c"]` instead of `str` here
+reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
+
+def literal_string_case(literal_string: LiteralString):
+    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+
+reveal_type(flatten(b"abc"))  # revealed: list[int]
+reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
+# TODO: we could have `Literal[97, 98, 99]` instead of `int` in the next two lines
+reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
+reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
 ```

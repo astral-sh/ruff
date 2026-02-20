@@ -1,0 +1,12 @@
+---
+source: crates/ruff_python_parser/src/parser/tests.rs
+expression: error
+---
+ParseError {
+    error: Lexical(
+        UnrecognizedToken {
+            tok: '\0',
+        },
+    ),
+    location: 5..6,
+}

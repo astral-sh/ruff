@@ -92,7 +92,7 @@ class Project(NamedTuple):
             )
 
         except subprocess.CalledProcessError as e:
-            raise RuntimeError(f"Failed to clone {self.name}: {e.stderr}")
+            raise RuntimeError(f"Failed to clone {self.name}:\n\n{e.stderr}") from e
 
         logging.info(f"Cloned {self.name} to {checkout_dir}.")
 
@@ -177,7 +177,7 @@ ALL: Final = [
     Project(
         name="homeassistant",
         repository="https://github.com/home-assistant/core.git",
-        revision="7fd440c4a06777bc4cfd90a3c176ded80c87a8fd",
+        revision="7b6df1a8a074afefff6a50b3495dafd5954b6dac",
         python_version="3.14",
         include=["homeassistant"],
         skip="Missing dependencies on Windows" if sys.platform == "win32" else None,

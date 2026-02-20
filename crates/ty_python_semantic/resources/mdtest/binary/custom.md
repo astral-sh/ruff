@@ -79,31 +79,31 @@ reveal_type(Sub() & Sub())  # revealed: Literal["&"]
 reveal_type(Sub() // Sub())  # revealed: Literal["//"]
 
 # No does not implement any of the dunder methods.
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `No`"
 reveal_type(No() + No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `-` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `-` is not supported between two objects of type `No`"
 reveal_type(No() - No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `*` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `*` is not supported between two objects of type `No`"
 reveal_type(No() * No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `@` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `@` is not supported between two objects of type `No`"
 reveal_type(No() @ No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `/` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `/` is not supported between two objects of type `No`"
 reveal_type(No() / No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `%` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `%` is not supported between two objects of type `No`"
 reveal_type(No() % No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `**` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `**` is not supported between two objects of type `No`"
 reveal_type(No() ** No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<<` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `<<` is not supported between two objects of type `No`"
 reveal_type(No() << No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>>` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `>>` is not supported between two objects of type `No`"
 reveal_type(No() >> No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `|` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `|` is not supported between two objects of type `No`"
 reveal_type(No() | No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `^` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `^` is not supported between two objects of type `No`"
 reveal_type(No() ^ No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `&` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `&` is not supported between two objects of type `No`"
 reveal_type(No() & No())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `//` is not supported between objects of type `No` and `No`"
+# error: [unsupported-operator] "Operator `//` is not supported between two objects of type `No`"
 reveal_type(No() // No())  # revealed: Unknown
 
 # Yes does not implement any of the reflected dunder methods.
@@ -293,6 +293,8 @@ reveal_type(Yes() // No())  # revealed: Literal["//"]
 
 ## Classes
 
+<!-- snapshot-diagnostics -->
+
 Dunder methods defined in a class are available to instances of that class, but not to the class
 itself. (For these operators to work on the class itself, they would have to be defined on the
 class's type, i.e. `type`.)
@@ -307,11 +309,11 @@ class Yes:
 class Sub(Yes): ...
 class No: ...
 
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `<class 'Yes'>` and `<class 'Yes'>`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Yes'>`"
 reveal_type(Yes + Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `<class 'Sub'>` and `<class 'Sub'>`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Sub'>`"
 reveal_type(Sub + Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `<class 'No'>` and `<class 'No'>`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'No'>`"
 reveal_type(No + No)  # revealed: Unknown
 ```
 
@@ -336,11 +338,11 @@ def sub() -> type[Sub]:
 def no() -> type[No]:
     return No
 
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `type[Yes]` and `type[Yes]`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `type[Yes]`"
 reveal_type(yes() + yes())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `type[Sub]` and `type[Sub]`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `type[Sub]`"
 reveal_type(sub() + sub())  # revealed: Unknown
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `type[No]` and `type[No]`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `type[No]`"
 reveal_type(no() + no())  # revealed: Unknown
 ```
 
@@ -350,30 +352,54 @@ reveal_type(no() + no())  # revealed: Unknown
 def f():
     pass
 
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f + f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `-` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `-` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f - f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `*` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `*` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f * f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `@` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `@` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f @ f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `/` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `/` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f / f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `%` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `%` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f % f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `**` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `**` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f**f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<<` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `<<` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f << f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>>` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `>>` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f >> f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `|` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `|` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f | f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `^` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `^` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f ^ f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `&` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `&` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f & f)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `//` is not supported between objects of type `def f() -> Unknown` and `def f() -> Unknown`"
+# error: [unsupported-operator] "Operator `//` is not supported between two objects of type `def f() -> Unknown`"
 reveal_type(f // f)  # revealed: Unknown
+```
+
+## Classes from different modules with the same name
+
+We use the fully qualified names in diagnostics if the two classes have the same unqualified name,
+but are nonetheless different.
+
+<!-- snapshot-diagnostics -->
+
+`mod1.py`:
+
+```py
+class A: ...
+```
+
+`mod2.py`:
+
+```py
+import mod1
+
+class A: ...
+
+# error: [unsupported-operator] "Operator `+` is not supported between objects of type `mod2.A` and `mod1.A`"
+A() + mod1.A()
 ```

@@ -9,7 +9,7 @@ from typing import ParamSpec
 
 P = ParamSpec("P")
 reveal_type(type(P))  # revealed: <class 'ParamSpec'>
-reveal_type(P)  # revealed: typing.ParamSpec
+reveal_type(P)  # revealed: ParamSpec
 reveal_type(P.__name__)  # revealed: Literal["P"]
 ```
 
@@ -283,7 +283,7 @@ reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 def func(c: Callable[P2, None]):
     reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (**P2@func) -> None
 
-# TODO: error: paramspec is unbound
+# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
@@ -298,14 +298,14 @@ it having the same AST as the one without the parentheses. Both mypy and Pyright
 reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
 ```
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
 reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 
@@ -327,15 +327,14 @@ reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str,
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 
-# TODO: We could still specialize for `T1` as the type is valid which would reveal `(...) -> int`
-# TODO: error: paramspec is unbound
-reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> Unknown
+# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
+reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
+reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> int
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
-reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> Unknown
+reveal_type(TypeVarAndParamSpec[int, ()]().attr)  # revealed: (...) -> int
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
-reveal_type(TypeVarAndParamSpec[int, ()]().attr)  # revealed: (...) -> Unknown
-# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
-reveal_type(TypeVarAndParamSpec[int, (int, str)]().attr)  # revealed: (...) -> Unknown
+reveal_type(TypeVarAndParamSpec[int, (int, str)]().attr)  # revealed: (...) -> int
 ```
 
 Nor can they be omitted when there are more than one `ParamSpec`s.
@@ -425,9 +424,8 @@ p3 = ParamSpecWithDefault4[[int], [str]]()
 reveal_type(p3.attr1)  # revealed: (int, /) -> None
 reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
-# TODO: error
 # Un-ordered type variables as the default of `PAnother` is `P`
-class ParamSpecWithDefault5(Generic[PAnother, P]):
+class ParamSpecWithDefault5(Generic[PAnother, P]):  # error: [invalid-generic-class]
     attr: Callable[PAnother, None]
 
 # TODO: error

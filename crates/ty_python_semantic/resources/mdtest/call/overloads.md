@@ -408,7 +408,7 @@ def f(x: type[B]) -> B: ...
 from overloaded import A, B, f
 
 def _(x: type[A | B]):
-    reveal_type(x)  # revealed: type[A] | type[B]
+    reveal_type(x)  # revealed: type[A | B]
     reveal_type(f(x))  # revealed: A | B
     reveal_type(f(*(x,)))  # revealed: A | B
 ```
@@ -427,7 +427,6 @@ class SomeEnum(Enum):
     A = 1
     B = 2
     C = 3
-
 
 class A: ...
 class B: ...
@@ -558,6 +557,41 @@ def _(actual_enum: ActualEnum, my_enum_instance: MyEnumSubclass):
 
     reveal_type(f(my_enum_instance))  # revealed: MyEnumSubclass
     reveal_type(f(*(my_enum_instance,)))  # revealed: MyEnumSubclass
+```
+
+### Expanding PEP 695 type alias
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+PEP 695 type aliases should be properly expanded during argument type expansion. This test ensures
+that `type X = A | B` is treated the same as a plain union `A | B` during overload resolution.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload, Literal
+
+class A: ...
+class B: ...
+
+@overload
+def f(x: A) -> A: ...
+@overload
+def f(x: B) -> B: ...
+```
+
+```py
+from overloaded import A, B, f
+
+type Alias = A | B
+
+def _(x: Alias) -> None:
+    # The type alias `Alias` should be expanded to `A | B` during overload resolution
+    reveal_type(f(x))  # revealed: A | B
+    reveal_type(f(*(x,)))  # revealed: A | B
 ```
 
 ### No matching overloads
@@ -881,6 +915,33 @@ def _(a: int | None):
             a30=a,
         )
     )
+```
+
+### Optimization: Limit tuple element expansion size
+
+To prevent combinatorial explosion, ty limits the Cartesian product size when expanding tuple
+elements. A tuple like `tuple[A | B, A | B, ..., A | B]` with many union-typed elements would
+otherwise produce an exponential number of expanded types.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def f(x: tuple[int, ...]) -> int: ...
+@overload
+def f(x: tuple[str, ...]) -> str: ...
+```
+
+```py
+from overloaded import f
+
+def _(a: int | str) -> None:
+    # This tuple has too many expandable elements for the Cartesian product to be computed.
+    # ty skips the tuple expansion and falls through to the error case.
+    # error: [no-matching-overload]
+    f((a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a))
 ```
 
 ### Retry from parameter matching
@@ -1432,19 +1493,16 @@ class B: ...
 def f1(x: int) -> A: ...
 @overload
 def f1(x: Any, y: Any) -> A: ...
-
 @overload
 def f2(x: int) -> A: ...
 @overload
 def f2(x: Any, y: Any) -> B: ...
-
 @overload
 def f3(x: int) -> A: ...
 @overload
 def f3(x: Any, y: Any) -> A: ...
 @overload
 def f3(x: Any, y: Any, *, z: str) -> B: ...
-
 @overload
 def f4(x: int) -> A: ...
 @overload
@@ -1488,14 +1546,12 @@ def f1(x1: T1, x2: T2, /) -> tuple[T1, T2]: ...
 def f1(x1: T1, x2: T2, x3: T3, /) -> tuple[T1, T2, T3]: ...
 @overload
 def f1(*args: Any) -> tuple[Any, ...]: ...
-
 @overload
 def f2(x1: T1) -> tuple[T1]: ...
 @overload
 def f2(x1: T1, x2: T2) -> tuple[T1, T2]: ...
 @overload
 def f2(*args: Any, **kwargs: Any) -> tuple[Any, ...]: ...
-
 @overload
 def f3(x: T1) -> tuple[T1]: ...
 @overload

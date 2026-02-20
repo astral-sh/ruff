@@ -58,6 +58,11 @@ use crate::{AlwaysFixableViolation, Fix};
 /// async def create_item(item: Item) -> Item:
 ///     return item
 /// ```
+///
+/// ## Fix safety
+/// This fix is always unsafe, as removing the `response_model` argument can change
+/// runtime behavior and API documentation generation. Additionally, comments inside
+/// the decorator might be removed when the argument is deleted.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct FastApiRedundantResponseModel;
@@ -122,8 +127,13 @@ fn is_identical_types(
     if let (Expr::Name(response_mode_name_expr), Expr::Name(return_value_name_expr)) =
         (response_model_arg, return_value)
     {
-        return semantic.resolve_name(response_mode_name_expr)
-            == semantic.resolve_name(return_value_name_expr);
+        return semantic
+            .resolve_name(response_mode_name_expr)
+            .is_some_and(|left| {
+                semantic
+                    .resolve_name(return_value_name_expr)
+                    .is_some_and(|right| left == right)
+            });
     }
     if let (Expr::Subscript(response_mode_subscript), Expr::Subscript(return_value_subscript)) =
         (response_model_arg, return_value)

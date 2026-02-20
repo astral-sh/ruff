@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR301 [*] `apply_defaults` is removed in Airflow 3.0
+ --> AIR301_decorator.py:7:5
+  |
+6 | class DecoratedOperator(BaseOperator):
+7 |     @apply_defaults
+  |     ^^^^^^^^^^^^^^^
+8 |     def __init__(self, message, **kwargs):
+9 |         super().__init__(**kwargs)
+  |
+help: `apply_defaults` is now unconditionally done and can be safely removed.
+4 | 
+5 | 
+6 | class DecoratedOperator(BaseOperator):
+  -     @apply_defaults
+7 |     def __init__(self, message, **kwargs):
+8 |         super().__init__(**kwargs)
+9 |         self.message = message

@@ -113,9 +113,7 @@ intention that it shouldn't influence the method's descriptor behavior. For exam
 ```py
 from typing import Callable
 
-# TODO: this could use a generic signature, but we don't support
-# `ParamSpec` and solving of typevars inside `Callable` types yet.
-def memoize(f: Callable[[C1, int], str]) -> Callable[[C1, int], str]:
+def memoize[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     raise NotImplementedError
 
 class C1:
@@ -257,6 +255,131 @@ class MyClass:
 
 reveal_type(MyClass().method)  # revealed: (...) -> int
 reveal_type(MyClass().method.__name__)  # revealed: str
+```
+
+## classmethods passed through Callable-returning decorators
+
+The behavior described above is also applied to classmethods. If a method is decorated with
+`@classmethod`, and also with another decorator which returns a Callable type, we make the
+assumption that the decorator returns a callable which still has the classmethod descriptor
+behavior.
+
+```py
+from typing import Callable
+
+def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class C:
+    @callable_identity
+    @classmethod
+    def f1(cls, x: int) -> str:
+        return "a"
+
+    @classmethod
+    @callable_identity
+    def f2(cls, x: int) -> str:
+        return "a"
+
+# error: [too-many-positional-arguments]
+# error: [invalid-argument-type]
+C.f1(C, 1)
+C.f1(1)
+C().f1(1)
+C.f2(1)
+C().f2(1)
+```
+
+## Types are not bound-method descriptors
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+The callable type of a type object is not function-like.
+
+```py
+from typing import ClassVar
+from ty_extensions import CallableTypeOf
+
+class WithNew:
+    def __new__(self, x: int) -> WithNew:
+        return super().__new__(WithNew)
+
+class WithInit:
+    def __init__(self, x: int) -> None:
+        pass
+
+class C:
+    with_new: ClassVar[CallableTypeOf[WithNew]]
+    with_init: ClassVar[CallableTypeOf[WithInit]]
+
+C.with_new(1)
+C().with_new(1)
+C.with_init(1)
+C().with_init(1)
+```
+
+## Decorators returning PEP 695 type aliases
+
+When a decorator's return type is a PEP 695 type alias that wraps a `Callable` type, the decorated
+method should still behave as a bound-method descriptor. This also works correctly with `super()`.
+
+```py
+from typing import Any
+from collections.abc import Callable
+
+type Func = Callable[[Any], str]
+
+def noop(func: Func) -> Func:
+    return func
+
+class Base:
+    @noop
+    def foo(self) -> str:
+        return "base"
+
+class Derived(Base):
+    @noop
+    def foo(self) -> str:
+        return super().foo()
+
+reveal_type(Base().foo)  # revealed: () -> str
+reveal_type(Derived().foo)  # revealed: () -> str
+
+# These calls should work without errors
+Base().foo()
+Derived().foo()
+```
+
+The same applies to methods accessed via `super()` directly:
+
+```py
+from typing import Any
+from collections.abc import Callable
+
+type MethodType = Callable[[Any, int], str]
+
+def decorator(func: MethodType) -> MethodType:
+    return func
+
+class Parent:
+    @decorator
+    def method(self, x: int) -> str:
+        return str(x)
+
+class Child(Parent):
+    @decorator
+    def method(self, x: int) -> str:
+        # super().method should be a bound method, not require `self`
+        return super().method(x)
+
+reveal_type(Parent().method)  # revealed: (int, /) -> str
+reveal_type(Child().method)  # revealed: (int, /) -> str
+
+Parent().method(1)
+Child().method(1)
 ```
 
 [`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092

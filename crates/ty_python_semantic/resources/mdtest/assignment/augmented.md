@@ -38,6 +38,8 @@ reveal_type(x)  # revealed: int
 
 ## Unsupported types
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class C:
     def __isub__(self, other: str) -> int:
@@ -58,6 +60,7 @@ def _(flag: bool):
         if flag:
             def __iadd__(self, other: int) -> str:
                 return "Hello, world!"
+
         else:
             def __iadd__(self, other: int) -> int:
                 return 42

@@ -53,6 +53,6 @@ homeassistant/runner.py:284: error: function asyncio.events.set_event_loop_polic
 homeassistant/scripts/auth.py:51: error: function asyncio.events.set_event_loop_policy is deprecated: Deprecated since Python 3.14; will be removed in Python 3.16.  [deprecated]
 homeassistant/scripts/__init__.py:64: error: function asyncio.events.set_event_loop_policy is deprecated: Deprecated since Python 3.14; will be removed in Python 3.16.  [deprecated]
 Found 54 errors in 13 files (checked 8626 source files)
-/Users/micha/.local/share/uv/python/cpython-3.14.0-macos-aarch64-none/lib/python3.14/importlib/__init__.py:88: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
+/home/micha/.local/share/uv/python/cpython-3.14.2-linux-x86_64-gnu/lib/python3.14/importlib/__init__.py:88: UserWarning: Core Pydantic V1 functionality isn't compatible with Python 3.14 or greater.
   return _bootstrap._gcd_import(name[level:], package, level)
 Warning: unused section(s) in mypy.ini: [mypy-tests.*]

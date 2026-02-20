@@ -42,6 +42,15 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     ...
 /// ```
 ///
+/// ## Options
+///
+/// The rule will consult these two settings when deciding if a fix can be provided:
+///
+/// - `lint.pycodestyle.max-line-length`
+/// - `indent-width`
+///
+/// Lines that would exceed the configured line length will not be fixed automatically.
+///
 /// ## References
 /// - [Python documentation: The `if` statement](https://docs.python.org/3/reference/compound_stmts.html#the-if-statement)
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)

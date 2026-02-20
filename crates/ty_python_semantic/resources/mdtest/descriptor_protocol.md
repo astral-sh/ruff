@@ -525,6 +525,42 @@ c.name = None
 c.name = 42
 ```
 
+### Overriding properties in subclasses
+
+When a subclass overrides a property, accessing other inherited properties from within the
+overriding property methods should still work correctly.
+
+```py
+class Base:
+    _value: float = 0.0
+
+    @property
+    def value(self) -> float:
+        return self._value
+
+    @value.setter
+    def value(self, v: float) -> None:
+        self._value = v
+
+    @property
+    def other(self) -> float:
+        return self.value
+
+    @other.setter
+    def other(self, v: float) -> None:
+        self.value = v
+
+class Derived(Base):
+    @property
+    def other(self) -> float:
+        return self.value
+
+    @other.setter
+    def other(self, v: float) -> None:
+        reveal_type(self.value)  # revealed: int | float
+        self.value = v
+```
+
 ### Properties with no setters
 
 <!-- snapshot-diagnostics -->
@@ -596,14 +632,14 @@ def f(x: object) -> str:
     return "a"
 
 reveal_type(f)  # revealed: def f(x: object) -> str
-reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(f.__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
 static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
 reveal_type(f.__get__(None, type(f)))  # revealed: def f(x: object) -> str
 reveal_type(f.__get__(None, type(f))(1))  # revealed: str
 
 wrapper_descriptor = getattr_static(f, "__get__")
 
-reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor `__get__` of `function` objects>
+reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor '__get__' of 'function' objects>
 reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: def f(x: object) -> str
 static_assert(is_subtype_of(TypeOf[wrapper_descriptor], types.WrapperDescriptorType))
 

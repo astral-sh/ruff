@@ -386,3 +386,125 @@ def _(target: int, flag: NotBoolable):
 
     reveal_type(y)  # revealed: Literal[1, 2, 3]
 ```
+
+## Matching on enum | None without covering None
+
+When matching on a union of an enum and None, code after the match should still be reachable if None
+is not covered by any case, even when all enum members are covered.
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = 1
+    NO = 2
+
+def _(answer: Answer | None):
+    y = 0
+    match answer:
+        case Answer.YES:
+            y = 1
+        case Answer.NO:
+            y = 2
+
+    # The match is not exhaustive because None is not covered,
+    # so y could still be 0
+    reveal_type(y)  # revealed: Literal[0, 1, 2]
+
+def _(answer: Answer | None):
+    match answer:
+        case Answer.YES:
+            return 1
+        case Answer.NO:
+            return 2
+
+    # Code here is reachable because None is not covered
+    reveal_type(answer)  # revealed: None
+    return 3
+
+class Foo: ...
+
+def _(answer: Answer | None):
+    match answer:
+        case Answer.YES:
+            return
+        case Answer.NO:
+            return
+
+    # New assignments after the match should not be `Never`
+    x = Foo()
+    reveal_type(x)  # revealed: Foo
+```
+
+## Invalid class patterns
+
+For class patterns, the runtime first checks that the match pattern is an instance of `type`, and
+then uses `isinstance` to check the match.
+
+If the match pattern is not an instance of `type`, we raise a diagnostic:
+
+```py
+from typing import Any
+from ty_extensions import Intersection
+
+def _(val, Valid1: type | Any, Valid2: Intersection[type, Any], Valid3: type[Any], Valid4: type[int]):
+    Invalid1 = "foo"
+
+    match val:
+        # error: [invalid-match-pattern] "`Literal["foo"]` cannot be used in a class pattern because it is not a type"
+        case Invalid1(): ...
+
+    Invalid2 = int | str
+
+    match val:
+        # error: [invalid-match-pattern] "`<types.UnionType special-form 'int | str'>` cannot be used in a class pattern because it is not a type"
+        case Invalid2():
+            pass
+        case Valid1():  # fine
+            pass
+        case Valid2():  # fine
+            pass
+        case Valid3():  # fine
+            pass
+        case Valid4():  # fine
+            pass
+```
+
+We also raise a diagnostic if the class cannot be used with `isinstance`:
+
+```py
+from typing import Any, TypedDict
+
+def _(val):
+    Invalid3 = Any
+
+    match val:
+        # TODO: this should be an `invalid-match-pattern` error
+        case Invalid3(): ...
+
+    class Invalid4(TypedDict): ...
+
+    match val:
+        # TODO: this could have the `invalid-match-pattern` error code instead.
+        # error: [isinstance-against-typed-dict] "`TypedDict` class `Invalid4` cannot be used in a class pattern"
+        case Invalid4(): ...
+```
+
+We do not raise a diagnostic for dynamic types:
+
+```py
+def _(val, UnknownSymbol):
+    reveal_type(UnknownSymbol)  # revealed: Unknown
+
+    match val:
+        case UnknownSymbol(): ...
+```
+
+We also do not raise a diagnostic if the match pattern is a non-statically known instance of `type`:
+
+```py
+def _(val, IntOrStr: type[int | str]):
+    match val:
+        case IntOrStr():
+            print(f"Matched as {IntOrStr}: {val!r}")
+```

@@ -79,3 +79,28 @@ help: Convert to `datetime.UTC` alias
 27 | 
    -     print(dt.timezone.utc)
 28 +     print(dt.UTC)
+29 | 
+30 | 
+31 | def func():
+
+UP017 [*] Use `datetime.UTC` alias
+  --> UP017.py:35:9
+   |
+34 |       print((
+35 | /         datetime
+36 | |         .timezone  # text
+37 | |         .utc
+   | |____________^
+38 |       ))
+   |
+help: Convert to `datetime.UTC` alias
+32 |     import datetime
+33 | 
+34 |     print((
+   -         datetime
+   -         .timezone  # text
+   -         .utc
+35 +         datetime.UTC
+36 |     ))
+37 | 
+note: This is an unsafe fix and may change runtime behavior

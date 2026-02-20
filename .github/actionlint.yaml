@@ -1,13 +1,20 @@
-# Configuration for the actionlint tool, which we run via pre-commit
+# Configuration for the actionlint tool, which we run via prek
 # to verify the correctness of the syntax in our GitHub Actions workflows.
 
 self-hosted-runner:
   # Various runners we use that aren't recognized out-of-the-box by actionlint:
   labels:
+    - depot-ubuntu-24.04-4
     - depot-ubuntu-latest-8
     - depot-ubuntu-22.04-16
     - depot-ubuntu-22.04-32
     - depot-windows-2022-16
+    - depot-ubuntu-22.04-arm-4
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
+
+paths:
+  ".github/workflows/mypy_primer.yaml":
+    ignore:
+      - 'constant expression "false" in condition. remove the if: section'

@@ -8,12 +8,87 @@ two projects in a monorepo have conflicting definitions (but we want to analyze 
 
 In practice these tests cover what we call "desperate module resolution" which, when an import
 fails, results in us walking up the ancestor directories of the importing file and trying those as
-"desperate search-paths".
+"desperate search-paths" until one works.
 
 Currently desperate search-paths are restricted to subdirectories of the first-party search-path
-(the directory you're running `ty` in). Currently we only consider one desperate search-path: the
-closest ancestor directory containing a `pyproject.toml`. In the future we may want to try every
-ancestor `pyproject.toml` or every ancestor directory.
+(typically, the directory you're running `ty` in).
+
+There are two styles of desperate search-path we consider: "absolute" and "relative". Absolute
+desperate search-paths are used for resolving absolute imports (`import a.b.c`) while relative
+desperate search-paths are used for resolving relative imports (`from .c import x`).
+
+Only the closest directory that contains either a `pyproject.toml` or `ty.toml` is a valid relative
+desperate search-path.
+
+All ancestor directories that *do not* contain an `__init__.py(i)` are valid absolute desperate
+search-paths.
+
+(Distracting detail: to ensure relative desperate search-paths are always valid absolute desperate
+search-paths, a directory that contains an `__init__.py(i)` *and* either a `pyproject.toml` or
+`ty.toml` is also a valid absolute search-path, but this shouldn't matter in practice, as you do not
+typically have those two kinds of file in the same directory.)
+
+## Relative Desperate Search-Paths
+
+We do not directly resolve relative imports. Instead we have a two-phase process:
+
+1. Convert the relative module name `.c` to an absolute one `a.b.c`
+1. Resolve the absolute import `a.b.c`
+
+(This allows us to transparently handle packaging semantics that mandate separate directories should
+be "logically combined" into a single directory, like namespace packages and stub packages.)
+
+Relative desperate search-paths only appear in step 1, where we compute the module name of the
+importing file as the first step in resolving `.` to an absolute module name.
+
+In practice, relative desperate search-paths are rarely needed because it usually doesn't matter if
+we think `.` is `a.b` or `b` when resolving `.c`: the fact that we computed `a.b` using our
+search-paths means `a.b.c` is what will resolve with those search-paths!
+
+There are three caveats to this:
+
+- If the module name we compute is *too short* then too many relative levels will fail to resolve
+    (`..c` resolves in `a.b` but not `b`).
+- If the module name is *too long* then we may encounter directories that aren't valid module names,
+    and reject the import (`my-proj.a.b.c` is not a valid module name).
+- Sloppiness will break relative imports in any kind of packaging situation where different
+    directories are supposed to be "logically combined".
+
+The fact that we restrict desperate resolution to the first-party search-path ("the project you're
+working on") allows us to largely dismiss the last concern for the purposes of this discussion. The
+remaining two concerns encourage us to find "the longest possible module name without stumbling into
+random nonsense directories". When we need relative desperate search-paths we are usually running
+into the "too long" problem and "snap to the parent `pyproject.toml` (or `ty.toml`)" tends to
+resolve it well!
+
+As a more aesthetic concern, this approach also ensures that all the files under a given
+`pyproject.toml` will, when faced with desperation, agree on eachother's relative module names. This
+may or may not be important, but it's definitely *reassuring* and *satisfying*!
+
+## Absolute Desperate Search-Paths
+
+Absolute desperate search-paths are much more load-bearing, because if we're handed the absolute
+import `a.b.c` then there is only one possible search-path that will properly resolve this the way
+the user wants, and if that search-path isn't configured we will fail.
+
+Basic heuristics like checking for `<working-dir>/src/` and resolving editables in the local `.venv`
+work well in most cases, but desperate resolution is needed in a couple key scenarios:
+
+- Test or script directories have a tendency to assume extra search-paths that aren't structurally
+    obvious ([notably pytest](https://docs.pytest.org/en/stable/explanation/pythonpath.html))
+- If you open the root of a monorepo in an IDE, you will often have many separate projects but no
+    configuration explaining this. Absolute imports within each project should resolve things in
+    that project.
+
+The latter case is often handled reasonably well by the the `pyproject.toml` rule that relative
+desperate search-paths have. However the more complex testing/scripting scenarios tend to fall over
+here -- in the limit pytest will add literally every ancestor to the search-path, and so we simply
+need to try every single one and hope *one* works for every absolute import (and it might be a
+different one for different imports).
+
+We exclude directories that contain an `__init__.py(i)` because there shouldn't be any reasonable
+scenario where we need to "truncate" a regular package like that (and pytest's Exciting behaviour
+here is explicitly disabled by `__init__.py`).
 
 ## Invalid Names
 
@@ -134,13 +209,11 @@ from .mod1 import x
 
 # error: [unresolved-import]
 from . import mod2
-
-# error: [unresolved-import]
 import mod3
 
 reveal_type(x)  # revealed: Unknown
 reveal_type(mod2.y)  # revealed: Unknown
-reveal_type(mod3.z)  # revealed: Unknown
+reveal_type(mod3.z)  # revealed: int
 ```
 
 `my-proj/tests/mod1.py`:
@@ -338,21 +411,6 @@ create, and we are now very sensitive to precise search-path ordering.**
 
 Here the use of editables means that `a/` has higher priority than `a/src/a/`.
 
-Somehow this results in `a/tests/test1.py` being able to resolve `.setup` but not `.`.
-
-My best guess is that in this state we can resolve regular modules in `a/tests/` but not namespace
-packages because we have some extra validation for namespace packages conflicted by regular
-packages, but that validation isn't applied when we successfully resolve a submodule of the
-namespace package.
-
-In this case, as we find that `a/tests/test1.py` matches on the first-party path as `a.tests.test1`
-and is syntactically valid. We then resolve `a.tests.test1` and because the namespace package
-(`/a/`) comes first we succeed. We then syntactically compute `.` to be `a.tests`.
-
-When we go to lookup `a.tests.setup`, whatever grace that allowed `a.tests.test1` to resolve still
-works so it resolves too. However when we try to resolve `a.tests` on its own some additional
-validation rejects the namespace package conflicting with the regular package.
-
 ```toml
 [environment]
 # Setup a venv with editables for a/src/ and b/src/
@@ -385,17 +443,13 @@ b/src/
 `a/tests/test1.py`:
 
 ```py
-# TODO: there should be no errors in this file.
-
 from .setup import x
-
-# error: [unresolved-import]
 from . import setup
 from a import y
 import a
 
 reveal_type(x)  # revealed: int
-reveal_type(setup.x)  # revealed: Unknown
+reveal_type(setup.x)  # revealed: int
 reveal_type(y)  # revealed: int
 reveal_type(a.y)  # revealed: int
 ```
@@ -422,17 +476,13 @@ y: int = 10
 `b/tests/test1.py`:
 
 ```py
-# TODO: there should be no errors in this file
-
 from .setup import x
-
-# error: [unresolved-import]
 from . import setup
 from b import y
 import b
 
 reveal_type(x)  # revealed: str
-reveal_type(setup.x)  # revealed: Unknown
+reveal_type(setup.x)  # revealed: str
 reveal_type(y)  # revealed: str
 reveal_type(b.y)  # revealed: str
 ```

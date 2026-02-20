@@ -22,27 +22,31 @@ reveal_type(stop())
 from typing_extensions import NoReturn, Never, Any
 
 # error: [invalid-type-form] "Type `typing.Never` expected no type parameter"
-x: Never[int]
-a1: NoReturn
-a2: Never
-b1: Any
-b2: int
+invalid: Never[int]
 
-def f():
+def _(never: Never):
     # revealed: Never
-    reveal_type(a1)
-    # revealed: Never
-    reveal_type(a2)
+    reveal_type(never)
 
-    # Never is assignable to all types.
-    v1: int = a1
-    v2: str = a1
-    # Other types are not assignable to Never except for Never (and Any).
-    v3: Never = b1
-    v4: Never = a2
-    v5: Any = b2
-    # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to `Never`"
-    v6: Never = 1
+def _(noreturn: NoReturn):
+    # revealed: Never
+    reveal_type(noreturn)
+
+# Never is assignable to all types:
+def _(never: Never):
+    v1: int = never
+    v2: str = never
+    v3: Never = never
+    v4: Any = never
+
+# No type is assignable to Never except for Never (and Any):
+def _(never: Never, noreturn: NoReturn, any: Any):
+    v1: Never = 1  # error: [invalid-assignment]
+    v2: Never = "a"  # error: [invalid-assignment]
+
+    v3: Never = any
+    v4: Never = noreturn
+    v4: NoReturn = never
 ```
 
 ## `typing.Never`
@@ -59,7 +63,7 @@ python-version = "3.11"
 ```py
 from typing import Never
 
-reveal_type(Never)  # revealed: <special form 'typing.Never'>
+reveal_type(Never)  # revealed: <special-form 'typing.Never'>
 ```
 
 ### Python 3.10

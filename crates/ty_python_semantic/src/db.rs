@@ -1,10 +1,11 @@
+use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
-use ruff_db::Db as SourceDb;
 use ruff_db::files::File;
+use ty_module_resolver::Db as ModuleResolverDb;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: SourceDb {
+pub trait Db: ModuleResolverDb {
     /// Returns `true` if the file should be checked.
     fn should_check_file(&self, file: File) -> bool;
 
@@ -12,6 +13,8 @@ pub trait Db: SourceDb {
     fn rule_selection(&self, file: File) -> &RuleSelection;
 
     fn lint_registry(&self) -> &LintRegistry;
+
+    fn analysis_settings(&self, file: File) -> &AnalysisSettings;
 
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
@@ -21,11 +24,12 @@ pub trait Db: SourceDb {
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
-    use crate::program::{Program, SearchPathSettings};
+    use crate::program::Program;
     use crate::{
-        ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-        default_lint_registry,
+        AnalysisSettings, ProgramSettings, PythonPlatform, PythonVersionSource,
+        PythonVersionWithSource, default_lint_registry,
     };
+    use ty_module_resolver::SearchPathSettings;
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
@@ -37,6 +41,8 @@ pub(crate) mod tests {
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
+    use ty_module_resolver::Db as ModuleResolverDb;
+    use ty_module_resolver::SearchPaths;
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -49,6 +55,7 @@ pub(crate) mod tests {
         vendored: VendoredFileSystem,
         events: Events,
         rule_selection: Arc<RuleSelection>,
+        analysis_settings: Arc<AnalysisSettings>,
     }
 
     impl TestDb {
@@ -68,6 +75,7 @@ pub(crate) mod tests {
                 events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
+                analysis_settings: AnalysisSettings::default().into(),
             }
         }
 
@@ -130,8 +138,19 @@ pub(crate) mod tests {
             default_lint_registry()
         }
 
+        fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
+            &self.analysis_settings
+        }
+
         fn verbose(&self) -> bool {
             false
+        }
+    }
+
+    #[salsa::db]
+    impl ModuleResolverDb for TestDb {
+        fn search_paths(&self) -> &SearchPaths {
+            Program::get(self).search_paths(self)
         }
     }
 

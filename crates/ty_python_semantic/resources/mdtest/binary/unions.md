@@ -18,7 +18,7 @@ cannot be added, because that would require addition of `int` and `str` or vice 
 def f2(i: int, s: str, int_or_str: int | str):
     i + i
     s + s
-    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `int | str` and `int | str`"
+    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `int | str`"
     reveal_type(int_or_str + int_or_str)  # revealed: Unknown
 ```
 

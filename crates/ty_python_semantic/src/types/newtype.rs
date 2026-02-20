@@ -3,9 +3,7 @@ use std::collections::BTreeSet;
 use crate::Db;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::ConstraintSet;
-use crate::types::{
-    ClassType, KnownClass, KnownUnion, Type, UnionType, definition_expression_type, visitor,
-};
+use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 
@@ -236,21 +234,8 @@ impl<'db> NewTypeBase<'db> {
         match self {
             NewTypeBase::ClassType(class_type) => Type::instance(db, class_type),
             NewTypeBase::NewType(newtype) => Type::NewTypeInstance(newtype),
-            NewTypeBase::Float => UnionType::from_elements(
-                db,
-                [
-                    KnownClass::Int.to_instance(db),
-                    KnownClass::Float.to_instance(db),
-                ],
-            ),
-            NewTypeBase::Complex => UnionType::from_elements(
-                db,
-                [
-                    KnownClass::Int.to_instance(db),
-                    KnownClass::Float.to_instance(db),
-                    KnownClass::Complex.to_instance(db),
-                ],
-            ),
+            NewTypeBase::Float => KnownUnion::Float.to_type(db),
+            NewTypeBase::Complex => KnownUnion::Complex.to_type(db),
         }
     }
 }

@@ -35,6 +35,11 @@ use crate::checkers::ast::Checker;
 ///         pass
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+///
 /// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.6.0")]

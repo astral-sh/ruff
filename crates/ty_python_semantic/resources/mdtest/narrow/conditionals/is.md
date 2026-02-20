@@ -138,3 +138,104 @@ if (x := f()) is None:
 else:
     reveal_type(x)  # revealed: Literal[1, 2]
 ```
+
+## `is` with two narrowable operands
+
+Both operands should be narrowed when both are narrowable expressions.
+
+```py
+from typing import Literal
+
+def _(t: Literal[True], tn: Literal[True] | None):
+    if tn is t:
+        reveal_type(tn)  # revealed: Literal[True]
+    if t is tn:
+        reveal_type(tn)  # revealed: Literal[True]
+```
+
+Both operands should also be narrowed in chained comparisons:
+
+```py
+from typing import Literal
+
+def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
+    if a is b is c:
+        reveal_type(b)  # revealed: Literal[1]
+        reveal_type(c)  # revealed: Literal[1]
+```
+
+## `is` where the other operand is a call expression
+
+```py
+from typing import Literal, final
+
+def foo() -> Literal[42]:
+    return 42
+
+def f(x: object):
+    if x is foo():
+        reveal_type(x)  # revealed: Literal[42]
+    else:
+        reveal_type(x)  # revealed: object
+
+    if x is not foo():
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: Literal[42]
+
+    if foo() is x:
+        reveal_type(x)  # revealed: Literal[42]
+    else:
+        reveal_type(x)  # revealed: object
+
+    if foo() is not x:
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: Literal[42]
+
+def bar() -> int:
+    return 42
+
+def g(x: object):
+    if x is bar():
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: object
+
+    if x is not bar():
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: int
+
+@final
+class FinalClass: ...
+
+def baz() -> FinalClass:
+    return FinalClass()
+
+def h(x: object):
+    if x is baz():
+        reveal_type(x)  # revealed: FinalClass
+    else:
+        reveal_type(x)  # revealed: object
+
+    if x is not baz():
+        reveal_type(x)  # revealed: object
+    else:
+        reveal_type(x)  # revealed: FinalClass
+
+def spam() -> None:
+    return None
+
+def h(x: object):
+    if x is spam():
+        reveal_type(x)  # revealed: None
+    else:
+        # `else` narrowing can occur because `spam()` returns a singleton type
+        reveal_type(x)  # revealed: ~None
+
+    if x is not spam():
+        reveal_type(x)  # revealed: ~None
+    else:
+        reveal_type(x)  # revealed: None
+```

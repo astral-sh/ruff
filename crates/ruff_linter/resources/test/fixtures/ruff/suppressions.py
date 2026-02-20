@@ -41,8 +41,8 @@ def f():
 
 
 def f():
-    # Neither of these are ignored and warnings are
-    # logged to user
+    # Neither of these are ignored and warnings are logged to user.
+    # An usued suppression diagnostic should also be logged.
     # ruff: disable[E501]
     I = 1
     # ruff: enable[E501]
@@ -57,7 +57,7 @@ def f():
 
 
 def f():
-    # TODO: Duplicate codes should be counted as duplicate, not unused
+    # Duplicate codes that are actually used.
     # ruff: disable[F841, F841]
     foo = 0
 
@@ -86,3 +86,33 @@ def f():
     # Multiple codes but none are used
     # ruff: disable[E741, F401, F841]
     print("hello")
+
+
+def f():
+    # Unknown rule codes
+    # ruff: disable[YF829]
+    # ruff: disable[F841, RQW320]
+    value = 0
+    # ruff: enable[F841, RQW320]
+    # ruff: enable[YF829]
+
+
+def f():
+    # External rule codes should be ignored
+    # ruff: disable[TK421]
+    print("hello")
+    # ruff: enable[TK421]
+
+
+def f():
+    # Empty or missing rule codes
+    # ruff: disable
+    # ruff: disable[]
+    print("hello")
+
+
+# Ensure LAST suppression in file is reported.
+# https://github.com/astral-sh/ruff/issues/23235
+# ruff:disable[F401]
+print("goodbye")
+# ruff:enable[F401]

@@ -24,11 +24,11 @@ reveal_type(+Sub())  # revealed: bool
 reveal_type(-Sub())  # revealed: str
 reveal_type(~Sub())  # revealed: int
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `No`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `No`"
 reveal_type(+No())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `No`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `No`"
 reveal_type(-No())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `No`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `No`"
 reveal_type(~No())  # revealed: Unknown
 ```
 
@@ -52,25 +52,25 @@ class Yes:
 class Sub(Yes): ...
 class No: ...
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `<class 'Yes'>`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'Yes'>`"
 reveal_type(+Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `<class 'Yes'>`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `<class 'Yes'>`"
 reveal_type(-Yes)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `<class 'Yes'>`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'Yes'>`"
 reveal_type(~Yes)  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `<class 'Sub'>`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'Sub'>`"
 reveal_type(+Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `<class 'Sub'>`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `<class 'Sub'>`"
 reveal_type(-Sub)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `<class 'Sub'>`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'Sub'>`"
 reveal_type(~Sub)  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'No'>`"
 reveal_type(+No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `<class 'No'>`"
 reveal_type(-No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'No'>`"
 reveal_type(~No)  # revealed: Unknown
 ```
 
@@ -80,11 +80,11 @@ reveal_type(~No)  # revealed: Unknown
 def f():
     pass
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `def f() -> Unknown`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `def f() -> Unknown`"
 reveal_type(+f)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `def f() -> Unknown`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `def f() -> Unknown`"
 reveal_type(-f)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `def f() -> Unknown`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `def f() -> Unknown`"
 reveal_type(~f)  # revealed: Unknown
 ```
 
@@ -113,25 +113,25 @@ def sub() -> type[Sub]:
 def no() -> type[No]:
     return No
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `type[Yes]`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `type[Yes]`"
 reveal_type(+yes())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `type[Yes]`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `type[Yes]`"
 reveal_type(-yes())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `type[Yes]`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `type[Yes]`"
 reveal_type(~yes())  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `type[Sub]`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `type[Sub]`"
 reveal_type(+sub())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `type[Sub]`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `type[Sub]`"
 reveal_type(-sub())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `type[Sub]`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `type[Sub]`"
 reveal_type(~sub())  # revealed: Unknown
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `type[No]`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `type[No]`"
 reveal_type(+no())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `type[No]`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `type[No]`"
 reveal_type(-no())  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `type[No]`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `type[No]`"
 reveal_type(~no())  # revealed: Unknown
 ```
 
@@ -160,10 +160,10 @@ reveal_type(+Sub)  # revealed: bool
 reveal_type(-Sub)  # revealed: str
 reveal_type(~Sub)  # revealed: int
 
-# error: [unsupported-operator] "Unary operator `+` is not supported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `+` is not supported for object of type `<class 'No'>`"
 reveal_type(+No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `-` is not supported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `-` is not supported for object of type `<class 'No'>`"
 reveal_type(-No)  # revealed: Unknown
-# error: [unsupported-operator] "Unary operator `~` is not supported for type `<class 'No'>`"
+# error: [unsupported-operator] "Unary operator `~` is not supported for object of type `<class 'No'>`"
 reveal_type(~No)  # revealed: Unknown
 ```

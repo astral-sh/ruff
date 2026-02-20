@@ -42,7 +42,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -72,7 +72,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -82,15 +82,15 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | -------
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
-        ");
+        "#);
     }
 
     // this is a slightly different case to the one above,
@@ -137,7 +137,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -147,16 +147,15 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:781:1
-            |
-        779 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
-        780 |
-        781 | Generic: type[_Generic]
-            | -------
-        782 |
-        783 | class _ProtocolMeta(ABCMeta):
-            |
-        ");
+            --> stdlib/typing.pyi:1268:1
+             |
+        1266 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+        1267 |
+        1268 | Generic: type[_Generic]
+             | -------
+        1269 | """Abstract base class for generic types.
+             |
+        "#);
     }
 
     #[test]
@@ -169,7 +168,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -179,13 +178,13 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:21:1
+          --> stdlib/ty_extensions.pyi:15:1
            |
-        19 | # Types
-        20 | Unknown = object()
-        21 | AlwaysTruthy = object()
+        13 | # Types
+        14 | Unknown = object()
+        15 | AlwaysTruthy = object()
            | ------------
-        22 | AlwaysFalsy = object()
+        16 | AlwaysFalsy = object()
            |
         ");
     }
@@ -202,7 +201,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:6:1
           |
@@ -240,7 +239,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
           --> main.py:12:1
            |
@@ -273,7 +272,7 @@ mod tests {
 
         test.write_file("lib.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:8
           |
@@ -300,7 +299,7 @@ mod tests {
         test.write_file("lib/__init__.py", "b = 7").unwrap();
         test.write_file("lib/submod.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:8
           |
@@ -327,7 +326,7 @@ mod tests {
         test.write_file("lib/__init__.py", "b = 7").unwrap();
         test.write_file("lib/submod.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:12
           |
@@ -353,7 +352,7 @@ mod tests {
 
         test.write_file("lib.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:6
           |
@@ -380,7 +379,7 @@ mod tests {
         test.write_file("lib/__init__.py", "b = 7").unwrap();
         test.write_file("lib/submod.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:6
           |
@@ -407,7 +406,7 @@ mod tests {
         test.write_file("lib/__init__.py", "b = 7").unwrap();
         test.write_file("lib/submod.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:10
           |
@@ -443,7 +442,7 @@ mod tests {
         test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
             .unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> lib/sub/__init__.py:2:11
           |
@@ -480,7 +479,7 @@ mod tests {
         test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
             .unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> lib/sub/__init__.py:2:7
           |
@@ -517,7 +516,7 @@ mod tests {
         test.write_file("lib/sub/bot/botmod.py", "botmod = 31")
             .unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> lib/sub/__init__.py:2:7
           |
@@ -569,7 +568,7 @@ mod tests {
 
         test.write_file("lib.py", "a = 10").unwrap();
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -652,7 +651,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:34
           |
@@ -676,7 +675,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:41
           |
@@ -765,7 +764,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -797,13 +814,13 @@ mod tests {
             |       -------
           5 |     """some docs"""
             |
-           ::: stdlib/types.pyi:950:11
+           ::: stdlib/types.pyi:969:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        951 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -819,7 +836,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -851,13 +886,13 @@ mod tests {
             |       -------
           5 |     """some docs"""
             |
-           ::: stdlib/types.pyi:950:11
+           ::: stdlib/types.pyi:969:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        951 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -883,13 +918,13 @@ mod tests {
         4 | class MyClass:
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | -------
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         "#);
     }
@@ -905,7 +940,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | a: "MyClass | No" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
     }
 
     #[test]
@@ -919,7 +972,25 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:15
+          |
+        2 | a: "MyClass | No" = 1
+          |               ^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | -------
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
+        "#);
     }
 
     #[test]
@@ -938,13 +1009,13 @@ mod tests {
           |      ^^ Clicking here
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | -------
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         "#);
     }
@@ -965,14 +1036,238 @@ mod tests {
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | -------
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested1() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class | int'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass | int'] | None"
+          |           ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass | int'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested2() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:17
+          |
+        2 | x: "list['int | MyClass'] | None"
+          |                 ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['int | MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested3() {
+        let test = cursor_test(
+            r#"
+        x: "list['int | None'] | My<CURSOR>Class"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:26
+          |
+        2 | x: "list['int | None'] | MyClass"
+          |                          ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['int | None'] | MyClass"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested4() {
+        let test = cursor_test(
+            r#"
+        x: "list['int' | 'My<CURSOR>Class'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:19
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+          |                   ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['int' | 'MyClass'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_nested5() {
+        let test = cursor_test(
+            r#"
+        x: "list['My<CURSOR>Class' | 'str'] | None"
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:11
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+          |           ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: "list['MyClass' | 'str'] | None"
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_too_nested1() {
+        let test = cursor_test(
+            r#"
+        x: """'list["My<CURSOR>Class" | "str"]' | None"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:13
+          |
+        2 | x: """'list["MyClass" | "str"]' | None"""
+          |             ^^^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | -------
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_too_nested2() {
+        let test = cursor_test(
+            r#"
+        x: """'list["int" | "str"]' | My<CURSOR>Class"""
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type definition]: Go to type definition
+         --> main.py:2:31
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+          |                               ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 type definition
+         --> main.py:4:7
+          |
+        2 | x: """'list["int" | "str"]' | MyClass"""
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
         "#);
     }
 
@@ -1166,7 +1461,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:13
           |
@@ -1190,7 +1485,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:2:37
           |
@@ -1339,13 +1634,13 @@ f(**kwargs<CURSOR>)
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/builtins.pyi:2920:7
+            --> stdlib/builtins.pyi:2947:7
              |
-        2919 | @disjoint_base
-        2920 | class dict(MutableMapping[_KT, _VT]):
+        2946 | @disjoint_base
+        2947 | class dict(MutableMapping[_KT, _VT]):
              |       ----
-        2921 |     """dict() -> new empty dictionary
-        2922 |     dict(mapping) -> new dictionary initialized from a mapping object's
+        2948 |     """dict() -> new empty dictionary
+        2949 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         "#);
     }
@@ -1504,7 +1799,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:7:1
           |
@@ -1533,7 +1828,7 @@ def function():
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -1610,13 +1905,13 @@ def function():
         916 |     """str(object='') -> str
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
-           ::: stdlib/types.pyi:950:11
+           ::: stdlib/types.pyi:969:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        967 | if sys.version_info >= (3, 10):
+        968 |     @final
+        969 |     class NoneType:
             |           --------
-        951 |         """The type of the None singleton."""
+        970 |         """The type of the None singleton."""
             |
         "#);
     }
@@ -1642,7 +1937,7 @@ def function():
             .build();
 
         // The module is the correct type definition
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:4:5
           |
@@ -1679,7 +1974,7 @@ def function():
             .build();
 
         // The module is the correct type definition
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:2:7
           |
@@ -1716,7 +2011,7 @@ def function():
             .build();
 
         // Unknown is correct, `submod` is not in scope
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:4:5
           |
@@ -1726,13 +2021,13 @@ def function():
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | -------
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         ");
     }
@@ -1758,7 +2053,7 @@ def function():
             .build();
 
         // The module is correct
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:2:14
           |
@@ -1797,7 +2092,7 @@ def function():
             .build();
 
         // The module is correct
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @"
         info[goto-type definition]: Go to type definition
          --> mypackage/__init__.py:2:7
           |

@@ -131,7 +131,7 @@ reveal_type(os.stat("my_file.txt"))  # revealed: stat_result
 reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
 reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: int | float
 
-# revealed: (<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[int | float]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(os.stat_result)
 
 # There are no specific overloads for the `float` elements in `os.stat_result`,
@@ -351,12 +351,12 @@ from ty_extensions import reveal_mro
 
 class A(tuple[int, str]): ...
 
-# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 
 class C(tuple): ...
 
-# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(C)
 ```
 
@@ -393,12 +393,12 @@ from ty_extensions import reveal_mro
 
 class A(Tuple[int, str]): ...
 
-# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 
 class C(Tuple): ...
 
-# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(C)
 ```
 
@@ -416,7 +416,7 @@ def test2(val: tuple[str, None] | list[int | float]):
 
 ```py
 def test3(val: tuple[str] | tuple[int] | int):
-    # error: [non-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
+    # error: [not-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
     reveal_type(val[0])  # revealed: str | int | Unknown
 ```
 
@@ -429,6 +429,36 @@ class Foo: ...
 class Bar: ...
 
 def test4(val: Intersection[tuple[Foo], tuple[Bar]]):
-    # TODO: should be `Foo & Bar`
-    reveal_type(val[0])  # revealed: @Todo(Subscript expressions on intersections)
+    reveal_type(val[0])  # revealed: Foo & Bar
+```
+
+## Intersection slice access
+
+```py
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+def f(
+    x: tuple[A, B],
+    y: tuple[C, D],
+    z: Intersection[tuple[A, B], tuple[C, D]],
+):
+    reveal_type(x[1:])  # revealed: tuple[B]
+    reveal_type(y[1:])  # revealed: tuple[D]
+    reveal_type(z[1:])  # revealed: tuple[B] & tuple[D]
+```
+
+```py
+class A: ...
+class B: ...
+class C: ...
+
+def g(x: tuple[A, B]):
+    reveal_type(x[1:])  # revealed: tuple[B]
+    if isinstance(x, C):
+        reveal_type(x[1:])  # revealed: tuple[B]
 ```

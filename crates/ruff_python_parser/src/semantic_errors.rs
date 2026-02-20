@@ -272,7 +272,9 @@ impl SemanticSyntaxChecker {
 
     fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+            Stmt::AnnAssign(ast::StmtAnnAssign {
+                target, annotation, ..
+            }) => {
                 if ctx.python_version() > PythonVersion::PY313 {
                     // test_ok valid_annotation_py313
                     // # parse_options: {"target-version": "3.13"}
@@ -296,6 +298,18 @@ impl SemanticSyntaxChecker {
                         ctx,
                     };
                     visitor.visit_expr(annotation);
+                }
+                if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                    if let Some(global_stmt) = ctx.global(id.as_str()) {
+                        let global_start = global_stmt.start();
+                        if !ctx.in_module_scope() || target.start() < global_start {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::AnnotatedGlobal(id.to_string()),
+                                target.range(),
+                            );
+                        }
+                    }
                 }
             }
             Stmt::FunctionDef(ast::StmtFunctionDef {

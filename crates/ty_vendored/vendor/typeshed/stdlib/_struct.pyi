@@ -13,9 +13,9 @@ The optional first format char indicates byte order, size and alignment:
 The remaining chars indicate types of args and must match exactly;
 these can be preceded by a decimal repeat count:
   x: pad byte (no data); c:char; b:signed byte; B:unsigned byte;
-  ?: _Bool (requires C99; if not available, char is used instead)
-  h:short; H:unsigned short; i:int; I:unsigned int;
+  ?:_Bool; h:short; H:unsigned short; i:int; I:unsigned int;
   l:long; L:unsigned long; f:float; d:double; e:half-float.
+  F:float complex; D:double complex.
 Special cases (preceding decimal count indicates length):
   s:string (array of char); p: pascal string (with count byte).
 Special cases (only available in native format):

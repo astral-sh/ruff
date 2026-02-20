@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fmt;
 use std::fmt::{Display, Formatter};
 
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -60,6 +60,7 @@ pub struct Settings {
     pub constants: FxHashSet<String>,
     pub variables: FxHashSet<String>,
     pub no_lines_before: FxHashSet<ImportSection>,
+    pub import_headings: FxHashMap<ImportSection, String>,
     pub lines_after_imports: isize,
     pub lines_between_types: usize,
     pub forced_separate: Vec<String>,
@@ -114,6 +115,7 @@ impl Default for Settings {
             constants: FxHashSet::default(),
             variables: FxHashSet::default(),
             no_lines_before: FxHashSet::default(),
+            import_headings: FxHashMap::default(),
             lines_after_imports: -1,
             lines_between_types: 0,
             forced_separate: Vec::new(),
@@ -150,6 +152,7 @@ impl Display for Settings {
                 self.constants | set,
                 self.variables | set,
                 self.no_lines_before | set,
+                self.import_headings | map,
                 self.lines_after_imports,
                 self.lines_between_types,
                 self.forced_separate | array,

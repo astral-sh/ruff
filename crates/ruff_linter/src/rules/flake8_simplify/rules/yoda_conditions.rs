@@ -146,7 +146,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
         let left = (*comparison.left).clone();
 
         // Copy the right side to the left side.
-        comparison.left = Box::new(comparison.comparisons[0].comparator.clone());
+        *comparison.left = comparison.comparisons[0].comparator.clone();
 
         // Copy the left side to the right side.
         comparison.comparisons[0].comparator = left;

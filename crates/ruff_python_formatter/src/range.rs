@@ -15,7 +15,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::comments::Comments;
 use crate::context::{IndentLevel, NodeLevel};
 use crate::prelude::*;
-use crate::statement::suite::DocstringStmt;
+use crate::statement::suite::{DocstringStmt, skip_range};
 use crate::verbatim::{ends_suppression, starts_suppression};
 use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 
@@ -251,7 +251,29 @@ impl<'ast> SourceOrderVisitor<'ast> for FindEnclosingNode<'_, 'ast> {
         // We only visit statements that aren't suppressed that's why we don't need to track the suppression
         // state in a stack. Assert that this assumption is safe.
         debug_assert!(self.suppressed.is_no());
-        walk_body(self, body);
+
+        let mut iter = body.iter();
+
+        while let Some(stmt) = iter.next() {
+            // If the range intersects a skip range then we need to
+            // format the entire suite to properly handle the case
+            // where a `fmt: skip` affects multiple statements.
+            //
+            // For example, in the case
+            //
+            // ```
+            // <RANGE_START>x=1<RANGE_END>;x=2 # fmt: skip
+            // ```
+            //
+            // the statement `x=1` does not "know" that it is
+            // suppressed, but the suite does.
+            if let Some(verbatim_range) = skip_range(stmt, iter.as_slice(), self.context)
+                && verbatim_range.intersect(self.range).is_some()
+            {
+                break;
+            }
+            self.visit_stmt(stmt);
+        }
         self.suppressed = Suppressed::No;
     }
 }
@@ -561,7 +583,7 @@ impl NarrowRange<'_> {
 }
 
 pub(crate) const fn is_logical_line(node: AnyNodeRef) -> bool {
-    // Make sure to update [`FormatEnclosingLine`] when changing this.
+    // Make sure to update [`FormatEnclosingNode`] when changing this.
     node.is_statement()
         || node.is_decorator()
         || node.is_except_handler()

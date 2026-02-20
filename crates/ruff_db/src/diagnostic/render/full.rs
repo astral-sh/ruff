@@ -53,6 +53,10 @@ impl<'a> FullRenderer<'a> {
             .hyperlink(stylesheet.hyperlink);
 
         for diag in diagnostics {
+            if self.config.is_canceled() {
+                return Ok(());
+            }
+
             let resolved = Resolved::new(self.resolver, diag, self.config);
             let renderable = resolved.to_renderable(self.config.context);
             for diag in renderable.diagnostics.iter() {

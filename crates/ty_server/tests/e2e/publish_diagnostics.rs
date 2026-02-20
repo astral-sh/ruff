@@ -2,10 +2,11 @@ use std::time::Duration;
 
 use anyhow::Result;
 use lsp_types::{
-    DidOpenTextDocumentParams, FileChangeType, FileEvent, TextDocumentItem,
+    DidOpenTextDocumentParams, FileChangeType, FileEvent, TextDocumentItem, Url,
     notification::{DidOpenTextDocument, PublishDiagnostics},
 };
 use ruff_db::system::SystemPath;
+use ty_server::ClientOptions;
 
 use crate::TestServerBuilder;
 
@@ -29,6 +30,226 @@ def foo() -> str:
     let diagnostics = server.await_notification::<PublishDiagnostics>();
 
     insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+/// Tests that we get diagnostics for a file that is NOT saved to
+/// disk when using `OpenFilesOnly` diagnostic mode.
+#[test]
+fn on_did_open_non_existing_file_open_files_only() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(
+                ClientOptions::default()
+                    .with_diagnostic_mode(ty_server::DiagnosticMode::OpenFilesOnly),
+            ),
+        )?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+/// Tests that we get diagnostics for a file that is NOT saved to disk when
+/// using `Workspace` diagnostic mode.
+///
+/// Basically, ty currently doesn't know whether a `file://...` path refers
+/// to a file that doesn't exist or not. To work around that, we always check
+/// the open file set for whether we should "check" a file or not.
+#[test]
+fn on_did_open_non_existing_file_workspace_with_file_uri() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(
+                ClientOptions::default().with_diagnostic_mode(ty_server::DiagnosticMode::Workspace),
+            ),
+        )?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+/// Like `on_did_open_non_existing_file_workspace_with_file_uri`, but uses
+/// a `untitled://...` URL instead of `file://...`.
+///
+/// Notably, this makes diagnostics for opened files that aren't saved to
+/// disk yet work without needing to check the open file set explicitly. It's
+/// because ty follows the LSP protocol convention that URIs to files that
+/// _don't_ use the `file` scheme refer to documents that aren't saved to disk
+/// yet. So ty correctly detects this as a virtual file and returns diagnostics
+/// for it.
+///
+/// Ref: <https://github.com/astral-sh/ruff/issues/15392>
+/// Ref: <https://github.com/neovim/neovim/issues/21276>
+/// Ref: <https://github.com/microsoft/language-server-protocol/issues/1030>
+#[test]
+fn on_did_open_non_existing_file_workspace_with_untitled_uri() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(
+                ClientOptions::default().with_diagnostic_mode(ty_server::DiagnosticMode::Workspace),
+            ),
+        )?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.send_notification::<DidOpenTextDocument>(DidOpenTextDocumentParams {
+        text_document: TextDocumentItem {
+            uri: {
+                let uri = server.file_uri(foo);
+                Url::parse(&format!("untitled://{}", uri.path())).unwrap()
+            },
+            language_id: "python".to_string(),
+            version: 1,
+            text: foo_content.to_string(),
+        },
+    });
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_open_diagnostics_off() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(ty_server::DiagnosticMode::Off)),
+        )?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics =
+        server.try_await_notification::<PublishDiagnostics>(Some(Duration::from_millis(100)));
+
+    assert!(
+        diagnostics.is_err(),
+        "Server should not send a publish diagnostics notification when diagnostics are off"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    let changes = vec![lsp_types::TextDocumentContentChangeEvent {
+        range: None,
+        range_length: None,
+        text: "def foo() -> int: return 42".to_string(),
+    }];
+
+    server.change_text_document(foo, changes, 2);
+
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+
+    assert_eq!(diagnostics.version, Some(2));
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change_diagnostics_off() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(ty_server::DiagnosticMode::Off)),
+        )?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let changes = vec![lsp_types::TextDocumentContentChangeEvent {
+        range: None,
+        range_length: None,
+        text: "def foo() -> int: return 42".to_string(),
+    }];
+
+    server.change_text_document(foo, changes, 2);
+
+    let diagnostics =
+        server.try_await_notification::<PublishDiagnostics>(Some(Duration::from_millis(100)));
+
+    assert!(
+        diagnostics.is_err(),
+        "Server should not send a publish diagnostics notification when diagnostics are off"
+    );
 
     Ok(())
 }
@@ -218,7 +439,32 @@ def foo() -> str:
         },
     };
     server.send_notification::<DidOpenTextDocument>(params);
-    let _close_diagnostics = server.await_notification::<PublishDiagnostics>();
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn invalid_syntax_with_syntax_errors_disabled() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo(
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_show_syntax_errors(false)),
+        )?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
 
     let diagnostics = server.await_notification::<PublishDiagnostics>();
 

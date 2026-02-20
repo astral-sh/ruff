@@ -188,7 +188,7 @@ IndexError: list index out of range
 ```
 
 ```console
-$ python -c 'next(iter(range(0)))[0]'
+$ python -c 'next(iter(range(0)))'
 Traceback (most recent call last):
   File "<string>", line 1, in <module>
 StopIteration
@@ -343,8 +343,6 @@ The full inline comment specification is as follows:
 
 #### Block-level
 
-*Range suppressions are currently only available in [preview mode](preview.md#preview).*
-
 To ignore one or more violations within a range or block of code, a "disable" comment
 followed by a matching "enable" comment can be used, like so:
 
@@ -384,6 +382,9 @@ foo()
 
 It is strongly suggested to use explicit range suppressions, in order to prevent
 accidental suppressions of violations, especially at global module scope.
+For this reason, a `RUF104` diagnostic will also be produced for any implicit range.
+If implicit range suppressions are desired, the `RUF104` rule can be disabled,
+or an inline `noqa` suppression can be added to the end of the "disable" comment.
 
 Range suppressions cannot be used to enable or select rules that aren't already
 selected by the project configuration or runtime flags. An "enable" comment can only
@@ -397,7 +398,7 @@ The full range suppression comment specification is as follows:
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
   after the `#` symbol and `:` symbol, followed by either `disable` or `enable`
   to start or end a range respectively, immediately followed by `[`, any codes to
-  be suppressed, and ending with `]`. 
+  be suppressed, and ending with `]`.
 - Codes to be suppressed must be separated by commas, with optional whitespace
   before or after each code, and may be followed by an optional trailing comma
   after the last code.

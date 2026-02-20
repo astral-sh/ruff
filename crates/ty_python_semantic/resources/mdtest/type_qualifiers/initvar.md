@@ -67,7 +67,7 @@ class Person:
 
     metadata: InitVar[str] = "default"
 
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = Literal["default"]) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = "default") -> None
 
 alice = Person("Alice", 30)
 bob = Person("Bob", 25, "custom metadata")

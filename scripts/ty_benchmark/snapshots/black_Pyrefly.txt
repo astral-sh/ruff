@@ -29,7 +29,6 @@ ERROR src/black/trans.py:544:10-23: `type[Err[CannotTransform] | Ok[TypeVar[T]]]
 ERROR src/black/trans.py:752:55-68: `type[Err[CannotTransform] | Ok[TypeVar[T]]]` is not subscriptable [unsupported-operation]
 ERROR src/black/trans.py:985:19-32: `type[Err[CannotTransform] | Ok[TypeVar[T]]]` is not subscriptable [unsupported-operation]
 ERROR src/black/trans.py:1111:57-70: `type[Err[CannotTransform] | Ok[TypeVar[T]]]` is not subscriptable [unsupported-operation]
-ERROR src/black/trans.py:1349:17-1350:27: `int` is not assignable to `int` (caused by inconsistent types when breaking cycles) [bad-assignment]
 ERROR src/black/trans.py:1480:19-32: `type[Err[CannotTransform] | Ok[TypeVar[T]]]` is not subscriptable [unsupported-operation]
 ERROR src/black/trans.py:1630:25-31: `csplit` may be uninitialized [unbound-name]
 ERROR src/black/trans.py:2162:19-32: `type[Err[CannotTransform] | Ok[TypeVar[T]]]` is not subscriptable [unsupported-operation]
@@ -43,4 +42,4 @@ ERROR src/blib2to3/pytree.py:670:24-34: `newcontent` may be uninitialized [unbou
 ERROR src/blib2to3/pytree.py:756:24-39: `wrapped_content` may be uninitialized [unbound-name]
 ERROR src/blib2to3/pytree.py:847:34-45: `save_stderr` may be uninitialized [unbound-name]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- INFO 44 errors (2 suppressed)
+ INFO 43 errors (2 suppressed)

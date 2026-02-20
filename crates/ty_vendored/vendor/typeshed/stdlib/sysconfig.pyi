@@ -97,7 +97,14 @@ def get_platform() -> str:
     For other non-POSIX platforms, currently just returns :data:`sys.platform`.
     """
 
-if sys.version_info >= (3, 11):
+if sys.version_info >= (3, 12):
+    @overload
+    def is_python_build() -> bool: ...
+    @overload
+    @deprecated("The `check_home` parameter is deprecated since Python 3.12; removed in Python 3.15.")
+    def is_python_build(check_home: object = None) -> bool: ...
+
+elif sys.version_info >= (3, 11):
     def is_python_build(check_home: object = None) -> bool: ...
 
 else:

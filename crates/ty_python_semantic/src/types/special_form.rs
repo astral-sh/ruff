@@ -3,12 +3,12 @@
 
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
-use crate::module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{FileScopeId, place_table, use_def_map};
 use crate::types::TypeDefinition;
 use ruff_db::files::File;
 use std::str::FromStr;
+use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.
@@ -328,6 +328,59 @@ impl SpecialFormType {
             | Self::Protocol
             | Self::Any
             | Self::Generic => false,
+        }
+    }
+
+    /// Return `true` if this special form type is valid in a type-expression context (and not
+    /// just in an *annotation* expression context). See the following section of the typing
+    /// specification for more details:
+    /// <https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions>
+    pub(super) const fn is_valid_in_type_expression(self) -> bool {
+        match self {
+            Self::ClassVar
+            | Self::Final
+            | Self::Required
+            | Self::NotRequired
+            | SpecialFormType::ReadOnly
+            | SpecialFormType::Unpack
+            | SpecialFormType::TypeAlias => false,
+            Self::Annotated
+            | SpecialFormType::Any
+            | SpecialFormType::Literal
+            | SpecialFormType::LiteralString
+            | SpecialFormType::Optional
+            | SpecialFormType::Union
+            | SpecialFormType::NoReturn
+            | SpecialFormType::Never
+            | SpecialFormType::Tuple
+            | SpecialFormType::List
+            | SpecialFormType::Dict
+            | SpecialFormType::Set
+            | SpecialFormType::FrozenSet
+            | SpecialFormType::ChainMap
+            | SpecialFormType::Counter
+            | SpecialFormType::DefaultDict
+            | SpecialFormType::Deque
+            | SpecialFormType::OrderedDict
+            | SpecialFormType::Type
+            | SpecialFormType::Unknown
+            | SpecialFormType::AlwaysTruthy
+            | SpecialFormType::AlwaysFalsy
+            | SpecialFormType::Not
+            | SpecialFormType::Intersection
+            | SpecialFormType::TypeOf
+            | SpecialFormType::CallableTypeOf
+            | SpecialFormType::Top
+            | SpecialFormType::Bottom
+            | SpecialFormType::Callable
+            | SpecialFormType::TypingSelf
+            | SpecialFormType::Concatenate
+            | SpecialFormType::TypeGuard
+            | SpecialFormType::TypedDict
+            | SpecialFormType::TypeIs
+            | SpecialFormType::Protocol
+            | SpecialFormType::Generic
+            | SpecialFormType::NamedTuple => true,
         }
     }
 
