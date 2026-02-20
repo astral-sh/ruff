@@ -63,6 +63,7 @@ file_resolver.include = [
 	"*.pyw",
 	"*.ipynb",
 	"**/pyproject.toml",
+	"*.md",
 ]
 file_resolver.extend_include = []
 file_resolver.respect_gitignore = true
