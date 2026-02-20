@@ -109,8 +109,8 @@ fn test_output_format_env() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
-    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined%0A  info: rule `unresolved-reference` was selected on the command line
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method%0A  info: rule `not-subscriptable` is enabled by default
     ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
     ----- stderr -----
@@ -794,8 +794,8 @@ fn github_diagnostics() -> anyhow::Result<()> {
     success: false
     exit_code: 1
     ----- stdout -----
-    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
-    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined%0A  info: rule `unresolved-reference` was selected on the command line
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method%0A  info: rule `not-subscriptable` is enabled by default
     ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
     ----- stderr -----
