@@ -5,7 +5,7 @@ use ruff_text_size::TextRange;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::rules::flake8_pytest_style::is_pytest_hookimpl_wrapper;
+use crate::rules::flake8_pytest_style::helpers::is_pytest_hookimpl_wrapper;
 
 /// ## What it does
 /// Checks for `return {value}` statements in functions that also contain `yield`

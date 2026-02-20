@@ -1,6 +1,6 @@
 use std::fmt;
 
-use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::helpers::{is_const_true, map_callable};
 use ruff_python_ast::{self as ast, Decorator, Expr, ExprCall, Keyword, Stmt, StmtFunctionDef};
 use ruff_python_semantic::analyze::visibility;
 use ruff_python_semantic::{ScopeKind, SemanticModel};
@@ -50,7 +50,8 @@ pub(super) fn is_pytest_parametrize(call: &ExprCall, semantic: &SemanticModel) -
         })
 }
 
-/// Returns `true` if the decorator is `@pytest.hookimpl(wrapper=True)` or `@hookimpl(wrapper=True)`.
+/// Returns `true` if the decorator is `@pytest.hookimpl(wrapper=True)` or
+/// `@pytest.hookimpl(hookwrapper=True)`.
 ///
 /// These hook wrappers intentionally use `return` in generator functions as part of the
 /// pytest hook wrapper protocol.
@@ -70,14 +71,10 @@ pub(crate) fn is_pytest_hookimpl_wrapper(decorator: &Decorator, semantic: &Seman
         return false;
     }
 
-    // Check for wrapper=True keyword argument
-    call.arguments.keywords.iter().any(|keyword| {
-        keyword.arg.as_ref().is_some_and(|arg| arg == "wrapper")
-            && matches!(
-                &keyword.value,
-                Expr::BooleanLiteral(ast::ExprBooleanLiteral { value: true, .. })
-            )
-    })
+    let wrapper = call.arguments.find_argument_value("wrapper", 6);
+    let hookwrapper = call.arguments.find_argument_value("hookwrapper", 1);
+
+    wrapper.or(hookwrapper).is_some_and(is_const_true)
 }
 
 /// Whether the currently checked `func` is likely to be a Pytest test.

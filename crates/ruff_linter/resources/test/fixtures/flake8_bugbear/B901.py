@@ -1,8 +1,7 @@
 """
 Should emit:
-B901 - on lines 9, 36, 56, 60, 72, 83, 88, 112, 119, 126
+B901 - on lines 9, 36
 """
-import pytest
 
 
 def broken():
@@ -89,6 +88,9 @@ async def broken7():
     return [1, 2, 3]
 
 
+import pytest
+
+
 @pytest.hookimpl(wrapper=True)
 def pytest_runtest_makereport():
     result = yield
@@ -99,6 +101,12 @@ def pytest_runtest_makereport():
 def pytest_fixture_setup():
     result = yield
     result.some_attr = "modified"
+    return result
+
+
+@pytest.hookimpl(hookwrapper=True)
+def pytest_runtest_call():
+    result = yield
     return result
 
 
