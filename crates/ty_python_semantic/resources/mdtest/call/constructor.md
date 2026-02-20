@@ -261,6 +261,174 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+Constructor typevars should stay independent from same-named typevars in the enclosing class:
+
+```py
+from typing import Generic, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+class Pair(Generic[K, V]):
+    def __init__(self, key: K, value: V) -> None:
+        self.key: K = key
+        self.value: V = value
+
+    def swap(self) -> "Pair[V, K]":
+        swapped_pair = Pair(self.value, self.key)
+        reveal_type(swapped_pair)  # revealed: Pair[V@Pair, K@Pair]
+        return swapped_pair
+
+pair = Pair("foo", 123)  # Pair[str, int]
+swapped = pair.swap()
+reveal_type(swapped)  # revealed: Pair[int, str]
+```
+
+Constructor inference should avoid "chasing" inferred typevar-to-typevar assignments in a way that
+leaks the inferred type for one type parameter into another.
+
+```py
+from typing import Generic, TypeVar
+
+K2 = TypeVar("K2")
+V2 = TypeVar("V2")
+
+class Pair2(Generic[K2, V2]):
+    def __init__(self, key: K2, value: V2) -> None:
+        self.key: K2 = key
+        self.value: V2 = value
+
+    def with_int_value(self) -> "Pair2[V2, int]":
+        pair = Pair2(self.value, 1)
+        reveal_type(pair)  # revealed: Pair2[V2@Pair2, int]
+        return pair
+
+pair = Pair2("foo", 123)
+reveal_type(pair.with_int_value())  # revealed: Pair2[int, int]
+```
+
+Constructor inference should not transitively chase typevars when doing so would conflate the
+enclosing instance's typevars with the constructed instance's typevars:
+
+```py
+from typing import Generic, TypeVar
+
+K4 = TypeVar("K4")
+V4 = TypeVar("V4")
+
+class Pair4(Generic[K4, V4]):
+    def __init__(self, key: K4, value: V4) -> None:
+        self.key: K4 = key
+        self.value: V4 = value
+
+    def rekey(self, key: V4) -> "Pair4[V4, int]":
+        pair = Pair4(key, 1)
+        reveal_type(pair)  # revealed: Pair4[V4@Pair4, int]
+        return pair
+
+pair = Pair4("foo", 123)
+rekeyed = pair.rekey(123)
+reveal_type(rekeyed)  # revealed: Pair4[int, int]
+```
+
+Constructor specializations should compose in nested calls:
+
+```py
+from typing import Generic, TypeVar
+
+K3 = TypeVar("K3")
+V3 = TypeVar("V3")
+
+class Pair3(Generic[K3, V3]):
+    def __init__(self, key: K3, value: V3) -> None:
+        self.key: K3 = key
+        self.value: V3 = value
+
+    def swap(self) -> "Pair3[V3, K3]":
+        return Pair3(self.value, self.key)
+
+    def swap_twice(self) -> "Pair3[K3, V3]":
+        swapped = self.swap()
+        swapped_twice = swapped.swap()
+        reveal_type(swapped_twice)  # revealed: Pair3[K3@Pair3, V3@Pair3]
+        return swapped_twice
+
+pair = Pair3("foo", 123)
+reveal_type(pair.swap_twice())  # revealed: Pair3[str, int]
+```
+
+A `Never` that comes from the constructor arguments themselves should remain `Never`:
+
+```py
+from typing import Generic, TypeVar
+from typing_extensions import Never
+
+T5 = TypeVar("T5")
+V5 = TypeVar("V5")
+
+def boom() -> Never:
+    raise RuntimeError
+
+class Pair5(Generic[T5, V5]):
+    def __init__(self, key: T5, value: V5) -> None:
+        self.key: T5 = key
+        self.value: V5 = value
+
+    def with_never_key(self, value: V5) -> "Pair5[Never, V5]":
+        pair = Pair5(boom(), value)
+        return pair
+
+pair = Pair5("foo", 123)
+reveal_type(pair.with_never_key(123))  # revealed: Pair5[Never, int]
+```
+
+## Constructor specialization in builtins constructors
+
+```py
+from typing import Mapping
+
+mapping: Mapping[str, str] = {"PATH": "a:b", "HOME": "/tmp"}
+words: list[str] = ["A", "B"]
+string_dict: dict[str, str] = {"k": "v"}
+
+constructed_dict = dict(mapping)
+reveal_type(constructed_dict)  # revealed: dict[str, str]
+
+constructed_items = dict(string_dict).items()
+reveal_type(constructed_items)  # revealed: dict_items[str, str]
+
+lower_list = list(map(str.lower, words))
+reveal_type(lower_list)  # revealed: list[str]
+
+lower_iter = map(str.lower, words)
+reveal_type(lower_iter)  # revealed: map[str]
+
+joined = " ".join(map(str.lower, words))
+reveal_type(joined)  # revealed: str
+
+split_head = dict(mapping)["PATH"].split(":")[0]
+reveal_type(split_head)  # revealed: str
+
+import os
+import pathlib
+import re
+
+def tuple_from_mapped_paths(xs: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(map(os.path.abspath, xs))
+
+def filtered_resolved_paths(path: pathlib.Path) -> set[pathlib.Path]:
+    return set(filter(pathlib.Path.is_file, map(pathlib.Path.resolve, path.glob("*.py"))))
+
+CHAR = "abc"
+
+def unescape(text: str, *, chars: str = "".join(map(re.escape, CHAR))) -> str:
+    return re.sub(f"\\\\([{chars}])", "\\1", text)
+
+reveal_type(tuple_from_mapped_paths(("a", "b")))  # revealed: tuple[str, ...]
+reveal_type(filtered_resolved_paths(pathlib.Path(".")))  # revealed: set[Path]
+reveal_type(unescape("a"))  # revealed: str
+```
+
 ## Constructor calls through `type[T]` with a bound TypeVar
 
 ```py
