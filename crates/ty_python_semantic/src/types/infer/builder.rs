@@ -6669,6 +6669,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.validate_subscript_assignment(subscript_expr, value, infer_assigned_ty);
                 }
             }
+            ast::Expr::Starred(ast::ExprStarred {
+                value: starred_value,
+                ..
+            }) => {
+                self.infer_target_impl(starred_value, value, infer_assigned_ty);
+            }
 
             // TODO: Remove this once we handle all possible assignment targets.
             _ => {

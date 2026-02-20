@@ -1269,6 +1269,73 @@ mod tests {
     }
 
     #[test]
+    fn test_starred_unpacked_tuple_assignment() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(x: tuple[int, ...]):
+                (a, *b) = x
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def foo(x: tuple[int, ...]):
+            (a[: int], *b[: list[int]]) = x
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:10
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |          ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:3:21
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |                     ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:26
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |                          ^^^
+          |
+        "#);
+    }
+
+    #[test]
     fn test_leading_underscore_variable_assignment_has_no_type_inlay_hint() {
         let mut test = inlay_hint_test(
             "
