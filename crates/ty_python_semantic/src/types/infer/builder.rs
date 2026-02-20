@@ -6603,6 +6603,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         value: &ast::Expr,
         infer_assigned_ty: Option<&dyn Fn(&mut Self, TypeContext<'db>) -> Type<'db>>,
     ) {
+        /// Unwrap a starred expression to its inner value, so that the inner
+        /// target is processed through `infer_definition` rather than
+        /// `infer_expression` (which would incorrectly assign `Never` for
+        /// a name in `Store` context).
+        fn unwrap_starred(expr: &ast::Expr) -> &ast::Expr {
+            match expr {
+                ast::Expr::Starred(ast::ExprStarred { value, .. }) => value,
+                _ => expr,
+            }
+        }
+
         match target {
             ast::Expr::Name(name) => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
@@ -6621,6 +6632,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let assigned_tys = tuple_spec.all_elements().to_vec();
 
                     for (i, element) in elts.iter().enumerate() {
+                        let element = unwrap_starred(element);
                         match assigned_tys.get(i).copied() {
                             None => self.infer_target_impl(element, value, None),
                             Some(ty) => self.infer_target_impl(element, value, Some(&|_, _| ty)),
@@ -6628,7 +6640,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 } else {
                     for element in elts {
-                        self.infer_target_impl(element, value, None);
+                        self.infer_target_impl(unwrap_starred(element), value, None);
                     }
                 }
             }
@@ -6669,13 +6681,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.validate_subscript_assignment(subscript_expr, value, infer_assigned_ty);
                 }
             }
-            ast::Expr::Starred(ast::ExprStarred {
-                value: starred_value,
-                ..
-            }) => {
-                self.infer_target_impl(starred_value, value, infer_assigned_ty);
-            }
-
             // TODO: Remove this once we handle all possible assignment targets.
             _ => {
                 if let Some(infer_assigned_ty) = infer_assigned_ty {
