@@ -700,9 +700,11 @@ impl FormatString {
         })
     }
 
-    pub fn parse(text: &str, is_raw: bool) -> Result<Self, FormatParseError> {
+    fn parse(text: &str, is_raw: bool) -> Result<Self, FormatParseError> {
         let mut cur_text: &str = text;
         let mut parts: Vec<FormatPart> = Vec::new();
+        // Try to parse both literals and bracketed format parts until we
+        // run out of text
         while !cur_text.is_empty() {
             cur_text = FormatString::parse_literal(cur_text, is_raw)
                 .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
@@ -720,6 +722,7 @@ impl FormatString {
 pub trait FromTemplate<'a>: Sized {
     type Err;
     fn from_str(s: &'a str) -> Result<Self, Self::Err>;
+    fn from_raw_str(s: &'a str) -> Result<Self, Self::Err>;
 }
 
 impl<'a> FromTemplate<'a> for FormatString {
@@ -727,6 +730,10 @@ impl<'a> FromTemplate<'a> for FormatString {
 
     fn from_str(text: &'a str) -> Result<Self, Self::Err> {
         FormatString::parse(text, false)
+    }
+
+    fn from_raw_str(text: &'a str) -> Result<Self, Self::Err> {
+        FormatString::parse(text, true)
     }
 }
 

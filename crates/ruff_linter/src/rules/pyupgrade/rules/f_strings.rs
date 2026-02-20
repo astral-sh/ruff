@@ -8,7 +8,9 @@ use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
-use ruff_python_literal::format::{FieldName, FieldNamePart, FieldType, FormatPart, FormatString};
+use ruff_python_literal::format::{
+    FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
+};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -273,7 +275,11 @@ impl FStringConversion {
         }
 
         // Parse the format string
-        let format_string = FormatString::parse(contents, raw)?;
+        let format_string = if raw {
+            FormatString::from_raw_str(contents)
+        } else {
+            FormatString::from_str(contents)
+        }?;
 
         // If the format string contains only literal parts, it doesn't need to be converted.
         if format_string
