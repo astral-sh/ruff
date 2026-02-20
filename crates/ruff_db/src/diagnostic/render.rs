@@ -2798,6 +2798,16 @@ watermelon
             self
         }
 
+        /// Adds a sub-diagnostic constructed with this diagnostic's environment.
+        fn sub(
+            mut self,
+            f: impl Fn(&mut TestEnvironment) -> SubDiagnostic,
+        ) -> DiagnosticBuilder<'e> {
+            let sub = f(self.env);
+            self.diag.sub(sub);
+            self
+        }
+
         /// Set the documentation URL for the diagnostic.
         pub(super) fn documentation_url(mut self, url: impl Into<String>) -> DiagnosticBuilder<'e> {
             self.diag.set_documentation_url(Some(url.into()));
@@ -2907,30 +2917,6 @@ def fibonacci(n):
         env.add("undef.py", r"if a == 1: pass");
         env.format(format);
 
-        let mut primary_diagnostic = env
-            .builder(
-                "undefined-name",
-                Severity::Error,
-                "Undefined name `fibonaccii`",
-            )
-            .primary("fib.py", "12:15", "12:25", "")
-            .secondary_code("F821")
-            .noqa_offset(ruff_text_size::TextSize::from(0))
-            .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
-            .secondary("fib.py", "12:35", "12:36", "")
-            .build();
-
-        let sub_diagnostic = env
-            .sub_builder(
-                SubDiagnosticSeverity::Info,
-                "Did you mean to import it from `/some/path/def.py`?",
-            )
-            .primary("fib.py", "4:4", "4:13", "`fibonacci` is defined here")
-            .secondary("fib.py", "5:4", "5", "`fibonacci` is documented here")
-            .build();
-
-        primary_diagnostic.sub(sub_diagnostic);
-
         let diagnostics = vec![
             env.builder("unused-import", Severity::Error, "`os` imported but unused")
                 .primary("fib.py", "1:7", "1:9", "")
@@ -2964,7 +2950,26 @@ def fibonacci(n):
                 .noqa_offset(TextSize::from(3))
                 .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
                 .build(),
-            primary_diagnostic,
+            env.builder(
+                "undefined-name",
+                Severity::Error,
+                "Undefined name `fibonaccii`",
+            )
+            .primary("fib.py", "12:15", "12:25", "")
+            .secondary_code("F821")
+            .noqa_offset(ruff_text_size::TextSize::from(0))
+            .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
+            .secondary("fib.py", "12:35", "12:36", "")
+            .sub(|env| {
+                env.sub_builder(
+                    SubDiagnosticSeverity::Info,
+                    "Did you mean to import it from `/some/path/def.py`?",
+                )
+                .primary("fib.py", "4:4", "4:13", "`fibonacci` is defined here")
+                .secondary("fib.py", "5:4", "5", "`fibonacci` is documented here")
+                .build()
+            })
+            .build(),
         ];
 
         (env, diagnostics)
