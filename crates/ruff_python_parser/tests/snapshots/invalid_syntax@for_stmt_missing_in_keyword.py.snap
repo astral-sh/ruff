@@ -7,17 +7,17 @@ input_file: crates/ruff_python_parser/resources/inline/err/for_stmt_missing_in_k
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..24,
         body: [
             For(
                 StmtFor {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..12,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 4..5,
                             id: Name("a"),
                             ctx: Store,
@@ -25,7 +25,7 @@ Module(
                     ),
                     iter: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 6..7,
                             id: Name("b"),
                             ctx: Load,
@@ -34,11 +34,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 9..12,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 9..12,
                                     },
                                 ),
@@ -50,12 +50,12 @@ Module(
             ),
             For(
                 StmtFor {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 13..23,
                     is_async: false,
                     target: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 17..18,
                             id: Name("a"),
                             ctx: Store,
@@ -63,7 +63,7 @@ Module(
                     ),
                     iter: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 18..18,
                             id: Name(""),
                             ctx: Invalid,
@@ -72,11 +72,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 20..23,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 20..23,
                                     },
                                 ),
@@ -94,7 +94,7 @@ Module(
 
   |
 1 | for a b: ...
-  |       ^ Syntax Error: Expected 'in', found name
+  |       ^ Syntax Error: Expected `in`, found name
 2 | for a: ...
   |
 
@@ -102,5 +102,5 @@ Module(
   |
 1 | for a b: ...
 2 | for a: ...
-  |      ^ Syntax Error: Expected 'in', found ':'
+  |      ^ Syntax Error: Expected `in`, found `:`
   |

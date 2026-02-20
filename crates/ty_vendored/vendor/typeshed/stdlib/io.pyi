@@ -162,6 +162,7 @@ if sys.version_info >= (3, 14):
         This protocol only supports blocking I/O.
         """
 
+        __slots__ = ()
         def read(self, size: int = ..., /) -> _T_co:
             """Read data from the input stream and return it.
 
@@ -175,5 +176,6 @@ if sys.version_info >= (3, 14):
         This protocol only supports blocking I/O.
         """
 
+        __slots__ = ()
         def write(self, data: _T_contra, /) -> int:
             """Write *data* to the output stream and return the number of items written."""

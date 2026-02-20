@@ -118,3 +118,10 @@ def func():
         return lambda: value
 
     defaultdict(constant_factory("<missing>"))
+
+def func():
+    defaultdict(default_factory=t"")  # OK
+
+
+def func():
+    defaultdict(default_factory=t"hello")  # OK

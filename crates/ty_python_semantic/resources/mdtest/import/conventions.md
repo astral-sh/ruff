@@ -53,8 +53,8 @@ in `import os.path as os.path` the `os.path` is not a valid identifier.
 ```py
 from b import Any, Literal, foo
 
-reveal_type(Any)  # revealed: typing.Any
-reveal_type(Literal)  # revealed: typing.Literal
+reveal_type(Any)  # revealed: <special-form 'typing.Any'>
+reveal_type(Literal)  # revealed: <special-form 'typing.Literal'>
 reveal_type(foo)  # revealed: <module 'foo'>
 ```
 
@@ -132,7 +132,7 @@ reveal_type(Any)  # revealed: Unknown
 ```pyi
 from typing import Any
 
-reveal_type(Any)  # revealed: typing.Any
+reveal_type(Any)  # revealed: <special-form 'typing.Any'>
 ```
 
 ## Nested mixed re-export and not
@@ -169,7 +169,7 @@ reveal_type(Any)  # revealed: Unknown
 ```pyi
 from typing import Any
 
-reveal_type(Any)  # revealed: typing.Any
+reveal_type(Any)  # revealed: <special-form 'typing.Any'>
 ```
 
 ## Exported as different name
@@ -212,7 +212,7 @@ reveal_type(Foo)  # revealed: <class 'Foo'>
 ```pyi
 from b import Foo
 
-__all__ = ['Foo']
+__all__ = ["Foo"]
 ```
 
 `b.pyi`:
@@ -306,7 +306,7 @@ The following scenarios are when a re-export happens conditionally in a stub fil
 ### Global import
 
 ```py
-# error: "Member `Foo` of module `a` is possibly unbound"
+# error: "Member `Foo` of module `a` may be missing"
 from a import Foo
 
 reveal_type(Foo)  # revealed: str
@@ -337,7 +337,7 @@ Here, both the branches of the condition are import statements where one of them
 the other does not.
 
 ```py
-# error: "Member `Foo` of module `a` is possibly unbound"
+# error: "Member `Foo` of module `a` may be missing"
 from a import Foo
 
 reveal_type(Foo)  # revealed: <class 'Foo'>
@@ -365,7 +365,7 @@ class Foo: ...
 ### Re-export in one branch
 
 ```py
-# error: "Member `Foo` of module `a` is possibly unbound"
+# error: "Member `Foo` of module `a` may be missing"
 from a import Foo
 
 reveal_type(Foo)  # revealed: <class 'Foo'>

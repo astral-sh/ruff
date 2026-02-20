@@ -25,7 +25,7 @@ from asyncio.transports import BaseTransport, DatagramTransport, ReadTransport, 
 from collections.abc import Callable, Iterable, Sequence
 from concurrent.futures import Executor, ThreadPoolExecutor
 from contextvars import Context
-from socket import AddressFamily, SocketKind, _Address, _RetAddress, socket
+from socket import AddressFamily, AddressInfo, SocketKind, _Address, _RetAddress, socket
 from typing import IO, Any, Literal, TypeVar, overload
 from typing_extensions import TypeAlias, TypeVarTuple, Unpack
 
@@ -182,9 +182,22 @@ class BaseEventLoop(AbstractEventLoop):
     def create_future(self) -> Future[Any]:
         """Create a Future object attached to the loop."""
     # Tasks methods
-    if sys.version_info >= (3, 11):
-        def create_task(self, coro: _CoroutineLike[_T], *, name: object = None, context: Context | None = None) -> Task[_T]:
+    if sys.version_info >= (3, 14):
+        def create_task(
+            self,
+            coro: _CoroutineLike[_T],
+            *,
+            name: object = None,
+            context: Context | None = None,
+            eager_start: bool | None = None,
+        ) -> Task[_T]:
             """Schedule or begin executing a coroutine object.
+
+            Return a task object.
+            """
+    elif sys.version_info >= (3, 11):
+        def create_task(self, coro: _CoroutineLike[_T], *, name: object = None, context: Context | None = None) -> Task[_T]:
+            """Schedule a coroutine object.
 
             Return a task object.
             """
@@ -392,8 +405,8 @@ class BaseEventLoop(AbstractEventLoop):
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = 0,
+            flags: int = 1,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -427,8 +440,8 @@ class BaseEventLoop(AbstractEventLoop):
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = 0,
+            flags: int = 1,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -447,8 +460,8 @@ class BaseEventLoop(AbstractEventLoop):
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -481,8 +494,8 @@ class BaseEventLoop(AbstractEventLoop):
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -500,8 +513,8 @@ class BaseEventLoop(AbstractEventLoop):
             host: str | Sequence[str] | None = None,
             port: int = ...,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: None = None,
             backlog: int = 100,
             ssl: _SSLContext = None,
@@ -533,8 +546,8 @@ class BaseEventLoop(AbstractEventLoop):
             host: None = None,
             port: None = None,
             *,
-            family: int = ...,
-            flags: int = ...,
+            family: int = AddressFamily.AF_UNSPEC,
+            flags: int = AddressInfo.AI_PASSIVE,
             sock: socket = ...,
             backlog: int = 100,
             ssl: _SSLContext = None,

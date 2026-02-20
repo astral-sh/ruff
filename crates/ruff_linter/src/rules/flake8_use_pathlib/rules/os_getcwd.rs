@@ -1,11 +1,13 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use crate::preview::is_fix_os_getcwd_enabled;
-use crate::{FixAvailability, Violation};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::preview::is_fix_os_getcwd_enabled;
+use crate::rules::flake8_use_pathlib::helpers::is_top_level_expression_in_statement;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `os.getcwd` and `os.getcwdb`.
@@ -37,16 +39,19 @@ use ruff_text_size::Ranged;
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// Additionally, the fix is marked as unsafe when the return value is used because the type changes
+/// from `str` or `bytes` to a `Path` object.
 ///
 /// ## References
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
 /// - [Python documentation: `os.getcwd`](https://docs.python.org/3/library/os.html#os.getcwd)
 /// - [Python documentation: `os.getcwdb`](https://docs.python.org/3/library/os.html#os.getcwdb)
 /// - [PEP 428 – The pathlib module – object-oriented filesystem paths](https://peps.python.org/pep-0428/)
-/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#correspondence-to-tools-in-the-os-module)
+/// - [Correspondence between `os` and `pathlib`](https://docs.python.org/3/library/pathlib.html#corresponding-tools)
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct OsGetcwd;
 
 impl Violation for OsGetcwd {
@@ -82,7 +87,10 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
                 checker.semantic(),
             )?;
 
-            let applicability = if checker.comment_ranges().intersects(range) {
+            // Unsafe when the fix would delete comments or change a used return value
+            let applicability = if checker.comment_ranges().intersects(range)
+                || !is_top_level_expression_in_statement(checker)
+            {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe

@@ -3,7 +3,7 @@
 use crate::AtomicNodeIndex;
 use crate::generated::{
     ExprBytesLiteral, ExprDict, ExprFString, ExprList, ExprName, ExprSet, ExprStringLiteral,
-    ExprTString, ExprTuple, StmtClassDef,
+    ExprTString, ExprTuple, PatternMatchAs, PatternMatchOr, StmtClassDef,
 };
 use std::borrow::Cow;
 use std::fmt;
@@ -14,7 +14,6 @@ use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
 use bitflags::bitflags;
-use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -515,7 +514,7 @@ impl FStringValue {
 
     /// Returns `true` if the node represents an empty f-string literal.
     ///
-    /// Noteh that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
+    /// Note that a [`FStringValue`] node will always have >= 1 [`FStringPart`]s inside it.
     /// This method checks whether the value of the concatenated parts is equal to the empty
     /// f-string, not whether the f-string has 0 parts inside it.
     pub fn is_empty_literal(&self) -> bool {
@@ -681,6 +680,22 @@ impl TStringValue {
     pub fn elements(&self) -> impl Iterator<Item = &InterpolatedStringElement> {
         self.iter().flat_map(|tstring| tstring.elements.iter())
     }
+
+    /// Returns `true` if the node represents an empty t-string in the
+    /// sense that `__iter__` returns an empty iterable.
+    ///
+    /// Beware that empty t-strings are still truthy, i.e. `bool(t"") == True`.
+    ///
+    /// Note that a [`TStringValue`] node will always contain at least one
+    /// [`TString`] node. This method checks whether each of the constituent
+    /// t-strings (in an implicitly concatenated t-string) are empty
+    /// in the above sense.
+    pub fn is_empty_iterable(&self) -> bool {
+        match &self.inner {
+            TStringValueInner::Single(tstring) => tstring.is_empty(),
+            TStringValueInner::Concatenated(tstrings) => tstrings.iter().all(TString::is_empty),
+        }
+    }
 }
 
 impl<'a> IntoIterator for &'a TStringValue {
@@ -719,6 +734,8 @@ pub trait StringFlags: Copy {
 
     fn prefix(self) -> AnyStringPrefix;
 
+    fn is_unclosed(self) -> bool;
+
     /// Is the string triple-quoted, i.e.,
     /// does it begin and end with three consecutive quote characters?
     fn is_triple_quoted(self) -> bool {
@@ -755,14 +772,19 @@ pub trait StringFlags: Copy {
     }
 
     /// The total length of the string's closer.
-    /// This is always equal to `self.quote_len()`,
-    /// but is provided here for symmetry with the `opener_len()` method.
+    /// This is always equal to `self.quote_len()`, except when the string is unclosed,
+    /// in which case the length is zero.
     fn closer_len(self) -> TextSize {
-        self.quote_len()
+        if self.is_unclosed() {
+            TextSize::default()
+        } else {
+            self.quote_len()
+        }
     }
 
     fn as_any_string_flags(self) -> AnyStringFlags {
         AnyStringFlags::new(self.prefix(), self.quote_style(), self.triple_quotes())
+            .with_unclosed(self.is_unclosed())
     }
 
     fn display_contents(self, contents: &str) -> DisplayFlags<'_> {
@@ -813,6 +835,10 @@ bitflags! {
         /// for why we track the casing of the `r` prefix,
         /// but not for any other prefix
         const R_PREFIX_UPPER = 1 << 3;
+
+        /// The f-string is unclosed, meaning it is missing a closing quote.
+        /// For example: `f"{bar`
+        const UNCLOSED = 1 << 4;
     }
 }
 
@@ -868,6 +894,12 @@ impl FStringFlags {
             InterpolatedStringFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
         );
+        self
+    }
+
+    #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(InterpolatedStringFlagsInner::UNCLOSED, unclosed);
         self
     }
 
@@ -969,6 +1001,12 @@ impl TStringFlags {
     }
 
     #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(InterpolatedStringFlagsInner::UNCLOSED, unclosed);
+        self
+    }
+
+    #[must_use]
     pub fn with_prefix(mut self, prefix: TStringPrefix) -> Self {
         match prefix {
             TStringPrefix::Regular => Self(
@@ -1035,6 +1073,10 @@ impl StringFlags for FStringFlags {
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Format(self.prefix())
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(InterpolatedStringFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for FStringFlags {
@@ -1043,6 +1085,7 @@ impl fmt::Debug for FStringFlags {
             .field("quote_style", &self.quote_style())
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -1074,6 +1117,10 @@ impl StringFlags for TStringFlags {
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Template(self.prefix())
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(InterpolatedStringFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for TStringFlags {
@@ -1082,6 +1129,7 @@ impl fmt::Debug for TStringFlags {
             .field("quote_style", &self.quote_style())
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -1181,6 +1229,10 @@ pub struct TString {
 impl TString {
     pub fn quote_style(&self) -> Quote {
         self.flags.quote_style()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.elements.is_empty()
     }
 }
 
@@ -1407,6 +1459,9 @@ bitflags! {
 
         /// The string was deemed invalid by the parser.
         const INVALID = 1 << 5;
+
+        /// The string literal misses the matching closing quote(s).
+        const UNCLOSED = 1 << 6;
     }
 }
 
@@ -1456,6 +1511,12 @@ impl StringLiteralFlags {
             StringLiteralFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
         );
+        self
+    }
+
+    #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(StringLiteralFlagsInner::UNCLOSED, unclosed);
         self
     }
 
@@ -1540,6 +1601,10 @@ impl StringFlags for StringLiteralFlags {
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Regular(self.prefix())
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(StringLiteralFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for StringLiteralFlags {
@@ -1548,6 +1613,7 @@ impl fmt::Debug for StringLiteralFlags {
             .field("quote_style", &self.quote_style())
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -1582,7 +1648,7 @@ impl StringLiteral {
         Self {
             range,
             value: "".into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             flags: StringLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1602,7 +1668,7 @@ impl From<StringLiteral> for Expr {
     fn from(payload: StringLiteral) -> Self {
         ExprStringLiteral {
             range: payload.range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             value: StringLiteralValue::single(payload),
         }
         .into()
@@ -1826,6 +1892,9 @@ bitflags! {
 
         /// The bytestring was deemed invalid by the parser.
         const INVALID = 1 << 4;
+
+        /// The byte string misses the matching closing quote(s).
+        const UNCLOSED = 1 << 5;
     }
 }
 
@@ -1874,6 +1943,12 @@ impl BytesLiteralFlags {
             BytesLiteralFlagsInner::TRIPLE_QUOTED,
             triple_quotes.is_yes(),
         );
+        self
+    }
+
+    #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(BytesLiteralFlagsInner::UNCLOSED, unclosed);
         self
     }
 
@@ -1939,6 +2014,10 @@ impl StringFlags for BytesLiteralFlags {
     fn prefix(self) -> AnyStringPrefix {
         AnyStringPrefix::Bytes(self.prefix())
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(BytesLiteralFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for BytesLiteralFlags {
@@ -1947,6 +2026,7 @@ impl fmt::Debug for BytesLiteralFlags {
             .field("quote_style", &self.quote_style())
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -1981,7 +2061,7 @@ impl BytesLiteral {
         Self {
             range,
             value: Box::new([]),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             flags: BytesLiteralFlags::empty().with_invalid(),
         }
     }
@@ -1991,7 +2071,7 @@ impl From<BytesLiteral> for Expr {
     fn from(payload: BytesLiteral) -> Self {
         ExprBytesLiteral {
             range: payload.range,
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             value: BytesLiteralValue::single(payload),
         }
         .into()
@@ -2008,7 +2088,7 @@ bitflags! {
     /// prefix flags is by calling the `as_flags()` method on the
     /// `StringPrefix` enum.
     #[derive(Default, Debug, Copy, Clone, PartialEq, Eq, Hash)]
-    struct AnyStringFlagsInner: u8 {
+    struct AnyStringFlagsInner: u16 {
         /// The string uses double quotes (`"`).
         /// If this flag is not set, the string uses single quotes (`'`).
         const DOUBLE = 1 << 0;
@@ -2051,6 +2131,9 @@ bitflags! {
         /// for why we track the casing of the `r` prefix,
         /// but not for any other prefix
         const R_PREFIX_UPPER = 1 << 7;
+
+        /// String without matching closing quote(s).
+        const UNCLOSED = 1 << 8;
     }
 }
 
@@ -2146,6 +2229,12 @@ impl AnyStringFlags {
             .set(AnyStringFlagsInner::TRIPLE_QUOTED, triple_quotes.is_yes());
         self
     }
+
+    #[must_use]
+    pub fn with_unclosed(mut self, unclosed: bool) -> Self {
+        self.0.set(AnyStringFlagsInner::UNCLOSED, unclosed);
+        self
+    }
 }
 
 impl StringFlags for AnyStringFlags {
@@ -2214,6 +2303,10 @@ impl StringFlags for AnyStringFlags {
         }
         AnyStringPrefix::Regular(StringLiteralPrefix::Empty)
     }
+
+    fn is_unclosed(self) -> bool {
+        self.0.intersects(AnyStringFlagsInner::UNCLOSED)
+    }
 }
 
 impl fmt::Debug for AnyStringFlags {
@@ -2222,6 +2315,7 @@ impl fmt::Debug for AnyStringFlags {
             .field("prefix", &self.prefix())
             .field("triple_quoted", &self.is_triple_quoted())
             .field("quote_style", &self.quote_style())
+            .field("unclosed", &self.is_unclosed())
             .finish()
     }
 }
@@ -2238,6 +2332,7 @@ impl From<AnyStringFlags> for StringLiteralFlags {
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
+            .with_unclosed(value.is_unclosed())
     }
 }
 
@@ -2259,6 +2354,7 @@ impl From<AnyStringFlags> for BytesLiteralFlags {
             .with_quote_style(value.quote_style())
             .with_prefix(bytestring_prefix)
             .with_triple_quotes(value.triple_quotes())
+            .with_unclosed(value.is_unclosed())
     }
 }
 
@@ -2280,6 +2376,7 @@ impl From<AnyStringFlags> for FStringFlags {
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
+            .with_unclosed(value.is_unclosed())
     }
 }
 
@@ -2301,6 +2398,7 @@ impl From<AnyStringFlags> for TStringFlags {
             .with_quote_style(value.quote_style())
             .with_prefix(prefix)
             .with_triple_quotes(value.triple_quotes())
+            .with_unclosed(value.is_unclosed())
     }
 }
 
@@ -2753,58 +2851,10 @@ pub enum IrrefutablePatternKind {
     Wildcard,
 }
 
-/// See also [MatchValue](https://docs.python.org/3/library/ast.html#ast.MatchValue)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchValue {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub value: Box<Expr>,
-}
-
-/// See also [MatchSingleton](https://docs.python.org/3/library/ast.html#ast.MatchSingleton)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchSingleton {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub value: Singleton,
-}
-
-/// See also [MatchSequence](https://docs.python.org/3/library/ast.html#ast.MatchSequence)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchSequence {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub patterns: Vec<Pattern>,
-}
-
-/// See also [MatchMapping](https://docs.python.org/3/library/ast.html#ast.MatchMapping)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchMapping {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub keys: Vec<Expr>,
-    pub patterns: Vec<Pattern>,
-    pub rest: Option<Identifier>,
-}
-
-/// See also [MatchClass](https://docs.python.org/3/library/ast.html#ast.MatchClass)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchClass {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub cls: Box<Expr>,
-    pub arguments: PatternArguments,
-}
-
-/// An AST node to represent the arguments to a [`PatternMatchClass`], i.e., the
+/// An AST node to represent the arguments to a [`crate::PatternMatchClass`], i.e., the
 /// parenthesized contents in `case Point(1, x=0, y=0)`.
 ///
-/// Like [`Arguments`], but for [`PatternMatchClass`].
+/// Like [`Arguments`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternArguments {
@@ -2814,10 +2864,10 @@ pub struct PatternArguments {
     pub keywords: Vec<PatternKeyword>,
 }
 
-/// An AST node to represent the keyword arguments to a [`PatternMatchClass`], i.e., the
+/// An AST node to represent the keyword arguments to a [`crate::PatternMatchClass`], i.e., the
 /// `x=0` and `y=0` in `case Point(x=0, y=0)`.
 ///
-/// Like [`Keyword`], but for [`PatternMatchClass`].
+/// Like [`Keyword`], but for [`crate::PatternMatchClass`].
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct PatternKeyword {
@@ -2827,33 +2877,56 @@ pub struct PatternKeyword {
     pub pattern: Pattern,
 }
 
-/// See also [MatchStar](https://docs.python.org/3/library/ast.html#ast.MatchStar)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchStar {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Option<Identifier>,
+impl PatternArguments {
+    /// Returns an iterator over the patterns and keywords in source order.
+    pub fn patterns_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
+        PatternArgumentsSourceOrder {
+            patterns: &self.patterns,
+            keywords: &self.keywords,
+            next_pattern: 0,
+            next_keyword: 0,
+        }
+    }
 }
 
-/// See also [MatchAs](https://docs.python.org/3/library/ast.html#ast.MatchAs)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchAs {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub pattern: Option<Box<Pattern>>,
-    pub name: Option<Identifier>,
+/// The iterator returned by [`PatternArguments::patterns_source_order`].
+#[derive(Clone)]
+pub struct PatternArgumentsSourceOrder<'a> {
+    patterns: &'a [Pattern],
+    keywords: &'a [PatternKeyword],
+    next_pattern: usize,
+    next_keyword: usize,
 }
 
-/// See also [MatchOr](https://docs.python.org/3/library/ast.html#ast.MatchOr)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct PatternMatchOr {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub patterns: Vec<Pattern>,
+/// An entry in the argument list of a class pattern.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PatternOrKeyword<'a> {
+    Pattern(&'a Pattern),
+    Keyword(&'a PatternKeyword),
 }
+
+impl<'a> Iterator for PatternArgumentsSourceOrder<'a> {
+    type Item = PatternOrKeyword<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let pattern = self.patterns.get(self.next_pattern);
+        let keyword = self.keywords.get(self.next_keyword);
+
+        if let Some(pattern) = pattern
+            && keyword.is_none_or(|keyword| pattern.start() <= keyword.start())
+        {
+            self.next_pattern += 1;
+            Some(PatternOrKeyword::Pattern(pattern))
+        } else if let Some(keyword) = keyword {
+            self.next_keyword += 1;
+            Some(PatternOrKeyword::Keyword(keyword))
+        } else {
+            None
+        }
+    }
+}
+
+impl FusedIterator for PatternArgumentsSourceOrder<'_> {}
 
 impl TypeParam {
     pub const fn name(&self) -> &Identifier {
@@ -2871,37 +2944,6 @@ impl TypeParam {
             Self::TypeVarTuple(x) => x.default.as_deref(),
         }
     }
-}
-
-/// See also [TypeVar](https://docs.python.org/3/library/ast.html#ast.TypeVar)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamTypeVar {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub bound: Option<Box<Expr>>,
-    pub default: Option<Box<Expr>>,
-}
-
-/// See also [ParamSpec](https://docs.python.org/3/library/ast.html#ast.ParamSpec)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamParamSpec {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
-}
-
-/// See also [TypeVarTuple](https://docs.python.org/3/library/ast.html#ast.TypeVarTuple)
-#[derive(Clone, Debug, PartialEq)]
-#[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
-pub struct TypeParamTypeVarTuple {
-    pub range: TextRange,
-    pub node_index: AtomicNodeIndex,
-    pub name: Identifier,
-    pub default: Option<Box<Expr>>,
 }
 
 /// See also [decorator](https://docs.python.org/3/library/ast.html#ast.decorator)
@@ -3010,6 +3052,12 @@ impl Parameters {
             .find(|arg| arg.parameter.name.as_str() == name)
     }
 
+    /// Returns the index of the parameter with the given name
+    pub fn index(&self, name: &str) -> Option<usize> {
+        self.iter_non_variadic_params()
+            .position(|arg| arg.parameter.name.as_str() == name)
+    }
+
     /// Returns an iterator over all parameters included in this [`Parameters`] node.
     pub fn iter(&self) -> ParametersIterator<'_> {
         ParametersIterator::new(self)
@@ -3053,6 +3101,27 @@ impl Parameters {
             && self.kwonlyargs.is_empty()
             && self.vararg.is_none()
             && self.kwarg.is_none()
+    }
+
+    /// Returns an iterator over all parameters in source order.
+    ///
+    /// This differs from [`Parameters::iter`] which returns parameters
+    /// in type-based order (positional-only, regular, variadic, keyword-only,
+    /// keyword). For well-formed Python the two orderings are identical, but
+    /// error recovery can produce ASTs where variadic parameters appear before
+    /// non-variadic ones (e.g. `def foo(**kwargs, a):`).
+    pub fn iter_source_order(&self) -> ParametersSourceOrderIterator<'_> {
+        let mut variadics = [self.vararg.as_deref(), self.kwarg.as_deref()];
+        variadics.sort_by_key(|param| param.map_or(TextSize::new(u32::MAX), Ranged::start));
+
+        ParametersSourceOrderIterator {
+            next_non_variadic_peeked: None,
+            posonlyargs: self.posonlyargs.iter(),
+            args: self.args.iter(),
+            kwonlyargs: self.kwonlyargs.iter(),
+            variadics,
+            next_variadic: 0,
+        }
     }
 }
 
@@ -3195,11 +3264,73 @@ impl<'a> IntoIterator for &'a Box<Parameters> {
     }
 }
 
+/// The iterator returned by [`Parameters::iter_source_order`].
+pub struct ParametersSourceOrderIterator<'a> {
+    next_non_variadic_peeked: Option<&'a ParameterWithDefault>,
+    posonlyargs: Iter<'a, ParameterWithDefault>,
+    args: Iter<'a, ParameterWithDefault>,
+    kwonlyargs: Iter<'a, ParameterWithDefault>,
+    variadics: [Option<&'a Parameter>; 2],
+    next_variadic: usize,
+}
+
+impl<'a> ParametersSourceOrderIterator<'a> {
+    /// Returns the next variadic parameter that appears before `before`, if any.
+    fn next_variadic_before(&mut self, before: TextSize) -> Option<&'a Parameter> {
+        let param = self.variadics.get(self.next_variadic).copied().flatten()?;
+        if param.start() < before {
+            self.next_variadic += 1;
+            Some(param)
+        } else {
+            None
+        }
+    }
+
+    fn next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault> {
+        self.next_non_variadic_peeked
+            .take()
+            .or_else(|| self.posonlyargs.next())
+            .or_else(|| self.args.next())
+            .or_else(|| self.kwonlyargs.next())
+    }
+
+    fn peek_next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault> {
+        let next = self.next_non_variadic()?;
+        self.next_non_variadic_peeked = Some(next);
+        Some(next)
+    }
+}
+
+impl<'a> Iterator for ParametersSourceOrderIterator<'a> {
+    type Item = AnyParameterRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // If there's a variadic parameter that comes before the next
+        // non-variadic parameter, emit it first.
+        let next_non_variadic_start = self
+            .peek_next_non_variadic()
+            .map_or(TextSize::new(u32::MAX), Ranged::start);
+
+        if let Some(variadic) = self.next_variadic_before(next_non_variadic_start) {
+            return Some(AnyParameterRef::Variadic(variadic));
+        }
+
+        if let Some(non_variadic) = self.next_non_variadic() {
+            return Some(AnyParameterRef::NonVariadic(non_variadic));
+        }
+
+        // Drain remaining variadics.
+        self.next_variadic_before(TextSize::new(u32::MAX))
+            .map(AnyParameterRef::Variadic)
+    }
+}
+
+impl FusedIterator for ParametersSourceOrderIterator<'_> {}
+
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
 /// Used by `Arguments` original type.
 ///
 /// NOTE: This type is different from original Python AST.
-
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub struct ParameterWithDefault {
@@ -3220,6 +3351,14 @@ impl ParameterWithDefault {
 
     pub fn annotation(&self) -> Option<&Expr> {
         self.parameter.annotation()
+    }
+
+    /// Return `true` if the parameter name uses the pre-PEP-570 convention
+    /// (specified in PEP 484) to indicate to a type checker that it should be treated
+    /// as positional-only.
+    pub fn uses_pep_484_positional_only_convention(&self) -> bool {
+        let name = self.name();
+        name.starts_with("__") && !name.ends_with("__")
     }
 }
 
@@ -3266,6 +3405,13 @@ impl<'a> ArgOrKeyword<'a> {
         match self {
             ArgOrKeyword::Arg(argument) => argument,
             ArgOrKeyword::Keyword(keyword) => &keyword.value,
+        }
+    }
+
+    pub const fn is_variadic(self) -> bool {
+        match self {
+            ArgOrKeyword::Arg(expr) => expr.is_starred_expr(),
+            ArgOrKeyword::Keyword(keyword) => keyword.arg.is_none(),
         }
     }
 }
@@ -3368,10 +3514,13 @@ impl Arguments {
     /// 2
     /// {'4': 5}
     /// ```
-    pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> {
-        let args = self.args.iter().map(ArgOrKeyword::Arg);
-        let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
-        args.merge_by(keywords, |left, right| left.start() < right.start())
+    pub fn arguments_source_order(&self) -> ArgumentsSourceOrder<'_> {
+        ArgumentsSourceOrder {
+            args: &self.args,
+            keywords: &self.keywords,
+            next_arg: 0,
+            next_keyword: 0,
+        }
     }
 
     pub fn inner_range(&self) -> TextRange {
@@ -3386,6 +3535,38 @@ impl Arguments {
         TextRange::new(self.end() - ')'.text_len(), self.end())
     }
 }
+
+/// The iterator returned by [`Arguments::arguments_source_order`].
+#[derive(Clone)]
+pub struct ArgumentsSourceOrder<'a> {
+    args: &'a [Expr],
+    keywords: &'a [Keyword],
+    next_arg: usize,
+    next_keyword: usize,
+}
+
+impl<'a> Iterator for ArgumentsSourceOrder<'a> {
+    type Item = ArgOrKeyword<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let arg = self.args.get(self.next_arg);
+        let keyword = self.keywords.get(self.next_keyword);
+
+        if let Some(arg) = arg
+            && keyword.is_none_or(|keyword| arg.start() <= keyword.start())
+        {
+            self.next_arg += 1;
+            Some(ArgOrKeyword::Arg(arg))
+        } else if let Some(keyword) = keyword {
+            self.next_keyword += 1;
+            Some(ArgOrKeyword::Keyword(keyword))
+        } else {
+            None
+        }
+    }
+}
+
+impl FusedIterator for ArgumentsSourceOrder<'_> {}
 
 /// An AST node used to represent a sequence of type parameters.
 ///
@@ -3525,7 +3706,7 @@ impl Identifier {
     pub fn new(id: impl Into<Name>, range: TextRange) -> Self {
         Self {
             id: id.into(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             range,
         }
     }

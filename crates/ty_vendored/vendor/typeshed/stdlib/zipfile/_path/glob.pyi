@@ -16,7 +16,11 @@ if sys.version_info >= (3, 13):
         AssertionError: Invalid separators
         """
 
-        def __init__(self, seps: str = ...) -> None: ...
+        if sys.platform == "win32":
+            def __init__(self, seps: str = "\\/") -> None: ...
+        else:
+            def __init__(self, seps: str = "/") -> None: ...
+
         def translate(self, pattern: str) -> str:
             """
             Given a glob pattern, produce a regex that matches it.

@@ -7,24 +7,24 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/attribute/mu
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..46,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..10,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..10,
                             value: Attribute(
                                 ExprAttribute {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 0..6,
                                     value: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 0..5,
                                             id: Name("extra"),
                                             ctx: Load,
@@ -33,7 +33,7 @@ Module(
                                     attr: Identifier {
                                         id: Name(""),
                                         range: 6..6,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
                                 },
@@ -41,7 +41,7 @@ Module(
                             attr: Identifier {
                                 id: Name("dot"),
                                 range: 7..10,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },
@@ -50,11 +50,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 11..19,
                     value: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 11..19,
                             id: Name("multiple"),
                             ctx: Load,
@@ -64,22 +64,22 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 19..27,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 19..27,
                             value: EllipsisLiteral(
                                 ExprEllipsisLiteral {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 19..22,
                                 },
                             ),
                             attr: Identifier {
                                 id: Name("dots"),
                                 range: 23..27,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },
@@ -88,11 +88,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 28..36,
                     value: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 28..36,
                             id: Name("multiple"),
                             ctx: Load,
@@ -102,26 +102,26 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 36..45,
                     value: Attribute(
                         ExprAttribute {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 36..45,
                             value: Attribute(
                                 ExprAttribute {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 36..40,
                                     value: EllipsisLiteral(
                                         ExprEllipsisLiteral {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 36..39,
                                         },
                                     ),
                                     attr: Identifier {
                                         id: Name(""),
                                         range: 40..40,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     ctx: Load,
                                 },
@@ -129,7 +129,7 @@ Module(
                             attr: Identifier {
                                 id: Name("dots"),
                                 range: 41..45,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                             },
                             ctx: Load,
                         },

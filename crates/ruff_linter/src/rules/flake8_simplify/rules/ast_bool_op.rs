@@ -10,7 +10,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{Truthiness, contains_effect};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::SemanticModel;
 
@@ -45,6 +45,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `isinstance`](https://docs.python.org/3/library/functions.html#isinstance)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.212")]
 pub(crate) struct DuplicateIsinstanceCall {
     name: Option<String>,
 }
@@ -93,6 +94,7 @@ impl Violation for DuplicateIsinstanceCall {
 /// ## References
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.213")]
 pub(crate) struct CompareWithTuple {
     replacement: String,
 }
@@ -126,6 +128,7 @@ impl AlwaysFixableViolation for CompareWithTuple {
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct ExprAndNotExpr {
     name: String,
 }
@@ -158,6 +161,7 @@ impl AlwaysFixableViolation for ExprAndNotExpr {
 /// ## References
 /// - [Python documentation: Boolean operations](https://docs.python.org/3/reference/expressions.html#boolean-operations)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct ExprOrNotExpr {
     name: String,
 }
@@ -210,6 +214,7 @@ pub(crate) enum ContentAround {
 /// a = x or [1]
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct ExprOrTrue {
     expr: String,
     remove: ContentAround,
@@ -262,6 +267,7 @@ impl AlwaysFixableViolation for ExprOrTrue {
 /// a = x and []
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct ExprAndFalse {
     expr: String,
     remove: ContentAround,
@@ -421,7 +427,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         .collect(),
                     ctx: ExprContext::Load,
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     parenthesized: true,
                 };
                 let isinstance_call = ast::ExprCall {
@@ -430,7 +436,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                             id: Name::new_static("isinstance"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         }
                         .into(),
                     ),
@@ -438,10 +444,10 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         args: Box::from([target.clone(), tuple.into()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }
                 .into();
 
@@ -458,7 +464,7 @@ pub(crate) fn duplicate_isinstance_call(checker: &Checker, expr: &Expr) {
                         .chain(after)
                         .collect(),
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }
                 .into();
                 let fixed_source = checker.generator().expr(&bool_op);
@@ -552,21 +558,21 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
             elts: comparators.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             parenthesized: true,
         };
         let node1 = ast::ExprName {
             id: id.clone(),
             ctx: ExprContext::Load,
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         let node2 = ast::ExprCompare {
             left: Box::new(node1.into()),
             ops: Box::from([CmpOp::In]),
             comparators: Box::from([node.into()]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         };
         let in_expr = node2.into();
         let mut diagnostic = checker.report_diagnostic(
@@ -589,7 +595,7 @@ pub(crate) fn compare_with_tuple(checker: &Checker, expr: &Expr) {
                 op: BoolOp::Or,
                 values: iter::once(in_expr).chain(unmatched).collect(),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             node.into()
         };
@@ -794,14 +800,9 @@ fn is_short_circuit(
             edit = Some(get_short_circuit_edit(
                 value,
                 TextRange::new(
-                    parenthesized_range(
-                        furthest.into(),
-                        expr.into(),
-                        checker.comment_ranges(),
-                        checker.locator().contents(),
-                    )
-                    .unwrap_or(furthest.range())
-                    .start(),
+                    parenthesized_range(furthest.into(), expr.into(), checker.tokens())
+                        .unwrap_or(furthest.range())
+                        .start(),
                     expr.end(),
                 ),
                 short_circuit_truthiness,
@@ -822,14 +823,9 @@ fn is_short_circuit(
             edit = Some(get_short_circuit_edit(
                 next_value,
                 TextRange::new(
-                    parenthesized_range(
-                        furthest.into(),
-                        expr.into(),
-                        checker.comment_ranges(),
-                        checker.locator().contents(),
-                    )
-                    .unwrap_or(furthest.range())
-                    .start(),
+                    parenthesized_range(furthest.into(), expr.into(), checker.tokens())
+                        .unwrap_or(furthest.range())
+                        .start(),
                     expr.end(),
                 ),
                 short_circuit_truthiness,

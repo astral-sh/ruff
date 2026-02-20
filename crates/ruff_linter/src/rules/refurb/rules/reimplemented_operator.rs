@@ -69,6 +69,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [descriptors]: https://docs.python.org/3/howto/descriptor.html
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.9")]
 pub(crate) struct ReimplementedOperator {
     operator: Operator,
     target: FunctionLikeKind,
@@ -310,7 +311,12 @@ fn itemgetter_op_tuple(
             .iter()
             .map(|expr| {
                 expr.as_subscript_expr()
-                    .filter(|expr| is_same_expression(arg, &expr.value))
+                    .filter(|expr| {
+                        is_same_expression(arg, &expr.value)
+                            && !any_over_expr(expr.slice.as_ref(), &|expr| {
+                                is_same_expression(arg, expr)
+                            })
+                    })
                     .map(|expr| expr.slice.as_ref())
                     .map(|slice| subscript_slice_to_string(slice, locator).to_string())
             })

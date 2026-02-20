@@ -1,6 +1,6 @@
 import sys
 from _typeshed import Unused
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from contextvars import Context
 from typing import Any, TypeVar, final
 from typing_extensions import Self
@@ -50,13 +50,16 @@ if sys.version_info >= (3, 11):
 
         def get_loop(self) -> AbstractEventLoop:
             """Return embedded event loop."""
-
-        def run(self, coro: Coroutine[Any, Any, _T], *, context: Context | None = None) -> _T:
-            """Run code in the embedded event loop."""
+        if sys.version_info >= (3, 14):
+            def run(self, coro: Awaitable[_T], *, context: Context | None = None) -> _T:
+                """Run code in the embedded event loop."""
+        else:
+            def run(self, coro: Coroutine[Any, Any, _T], *, context: Context | None = None) -> _T:
+                """Run a coroutine inside the embedded event loop."""
 
 if sys.version_info >= (3, 12):
     def run(
-        main: Coroutine[Any, Any, _T], *, debug: bool | None = ..., loop_factory: Callable[[], AbstractEventLoop] | None = ...
+        main: Coroutine[Any, Any, _T], *, debug: bool | None = None, loop_factory: Callable[[], AbstractEventLoop] | None = None
     ) -> _T:
         """Execute the coroutine and return the result.
 

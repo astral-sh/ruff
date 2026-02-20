@@ -48,6 +48,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UnnecessaryDoubleCastOrProcess {
     inner: String,
     outer: String,

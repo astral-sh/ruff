@@ -1,3 +1,5 @@
+#![allow(clippy::disallowed_methods)]
+
 use super::walk_directory::{
     self, DirectoryWalker, WalkDirectoryBuilder, WalkDirectoryConfiguration,
     WalkDirectoryVisitorBuilder, WalkState,
@@ -127,6 +129,10 @@ impl System for OsSystem {
         self.inner.case_sensitivity
     }
 
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        is_executable::is_executable(path.as_std_path())
+    }
+
     fn current_directory(&self) -> &SystemPath {
         &self.inner.cwd
     }
@@ -198,7 +204,12 @@ impl System for OsSystem {
     /// The walker ignores files according to [`ignore::WalkBuilder::standard_filters`]
     /// when setting [`WalkDirectoryBuilder::standard_filters`] to true.
     fn walk_directory(&self, path: &SystemPath) -> WalkDirectoryBuilder {
-        WalkDirectoryBuilder::new(path, OsDirectoryWalker {})
+        WalkDirectoryBuilder::new(
+            path,
+            OsDirectoryWalker {
+                cwd: self.current_directory().to_path_buf(),
+            },
+        )
     }
 
     fn glob(
@@ -255,6 +266,10 @@ impl System for OsSystem {
     fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
         std::env::var(name)
     }
+
+    fn dyn_clone(&self) -> Box<dyn System> {
+        Box::new(self.clone())
+    }
 }
 
 impl OsSystem {
@@ -264,16 +279,16 @@ impl OsSystem {
     /// instead of at least one system call for each component between `path` and `prefix`.
     ///
     /// However, using `canonicalize` to resolve the path's casing doesn't work in two cases:
-    /// * if `path` is a symlink because `canonicalize` then returns the symlink's target and not the symlink's source path.
-    /// * on Windows: If `path` is a mapped network drive because `canonicalize` then returns the UNC path
-    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` then returns `\\?\UNC\server\share`).
+    /// * if `path` is a symlink, `canonicalize` returns the symlink's target and not the symlink's source path.
+    /// * on Windows: If `path` is a mapped network drive, `canonicalize` returns the UNC path
+    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` returns `\\?\UNC\server\share`).
     ///
     /// Symlinks and mapped network drives should be rare enough that this fast path is worth trying first,
     /// even if it comes at a cost for those rare use cases.
     fn path_exists_case_sensitive_fast(&self, path: &SystemPath) -> Option<bool> {
         // This is a more forgiving version of `dunce::simplified` that removes all `\\?\` prefixes on Windows.
         // We use this more forgiving version because we don't intend on using either path for anything other than comparison
-        // and the prefix is only relevant when passing the path to other programs and its longer than 200 something
+        // and the prefix is only relevant when passing the path to other programs and it's longer than 200 something
         // characters.
         fn simplify_ignore_verbatim(path: &SystemPath) -> &SystemPath {
             if cfg!(windows) {
@@ -287,9 +302,7 @@ impl OsSystem {
             }
         }
 
-        let simplified = simplify_ignore_verbatim(path);
-
-        let Ok(canonicalized) = simplified.as_std_path().canonicalize() else {
+        let Ok(canonicalized) = path.as_std_path().canonicalize() else {
             // The path doesn't exist or can't be accessed. The path doesn't exist.
             return Some(false);
         };
@@ -298,12 +311,13 @@ impl OsSystem {
             // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
             // that a symlink is involved. Fall back to the slow path.
             tracing::debug!(
-                "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8"
+                "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{path}` is not valid UTF-8"
             );
             return None;
         };
 
         let simplified_canonicalized = simplify_ignore_verbatim(&canonicalized);
+        let simplified = simplify_ignore_verbatim(path);
 
         // Test if the paths differ by anything other than casing. If so, that suggests that
         // `path` pointed to a symlink (or some other none reversible path normalization happened).
@@ -351,12 +365,16 @@ impl WritableSystem for OsSystem {
         std::fs::File::create_new(path).map(drop)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }
 
@@ -448,7 +466,9 @@ struct ListedDirectory {
 }
 
 #[derive(Debug)]
-struct OsDirectoryWalker;
+struct OsDirectoryWalker {
+    cwd: SystemPathBuf,
+}
 
 impl DirectoryWalker for OsDirectoryWalker {
     fn walk(
@@ -467,6 +487,7 @@ impl DirectoryWalker for OsDirectoryWalker {
         };
 
         let mut builder = ignore::WalkBuilder::new(first.as_std_path());
+        builder.current_dir(self.cwd.as_std_path());
 
         builder.standard_filters(standard_filters);
         builder.hidden(hidden);

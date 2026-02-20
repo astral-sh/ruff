@@ -59,6 +59,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// re.compile(r"foo\bar")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.8.0")]
 pub(crate) struct UnrawRePattern {
     module: RegexModule,
     func: String,

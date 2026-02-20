@@ -1,3 +1,8 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods"
+)]
+
 use crate::files::Files;
 use crate::system::System;
 use crate::vendored::VendoredFileSystem;
@@ -7,6 +12,7 @@ use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
 use ty_static::EnvVars;
 
+pub mod cancellation;
 pub mod diagnostic;
 pub mod display;
 pub mod file_revision;
@@ -65,6 +71,10 @@ pub trait Db: salsa::Database {
 /// to process work in parallel. For example, to index a directory or checking the files of a project.
 /// ty can still spawn more threads for other tasks, e.g. to wait for a Ctrl+C signal or
 /// watching the files for changes.
+#[expect(
+    clippy::disallowed_methods,
+    reason = "We don't have access to System here, but this is also only used by the CLI and the server which always run on a real system."
+)]
 pub fn max_parallelism() -> NonZeroUsize {
     std::env::var(EnvVars::TY_MAX_PARALLELISM)
         .or_else(|_| std::env::var(EnvVars::RAYON_NUM_THREADS))
@@ -74,6 +84,13 @@ pub fn max_parallelism() -> NonZeroUsize {
             std::thread::available_parallelism().unwrap_or_else(|_| NonZeroUsize::new(1).unwrap())
         })
 }
+
+// Use a reasonably large stack size to avoid running into stack overflows too easily. The
+// size was chosen in such a way as to still be able to handle large expressions involving
+// binary operators (x + x + … + x) both during the AST walk in semantic index building as
+// well as during type checking. Using this stack size, we can handle handle expressions
+// that are several times larger than the corresponding limits in existing type checkers.
+pub const STACK_SIZE: usize = 16 * 1024 * 1024;
 
 /// Trait for types that can provide Rust documentation.
 ///

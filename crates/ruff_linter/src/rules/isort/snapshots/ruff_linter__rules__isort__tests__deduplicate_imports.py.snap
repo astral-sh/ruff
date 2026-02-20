@@ -11,9 +11,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-1 1 | import os
-2   |-import os
-3 2 | import os as os1
-4 3 | import os as os2
+1 | import os
+  - import os
+2 | import os as os1
+3 | import os as os2

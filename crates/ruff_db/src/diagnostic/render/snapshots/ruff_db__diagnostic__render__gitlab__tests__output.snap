@@ -1,0 +1,63 @@
+---
+source: crates/ruff_db/src/diagnostic/render/gitlab.rs
+expression: env.render_diagnostics(&diagnostics)
+---
+[
+  {
+    "check_name": "F401",
+    "description": "F401: `os` imported but unused",
+    "severity": "major",
+    "fingerprint": "<redacted>",
+    "location": {
+      "path": "fib.py",
+      "positions": {
+        "begin": {
+          "line": 1,
+          "column": 8
+        },
+        "end": {
+          "line": 1,
+          "column": 10
+        }
+      }
+    }
+  },
+  {
+    "check_name": "F841",
+    "description": "F841: Local variable `x` is assigned to but never used",
+    "severity": "major",
+    "fingerprint": "<redacted>",
+    "location": {
+      "path": "fib.py",
+      "positions": {
+        "begin": {
+          "line": 6,
+          "column": 5
+        },
+        "end": {
+          "line": 6,
+          "column": 6
+        }
+      }
+    }
+  },
+  {
+    "check_name": "F821",
+    "description": "F821: Undefined name `a`",
+    "severity": "major",
+    "fingerprint": "<redacted>",
+    "location": {
+      "path": "undef.py",
+      "positions": {
+        "begin": {
+          "line": 1,
+          "column": 4
+        },
+        "end": {
+          "line": 1,
+          "column": 5
+        }
+      }
+    }
+  }
+]

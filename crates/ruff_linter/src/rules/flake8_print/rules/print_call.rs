@@ -36,18 +36,23 @@ use crate::{Fix, FixAvailability, Violation};
 /// ```python
 /// import logging
 ///
-/// logging.basicConfig(level=logging.INFO)
+/// logger = logging.getLogger(__name__)
 ///
 ///
 /// def sum_less_than_four(a, b):
-///     logging.debug("Calling sum_less_than_four")
+///     logger.debug("Calling sum_less_than_four")
 ///     return a + b < 4
+///
+///
+/// if __name__ == "__main__":
+///     logging.basicConfig(level=logging.INFO)
 /// ```
 ///
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it will remove `print` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.57")]
 pub(crate) struct Print;
 
 impl Violation for Print {
@@ -97,6 +102,7 @@ impl Violation for Print {
 /// This rule's fix is marked as unsafe, as it will remove `pprint` statements
 /// that are used beyond debugging purposes.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.57")]
 pub(crate) struct PPrint;
 
 impl Violation for PPrint {

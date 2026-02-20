@@ -28,6 +28,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::RuntimeImportInTypeCheckingBlock,
         Rule::SingledispatchMethod,
         Rule::SingledispatchmethodFunction,
+        Rule::SwapWithTemporaryVariable,
         Rule::TooManyLocals,
         Rule::TypingOnlyFirstPartyImport,
         Rule::TypingOnlyStandardLibraryImport,
@@ -94,6 +95,10 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
             pylint::rules::global_variable_not_assigned(checker, scope);
         }
 
+        if checker.is_rule_enabled(Rule::SwapWithTemporaryVariable) {
+            pylint::rules::swap_with_temporary_variable(checker, scope_id, scope);
+        }
+
         if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
             pylint::rules::redefined_argument_from_local(checker, scope_id, scope);
         }
@@ -134,7 +139,7 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
                 );
             }
             if checker.is_rule_enabled(Rule::FunctionCallInDataclassDefaultArgument) {
-                ruff::rules::function_call_in_dataclass_default(checker, class_def);
+                ruff::rules::function_call_in_dataclass_default(checker, class_def, scope_id);
             }
             if checker.is_rule_enabled(Rule::MutableClassDefault) {
                 ruff::rules::mutable_class_default(checker, class_def);

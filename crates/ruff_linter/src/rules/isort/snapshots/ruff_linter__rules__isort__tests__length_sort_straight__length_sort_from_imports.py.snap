@@ -10,9 +10,7 @@ I001 [*] Import block is un-sorted or un-formatted
   | |______________________________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-  1 |+from loooooooooooooooooooooog import c
-1 2 | from mediuuuuuuuuuuum import a
-2 3 | from short import b
-3   |-from loooooooooooooooooooooog import c
+1 + from loooooooooooooooooooooog import c
+2 | from mediuuuuuuuuuuum import a
+3 | from short import b
+  - from loooooooooooooooooooooog import c

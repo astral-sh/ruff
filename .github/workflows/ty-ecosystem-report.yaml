@@ -1,3 +1,7 @@
+# This workflow is a cron job that generates a report describing
+# all diagnostics ty emits across the whole ecosystem. The report
+# is uploaded to https://ty-ecosystem-ext.pages.dev/ on a weekly basis.
+
 name: ty ecosystem-report
 
 permissions: {}
@@ -14,26 +18,29 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
 
 jobs:
   ty-ecosystem-report:
     name: Create ecosystem report
-    runs-on: depot-ubuntu-22.04-32
-    timeout-minutes: 20
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 40
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           path: ruff
           fetch-depth: 0
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@e92bafb6253dcd438e0484186d7669ea7a8ca1cc # v6.4.3
+        uses: astral-sh/setup-uv@eac588ad8def6316056a12d4907a9d4d84ff7a3b # v7.3.0
+        with:
+          enable-cache: true
+          version: "0.10.2"
 
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
+          lookup-only: false
 
       - name: Install Rust toolchain
         run: rustup show
@@ -49,12 +56,14 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@27dd66d9e397d986ef9c631119ee09556eab8af9"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@3f567bd8ee20bce7a42f1334ac266829ab3f4eb5"
 
           ecosystem-analyzer \
             --verbose \
             --repository ruff \
+            --flaky-runs 20 \
             analyze \
+            --profile=profiling \
             --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
@@ -62,15 +71,14 @@ jobs:
 
           ecosystem-analyzer \
             generate-report \
-            --max-diagnostics-per-project=1200 \
+            --max-diagnostics-per-project=1000 \
             ecosystem-diagnostics.json \
             --output dist/index.html
 
-      - name: "Deploy to Cloudflare Pages"
-        if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
-        id: deploy
-        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
+      # NOTE: astral-sh-bot uses this artifact to publish the ecosystem report.
+      # Make sure to update the bot if you rename the artifact.
+      - name: "Upload ecosystem report"
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          apiToken: ${{ secrets.CF_API_TOKEN }}
-          accountId: ${{ secrets.CF_ACCOUNT_ID }}
-          command: pages deploy dist --project-name=ty-ecosystem --branch main --commit-hash ${GITHUB_SHA}
+          name: full-report
+          path: dist/

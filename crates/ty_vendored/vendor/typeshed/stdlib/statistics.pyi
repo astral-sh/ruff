@@ -106,10 +106,10 @@ A single exception is defined: StatisticsError is a subclass of ValueError.
 
 import sys
 from _typeshed import SupportsRichComparisonT
-from collections.abc import Callable, Hashable, Iterable, Sequence
+from collections.abc import Callable, Hashable, Iterable, Sequence, Sized
 from decimal import Decimal
 from fractions import Fraction
-from typing import Literal, NamedTuple, SupportsFloat, SupportsIndex, TypeVar
+from typing import Literal, NamedTuple, Protocol, SupportsFloat, SupportsIndex, TypeVar
 from typing_extensions import Self, TypeAlias
 
 __all__ = [
@@ -147,6 +147,10 @@ _HashableT = TypeVar("_HashableT", bound=Hashable)
 # Used in NormalDist.samples and kde_random
 _Seed: TypeAlias = int | float | str | bytes | bytearray  # noqa: Y041
 
+# Used in linear_regression
+_T_co = TypeVar("_T_co", covariant=True)
+
+class _SizedIterable(Iterable[_T_co], Sized, Protocol[_T_co]): ...
 class StatisticsError(ValueError): ...
 
 if sys.version_info >= (3, 11):
@@ -523,6 +527,7 @@ def variance(data: Iterable[_NumberT], xbar: _NumberT | None = None) -> _NumberT
 class NormalDist:
     """Normal distribution of a random variable"""
 
+    __slots__ = {"_mu": "Arithmetic mean of a normal distribution", "_sigma": "Standard deviation of a normal distribution"}
     def __init__(self, mu: float = 0.0, sigma: float = 1.0) -> None:
         """NormalDist where mu is the mean and sigma is the standard deviation."""
 
@@ -727,7 +732,7 @@ if sys.version_info >= (3, 10):
 
 if sys.version_info >= (3, 11):
     def linear_regression(
-        regressor: Sequence[_Number], dependent_variable: Sequence[_Number], /, *, proportional: bool = False
+        regressor: _SizedIterable[_Number], dependent_variable: _SizedIterable[_Number], /, *, proportional: bool = False
     ) -> LinearRegression:
         """Slope and intercept for simple linear regression.
 
@@ -768,7 +773,7 @@ if sys.version_info >= (3, 11):
         """
 
 elif sys.version_info >= (3, 10):
-    def linear_regression(regressor: Sequence[_Number], dependent_variable: Sequence[_Number], /) -> LinearRegression:
+    def linear_regression(regressor: _SizedIterable[_Number], dependent_variable: _SizedIterable[_Number], /) -> LinearRegression:
         """Slope and intercept for simple linear regression.
 
         Return the slope and intercept of simple linear regression

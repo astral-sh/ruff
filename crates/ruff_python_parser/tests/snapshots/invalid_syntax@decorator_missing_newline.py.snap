@@ -7,21 +7,21 @@ input_file: crates/ruff_python_parser/resources/inline/err/decorator_missing_new
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..60,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..17,
                     is_async: false,
                     decorator_list: [
                         Decorator {
                             range: 0..2,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             expression: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 1..2,
                                     id: Name("x"),
                                     ctx: Load,
@@ -32,14 +32,12 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 7..10,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 10..12,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -50,11 +48,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 14..17,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 14..17,
                                     },
                                 ),
@@ -65,16 +63,16 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 18..41,
                     is_async: true,
                     decorator_list: [
                         Decorator {
                             range: 18..20,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             expression: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 19..20,
                                     id: Name("x"),
                                     ctx: Load,
@@ -85,14 +83,12 @@ Module(
                     name: Identifier {
                         id: Name("foo"),
                         range: 31..34,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 34..36,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -103,11 +99,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 38..41,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 38..41,
                                     },
                                 ),
@@ -118,15 +114,15 @@ Module(
             ),
             ClassDef(
                 StmtClassDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 42..59,
                     decorator_list: [
                         Decorator {
                             range: 42..44,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             expression: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 43..44,
                                     id: Name("x"),
                                     ctx: Load,
@@ -137,18 +133,18 @@ Module(
                     name: Identifier {
                         id: Name("Foo"),
                         range: 51..54,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     arguments: None,
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 56..59,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 56..59,
                                     },
                                 ),
@@ -165,7 +161,7 @@ Module(
 
   |
 1 | @x def foo(): ...
-  |    ^^^ Syntax Error: Expected newline, found 'def'
+  |    ^^^ Syntax Error: Expected newline, found `def`
 2 | @x async def foo(): ...
 3 | @x class Foo: ...
   |
@@ -174,7 +170,7 @@ Module(
   |
 1 | @x def foo(): ...
 2 | @x async def foo(): ...
-  |    ^^^^^ Syntax Error: Expected newline, found 'async'
+  |    ^^^^^ Syntax Error: Expected newline, found `async`
 3 | @x class Foo: ...
   |
 
@@ -183,5 +179,5 @@ Module(
 1 | @x def foo(): ...
 2 | @x async def foo(): ...
 3 | @x class Foo: ...
-  |    ^^^^^ Syntax Error: Expected newline, found 'class'
+  |    ^^^^^ Syntax Error: Expected newline, found `class`
   |

@@ -17,6 +17,7 @@ _LocalDict: TypeAlias = dict[Any, Any]
 class _localimpl:
     """A class managing thread-local dicts"""
 
+    __slots__ = ("key", "dicts", "localargs", "locallock", "__weakref__")
     key: str
     dicts: dict[int, tuple[ReferenceType[Any], _LocalDict]]
     # Keep localargs in sync with the *args, **kwargs annotation on local.__new__
@@ -31,6 +32,7 @@ class _localimpl:
         """Create a new dict for the current thread, and return it."""
 
 class local:
+    __slots__ = ("_local__impl", "__dict__")
     def __new__(cls, /, *args: Any, **kw: Any) -> Self: ...
     def __getattribute__(self, name: str) -> Any: ...
     def __setattr__(self, name: str, value: Any) -> None: ...

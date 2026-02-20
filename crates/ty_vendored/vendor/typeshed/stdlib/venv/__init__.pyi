@@ -9,10 +9,11 @@ import sys
 from _typeshed import StrOrBytesPath
 from collections.abc import Iterable, Sequence
 from types import SimpleNamespace
+from typing import Final
 
 logger: logging.Logger
 
-CORE_VENV_DEPS: tuple[str, ...]
+CORE_VENV_DEPS: Final[tuple[str, ...]]
 
 class EnvBuilder:
     """
@@ -113,8 +114,7 @@ Set up a Python executable in the environment.
                 being processed.
 """
     def _setup_pip(self, context: SimpleNamespace) -> None:  # undocumented
-        """Installs or upgrades pip in a virtual environment
-"""
+        """Installs or upgrades pip in a virtual environment"""
     def setup_scripts(self, context: SimpleNamespace) -> None:
         """
 Set up scripts into the created environment from a directory.
@@ -180,8 +180,7 @@ if sys.version_info >= (3, 13):
         *,
         scm_ignore_files: Iterable[str] = ...,
     ) -> None:
-        """Create a virtual environment in a directory.
-"""
+        """Create a virtual environment in a directory."""
 
 else:
     def create(
@@ -193,7 +192,6 @@ else:
         prompt: str | None = None,
         upgrade_deps: bool = False,
     ) -> None:
-        """Create a virtual environment in a directory.
-"""
+        """Create a virtual environment in a directory."""
 
 def main(args: Sequence[str] | None = None) -> None: ...

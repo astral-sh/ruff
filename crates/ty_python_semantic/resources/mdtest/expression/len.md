@@ -43,13 +43,11 @@ reveal_type(len((1,)))  # revealed: Literal[1]
 reveal_type(len((1, 2)))  # revealed: Literal[2]
 reveal_type(len(tuple()))  # revealed: Literal[0]
 
-# TODO: Handle star unpacks; Should be: Literal[0]
-reveal_type(len((*[],)))  # revealed: Literal[1]
+reveal_type(len((*[],)))  # revealed: Literal[0]
 
 # fmt: off
 
-# TODO: Handle star unpacks; Should be: Literal[1]
-reveal_type(len(  # revealed: Literal[2]
+reveal_type(len(  # revealed: Literal[1]
     (
         *[],
         1,
@@ -58,11 +56,8 @@ reveal_type(len(  # revealed: Literal[2]
 
 # fmt: on
 
-# TODO: Handle star unpacks; Should be: Literal[2]
-reveal_type(len((*[], 1, 2)))  # revealed: Literal[3]
-
-# TODO: Handle star unpacks; Should be: Literal[0]
-reveal_type(len((*[], *{})))  # revealed: Literal[2]
+reveal_type(len((*[], 1, 2)))  # revealed: Literal[2]
+reveal_type(len((*[], *{})))  # revealed: Literal[0]
 ```
 
 Tuple subclasses:
@@ -103,8 +98,7 @@ class UnknownLengthSubclassWithDunderLenOverridden(tuple[int, ...]):
 reveal_type(len(UnknownLengthSubclassWithDunderLenOverridden()))  # revealed: Literal[42]
 
 class FixedLengthSubclassWithDunderLenOverridden(tuple[int]):
-    # TODO: we should complain about this as a Liskov violation (incompatible override)
-    def __len__(self) -> Literal[42]:
+    def __len__(self) -> Literal[42]:  # error: [invalid-method-override]
         return 42
 
 reveal_type(len(FixedLengthSubclassWithDunderLenOverridden((1,))))  # revealed: Literal[42]
@@ -170,10 +164,10 @@ reveal_type(len(ZeroOrOne()))  # revealed: Literal[0, 1]
 reveal_type(len(ZeroOrTrue()))  # revealed: Literal[0, 1]
 reveal_type(len(OneOrFalse()))  # revealed: Literal[1, 0]
 
-# TODO: Emit a diagnostic
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `OneOrFoo`"
 reveal_type(len(OneOrFoo()))  # revealed: int
 
-# TODO: Emit a diagnostic
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `ZeroOrStr`"
 reveal_type(len(ZeroOrStr()))  # revealed: int
 ```
 
@@ -192,46 +186,6 @@ class LiteralFalse:
 
 reveal_type(len(LiteralTrue()))  # revealed: Literal[1]
 reveal_type(len(LiteralFalse()))  # revealed: Literal[0]
-```
-
-### Enums
-
-```py
-from enum import Enum, auto
-from typing import Literal
-
-class SomeEnum(Enum):
-    AUTO = auto()
-    INT = 2
-    STR = "4"
-    TUPLE = (8, "16")
-    INT_2 = 3_2
-
-class Auto:
-    def __len__(self) -> Literal[SomeEnum.AUTO]:
-        return SomeEnum.AUTO
-
-class Int:
-    def __len__(self) -> Literal[SomeEnum.INT]:
-        return SomeEnum.INT
-
-class Str:
-    def __len__(self) -> Literal[SomeEnum.STR]:
-        return SomeEnum.STR
-
-class Tuple:
-    def __len__(self) -> Literal[SomeEnum.TUPLE]:
-        return SomeEnum.TUPLE
-
-class IntUnion:
-    def __len__(self) -> Literal[SomeEnum.INT, SomeEnum.INT_2]:
-        return SomeEnum.INT
-
-reveal_type(len(Auto()))  # revealed: int
-reveal_type(len(Int()))  # revealed: int
-reveal_type(len(Str()))  # revealed: int
-reveal_type(len(Tuple()))  # revealed: int
-reveal_type(len(IntUnion()))  # revealed: int
 ```
 
 ### Negative integers
@@ -260,11 +214,11 @@ class SecondRequiredArgument:
     def __len__(self, v: int) -> Literal[1]:
         return 1
 
-# TODO: Emit a diagnostic
+# this is fine: the call succeeds at runtime since the second argument is optional
 reveal_type(len(SecondOptionalArgument()))  # revealed: Literal[0]
 
-# TODO: Emit a diagnostic
-reveal_type(len(SecondRequiredArgument()))  # revealed: Literal[1]
+# error: [invalid-argument-type] "Argument to function `len` is incorrect: Expected `Sized`, found `SecondRequiredArgument`"
+reveal_type(len(SecondRequiredArgument()))  # revealed: int
 ```
 
 ### No `__len__`

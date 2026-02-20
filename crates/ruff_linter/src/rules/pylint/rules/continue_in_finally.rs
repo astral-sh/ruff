@@ -37,6 +37,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct ContinueInFinally;
 
 impl Violation for ContinueInFinally {

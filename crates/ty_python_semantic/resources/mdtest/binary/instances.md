@@ -313,8 +313,7 @@ reveal_type(A() + "foo")  # revealed: A
 reveal_type("foo" + A())  # revealed: A
 
 reveal_type(A() + b"foo")  # revealed: A
-# TODO should be `A` since `bytes.__add__` doesn't support `A` instances
-reveal_type(b"foo" + A())  # revealed: bytes
+reveal_type(b"foo" + A())  # revealed: A
 
 reveal_type(A() + ())  # revealed: A
 reveal_type(() + A())  # revealed: A
@@ -387,13 +386,13 @@ class A(metaclass=Meta): ...
 class B(metaclass=Meta): ...
 
 reveal_type(A + B)  # revealed: int
-# error: [unsupported-operator] "Operator `-` is unsupported between objects of type `<class 'A'>` and `<class 'B'>`"
+# error: [unsupported-operator] "Operator `-` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
 reveal_type(A - B)  # revealed: Unknown
 
 reveal_type(A < B)  # revealed: bool
 reveal_type(A > B)  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<=` is not supported for types `<class 'A'>` and `<class 'B'>`"
+# error: [unsupported-operator] "Operator `<=` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
 reveal_type(A <= B)  # revealed: Unknown
 
 reveal_type(A[0])  # revealed: str
@@ -413,7 +412,7 @@ class A:
     def __init__(self):
         self.__add__ = add_impl
 
-# error: [unsupported-operator] "Operator `+` is unsupported between objects of type `A` and `A`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `A`"
 # revealed: Unknown
 reveal_type(A() + A())
 ```

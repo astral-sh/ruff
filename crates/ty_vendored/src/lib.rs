@@ -1,3 +1,7 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
 use ruff_db::vendored::VendoredFileSystem;
 use std::sync::LazyLock;
 

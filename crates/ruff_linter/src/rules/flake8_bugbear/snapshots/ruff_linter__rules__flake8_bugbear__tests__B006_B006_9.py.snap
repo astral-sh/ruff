@@ -1,0 +1,22 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bugbear/mod.rs
+---
+B006 [*] Do not use mutable data structures for argument defaults
+  --> B006_9.py:17:11
+   |
+17 | def f5(x=([1, ])):
+   |           ^^^^^
+18 |     print(x)
+   |
+help: Replace with `None`; initialize within function
+14 |     print(x)
+15 | 
+16 | 
+   - def f5(x=([1, ])):
+17 + def f5(x=None):
+18 +     if x is None:
+19 +         x = [1]
+20 |     print(x)
+21 | 
+22 | 
+note: This is an unsafe fix and may change runtime behavior

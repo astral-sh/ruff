@@ -18,8 +18,6 @@ Q000 [*] Double quotes found but single quotes preferred
   |     ^^^^^^^^
   |
 help: Replace double quotes with single quotes
-
-ℹ Safe fix
-1 1 | s = ""'Start with empty string' ' and lint docstring safely'
-2   |-s = "Do not"' start with empty string' ' and lint docstring safely'
-  2 |+s = 'Do not'' start with empty string' ' and lint docstring safely'
+1 | s = ""'Start with empty string' ' and lint docstring safely'
+  - s = "Do not"' start with empty string' ' and lint docstring safely'
+2 + s = 'Do not'' start with empty string' ' and lint docstring safely'

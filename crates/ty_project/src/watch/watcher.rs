@@ -1,3 +1,8 @@
+#![allow(
+    clippy::disallowed_methods,
+    reason = "This implementation is specific to real file systems."
+)]
+
 use notify::event::{CreateKind, MetadataKind, ModifyKind, RemoveKind, RenameMode};
 use notify::{EventKind, RecommendedWatcher, RecursiveMode, Watcher as _, recommended_watcher};
 

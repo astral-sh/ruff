@@ -1,0 +1,60 @@
+---
+source: crates/ruff/tests/cli/format.rs
+info:
+  program: ruff
+  args:
+    - format
+    - "--no-cache"
+    - "--output-format"
+    - rdjson
+    - "--preview"
+    - "--check"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+{
+  "diagnostics": [
+    {
+      "code": {
+        "value": "unformatted"
+      },
+      "location": {
+        "path": "[TMP]/input.py",
+        "range": {
+          "end": {
+            "column": 1,
+            "line": 2
+          },
+          "start": {
+            "column": 1,
+            "line": 1
+          }
+        }
+      },
+      "message": "File would be reformatted",
+      "suggestions": [
+        {
+          "range": {
+            "end": {
+              "column": 1,
+              "line": 2
+            },
+            "start": {
+              "column": 1,
+              "line": 1
+            }
+          },
+          "text": ""
+        }
+      ]
+    }
+  ],
+  "severity": "WARNING",
+  "source": {
+    "name": "ruff",
+    "url": "https://docs.astral.sh/ruff"
+  }
+}
+----- stderr -----

@@ -12,15 +12,13 @@ D214 [*] Section is over-indented ("Returns")
 5 |     valid returns
   |
 help: Remove over-indentation from "Returns"
-
-ℹ Safe fix
-1 1 | """A module docstring with D214 violations
-2 2 | 
-3   |-    Returns
-  3 |+Returns
-4 4 | -----
-5 5 |     valid returns
-6 6 | 
+1 | """A module docstring with D214 violations
+2 | 
+  -     Returns
+3 + Returns
+4 | -----
+5 |     valid returns
+6 | 
 
 D214 [*] Section is over-indented ("Args")
  --> D214_module.py:7:5
@@ -33,13 +31,11 @@ D214 [*] Section is over-indented ("Args")
 9 |     valid args
   |
 help: Remove over-indentation from "Args"
-
-ℹ Safe fix
-4 4 | -----
-5 5 |     valid returns
-6 6 | 
-7   |-    Args
-  7 |+Args
-8 8 | -----
-9 9 |     valid args
-10 10 | """
+4  | -----
+5  |     valid returns
+6  | 
+   -     Args
+7  + Args
+8  | -----
+9  |     valid args
+10 | """

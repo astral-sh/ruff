@@ -24,3 +24,20 @@ ignore-interior-mutability = [
     # The expression is read-only.
     "ruff_python_ast::hashable::HashableExpr",
 ]
+
+disallowed-methods = [
+    { path = "std::env::var", reason = "Use System::env_var instead in ty crates" },
+    { path = "std::env::current_dir", reason = "Use System::current_directory instead in ty crates" },
+    { path = "std::fs::read_to_string", reason = "Use System::read_to_string instead in ty crates" },
+    { path = "std::fs::metadata", reason = "Use System::path_metadata instead in ty crates" },
+    { path = "std::fs::canonicalize", reason = "Use System::canonicalize_path instead in ty crates" },
+    { path = "dunce::canonicalize", reason = "Use System::canonicalize_path instead in ty crates" },
+    { path = "std::fs::read_dir", reason = "Use System::read_directory instead in ty crates" },
+    { path = "std::fs::write", reason = "Use WritableSystem::write_file instead in ty crates" },
+    { path = "std::fs::create_dir_all", reason = "Use WritableSystem::create_directory_all instead in ty crates" },
+    { path = "std::fs::File::create_new", reason = "Use WritableSystem::create_new_file instead in ty crates" },
+    # Path methods that have System trait equivalents
+    { path = "std::path::Path::exists", reason = "Use System::path_exists instead in ty crates" },
+    { path = "std::path::Path::is_dir", reason = "Use System::is_directory instead in ty crates" },
+    { path = "std::path::Path::is_file", reason = "Use System::is_file instead in ty crates" },
+]

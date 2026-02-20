@@ -255,6 +255,10 @@ impl RuffSettingsIndex {
 
         // Add any settings within the workspace itself
         let mut builder = WalkBuilder::new(root);
+        if let Ok(cwd) = std::env::current_dir() {
+            builder.current_dir(cwd);
+        }
+
         builder.standard_filters(
             respect_gitignore.unwrap_or_else(|| fallback.file_resolver.respect_gitignore),
         );
@@ -401,6 +405,7 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
             configuration,
             format_preview,
             lint_preview,
+            format_backend: _,
             select,
             extend_select,
             ignore,

@@ -6,7 +6,7 @@ from _typeshed import SupportsAllComparisons, SupportsItems
 from collections.abc import Callable, Hashable, Iterable, Sized
 from types import GenericAlias
 from typing import Any, Final, Generic, Literal, NamedTuple, TypedDict, TypeVar, final, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias
+from typing_extensions import ParamSpec, Self, TypeAlias, disjoint_base
 
 __all__ = [
     "update_wrapper",
@@ -87,7 +87,7 @@ class _CacheParameters(TypedDict):
     typed: bool
 
 @final
-class _lru_cache_wrapper(Generic[_T]):
+class _lru_cache_wrapper(Generic[_T_co]):
     """Create a cached callable that wraps another function.
 
     user_function:      the function being cached
@@ -103,8 +103,8 @@ class _lru_cache_wrapper(Generic[_T]):
                             hits misses currsize maxsize
     """
 
-    __wrapped__: Callable[..., _T]
-    def __call__(self, *args: Hashable, **kwargs: Hashable) -> _T:
+    __wrapped__: Callable[..., _T_co]
+    def __call__(self, *args: Hashable, **kwargs: Hashable) -> _T_co:
         """Call self as a function."""
 
     def cache_info(self) -> _CacheInfo:
@@ -114,8 +114,12 @@ class _lru_cache_wrapper(Generic[_T]):
         """Clear the cache and cache statistics"""
 
     def cache_parameters(self) -> _CacheParameters: ...
-    def __copy__(self) -> _lru_cache_wrapper[_T]: ...
-    def __deepcopy__(self, memo: Any, /) -> _lru_cache_wrapper[_T]: ...
+    def __copy__(self) -> _lru_cache_wrapper[_T_co]: ...
+    def __deepcopy__(self, memo: Any, /) -> _lru_cache_wrapper[_T_co]: ...
+
+    # as with ``Callable``, we'll assume that these attributes exist
+    __name__: str
+    __qualname__: str
 
 @overload
 def lru_cache(maxsize: int | None = 128, typed: bool = False) -> Callable[[Callable[..., _T]], _lru_cache_wrapper[_T]]:
@@ -169,7 +173,7 @@ else:
         tuple[Literal["__module__"], Literal["__name__"], Literal["__qualname__"], Literal["__doc__"], Literal["__annotations__"]]
     ]
 
-WRAPPER_UPDATES: tuple[Literal["__dict__"]]
+WRAPPER_UPDATES: Final[tuple[Literal["__dict__"]]]
 
 @type_check_only
 class _Wrapped(Generic[_PWrapped, _RWrapped, _PWrapper, _RWrapper]):
@@ -292,6 +296,7 @@ def cmp_to_key(mycmp: Callable[[_T, _T], int]) -> Callable[[_T], SupportsAllComp
       Function that compares two objects.
     """
 
+@disjoint_base
 class partial(Generic[_T]):
     """Create a new function with partial application of the given arguments
     and keywords.
@@ -330,10 +335,17 @@ class partialmethod(Generic[_T]):
     func: Callable[..., _T] | _Descriptor
     args: tuple[Any, ...]
     keywords: dict[str, Any]
-    @overload
-    def __init__(self, func: Callable[..., _T], /, *args: Any, **keywords: Any) -> None: ...
-    @overload
-    def __init__(self, func: _Descriptor, /, *args: Any, **keywords: Any) -> None: ...
+    if sys.version_info >= (3, 14):
+        @overload
+        def __new__(self, func: Callable[..., _T], /, *args: Any, **keywords: Any) -> Self: ...
+        @overload
+        def __new__(self, func: _Descriptor, /, *args: Any, **keywords: Any) -> Self: ...
+    else:
+        @overload
+        def __init__(self, func: Callable[..., _T], /, *args: Any, **keywords: Any) -> None: ...
+        @overload
+        def __init__(self, func: _Descriptor, /, *args: Any, **keywords: Any) -> None: ...
+
     def __get__(self, obj: Any, cls: type[Any] | None = None) -> Callable[..., _T]: ...
     @property
     def __isabstractmethod__(self) -> bool: ...
@@ -379,8 +391,7 @@ def singledispatch(func: Callable[..., _T]) -> _SingleDispatchCallable[_T]:
 class singledispatchmethod(Generic[_T]):
     """Single-dispatch generic method descriptor.
 
-    Supports wrapping existing descriptors and handles non-descriptor
-    callables as instance methods.
+    Supports wrapping existing descriptors.
     """
 
     dispatcher: _SingleDispatchCallable[_T]

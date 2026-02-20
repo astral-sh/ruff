@@ -18,16 +18,14 @@ I001 [*] Import block is un-sorted or un-formatted
    | |__________^
    |
 help: Organize imports
-
-ℹ Safe fix
-   1  |+import abc
-1  2  | import io
-   3  |+
-2  4  | # Old MacDonald had a farm,
-3  5  | # EIEIO
-4  6  | # And on his farm he had a cow,
+1  + import abc
+2  | import io
+3  + 
+4  | # Old MacDonald had a farm,
+5  | # EIEIO
+6  | # And on his farm he had a cow,
 --------------------------------------------------------------------------------
-8  10 | # Old MacDonald had a farm,
-9  11 | # EIEIO
-10 12 | from errno import EIO
-11    |-import abc
+10 | # Old MacDonald had a farm,
+11 | # EIEIO
+12 | from errno import EIO
+   - import abc

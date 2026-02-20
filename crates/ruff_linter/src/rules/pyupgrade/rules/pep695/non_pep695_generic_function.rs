@@ -1,3 +1,5 @@
+use rustc_hash::FxHashSet;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::StmtFunctionDef;
 use ruff_python_ast::visitor::Visitor;
@@ -71,6 +73,10 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// This rule only applies to generic functions and does not include generic classes. See
 /// [`non-pep695-generic-class`][UP046] for the class version.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PEP 696]: https://peps.python.org/pep-0696/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
@@ -78,6 +84,7 @@ use super::{DisplayTypeVars, TypeVarReferenceVisitor, check_type_vars, in_nested
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 /// [fail]: https://github.com/python/mypy/issues/18507
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP695GenericFunction {
     name: String,
 }
@@ -154,7 +161,11 @@ pub(crate) fn non_pep695_generic_function(checker: &Checker, function_def: &Stmt
         }
     }
 
-    let Some(type_vars) = check_type_vars(type_vars) else {
+    // Deduplicate type vars that appear in multiple parameter annotations
+    let mut seen = FxHashSet::default();
+    type_vars.retain(|tv| seen.insert(tv.name));
+
+    let Some(type_vars) = check_type_vars(type_vars, checker) else {
         return;
     };
 

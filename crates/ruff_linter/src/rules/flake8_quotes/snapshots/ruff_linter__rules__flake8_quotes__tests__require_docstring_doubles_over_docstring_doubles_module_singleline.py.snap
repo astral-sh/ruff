@@ -11,14 +11,12 @@ Q001 [*] Double quote multiline found but single quotes preferred
 4 | def foo():
   |
 help: Replace double multiline quotes with single quotes
-
-ℹ Safe fix
-1 1 | """ Double quotes singleline module docstring """
-2   |-""" this is not a docstring """
-  2 |+''' this is not a docstring '''
-3 3 | 
-4 4 | def foo():
-5 5 |     pass
+1 | """ Double quotes singleline module docstring """
+  - """ this is not a docstring """
+2 + ''' this is not a docstring '''
+3 | 
+4 | def foo():
+5 |     pass
 
 Q001 [*] Double quote multiline found but single quotes preferred
  --> docstring_doubles_module_singleline.py:6:1
@@ -29,10 +27,8 @@ Q001 [*] Double quote multiline found but single quotes preferred
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Replace double multiline quotes with single quotes
-
-ℹ Safe fix
-3 3 | 
-4 4 | def foo():
-5 5 |     pass
-6   |-""" this is not a docstring """
-  6 |+''' this is not a docstring '''
+3 | 
+4 | def foo():
+5 |     pass
+  - """ this is not a docstring """
+6 + ''' this is not a docstring '''

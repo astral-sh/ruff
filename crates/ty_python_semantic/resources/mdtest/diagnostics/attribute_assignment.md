@@ -38,6 +38,17 @@ instance.attr = "wrong"  # error: [invalid-assignment]
 C.attr = 1  # error: [invalid-attribute-access]
 ```
 
+## Invalid annotated assignment to attribute
+
+Annotated assignments to attributes on `self` should be validated against their annotation.
+
+```py
+class C:
+    def __init__(self):
+        self.attr: str = None  # error: [invalid-assignment]
+        self.attr2: int = 1  # fine
+```
+
 ## `ClassVar`s
 
 These can only be set on class objects. When trying to set them on instances, we generate a useful
@@ -69,7 +80,7 @@ instance = C()
 instance.non_existent = 1  # error: [unresolved-attribute]
 ```
 
-## Possibly-unbound attributes
+## Possibly-missing attributes
 
 When trying to set an attribute that is not defined in all branches, we emit errors:
 
@@ -79,10 +90,10 @@ def _(flag: bool) -> None:
         if flag:
             attr: int = 0
 
-    C.attr = 1  # error: [possibly-unbound-attribute]
+    C.attr = 1  # error: [possibly-missing-attribute]
 
     instance = C()
-    instance.attr = 1  # error: [possibly-unbound-attribute]
+    instance.attr = 1  # error: [possibly-missing-attribute]
 ```
 
 ## Data descriptors

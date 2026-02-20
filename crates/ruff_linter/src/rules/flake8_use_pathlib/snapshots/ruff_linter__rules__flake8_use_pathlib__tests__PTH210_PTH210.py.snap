@@ -1,17 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_use_pathlib/mod.rs
 ---
-PTH210 Invalid suffix passed to `.with_suffix()`
-  --> PTH210.py:21:1
-   |
-20 | ### Errors
-21 | path.with_suffix(".")
-   | ^^^^^^^^^^^^^^^^^^^^^
-22 | path.with_suffix("py")
-23 | path.with_suffix(r"s")
-   |
-help: Remove "." or extend to valid suffix
-
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:22:1
    |
@@ -23,16 +12,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 24 | path.with_suffix(u'' "json")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-19 19 | 
-20 20 | ### Errors
-21 21 | path.with_suffix(".")
-22    |-path.with_suffix("py")
-   22 |+path.with_suffix(".py")
-23 23 | path.with_suffix(r"s")
-24 24 | path.with_suffix(u'' "json")
-25 25 | path.with_suffix(suffix="js")
+19 | 
+20 | ### Errors
+21 | path.with_suffix(".")
+   - path.with_suffix("py")
+22 + path.with_suffix(".py")
+23 | path.with_suffix(r"s")
+24 | path.with_suffix(u'' "json")
+25 | path.with_suffix(suffix="js")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:23:1
@@ -45,16 +33,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 25 | path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-20 20 | ### Errors
-21 21 | path.with_suffix(".")
-22 22 | path.with_suffix("py")
-23    |-path.with_suffix(r"s")
-   23 |+path.with_suffix(r".s")
-24 24 | path.with_suffix(u'' "json")
-25 25 | path.with_suffix(suffix="js")
-26 26 | 
+20 | ### Errors
+21 | path.with_suffix(".")
+22 | path.with_suffix("py")
+   - path.with_suffix(r"s")
+23 + path.with_suffix(r".s")
+24 | path.with_suffix(u'' "json")
+25 | path.with_suffix(suffix="js")
+26 | 
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:24:1
@@ -66,16 +53,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 25 | path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-21 21 | path.with_suffix(".")
-22 22 | path.with_suffix("py")
-23 23 | path.with_suffix(r"s")
-24    |-path.with_suffix(u'' "json")
-   24 |+path.with_suffix(u'.' "json")
-25 25 | path.with_suffix(suffix="js")
-26 26 | 
-27 27 | posix_path.with_suffix(".")
+21 | path.with_suffix(".")
+22 | path.with_suffix("py")
+23 | path.with_suffix(r"s")
+   - path.with_suffix(u'' "json")
+24 + path.with_suffix(u'.' "json")
+25 | path.with_suffix(suffix="js")
+26 | 
+27 | posix_path.with_suffix(".")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:25:1
@@ -88,28 +74,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 27 | posix_path.with_suffix(".")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-22 22 | path.with_suffix("py")
-23 23 | path.with_suffix(r"s")
-24 24 | path.with_suffix(u'' "json")
-25    |-path.with_suffix(suffix="js")
-   25 |+path.with_suffix(suffix=".js")
-26 26 | 
-27 27 | posix_path.with_suffix(".")
-28 28 | posix_path.with_suffix("py")
-
-PTH210 Invalid suffix passed to `.with_suffix()`
-  --> PTH210.py:27:1
-   |
-25 | path.with_suffix(suffix="js")
-26 |
+22 | path.with_suffix("py")
+23 | path.with_suffix(r"s")
+24 | path.with_suffix(u'' "json")
+   - path.with_suffix(suffix="js")
+25 + path.with_suffix(suffix=".js")
+26 | 
 27 | posix_path.with_suffix(".")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
 28 | posix_path.with_suffix("py")
-29 | posix_path.with_suffix(r"s")
-   |
-help: Remove "." or extend to valid suffix
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:28:1
@@ -121,16 +94,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 30 | posix_path.with_suffix(u'' "json")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-25 25 | path.with_suffix(suffix="js")
-26 26 | 
-27 27 | posix_path.with_suffix(".")
-28    |-posix_path.with_suffix("py")
-   28 |+posix_path.with_suffix(".py")
-29 29 | posix_path.with_suffix(r"s")
-30 30 | posix_path.with_suffix(u'' "json")
-31 31 | posix_path.with_suffix(suffix="js")
+25 | path.with_suffix(suffix="js")
+26 | 
+27 | posix_path.with_suffix(".")
+   - posix_path.with_suffix("py")
+28 + posix_path.with_suffix(".py")
+29 | posix_path.with_suffix(r"s")
+30 | posix_path.with_suffix(u'' "json")
+31 | posix_path.with_suffix(suffix="js")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:29:1
@@ -143,16 +115,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 31 | posix_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-26 26 | 
-27 27 | posix_path.with_suffix(".")
-28 28 | posix_path.with_suffix("py")
-29    |-posix_path.with_suffix(r"s")
-   29 |+posix_path.with_suffix(r".s")
-30 30 | posix_path.with_suffix(u'' "json")
-31 31 | posix_path.with_suffix(suffix="js")
-32 32 | 
+26 | 
+27 | posix_path.with_suffix(".")
+28 | posix_path.with_suffix("py")
+   - posix_path.with_suffix(r"s")
+29 + posix_path.with_suffix(r".s")
+30 | posix_path.with_suffix(u'' "json")
+31 | posix_path.with_suffix(suffix="js")
+32 | 
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:30:1
@@ -164,16 +135,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 31 | posix_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-27 27 | posix_path.with_suffix(".")
-28 28 | posix_path.with_suffix("py")
-29 29 | posix_path.with_suffix(r"s")
-30    |-posix_path.with_suffix(u'' "json")
-   30 |+posix_path.with_suffix(u'.' "json")
-31 31 | posix_path.with_suffix(suffix="js")
-32 32 | 
-33 33 | pure_path.with_suffix(".")
+27 | posix_path.with_suffix(".")
+28 | posix_path.with_suffix("py")
+29 | posix_path.with_suffix(r"s")
+   - posix_path.with_suffix(u'' "json")
+30 + posix_path.with_suffix(u'.' "json")
+31 | posix_path.with_suffix(suffix="js")
+32 | 
+33 | pure_path.with_suffix(".")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:31:1
@@ -186,28 +156,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 33 | pure_path.with_suffix(".")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-28 28 | posix_path.with_suffix("py")
-29 29 | posix_path.with_suffix(r"s")
-30 30 | posix_path.with_suffix(u'' "json")
-31    |-posix_path.with_suffix(suffix="js")
-   31 |+posix_path.with_suffix(suffix=".js")
-32 32 | 
-33 33 | pure_path.with_suffix(".")
-34 34 | pure_path.with_suffix("py")
-
-PTH210 Invalid suffix passed to `.with_suffix()`
-  --> PTH210.py:33:1
-   |
-31 | posix_path.with_suffix(suffix="js")
-32 |
+28 | posix_path.with_suffix("py")
+29 | posix_path.with_suffix(r"s")
+30 | posix_path.with_suffix(u'' "json")
+   - posix_path.with_suffix(suffix="js")
+31 + posix_path.with_suffix(suffix=".js")
+32 | 
 33 | pure_path.with_suffix(".")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^
 34 | pure_path.with_suffix("py")
-35 | pure_path.with_suffix(r"s")
-   |
-help: Remove "." or extend to valid suffix
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:34:1
@@ -219,16 +176,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 36 | pure_path.with_suffix(u'' "json")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-31 31 | posix_path.with_suffix(suffix="js")
-32 32 | 
-33 33 | pure_path.with_suffix(".")
-34    |-pure_path.with_suffix("py")
-   34 |+pure_path.with_suffix(".py")
-35 35 | pure_path.with_suffix(r"s")
-36 36 | pure_path.with_suffix(u'' "json")
-37 37 | pure_path.with_suffix(suffix="js")
+31 | posix_path.with_suffix(suffix="js")
+32 | 
+33 | pure_path.with_suffix(".")
+   - pure_path.with_suffix("py")
+34 + pure_path.with_suffix(".py")
+35 | pure_path.with_suffix(r"s")
+36 | pure_path.with_suffix(u'' "json")
+37 | pure_path.with_suffix(suffix="js")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:35:1
@@ -241,16 +197,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 37 | pure_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-32 32 | 
-33 33 | pure_path.with_suffix(".")
-34 34 | pure_path.with_suffix("py")
-35    |-pure_path.with_suffix(r"s")
-   35 |+pure_path.with_suffix(r".s")
-36 36 | pure_path.with_suffix(u'' "json")
-37 37 | pure_path.with_suffix(suffix="js")
-38 38 | 
+32 | 
+33 | pure_path.with_suffix(".")
+34 | pure_path.with_suffix("py")
+   - pure_path.with_suffix(r"s")
+35 + pure_path.with_suffix(r".s")
+36 | pure_path.with_suffix(u'' "json")
+37 | pure_path.with_suffix(suffix="js")
+38 | 
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:36:1
@@ -262,16 +217,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 37 | pure_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-33 33 | pure_path.with_suffix(".")
-34 34 | pure_path.with_suffix("py")
-35 35 | pure_path.with_suffix(r"s")
-36    |-pure_path.with_suffix(u'' "json")
-   36 |+pure_path.with_suffix(u'.' "json")
-37 37 | pure_path.with_suffix(suffix="js")
-38 38 | 
-39 39 | pure_posix_path.with_suffix(".")
+33 | pure_path.with_suffix(".")
+34 | pure_path.with_suffix("py")
+35 | pure_path.with_suffix(r"s")
+   - pure_path.with_suffix(u'' "json")
+36 + pure_path.with_suffix(u'.' "json")
+37 | pure_path.with_suffix(suffix="js")
+38 | 
+39 | pure_posix_path.with_suffix(".")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:37:1
@@ -284,28 +238,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 39 | pure_posix_path.with_suffix(".")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-34 34 | pure_path.with_suffix("py")
-35 35 | pure_path.with_suffix(r"s")
-36 36 | pure_path.with_suffix(u'' "json")
-37    |-pure_path.with_suffix(suffix="js")
-   37 |+pure_path.with_suffix(suffix=".js")
-38 38 | 
-39 39 | pure_posix_path.with_suffix(".")
-40 40 | pure_posix_path.with_suffix("py")
-
-PTH210 Invalid suffix passed to `.with_suffix()`
-  --> PTH210.py:39:1
-   |
-37 | pure_path.with_suffix(suffix="js")
-38 |
+34 | pure_path.with_suffix("py")
+35 | pure_path.with_suffix(r"s")
+36 | pure_path.with_suffix(u'' "json")
+   - pure_path.with_suffix(suffix="js")
+37 + pure_path.with_suffix(suffix=".js")
+38 | 
 39 | pure_posix_path.with_suffix(".")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 40 | pure_posix_path.with_suffix("py")
-41 | pure_posix_path.with_suffix(r"s")
-   |
-help: Remove "." or extend to valid suffix
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:40:1
@@ -317,16 +258,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 42 | pure_posix_path.with_suffix(u'' "json")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-37 37 | pure_path.with_suffix(suffix="js")
-38 38 | 
-39 39 | pure_posix_path.with_suffix(".")
-40    |-pure_posix_path.with_suffix("py")
-   40 |+pure_posix_path.with_suffix(".py")
-41 41 | pure_posix_path.with_suffix(r"s")
-42 42 | pure_posix_path.with_suffix(u'' "json")
-43 43 | pure_posix_path.with_suffix(suffix="js")
+37 | pure_path.with_suffix(suffix="js")
+38 | 
+39 | pure_posix_path.with_suffix(".")
+   - pure_posix_path.with_suffix("py")
+40 + pure_posix_path.with_suffix(".py")
+41 | pure_posix_path.with_suffix(r"s")
+42 | pure_posix_path.with_suffix(u'' "json")
+43 | pure_posix_path.with_suffix(suffix="js")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:41:1
@@ -339,16 +279,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 43 | pure_posix_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-38 38 | 
-39 39 | pure_posix_path.with_suffix(".")
-40 40 | pure_posix_path.with_suffix("py")
-41    |-pure_posix_path.with_suffix(r"s")
-   41 |+pure_posix_path.with_suffix(r".s")
-42 42 | pure_posix_path.with_suffix(u'' "json")
-43 43 | pure_posix_path.with_suffix(suffix="js")
-44 44 | 
+38 | 
+39 | pure_posix_path.with_suffix(".")
+40 | pure_posix_path.with_suffix("py")
+   - pure_posix_path.with_suffix(r"s")
+41 + pure_posix_path.with_suffix(r".s")
+42 | pure_posix_path.with_suffix(u'' "json")
+43 | pure_posix_path.with_suffix(suffix="js")
+44 | 
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:42:1
@@ -360,16 +299,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 43 | pure_posix_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-39 39 | pure_posix_path.with_suffix(".")
-40 40 | pure_posix_path.with_suffix("py")
-41 41 | pure_posix_path.with_suffix(r"s")
-42    |-pure_posix_path.with_suffix(u'' "json")
-   42 |+pure_posix_path.with_suffix(u'.' "json")
-43 43 | pure_posix_path.with_suffix(suffix="js")
-44 44 | 
-45 45 | pure_windows_path.with_suffix(".")
+39 | pure_posix_path.with_suffix(".")
+40 | pure_posix_path.with_suffix("py")
+41 | pure_posix_path.with_suffix(r"s")
+   - pure_posix_path.with_suffix(u'' "json")
+42 + pure_posix_path.with_suffix(u'.' "json")
+43 | pure_posix_path.with_suffix(suffix="js")
+44 | 
+45 | pure_windows_path.with_suffix(".")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:43:1
@@ -382,28 +320,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 45 | pure_windows_path.with_suffix(".")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-40 40 | pure_posix_path.with_suffix("py")
-41 41 | pure_posix_path.with_suffix(r"s")
-42 42 | pure_posix_path.with_suffix(u'' "json")
-43    |-pure_posix_path.with_suffix(suffix="js")
-   43 |+pure_posix_path.with_suffix(suffix=".js")
-44 44 | 
-45 45 | pure_windows_path.with_suffix(".")
-46 46 | pure_windows_path.with_suffix("py")
-
-PTH210 Invalid suffix passed to `.with_suffix()`
-  --> PTH210.py:45:1
-   |
-43 | pure_posix_path.with_suffix(suffix="js")
-44 |
+40 | pure_posix_path.with_suffix("py")
+41 | pure_posix_path.with_suffix(r"s")
+42 | pure_posix_path.with_suffix(u'' "json")
+   - pure_posix_path.with_suffix(suffix="js")
+43 + pure_posix_path.with_suffix(suffix=".js")
+44 | 
 45 | pure_windows_path.with_suffix(".")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 46 | pure_windows_path.with_suffix("py")
-47 | pure_windows_path.with_suffix(r"s")
-   |
-help: Remove "." or extend to valid suffix
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:46:1
@@ -415,16 +340,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 48 | pure_windows_path.with_suffix(u'' "json")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-43 43 | pure_posix_path.with_suffix(suffix="js")
-44 44 | 
-45 45 | pure_windows_path.with_suffix(".")
-46    |-pure_windows_path.with_suffix("py")
-   46 |+pure_windows_path.with_suffix(".py")
-47 47 | pure_windows_path.with_suffix(r"s")
-48 48 | pure_windows_path.with_suffix(u'' "json")
-49 49 | pure_windows_path.with_suffix(suffix="js")
+43 | pure_posix_path.with_suffix(suffix="js")
+44 | 
+45 | pure_windows_path.with_suffix(".")
+   - pure_windows_path.with_suffix("py")
+46 + pure_windows_path.with_suffix(".py")
+47 | pure_windows_path.with_suffix(r"s")
+48 | pure_windows_path.with_suffix(u'' "json")
+49 | pure_windows_path.with_suffix(suffix="js")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:47:1
@@ -437,16 +361,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 49 | pure_windows_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-44 44 | 
-45 45 | pure_windows_path.with_suffix(".")
-46 46 | pure_windows_path.with_suffix("py")
-47    |-pure_windows_path.with_suffix(r"s")
-   47 |+pure_windows_path.with_suffix(r".s")
-48 48 | pure_windows_path.with_suffix(u'' "json")
-49 49 | pure_windows_path.with_suffix(suffix="js")
-50 50 | 
+44 | 
+45 | pure_windows_path.with_suffix(".")
+46 | pure_windows_path.with_suffix("py")
+   - pure_windows_path.with_suffix(r"s")
+47 + pure_windows_path.with_suffix(r".s")
+48 | pure_windows_path.with_suffix(u'' "json")
+49 | pure_windows_path.with_suffix(suffix="js")
+50 | 
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:48:1
@@ -458,16 +381,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 49 | pure_windows_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-45 45 | pure_windows_path.with_suffix(".")
-46 46 | pure_windows_path.with_suffix("py")
-47 47 | pure_windows_path.with_suffix(r"s")
-48    |-pure_windows_path.with_suffix(u'' "json")
-   48 |+pure_windows_path.with_suffix(u'.' "json")
-49 49 | pure_windows_path.with_suffix(suffix="js")
-50 50 | 
-51 51 | windows_path.with_suffix(".")
+45 | pure_windows_path.with_suffix(".")
+46 | pure_windows_path.with_suffix("py")
+47 | pure_windows_path.with_suffix(r"s")
+   - pure_windows_path.with_suffix(u'' "json")
+48 + pure_windows_path.with_suffix(u'.' "json")
+49 | pure_windows_path.with_suffix(suffix="js")
+50 | 
+51 | windows_path.with_suffix(".")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:49:1
@@ -480,28 +402,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 51 | windows_path.with_suffix(".")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-46 46 | pure_windows_path.with_suffix("py")
-47 47 | pure_windows_path.with_suffix(r"s")
-48 48 | pure_windows_path.with_suffix(u'' "json")
-49    |-pure_windows_path.with_suffix(suffix="js")
-   49 |+pure_windows_path.with_suffix(suffix=".js")
-50 50 | 
-51 51 | windows_path.with_suffix(".")
-52 52 | windows_path.with_suffix("py")
-
-PTH210 Invalid suffix passed to `.with_suffix()`
-  --> PTH210.py:51:1
-   |
-49 | pure_windows_path.with_suffix(suffix="js")
-50 |
+46 | pure_windows_path.with_suffix("py")
+47 | pure_windows_path.with_suffix(r"s")
+48 | pure_windows_path.with_suffix(u'' "json")
+   - pure_windows_path.with_suffix(suffix="js")
+49 + pure_windows_path.with_suffix(suffix=".js")
+50 | 
 51 | windows_path.with_suffix(".")
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 52 | windows_path.with_suffix("py")
-53 | windows_path.with_suffix(r"s")
-   |
-help: Remove "." or extend to valid suffix
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:52:1
@@ -513,16 +422,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 54 | windows_path.with_suffix(u'' "json")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-49 49 | pure_windows_path.with_suffix(suffix="js")
-50 50 | 
-51 51 | windows_path.with_suffix(".")
-52    |-windows_path.with_suffix("py")
-   52 |+windows_path.with_suffix(".py")
-53 53 | windows_path.with_suffix(r"s")
-54 54 | windows_path.with_suffix(u'' "json")
-55 55 | windows_path.with_suffix(suffix="js")
+49 | pure_windows_path.with_suffix(suffix="js")
+50 | 
+51 | windows_path.with_suffix(".")
+   - windows_path.with_suffix("py")
+52 + windows_path.with_suffix(".py")
+53 | windows_path.with_suffix(r"s")
+54 | windows_path.with_suffix(u'' "json")
+55 | windows_path.with_suffix(suffix="js")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:53:1
@@ -535,16 +443,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 55 | windows_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-50 50 | 
-51 51 | windows_path.with_suffix(".")
-52 52 | windows_path.with_suffix("py")
-53    |-windows_path.with_suffix(r"s")
-   53 |+windows_path.with_suffix(r".s")
-54 54 | windows_path.with_suffix(u'' "json")
-55 55 | windows_path.with_suffix(suffix="js")
-56 56 | 
+50 | 
+51 | windows_path.with_suffix(".")
+52 | windows_path.with_suffix("py")
+   - windows_path.with_suffix(r"s")
+53 + windows_path.with_suffix(r".s")
+54 | windows_path.with_suffix(u'' "json")
+55 | windows_path.with_suffix(suffix="js")
+56 | 
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:54:1
@@ -556,16 +463,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 55 | windows_path.with_suffix(suffix="js")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-51 51 | windows_path.with_suffix(".")
-52 52 | windows_path.with_suffix("py")
-53 53 | windows_path.with_suffix(r"s")
-54    |-windows_path.with_suffix(u'' "json")
-   54 |+windows_path.with_suffix(u'.' "json")
-55 55 | windows_path.with_suffix(suffix="js")
-56 56 | 
-57 57 | Path().with_suffix(".")
+51 | windows_path.with_suffix(".")
+52 | windows_path.with_suffix("py")
+53 | windows_path.with_suffix(r"s")
+   - windows_path.with_suffix(u'' "json")
+54 + windows_path.with_suffix(u'.' "json")
+55 | windows_path.with_suffix(suffix="js")
+56 | 
+57 | Path().with_suffix(".")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:55:1
@@ -578,28 +484,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 57 | Path().with_suffix(".")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-52 52 | windows_path.with_suffix("py")
-53 53 | windows_path.with_suffix(r"s")
-54 54 | windows_path.with_suffix(u'' "json")
-55    |-windows_path.with_suffix(suffix="js")
-   55 |+windows_path.with_suffix(suffix=".js")
-56 56 | 
-57 57 | Path().with_suffix(".")
-58 58 | Path().with_suffix("py")
-
-PTH210 Invalid suffix passed to `.with_suffix()`
-  --> PTH210.py:57:1
-   |
-55 | windows_path.with_suffix(suffix="js")
-56 |
+52 | windows_path.with_suffix("py")
+53 | windows_path.with_suffix(r"s")
+54 | windows_path.with_suffix(u'' "json")
+   - windows_path.with_suffix(suffix="js")
+55 + windows_path.with_suffix(suffix=".js")
+56 | 
 57 | Path().with_suffix(".")
-   | ^^^^^^^^^^^^^^^^^^^^^^^
 58 | Path().with_suffix("py")
-59 | PosixPath().with_suffix("py")
-   |
-help: Remove "." or extend to valid suffix
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:58:1
@@ -611,16 +504,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 60 | PurePath().with_suffix("py")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-55 55 | windows_path.with_suffix(suffix="js")
-56 56 | 
-57 57 | Path().with_suffix(".")
-58    |-Path().with_suffix("py")
-   58 |+Path().with_suffix(".py")
-59 59 | PosixPath().with_suffix("py")
-60 60 | PurePath().with_suffix("py")
-61 61 | PurePosixPath().with_suffix("py")
+55 | windows_path.with_suffix(suffix="js")
+56 | 
+57 | Path().with_suffix(".")
+   - Path().with_suffix("py")
+58 + Path().with_suffix(".py")
+59 | PosixPath().with_suffix("py")
+60 | PurePath().with_suffix("py")
+61 | PurePosixPath().with_suffix("py")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:59:1
@@ -633,16 +525,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 61 | PurePosixPath().with_suffix("py")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-56 56 | 
-57 57 | Path().with_suffix(".")
-58 58 | Path().with_suffix("py")
-59    |-PosixPath().with_suffix("py")
-   59 |+PosixPath().with_suffix(".py")
-60 60 | PurePath().with_suffix("py")
-61 61 | PurePosixPath().with_suffix("py")
-62 62 | PureWindowsPath().with_suffix("py")
+56 | 
+57 | Path().with_suffix(".")
+58 | Path().with_suffix("py")
+   - PosixPath().with_suffix("py")
+59 + PosixPath().with_suffix(".py")
+60 | PurePath().with_suffix("py")
+61 | PurePosixPath().with_suffix("py")
+62 | PureWindowsPath().with_suffix("py")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:60:1
@@ -655,16 +546,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 62 | PureWindowsPath().with_suffix("py")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-57 57 | Path().with_suffix(".")
-58 58 | Path().with_suffix("py")
-59 59 | PosixPath().with_suffix("py")
-60    |-PurePath().with_suffix("py")
-   60 |+PurePath().with_suffix(".py")
-61 61 | PurePosixPath().with_suffix("py")
-62 62 | PureWindowsPath().with_suffix("py")
-63 63 | WindowsPath().with_suffix("py")
+57 | Path().with_suffix(".")
+58 | Path().with_suffix("py")
+59 | PosixPath().with_suffix("py")
+   - PurePath().with_suffix("py")
+60 + PurePath().with_suffix(".py")
+61 | PurePosixPath().with_suffix("py")
+62 | PureWindowsPath().with_suffix("py")
+63 | WindowsPath().with_suffix("py")
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:61:1
@@ -677,16 +567,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 63 | WindowsPath().with_suffix("py")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-58 58 | Path().with_suffix("py")
-59 59 | PosixPath().with_suffix("py")
-60 60 | PurePath().with_suffix("py")
-61    |-PurePosixPath().with_suffix("py")
-   61 |+PurePosixPath().with_suffix(".py")
-62 62 | PureWindowsPath().with_suffix("py")
-63 63 | WindowsPath().with_suffix("py")
-64 64 | 
+58 | Path().with_suffix("py")
+59 | PosixPath().with_suffix("py")
+60 | PurePath().with_suffix("py")
+   - PurePosixPath().with_suffix("py")
+61 + PurePosixPath().with_suffix(".py")
+62 | PureWindowsPath().with_suffix("py")
+63 | WindowsPath().with_suffix("py")
+64 | 
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:62:1
@@ -698,16 +587,15 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 63 | WindowsPath().with_suffix("py")
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-59 59 | PosixPath().with_suffix("py")
-60 60 | PurePath().with_suffix("py")
-61 61 | PurePosixPath().with_suffix("py")
-62    |-PureWindowsPath().with_suffix("py")
-   62 |+PureWindowsPath().with_suffix(".py")
-63 63 | WindowsPath().with_suffix("py")
-64 64 | 
-65 65 | ### No errors
+59 | PosixPath().with_suffix("py")
+60 | PurePath().with_suffix("py")
+61 | PurePosixPath().with_suffix("py")
+   - PureWindowsPath().with_suffix("py")
+62 + PureWindowsPath().with_suffix(".py")
+63 | WindowsPath().with_suffix("py")
+64 | 
+65 | ### No errors
+note: This is an unsafe fix and may change runtime behavior
 
 PTH210 [*] Dotless suffix passed to `.with_suffix()`
   --> PTH210.py:63:1
@@ -720,13 +608,12 @@ PTH210 [*] Dotless suffix passed to `.with_suffix()`
 65 | ### No errors
    |
 help: Add a leading dot
-
-ℹ Unsafe fix
-60 60 | PurePath().with_suffix("py")
-61 61 | PurePosixPath().with_suffix("py")
-62 62 | PureWindowsPath().with_suffix("py")
-63    |-WindowsPath().with_suffix("py")
-   63 |+WindowsPath().with_suffix(".py")
-64 64 | 
-65 65 | ### No errors
-66 66 | path.with_suffix()
+60 | PurePath().with_suffix("py")
+61 | PurePosixPath().with_suffix("py")
+62 | PureWindowsPath().with_suffix("py")
+   - WindowsPath().with_suffix("py")
+63 + WindowsPath().with_suffix(".py")
+64 | 
+65 | ### No errors
+66 | path.with_suffix()
+note: This is an unsafe fix and may change runtime behavior

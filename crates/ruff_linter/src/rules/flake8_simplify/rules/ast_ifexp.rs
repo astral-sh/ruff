@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextRange};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 
 use crate::checkers::ast::Checker;
 use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
@@ -37,6 +37,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.214")]
 pub(crate) struct IfExprWithTrueFalse {
     is_compare: bool,
 }
@@ -85,6 +86,7 @@ impl Violation for IfExprWithTrueFalse {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.214")]
 pub(crate) struct IfExprWithFalseTrue;
 
 impl AlwaysFixableViolation for IfExprWithFalseTrue {
@@ -118,6 +120,7 @@ impl AlwaysFixableViolation for IfExprWithFalseTrue {
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.214")]
 pub(crate) struct IfExprWithTwistedArms {
     expr_body: String,
     expr_else: String,
@@ -168,13 +171,8 @@ pub(crate) fn if_expr_with_true_false(
             checker
                 .locator()
                 .slice(
-                    parenthesized_range(
-                        test.into(),
-                        expr.into(),
-                        checker.comment_ranges(),
-                        checker.locator().contents(),
-                    )
-                    .unwrap_or(test.range()),
+                    parenthesized_range(test.into(), expr.into(), checker.tokens())
+                        .unwrap_or(test.range()),
                 )
                 .to_string(),
             expr.range(),
@@ -188,7 +186,7 @@ pub(crate) fn if_expr_with_true_false(
                             id: Name::new_static("bool"),
                             ctx: ExprContext::Load,
                             range: TextRange::default(),
-                            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                         }
                         .into(),
                     ),
@@ -196,10 +194,10 @@ pub(crate) fn if_expr_with_true_false(
                         args: Box::from([test.clone()]),
                         keywords: Box::from([]),
                         range: TextRange::default(),
-                        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                     },
                     range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 }
                 .into(),
             ),
@@ -227,7 +225,7 @@ pub(crate) fn if_expr_with_false_true(
                 op: UnaryOp::Not,
                 operand: Box::new(test.clone()),
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             }
             .into(),
         ),
@@ -282,7 +280,7 @@ pub(crate) fn twisted_arms_in_ifexpr(
         body: Box::new(node1),
         orelse: Box::new(node),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
         checker.generator().expr(&node3.into()),

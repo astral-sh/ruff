@@ -123,17 +123,17 @@ class TarFile:
     OPEN_METH: ClassVar[Mapping[str, str]]
     name: StrOrBytesPath | None
     mode: Literal["r", "a", "w", "x"]
-    fileobj: _Fileobj | None
-    format: _TarFormat | None
+    fileobj: _Fileobj
+    format: _TarFormat
     tarinfo: type[TarInfo]
-    dereference: bool | None
-    ignore_zeros: bool | None
-    encoding: str | None
+    dereference: bool
+    ignore_zeros: bool
+    encoding: str
     errors: str
     fileobject: type[ExFileObject]  # undocumented
-    pax_headers: Mapping[str, str] | None
-    debug: int | None
-    errorlevel: int | None
+    pax_headers: Mapping[str, str]
+    debug: int
+    errorlevel: int
     offset: int  # undocumented
     extraction_filter: _FilterFunction | None
     if sys.version_info >= (3, 13):
@@ -276,7 +276,7 @@ class TarFile:
             errorlevel: int | None = ...,
             level: None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self:
             """Open a tar archive for reading, writing or appending. Return
             an appropriate TarFile class.
@@ -457,7 +457,7 @@ class TarFile:
             debug: int | None = ...,
             errorlevel: int | None = ...,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self:
             """Open a tar archive for reading, writing or appending. Return
             an appropriate TarFile class.
@@ -519,7 +519,7 @@ class TarFile:
             debug: int | None = ...,
             errorlevel: int | None = ...,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self: ...
 
     @overload
@@ -767,7 +767,7 @@ class TarFile:
             fileobj: IO[bytes] | None = None,
             level: None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
             *,
             format: int | None = ...,
             tarinfo: type[TarInfo] | None = ...,
@@ -791,7 +791,7 @@ class TarFile:
             fileobj: IO[bytes] | None = None,
             level: int | None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
             *,
             format: int | None = ...,
             tarinfo: type[TarInfo] | None = ...,
@@ -840,7 +840,7 @@ class TarFile:
         members: Iterable[TarInfo] | None = None,
         *,
         numeric_owner: bool = False,
-        filter: _TarfileFilter | None = ...,
+        filter: _TarfileFilter | None = None,
     ) -> None:
         """Extract all members from the archive to the current working
         directory and set owner, modification time and permissions on
@@ -862,7 +862,7 @@ class TarFile:
         set_attrs: bool = True,
         *,
         numeric_owner: bool = False,
-        filter: _TarfileFilter | None = ...,
+        filter: _TarfileFilter | None = None,
     ) -> None:
         """Extract a member from the archive to the current working directory,
         using its full name. Its file information is extracted as accurately
@@ -992,6 +992,46 @@ class TarFile:
         """
 
 open = TarFile.open
+"""Open a tar archive for reading, writing or appending. Return
+an appropriate TarFile class.
+
+mode:
+'r' or 'r:*' open for reading with transparent compression
+'r:'         open for reading exclusively uncompressed
+'r:gz'       open for reading with gzip compression
+'r:bz2'      open for reading with bzip2 compression
+'r:xz'       open for reading with lzma compression
+'r:zst'      open for reading with zstd compression
+'a' or 'a:'  open for appending, creating the file if necessary
+'w' or 'w:'  open for writing without compression
+'w:gz'       open for writing with gzip compression
+'w:bz2'      open for writing with bzip2 compression
+'w:xz'       open for writing with lzma compression
+'w:zst'      open for writing with zstd compression
+
+'x' or 'x:'  create a tarfile exclusively without compression, raise
+             an exception if the file is already created
+'x:gz'       create a gzip compressed tarfile, raise an exception
+             if the file is already created
+'x:bz2'      create a bzip2 compressed tarfile, raise an exception
+             if the file is already created
+'x:xz'       create an lzma compressed tarfile, raise an exception
+             if the file is already created
+'x:zst'      create a zstd compressed tarfile, raise an exception
+             if the file is already created
+
+'r|*'        open a stream of tar blocks with transparent compression
+'r|'         open an uncompressed stream of tar blocks for reading
+'r|gz'       open a gzip compressed stream of tar blocks
+'r|bz2'      open a bzip2 compressed stream of tar blocks
+'r|xz'       open an lzma compressed stream of tar blocks
+'r|zst'      open a zstd compressed stream of tar blocks
+'w|'         open an uncompressed stream for writing
+'w|gz'       open a gzip compressed stream for writing
+'w|bz2'      open a bzip2 compressed stream for writing
+'w|xz'       open an lzma compressed stream for writing
+'w|zst'      open a zstd compressed stream for writing
+"""
 
 def is_tarfile(name: StrOrBytesPath | IO[bytes]) -> bool:
     """Return True if name points to a tar archive that we
@@ -1053,8 +1093,32 @@ class TarInfo:
     usually created internally.
     """
 
+    __slots__ = (
+        "name",
+        "mode",
+        "uid",
+        "gid",
+        "size",
+        "mtime",
+        "chksum",
+        "type",
+        "linkname",
+        "uname",
+        "gname",
+        "devmajor",
+        "devminor",
+        "offset",
+        "offset_data",
+        "pax_headers",
+        "sparse",
+        "_tarfile",
+        "_sparse_structs",
+        "_link_target",
+    )
     name: str
     path: str
+    """In pax headers, "name" is called "path"."""
+
     size: int
     mtime: int | float
     chksum: int
@@ -1077,10 +1141,10 @@ class TarInfo:
         """
     if sys.version_info >= (3, 13):
         @property
-        @deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.16")
+        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
         def tarfile(self) -> TarFile | None: ...
         @tarfile.setter
-        @deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.16")
+        @deprecated("Deprecated since Python 3.13; will be removed in Python 3.16.")
         def tarfile(self, tarfile: TarFile | None) -> None: ...
     else:
         tarfile: TarFile | None

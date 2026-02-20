@@ -11,9 +11,9 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
-serde = { workspace = true, optional = true }
 get-size2 = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
+serde = { workspace = true, optional = true }
 
 [dev-dependencies]
 serde_test = { workspace = true }

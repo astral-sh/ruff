@@ -1,5 +1,100 @@
 # Breaking Changes
 
+## 0.15.0
+
+- **2026 formatter style guide**
+
+    Ruff now formats your code according to the 2026 style guide. See the
+    formatter section in the changelog or blog post for a detailed list of
+    changes.
+
+- **Block suppression comments in the linter**
+
+    The linter now supports block suppression comments. For example, to suppress
+    `N803` for all parameters in this function:
+
+    ```python
+    # ruff: disable[N803]
+    def foo(
+        legacyArg1,
+        legacyArg2,
+        legacyArg3,
+        legacyArg4,
+    ): ...
+    # ruff: enable[N803]
+    ```
+
+- **Alpine Docker image**
+
+    The `ruff:alpine` Docker image is now based on Alpine 3.23 (up from 3.21).
+
+- **Debian Docker image**
+
+    The `ruff:debian` and `ruff:debian-slim` Docker images are now based on Debian 13 "Trixie" instead of Debian 12 "Bookworm."
+
+- **`ppc64` binaries**
+
+    Binaries for the `ppc64` (64-bit big-endian PowerPC) architecture are no longer included in our releases. It should still be possible to build Ruff manually for this platform, if needed.
+
+- **Default Python version and `extend`**
+
+    Ruff now resolves all `extend`ed configuration files before falling back on a default Python version.
+
+## 0.14.0
+
+- **Default to Python 3.10**
+
+    Ruff now defaults to Python 3.10 instead of 3.9 if no explicit Python
+    version is configured using [`ruff.target-version`](https://docs.astral.sh/ruff/settings/#target-version)
+    or [`project.requires-python`](https://packaging.python.org/en/latest/guides/writing-pyproject-toml/#python-requires)
+    ([#20725](https://github.com/astral-sh/ruff/pull/20725))
+
+- **Default to Python 3.14 for syntax errors**
+
+    Ruff will default to the _latest_ supported Python version (3.14) when
+    checking for syntax errors without a Python version configured. The default
+    in all other cases, like applying lint rules, remains at the minimum
+    supported Python version (3.10).
+
+## 0.13.0
+
+- **Several rules can now add `from __future__ import annotations` automatically**
+
+    `TC001`, `TC002`, `TC003`, `RUF013`, and `UP037` now add `from __future__ import annotations` as part of their fixes when the
+    `lint.future-annotations` setting is enabled. This allows the rules to move
+    more imports into `TYPE_CHECKING` blocks (`TC001`, `TC002`, and `TC003`),
+    use PEP 604 union syntax on Python versions before 3.10 (`RUF013`), and
+    unquote more annotations (`UP037`).
+
+- **Full module paths are now used to verify first-party modules**
+
+    Ruff now checks that the full path to a module exists on disk before
+    categorizing it as a first-party import. This change makes first-party
+    import detection more accurate, helping to avoid false positives on local
+    directories with the same name as a third-party dependency, for example. See
+    the [FAQ
+    section](https://docs.astral.sh/ruff/faq/#how-does-ruff-determine-which-of-my-imports-are-first-party-third-party-etc) on import categorization for more details.
+
+- **Deprecated rules must now be selected by exact rule code**
+
+    Ruff will no longer activate deprecated rules selected by their group name
+    or prefix. As noted below, the two remaining deprecated rules were also
+    removed in this release, so this won't affect any current rules, but it will
+    still affect any deprecations in the future.
+
+- **The deprecated macOS configuration directory fallback has been removed**
+
+    Ruff will no longer look for a user-level configuration file at
+    `~/Library/Application Support/ruff/ruff.toml` on macOS. This feature was
+    deprecated in v0.5 in favor of using the [XDG
+    specification](https://specifications.freedesktop.org/basedir-spec/latest/)
+    (usually resolving to `~/.config/ruff/ruff.toml`), like on Linux. The
+    fallback and accompanying deprecation warning have now been removed.
+
+- **[`pandas-df-variable-name`](https://docs.astral.sh/ruff/rules/pandas-df-variable-name) (`PD901`) has been removed**
+
+- **[`non-pep604-isinstance`](https://docs.astral.sh/ruff/rules/non-pep604-isinstance) (`UP038`) has been removed**
+
 ## 0.12.0
 
 - **Detection of more syntax errors**

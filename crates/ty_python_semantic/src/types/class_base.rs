@@ -1,10 +1,13 @@
-use crate::Db;
-use crate::types::generics::Specialization;
+use crate::types::class::CodeGeneratorKind;
+use crate::types::generics::{ApplySpecialization, Specialization};
+use crate::types::mro::MroIterator;
+use crate::{Db, DisplaySettings};
+
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type, TypeMapping, TypeTransformer,
-    todo_type,
+    MaterializationKind, NormalizedVisitor, SpecialFormType, StaticMroError, Type, TypeContext,
+    TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -17,7 +20,7 @@ use crate::types::{
 /// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
@@ -42,17 +45,34 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
+            Self::Class(class) => Some(Self::Class(
+                class.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
+        }
+    }
+
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
-            ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
+            ClassBase::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => "Unknown",
+            ClassBase::Dynamic(DynamicType::UnspecializedTypeVar) => "UnspecializedTypeVar",
             ClassBase::Dynamic(
                 DynamicType::Todo(_)
-                | DynamicType::TodoPEP695ParamSpec
-                | DynamicType::TodoTypeAlias
-                | DynamicType::TodoUnpack,
+                | DynamicType::TodoUnpack
+                | DynamicType::TodoStarredExpression
+                | DynamicType::TodoTypeVarTuple,
             ) => "@Todo",
+            ClassBase::Dynamic(DynamicType::Divergent(_)) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
             ClassBase::TypedDict => "TypedDict",
@@ -61,10 +81,11 @@ impl<'db> ClassBase<'db> {
 
     /// Return a `ClassBase` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
-        KnownClass::Object
-            .to_class_literal(db)
-            .to_class_type(db)
-            .map_or(Self::unknown(), Self::Class)
+        Self::Class(ClassType::object(db))
+    }
+
+    pub(super) const fn is_typed_dict(self) -> bool {
+        matches!(self, ClassBase::TypedDict)
     }
 
     /// Attempt to resolve `ty` into a `ClassBase`.
@@ -73,20 +94,14 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(
         db: &'db dyn Db,
         ty: Type<'db>,
-        subclass: ClassLiteral<'db>,
+        subclass: Option<ClassLiteral<'db>>,
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
-            Type::ClassLiteral(literal) => {
-                if literal.is_known(db, KnownClass::Any) {
-                    Some(Self::Dynamic(DynamicType::Any))
-                } else {
-                    Some(Self::Class(literal.default_specialization(db)))
-                }
-            }
+            Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
-                if instance.class(db).is_known(db, KnownClass::GenericAlias) =>
+                if instance.has_known_class(db, KnownClass::GenericAlias) =>
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"), subclass)
             }
@@ -140,28 +155,27 @@ impl<'db> ClassBase<'db> {
 
             Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db), subclass),
 
+            Type::NewTypeInstance(newtype) => {
+                ClassBase::try_from_type(db, newtype.concrete_base_type(db), subclass)
+            }
+
             Type::PropertyInstance(_)
-            | Type::BooleanLiteral(_)
+            | Type::LiteralValue(_)
             | Type::FunctionLiteral(_)
             | Type::Callable(..)
             | Type::BoundMethod(_)
-            | Type::MethodWrapper(_)
+            | Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
-            | Type::BytesLiteral(_)
-            | Type::IntLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::LiteralString
             | Type::ModuleLiteral(_)
-            | Type::NonInferableTypeVar(_)
             | Type::TypeVar(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
@@ -170,7 +184,32 @@ impl<'db> ClassBase<'db> {
                 KnownInstanceType::TypeAliasType(_)
                 | KnownInstanceType::TypeVar(_)
                 | KnownInstanceType::Deprecated(_)
-                | KnownInstanceType::Field(_) => None,
+                | KnownInstanceType::Field(_)
+                | KnownInstanceType::ConstraintSet(_)
+                | KnownInstanceType::Callable(_)
+                | KnownInstanceType::GenericContext(_)
+                | KnownInstanceType::Specialization(_)
+                | KnownInstanceType::UnionType(_)
+                | KnownInstanceType::Literal(_)
+                | KnownInstanceType::LiteralStringAlias(_)
+                | KnownInstanceType::NamedTupleSpec(_)
+                // A class inheriting from a newtype would make intuitive sense, but newtype
+                // wrappers are just identity callables at runtime, so this sort of inheritance
+                // doesn't work and isn't allowed.
+                | KnownInstanceType::NewType(_) => None,
+                KnownInstanceType::TypeGenericAlias(_) => {
+                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
+                }
+                KnownInstanceType::Annotated(ty) => {
+                    // Unions are not supported in this position, so we only need to support
+                    // something like `class C(Annotated[Base, "metadata"]): ...`, which we
+                    // can do by turning the instance type (`Base` in this example) back into
+                    // a class.
+                    let annotated_ty = ty.inner(db);
+                    let instance_ty = annotated_ty.as_nominal_instance()?;
+
+                    Some(Self::Class(instance_ty.class(db)))
+                }
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -193,19 +232,23 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::ReadOnly
                 | SpecialFormType::Optional
                 | SpecialFormType::Not
+                | SpecialFormType::Top
+                | SpecialFormType::Bottom
                 | SpecialFormType::Intersection
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::AlwaysTruthy
                 | SpecialFormType::AlwaysFalsy => None,
 
+                SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),
 
                 SpecialFormType::Protocol => Some(Self::Protocol),
                 SpecialFormType::Generic => Some(Self::Generic),
 
                 SpecialFormType::NamedTuple => {
-                    let fields = subclass.own_fields(db, None);
+                    let class = subclass?.as_static()?;
+                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,
                         TupleType::heterogeneous(
@@ -269,15 +312,26 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    /// Return the metaclass of this class base.
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Class(class) => class.metaclass(db),
+            Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
+            Self::Protocol | Self::Generic | Self::TypedDict => KnownClass::Type.to_instance(db),
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         match self {
             Self::Class(class) => {
-                Self::Class(class.apply_type_mapping_impl(db, type_mapping, visitor))
+                Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
             Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
         }
@@ -289,23 +343,45 @@ impl<'db> ClassBase<'db> {
         specialization: Option<Specialization<'db>>,
     ) -> Self {
         if let Some(specialization) = specialization {
-            self.apply_type_mapping_impl(
+            let new_self = self.apply_type_mapping_impl(
                 db,
-                &TypeMapping::Specialization(specialization),
-                &TypeTransformer::default(),
-            )
+                &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                    specialization,
+                )),
+                TypeContext::default(),
+                &ApplyTypeMappingVisitor::default(),
+            );
+            match specialization.materialization_kind(db) {
+                None => new_self,
+                Some(materialization_kind) => new_self.materialize(db, materialization_kind),
+            }
         } else {
             self
         }
     }
 
+    fn materialize(self, db: &'db dyn Db, kind: MaterializationKind) -> Self {
+        self.apply_type_mapping_impl(
+            db,
+            &TypeMapping::Materialize(kind),
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
         match self {
             ClassBase::Class(class) => {
-                let (class_literal, specialization) = class.class_literal(db);
+                let Some((class_literal, specialization)) = class.static_class_literal(db) else {
+                    // Dynamic classes can't have cyclic MRO since their bases must
+                    // already exist at creation time. Unlike statement classes, we do not
+                    // permit dynamic classes to have forward references in their
+                    // bases list.
+                    return false;
+                };
                 class_literal
                     .try_mro(db, specialization)
-                    .is_err_and(MroError::is_cycle)
+                    .is_err_and(StaticMroError::is_cycle)
             }
             ClassBase::Dynamic(_)
             | ClassBase::Generic
@@ -328,6 +404,42 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
+        }
+    }
+
+    pub(super) fn display(self, db: &'db dyn Db) -> impl std::fmt::Display {
+        self.display_with(db, DisplaySettings::default())
+    }
+
+    pub(super) fn display_with(
+        self,
+        db: &'db dyn Db,
+        display_settings: DisplaySettings<'db>,
+    ) -> impl std::fmt::Display {
+        struct ClassBaseDisplay<'db> {
+            db: &'db dyn Db,
+            base: ClassBase<'db>,
+            settings: DisplaySettings<'db>,
+        }
+
+        impl std::fmt::Display for ClassBaseDisplay<'_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self.base {
+                    ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
+                    ClassBase::Class(class) => Type::from(class)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt(f),
+                    ClassBase::Protocol => f.write_str("typing.Protocol"),
+                    ClassBase::Generic => f.write_str("typing.Generic"),
+                    ClassBase::TypedDict => f.write_str("typing.TypedDict"),
+                }
+            }
+        }
+
+        ClassBaseDisplay {
+            db,
+            base: self,
+            settings: display_settings,
         }
     }
 }

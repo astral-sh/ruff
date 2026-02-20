@@ -110,9 +110,13 @@ class Function(SymbolTable):
         """Return a tuple of nonlocals in the function."""
 
 class Class(SymbolTable):
-    @deprecated("deprecated in Python 3.14, will be removed in Python 3.16")
-    def get_methods(self) -> tuple[str, ...]:
-        """Return a tuple of methods declared in the class."""
+    if sys.version_info >= (3, 14):
+        @deprecated("Deprecated since Python 3.14; will be removed in Python 3.16.")
+        def get_methods(self) -> tuple[str, ...]:
+            """Return a tuple of methods declared in the class."""
+    else:
+        def get_methods(self) -> tuple[str, ...]:
+            """Return a tuple of methods declared in the class."""
 
 class Symbol:
     def __init__(

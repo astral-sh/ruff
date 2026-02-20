@@ -42,6 +42,7 @@ use crate::checkers::ast::Checker;
 /// - [The Hitchhiker's Guide to Python: Late Binding Closures](https://docs.python-guide.org/writing/gotchas/#late-binding-closures)
 /// - [Python documentation: `functools.partial`](https://docs.python.org/3/library/functools.html#functools.partial)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.139")]
 pub(crate) struct FunctionUsesLoopVariable {
     name: String,
 }
@@ -131,6 +132,12 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                 range: _,
                 node_index: _,
             }) => {
+                // Mark immediately-invoked lambdas as safe — the closure
+                // is consumed right away, so late-binding is not a concern.
+                if func.is_lambda_expr() {
+                    self.safe_functions.push(func);
+                }
+
                 match func.as_ref() {
                     Expr::Name(ast::ExprName { id, .. }) => {
                         if matches!(id.as_str(), "filter" | "reduce" | "map") {

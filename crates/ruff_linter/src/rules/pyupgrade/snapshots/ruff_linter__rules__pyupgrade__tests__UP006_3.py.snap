@@ -9,11 +9,9 @@ UP006 [*] Use `collections.defaultdict` instead of `typing.DefaultDict` for type
 8 |     ...
   |
 help: Replace with `collections.defaultdict`
-
-ℹ Safe fix
-4 4 |     from collections import defaultdict
-5 5 | 
-6 6 | 
-7   |-def f(x: "typing.DefaultDict[str, str]") -> None:
-  7 |+def f(x: "defaultdict[str, str]") -> None:
-8 8 |     ...
+4 |     from collections import defaultdict
+5 | 
+6 | 
+  - def f(x: "typing.DefaultDict[str, str]") -> None:
+7 + def f(x: "defaultdict[str, str]") -> None:
+8 |     ...

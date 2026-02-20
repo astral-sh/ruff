@@ -1,47 +1,47 @@
 """Constants and membership tests for ASCII characters"""
 
-from typing import TypeVar
+from typing import Final, TypeVar
 
 _CharT = TypeVar("_CharT", str, int)
 
-NUL: int
-SOH: int
-STX: int
-ETX: int
-EOT: int
-ENQ: int
-ACK: int
-BEL: int
-BS: int
-TAB: int
-HT: int
-LF: int
-NL: int
-VT: int
-FF: int
-CR: int
-SO: int
-SI: int
-DLE: int
-DC1: int
-DC2: int
-DC3: int
-DC4: int
-NAK: int
-SYN: int
-ETB: int
-CAN: int
-EM: int
-SUB: int
-ESC: int
-FS: int
-GS: int
-RS: int
-US: int
-SP: int
-DEL: int
+NUL: Final = 0x00
+SOH: Final = 0x01
+STX: Final = 0x02
+ETX: Final = 0x03
+EOT: Final = 0x04
+ENQ: Final = 0x05
+ACK: Final = 0x06
+BEL: Final = 0x07
+BS: Final = 0x08
+TAB: Final = 0x09
+HT: Final = 0x09
+LF: Final = 0x0A
+NL: Final = 0x0A
+VT: Final = 0x0B
+FF: Final = 0x0C
+CR: Final = 0x0D
+SO: Final = 0x0E
+SI: Final = 0x0F
+DLE: Final = 0x10
+DC1: Final = 0x11
+DC2: Final = 0x12
+DC3: Final = 0x13
+DC4: Final = 0x14
+NAK: Final = 0x15
+SYN: Final = 0x16
+ETB: Final = 0x17
+CAN: Final = 0x18
+EM: Final = 0x19
+SUB: Final = 0x1A
+ESC: Final = 0x1B
+FS: Final = 0x1C
+GS: Final = 0x1D
+RS: Final = 0x1E
+US: Final = 0x1F
+SP: Final = 0x20
+DEL: Final = 0x7F
 
-controlnames: list[int]
+controlnames: Final[list[int]]
 
 def isalnum(c: str | int) -> bool: ...
 def isalpha(c: str | int) -> bool: ...

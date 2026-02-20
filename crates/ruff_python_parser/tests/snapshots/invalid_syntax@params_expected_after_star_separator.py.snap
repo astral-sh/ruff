@@ -7,26 +7,24 @@ input_file: crates/ruff_python_parser/resources/inline/err/params_expected_after
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..98,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..15,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 4..7,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 7..10,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -37,11 +35,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 12..15,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 12..15,
                                     },
                                 ),
@@ -52,21 +50,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 16..32,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 20..23,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 23..27,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -77,11 +73,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 29..32,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 29..32,
                                     },
                                 ),
@@ -92,33 +88,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 33..51,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 37..40,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 40..46,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 41..42,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 41..42,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 41..42,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -133,11 +127,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 48..51,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 48..51,
                                     },
                                 ),
@@ -148,33 +142,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 52..71,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 56..59,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 59..66,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 60..61,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 60..61,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 60..61,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -189,11 +181,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 68..71,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 68..71,
                                     },
                                 ),
@@ -204,21 +196,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 72..97,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 76..79,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 79..92,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -226,11 +216,11 @@ Module(
                         kwarg: Some(
                             Parameter {
                                 range: 83..91,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("kwargs"),
                                     range: 85..91,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                 },
                                 annotation: None,
                             },
@@ -240,11 +230,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 94..97,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 94..97,
                                     },
                                 ),
@@ -261,7 +251,7 @@ Module(
 
   |
 1 | def foo(*): ...
-  |         ^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |         ^ Syntax Error: Expected one or more keyword parameter after `*` separator
 2 | def foo(*,): ...
 3 | def foo(a, *): ...
   |
@@ -270,7 +260,7 @@ Module(
   |
 1 | def foo(*): ...
 2 | def foo(*,): ...
-  |         ^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |         ^ Syntax Error: Expected one or more keyword parameter after `*` separator
 3 | def foo(a, *): ...
 4 | def foo(a, *,): ...
   |
@@ -280,7 +270,7 @@ Module(
 1 | def foo(*): ...
 2 | def foo(*,): ...
 3 | def foo(a, *): ...
-  |            ^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |            ^ Syntax Error: Expected one or more keyword parameter after `*` separator
 4 | def foo(a, *,): ...
 5 | def foo(*, **kwargs): ...
   |
@@ -290,7 +280,7 @@ Module(
 2 | def foo(*,): ...
 3 | def foo(a, *): ...
 4 | def foo(a, *,): ...
-  |            ^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |            ^ Syntax Error: Expected one or more keyword parameter after `*` separator
 5 | def foo(*, **kwargs): ...
   |
 
@@ -299,5 +289,5 @@ Module(
 3 | def foo(a, *): ...
 4 | def foo(a, *,): ...
 5 | def foo(*, **kwargs): ...
-  |            ^^^^^^^^ Syntax Error: Expected one or more keyword parameter after '*' separator
+  |            ^^^^^^^^ Syntax Error: Expected one or more keyword parameter after `*` separator
   |

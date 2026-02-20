@@ -7,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/ok/match_classify_as_keyw
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..358,
         body: [
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..26,
                     subject: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 6..9,
                             id: Name("foo"),
                             ctx: Load,
@@ -25,11 +25,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 15..26,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 20..21,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -38,11 +38,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 23..26,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 23..26,
                                             },
                                         ),
@@ -55,11 +55,11 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 27..51,
                     subject: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 33..34,
                             value: Int(
                                 1,
@@ -69,11 +69,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 40..51,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 45..46,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -82,11 +82,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 48..51,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 48..51,
                                             },
                                         ),
@@ -99,11 +99,11 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 52..78,
                     subject: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 58..61,
                             value: Float(
                                 1.0,
@@ -113,11 +113,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 67..78,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 72..73,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -126,11 +126,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 75..78,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 75..78,
                                             },
                                         ),
@@ -143,11 +143,11 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 79..104,
                     subject: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 85..87,
                             value: Complex {
                                 real: 0.0,
@@ -158,11 +158,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 93..104,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 98..99,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -171,11 +171,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 101..104,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 101..104,
                                             },
                                         ),
@@ -188,22 +188,23 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 105..133,
                     subject: StringLiteral(
                         ExprStringLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 111..116,
                             value: StringLiteralValue {
                                 inner: Single(
                                     StringLiteral {
                                         range: 111..116,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         value: "foo",
                                         flags: StringLiteralFlags {
                                             quote_style: Double,
                                             prefix: Empty,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -213,11 +214,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 122..133,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 127..128,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -226,11 +227,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 130..133,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 130..133,
                                             },
                                         ),
@@ -243,33 +244,33 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 134..167,
                     subject: FString(
                         ExprFString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 140..150,
                             value: FStringValue {
                                 inner: Single(
                                     FString(
                                         FString {
                                             range: 140..150,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             elements: [
                                                 Literal(
                                                     InterpolatedStringLiteralElement {
                                                         range: 142..146,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         value: "foo ",
                                                     },
                                                 ),
                                                 Interpolation(
                                                     InterpolatedElement {
                                                         range: 146..149,
-                                                        node_index: AtomicNodeIndex(..),
+                                                        node_index: NodeIndex(None),
                                                         expression: Name(
                                                             ExprName {
-                                                                node_index: AtomicNodeIndex(..),
+                                                                node_index: NodeIndex(None),
                                                                 range: 147..148,
                                                                 id: Name("x"),
                                                                 ctx: Load,
@@ -285,6 +286,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -295,11 +297,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 156..167,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 161..162,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -308,11 +310,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 164..167,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 164..167,
                                             },
                                         ),
@@ -325,16 +327,16 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 168..197,
                     subject: Set(
                         ExprSet {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 174..180,
                             elts: [
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 175..176,
                                         value: Int(
                                             1,
@@ -343,7 +345,7 @@ Module(
                                 ),
                                 NumberLiteral(
                                     ExprNumberLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 178..179,
                                         value: Int(
                                             2,
@@ -356,11 +358,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 186..197,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 191..192,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -369,11 +371,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 194..197,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 194..197,
                                             },
                                         ),
@@ -386,16 +388,16 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 198..225,
                     subject: UnaryOp(
                         ExprUnaryOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 204..208,
                             op: Invert,
                             operand: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 205..208,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -406,11 +408,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 214..225,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 219..220,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -419,11 +421,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 222..225,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 222..225,
                                             },
                                         ),
@@ -436,22 +438,22 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 226..252,
                     subject: EllipsisLiteral(
                         ExprEllipsisLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 232..235,
                         },
                     ),
                     cases: [
                         MatchCase {
                             range: 241..252,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 246..247,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -460,11 +462,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 249..252,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 249..252,
                                             },
                                         ),
@@ -477,16 +479,16 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 253..283,
                     subject: UnaryOp(
                         ExprUnaryOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 259..266,
                             op: Not,
                             operand: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 263..266,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -497,11 +499,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 272..283,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 277..278,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -510,11 +512,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 280..283,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 280..283,
                                             },
                                         ),
@@ -527,19 +529,19 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 284..318,
                     subject: Await(
                         ExprAwait {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 290..301,
                             value: Call(
                                 ExprCall {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 296..301,
                                     func: Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 296..299,
                                             id: Name("foo"),
                                             ctx: Load,
@@ -547,7 +549,7 @@ Module(
                                     ),
                                     arguments: Arguments {
                                         range: 299..301,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         args: [],
                                         keywords: [],
                                     },
@@ -558,11 +560,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 307..318,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 312..313,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -571,11 +573,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 315..318,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 315..318,
                                             },
                                         ),
@@ -588,30 +590,28 @@ Module(
             ),
             Match(
                 StmtMatch {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 319..357,
                     subject: Lambda(
                         ExprLambda {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 325..340,
                             parameters: Some(
                                 Parameters {
                                     range: 332..335,
-                                    node_index: AtomicNodeIndex(
-                                        0,
-                                    ),
+                                    node_index: NodeIndex(None),
                                     posonlyargs: [],
                                     args: [
                                         ParameterWithDefault {
                                             range: 332..335,
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             parameter: Parameter {
                                                 range: 332..335,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 name: Identifier {
                                                     id: Name("foo"),
                                                     range: 332..335,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                 },
                                                 annotation: None,
                                             },
@@ -625,7 +625,7 @@ Module(
                             ),
                             body: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 337..340,
                                     id: Name("foo"),
                                     ctx: Load,
@@ -636,11 +636,11 @@ Module(
                     cases: [
                         MatchCase {
                             range: 346..357,
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
+                                    node_index: NodeIndex(None),
                                     range: 351..352,
-                                    node_index: AtomicNodeIndex(..),
                                     pattern: None,
                                     name: None,
                                 },
@@ -649,11 +649,11 @@ Module(
                             body: [
                                 Expr(
                                     StmtExpr {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 354..357,
                                         value: EllipsisLiteral(
                                             ExprEllipsisLiteral {
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 range: 354..357,
                                             },
                                         ),

@@ -9,7 +9,7 @@ use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
 use crate::types::tuple::{ResizeTupleError, Tuple, TupleLength, TupleSpec, TupleUnpacker};
-use crate::types::{Type, TypeCheckDiagnostics, infer_expression_types};
+use crate::types::{Type, TypeCheckDiagnostics, TypeContext, infer_expression_types};
 use crate::unpack::{UnpackKind, UnpackValue};
 
 use super::context::InferContext;
@@ -48,8 +48,9 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
             "Unpacking target must be a list or tuple expression"
         );
 
-        let value_type = infer_expression_types(self.db(), value.expression())
-            .expression_type(value.expression().node_ref(self.db(), self.module()));
+        let value_type =
+            infer_expression_types(self.db(), value.expression(), TypeContext::default())
+                .expression_type(value.expression().node_ref(self.db(), self.module()));
 
         let value_type = match value.kind() {
             UnpackKind::Assign => {
@@ -117,6 +118,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
                 };
                 let mut unpacker = TupleUnpacker::new(self.db(), target_len);
 
+                // N.B. `Type::try_iterate` internally handles unions, but in a lossy way.
+                // For our purposes here, we get better error messages and more precise inference
+                // if we manually map over the union and call `try_iterate` on each union element.
+                // See <https://github.com/astral-sh/ruff/pull/20377#issuecomment-3401380305>
+                // for more discussion.
                 let unpack_types = match value_ty {
                     Type::Union(union_ty) => union_ty.elements(self.db()),
                     _ => std::slice::from_ref(&value_ty),
@@ -174,10 +180,11 @@ impl<'db, 'ast> Unpacker<'db, 'ast> {
 
     pub(crate) fn finish(mut self) -> UnpackResult<'db> {
         self.targets.shrink_to_fit();
+
         UnpackResult {
             diagnostics: self.context.finish(),
             targets: self.targets,
-            cycle_fallback_type: None,
+            cycle_recovery: None,
         }
     }
 }
@@ -190,7 +197,7 @@ pub(crate) struct UnpackResult<'db> {
     /// The fallback type for missing expressions.
     ///
     /// This is used only when constructing a cycle-recovery `UnpackResult`.
-    cycle_fallback_type: Option<Type<'db>>,
+    cycle_recovery: Option<Type<'db>>,
 }
 
 impl<'db> UnpackResult<'db> {
@@ -216,7 +223,7 @@ impl<'db> UnpackResult<'db> {
         self.targets
             .get(&expr.into())
             .copied()
-            .or(self.cycle_fallback_type)
+            .or(self.cycle_recovery)
     }
 
     /// Returns the diagnostics in this unpacking assignment.
@@ -224,11 +231,25 @@ impl<'db> UnpackResult<'db> {
         &self.diagnostics
     }
 
-    pub(crate) fn cycle_fallback(cycle_fallback_type: Type<'db>) -> Self {
+    pub(crate) fn cycle_initial(cycle_recovery: Type<'db>) -> Self {
         Self {
             targets: FxHashMap::default(),
             diagnostics: TypeCheckDiagnostics::default(),
-            cycle_fallback_type: Some(cycle_fallback_type),
+            cycle_recovery: Some(cycle_recovery),
         }
+    }
+
+    pub(crate) fn cycle_normalized(
+        mut self,
+        db: &'db dyn Db,
+        previous_cycle_result: &UnpackResult<'db>,
+        cycle: &salsa::Cycle,
+    ) -> Self {
+        for (expr, ty) in &mut self.targets {
+            let previous_ty = previous_cycle_result.expression_type(*expr);
+            *ty = ty.cycle_normalized(db, previous_ty, cycle);
+        }
+
+        self
     }
 }

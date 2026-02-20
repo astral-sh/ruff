@@ -122,12 +122,20 @@ class MixedGenerics[U]:
         return (u, t)
 
 
-# TODO(brent) default requires 3.13
+# default requires 3.13
 V = TypeVar("V", default=Any, bound=str)
 
 
 class DefaultTypeVar(Generic[V]):  # -> [V: str = Any]
     var: V
+
+
+# Test case for TypeVar with default but no bound
+W = TypeVar("W", default=int)
+
+
+class DefaultOnlyTypeVar(Generic[W]):  # -> [W = int]
+    var: W
 
 
 # nested classes and functions are skipped

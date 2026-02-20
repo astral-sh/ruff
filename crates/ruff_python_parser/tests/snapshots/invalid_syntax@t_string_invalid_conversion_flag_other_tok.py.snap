@@ -7,30 +7,30 @@ input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_conv
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..66,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 44..54,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 44..54,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 44..54,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 46..53,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 47..48,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -46,6 +46,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -56,25 +57,25 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 55..65,
                     value: TString(
                         ExprTString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 55..65,
                             value: TStringValue {
                                 inner: Single(
                                     TString {
                                         range: 55..65,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Interpolation(
                                                 InterpolatedElement {
                                                     range: 57..64,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     expression: Name(
                                                         ExprName {
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             range: 58..59,
                                                             id: Name("x"),
                                                             ctx: Load,
@@ -90,6 +91,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),

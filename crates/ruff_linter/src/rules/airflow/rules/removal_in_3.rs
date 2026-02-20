@@ -1,7 +1,7 @@
 use crate::checkers::ast::Checker;
 use crate::rules::airflow::helpers::{
     Replacement, generate_import_edit, generate_remove_and_runtime_import_edit,
-    is_airflow_builtin_or_provider, is_guarded_by_try_except,
+    is_airflow_builtin_or_provider, is_guarded_by_try_except, is_method_in_subclass,
 };
 use crate::{Edit, Fix, FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -14,6 +14,7 @@ use ruff_python_semantic::Modules;
 use ruff_python_semantic::ScopeKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 use ruff_text_size::TextRange;
 
@@ -23,7 +24,7 @@ use ruff_text_size::TextRange;
 /// ## Why is this bad?
 /// Airflow 3.0 removed various deprecated functions, members, and other
 /// values. Some have more modern replacements. Others are considered too niche
-/// and not worth to be maintained in Airflow.
+/// and not worth continued maintenance in Airflow.
 ///
 /// ## Example
 /// ```python
@@ -41,6 +42,7 @@ use ruff_text_size::TextRange;
 /// yesterday = today - timedelta(days=1)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct Airflow3Removal {
     deprecated: String,
     replacement: Replacement,
@@ -51,19 +53,8 @@ impl Violation for Airflow3Removal {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Airflow3Removal {
-            deprecated,
-            replacement,
-        } = self;
-        match replacement {
-            Replacement::None
-            | Replacement::AttrName(_)
-            | Replacement::Message(_)
-            | Replacement::AutoImport { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ } => {
-                format!("`{deprecated}` is removed in Airflow 3.0")
-            }
-        }
+        let Airflow3Removal { deprecated, .. } = self;
+        format!("`{deprecated}` is removed in Airflow 3.0")
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -72,12 +63,27 @@ impl Violation for Airflow3Removal {
             Replacement::None => None,
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
-            Replacement::AutoImport { module, name } => {
+            Replacement::Rename { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
             Replacement::SourceModuleMoved { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
+            Replacement::SourceModuleMovedToSDK {
+                module,
+                name,
+                version,
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0 (with apache-airflow-task-sdk>={version})."
+            )),
+            Replacement::SourceModuleMovedWithMessage {
+                module,
+                name,
+                message,
+                ..
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0. {message}"
+            )),
         }
     }
 }
@@ -103,6 +109,7 @@ pub(crate) fn airflow_3_removal_expr(checker: &Checker, expr: &Expr) {
         Expr::Attribute(attribute_expr @ ExprAttribute { range, .. }) => {
             check_name(checker, expr, *range);
             check_class_attribute(checker, attribute_expr);
+            check_removed_attribute_access_on_context_key(checker, attribute_expr);
         }
         Expr::Name(ExprName {
             id,
@@ -131,6 +138,7 @@ pub(crate) fn airflow_3_removal_function_def(checker: &Checker, function_def: &S
     }
 
     check_function_parameters(checker, function_def);
+    check_apply_defaults_decorator(checker, function_def);
 }
 
 const REMOVED_CONTEXT_KEYS: [&str; 12] = [
@@ -195,12 +203,19 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             // with replacement
+            diagnostic_for_argument(checker, arguments, "concurrency", Some("max_active_tasks"));
             diagnostic_for_argument(checker, arguments, "fail_stop", Some("fail_fast"));
             diagnostic_for_argument(checker, arguments, "schedule_interval", Some("schedule"));
             diagnostic_for_argument(checker, arguments, "timetable", Some("schedule"));
             // without replacement
             diagnostic_for_argument(checker, arguments, "default_view", None);
             diagnostic_for_argument(checker, arguments, "orientation", None);
+        }
+        ["airflow", "sdk", .., "Variable", "get"] => {
+            diagnostic_for_argument(checker, arguments, "default_var", Some("default"));
+        }
+        ["airflow", "decorators" | "sdk", "task"] => {
+            check_trigger_rule_argument_value(checker, arguments);
         }
         segments => {
             if is_airflow_auth_manager(segments) {
@@ -224,6 +239,8 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
                     "task_concurrency",
                     Some("max_active_tis_per_dag"),
                 );
+                diagnostic_for_argument(checker, arguments, "provide_context", None);
+                check_trigger_rule_argument_value(checker, arguments);
                 match segments {
                     [
                         "airflow",
@@ -322,6 +339,55 @@ fn check_class_attribute(checker: &Checker, attribute_expr: &ExprAttribute) {
     }
 }
 
+fn check_deprecated_context_key_value_access(
+    checker: &Checker,
+    value: &Expr,
+    range: TextRange,
+) -> bool {
+    // access context["inlet_events"] via a string key is deprecated.
+    if is_value_from_context_key(checker, value, "inlet_events") {
+        checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: "inlet_events[\"<uri>\"]".to_string(),
+                replacement: Replacement::Message(
+                    "Accessing `inlet_events` via a string key is deprecated; use `context[\"inlet_events\"][Asset(uri=\"this://is-url\")]` instead of `context[\"inlet_events\"][\"this://is-url\"]`.",
+                ),
+            },
+            range,
+        );
+        return true;
+    }
+    false
+}
+
+/// Check for deprecated/renamed context key access and report diagnostics.
+fn check_deprecated_context_key(checker: &Checker, key: &str, range: TextRange) {
+    if REMOVED_CONTEXT_KEYS.contains(&key) {
+        checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: key.to_string(),
+                replacement: Replacement::None,
+            },
+            range,
+        );
+        return;
+    }
+
+    if key == "triggering_dataset_events" {
+        let mut diagnostic = checker.report_diagnostic(
+            Airflow3Removal {
+                deprecated: "triggering_dataset_events".to_string(),
+                replacement: Replacement::AttrName("triggering_asset_events"),
+            },
+            range,
+        );
+        diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+            "\"triggering_asset_events\"".to_string(),
+            range,
+        )));
+    }
+}
+
 /// Checks whether an Airflow 3.0–removed context key is used in a function decorated with `@task`.
 ///
 /// Specifically, it flags the following two scenarios:
@@ -363,41 +429,24 @@ fn check_context_key_usage_in_call(checker: &Checker, call_expr: &ExprCall) {
         return;
     }
 
-    let is_kwarg_parameter = value
-        .as_name_expr()
-        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
+    let Some(Expr::StringLiteral(ExprStringLiteral {
+        value: key,
+        range,
+        node_index: _,
+    })) = call_expr.arguments.find_positional(0)
+    else {
+        return;
+    };
 
-    let is_assigned_from_get_current_context =
-        typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["airflow", "utils", "context", "get_current_context"]
-            )
-        });
-
-    if !(is_kwarg_parameter || is_assigned_from_get_current_context) {
+    if check_deprecated_context_key_value_access(checker, value, *range) {
         return;
     }
 
-    for removed_key in REMOVED_CONTEXT_KEYS {
-        let Some(Expr::StringLiteral(ExprStringLiteral {
-            value,
-            range,
-            node_index: _,
-        })) = call_expr.arguments.find_positional(0)
-        else {
-            continue;
-        };
-        if value == removed_key {
-            checker.report_diagnostic(
-                Airflow3Removal {
-                    deprecated: removed_key.to_string(),
-                    replacement: Replacement::None,
-                },
-                *range,
-            );
-        }
+    if !is_context_variable(checker, value) {
+        return;
     }
+
+    check_deprecated_context_key(checker, key.to_str(), *range);
 }
 
 /// Check if a subscript expression accesses a removed Airflow context variable.
@@ -413,30 +462,55 @@ fn check_context_key_usage_in_subscript(checker: &Checker, subscript: &ExprSubsc
         return;
     };
 
-    let is_kwarg_parameter = value
-        .as_name_expr()
-        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
-
-    let is_assigned_from_get_current_context =
-        typing::resolve_assignment(value, checker.semantic()).is_some_and(|qualified_name| {
-            matches!(
-                qualified_name.segments(),
-                ["airflow", "utils", "context", "get_current_context"]
-            )
-        });
-
-    if !(is_kwarg_parameter || is_assigned_from_get_current_context) {
+    if check_deprecated_context_key_value_access(checker, value, slice.range()) {
         return;
     }
 
-    if REMOVED_CONTEXT_KEYS.contains(&key.to_str()) {
-        checker.report_diagnostic(
-            Airflow3Removal {
-                deprecated: key.to_string(),
-                replacement: Replacement::None,
-            },
-            slice.range(),
-        );
+    if !is_context_variable(checker, value) {
+        return;
+    }
+
+    check_deprecated_context_key(checker, key.to_str(), slice.range());
+}
+
+/// Check for removed attribute access on context key value.
+fn check_removed_attribute_access_on_context_key(checker: &Checker, attr_expr: &ExprAttribute) {
+    if !in_airflow_task_function(checker.semantic()) {
+        return;
+    }
+
+    let attr = attr_expr.attr.as_str();
+
+    let replacement = match attr {
+        "external_trigger"
+            if is_removed_context_key_attribute(checker, attr_expr, "dag_run", attr) =>
+        {
+            Replacement::Message(
+                "`external_trigger` is removed; it cannot be accessed from `context[\"dag_run\"]`",
+            )
+        }
+        _ => return,
+    };
+
+    let fix = if let Replacement::AttrName(name) = replacement {
+        Some(Fix::safe_edit(Edit::range_replacement(
+            name.to_string(),
+            attr_expr.attr.range(),
+        )))
+    } else {
+        None
+    };
+
+    let mut diagnostic = checker.report_diagnostic(
+        Airflow3Removal {
+            deprecated: attr.to_string(),
+            replacement,
+        },
+        attr_expr.attr.range(),
+    );
+
+    if let Some(fix) = fix {
+        diagnostic.set_fix(fix);
     }
 }
 
@@ -491,6 +565,12 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             "collected_datasets" => Replacement::AttrName("collected_assets"),
             _ => return,
         },
+        ["airflow", "models", "dag", "DAG"] | ["airflow", "models", "DAG"] | ["airflow", "DAG"] => {
+            match attr.as_str() {
+                "create_dagrun" => Replacement::None,
+                _ => return,
+            }
+        }
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "initialize_providers_dataset_uri_resources" => {
                 Replacement::AttrName("initialize_providers_asset_uri_resources")
@@ -593,7 +673,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "api_connexion",
             "security",
             "requires_access_dataset",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.api_fastapi.core_api.security",
             name: "requires_access_asset",
         },
@@ -605,7 +685,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "managers",
             "base_auth_manager",
             "BaseAuthManager",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.api_fastapi.auth.managers.base_auth_manager",
             name: "BaseAuthManager",
         },
@@ -616,7 +696,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "models",
             "resource_details",
             "DatasetDetails",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.api_fastapi.auth.managers.models.resource_details",
             name: "AssetDetails",
         },
@@ -639,15 +719,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.datasets.manager
         ["airflow", "datasets", "manager", rest] => match *rest {
-            "DatasetManager" => Replacement::AutoImport {
+            "DatasetManager" => Replacement::Rename {
                 module: "airflow.assets.manager",
                 name: "AssetManager",
             },
-            "dataset_manager" => Replacement::AutoImport {
+            "dataset_manager" => Replacement::Rename {
                 module: "airflow.assets.manager",
                 name: "asset_manager",
             },
-            "resolve_dataset_manager" => Replacement::AutoImport {
+            "resolve_dataset_manager" => Replacement::Rename {
                 module: "airflow.assets.manager",
                 name: "resolve_asset_manager",
             },
@@ -655,26 +735,35 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
         // airflow.datasets
         ["airflow", "datasets", "DatasetAliasEvent"] => Replacement::None,
+        ["airflow", "datasets", "DatasetEvent"] => Replacement::Message(
+            "`DatasetEvent` has been made private in Airflow 3. \
+             Use `dict[str, Any]` for the time being. \
+             An `AssetEvent` type will be added to the apache-airflow-task-sdk in a future version.",
+        ),
 
         // airflow.hooks
-        ["airflow", "hooks", "base_hook", "BaseHook"] => Replacement::AutoImport {
-            module: "airflow.hooks.base",
-            name: "BaseHook",
-        },
+        ["airflow", "hooks", "base_hook", "BaseHook"] => {
+            Replacement::SourceModuleMovedWithMessage {
+                module: "airflow.hooks.base",
+                name: "BaseHook".to_string(),
+                message: "Import `BaseHook` from `airflow.hooks.base` is suggested in Airflow 3.0, but it is deprecated in Airflow 3.1+.",
+                suggest_fix: true,
+            }
+        }
 
         // airflow.lineage.hook
-        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => Replacement::AutoImport {
+        ["airflow", "lineage", "hook", "DatasetLineageInfo"] => Replacement::Rename {
             module: "airflow.lineage.hook",
             name: "AssetLineageInfo",
         },
 
         // airflow.listeners.spec
         ["airflow", "listeners", "spec", "dataset", rest] => match *rest {
-            "on_dataset_created" => Replacement::AutoImport {
+            "on_dataset_created" => Replacement::Rename {
                 module: "airflow.listeners.spec.asset",
                 name: "on_asset_created",
             },
-            "on_dataset_changed" => Replacement::AutoImport {
+            "on_dataset_changed" => Replacement::Rename {
                 module: "airflow.listeners.spec.asset",
                 name: "on_asset_changed",
             },
@@ -683,11 +772,11 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
         // airflow.metrics.validators
         ["airflow", "metrics", "validators", rest] => match *rest {
-            "AllowListValidator" => Replacement::AutoImport {
+            "AllowListValidator" => Replacement::Rename {
                 module: "airflow.metrics.validators",
                 name: "PatternAllowListValidator",
             },
-            "BlockListValidator" => Replacement::AutoImport {
+            "BlockListValidator" => Replacement::Rename {
                 module: "airflow.metrics.validators",
                 name: "PatternBlockListValidator",
             },
@@ -695,32 +784,35 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.notifications
-        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => Replacement::AutoImport {
-            module: "airflow.sdk.bases.notifier",
-            name: "BaseNotifier",
-        },
+        ["airflow", "notifications", "basenotifier", "BaseNotifier"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk.bases.notifier",
+                name: "BaseNotifier".to_string(),
+                version: "1.0.0",
+            }
+        }
 
         // airflow.operators
         ["airflow", "operators", "subdag", ..] => {
             Replacement::Message("The whole `airflow.subdag` module has been removed.")
         }
-        ["airflow", "operators", "python", "get_current_context"] => Replacement::AutoImport {
-            module: "airflow.sdk",
-            name: "get_current_context",
-        },
+        ["airflow", "operators", "postgres_operator", "Mapping"] => Replacement::None,
+        ["airflow", "operators", "python", "get_current_context"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk",
+                name: "get_current_context".to_string(),
+                version: "1.0.0",
+            }
+        }
 
         // airflow.secrets
-        ["airflow", "secrets", "cache", "SecretCache"] => Replacement::AutoImport {
-            module: "airflow.sdk",
-            name: "SecretCache",
-        },
-        ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::AutoImport {
+        ["airflow", "secrets", "local_filesystem", "load_connections"] => Replacement::Rename {
             module: "airflow.secrets.local_filesystem",
             name: "load_connections_dict",
         },
 
         // airflow.security
-        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => Replacement::AutoImport {
+        ["airflow", "security", "permissions", "RESOURCE_DATASET"] => Replacement::Rename {
             module: "airflow.security.permissions",
             name: "RESOURCE_ASSET",
         },
@@ -731,9 +823,10 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "sensors",
             "base_sensor_operator",
             "BaseSensorOperator",
-        ] => Replacement::AutoImport {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.bases.sensor",
-            name: "BaseSensorOperator",
+            name: "BaseSensorOperator".to_string(),
+            version: "1.0.0",
         },
 
         // airflow.timetables
@@ -742,7 +835,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "timetables",
             "simple",
             "DatasetTriggeredTimetable",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.timetables.simple",
             name: "AssetTriggeredTimetable",
         },
@@ -758,11 +851,6 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             // airflow.utils.db
             ["db", "create_session"] => Replacement::None,
 
-            // airflow.utils.decorators
-            ["decorators", "apply_defaults"] => Replacement::Message(
-                "`apply_defaults` is now unconditionally done and can be safely removed.",
-            ),
-
             // airflow.utils.dates
             ["dates", "date_range"] => Replacement::None,
             ["dates", "days_ago"] => {
@@ -774,38 +862,36 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             ] => Replacement::None,
 
             // airflow.utils.file
-            ["file", "TemporaryDirectory"] => Replacement::AutoImport {
+            ["file", "TemporaryDirectory"] => Replacement::Rename {
                 module: "tempfile",
                 name: "TemporaryDirectory",
             },
             ["file", "mkdirs"] => Replacement::Message("Use `pathlib.Path({path}).mkdir` instead"),
 
             // airflow.utils.helpers
-            ["helpers", "chain"] => Replacement::AutoImport {
+            ["helpers", "chain"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "chain",
+                name: "chain".to_string(),
+                version: "1.0.0",
             },
-            ["helpers", "cross_downstream"] => Replacement::AutoImport {
+            ["helpers", "cross_downstream"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "cross_downstream",
+                name: "cross_downstream".to_string(),
+                version: "1.0.0",
             },
 
-            // TODO: update it as SourceModuleMoved
             // airflow.utils.log.secrets_masker
-            ["log", "secrets_masker"] => Replacement::AutoImport {
+            ["log", "secrets_masker"] => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk.execution_time",
-                name: "secrets_masker",
+                name: "secrets_masker".to_string(),
+                version: "1.0.0",
             },
 
             // airflow.utils.state
             ["state", "SHUTDOWN" | "terminating_states"] => Replacement::None,
 
             // airflow.utils.trigger_rule
-            [
-                "trigger_rule",
-                "TriggerRule",
-                "DUMMY" | "NONE_FAILED_OR_SKIPPED",
-            ] => Replacement::None,
+            ["trigger_rule", "TriggerRule", "DUMMY"] => Replacement::None,
             _ => return,
         },
 
@@ -833,15 +919,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "s3",
             rest,
         ] => match *rest {
-            "create_dataset" => Replacement::AutoImport {
+            "create_dataset" => Replacement::Rename {
                 module: "airflow.providers.amazon.aws.assets.s3",
                 name: "create_asset",
             },
-            "convert_dataset_to_openlineage" => Replacement::AutoImport {
+            "convert_dataset_to_openlineage" => Replacement::Rename {
                 module: "airflow.providers.amazon.aws.assets.s3",
                 name: "convert_asset_to_openlineage",
             },
-            "sanitize_uri" => Replacement::AutoImport {
+            "sanitize_uri" => Replacement::Rename {
                 module: "airflow.providers.amazon.aws.assets.s3",
                 name: "sanitize_uri",
             },
@@ -857,7 +943,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "entities",
             "AvpEntities",
             "DATASET",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.providers.amazon.aws.auth_manager.avp.entities",
             name: "AvpEntities.ASSET",
         },
@@ -873,15 +959,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "file",
             rest,
         ] => match *rest {
-            "create_dataset" => Replacement::AutoImport {
+            "create_dataset" => Replacement::Rename {
                 module: "airflow.providers.common.io.assets.file",
                 name: "create_asset",
             },
-            "convert_dataset_to_openlineage" => Replacement::AutoImport {
+            "convert_dataset_to_openlineage" => Replacement::Rename {
                 module: "airflow.providers.common.io.assets.file",
                 name: "convert_asset_to_openlineage",
             },
-            "sanitize_uri" => Replacement::AutoImport {
+            "sanitize_uri" => Replacement::Rename {
                 module: "airflow.providers.common.io.assets.file",
                 name: "sanitize_uri",
             },
@@ -891,19 +977,19 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         // airflow.providers.google
         // airflow.providers.google.datasets
         ["airflow", "providers", "google", "datasets", rest @ ..] => match &rest {
-            ["bigquery", "create_dataset"] => Replacement::AutoImport {
+            ["bigquery", "create_dataset"] => Replacement::Rename {
                 module: "airflow.providers.google.assets.bigquery",
                 name: "create_asset",
             },
-            ["gcs", "create_dataset"] => Replacement::AutoImport {
+            ["gcs", "create_dataset"] => Replacement::Rename {
                 module: "airflow.providers.google.assets.gcs",
                 name: "create_asset",
             },
-            ["gcs", "convert_dataset_to_openlineage"] => Replacement::AutoImport {
+            ["gcs", "convert_dataset_to_openlineage"] => Replacement::Rename {
                 module: "airflow.providers.google.assets.gcs",
                 name: "convert_asset_to_openlineage",
             },
-            ["gcs", "sanitize_uri"] => Replacement::AutoImport {
+            ["gcs", "sanitize_uri"] => Replacement::Rename {
                 module: "airflow.providers.google.assets.gcs",
                 name: "sanitize_uri",
             },
@@ -919,7 +1005,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "datasets",
             "mysql",
             "sanitize_uri",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.providers.mysql.assets.mysql",
             name: "sanitize_uri",
         },
@@ -932,7 +1018,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "datasets",
             "postgres",
             "sanitize_uri",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.providers.postgres.assets.postgres",
             name: "sanitize_uri",
         },
@@ -947,12 +1033,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "utils",
             rest,
         ] => match *rest {
-            "DatasetInfo" => Replacement::AutoImport {
+            "DatasetInfo" => Replacement::Rename {
                 module: "airflow.providers.openlineage.utils.utils",
                 name: "AssetInfo",
             },
 
-            "translate_airflow_dataset" => Replacement::AutoImport {
+            "translate_airflow_dataset" => Replacement::Rename {
                 module: "airflow.providers.openlineage.utils.utils",
                 name: "translate_airflow_asset",
             },
@@ -967,7 +1053,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "datasets",
             "trino",
             "sanitize_uri",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.providers.trino.assets.trino",
             name: "sanitize_uri",
         },
@@ -976,8 +1062,15 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     };
 
     let (module, name) = match &replacement {
-        Replacement::AutoImport { module, name } => (module, *name),
+        Replacement::Rename { module, name } => (module, *name),
         Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        Replacement::SourceModuleMovedToSDK { module, name, .. } => (module, name.as_str()),
+        Replacement::SourceModuleMovedWithMessage {
+            module,
+            name,
+            suggest_fix,
+            ..
+        } if *suggest_fix => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(
                 Airflow3Removal {
@@ -1165,19 +1258,211 @@ fn is_execute_method_inherits_from_airflow_operator(
     function_def: &StmtFunctionDef,
     semantic: &SemanticModel,
 ) -> bool {
-    if function_def.name.as_str() != "execute" {
+    is_method_in_subclass(function_def, semantic, "execute", |qualified_name| {
+        matches!(qualified_name.segments(), ["airflow", .., "BaseOperator"])
+    })
+}
+
+/// Check if an expression is a valid Airflow context variable.
+fn is_context_variable(checker: &Checker, expr: &Expr) -> bool {
+    let is_kwarg = expr
+        .as_name_expr()
+        .is_some_and(|name| is_kwarg_parameter(checker.semantic(), name));
+
+    let is_from_get_current_context = typing::resolve_assignment(expr, checker.semantic())
+        .is_some_and(|qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["airflow", "utils", "context", "get_current_context"]
+            )
+        });
+
+    is_kwarg || is_from_get_current_context
+}
+
+/// Check if an expression accesses a specific context key. It returns `true` if `expr`
+/// accesses the given `key` from an Airflow context variable via either subscript or
+/// `.get()` method.
+fn is_context_key_access(checker: &Checker, expr: &Expr, key: &str) -> bool {
+    // context["key"]
+    if let Expr::Subscript(ExprSubscript { value, slice, .. }) = expr {
+        if let Some(ExprStringLiteral {
+            value: slice_key, ..
+        }) = slice.as_string_literal_expr()
+        {
+            if slice_key.to_str() == key && is_context_variable(checker, value) {
+                return true;
+            }
+        }
+    }
+    // context.get("key")
+    if let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = expr
+    {
+        if let Expr::Attribute(ExprAttribute { value, attr, .. }) = func.as_ref() {
+            if attr.as_str() == "get" {
+                if let Some(Expr::StringLiteral(ExprStringLiteral { value: arg_key, .. })) =
+                    arguments.find_positional(0)
+                {
+                    if arg_key.to_str() == key && is_context_variable(checker, value) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    false
+}
+
+/// Check if an expression is or resolves to an access of a specific context key.
+///
+/// Returns `true` if `expr` is:
+/// - Direct access: `context["key"]` or `context.get("key")`
+/// - Variable bound to context key: `x = context["key"]; x`
+fn is_value_from_context_key(checker: &Checker, expr: &Expr, context_key: &str) -> bool {
+    if is_context_key_access(checker, expr, context_key) {
+        return true;
+    }
+
+    let semantic = checker.semantic();
+    expr.as_name_expr()
+        .and_then(|name| semantic.only_binding(name))
+        .map(|id| semantic.binding(id))
+        .and_then(|binding| typing::find_binding_value(binding, semantic))
+        .is_some_and(|bound_value| is_context_key_access(checker, bound_value, context_key))
+}
+
+/// Check for removed attributes on context key values.
+///
+/// Returns `true` if `attr_expr` accesses a removed attribute on a context key value,
+/// which can be used to determine whether to report a diagnostic.
+///
+/// Examples for `context_key="dag_run"`, `removed_attr="external_trigger"`:
+/// ```python
+/// context["dag_run"].external_trigger
+/// context.get("dag_run").external_trigger
+/// dag_run = context["dag_run"]; dag_run.external_trigger
+/// ```
+fn is_removed_context_key_attribute(
+    checker: &Checker,
+    attr_expr: &ExprAttribute,
+    context_key: &str,
+    removed_attr: &str,
+) -> bool {
+    let ExprAttribute { value, attr, .. } = attr_expr;
+
+    if attr.as_str() != removed_attr {
         return false;
     }
 
-    let ScopeKind::Class(class_def) = semantic.current_scope().kind else {
-        return false;
+    is_value_from_context_key(checker, value, context_key)
+}
+
+/// Check for the use of the `@apply_defaults` decorator.
+///
+/// `apply_defaults` is now unconditionally done in Airflow 3.0 and can be safely removed.
+///
+/// For example:
+///
+/// ```python
+/// from airflow.models.baseoperator import BaseOperator
+/// from airflow.utils.decorators import apply_defaults
+///
+/// class ExampleOperator(BaseOperator):
+///     @apply_defaults
+///     def __init__(self, message, **kwargs):
+///         super().__init__(**kwargs)
+///         self.message = message
+/// ```
+fn check_apply_defaults_decorator(checker: &Checker, function_def: &StmtFunctionDef) {
+    for decorator in &function_def.decorator_list {
+        if checker
+            .semantic()
+            .resolve_qualified_name(map_callable(&decorator.expression))
+            .is_some_and(|qualified_name| {
+                matches!(
+                    qualified_name.segments(),
+                    ["airflow", "utils", "decorators", "apply_defaults"]
+                )
+            })
+        {
+            let mut diagnostic = checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: "apply_defaults".to_string(),
+                    replacement: Replacement::Message(
+                        "`apply_defaults` is now unconditionally done and can be safely removed.",
+                    ),
+                },
+                decorator.range(),
+            );
+            let range = checker.locator().full_lines_range(decorator.range());
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_deletion(range)));
+        }
+    }
+}
+
+/// Check if `trigger_rule` argument contains a deprecated value.
+///
+/// Check both string literal and `TriggerRule` enum usages:
+///
+/// ```python
+/// from airflow.operators.empty import EmptyOperator
+/// from airflow.utils.trigger_rule import TriggerRule
+///
+/// # String literal
+/// EmptyOperator(task_id="my_task", trigger_rule="none_failed_or_skipped")
+///
+/// # Enum value
+/// EmptyOperator(task_id="my_task", trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+/// ```
+fn check_trigger_rule_argument_value(checker: &Checker, arguments: &Arguments) {
+    let Some(keyword) = arguments.find_keyword("trigger_rule") else {
+        return;
     };
 
-    class_def.bases().iter().any(|class_base| {
-        semantic
-            .resolve_qualified_name(class_base)
-            .is_some_and(|qualified_name| {
-                matches!(qualified_name.segments(), ["airflow", .., "BaseOperator"])
-            })
-    })
+    // Check for string literal value
+    if let Some(value) = keyword.value.as_string_literal_expr() {
+        if value.value.to_str() == "none_failed_or_skipped" {
+            let mut diagnostic = checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: "none_failed_or_skipped".to_string(),
+                    replacement: Replacement::AttrName("none_failed_min_one_success"),
+                },
+                value.range(),
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "\"none_failed_min_one_success\"".to_string(),
+                value.range(),
+            )));
+        }
+        return;
+    }
+
+    // Check for TriggerRule enum value
+    if let Some(qualified_name) = checker.semantic().resolve_qualified_name(&keyword.value) {
+        if matches!(
+            qualified_name.segments(),
+            [
+                "airflow",
+                "utils",
+                "trigger_rule",
+                "TriggerRule",
+                "NONE_FAILED_OR_SKIPPED"
+            ]
+        ) {
+            let mut diagnostic = checker.report_diagnostic(
+                Airflow3Removal {
+                    deprecated: qualified_name.to_string(),
+                    replacement: Replacement::AttrName("NONE_FAILED_MIN_ONE_SUCCESS"),
+                },
+                keyword.value.range(),
+            );
+            diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
+                "TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS".to_string(),
+                keyword.value.range(),
+            )));
+        }
+    }
 }

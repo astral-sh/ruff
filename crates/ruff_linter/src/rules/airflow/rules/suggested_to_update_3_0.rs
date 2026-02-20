@@ -17,9 +17,9 @@ use ruff_text_size::TextRange;
 /// ## Why is this bad?
 /// Airflow 3.0 removed various deprecated functions, members, and other
 /// values. Some have more modern replacements. Others are considered too niche
-/// and not worth to be maintained in Airflow.
+/// and not worth continued maintenance in Airflow.
 /// Even though these symbols still work fine on Airflow 3.0, they are expected to be removed in a future version.
-/// The user is suggested to replace the original usage with the new ones.
+/// Where available, users should replace the removed functionality with the new alternatives.
 ///
 /// ## Example
 /// ```python
@@ -37,6 +37,7 @@ use ruff_text_size::TextRange;
 /// Asset(uri="test://test/")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct Airflow3SuggestedUpdate {
     deprecated: String,
     replacement: Replacement,
@@ -47,22 +48,10 @@ impl Violation for Airflow3SuggestedUpdate {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Airflow3SuggestedUpdate {
-            deprecated,
-            replacement,
-        } = self;
-        match replacement {
-            Replacement::None
-            | Replacement::AttrName(_)
-            | Replacement::Message(_)
-            | Replacement::AutoImport { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ } => {
-                format!(
-                    "`{deprecated}` is removed in Airflow 3.0; \
-                    It still works in Airflow 3.0 but is expected to be removed in a future version."
-                )
-            }
-        }
+        let Airflow3SuggestedUpdate { deprecated, .. } = self;
+        format!(
+            "`{deprecated}` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version."
+        )
     }
 
     fn fix_title(&self) -> Option<String> {
@@ -71,12 +60,27 @@ impl Violation for Airflow3SuggestedUpdate {
             Replacement::None => None,
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
-            Replacement::AutoImport { module, name } => {
+            Replacement::Rename { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
             Replacement::SourceModuleMoved { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
+            Replacement::SourceModuleMovedToSDK {
+                module,
+                name,
+                version,
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0 (with apache-airflow-task-sdk>={version})."
+            )),
+            Replacement::SourceModuleMovedWithMessage {
+                module,
+                name,
+                message,
+                ..
+            } => Some(format!(
+                "`{name}` has been moved to `{module}` since Airflow 3.0. {message}"
+            )),
         }
     }
 }
@@ -157,6 +161,9 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
         ["airflow", .., "DAG" | "dag"] => {
             diagnostic_for_argument(checker, arguments, "sla_miss_callback", None);
         }
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => {
+            diagnostic_for_argument(checker, arguments, "datasets", Some("assets"));
+        }
         segments => {
             if is_airflow_builtin_or_provider(segments, "operators", "Operator") {
                 diagnostic_for_argument(checker, arguments, "sla", None);
@@ -188,30 +195,37 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
     let replacement = match qualified_name.segments() {
         // airflow.datasets.metadata
-        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::AutoImport {
+        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
-            name: "Metadata",
+            name: "Metadata".to_string(),
+            version: "1.0.0",
         },
         // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
-            module: "airflow.sdk",
-            name: "Asset",
-        },
+        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk",
+                name: "Asset".to_string(),
+                version: "1.0.0",
+            }
+        }
         ["airflow", "datasets", rest] => match *rest {
             "DatasetAliasEvent" => Replacement::None,
-            "DatasetAlias" => Replacement::AutoImport {
+            "DatasetAlias" => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "AssetAlias",
+                name: "AssetAlias".to_string(),
+                version: "1.0.0",
             },
-            "DatasetAll" => Replacement::AutoImport {
+            "DatasetAll" => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "AssetAll",
+                name: "AssetAll".to_string(),
+                version: "1.0.0",
             },
-            "DatasetAny" => Replacement::AutoImport {
+            "DatasetAny" => Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
-                name: "AssetAny",
+                name: "AssetAny".to_string(),
+                version: "1.0.0",
             },
-            "expand_alias_to_datasets" => Replacement::AutoImport {
+            "expand_alias_to_datasets" => Replacement::Rename {
                 module: "airflow.models.asset",
                 name: "expand_alias_to_assets",
             },
@@ -223,28 +237,56 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "airflow",
             "decorators",
             rest @ ("dag" | "task" | "task_group" | "setup" | "teardown"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: (*rest).to_string(),
+            version: "1.0.0",
+        },
+        [
+            "airflow",
+            "decorators",
+            "base",
+            rest @ ("DecoratedMappedOperator"
+            | "DecoratedOperator"
+            | "TaskDecorator"
+            | "get_unique_task_id"
+            | "task_decorator_factory"),
+        ] => Replacement::SourceModuleMovedToSDK {
+            module: "airflow.sdk.bases.decorator",
+            name: (*rest).to_string(),
+            version: "1.0.0",
         },
 
         // airflow.io
-        ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMoved {
+        ["airflow", "io", "path", "ObjectStoragePath"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: "ObjectStoragePath".to_string(),
+            version: "1.0.0",
         },
-        ["airflow", "io", "storage", "attach"] => Replacement::SourceModuleMoved {
+        ["airflow", "io", "store", "attach"] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk.io",
             name: "attach".to_string(),
+            version: "1.0.0",
         },
 
         // airflow.models
         ["airflow", "models", rest @ ("Connection" | "Variable")] => {
-            Replacement::SourceModuleMoved {
+            Replacement::SourceModuleMovedToSDK {
                 module: "airflow.sdk",
                 name: (*rest).to_string(),
+                version: "1.0.0",
             }
         }
+        [
+            "airflow",
+            "models",
+            ..,
+            rest @ ("Param" | "ParamsDict" | "DagParam"),
+        ] => Replacement::SourceModuleMovedToSDK {
+            module: "airflow.sdk.definitions.param",
+            name: (*rest).to_string(),
+            version: "1.0.0",
+        },
 
         // airflow.models.baseoperator
         [
@@ -252,41 +294,77 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "models",
             "baseoperator",
             rest @ ("chain" | "chain_linear" | "cross_downstream"),
-        ] => Replacement::SourceModuleMoved {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
             name: (*rest).to_string(),
+            version: "1.0.0",
         },
-        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::AutoImport {
-            module: "airflow.sdk",
-            name: "BaseOperatorLink",
-        },
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk",
+                name: "BaseOperatorLink".to_string(),
+                version: "1.0.0",
+            }
+        }
+
         // airflow.model..DAG
-        ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {
+        ["airflow", "models", "dag", "DAG"] | ["airflow", "models", "DAG"] | ["airflow", "DAG"] => {
+            Replacement::SourceModuleMovedToSDK {
+                module: "airflow.sdk",
+                name: "DAG".to_string(),
+                version: "1.0.0",
+            }
+        }
+
+        // airflow.sensors.base
+        [
+            "airflow",
+            "sensors",
+            "base",
+            rest @ ("BaseSensorOperator" | "PokeReturnValue"),
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
-            name: "DAG".to_string(),
+            name: (*rest).to_string(),
+            version: "1.0.0",
         },
+
+        ["airflow", "sensors", "base", "poke_mode_only"] => Replacement::SourceModuleMovedToSDK {
+            module: "airflow.sdk.bases.sensor",
+            name: "poke_mode_only".to_string(),
+            version: "1.0.0",
+        },
+
         // airflow.timetables
-        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::AutoImport {
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::Rename {
             module: "airflow.timetables.assets",
             name: "AssetOrTimeSchedule",
         },
+
         // airflow.utils
         [
             "airflow",
             "utils",
             "dag_parsing_context",
             "get_parsing_context",
-        ] => Replacement::AutoImport {
+        ] => Replacement::SourceModuleMovedToSDK {
             module: "airflow.sdk",
-            name: "get_parsing_context",
+            name: "get_parsing_context".to_string(),
+            version: "1.0.0",
         },
 
         _ => return,
     };
 
     let (module, name) = match &replacement {
-        Replacement::AutoImport { module, name } => (module, *name),
+        Replacement::Rename { module, name } => (module, *name),
         Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
+        Replacement::SourceModuleMovedToSDK { module, name, .. } => (module, name.as_str()),
+        Replacement::SourceModuleMovedWithMessage {
+            module,
+            name,
+            suggest_fix,
+            ..
+        } if *suggest_fix => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(
                 Airflow3SuggestedUpdate {

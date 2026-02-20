@@ -9,12 +9,10 @@ UP010 [*] Unnecessary `__future__` imports `generators`, `nested_scopes` for tar
 2 | from __future__ import with_statement, unicode_literals
   |
 help: Remove unnecessary `__future__` import
-
-ℹ Safe fix
-1   |-from __future__ import nested_scopes, generators
-2 1 | from __future__ import with_statement, unicode_literals
-3 2 | 
-4 3 | from __future__ import absolute_import, division
+  - from __future__ import nested_scopes, generators
+1 | from __future__ import with_statement, unicode_literals
+2 | 
+3 | from __future__ import absolute_import, division
 
 UP010 [*] Unnecessary `__future__` import `unicode_literals` for target Python version
  --> UP010_1.py:2:1
@@ -26,14 +24,12 @@ UP010 [*] Unnecessary `__future__` import `unicode_literals` for target Python v
 4 | from __future__ import absolute_import, division
   |
 help: Remove unnecessary `__future__` import
-
-ℹ Safe fix
-1 1 | from __future__ import nested_scopes, generators
-2   |-from __future__ import with_statement, unicode_literals
-  2 |+from __future__ import with_statement
-3 3 | 
-4 4 | from __future__ import absolute_import, division
-5 5 | from __future__ import generator_stop
+1 | from __future__ import nested_scopes, generators
+  - from __future__ import with_statement, unicode_literals
+2 + from __future__ import with_statement
+3 | 
+4 | from __future__ import absolute_import, division
+5 | from __future__ import generator_stop
 
 UP010 [*] Unnecessary `__future__` import `absolute_import` for target Python version
  --> UP010_1.py:4:1
@@ -46,16 +42,14 @@ UP010 [*] Unnecessary `__future__` import `absolute_import` for target Python ve
 6 | from __future__ import print_function, nested_scopes, generator_stop
   |
 help: Remove unnecessary `__future__` import
-
-ℹ Safe fix
-1 1 | from __future__ import nested_scopes, generators
-2 2 | from __future__ import with_statement, unicode_literals
-3 3 | 
-4   |-from __future__ import absolute_import, division
-  4 |+from __future__ import division
-5 5 | from __future__ import generator_stop
-6 6 | from __future__ import print_function, nested_scopes, generator_stop
-7 7 | 
+1 | from __future__ import nested_scopes, generators
+2 | from __future__ import with_statement, unicode_literals
+3 | 
+  - from __future__ import absolute_import, division
+4 + from __future__ import division
+5 | from __future__ import generator_stop
+6 | from __future__ import print_function, nested_scopes, generator_stop
+7 | 
 
 UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
  --> UP010_1.py:5:1
@@ -66,15 +60,13 @@ UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python ver
 6 | from __future__ import print_function, nested_scopes, generator_stop
   |
 help: Remove unnecessary `__future__` import
-
-ℹ Safe fix
-2 2 | from __future__ import with_statement, unicode_literals
-3 3 | 
-4 4 | from __future__ import absolute_import, division
-5   |-from __future__ import generator_stop
-6 5 | from __future__ import print_function, nested_scopes, generator_stop
-7 6 | 
-8 7 | print(with_statement)
+2 | from __future__ import with_statement, unicode_literals
+3 | 
+4 | from __future__ import absolute_import, division
+  - from __future__ import generator_stop
+5 | from __future__ import print_function, nested_scopes, generator_stop
+6 | 
+7 | print(with_statement)
 
 UP010 [*] Unnecessary `__future__` import `nested_scopes` for target Python version
  --> UP010_1.py:6:1
@@ -87,13 +79,11 @@ UP010 [*] Unnecessary `__future__` import `nested_scopes` for target Python vers
 8 | print(with_statement)
   |
 help: Remove unnecessary `__future__` import
-
-ℹ Safe fix
-3 3 | 
-4 4 | from __future__ import absolute_import, division
-5 5 | from __future__ import generator_stop
-6   |-from __future__ import print_function, nested_scopes, generator_stop
-  6 |+from __future__ import print_function, generator_stop
-7 7 | 
-8 8 | print(with_statement)
-9 9 | generators = 1
+3 | 
+4 | from __future__ import absolute_import, division
+5 | from __future__ import generator_stop
+  - from __future__ import print_function, nested_scopes, generator_stop
+6 + from __future__ import print_function, generator_stop
+7 | 
+8 | print(with_statement)
+9 | generators = 1

@@ -11,15 +11,13 @@ Q001 [*] Double quote multiline found but single quotes preferred
 4 |     return
   |
 help: Replace double multiline quotes with single quotes
-
-ℹ Safe fix
-1 1 | def foo():
-2 2 |     """function without params, single line docstring"""
-3   |-    """ not a docstring"""
-  3 |+    ''' not a docstring'''
-4 4 |     return
-5 5 | 
-6 6 | 
+1 | def foo():
+2 |     """function without params, single line docstring"""
+  -     """ not a docstring"""
+3 +     ''' not a docstring'''
+4 |     return
+5 | 
+6 | 
 
 Q001 [*] Double quote multiline found but single quotes preferred
   --> docstring_doubles_function.py:11:5
@@ -31,16 +29,14 @@ Q001 [*] Double quote multiline found but single quotes preferred
 12 |     return
    |
 help: Replace double multiline quotes with single quotes
-
-ℹ Safe fix
-8  8  |     """
-9  9  |         function without params, multiline docstring
-10 10 |     """
-11    |-    """ not a docstring"""
-   11 |+    ''' not a docstring'''
-12 12 |     return
-13 13 | 
-14 14 | 
+8  |     """
+9  |         function without params, multiline docstring
+10 |     """
+   -     """ not a docstring"""
+11 +     ''' not a docstring'''
+12 |     return
+13 | 
+14 | 
 
 Q001 [*] Double quote multiline found but single quotes preferred
   --> docstring_doubles_function.py:15:39
@@ -53,19 +49,17 @@ Q001 [*] Double quote multiline found but single quotes preferred
 18 |       pass
    |
 help: Replace double multiline quotes with single quotes
-
-ℹ Safe fix
-12 12 |     return
-13 13 | 
-14 14 | 
-15    |-def fun_with_params_no_docstring(a, b="""
-   15 |+def fun_with_params_no_docstring(a, b='''
-16 16 |     not a
-17    |-""" """docstring"""):
-   17 |+''' """docstring"""):
-18 18 |     pass
-19 19 | 
-20 20 | 
+12 |     return
+13 | 
+14 | 
+   - def fun_with_params_no_docstring(a, b="""
+15 + def fun_with_params_no_docstring(a, b='''
+16 |     not a
+   - """ """docstring"""):
+17 + ''' """docstring"""):
+18 |     pass
+19 | 
+20 | 
 
 Q001 [*] Double quote multiline found but single quotes preferred
   --> docstring_doubles_function.py:17:5
@@ -77,16 +71,14 @@ Q001 [*] Double quote multiline found but single quotes preferred
 18 |     pass
    |
 help: Replace double multiline quotes with single quotes
-
-ℹ Safe fix
-14 14 | 
-15 15 | def fun_with_params_no_docstring(a, b="""
-16 16 |     not a
-17    |-""" """docstring"""):
-   17 |+""" '''docstring'''):
-18 18 |     pass
-19 19 | 
-20 20 | 
+14 | 
+15 | def fun_with_params_no_docstring(a, b="""
+16 |     not a
+   - """ """docstring"""):
+17 + """ '''docstring'''):
+18 |     pass
+19 | 
+20 | 
 
 Q001 [*] Double quote multiline found but single quotes preferred
   --> docstring_doubles_function.py:22:5
@@ -97,13 +89,11 @@ Q001 [*] Double quote multiline found but single quotes preferred
 23 |     pass
    |
 help: Replace double multiline quotes with single quotes
-
-ℹ Safe fix
-19 19 | 
-20 20 | 
-21 21 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
-22    |-    """ not a docstring """):
-   22 |+    ''' not a docstring '''):
-23 23 |     pass
-24 24 | 
-25 25 |
+19 | 
+20 | 
+21 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
+   -     """ not a docstring """):
+22 +     ''' not a docstring '''):
+23 |     pass
+24 | 
+25 |

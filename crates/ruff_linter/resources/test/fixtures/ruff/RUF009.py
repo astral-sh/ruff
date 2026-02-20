@@ -126,3 +126,12 @@ class D:
 @dataclass
 class E:
     c: C = C()
+
+# https://github.com/astral-sh/ruff/issues/20266
+@dataclass(frozen=True)
+class C:
+    @dataclass(frozen=True)
+    class D:
+        foo: int = 1
+
+    d: D = D() # OK

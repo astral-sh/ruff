@@ -124,3 +124,28 @@ def fun_with_python_syntax():
             ...
 
     return Foo
+
+
+@dataclass
+class C:
+    def __post_init__(self, x: tuple[int, ...] = (
+        1,
+        2,
+    )) -> None:
+        self.x = x
+
+
+@dataclass
+class D:
+    def __post_init__(self, x: int = """
+    """) -> None:
+        self.x = x
+
+
+# https://github.com/astral-sh/ruff/issues/19628
+# No fix: annotation references a type variable scoped to `__post_init__`
+@dataclass
+class E:
+    def __post_init__[T: (str, bytes)](self, a: T | None = None, b: T | None = None) -> None:
+        self.a = str(a)
+        self.b = str(b)

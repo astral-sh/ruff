@@ -10,10 +10,8 @@ UP015 [*] Unnecessary mode argument
   |                 ^^^
   |
 help: Remove mode argument
-
-ℹ Safe fix
-1 1 | # Not a valid type annotation but this test shouldn't result in a panic.
-2 2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
-3   |-x: 'open("foo", "r")'
-  3 |+x: 'open("foo")'
-4 4 |
+1 | # Not a valid type annotation but this test shouldn't result in a panic.
+2 | # Refer: https://github.com/astral-sh/ruff/issues/11736
+  - x: 'open("foo", "r")'
+3 + x: 'open("foo")'
+4 |

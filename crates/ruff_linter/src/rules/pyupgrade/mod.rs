@@ -19,7 +19,7 @@ mod tests {
     use crate::rules::{isort, pyupgrade};
     use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_snippet};
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::ConvertNamedTupleFunctionalToClass, Path::new("UP014.py"))]
     #[test_case(Rule::ConvertTypedDictFunctionalToClass, Path::new("UP013.py"))]
@@ -64,6 +64,7 @@ mod tests {
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_3.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"))]
@@ -97,7 +98,9 @@ mod tests {
     )]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_many_empty_lines.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
-    #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"))]
+    #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_0.py"))]
+    #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_2.py"))]
+    #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_3.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
@@ -111,7 +114,7 @@ mod tests {
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
-    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_0.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_0.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_1.py"))]
     #[test_case(Rule::UselessClassMetaclassType, Path::new("UP050.py"))]
@@ -125,7 +128,24 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_2.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_1.py"))]
+    fn rules_not_applied_default_typevar_backported(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = path.to_string_lossy().to_string();
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"))]
+    #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"))]
     fn rules_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview", path.to_string_lossy());
         let diagnostics = test_path(
@@ -139,6 +159,42 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_3.py"))]
+    fn rules_py313(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("rules_py313__{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
+    #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_0.py"))]
+    fn type_var_default_preview(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}__preview_diff", path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        );
+        Ok(())
+    }
+
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]
@@ -147,7 +203,6 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 future_annotations: true,
                 ..settings::LinterSettings::for_rule(rule_code)
             },
@@ -332,7 +387,7 @@ mod tests {
                 ])
             },
         );
-        assert_diagnostics!(diagnostics, @r"
+        assert_diagnostics!(diagnostics, @"
         UP035 [*] Import from `shlex` instead: `quote`
          --> <filename>:1:1
           |
@@ -340,27 +395,74 @@ mod tests {
           | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
           |
         help: Import from `shlex`
-
-        ℹ Safe fix
-        1   |-from pipes import quote, Template
-          1 |+from pipes import Template
-          2 |+from shlex import quote
-
-        I002 [*] Missing required import: `from __future__ import generator_stop`
-        --> <filename>:1:1
-        help: Insert required import: `from __future__ import generator_stop`
-
-        ℹ Safe fix
-          1 |+from __future__ import generator_stop
-        1 2 | from pipes import quote, Template
+          - from pipes import quote, Template
+        1 + from pipes import Template
+        2 + from shlex import quote
 
         I002 [*] Missing required import: `from collections import Sequence`
         --> <filename>:1:1
         help: Insert required import: `from collections import Sequence`
+        1 + from collections import Sequence
+        2 | from pipes import quote, Template
 
-        ℹ Safe fix
-          1 |+from collections import Sequence
-        1 2 | from pipes import quote, Template
+        I002 [*] Missing required import: `from __future__ import generator_stop`
+        --> <filename>:1:1
+        help: Insert required import: `from __future__ import generator_stop`
+        1 + from __future__ import generator_stop
+        2 | from pipes import quote, Template
         ");
+    }
+
+    #[test_case(Path::new("UP029_1.py"))]
+    fn i002_up029_conflict(path: &Path) -> Result<()> {
+        let snapshot = format!("{}_skip_required_imports", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                isort: isort::settings::Settings {
+                    required_imports: BTreeSet::from_iter([
+                        // https://github.com/astral-sh/ruff/issues/20601
+                        NameImport::ImportFrom(MemberNameImport::member(
+                            "builtins".to_string(),
+                            "str".to_string(),
+                        )),
+                    ]),
+                    ..Default::default()
+                },
+                ..settings::LinterSettings::for_rules([
+                    Rule::MissingRequiredImport,
+                    Rule::UnnecessaryBuiltinImport,
+                ])
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn unnecessary_default_type_args_stubs_py312() -> Result<()> {
+        let snapshot = "UP043.pyi";
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP043.pyi"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..settings::LinterSettings::for_rule(Rule::UnnecessaryDefaultTypeArgs)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn up045_future_annotations_py39() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyupgrade/UP045_py39.py"),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY39.into(),
+                ..settings::LinterSettings::for_rule(Rule::NonPEP604AnnotationOptional)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
     }
 }

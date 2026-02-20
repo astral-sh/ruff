@@ -49,11 +49,12 @@ from types import CellType, CodeType, GenericAlias, TracebackType
 
 # mypy crashes if any of {ByteString, Sequence, MutableSequence, Mapping, MutableMapping}
 # are imported from collections.abc in builtins.pyi
-from typing import (  # noqa: Y022,UP035
+from typing import (  # noqa: Y022,UP035,RUF100
     IO,
     Any,
     BinaryIO,
     ClassVar,
+    Final,
     Generic,
     Mapping,
     MutableMapping,
@@ -83,6 +84,7 @@ from typing_extensions import (  # noqa: Y023
     TypeIs,
     TypeVarTuple,
     deprecated,
+    disjoint_base,
 )
 
 if sys.version_info >= (3, 14):
@@ -115,6 +117,7 @@ _StopT_co = TypeVar("_StopT_co", covariant=True, default=_StartT_co)  #  slice[A
 # FIXME: https://github.com/python/typing/issues/213 (replace step=start|stop with step=start&stop)
 _StepT_co = TypeVar("_StepT_co", covariant=True, default=_StartT_co | _StopT_co)  #  slice[A,B] -> slice[A, B, A|B]
 
+@disjoint_base
 class object:
     """The base class of the class hierarchy.
 
@@ -156,6 +159,7 @@ class object:
     @classmethod
     def __subclasshook__(cls, subclass: type, /) -> bool: ...
 
+@disjoint_base
 class staticmethod(Generic[_P, _R_co]):
     """Convert a function to be a static method.
 
@@ -197,6 +201,7 @@ class staticmethod(Generic[_P, _R_co]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
         __annotate__: AnnotateFunc | None
 
+@disjoint_base
 class classmethod(Generic[_T, _P, _R_co]):
     """Convert a function to be a class method.
 
@@ -238,6 +243,7 @@ class classmethod(Generic[_T, _P, _R_co]):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias: ...
         __annotate__: AnnotateFunc | None
 
+@disjoint_base
 class type:
     """type(object) -> the object's type
     type(name, bases, dict, **kwds) -> a new type
@@ -249,8 +255,9 @@ class type:
     __bases__: tuple[type, ...]
     @property
     def __basicsize__(self) -> int: ...
-    @property
-    def __dict__(self) -> types.MappingProxyType[str, Any]: ...  # type: ignore[override]
+    # type.__dict__ is read-only at runtime, but that can't be expressed currently.
+    # See https://github.com/python/typeshed/issues/11033 for a discussion.
+    __dict__: Final[types.MappingProxyType[str, Any]]  # type: ignore[assignment]
     @property
     def __dictoffset__(self) -> int: ...
     @property
@@ -296,10 +303,12 @@ class type:
     def __prepare__(metacls, name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]:
         """Create the namespace for the class statement"""
     if sys.version_info >= (3, 10):
-        def __or__(self, value: Any, /) -> types.UnionType:
+        # `int | str` produces an instance of `UnionType`, but `int | int` produces an instance of `type`,
+        # and `abc.ABC | abc.ABC` produces an instance of `abc.ABCMeta`.
+        def __or__(self: _typeshed.Self, value: Any, /) -> types.UnionType | _typeshed.Self:
             """Return self|value."""
 
-        def __ror__(self, value: Any, /) -> types.UnionType:
+        def __ror__(self: _typeshed.Self, value: Any, /) -> types.UnionType | _typeshed.Self:
             """Return value|self."""
     if sys.version_info >= (3, 12):
         __type_params__: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -307,6 +316,7 @@ class type:
     if sys.version_info >= (3, 14):
         __annotate__: AnnotateFunc | None
 
+@disjoint_base
 class super:
     """super() -> same as super(__class__, <first argument>)
     super(type) -> unbound super object
@@ -334,6 +344,7 @@ _PositiveInteger: TypeAlias = Literal[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13,
 _NegativeInteger: TypeAlias = Literal[-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17, -18, -19, -20]
 _LiteralInteger = _PositiveInteger | _NegativeInteger | Literal[0]  # noqa: Y026  # TODO: Use TypeAlias once mypy bugs are fixed
 
+@disjoint_base
 class int:
     """int([x]) -> integer
     int(x, base=10) -> integer
@@ -352,7 +363,7 @@ class int:
     """
 
     @overload
-    def __new__(cls, x: ConvertibleToInt = ..., /) -> Self: ...
+    def __new__(cls, x: ConvertibleToInt = 0, /) -> Self: ...
     @overload
     def __new__(cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self: ...
     def as_integer_ratio(self) -> tuple[int, Literal[1]]:
@@ -646,10 +657,11 @@ class int:
     def __format__(self, format_spec: str, /) -> str:
         """Convert to a string according to format_spec."""
 
+@disjoint_base
 class float:
     """Convert a string or number to a floating-point number, if possible."""
 
-    def __new__(cls, x: ConvertibleToFloat = ..., /) -> Self: ...
+    def __new__(cls, x: ConvertibleToFloat = 0, /) -> Self: ...
     def as_integer_ratio(self) -> tuple[int, int]:
         """Return a pair of integers, whose ratio is exactly equal to the original float.
 
@@ -806,6 +818,7 @@ class float:
         def from_number(cls, number: float | SupportsIndex | SupportsFloat, /) -> Self:
             """Convert real number to a floating-point number."""
 
+@disjoint_base
 class complex:
     """Create a complex number from a string or numbers.
 
@@ -819,8 +832,8 @@ class complex:
     @overload
     def __new__(
         cls,
-        real: complex | SupportsComplex | SupportsFloat | SupportsIndex = ...,
-        imag: complex | SupportsFloat | SupportsIndex = ...,
+        real: complex | SupportsComplex | SupportsFloat | SupportsIndex = 0,
+        imag: complex | SupportsFloat | SupportsIndex = 0,
     ) -> Self: ...
     @overload
     def __new__(cls, real: str | SupportsComplex | SupportsFloat | SupportsIndex | complex) -> Self: ...
@@ -898,6 +911,7 @@ class _FormatMapMapping(Protocol):
 class _TranslateTable(Protocol):
     def __getitem__(self, key: int, /) -> str | int | None: ...
 
+@disjoint_base
 class str(Sequence[str]):
     """str(object='') -> str
     str(bytes_or_buffer[, encoding[, errors]]) -> str
@@ -912,9 +926,9 @@ class str(Sequence[str]):
     """
 
     @overload
-    def __new__(cls, object: object = ...) -> Self: ...
+    def __new__(cls, object: object = "") -> Self: ...
     @overload
-    def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
+    def __new__(cls, object: ReadableBuffer, encoding: str = "utf-8", errors: str = "strict") -> Self: ...
     @overload
     def capitalize(self: LiteralString) -> LiteralString:
         """Return a capitalized version of the string.
@@ -940,7 +954,7 @@ class str(Sequence[str]):
 
     @overload
     def center(self, width: SupportsIndex, fillchar: str = " ", /) -> str: ...  # type: ignore[misc]
-    def count(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def count(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the number of non-overlapping occurrences of substring sub in string S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
@@ -960,7 +974,7 @@ class str(Sequence[str]):
         """
 
     def endswith(
-        self, suffix: str | tuple[str, ...], start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, suffix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> bool:
         """Return True if the string ends with the specified suffix, False otherwise.
 
@@ -981,7 +995,7 @@ class str(Sequence[str]):
 
     @overload
     def expandtabs(self, tabsize: SupportsIndex = 8) -> str: ...  # type: ignore[misc]
-    def find(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def find(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the lowest index in S where substring sub is found, such that sub is contained within S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
@@ -1001,7 +1015,7 @@ class str(Sequence[str]):
         The substitutions are identified by braces ('{' and '}').
         """
 
-    def index(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def index(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the lowest index in S where substring sub is found, such that sub is contained within S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
@@ -1193,14 +1207,14 @@ class str(Sequence[str]):
 
     @overload
     def removesuffix(self, suffix: str, /) -> str: ...  # type: ignore[misc]
-    def rfind(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def rfind(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the highest index in S where substring sub is found, such that sub is contained within S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
         Return -1 on failure.
         """
 
-    def rindex(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def rindex(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the highest index in S where substring sub is found, such that sub is contained within S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
@@ -1292,7 +1306,7 @@ class str(Sequence[str]):
     @overload
     def splitlines(self, keepends: bool = False) -> list[str]: ...  # type: ignore[misc]
     def startswith(
-        self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> bool:
         """Return True if the string starts with the specified prefix, False otherwise.
 
@@ -1389,11 +1403,11 @@ class str(Sequence[str]):
     def __eq__(self, value: object, /) -> bool: ...
     def __ge__(self, value: str, /) -> bool: ...
     @overload
-    def __getitem__(self: LiteralString, key: SupportsIndex | slice, /) -> LiteralString:
+    def __getitem__(self: LiteralString, key: SupportsIndex | slice[SupportsIndex | None], /) -> LiteralString:
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: SupportsIndex | slice, /) -> str: ...  # type: ignore[misc]
+    def __getitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> str: ...  # type: ignore[misc]
     def __gt__(self, value: str, /) -> bool: ...
     def __hash__(self) -> int: ...
     @overload
@@ -1430,6 +1444,7 @@ class str(Sequence[str]):
     def __format__(self, format_spec: str, /) -> str:
         """Return a formatted version of the string as described by format_spec."""
 
+@disjoint_base
 class bytes(Sequence[int]):
     """bytes(iterable_of_ints) -> bytes
     bytes(string, encoding[, errors]) -> bytes
@@ -1447,7 +1462,7 @@ class bytes(Sequence[int]):
     @overload
     def __new__(cls, o: Iterable[SupportsIndex] | SupportsIndex | SupportsBytes | ReadableBuffer, /) -> Self: ...
     @overload
-    def __new__(cls, string: str, /, encoding: str, errors: str = ...) -> Self: ...
+    def __new__(cls, string: str, /, encoding: str, errors: str = "strict") -> Self: ...
     @overload
     def __new__(cls) -> Self: ...
     def capitalize(self) -> bytes:
@@ -1464,7 +1479,7 @@ class bytes(Sequence[int]):
         """
 
     def count(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the number of non-overlapping occurrences of subsection 'sub' in bytes B[start:end].
 
@@ -1490,8 +1505,8 @@ class bytes(Sequence[int]):
     def endswith(
         self,
         suffix: ReadableBuffer | tuple[ReadableBuffer, ...],
-        start: SupportsIndex | None = ...,
-        end: SupportsIndex | None = ...,
+        start: SupportsIndex | None = None,
+        end: SupportsIndex | None = None,
         /,
     ) -> bool:
         """Return True if the bytes ends with the specified suffix, False otherwise.
@@ -1511,7 +1526,7 @@ class bytes(Sequence[int]):
         """
 
     def find(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end].
 
@@ -1523,7 +1538,7 @@ class bytes(Sequence[int]):
         Return -1 on failure.
         """
 
-    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = ...) -> str:
+    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = 1) -> str:
         """Create a string of hexadecimal numbers from a bytes object.
 
           sep
@@ -1545,7 +1560,7 @@ class bytes(Sequence[int]):
         """
 
     def index(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end].
 
@@ -1681,7 +1696,7 @@ class bytes(Sequence[int]):
         """
 
     def rfind(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end].
 
@@ -1694,7 +1709,7 @@ class bytes(Sequence[int]):
         """
 
     def rindex(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end].
 
@@ -1765,8 +1780,8 @@ class bytes(Sequence[int]):
     def startswith(
         self,
         prefix: ReadableBuffer | tuple[ReadableBuffer, ...],
-        start: SupportsIndex | None = ...,
-        end: SupportsIndex | None = ...,
+        start: SupportsIndex | None = None,
+        end: SupportsIndex | None = None,
         /,
     ) -> bool:
         """Return True if the bytes starts with the specified prefix, False otherwise.
@@ -1820,14 +1835,22 @@ class bytes(Sequence[int]):
 
         The original string is never truncated.
         """
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def fromhex(cls, string: str | ReadableBuffer, /) -> Self:
+            """Create a bytes object from a string of hexadecimal numbers.
 
-    @classmethod
-    def fromhex(cls, string: str, /) -> Self:
-        """Create a bytes object from a string of hexadecimal numbers.
+            Spaces between two numbers are accepted.
+            Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
+            """
+    else:
+        @classmethod
+        def fromhex(cls, string: str, /) -> Self:
+            """Create a bytes object from a string of hexadecimal numbers.
 
-        Spaces between two numbers are accepted.
-        Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
-        """
+            Spaces between two numbers are accepted.
+            Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
+            """
 
     @staticmethod
     def maketrans(frm: ReadableBuffer, to: ReadableBuffer, /) -> bytes:
@@ -1851,7 +1874,7 @@ class bytes(Sequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> bytes: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytes: ...
     def __add__(self, value: ReadableBuffer, /) -> bytes:
         """Return self+value."""
 
@@ -1881,6 +1904,7 @@ class bytes(Sequence[int]):
     def __buffer__(self, flags: int, /) -> memoryview:
         """Return a buffer object that exposes the underlying memory of the object."""
 
+@disjoint_base
 class bytearray(MutableSequence[int]):
     """bytearray(iterable_of_ints) -> bytearray
     bytearray(string, encoding[, errors]) -> bytearray
@@ -1901,7 +1925,7 @@ class bytearray(MutableSequence[int]):
     @overload
     def __init__(self, ints: Iterable[SupportsIndex] | SupportsIndex | ReadableBuffer, /) -> None: ...
     @overload
-    def __init__(self, string: str, /, encoding: str, errors: str = ...) -> None: ...
+    def __init__(self, string: str, /, encoding: str, errors: str = "strict") -> None: ...
     def append(self, item: SupportsIndex, /) -> None:
         """Append a single item to the end of the bytearray.
 
@@ -1923,7 +1947,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def count(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the number of non-overlapping occurrences of subsection 'sub' in bytes B[start:end].
 
@@ -1952,8 +1976,8 @@ class bytearray(MutableSequence[int]):
     def endswith(
         self,
         suffix: ReadableBuffer | tuple[ReadableBuffer, ...],
-        start: SupportsIndex | None = ...,
-        end: SupportsIndex | None = ...,
+        start: SupportsIndex | None = None,
+        end: SupportsIndex | None = None,
         /,
     ) -> bool:
         """Return True if the bytearray ends with the specified suffix, False otherwise.
@@ -1980,7 +2004,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def find(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end].
 
@@ -1992,7 +2016,7 @@ class bytearray(MutableSequence[int]):
         Return -1 on failure.
         """
 
-    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = ...) -> str:
+    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = 1) -> str:
         """Create a string of hexadecimal numbers from a bytearray object.
 
           sep
@@ -2014,7 +2038,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def index(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end].
 
@@ -2175,7 +2199,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def rfind(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end].
 
@@ -2188,7 +2212,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def rindex(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end].
 
@@ -2260,8 +2284,8 @@ class bytearray(MutableSequence[int]):
     def startswith(
         self,
         prefix: ReadableBuffer | tuple[ReadableBuffer, ...],
-        start: SupportsIndex | None = ...,
-        end: SupportsIndex | None = ...,
+        start: SupportsIndex | None = None,
+        end: SupportsIndex | None = None,
         /,
     ) -> bool:
         """Return True if the bytearray starts with the specified prefix, False otherwise.
@@ -2315,14 +2339,22 @@ class bytearray(MutableSequence[int]):
 
         The original string is never truncated.
         """
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def fromhex(cls, string: str | ReadableBuffer, /) -> Self:
+            """Create a bytearray object from a string of hexadecimal numbers.
 
-    @classmethod
-    def fromhex(cls, string: str, /) -> Self:
-        """Create a bytearray object from a string of hexadecimal numbers.
+            Spaces between two numbers are accepted.
+            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            """
+    else:
+        @classmethod
+        def fromhex(cls, string: str, /) -> Self:
+            """Create a bytearray object from a string of hexadecimal numbers.
 
-        Spaces between two numbers are accepted.
-        Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
-        """
+            Spaces between two numbers are accepted.
+            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            """
 
     @staticmethod
     def maketrans(frm: ReadableBuffer, to: ReadableBuffer, /) -> bytes:
@@ -2345,14 +2377,14 @@ class bytearray(MutableSequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> bytearray: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> bytearray: ...
     @overload
     def __setitem__(self, key: SupportsIndex, value: SupportsIndex, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[SupportsIndex] | bytes, /) -> None: ...
-    def __delitem__(self, key: SupportsIndex | slice, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[SupportsIndex] | bytes, /) -> None: ...
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
 
     def __add__(self, value: ReadableBuffer, /) -> bytearray:
@@ -2398,7 +2430,7 @@ class bytearray(MutableSequence[int]):
             """Resize the internal buffer of bytearray to len.
 
             size
-              New size to resize to..
+              New size to resize to.
             """
 
 _IntegerFormats: TypeAlias = Literal[
@@ -2493,7 +2525,7 @@ class memoryview(Sequence[_I]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> memoryview[_I]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> memoryview[_I]: ...
     def __contains__(self, x: object, /) -> bool: ...
     def __iter__(self) -> Iterator[_I]:
         """Implement iter(self)."""
@@ -2504,7 +2536,7 @@ class memoryview(Sequence[_I]):
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     @overload
-    def __setitem__(self, key: slice, value: ReadableBuffer, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: ReadableBuffer, /) -> None:
         """Set self[key] to value."""
 
     @overload
@@ -2537,7 +2569,7 @@ class memoryview(Sequence[_I]):
     def release(self) -> None:
         """Release the underlying buffer exposed by the memoryview object."""
 
-    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = ...) -> str:
+    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = 1) -> str:
         """Return the data in the buffer as a str of hexadecimal numbers.
 
           sep
@@ -2563,10 +2595,21 @@ class memoryview(Sequence[_I]):
 
     def __release_buffer__(self, buffer: memoryview, /) -> None:
         """Release the buffer object that exposes the underlying memory of the object."""
-    # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
-    # See https://github.com/python/cpython/issues/125420
-    index: ClassVar[None]  # type: ignore[assignment]
-    count: ClassVar[None]  # type: ignore[assignment]
+    if sys.version_info >= (3, 14):
+        def index(self, value: object, start: SupportsIndex = 0, stop: SupportsIndex = sys.maxsize, /) -> int:
+            """Return the index of the first occurrence of a value.
+
+            Raises ValueError if the value is not present.
+            """
+
+        def count(self, value: object, /) -> int:
+            """Count the number of occurrences of a value."""
+    else:
+        # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
+        # See https://github.com/python/cpython/issues/125420
+        index: ClassVar[None]  # type: ignore[assignment]
+        count: ClassVar[None]  # type: ignore[assignment]
+
     if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """See PEP 585"""
@@ -2578,7 +2621,7 @@ class bool(int):
     The class bool is a subclass of the class int, and cannot be subclassed.
     """
 
-    def __new__(cls, o: object = ..., /) -> Self: ...
+    def __new__(cls, o: object = False, /) -> Self: ...
     # The following overloads could be represented more elegantly with a TypeVar("_B", bool, int),
     # however mypy has a bug regarding TypeVar constraints (https://github.com/python/mypy/issues/11880).
     @overload
@@ -2675,6 +2718,7 @@ class slice(Generic[_StartT_co, _StopT_co, _StepT_co]):
         handling of normal slices.
         """
 
+@disjoint_base
 class tuple(Sequence[_T_co]):
     """Built-in immutable sequence.
 
@@ -2684,7 +2728,7 @@ class tuple(Sequence[_T_co]):
     If the argument is a tuple, the return value is the same object.
     """
 
-    def __new__(cls, iterable: Iterable[_T_co] = ..., /) -> Self: ...
+    def __new__(cls, iterable: Iterable[_T_co] = (), /) -> Self: ...
     def __len__(self) -> int:
         """Return len(self)."""
 
@@ -2696,7 +2740,7 @@ class tuple(Sequence[_T_co]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> tuple[_T_co, ...]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> tuple[_T_co, ...]: ...
     def __iter__(self) -> Iterator[_T_co]:
         """Implement iter(self)."""
 
@@ -2781,6 +2825,7 @@ class function:
     # mypy uses `builtins.function.__get__` to represent methods, properties, and getset_descriptors so we type the return as Any.
     def __get__(self, instance: object, owner: type | None = None, /) -> Any: ...
 
+@disjoint_base
 class list(MutableSequence[_T]):
     """Built-in mutable sequence.
 
@@ -2856,14 +2901,14 @@ class list(MutableSequence[_T]):
         """Return self[index]."""
 
     @overload
-    def __getitem__(self, s: slice, /) -> list[_T]: ...
+    def __getitem__(self, s: slice[SupportsIndex | None], /) -> list[_T]: ...
     @overload
     def __setitem__(self, key: SupportsIndex, value: _T, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: Iterable[_T], /) -> None: ...
-    def __delitem__(self, key: SupportsIndex | slice, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: Iterable[_T], /) -> None: ...
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
     # Overloading looks unnecessary, but is needed to work around complex mypy problems
     @overload
@@ -2898,6 +2943,7 @@ class list(MutableSequence[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
+@disjoint_base
 class dict(MutableMapping[_KT, _VT]):
     """dict() -> new empty dictionary
     dict(mapping) -> new dictionary initialized from a mapping object's
@@ -2913,9 +2959,9 @@ class dict(MutableMapping[_KT, _VT]):
     # __init__ should be kept roughly in line with `collections.UserDict.__init__`, which has similar semantics
     # Also multiprocessing.managers.SyncManager.dict()
     @overload
-    def __init__(self) -> None: ...
+    def __init__(self, /) -> None: ...
     @overload
-    def __init__(self: dict[str, _VT], **kwargs: _VT) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]  #11780
+    def __init__(self: dict[str, _VT], /, **kwargs: _VT) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]  #11780
     @overload
     def __init__(self, map: SupportsKeysAndGetItem[_KT, _VT], /) -> None: ...
     @overload
@@ -2940,7 +2986,7 @@ class dict(MutableMapping[_KT, _VT]):
     def __init__(self: dict[str, str], iterable: Iterable[list[str]], /) -> None: ...
     @overload
     def __init__(self: dict[bytes, bytes], iterable: Iterable[list[bytes]], /) -> None: ...
-    def __new__(cls, *args: Any, **kwargs: Any) -> Self: ...
+    def __new__(cls, /, *args: Any, **kwargs: Any) -> Self: ...
     def copy(self) -> dict[_KT, _VT]:
         """Return a shallow copy of the dict."""
 
@@ -3027,6 +3073,7 @@ class dict(MutableMapping[_KT, _VT]):
     @overload
     def __ior__(self, value: Iterable[tuple[_KT, _VT]], /) -> Self: ...
 
+@disjoint_base
 class set(MutableSet[_T]):
     """Build an unordered collection of unique elements."""
 
@@ -3110,7 +3157,7 @@ class set(MutableSet[_T]):
     def __ior__(self, value: AbstractSet[_T], /) -> Self:  # type: ignore[override,misc]
         """Return self|=value."""
 
-    def __sub__(self, value: AbstractSet[_T | None], /) -> set[_T]:
+    def __sub__(self, value: AbstractSet[object], /) -> set[_T]:
         """Return self-value."""
 
     def __isub__(self, value: AbstractSet[object], /) -> Self:
@@ -3131,6 +3178,7 @@ class set(MutableSet[_T]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
+@disjoint_base
 class frozenset(AbstractSet[_T_co]):
     """Build an immutable unordered collection of unique elements."""
 
@@ -3177,7 +3225,7 @@ class frozenset(AbstractSet[_T_co]):
     def __or__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
         """Return self|value."""
 
-    def __sub__(self, value: AbstractSet[_T_co], /) -> frozenset[_T_co]:
+    def __sub__(self, value: AbstractSet[object], /) -> frozenset[_T_co]:
         """Return self-value."""
 
     def __xor__(self, value: AbstractSet[_S], /) -> frozenset[_T_co | _S]:
@@ -3192,6 +3240,7 @@ class frozenset(AbstractSet[_T_co]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
+@disjoint_base
 class enumerate(Generic[_T]):
     """Return an enumerate object.
 
@@ -3236,7 +3285,7 @@ class range(Sequence[int]):
     @overload
     def __new__(cls, stop: SupportsIndex, /) -> Self: ...
     @overload
-    def __new__(cls, start: SupportsIndex, stop: SupportsIndex, step: SupportsIndex = ..., /) -> Self: ...
+    def __new__(cls, start: SupportsIndex, stop: SupportsIndex, step: SupportsIndex = 1, /) -> Self: ...
     def count(self, value: int, /) -> int:
         """rangeobject.count(value) -> integer -- return number of occurrences of value"""
 
@@ -3261,10 +3310,11 @@ class range(Sequence[int]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> range: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> range: ...
     def __reversed__(self) -> Iterator[int]:
         """Return a reverse iterator."""
 
+@disjoint_base
 class property:
     """Property attribute.
 
@@ -3309,10 +3359,10 @@ class property:
 
     def __init__(
         self,
-        fget: Callable[[Any], Any] | None = ...,
-        fset: Callable[[Any, Any], None] | None = ...,
-        fdel: Callable[[Any], None] | None = ...,
-        doc: str | None = ...,
+        fget: Callable[[Any], Any] | None = None,
+        fset: Callable[[Any, Any], None] | None = None,
+        fdel: Callable[[Any], None] | None = None,
+        doc: str | None = None,
     ) -> None: ...
     def getter(self, fget: Callable[[Any], Any], /) -> property:
         """Descriptor to obtain a copy of the property with a different getter."""
@@ -3334,15 +3384,6 @@ class property:
 
     def __delete__(self, instance: Any, /) -> None:
         """Delete an attribute of instance."""
-
-# This class does not exist at runtime, but stubtest complains if it's marked as
-# @type_check_only because it has an alias that does exist at runtime. See mypy#19568.
-# @type_check_only
-@final
-class _NotImplementedType(Any):
-    __call__: None
-
-NotImplemented: _NotImplementedType
 
 def abs(x: SupportsAbs[_T], /) -> _T:
     """Return the absolute value of the argument."""
@@ -3368,7 +3409,7 @@ def ascii(obj: object, /) -> str:
     to that returned by repr() in Python 2.
     """
 
-def bin(number: int | SupportsIndex, /) -> str:
+def bin(number: SupportsIndex, /) -> str:
     """Return the binary representation of an integer.
 
     >>> bin(2796202)
@@ -3389,7 +3430,7 @@ def callable(obj: object, /) -> TypeIs[Callable[..., object]]:
     __call__() method.
     """
 
-def chr(i: int | SupportsIndex, /) -> str:
+def chr(i: SupportsIndex, /) -> str:
     """Return a Unicode string of one character with ordinal i; 0 <= i <= 0x10ffff."""
 
 if sys.version_info >= (3, 10):
@@ -3420,7 +3461,7 @@ if sys.version_info >= (3, 10):
 @overload
 def compile(
     source: str | ReadableBuffer | _ast.Module | _ast.Expression | _ast.Interactive,
-    filename: str | ReadableBuffer | PathLike[Any],
+    filename: str | bytes | PathLike[Any],
     mode: str,
     flags: Literal[0],
     dont_inherit: bool = False,
@@ -3445,7 +3486,7 @@ def compile(
 @overload
 def compile(
     source: str | ReadableBuffer | _ast.Module | _ast.Expression | _ast.Interactive,
-    filename: str | ReadableBuffer | PathLike[Any],
+    filename: str | bytes | PathLike[Any],
     mode: str,
     *,
     dont_inherit: bool = False,
@@ -3455,7 +3496,7 @@ def compile(
 @overload
 def compile(
     source: str | ReadableBuffer | _ast.Module | _ast.Expression | _ast.Interactive,
-    filename: str | ReadableBuffer | PathLike[Any],
+    filename: str | bytes | PathLike[Any],
     mode: str,
     flags: Literal[1024],
     dont_inherit: bool = False,
@@ -3466,7 +3507,7 @@ def compile(
 @overload
 def compile(
     source: str | ReadableBuffer | _ast.Module | _ast.Expression | _ast.Interactive,
-    filename: str | ReadableBuffer | PathLike[Any],
+    filename: str | bytes | PathLike[Any],
     mode: str,
     flags: int,
     dont_inherit: bool = False,
@@ -3599,6 +3640,7 @@ else:
 
 exit: _sitebuiltins.Quitter
 
+@disjoint_base
 class filter(Generic[_T]):
     """Return an iterator yielding those items of iterable for which function(item)
     is true. If function is None, return the items that are true.
@@ -3673,7 +3715,7 @@ def hash(obj: object, /) -> int:
 
 help: _sitebuiltins._Helper
 
-def hex(number: int | SupportsIndex, /) -> str:
+def hex(number: SupportsIndex, /) -> str:
     """Return the hexadecimal representation of an integer.
 
     >>> hex(12648430)
@@ -3752,6 +3794,7 @@ def locals() -> dict[str, Any]:
     covered by any backwards compatibility guarantees.
     """
 
+@disjoint_base
 class map(Generic[_S]):
     """Make an iterator that computes the function using arguments from
     each of the iterables.  Stops when the shortest iterable is exhausted.
@@ -3924,7 +3967,7 @@ def next(i: SupportsNext[_T], /) -> _T:
 
 @overload
 def next(i: SupportsNext[_T], default: _VT, /) -> _T | _VT: ...
-def oct(number: int | SupportsIndex, /) -> str:
+def oct(number: SupportsIndex, /) -> str:
     """Return the octal representation of an integer.
 
     >>> oct(342391)
@@ -4134,7 +4177,14 @@ def open(
     opener: _Opener | None = None,
 ) -> IO[Any]: ...
 def ord(c: str | bytes | bytearray, /) -> int:
-    """Return the Unicode code point for a one-character string."""
+    """Return the ordinal value of a character.
+
+    If the argument is a one-character string, return the Unicode code
+    point of that character.
+
+    If the argument is a bytes or bytearray object of length 1, return its
+    single byte value.
+    """
 
 @type_check_only
 class _SupportsWriteAndFlush(SupportsWrite[_T_contra], SupportsFlush, Protocol[_T_contra]): ...
@@ -4231,6 +4281,7 @@ def pow(base: _SupportsSomeKindOfPow, exp: complex, mod: None = None) -> complex
 
 quit: _sitebuiltins.Quitter
 
+@disjoint_base
 class reversed(Generic[_T]):
     """Return a reverse iterator over the values of the given sequence."""
 
@@ -4335,7 +4386,7 @@ def vars(object: type, /) -> types.MappingProxyType[str, Any]:
 
 @overload
 def vars(object: Any = ..., /) -> dict[str, Any]: ...
-
+@disjoint_base
 class zip(Generic[_T_co]):
     """The zip object yields n-length tuples, where n is the number of iterables
     passed as positional arguments to zip().  The i-th element in every tuple
@@ -4351,18 +4402,25 @@ class zip(Generic[_T_co]):
 
     if sys.version_info >= (3, 10):
         @overload
-        def __new__(cls, *, strict: bool = ...) -> zip[Any]: ...
+        def __new__(cls, *, strict: bool = False) -> zip[Any]: ...
         @overload
-        def __new__(cls, iter1: Iterable[_T1], /, *, strict: bool = ...) -> zip[tuple[_T1]]: ...
+        def __new__(cls, iter1: Iterable[_T1], /, *, strict: bool = False) -> zip[tuple[_T1]]: ...
         @overload
-        def __new__(cls, iter1: Iterable[_T1], iter2: Iterable[_T2], /, *, strict: bool = ...) -> zip[tuple[_T1, _T2]]: ...
+        def __new__(cls, iter1: Iterable[_T1], iter2: Iterable[_T2], /, *, strict: bool = False) -> zip[tuple[_T1, _T2]]: ...
         @overload
         def __new__(
-            cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /, *, strict: bool = ...
+            cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /, *, strict: bool = False
         ) -> zip[tuple[_T1, _T2, _T3]]: ...
         @overload
         def __new__(
-            cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], iter4: Iterable[_T4], /, *, strict: bool = ...
+            cls,
+            iter1: Iterable[_T1],
+            iter2: Iterable[_T2],
+            iter3: Iterable[_T3],
+            iter4: Iterable[_T4],
+            /,
+            *,
+            strict: bool = False,
         ) -> zip[tuple[_T1, _T2, _T3, _T4]]: ...
         @overload
         def __new__(
@@ -4374,7 +4432,7 @@ class zip(Generic[_T_co]):
             iter5: Iterable[_T5],
             /,
             *,
-            strict: bool = ...,
+            strict: bool = False,
         ) -> zip[tuple[_T1, _T2, _T3, _T4, _T5]]: ...
         @overload
         def __new__(
@@ -4387,7 +4445,7 @@ class zip(Generic[_T_co]):
             iter6: Iterable[Any],
             /,
             *iterables: Iterable[Any],
-            strict: bool = ...,
+            strict: bool = False,
         ) -> zip[tuple[Any, ...]]: ...
     else:
         @overload
@@ -4431,7 +4489,7 @@ def __import__(
     name: str,
     globals: Mapping[str, object] | None = None,
     locals: Mapping[str, object] | None = None,
-    fromlist: Sequence[str] = (),
+    fromlist: Sequence[str] | None = (),
     level: int = 0,
 ) -> types.ModuleType:
     """Import a module.
@@ -4458,14 +4516,14 @@ def __build_class__(func: Callable[[], CellType | Any], name: str, /, *bases: An
     """
 
 if sys.version_info >= (3, 10):
-    from types import EllipsisType
+    from types import EllipsisType, NotImplementedType
 
     # Backwards compatibility hack for folks who relied on the ellipsis type
     # existing in typeshed in Python 3.9 and earlier.
     ellipsis = EllipsisType
 
     Ellipsis: EllipsisType
-
+    NotImplemented: NotImplementedType
 else:
     # Actually the type of Ellipsis is <type 'ellipsis'>, but since it's
     # not exposed anywhere under that name, we make it private here.
@@ -4475,12 +4533,23 @@ else:
 
     Ellipsis: ellipsis
 
+    @final
+    @type_check_only
+    class _NotImplementedType(Any): ...
+
+    NotImplemented: _NotImplementedType
+
+@disjoint_base
 class BaseException:
     """Common base class for all exceptions"""
 
     args: tuple[Any, ...]
     __cause__: BaseException | None
+    """exception cause"""
+
     __context__: BaseException | None
+    """exception context"""
+
     __suppress_context__: bool
     __traceback__: TracebackType | None
     def __init__(self, *args: object) -> None: ...
@@ -4488,6 +4557,10 @@ class BaseException:
     def __setstate__(self, state: dict[str, Any] | None, /) -> None: ...
     def with_traceback(self, tb: TracebackType | None, /) -> Self:
         """Set self.__traceback__ to tb and return self."""
+    # Necessary for security-focused static analyzers (e.g, pysa)
+    # See https://github.com/python/typeshed/pull/14900
+    def __str__(self) -> str: ...  # noqa: Y029
+    def __repr__(self) -> str: ...  # noqa: Y029
     if sys.version_info >= (3, 11):
         # only present after add_note() is called
         __notes__: list[str]
@@ -4500,29 +4573,43 @@ class GeneratorExit(BaseException):
 class KeyboardInterrupt(BaseException):
     """Program interrupted by user."""
 
+@disjoint_base
 class SystemExit(BaseException):
     """Request to exit from the interpreter."""
 
     code: sys._ExitCode
+    """exception code"""
 
 class Exception(BaseException):
     """Common base class for all non-exit exceptions."""
 
+@disjoint_base
 class StopIteration(Exception):
     """Signal the end from iterator.__next__()."""
 
     value: Any
+    """generator return value"""
 
+@disjoint_base
 class OSError(Exception):
     """Base class for I/O related errors."""
 
     errno: int | None
+    """POSIX exception code"""
+
     strerror: str | None
+    """exception strerror"""
+
     # filename, filename2 are actually str | bytes | None
     filename: Any
+    """exception filename"""
+
     filename2: Any
+    """second exception filename"""
+
     if sys.platform == "win32":
         winerror: int
+        """Win32 exception code"""
 
 EnvironmentError = OSError
 IOError = OSError
@@ -4535,13 +4622,21 @@ class ArithmeticError(Exception):
 class AssertionError(Exception):
     """Assertion failed."""
 
-class AttributeError(Exception):
-    """Attribute not found."""
+if sys.version_info >= (3, 10):
+    @disjoint_base
+    class AttributeError(Exception):
+        """Attribute not found."""
 
-    if sys.version_info >= (3, 10):
-        def __init__(self, *args: object, name: str | None = ..., obj: object = ...) -> None: ...
-        name: str
+        def __init__(self, *args: object, name: str | None = None, obj: object = None) -> None: ...
+        name: str | None
+        """attribute name"""
+
         obj: object
+        """object"""
+
+else:
+    class AttributeError(Exception):
+        """Attribute not found."""
 
 class BufferError(Exception):
     """Buffer error."""
@@ -4549,15 +4644,23 @@ class BufferError(Exception):
 class EOFError(Exception):
     """Read beyond end of file."""
 
+@disjoint_base
 class ImportError(Exception):
     """Import can't find module, or can't find name in module."""
 
-    def __init__(self, *args: object, name: str | None = ..., path: str | None = ...) -> None: ...
+    def __init__(self, *args: object, name: str | None = None, path: str | None = None) -> None: ...
     name: str | None
+    """module name"""
+
     path: str | None
+    """module path"""
+
     msg: str  # undocumented
+    """exception message"""
+
     if sys.version_info >= (3, 12):
         name_from: str | None  # undocumented
+        """name imported from module"""
 
 class LookupError(Exception):
     """Base class for lookup errors."""
@@ -4565,12 +4668,18 @@ class LookupError(Exception):
 class MemoryError(Exception):
     """Out of memory."""
 
-class NameError(Exception):
-    """Name not found globally."""
+if sys.version_info >= (3, 10):
+    @disjoint_base
+    class NameError(Exception):
+        """Name not found globally."""
 
-    if sys.version_info >= (3, 10):
-        def __init__(self, *args: object, name: str | None = ...) -> None: ...
-        name: str
+        def __init__(self, *args: object, name: str | None = None) -> None: ...
+        name: str | None
+        """name"""
+
+else:
+    class NameError(Exception):
+        """Name not found globally."""
 
 class ReferenceError(Exception):
     """Weak ref proxy used after referent went away."""
@@ -4581,20 +4690,36 @@ class RuntimeError(Exception):
 class StopAsyncIteration(Exception):
     """Signal the end from iterator.__anext__()."""
 
+@disjoint_base
 class SyntaxError(Exception):
     """Invalid syntax."""
 
     msg: str
+    """exception msg"""
+
     filename: str | None
+    """exception filename"""
+
     lineno: int | None
+    """exception lineno"""
+
     offset: int | None
+    """exception offset"""
+
     text: str | None
+    """exception text"""
+
     # Errors are displayed differently if this attribute exists on the exception.
     # The value is always None.
     print_file_and_line: None
+    """exception print_file_and_line"""
+
     if sys.version_info >= (3, 10):
         end_lineno: int | None
+        """exception end lineno"""
+
         end_offset: int | None
+        """exception end offset"""
 
     @overload
     def __init__(self) -> None: ...
@@ -4708,34 +4833,67 @@ class TabError(IndentationError):
 class UnicodeError(ValueError):
     """Unicode related error."""
 
+@disjoint_base
 class UnicodeDecodeError(UnicodeError):
     """Unicode decoding error."""
 
     encoding: str
+    """exception encoding"""
+
     object: bytes
+    """exception object"""
+
     start: int
+    """exception start"""
+
     end: int
+    """exception end"""
+
     reason: str
+    """exception reason"""
+
     def __init__(self, encoding: str, object: ReadableBuffer, start: int, end: int, reason: str, /) -> None: ...
 
+@disjoint_base
 class UnicodeEncodeError(UnicodeError):
     """Unicode encoding error."""
 
     encoding: str
+    """exception encoding"""
+
     object: str
+    """exception object"""
+
     start: int
+    """exception start"""
+
     end: int
+    """exception end"""
+
     reason: str
+    """exception reason"""
+
     def __init__(self, encoding: str, object: str, start: int, end: int, reason: str, /) -> None: ...
 
+@disjoint_base
 class UnicodeTranslateError(UnicodeError):
     """Unicode translation error."""
 
     encoding: None
+    """exception encoding"""
+
     object: str
+    """exception object"""
+
     start: int
+    """exception start"""
+
     end: int
+    """exception end"""
+
     reason: str
+    """exception reason"""
+
     def __init__(self, object: str, start: int, end: int, reason: str, /) -> None: ...
 
 class Warning(Exception):
@@ -4790,6 +4948,7 @@ if sys.version_info >= (3, 11):
     _ExceptionT = TypeVar("_ExceptionT", bound=Exception)
 
     # See `check_exception_group.py` for use-cases and comments.
+    @disjoint_base
     class BaseExceptionGroup(BaseException, Generic[_BaseExceptionT_co]):
         """A combination of multiple unrelated exceptions."""
 

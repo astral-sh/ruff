@@ -25,6 +25,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `xml.etree.ElementTree`](https://docs.python.org/3/library/xml.etree.elementtree.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.199")]
 pub(crate) struct DeprecatedCElementTree;
 
 impl AlwaysFixableViolation for DeprecatedCElementTree {
@@ -43,6 +44,7 @@ where
     T: Ranged,
 {
     let mut diagnostic = checker.report_diagnostic(DeprecatedCElementTree, node.range());
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
     let contents = checker.locator().slice(node);
     diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
         contents.replacen("cElementTree", "ElementTree", 1),

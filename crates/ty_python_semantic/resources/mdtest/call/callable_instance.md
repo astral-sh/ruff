@@ -19,7 +19,7 @@ b = Unit()(3.0)  # error: "Object of type `Unit` is not callable"
 reveal_type(b)  # revealed: Unknown
 ```
 
-## Possibly unbound `__call__` method
+## Possibly missing `__call__` method
 
 ```py
 def _(flag: bool):
@@ -29,7 +29,7 @@ def _(flag: bool):
                 return 1
 
     a = PossiblyNotCallable()
-    result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly unbound `__call__` method)"
+    result = a()  # error: "Object of type `PossiblyNotCallable` is not callable (possibly missing `__call__` method)"
     reveal_type(result)  # revealed: int
 ```
 
@@ -105,7 +105,7 @@ reveal_type(c())  # revealed: int
 
 ## Union over callables
 
-### Possibly unbound `__call__`
+### Possibly missing `__call__`
 
 ```py
 def outer(cond1: bool):
@@ -122,6 +122,6 @@ def outer(cond1: bool):
         else:
             a = Other()
 
-            # error: [call-non-callable] "Object of type `Test` is not callable (possibly unbound `__call__` method)"
+        # error: [call-non-callable] "Object of type `Test` is not callable (possibly missing `__call__` method)"
         a()
 ```

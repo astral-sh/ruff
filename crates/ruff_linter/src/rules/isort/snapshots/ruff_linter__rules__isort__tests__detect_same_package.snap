@@ -10,10 +10,8 @@ I001 [*] Import block is un-sorted or un-formatted
   | |______________^
   |
 help: Organize imports
-
-ℹ Safe fix
-1 1 | import os
-  2 |+
-2 3 | import pandas
-  4 |+
-3 5 | import foo.baz
+1 | import os
+2 + 
+3 | import pandas
+4 + 
+5 | import foo.baz

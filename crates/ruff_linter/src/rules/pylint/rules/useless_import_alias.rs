@@ -4,13 +4,11 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_ignore_init_files_in_useless_alias_enabled;
 use crate::{Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for import aliases that do not rename the original package.
-///
-/// In [preview] this rule does not apply in `__init__.py` files.
+/// This rule does not apply in `__init__.py` files.
 ///
 /// ## Why is this bad?
 /// The import alias is redundant and should be removed to avoid confusion.
@@ -36,8 +34,14 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// import numpy
 /// ```
 ///
-/// [preview]: https://docs.astral.sh/ruff/preview/
+/// ## Options
+///
+/// The rule will emit a diagnostic but not a fix if the import is required by the `isort`
+/// configuration option:
+///
+/// - `lint.isort.required-imports`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.156")]
 pub(crate) struct UselessImportAlias {
     required_import_conflict: bool,
 }
@@ -47,7 +51,6 @@ impl Violation for UselessImportAlias {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        #[expect(clippy::if_not_else)]
         if !self.required_import_conflict {
             "Import alias does not rename original package".to_string()
         } else {
@@ -74,9 +77,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     }
 
     // A re-export in __init__.py is probably intentional.
-    if checker.path().ends_with("__init__.py")
-        && is_ignore_init_files_in_useless_alias_enabled(checker.settings())
-    {
+    if checker.in_init_module() {
         return;
     }
 
@@ -115,7 +116,7 @@ pub(crate) fn useless_import_from_alias(
     }
 
     // A re-export in __init__.py is probably intentional.
-    if checker.path().ends_with("__init__.py") {
+    if checker.in_init_module() {
         return;
     }
 

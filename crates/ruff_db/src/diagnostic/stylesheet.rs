@@ -31,6 +31,43 @@ where
     FmtStyled { content, style }
 }
 
+pub(super) fn fmt_with_hyperlink<'a, T>(
+    content: T,
+    url: Option<&'a str>,
+    stylesheet: &DiagnosticStylesheet,
+) -> impl std::fmt::Display + 'a
+where
+    T: std::fmt::Display + 'a,
+{
+    struct FmtHyperlink<'a, T> {
+        content: T,
+        url: Option<&'a str>,
+    }
+
+    impl<T> std::fmt::Display for FmtHyperlink<'_, T>
+    where
+        T: std::fmt::Display,
+    {
+        fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+            if let Some(url) = self.url {
+                write!(f, "\x1B]8;;{url}\x1B\\")?;
+            }
+
+            self.content.fmt(f)?;
+
+            if self.url.is_some() {
+                f.write_str("\x1B]8;;\x1B\\")?;
+            }
+
+            Ok(())
+        }
+    }
+
+    let url = if stylesheet.hyperlink { url } else { None };
+
+    FmtHyperlink { content, url }
+}
+
 #[derive(Clone, Debug)]
 pub struct DiagnosticStylesheet {
     pub(crate) error: Style,
@@ -43,6 +80,11 @@ pub struct DiagnosticStylesheet {
     pub(crate) none: Style,
     pub(crate) separator: Style,
     pub(crate) secondary_code: Style,
+    pub(crate) insertion: Style,
+    pub(crate) deletion: Style,
+    pub(crate) insertion_line_no: Style,
+    pub(crate) deletion_line_no: Style,
+    pub(crate) hyperlink: bool,
 }
 
 impl Default for DiagnosticStylesheet {
@@ -55,6 +97,8 @@ impl DiagnosticStylesheet {
     /// Default terminal styling
     pub fn styled() -> Self {
         let bright_blue = AnsiColor::BrightBlue.on_default();
+
+        let hyperlink = supports_hyperlinks::supports_hyperlinks();
         Self {
             error: AnsiColor::BrightRed.on_default().effects(Effects::BOLD),
             warning: AnsiColor::Yellow.on_default().effects(Effects::BOLD),
@@ -66,6 +110,11 @@ impl DiagnosticStylesheet {
             none: Style::new(),
             separator: AnsiColor::Cyan.on_default(),
             secondary_code: AnsiColor::Red.on_default().effects(Effects::BOLD),
+            insertion: AnsiColor::Green.on_default(),
+            deletion: AnsiColor::Red.on_default(),
+            insertion_line_no: AnsiColor::Green.on_default().effects(Effects::BOLD),
+            deletion_line_no: AnsiColor::Red.on_default().effects(Effects::BOLD),
+            hyperlink,
         }
     }
 
@@ -81,6 +130,11 @@ impl DiagnosticStylesheet {
             none: Style::new(),
             separator: Style::new(),
             secondary_code: Style::new(),
+            insertion: Style::new(),
+            deletion: Style::new(),
+            insertion_line_no: Style::new(),
+            deletion_line_no: Style::new(),
+            hyperlink: false,
         }
     }
 }

@@ -10,16 +10,14 @@ PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
 11 |     return 42
    |
 help: Add parentheses
-
-ℹ Safe fix
-6  6  | # `import pytest`
-7  7  | 
-8  8  | 
-9     |-@pytest.fixture
-   9  |+@pytest.fixture()
-10 10 | def no_parentheses():
-11 11 |     return 42
-12 12 | 
+6  | # `import pytest`
+7  | 
+8  | 
+   - @pytest.fixture
+9  + @pytest.fixture()
+10 | def no_parentheses():
+11 |     return 42
+12 | 
 
 PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
   --> PT001.py:34:1
@@ -30,16 +28,14 @@ PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
 36 |     return 42
    |
 help: Add parentheses
-
-ℹ Safe fix
-31 31 | # `from pytest import fixture`
-32 32 | 
-33 33 | 
-34    |-@fixture
-   34 |+@fixture()
-35 35 | def imported_from_no_parentheses():
-36 36 |     return 42
-37 37 | 
+31 | # `from pytest import fixture`
+32 | 
+33 | 
+   - @fixture
+34 + @fixture()
+35 | def imported_from_no_parentheses():
+36 |     return 42
+37 | 
 
 PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
   --> PT001.py:59:1
@@ -50,13 +46,11 @@ PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
 61 |     return 42
    |
 help: Add parentheses
-
-ℹ Safe fix
-56 56 | # `from pytest import fixture as aliased`
-57 57 | 
-58 58 | 
-59    |-@aliased
-   59 |+@aliased()
-60 60 | def aliased_no_parentheses():
-61 61 |     return 42
-62 62 |
+56 | # `from pytest import fixture as aliased`
+57 | 
+58 | 
+   - @aliased
+59 + @aliased()
+60 | def aliased_no_parentheses():
+61 |     return 42
+62 |

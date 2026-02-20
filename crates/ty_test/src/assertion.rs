@@ -254,6 +254,15 @@ impl<'a> UnparsedAssertion<'a> {
         let comment = comment.trim().strip_prefix('#')?.trim();
         let (keyword, body) = comment.split_once(':')?;
         let keyword = keyword.trim();
+
+        // Support other pragma comments coming after `error` or `revealed`, e.g.
+        // `# error: [code] # type: ignore` (nested pragma comments)
+        let body = if let Some((before_nested, _)) = body.split_once('#') {
+            before_nested
+        } else {
+            body
+        };
+
         let body = body.trim();
 
         match keyword {
@@ -409,10 +418,14 @@ impl<'a> ErrorAssertionParser<'a> {
 
                 // message text
                 '"' => {
-                    let comment_source = self.comment_source.trim();
+                    let comment_source = self.comment_source.trim_end();
                     return if comment_source.ends_with('"') {
-                        let rest = &comment_source
-                            [self.cursor.offset().to_usize()..comment_source.len() - 1];
+                        let start = self.cursor.offset().to_usize();
+                        let end = comment_source.len() - 1;
+                        if start > end {
+                            return Err(ErrorAssertionParseError::DanglingMessageQuote);
+                        }
+                        let rest = &comment_source[start..end];
                         Ok(ErrorAssertion {
                             rule,
                             column,
@@ -480,6 +493,8 @@ pub(crate) enum ErrorAssertionParseError<'a> {
     MultipleRuleCodes,
     #[error("expected '\"' to be the final character in an assertion with an error message")]
     UnclosedMessage,
+    #[error("expected message text and closing '\"' after opening '\"'")]
+    DanglingMessageQuote,
     #[error(
         "unexpected character `{character}` at offset {offset} (relative to the `:` in the assertion comment)"
     )]
@@ -493,9 +508,8 @@ mod tests {
     use ruff_db::{Db as _, files::system_path_to_file};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
+    use ty_module_resolver::SearchPathSettings;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
         let mut db = Db::setup();

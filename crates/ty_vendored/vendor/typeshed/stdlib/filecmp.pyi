@@ -18,7 +18,7 @@ from typing import Any, AnyStr, Final, Generic, Literal
 
 __all__ = ["clear_cache", "cmp", "dircmp", "cmpfiles", "DEFAULT_IGNORES"]
 
-DEFAULT_IGNORES: list[str]
+DEFAULT_IGNORES: Final[list[str]]
 BUFSIZE: Final = 8192
 
 def cmp(f1: StrOrBytesPath, f2: StrOrBytesPath, shallow: bool | Literal[0, 1] = True) -> bool:

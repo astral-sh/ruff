@@ -72,9 +72,9 @@ class Number(metaclass=ABCMeta):
     caring what kind, use isinstance(x, Number).
     """
 
+    __slots__ = ()
     @abstractmethod
-    def __hash__(self) -> int:
-        """The type of the None singleton."""
+    def __hash__(self) -> int: ...
 
 # See comment at the top of the file
 # for why some of these return types are purposefully vague
@@ -89,6 +89,7 @@ class Complex(Number, _ComplexLike):
     type as described below.
     """
 
+    __slots__ = ()
     @abstractmethod
     def __complex__(self) -> complex:
         """Return a builtin complex instance. Called for complex(self)."""
@@ -182,6 +183,7 @@ class Real(Complex, _RealLike):
     Real also provides defaults for the derived operations.
     """
 
+    __slots__ = ()
     @abstractmethod
     def __float__(self) -> float:
         """Any Real can be converted to a native float object.
@@ -288,8 +290,13 @@ class Real(Complex, _RealLike):
 # See comment at the top of the file
 # for why some of these return types are purposefully vague
 class Rational(Real):
-    """.numerator and .denominator should be in lowest terms."""
+    """To Real, Rational adds numerator and denominator properties.
 
+    The numerator and denominator values should be in lowest terms,
+    with a positive denominator.
+    """
+
+    __slots__ = ()
     @property
     @abstractmethod
     def numerator(self) -> _IntegralLike:
@@ -321,6 +328,7 @@ class Integral(Rational, _IntegralLike):
     bit-string operations.
     """
 
+    __slots__ = ()
     @abstractmethod
     def __int__(self) -> int:
         """int(self)"""

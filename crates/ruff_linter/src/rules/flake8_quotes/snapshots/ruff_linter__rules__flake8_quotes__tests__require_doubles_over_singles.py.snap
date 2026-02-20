@@ -10,13 +10,11 @@ Q000 [*] Single quotes found but double quotes preferred
 3 | this_should_be_linted = f'double quote string'
   |
 help: Replace single quotes with double quotes
-
-ℹ Safe fix
-1   |-this_should_be_linted = 'single quote string'
-  1 |+this_should_be_linted = "single quote string"
-2 2 | this_should_be_linted = u'double quote string'
-3 3 | this_should_be_linted = f'double quote string'
-4 4 | this_should_be_linted = f'double {"quote"} string'
+  - this_should_be_linted = 'single quote string'
+1 + this_should_be_linted = "single quote string"
+2 | this_should_be_linted = u'double quote string'
+3 | this_should_be_linted = f'double quote string'
+4 | this_should_be_linted = f'double {"quote"} string'
 
 Q000 [*] Single quotes found but double quotes preferred
  --> singles.py:2:25
@@ -28,14 +26,12 @@ Q000 [*] Single quotes found but double quotes preferred
 4 | this_should_be_linted = f'double {"quote"} string'
   |
 help: Replace single quotes with double quotes
-
-ℹ Safe fix
-1 1 | this_should_be_linted = 'single quote string'
-2   |-this_should_be_linted = u'double quote string'
-  2 |+this_should_be_linted = u"double quote string"
-3 3 | this_should_be_linted = f'double quote string'
-4 4 | this_should_be_linted = f'double {"quote"} string'
-5 5 | 
+1 | this_should_be_linted = 'single quote string'
+  - this_should_be_linted = u'double quote string'
+2 + this_should_be_linted = u"double quote string"
+3 | this_should_be_linted = f'double quote string'
+4 | this_should_be_linted = f'double {"quote"} string'
+5 | 
 
 Q000 [*] Single quotes found but double quotes preferred
  --> singles.py:3:25
@@ -47,12 +43,10 @@ Q000 [*] Single quotes found but double quotes preferred
 4 | this_should_be_linted = f'double {"quote"} string'
   |
 help: Replace single quotes with double quotes
-
-ℹ Safe fix
-1 1 | this_should_be_linted = 'single quote string'
-2 2 | this_should_be_linted = u'double quote string'
-3   |-this_should_be_linted = f'double quote string'
-  3 |+this_should_be_linted = f"double quote string"
-4 4 | this_should_be_linted = f'double {"quote"} string'
-5 5 | 
-6 6 | # https://github.com/astral-sh/ruff/issues/10546
+1 | this_should_be_linted = 'single quote string'
+2 | this_should_be_linted = u'double quote string'
+  - this_should_be_linted = f'double quote string'
+3 + this_should_be_linted = f"double quote string"
+4 | this_should_be_linted = f'double {"quote"} string'
+5 | 
+6 | # https://github.com/astral-sh/ruff/issues/10546

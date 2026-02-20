@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: named_tuple.md - `NamedTuple` - `typing.NamedTuple` - Definition
 mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
@@ -47,7 +48,7 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
   |     --------------------- Earlier field `altitude` defined here with a default value
 5 |     # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `latitud…
 6 |     latitude: float
-  |     ^^^^^^^^ Field `latitude` defined here without a default value
+  |     ^^^^^^^^^^^^^^^ Field `latitude` defined here without a default value
 7 |     # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `longitu…
 8 |     longitude: float
   |
@@ -66,7 +67,7 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
  6 |     latitude: float
  7 |     # error: [invalid-named-tuple] "NamedTuple field without default value cannot follow field(s) with default value(s): Field `longit…
  8 |     longitude: float
-   |     ^^^^^^^^^ Field `longitude` defined here without a default value
+   |     ^^^^^^^^^^^^^^^^ Field `longitude` defined here without a default value
  9 |
 10 | class StrangeLocation(NamedTuple):
    |
@@ -83,7 +84,7 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
 14 |     altitude: float = 0.0
    |     --------------------- Earlier field `altitude` defined here with a default value
 15 |     latitude: float  # error: [invalid-named-tuple]
-   |     ^^^^^^^^ Field `latitude` defined here without a default value
+   |     ^^^^^^^^^^^^^^^ Field `latitude` defined here without a default value
 16 |     longitude: float  # error: [invalid-named-tuple]
    |
 info: rule `invalid-named-tuple` is enabled by default
@@ -100,7 +101,7 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
    |     --------------------- Earlier field `altitude` defined here with a default value
 15 |     latitude: float  # error: [invalid-named-tuple]
 16 |     longitude: float  # error: [invalid-named-tuple]
-   |     ^^^^^^^^^ Field `longitude` defined here without a default value
+   |     ^^^^^^^^^^^^^^^^ Field `longitude` defined here without a default value
 17 |
 18 | class VeryStrangeLocation(NamedTuple):
    |
@@ -115,7 +116,7 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
 18 | class VeryStrangeLocation(NamedTuple):
 19 |     altitude: float = 0.0
 20 |     latitude: float  # error: [invalid-named-tuple]
-   |     ^^^^^^^^ Field `latitude` defined here without a default value
+   |     ^^^^^^^^^^^^^^^ Field `latitude` defined here without a default value
 21 |     longitude: float  # error: [invalid-named-tuple]
 22 |     altitude: float = 0.0
    |
@@ -131,7 +132,7 @@ error[invalid-named-tuple]: NamedTuple field without default value cannot follow
 19 |     altitude: float = 0.0
 20 |     latitude: float  # error: [invalid-named-tuple]
 21 |     longitude: float  # error: [invalid-named-tuple]
-   |     ^^^^^^^^^ Field `longitude` defined here without a default value
+   |     ^^^^^^^^^^^^^^^^ Field `longitude` defined here without a default value
 22 |     altitude: float = 0.0
    |
 info: Earlier field `altitude` was defined with a default value

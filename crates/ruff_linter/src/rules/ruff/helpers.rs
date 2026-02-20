@@ -302,3 +302,23 @@ pub(super) fn class_def_visit_source_order_except_body<'a, V>(
         visitor.visit_arguments(arguments);
     }
 }
+
+/// Returns `true` if the class has `ctypes.Structure` as a base
+/// and the first target is the `_fields_` attribute.
+pub(super) fn is_ctypes_structure_fields(
+    class_def: &ast::StmtClassDef,
+    semantic: &SemanticModel,
+    targets: &[Expr],
+) -> bool {
+    let is_ctypes_structure =
+        analyze::class::any_qualified_base_class(class_def, semantic, &|qualified_name| {
+            matches!(qualified_name.segments(), ["ctypes", "Structure"])
+        });
+
+    let is_fields = matches!(
+        targets.first(),
+        Some(Expr::Name(ast::ExprName { id, .. })) if id == "_fields_"
+    );
+
+    is_ctypes_structure && is_fields
+}

@@ -31,6 +31,7 @@ use crate::checkers::ast::Checker;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: Formatted string literals](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.116")]
 pub(crate) struct FStringDocstring;
 
 impl Violation for FStringDocstring {

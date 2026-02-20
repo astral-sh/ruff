@@ -16,14 +16,12 @@ I001 [*] Import block is un-sorted or un-formatted
   | |____________________________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-2 2 | 
-3 3 | from typing import Any
-4 4 | 
-5   |-from requests import Session
-6   |-
-7 5 | from my_first_party import my_first_party_object
-  6 |+from requests import Session
-8 7 | 
-9 8 | from . import my_local_folder_object
+2 | 
+3 | from typing import Any
+4 | 
+  - from requests import Session
+  - 
+5 | from my_first_party import my_first_party_object
+6 + from requests import Session
+7 | 
+8 | from . import my_local_folder_object

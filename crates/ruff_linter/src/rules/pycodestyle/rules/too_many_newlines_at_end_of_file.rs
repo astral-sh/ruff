@@ -3,7 +3,7 @@ use std::iter::Peekable;
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_notebook::CellOffsets;
-use ruff_python_parser::{Token, TokenKind, Tokens};
+use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::{AlwaysFixableViolation, Edit, Fix, checkers::ast::LintContext};
@@ -29,6 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix, checkers::ast::LintContext};
 /// spam(1)\n
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.3")]
 pub(crate) struct TooManyNewlinesAtEndOfFile {
     num_trailing_newlines: u32,
     in_notebook: bool,

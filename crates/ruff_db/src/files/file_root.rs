@@ -81,6 +81,8 @@ impl FileRoots {
             }
         }
 
+        tracing::debug!("Adding new file root '{path}' of kind {kind:?}");
+
         // normalize the path to use `/` separators and escape the '{' and '}' characters,
         // which matchit uses for routing parameters
         let mut route = normalized_path.replace('{', "{{").replace('}', "}}");
@@ -95,7 +97,10 @@ impl FileRoots {
         self.by_path.insert(route.clone(), root).unwrap();
 
         // Insert a path that matches all subdirectories and files
-        route.push_str("/{*filepath}");
+        if !route.ends_with("/") {
+            route.push('/');
+        }
+        route.push_str("{*filepath}");
 
         self.by_path.insert(route, root).unwrap();
         self.roots.push(root);

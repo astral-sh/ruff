@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: for.md - For loops - Possibly-not-callable `__getitem__` method
 mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
@@ -12,23 +13,23 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 ## mdtest_snippet.py
 
 ```
- 1 | from typing_extensions import reveal_type
- 2 | 
- 3 | def _(flag: bool):
- 4 |     class CustomCallable:
- 5 |         if flag:
- 6 |             def __call__(self, *args, **kwargs) -> int:
- 7 |                 return 42
- 8 |         else:
- 9 |             __call__: None = None
-10 | 
-11 |     class Iterable1:
-12 |         __getitem__: CustomCallable = CustomCallable()
-13 | 
-14 |     class Iterable2:
-15 |         if flag:
-16 |             def __getitem__(self, key: int) -> int:
-17 |                 return 42
+ 1 | def _(flag: bool):
+ 2 |     class CustomCallable:
+ 3 |         if flag:
+ 4 |             def __call__(self, *args, **kwargs) -> int:
+ 5 |                 return 42
+ 6 | 
+ 7 |         else:
+ 8 |             __call__: None = None
+ 9 | 
+10 |     class Iterable1:
+11 |         __getitem__: CustomCallable = CustomCallable()
+12 | 
+13 |     class Iterable2:
+14 |         if flag:
+15 |             def __getitem__(self, key: int) -> int:
+16 |                 return 42
+17 | 
 18 |         else:
 19 |             __getitem__: None = None
 20 | 
@@ -62,20 +63,6 @@ info: rule `not-iterable` is enabled by default
 ```
 
 ```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:24:21
-   |
-22 |     for x in Iterable1():
-23 |         # TODO... `int` might be ideal here?
-24 |         reveal_type(x)  # revealed: int | Unknown
-   |                     ^ `int | Unknown`
-25 |
-26 |     # error: [not-iterable]
-   |
-
-```
-
-```
 error[not-iterable]: Object of type `Iterable2` may not be iterable
   --> src/mdtest_snippet.py:27:14
    |
@@ -88,17 +75,5 @@ error[not-iterable]: Object of type `Iterable2` may not be iterable
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable2.__getitem__(key: int) -> int) | None`, which is not callable
 info: rule `not-iterable` is enabled by default
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:29:21
-   |
-27 |     for y in Iterable2():
-28 |         # TODO... `int` might be ideal here?
-29 |         reveal_type(y)  # revealed: int | Unknown
-   |                     ^ `int | Unknown`
-   |
 
 ```

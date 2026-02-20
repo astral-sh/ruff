@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__bool__` method](https://docs.python.org/3/reference/datamodel.html#object.__bool__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.3")]
 pub(crate) struct InvalidBoolReturnType;
 
 impl Violation for InvalidBoolReturnType {
@@ -59,10 +60,10 @@ pub(crate) fn invalid_bool_return(checker: &Checker, function_def: &ast::StmtFun
     }
 
     // Determine the terminal behavior (i.e., implicit return, no return, etc.).
-    let terminal = Terminal::from_function(function_def);
+    let terminal = Terminal::from_function(function_def, checker.semantic());
 
     // If every control flow path raises an exception, ignore the function.
-    if terminal == Terminal::Raise {
+    if terminal.is_always_raise() {
         return;
     }
 

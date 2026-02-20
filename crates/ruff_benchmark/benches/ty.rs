@@ -15,7 +15,7 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::source::source_text;
 use ruff_db::system::{InMemorySystem, MemoryFileSystem, SystemPath, SystemPathBuf, TestSystem};
 use ruff_python_ast::PythonVersion;
-use ty_project::metadata::options::{EnvironmentOptions, Options};
+use ty_project::metadata::options::{AnalysisOptions, EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
 use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
@@ -84,6 +84,10 @@ fn setup_tomllib_case() -> Case {
         environment: Some(EnvironmentOptions {
             python_version: Some(RangedValue::cli(PythonVersion::PY312)),
             ..EnvironmentOptions::default()
+        }),
+        analysis: Some(AnalysisOptions {
+            respect_type_ignore_comments: Some(false),
+            ..AnalysisOptions::default()
         }),
         ..Options::default()
     });
@@ -221,7 +225,7 @@ fn setup_micro_case(code: &str) -> Case {
     let file_path = "src/test.py";
     fs.write_file_all(
         SystemPathBuf::from(file_path),
-        ruff_python_trivia::textwrap::dedent(code),
+        &*ruff_python_trivia::textwrap::dedent(code),
     )
     .unwrap();
 
@@ -444,15 +448,12 @@ fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
     criterion.bench_function("ty_micro[complex_constrained_attributes_2]", |b| {
         b.iter_batched_ref(
             || {
-                // This is is similar to the case above, but now the attributes are actually defined.
+                // This is similar to the case above, but now the attributes are actually defined.
                 // https://github.com/astral-sh/ty/issues/711
                 setup_micro_case(
                     r#"
                     class C:
                         def f(self: "C"):
-                            self.a = ""
-                            self.b = ""
-
                             if isinstance(self.a, str):
                                 return
 
@@ -466,6 +467,56 @@ fn benchmark_complex_constrained_attributes_2(criterion: &mut Criterion) {
                                 return
                             if isinstance(self.b, str):
                                 return
+                            if isinstance(self.b, str):
+                                return
+                            if isinstance(self.b, str):
+                                return
+
+                            self.a = ""
+                            self.b = ""
+                    "#,
+                )
+            },
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_complex_constrained_attributes_3(criterion: &mut Criterion) {
+    setup_rayon();
+
+    criterion.bench_function("ty_micro[complex_constrained_attributes_3]", |b| {
+        b.iter_batched_ref(
+            || {
+                // This is a regression test for https://github.com/astral-sh/ty/issues/758
+                setup_micro_case(
+                    r#"
+                    class GridOut:
+                        def __init__(self: "GridOut") -> None:
+                            self._buffer = b""
+
+                        def _read_size_or_line(self: "GridOut", size: int = -1):
+                            if size > self._position:
+                                size = self._position
+                                pass
+                            if size == 0:
+                                return bytes()
+
+                            while size > 0:
+                                if self._buffer:
+                                    buf = self._buffer
+                                    self._buffer = b""
+                                else:
+                                    buf = b""
+
+                                if len(buf) > size:
+                                    self._buffer = buf
+                                    self._position -= len(self._buffer)
                     "#,
                 )
             },
@@ -498,6 +549,103 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     }
 
     criterion.bench_function("ty_micro[many_enum_members]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+/// Micro-benchmark that tests our performance when slicing and unpacking
+/// a very large tuple that has many varied literal strings inside it.
+///
+/// Adapted from <https://github.com/MMD-Blender/blender_mmd_tools/blob/6ae13d6039763b6813832622c13da464983e93b3/mmd_tools/m17n.py>
+fn benchmark_very_large_tuple(criterion: &mut Criterion) {
+    /// Number of entries in the tuple -- must be >64 to trigger the literal-promotion optimization
+    const NUM_ENTRIES: usize = 65;
+
+    setup_rayon();
+
+    let mut code = "translations_tuple = (\n".to_string();
+    for i in 0..NUM_ENTRIES {
+        writeln!(
+            &mut code,
+            r#"    (("*", "Description {i}"), (("ref.path.{i}",), ()), ("ja_JP", "翻訳{i}", (False, ())), ("zh_HANS", "翻译{i}", (False, ()))),"#
+        )
+        .ok();
+    }
+    code.push_str(")\n\n");
+
+    // This slice operation (msg[2:]) is what triggers the expensive type inference:
+    // ty must compute the union of all possible slice results.
+    code.push_str(
+        "\
+for msg in translations_tuple:
+    for lang, trans, (is_fuzzy, comments) in msg[2:]:
+        pass
+",
+    );
+
+    criterion.bench_function("ty_micro[very_large_tuple]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 48;
+
+    setup_rayon();
+
+    let mut code = "\
+from enum import Enum
+from typing_extensions import assert_never
+
+class E(Enum):
+"
+    .to_string();
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    m{i} = {i}").ok();
+    }
+
+    code.push_str(
+        "
+    def method(self):
+        match self:",
+    );
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        write!(
+            &mut code,
+            "
+            case E.m{i}:
+                pass"
+        )
+        .ok();
+    }
+
+    write!(
+        &mut code,
+        "
+            case _:
+                assert_never(self)"
+    )
+    .ok();
+
+    criterion.bench_function("ty_micro[many_enum_members_2]", |b| {
         b.iter_batched_ref(
             || setup_micro_case(&code),
             |case| {
@@ -552,7 +700,7 @@ impl<'a> ProjectBenchmark<'a> {
             self.project
                 .check_paths()
                 .iter()
-                .map(|path| path.to_path_buf())
+                .map(|path| SystemPathBuf::from(*path))
                 .collect(),
         );
 
@@ -598,8 +746,8 @@ fn hydra(criterion: &mut Criterion) {
             name: "hydra-zen",
             repository: "https://github.com/mit-ll-responsible-ai/hydra-zen",
             commit: "dd2b50a9614c6f8c46c5866f283c8f7e7a960aa8",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec!["pydantic", "beartype", "hydra-core"],
+            paths: &["src"],
+            dependencies: &["pydantic", "beartype", "hydra-core"],
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
@@ -615,12 +763,12 @@ fn attrs(criterion: &mut Criterion) {
             name: "attrs",
             repository: "https://github.com/python-attrs/attrs",
             commit: "a6ae894aad9bc09edc7cdad8c416898784ceec9b",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec![],
+            paths: &["src"],
+            dependencies: &[],
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
-        100,
+        120,
     );
 
     bench_project(&benchmark, criterion);
@@ -632,12 +780,12 @@ fn anyio(criterion: &mut Criterion) {
             name: "anyio",
             repository: "https://github.com/agronholm/anyio",
             commit: "561d81270a12f7c6bbafb5bc5fad99a2a13f96be",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec![],
+            paths: &["src"],
+            dependencies: &[],
             max_dep_date: "2025-06-17",
             python_version: PythonVersion::PY313,
         },
-        100,
+        150,
     );
 
     bench_project(&benchmark, criterion);
@@ -649,12 +797,12 @@ fn datetype(criterion: &mut Criterion) {
             name: "DateType",
             repository: "https://github.com/glyph/DateType",
             commit: "57c9c93cf2468069f72945fc04bf27b64100dad8",
-            paths: vec![SystemPath::new("src")],
-            dependencies: vec![],
+            paths: &["src"],
+            dependencies: &[],
             max_dep_date: "2025-07-04",
             python_version: PythonVersion::PY313,
         },
-        2,
+        4,
     );
 
     bench_project(&benchmark, criterion);
@@ -668,7 +816,10 @@ criterion_group!(
     benchmark_tuple_implicit_instance_attributes,
     benchmark_complex_constrained_attributes_1,
     benchmark_complex_constrained_attributes_2,
+    benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
+    benchmark_many_enum_members_2,
+    benchmark_very_large_tuple,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

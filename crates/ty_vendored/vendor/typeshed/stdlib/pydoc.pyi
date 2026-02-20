@@ -44,7 +44,7 @@ from builtins import list as _list  # "list" conflicts with method name
 from collections.abc import Callable, Container, Mapping, MutableMapping
 from reprlib import Repr
 from types import MethodType, ModuleType, TracebackType
-from typing import IO, Any, AnyStr, Final, NoReturn, Protocol, TypeVar, type_check_only
+from typing import IO, Any, AnyStr, Final, NoReturn, Protocol, TypeVar, overload, type_check_only
 from typing_extensions import TypeGuard, deprecated
 
 __all__ = ["help"]
@@ -92,12 +92,12 @@ def classify_class_attrs(object: object) -> list[tuple[str, str, type, str]]:
     """Wrap inspect.classify_class_attrs, with fixup for data descriptors and bound methods."""
 
 if sys.version_info >= (3, 13):
-    @deprecated("Deprecated in Python 3.13.")
-    def ispackage(path: str) -> bool:
+    @deprecated("Deprecated since Python 3.13.")
+    def ispackage(path: str) -> bool:  # undocumented
         """Guess whether a path refers to a package directory."""
 
 else:
-    def ispackage(path: str) -> bool:
+    def ispackage(path: str) -> bool:  # undocumented
         """Guess whether a path refers to a package directory."""
 
 def source_synopsis(file: IO[AnyStr]) -> AnyStr | None:
@@ -113,7 +113,14 @@ class ErrorDuringImport(Exception):
     exc: type[BaseException] | None
     value: BaseException | None
     tb: TracebackType | None
-    def __init__(self, filename: str, exc_info: OptExcInfo) -> None: ...
+    if sys.version_info >= (3, 12):
+        @overload
+        def __init__(self, filename: str, exc_info: BaseException) -> None: ...
+        @overload
+        @deprecated("A tuple value for `exc_info` parameter is deprecated since Python 3.12. Use an exception instance.")
+        def __init__(self, filename: str, exc_info: OptExcInfo) -> None: ...
+    else:
+        def __init__(self, filename: str, exc_info: OptExcInfo) -> None: ...
 
 def importfile(path: str) -> ModuleType:
     """Import a Python source file or compiled file given its path."""

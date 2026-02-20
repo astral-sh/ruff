@@ -40,6 +40,7 @@ use crate::rules::pydocstyle::helpers::normalize_word;
 ///
 /// [PEP 257]: https://peps.python.org/pep-0257/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct DocstringStartsWithThis;
 
 impl Violation for DocstringStartsWithThis {

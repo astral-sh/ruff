@@ -971,6 +971,62 @@ Whether to enable Ruff's preview mode when formatting.
     }
     ```
 
+### `backend` {: #format_backend }
+
+The backend to use for formatting files. Following options are available:
+
+- `"internal"`: Use the built-in Ruff formatter
+- `"uv"`: Use uv for formatting (requires uv >= 0.8.13)
+
+For `internal`, the formatter version will match the selected Ruff version while for `uv`, the
+formatter version may differ.
+
+**Default value**: `"internal"`
+
+**Type**: `"internal" | "uv"`
+
+**Example usage**:
+
+=== "VS Code"
+
+    ```json
+    {
+        "ruff.format.backend": "uv"
+    }
+    ```
+
+=== "Neovim"
+
+    ```lua
+    require('lspconfig').ruff.setup {
+      init_options = {
+        settings = {
+          format = {
+            backend = "uv"
+          }
+        }
+      }
+    }
+    ```
+
+=== "Zed"
+
+    ```json
+    {
+      "lsp": {
+        "ruff": {
+          "initialization_options": {
+            "settings": {
+              "format": {
+                "backend": "uv"
+              }
+            }
+          }
+        }
+      }
+    }
+    ```
+
 ## VS Code specific
 
 Additionally, the Ruff extension provides the following settings specific to VS Code. These settings

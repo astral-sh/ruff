@@ -29,6 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: String constants](https://docs.python.org/3/library/string.html#string-constants)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.7.0")]
 pub(crate) struct HardcodedStringCharset {
     name: &'static str,
 }
@@ -61,40 +62,11 @@ pub(crate) fn hardcoded_string_charset_literal(checker: &Checker, expr: &ExprStr
 struct NamedCharset {
     name: &'static str,
     bytes: &'static [u8],
-    ascii_char_set: AsciiCharSet,
-}
-
-/// Represents the set of ascii characters in form of a bitset.
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-struct AsciiCharSet(u128);
-
-impl AsciiCharSet {
-    /// Creates the set of ascii characters from `bytes`.
-    /// Returns None if there is non-ascii byte.
-    const fn from_bytes(bytes: &[u8]) -> Option<Self> {
-        // TODO: simplify implementation, when const-traits are supported
-        //  https://github.com/rust-lang/rust-project-goals/issues/106
-        let mut bitset = 0;
-        let mut i = 0;
-        while i < bytes.len() {
-            if !bytes[i].is_ascii() {
-                return None;
-            }
-            bitset |= 1 << bytes[i];
-            i += 1;
-        }
-        Some(Self(bitset))
-    }
 }
 
 impl NamedCharset {
     const fn new(name: &'static str, bytes: &'static [u8]) -> Self {
-        Self {
-            name,
-            bytes,
-            // SAFETY: The named charset is guaranteed to have only ascii bytes.
-            ascii_char_set: AsciiCharSet::from_bytes(bytes).unwrap(),
-        }
+        Self { name, bytes }
     }
 }
 

@@ -39,6 +39,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Flask documentation: Debug Mode](https://flask.palletsprojects.com/en/latest/quickstart/#debug-mode)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct FlaskDebugTrue;
 
 impl Violation for FlaskDebugTrue {

@@ -9,9 +9,7 @@ UP009 [*] UTF-8 encoding declaration is unnecessary
 2 | print("Hello world")
   |
 help: Remove unnecessary coding comment
-
-ℹ Safe fix
-1   |- # coding=utf8
-2 1 | print("Hello world")
-3 2 | 
-4 3 | """
+  -  # coding=utf8
+1 | print("Hello world")
+2 | 
+3 | """

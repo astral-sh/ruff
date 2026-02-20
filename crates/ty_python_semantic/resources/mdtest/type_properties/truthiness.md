@@ -183,13 +183,11 @@ class CustomLenEnum(Enum):
     def __len__(self):
         return 0
 
-# TODO: these could be `Literal[True]`
-reveal_type(bool(NormalEnum.NO))  # revealed: bool
-reveal_type(bool(NormalEnum.YES))  # revealed: bool
+reveal_type(bool(NormalEnum.NO))  # revealed: Literal[True]
+reveal_type(bool(NormalEnum.YES))  # revealed: Literal[True]
 
-# TODO: these could be `Literal[False]`
-reveal_type(bool(FalsyEnum.NO))  # revealed: bool
-reveal_type(bool(FalsyEnum.YES))  # revealed: bool
+reveal_type(bool(FalsyEnum.NO))  # revealed: Literal[False]
+reveal_type(bool(FalsyEnum.YES))  # revealed: Literal[False]
 
 # All of the following must be `bool`:
 
@@ -223,15 +221,14 @@ class Normal(TypedDict):
     b: int
 
 def _(n: Normal) -> None:
-    # Could be `Literal[True]`
-    reveal_type(bool(n))  # revealed: bool
+    reveal_type(bool(n))  # revealed: Literal[True]
 
 class OnlyFalsyItems(TypedDict):
     wrong: Literal[False]
 
 def _(n: OnlyFalsyItems) -> None:
-    # Could be `Literal[True]` (it does not matter if all items are falsy)
-    reveal_type(bool(n))  # revealed: bool
+    # (it does not matter if all items are falsy)
+    reveal_type(bool(n))  # revealed: Literal[True]
 
 class Empty(TypedDict):
     pass

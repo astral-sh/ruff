@@ -43,7 +43,7 @@ def format_number(number: int) -> str:
     # underscore-delimited in the generated file, so we now preserve that property to
     # avoid unnecessary churn.
     if number > 100000:
-        number = str(number)
+        number: str = str(number)
         number = "_".join(number[i : i + 3] for i in range(0, len(number), 3))
         return f"{number}_u32"
 

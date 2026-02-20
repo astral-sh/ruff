@@ -122,7 +122,7 @@ properties on instance types:
 
 ```py
 reveal_type(sys.version_info.micro)  # revealed: int
-reveal_type(sys.version_info.releaselevel)  # revealed: @Todo(Support for `typing.TypeAlias`)
+reveal_type(sys.version_info.releaselevel)  # revealed: Literal["alpha", "beta", "candidate", "final"]
 reveal_type(sys.version_info.serial)  # revealed: int
 ```
 

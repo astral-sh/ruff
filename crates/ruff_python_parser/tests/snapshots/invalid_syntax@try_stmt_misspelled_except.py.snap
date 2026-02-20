@@ -7,17 +7,17 @@ input_file: crates/ruff_python_parser/resources/inline/err/try_stmt_misspelled_e
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..165,
         body: [
             Try(
                 StmtTry {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..13,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 9..13,
                             },
                         ),
@@ -30,11 +30,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 14..20,
                     target: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 14..19,
                             id: Name("exept"),
                             ctx: Store,
@@ -42,7 +42,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 20..20,
                             id: Name(""),
                             ctx: Invalid,
@@ -54,24 +54,24 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 54..58,
                 },
             ),
             Pass(
                 StmtPass {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 72..76,
                 },
             ),
             Assign(
                 StmtAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 77..82,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 77..78,
                                 id: Name("a"),
                                 ctx: Store,
@@ -80,7 +80,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 81..82,
                             value: Int(
                                 1,
@@ -91,12 +91,12 @@ Module(
             ),
             Try(
                 StmtTry {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 83..113,
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 92..96,
                             },
                         ),
@@ -105,13 +105,13 @@ Module(
                         ExceptHandler(
                             ExceptHandlerExceptHandler {
                                 range: 97..113,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 type_: None,
                                 name: None,
                                 body: [
                                     Pass(
                                         StmtPass {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 109..113,
                                         },
                                     ),
@@ -126,11 +126,11 @@ Module(
             ),
             AnnAssign(
                 StmtAnnAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 114..120,
                     target: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 114..119,
                             id: Name("exept"),
                             ctx: Store,
@@ -138,7 +138,7 @@ Module(
                     ),
                     annotation: Name(
                         ExprName {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 120..120,
                             id: Name(""),
                             ctx: Invalid,
@@ -150,18 +150,18 @@ Module(
             ),
             Pass(
                 StmtPass {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 154..158,
                 },
             ),
             Assign(
                 StmtAssign {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 159..164,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 159..160,
                                 id: Name("b"),
                                 ctx: Store,
@@ -170,7 +170,7 @@ Module(
                     ],
                     value: NumberLiteral(
                         ExprNumberLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 163..164,
                             value: Int(
                                 1,

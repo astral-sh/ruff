@@ -9,6 +9,18 @@ expression: initialization_result
       "openClose": true,
       "change": 2
     },
+    "notebookDocumentSync": {
+      "notebookSelector": [
+        {
+          "cells": [
+            {
+              "language": "python"
+            }
+          ]
+        }
+      ],
+      "save": false
+    },
     "selectionRangeProvider": true,
     "hoverProvider": true,
     "completionProvider": {
@@ -31,7 +43,28 @@ expression: initialization_result
     "documentHighlightProvider": true,
     "documentSymbolProvider": true,
     "workspaceSymbolProvider": true,
+    "codeActionProvider": {
+      "codeActionKinds": [
+        "quickfix"
+      ]
+    },
+    "renameProvider": {
+      "prepareProvider": true
+    },
+    "foldingRangeProvider": true,
     "declarationProvider": true,
+    "executeCommandProvider": {
+      "commands": [
+        "ty.printDebugInformation"
+      ],
+      "workDoneProgress": false
+    },
+    "workspace": {
+      "workspaceFolders": {
+        "supported": true,
+        "changeNotifications": true
+      }
+    },
     "semanticTokensProvider": {
       "legend": {
         "tokenTypes": [
@@ -54,7 +87,8 @@ expression: initialization_result
         "tokenModifiers": [
           "definition",
           "readonly",
-          "async"
+          "async",
+          "documentation"
         ]
       },
       "range": true,

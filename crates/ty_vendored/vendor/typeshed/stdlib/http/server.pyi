@@ -433,46 +433,91 @@ class SimpleHTTPRequestHandler(BaseHTTPRequestHandler):
 def executable(path: StrPath) -> bool:  # undocumented
     """Test for executable file."""
 
-@deprecated("Deprecated in Python 3.13; removal scheduled for Python 3.15")
-class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
-    """Complete HTTP server with GET, HEAD and POST commands.
+if sys.version_info >= (3, 13):
+    @deprecated("Deprecated since Python 3.13; will be removed in Python 3.15.")
+    class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
+        """Complete HTTP server with GET, HEAD and POST commands.
 
-    GET and HEAD also support running CGI scripts.
+        GET and HEAD also support running CGI scripts.
 
-    The POST command is *only* implemented for CGI scripts.
-
-    """
-
-    cgi_directories: list[str]
-    have_fork: bool  # undocumented
-    def do_POST(self) -> None:
-        """Serve a POST request.
-
-        This is only implemented for CGI scripts.
+        The POST command is *only* implemented for CGI scripts.
 
         """
 
-    def is_cgi(self) -> bool:  # undocumented
-        """Test whether self.path corresponds to a CGI script.
+        cgi_directories: list[str]
+        have_fork: bool  # undocumented
+        def do_POST(self) -> None:
+            """Serve a POST request.
 
-        Returns True and updates the cgi_info attribute to the tuple
-        (dir, rest) if self.path requires running a CGI script.
-        Returns False otherwise.
+            This is only implemented for CGI scripts.
 
-        If any exception is raised, the caller should assume that
-        self.path was rejected as invalid and act accordingly.
+            """
 
-        The default implementation tests whether the normalized url
-        path begins with one of the strings in self.cgi_directories
-        (and the next character is a '/' or the end of the string).
+        def is_cgi(self) -> bool:  # undocumented
+            """Test whether self.path corresponds to a CGI script.
+
+            Returns True and updates the cgi_info attribute to the tuple
+            (dir, rest) if self.path requires running a CGI script.
+            Returns False otherwise.
+
+            If any exception is raised, the caller should assume that
+            self.path was rejected as invalid and act accordingly.
+
+            The default implementation tests whether the normalized url
+            path begins with one of the strings in self.cgi_directories
+            (and the next character is a '/' or the end of the string).
+
+            """
+
+        def is_executable(self, path: StrPath) -> bool:  # undocumented
+            """Test whether argument path is an executable file."""
+
+        def is_python(self, path: StrPath) -> bool:  # undocumented
+            """Test whether argument path is a Python script."""
+
+        def run_cgi(self) -> None:  # undocumented
+            """Execute a CGI script."""
+
+else:
+    class CGIHTTPRequestHandler(SimpleHTTPRequestHandler):
+        """Complete HTTP server with GET, HEAD and POST commands.
+
+        GET and HEAD also support running CGI scripts.
+
+        The POST command is *only* implemented for CGI scripts.
 
         """
 
-    def is_executable(self, path: StrPath) -> bool:  # undocumented
-        """Test whether argument path is an executable file."""
+        cgi_directories: list[str]
+        have_fork: bool  # undocumented
+        def do_POST(self) -> None:
+            """Serve a POST request.
 
-    def is_python(self, path: StrPath) -> bool:  # undocumented
-        """Test whether argument path is a Python script."""
+            This is only implemented for CGI scripts.
 
-    def run_cgi(self) -> None:  # undocumented
-        """Execute a CGI script."""
+            """
+
+        def is_cgi(self) -> bool:  # undocumented
+            """Test whether self.path corresponds to a CGI script.
+
+            Returns True and updates the cgi_info attribute to the tuple
+            (dir, rest) if self.path requires running a CGI script.
+            Returns False otherwise.
+
+            If any exception is raised, the caller should assume that
+            self.path was rejected as invalid and act accordingly.
+
+            The default implementation tests whether the normalized url
+            path begins with one of the strings in self.cgi_directories
+            (and the next character is a '/' or the end of the string).
+
+            """
+
+        def is_executable(self, path: StrPath) -> bool:  # undocumented
+            """Test whether argument path is an executable file."""
+
+        def is_python(self, path: StrPath) -> bool:  # undocumented
+            """Test whether argument path is a Python script."""
+
+        def run_cgi(self) -> None:  # undocumented
+            """Execute a CGI script."""

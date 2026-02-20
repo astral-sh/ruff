@@ -1,9 +1,19 @@
+use std::sync::LazyLock;
+
 use proc_macro2::TokenStream;
 use quote::quote;
-use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta};
+use regex::Regex;
+use syn::{Attribute, DeriveInput, Error, Lit, LitStr, Meta, meta::ParseNestedMeta};
 
 pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream> {
     let docs = get_docs(&input.attrs)?;
+
+    let Some(group) = get_rule_status(&input.attrs)? else {
+        return Err(Error::new_spanned(
+            input,
+            "Missing required rule group metadata",
+        ));
+    };
 
     let name = input.ident;
 
@@ -19,6 +29,18 @@ pub(crate) fn violation_metadata(input: DeriveInput) -> syn::Result<TokenStream>
 
             fn explain() -> Option<&'static str> {
                 Some(#docs)
+            }
+
+            fn group() -> crate::codes::RuleGroup {
+                crate::codes::#group
+            }
+
+            fn file() -> &'static str {
+                file!()
+            }
+
+            fn line() -> u32 {
+                line!()
             }
         }
     })
@@ -43,6 +65,49 @@ fn get_docs(attrs: &[Attribute]) -> syn::Result<String> {
     Ok(explanation)
 }
 
+/// Extract the rule status attribute.
+///
+/// These attributes look like:
+///
+/// ```ignore
+/// #[violation_metadata(stable_since = "1.2.3")]
+/// struct MyRule;
+/// ```
+///
+/// The result is returned as a `TokenStream` so that the version string literal can be combined
+/// with the proper `RuleGroup` variant, e.g. `RuleGroup::Stable` for `stable_since` above.
+fn get_rule_status(attrs: &[Attribute]) -> syn::Result<Option<TokenStream>> {
+    let mut group = None;
+    for attr in attrs {
+        if attr.path().is_ident("violation_metadata") {
+            attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("stable_since") {
+                    let lit: LitStr = parse_version(&meta)?;
+                    group = Some(quote!(RuleGroup::Stable { since: #lit }));
+                    return Ok(());
+                } else if meta.path.is_ident("preview_since") {
+                    let lit: LitStr = parse_version(&meta)?;
+                    group = Some(quote!(RuleGroup::Preview { since: #lit }));
+                    return Ok(());
+                } else if meta.path.is_ident("deprecated_since") {
+                    let lit: LitStr = parse_version(&meta)?;
+                    group = Some(quote!(RuleGroup::Deprecated { since: #lit }));
+                    return Ok(());
+                } else if meta.path.is_ident("removed_since") {
+                    let lit: LitStr = parse_version(&meta)?;
+                    group = Some(quote!(RuleGroup::Removed { since: #lit }));
+                    return Ok(());
+                }
+                Err(Error::new_spanned(
+                    attr,
+                    "unimplemented violation metadata option",
+                ))
+            })?;
+        }
+    }
+    Ok(group)
+}
+
 fn parse_attr<'a, const LEN: usize>(
     path: [&'static str; LEN],
     attr: &'a Attribute,
@@ -65,4 +130,24 @@ fn parse_attr<'a, const LEN: usize>(
     }
 
     None
+}
+
+fn parse_version(meta: &ParseNestedMeta) -> syn::Result<LitStr> {
+    /// Match either a semantic version with an optional `v` prefix for versions before 0.5.0
+    /// (`v0.2.3`, `0.12.34`) or the special `NEXT_RUFF_VERSION` placeholder that is updated by
+    /// rooster in releases.
+    static VERSION: LazyLock<Regex> =
+        LazyLock::new(|| Regex::new(r"^(v0.[0-4].\d+|\d+\.\d+\.\d+|NEXT_RUFF_VERSION)$").unwrap());
+
+    let lit: LitStr = meta.value()?.parse()?;
+    let value = lit.value();
+
+    if VERSION.is_match(&value) {
+        Ok(lit)
+    } else {
+        Err(Error::new_spanned(
+            lit,
+            format_args!("Unknown version specifier `{value}`"),
+        ))
+    }
 }

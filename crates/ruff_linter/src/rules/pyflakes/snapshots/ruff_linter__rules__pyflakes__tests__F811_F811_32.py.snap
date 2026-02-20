@@ -12,12 +12,10 @@ F811 [*] Redefinition of unused `List` from line 4
 6 | )
   |
 help: Remove definition: `List`
-
-ℹ Safe fix
-2 2 | 
-3 3 | from typing import (
-4 4 |     List,
-5   |-    List,
-6 5 | )
-7 6 | 
-8 7 |
+2 | 
+3 | from typing import (
+4 |     List,
+  -     List,
+5 | )
+6 | 
+7 |

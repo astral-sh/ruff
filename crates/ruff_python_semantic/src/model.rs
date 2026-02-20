@@ -3,12 +3,13 @@ use std::path::Path;
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
+use crate::analyze::visibility;
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
     SubmoduleImport,
@@ -404,22 +405,11 @@ impl<'a> SemanticModel<'a> {
             }
         }
 
-        let mut seen_function = false;
         let mut import_starred = false;
         let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(self.scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
-                // Allow usages of `__class__` within methods, e.g.:
-                //
-                // ```python
-                // class Foo:
-                //     def __init__(self):
-                //         print(__class__)
-                // ```
-                if seen_function && matches!(name.id.as_str(), "__class__") {
-                    return ReadResult::ImplicitGlobal;
-                }
                 // Do not allow usages of class symbols unless it is the immediate parent
                 // (excluding type scopes), e.g.:
                 //
@@ -442,7 +432,13 @@ impl<'a> SemanticModel<'a> {
             // Allow class variables to be visible for an additional scope level
             // when a type scope is seen — this covers the type scope present between
             // function and class definitions and their parent class scope.
-            class_variables_visible = scope.kind.is_type() && index == 0;
+            //
+            // Also allow an additional level beyond that to cover the implicit
+            // `__class__` closure created around methods and enclosing the type scope.
+            class_variables_visible = matches!(
+                (scope.kind, index),
+                (ScopeKind::Type, 0) | (ScopeKind::DunderClassCell, 1)
+            );
 
             if let Some(binding_id) = scope.get(name.id.as_str()) {
                 // Mark the binding as used.
@@ -614,7 +610,6 @@ impl<'a> SemanticModel<'a> {
                 }
             }
 
-            seen_function |= scope.kind.is_function();
             import_starred = import_starred || scope.uses_star_imports();
         }
 
@@ -658,21 +653,19 @@ impl<'a> SemanticModel<'a> {
             }
         }
 
-        let mut seen_function = false;
         let mut class_variables_visible = true;
         for (index, scope_id) in self.scopes.ancestor_ids(scope_id).enumerate() {
             let scope = &self.scopes[scope_id];
             if scope.kind.is_class() {
-                if seen_function && matches!(symbol, "__class__") {
-                    return None;
-                }
                 if !class_variables_visible {
                     continue;
                 }
             }
 
-            class_variables_visible = scope.kind.is_type() && index == 0;
-            seen_function |= scope.kind.is_function();
+            class_variables_visible = matches!(
+                (scope.kind, index),
+                (ScopeKind::Type, 0) | (ScopeKind::DunderClassCell, 1)
+            );
 
             if let Some(binding_id) = scope.get(symbol) {
                 match self.bindings[binding_id].kind {
@@ -786,15 +779,15 @@ impl<'a> SemanticModel<'a> {
             }
 
             if scope.kind.is_class() {
-                if seen_function && matches!(symbol, "__class__") {
-                    return None;
-                }
                 if !class_variables_visible {
                     continue;
                 }
             }
 
-            class_variables_visible = scope.kind.is_type() && index == 0;
+            class_variables_visible = matches!(
+                (scope.kind, index),
+                (ScopeKind::Type, 0) | (ScopeKind::DunderClassCell, 1)
+            );
             seen_function |= scope.kind.is_function();
 
             if let Some(binding_id) = scope.get(symbol) {
@@ -867,11 +860,17 @@ impl<'a> SemanticModel<'a> {
     /// associated with `Class`, then the `BindingKind::FunctionDefinition` associated with
     /// `Class.method`.
     pub fn lookup_attribute(&self, value: &Expr) -> Option<BindingId> {
+        self.lookup_attribute_in_scope(value, self.scope_id)
+    }
+
+    /// Lookup a qualified attribute in the certain scope.
+    pub fn lookup_attribute_in_scope(&self, value: &Expr, scope_id: ScopeId) -> Option<BindingId> {
         let unqualified_name = UnqualifiedName::from_expr(value)?;
 
         // Find the symbol in the current scope.
         let (symbol, attribute) = unqualified_name.segments().split_first()?;
-        let mut binding_id = self.lookup_symbol(symbol)?;
+        let mut binding_id =
+            self.lookup_symbol_in_scope(symbol, scope_id, self.in_forward_reference())?;
 
         // Recursively resolve class attributes, e.g., `foo.bar.baz` in.
         let mut tail = attribute;
@@ -1353,11 +1352,12 @@ impl<'a> SemanticModel<'a> {
         self.scopes[scope_id].parent
     }
 
-    /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`], if any.
+    /// Returns the first parent of the given [`Scope`] that is not of [`ScopeKind::Type`] or
+    /// [`ScopeKind::DunderClassCell`], if any.
     pub fn first_non_type_parent_scope(&self, scope: &Scope) -> Option<&Scope<'a>> {
         let mut current_scope = scope;
         while let Some(parent) = self.parent_scope(current_scope) {
-            if parent.kind.is_type() {
+            if matches!(parent.kind, ScopeKind::Type | ScopeKind::DunderClassCell) {
                 current_scope = parent;
             } else {
                 return Some(parent);
@@ -1366,11 +1366,15 @@ impl<'a> SemanticModel<'a> {
         None
     }
 
-    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`], if any.
+    /// Returns the first parent of the given [`ScopeId`] that is not of [`ScopeKind::Type`] or
+    /// [`ScopeKind::DunderClassCell`], if any.
     pub fn first_non_type_parent_scope_id(&self, scope_id: ScopeId) -> Option<ScopeId> {
         let mut current_scope_id = scope_id;
         while let Some(parent_id) = self.parent_scope_id(current_scope_id) {
-            if self.scopes[parent_id].kind.is_type() {
+            if matches!(
+                self.scopes[parent_id].kind,
+                ScopeKind::Type | ScopeKind::DunderClassCell
+            ) {
                 current_scope_id = parent_id;
             } else {
                 return Some(parent_id);
@@ -1591,8 +1595,13 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an async context.
     pub fn in_async_context(&self) -> bool {
         for scope in self.current_scopes() {
-            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
-                return *is_async;
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -1679,6 +1688,48 @@ impl<'a> SemanticModel<'a> {
             .collect::<Vec<_>>();
 
         left == right
+    }
+
+    /// Returns `true` if any execution path to `node` passes through `dominator`.
+    ///
+    /// More precisely, it returns true if the path of branches leading
+    /// to `dominator` is a prefix of the path of branches leading to `node`.
+    ///
+    /// In this code snippet:
+    ///
+    /// ```python
+    /// if cond:
+    ///     dominator
+    ///     if other_cond:
+    ///         node
+    /// else:
+    ///     other_node
+    /// ```
+    ///
+    /// we have that `node` is dominated by `dominator` but that
+    /// `other_node` is not dominated by `dominator`.
+    ///
+    /// This implementation assumes that the statements are in the same scope.
+    pub fn dominates(&self, dominator: NodeId, node: NodeId) -> bool {
+        // Collect the branch path for the left statement.
+        let dominator = self
+            .nodes
+            .branch_id(dominator)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Collect the branch path for the right statement.
+        let node = self
+            .nodes
+            .branch_id(node)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Note that the paths are in "reverse" order -
+        // from most nested to least nested.
+        node.ends_with(&dominator)
     }
 
     /// Returns `true` if the given expression is an unused variable, or consists solely of
@@ -2098,7 +2149,7 @@ impl<'a> SemanticModel<'a> {
     /// Finds and returns the [`Scope`] corresponding to a given [`ast::StmtFunctionDef`].
     ///
     /// This method searches all scopes created by a function definition, comparing the
-    /// [`TextRange`] of the provided `function_def` with the the range of the function
+    /// [`TextRange`] of the provided `function_def` with the range of the function
     /// associated with the scope.
     pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope<'_>> {
         self.scopes.iter().find(|scope| {
@@ -2106,6 +2157,21 @@ impl<'a> SemanticModel<'a> {
                 return false;
             };
             function.range() == function_def.range()
+        })
+    }
+
+    /// Return `true` if the model is in a `typing.Protocol` subclass or an abstract
+    /// method.
+    pub fn in_protocol_or_abstract_method(&self) -> bool {
+        self.current_scopes().any(|scope| match scope.kind {
+            ScopeKind::Class(class_def) => class_def
+                .bases()
+                .iter()
+                .any(|base| self.match_typing_expr(map_subscript(base), "Protocol")),
+            ScopeKind::Function(function_def) => {
+                visibility::is_abstract(&function_def.decorator_list, self)
+            }
+            _ => false,
         })
     }
 }
@@ -2649,16 +2715,16 @@ pub enum ReadResult {
     /// The `x` in `print(x)` is resolved to the binding of `x` in `x = 1`.
     Resolved(BindingId),
 
-    /// The read reference is resolved to a context-specific, implicit global (e.g., `__class__`
+    /// The read reference is resolved to a context-specific, implicit global (e.g., `__qualname__`
     /// within a class scope).
     ///
     /// For example, given:
     /// ```python
     /// class C:
-    ///    print(__class__)
+    ///    print(__qualname__)
     /// ```
     ///
-    /// The `__class__` in `print(__class__)` is resolved to the implicit global `__class__`.
+    /// The `__qualname__` in `print(__qualname__)` is resolved to the implicit global `__qualname__`.
     ImplicitGlobal,
 
     /// The read reference is unresolved, but at least one of the containing scopes contains a

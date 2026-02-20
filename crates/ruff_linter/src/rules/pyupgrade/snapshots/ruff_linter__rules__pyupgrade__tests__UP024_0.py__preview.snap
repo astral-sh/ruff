@@ -1,0 +1,288 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP024 [*] Replace aliased errors with `OSError`
+ --> UP024_0.py:6:8
+  |
+4 | try:
+5 |     pass
+6 | except EnvironmentError:
+  |        ^^^^^^^^^^^^^^^^
+7 |     pass
+  |
+help: Replace `EnvironmentError` with builtin `OSError`
+3 | # These should be fixed
+4 | try:
+5 |     pass
+  - except EnvironmentError:
+6 + except OSError:
+7 |     pass
+8 | 
+9 | try:
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:11:8
+   |
+ 9 | try:
+10 |     pass
+11 | except IOError:
+   |        ^^^^^^^
+12 |     pass
+   |
+help: Replace `IOError` with builtin `OSError`
+8  | 
+9  | try:
+10 |     pass
+   - except IOError:
+11 + except OSError:
+12 |     pass
+13 | 
+14 | try:
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:16:8
+   |
+14 | try:
+15 |     pass
+16 | except WindowsError:
+   |        ^^^^^^^^^^^^
+17 |     pass
+   |
+help: Replace `WindowsError` with builtin `OSError`
+13 | 
+14 | try:
+15 |     pass
+   - except WindowsError:
+16 + except OSError:
+17 |     pass
+18 | 
+19 | try:
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:21:8
+   |
+19 | try:
+20 |     pass
+21 | except mmap.error:
+   |        ^^^^^^^^^^
+22 |     pass
+   |
+help: Replace `mmap.error` with builtin `OSError`
+18 | 
+19 | try:
+20 |     pass
+   - except mmap.error:
+21 + except OSError:
+22 |     pass
+23 | 
+24 | try:
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:26:8
+   |
+24 | try:
+25 |     pass
+26 | except select.error:
+   |        ^^^^^^^^^^^^
+27 |     pass
+   |
+help: Replace `select.error` with builtin `OSError`
+23 | 
+24 | try:
+25 |     pass
+   - except select.error:
+26 + except OSError:
+27 |     pass
+28 | 
+29 | try:
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:31:8
+   |
+29 | try:
+30 |     pass
+31 | except socket.error:
+   |        ^^^^^^^^^^^^
+32 |     pass
+   |
+help: Replace `socket.error` with builtin `OSError`
+28 | 
+29 | try:
+30 |     pass
+   - except socket.error:
+31 + except OSError:
+32 |     pass
+33 | 
+34 | try:
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:36:8
+   |
+34 | try:
+35 |     pass
+36 | except error:
+   |        ^^^^^
+37 |     pass
+   |
+help: Replace `error` with builtin `OSError`
+33 | 
+34 | try:
+35 |     pass
+   - except error:
+36 + except OSError:
+37 |     pass
+38 | 
+39 | # Should NOT be in parentheses when replaced
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:43:9
+   |
+41 | try:
+42 |     pass
+43 | except (IOError,):
+   |         ^^^^^^^
+44 |     pass
+45 | try:
+   |
+help: Replace with builtin `OSError`
+40 | 
+41 | try:
+42 |     pass
+   - except (IOError,):
+43 + except OSError:
+44 |     pass
+45 | try:
+46 |     pass
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:47:9
+   |
+45 | try:
+46 |     pass
+47 | except (mmap.error,):
+   |         ^^^^^^^^^^
+48 |     pass
+49 | try:
+   |
+help: Replace with builtin `OSError`
+44 |     pass
+45 | try:
+46 |     pass
+   - except (mmap.error,):
+47 + except OSError:
+48 |     pass
+49 | try:
+50 |     pass
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:51:9
+   |
+49 | try:
+50 |     pass
+51 | except (EnvironmentError, IOError, OSError, select.error):
+   |         ^^^^^^^^^^^^^^^^  -------           ------------
+52 |     pass
+   |
+help: Replace with builtin `OSError`
+48 |     pass
+49 | try:
+50 |     pass
+   - except (EnvironmentError, IOError, OSError, select.error):
+51 + except OSError:
+52 |     pass
+53 | 
+54 | # Should be kept in parentheses (because multiple)
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:58:9
+   |
+56 | try:
+57 |     pass
+58 | except (IOError, KeyError, OSError):
+   |         ^^^^^^^
+59 |     pass
+   |
+help: Replace with builtin `OSError`
+55 | 
+56 | try:
+57 |     pass
+   - except (IOError, KeyError, OSError):
+58 + except (KeyError, OSError):
+59 |     pass
+60 | 
+61 | # First should change, second should not
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:65:9
+   |
+63 | try:
+64 |     pass
+65 | except (IOError, error):
+   |         ^^^^^^^
+66 |     pass
+67 | # These should not change
+   |
+help: Replace with builtin `OSError`
+62 | from .mmap import error
+63 | try:
+64 |     pass
+   - except (IOError, error):
+65 + except (OSError, error):
+66 |     pass
+67 | # These should not change
+68 | 
+
+UP024 [*] Replace aliased errors with `OSError`
+  --> UP024_0.py:87:8
+   |
+85 | try:
+86 |     pass
+87 | except (mmap).error:
+   |        ^^^^^^^^^^^^
+88 |     pass
+   |
+help: Replace `mmap.error` with builtin `OSError`
+84 |     pass
+85 | try:
+86 |     pass
+   - except (mmap).error:
+87 + except OSError:
+88 |     pass
+89 | 
+90 | try:
+
+UP024 [*] Replace aliased errors with `OSError`
+   --> UP024_0.py:105:12
+    |
+103 |     try:
+104 |         mac_address = get_primary_mac_address()
+105 |     except(IOError, OSError) as ex:
+    |            ^^^^^^^
+106 |         msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)
+    |
+help: Replace with builtin `OSError`
+102 | def get_owner_id_from_mac_address():
+103 |     try:
+104 |         mac_address = get_primary_mac_address()
+    -     except(IOError, OSError) as ex:
+105 +     except OSError as ex:
+106 |         msg = 'Unable to query URL to get Owner ID: {u}\n{e}'.format(u=owner_id_url, e=ex)
+107 | 
+108 | 
+
+UP024 [*] Replace aliased errors with `OSError`
+   --> UP024_0.py:114:8
+    |
+112 | try:
+113 |     pass
+114 | except os.error:
+    |        ^^^^^^^^
+115 |     pass
+    |
+help: Replace `os.error` with builtin `OSError`
+111 | 
+112 | try:
+113 |     pass
+    - except os.error:
+114 + except OSError:
+115 |     pass

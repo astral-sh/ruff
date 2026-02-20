@@ -36,7 +36,12 @@ use crate::rules::pyflakes::cformat::CFormatSummary;
 ///     logging.error("%s error occurred: %s", type(e), e)
 ///     raise
 /// ```
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct LoggingTooFewArgs;
 
 impl Violation for LoggingTooFewArgs {
@@ -73,7 +78,12 @@ impl Violation for LoggingTooFewArgs {
 ///     logging.error("%s error occurred: %s", type(e), e)
 ///     raise
 /// ```
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.252")]
 pub(crate) struct LoggingTooManyArgs;
 
 impl Violation for LoggingTooManyArgs {

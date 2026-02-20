@@ -25,11 +25,16 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     """Return the mean of the given values."""
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.69")]
 pub(crate) struct FirstWordUncapitalized {
     first_word: String,
     capitalized_word: String,
@@ -93,7 +98,7 @@ pub(crate) fn capitalized(checker: &Checker, docstring: &Docstring) {
     let mut diagnostic = checker.report_diagnostic(
         FirstWordUncapitalized {
             first_word: first_word.to_string(),
-            capitalized_word: capitalized_word.to_string(),
+            capitalized_word: capitalized_word.clone(),
         },
         docstring.range(),
     );

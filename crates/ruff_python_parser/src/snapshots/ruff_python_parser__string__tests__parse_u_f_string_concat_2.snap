@@ -5,11 +5,11 @@ expression: suite
 [
     Expr(
         StmtExpr {
-            node_index: AtomicNodeIndex(..),
+            node_index: NodeIndex(None),
             range: 0..22,
             value: FString(
                 ExprFString {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..22,
                     value: FStringValue {
                         inner: Concatenated(
@@ -17,24 +17,25 @@ expression: suite
                                 Literal(
                                     StringLiteral {
                                         range: 0..9,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         value: "Hello ",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
                                             prefix: Unicode,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
                                 FString(
                                     FString {
                                         range: 10..18,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         elements: [
                                             Literal(
                                                 InterpolatedStringLiteralElement {
                                                     range: 12..17,
-                                                    node_index: AtomicNodeIndex(..),
+                                                    node_index: NodeIndex(None),
                                                     value: "world",
                                                 },
                                             ),
@@ -43,18 +44,20 @@ expression: suite
                                             quote_style: Single,
                                             prefix: Regular,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
                                 Literal(
                                     StringLiteral {
                                         range: 19..22,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         value: "!",
                                         flags: StringLiteralFlags {
                                             quote_style: Single,
                                             prefix: Empty,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),

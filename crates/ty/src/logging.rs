@@ -120,8 +120,10 @@ pub(crate) fn setup_tracing(
     } else {
         match level {
             VerbosityLevel::Default => {
-                // Show warning traces
-                EnvFilter::default().add_directive(LevelFilter::WARN.into())
+                // Show warning traces for ty and ruff but not for other crates
+                EnvFilter::default()
+                    .add_directive("ty=warn".parse().unwrap())
+                    .add_directive("ruff=warn".parse().unwrap())
             }
             level => {
                 let level_filter = level.level_filter();

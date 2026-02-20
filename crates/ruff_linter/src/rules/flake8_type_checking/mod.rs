@@ -14,7 +14,6 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::{Linter, Rule};
-    use crate::settings::types::PreviewMode;
     use crate::test::{test_path, test_snippet};
     use crate::{assert_diagnostics, settings};
 
@@ -86,7 +85,6 @@ mod tests {
             Path::new("flake8_type_checking").join(path).as_path(),
             &settings::LinterSettings {
                 future_annotations: true,
-                preview: PreviewMode::Enabled,
                 // also enable quoting annotations to check the interaction. the future import
                 // should take precedence.
                 flake8_type_checking: super::settings::Settings {
@@ -94,6 +92,26 @@ mod tests {
                     ..Default::default()
                 },
                 ..settings::LinterSettings::for_rules(rules.iter().copied())
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("TC003.py"))]
+    fn add_future_import_dataclass_kw_only_py313(rule: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "add_future_import_kw_only__{}_{}",
+            rule.noqa_code(),
+            path.to_string_lossy()
+        );
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::LinterSettings {
+                future_annotations: true,
+                // The issue in #21121 also didn't trigger on Python 3.14
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);

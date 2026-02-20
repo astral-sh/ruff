@@ -9,8 +9,6 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_________^
   |
 help: Organize imports
-
-ℹ Safe fix
-  1 |+import os
-1 2 | import sys
-2   |-import os
+1 + import os
+2 | import sys
+  - import os

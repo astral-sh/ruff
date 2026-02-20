@@ -3,6 +3,7 @@ use crate::server::api::traits::{RequestHandler, SyncRequestHandler};
 use crate::session::client::Client;
 
 use lsp_types::{WorkspaceDiagnosticReport, WorkspaceDiagnosticReportResult};
+use salsa::Database;
 
 pub(crate) struct ShutdownHandler;
 
@@ -27,6 +28,12 @@ impl SyncRequestHandler for ShutdownHandler {
         }
 
         session.set_shutdown_requested(true);
+
+        // Trigger cancellation for every db to cancel any compute intensive background tasks
+        // (e.g. workspace diagnostics or workspace symbols).
+        for db in session.projects_mut() {
+            db.trigger_cancellation();
+        }
 
         Ok(())
     }

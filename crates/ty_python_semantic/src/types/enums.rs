@@ -1,34 +1,37 @@
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
 
 use crate::{
-    Db, FxOrderSet,
-    place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
+    Db, FxIndexMap,
+    place::{
+        DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
+    },
     semantic_index::{place_table, use_def_map},
     types::{
-        ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy, Type,
-        TypeQualifiers,
+        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
+        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
     },
 };
 
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct EnumMetadata {
-    pub(crate) members: FxOrderSet<Name>,
+#[derive(Debug, PartialEq, Eq, salsa::Update)]
+pub(crate) struct EnumMetadata<'db> {
+    pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
 }
 
-impl get_size2::GetSize for EnumMetadata {}
+impl get_size2::GetSize for EnumMetadata<'_> {}
 
-impl EnumMetadata {
+impl EnumMetadata<'_> {
     fn empty() -> Self {
         EnumMetadata {
-            members: FxOrderSet::default(),
+            members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
         }
     }
 
     pub(crate) fn resolve_member<'a>(&'a self, name: &'a Name) -> Option<&'a Name> {
-        if self.members.contains(name) {
+        if self.members.contains_key(name) {
             Some(name)
         } else {
             self.aliases.get(name)
@@ -36,28 +39,30 @@ impl EnumMetadata {
     }
 }
 
-#[allow(clippy::ref_option)]
-fn enum_metadata_cycle_recover(
-    _db: &dyn Db,
-    _value: &Option<EnumMetadata>,
-    _count: u32,
-    _class: ClassLiteral<'_>,
-) -> salsa::CycleRecoveryAction<Option<EnumMetadata>> {
-    salsa::CycleRecoveryAction::Iterate
-}
-
-#[allow(clippy::unnecessary_wraps)]
-fn enum_metadata_cycle_initial(_db: &dyn Db, _class: ClassLiteral<'_>) -> Option<EnumMetadata> {
-    Some(EnumMetadata::empty())
-}
-
 /// List all members of an enum.
 #[allow(clippy::ref_option, clippy::unnecessary_wraps)]
-#[salsa::tracked(returns(as_ref), cycle_fn=enum_metadata_cycle_recover, cycle_initial=enum_metadata_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(as_ref), cycle_initial=|_, _, _| Some(EnumMetadata::empty()), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
-) -> Option<EnumMetadata> {
+) -> Option<EnumMetadata<'db>> {
+    let class = match class {
+        ClassLiteral::Static(class) => class,
+        ClassLiteral::Dynamic(..) => {
+            // Classes created via `type` cannot be enums; the following fails at runtime:
+            // ```python
+            // import enum
+            //
+            // class BaseEnum(enum.Enum):
+            //     pass
+            //
+            // MyEnum = type("MyEnum", (BaseEnum,), {"A": 1, "B": 2})
+            // ```
+            return None;
+        }
+        ClassLiteral::DynamicNamedTuple(..) => return None,
+    };
+
     // This is a fast path to avoid traversing the MRO of known classes
     if class
         .known(db)
@@ -66,11 +71,7 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    if !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
-        && !class
-            .metaclass(db)
-            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
-    {
+    if !is_enum_class_by_inheritance(db, class) {
         return None;
     }
 
@@ -79,19 +80,19 @@ pub(crate) fn enum_metadata<'db>(
     let table = place_table(db, scope_id);
 
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
-    // TODO: handle `StrEnum` which uses lowercase names as values when using `auto()`.
     let mut auto_counter = 0;
 
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
-        let ignore_bindings = use_def_map.all_reachable_symbol_bindings(ignore);
-        let ignore_place = place_from_bindings(db, ignore_bindings);
+        let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
+        let ignore_place = place_from_bindings(db, ignore_bindings).place;
 
         match ignore_place {
-            Place::Type(Type::StringLiteral(ignored_names), _) => {
-                Some(ignored_names.value(db).split_ascii_whitespace().collect())
-            }
+            Place::Defined(DefinedPlace { ty, .. }) => ty
+                .as_string_literal()
+                .map(|ignored_names| ignored_names.value(db).split_ascii_whitespace().collect()),
+
             // TODO: support the list-variant of `_ignore_`.
-            _ => None,
+            Place::Undefined => None,
         }
     } else {
         None
@@ -118,19 +119,19 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            let inferred = place_from_bindings(db, bindings);
+            let inferred = place_from_bindings(db, bindings).place;
 
             let value_ty = match inferred {
-                Place::Unbound => {
+                Place::Undefined => {
                     return None;
                 }
-                Place::Type(ty, _) => {
+                Place::Defined(DefinedPlace { ty, .. }) => {
                     let special_case = match ty {
                         Type::Callable(_) | Type::FunctionLiteral(_) => {
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }
-                        Type::NominalInstance(instance) => match instance.class(db).known(db) {
+                        Type::NominalInstance(instance) => match instance.known_class(db) {
                             // enum.nonmember
                             Some(KnownClass::Nonmember) => return None,
 
@@ -138,14 +139,53 @@ pub(crate) fn enum_metadata<'db>(
                             Some(KnownClass::Member) => Some(
                                 ty.member(db, "value")
                                     .place
-                                    .ignore_possibly_unbound()
+                                    .ignore_possibly_undefined()
                                     .unwrap_or(Type::unknown()),
                             ),
 
                             // enum.auto
                             Some(KnownClass::Auto) => {
                                 auto_counter += 1;
-                                Some(Type::IntLiteral(auto_counter))
+
+                                // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
+                                let auto_value_ty =
+                                    if Type::ClassLiteral(ClassLiteral::Static(class))
+                                        .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
+                                    {
+                                        Type::string_literal(db, &name.to_lowercase())
+                                    } else {
+                                        let custom_mixins: SmallVec<[Option<KnownClass>; 1]> =
+                                            class
+                                                .iter_mro(db, None)
+                                                .skip(1)
+                                                .filter_map(ClassBase::into_class)
+                                                .filter(|class| {
+                                                    !Type::from(*class).is_subtype_of(
+                                                        db,
+                                                        KnownClass::Enum.to_subclass_of(db),
+                                                    )
+                                                })
+                                                .map(|class| class.known(db))
+                                                .filter(|class| {
+                                                    !matches!(class, Some(KnownClass::Object))
+                                                })
+                                                .collect();
+
+                                        // `IntEnum`s have the same `auto()` behaviour to enums inheriting from `(int, Enum)`,
+                                        // and `IntEnum`s also have `int` in their MROs, so both cases are handled here.
+                                        //
+                                        // In general, the `auto()` behaviour for enums with non-`int` mixins is hard to predict,
+                                        // so we fall back to `Any` in those cases.
+                                        if matches!(
+                                            custom_mixins.as_slice(),
+                                            [] | [Some(KnownClass::Int)]
+                                        ) {
+                                            Type::int_literal(auto_counter)
+                                        } else {
+                                            Type::any()
+                                        }
+                                    };
+                                Some(auto_value_ty)
                             }
 
                             _ => None,
@@ -166,9 +206,13 @@ pub(crate) fn enum_metadata<'db>(
                             .place;
 
                         match dunder_get {
-                            Place::Unbound | Place::Type(Type::Dynamic(_), _) => ty,
+                            Place::Undefined
+                            | Place::Defined(DefinedPlace {
+                                ty: Type::Dynamic(_),
+                                ..
+                            }) => ty,
 
-                            Place::Type(_, _) => {
+                            Place::Defined(_) => {
                                 // Descriptors are not considered members.
                                 return None;
                             }
@@ -181,13 +225,22 @@ pub(crate) fn enum_metadata<'db>(
             // performed if we can infer a precise literal type for the enum member. If we only get `int`,
             // we don't know if it's a duplicate or not.
             if matches!(
-                value_ty,
-                Type::IntLiteral(_) | Type::StringLiteral(_) | Type::BytesLiteral(_)
+                value_ty.as_literal_value_kind(),
+                Some(
+                    LiteralValueTypeKind::Bool(_)
+                        | LiteralValueTypeKind::Int(_)
+                        | LiteralValueTypeKind::String(_)
+                        | LiteralValueTypeKind::Bytes(_)
+                )
             ) {
-                if let Some(previous) = enum_values.insert(value_ty, name.clone()) {
-                    aliases.insert(name.clone(), previous);
+                if let Some(canonical) = enum_values.get(&value_ty) {
+                    // This is a duplicate value, create an alias to the canonical (first) member
+                    aliases.insert(name.clone(), canonical.clone());
                     return None;
                 }
+
+                // This is the first occurrence of this value, track it as the canonical member
+                enum_values.insert(value_ty, name.clone());
             }
 
             let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
@@ -196,19 +249,27 @@ pub(crate) fn enum_metadata<'db>(
 
             match declared {
                 PlaceAndQualifiers {
-                    place: Place::Type(Type::Dynamic(DynamicType::Unknown), _),
+                    place:
+                        Place::Defined(DefinedPlace {
+                            ty: Type::Dynamic(DynamicType::Unknown),
+                            ..
+                        }),
                     qualifiers,
                 } if qualifiers.contains(TypeQualifiers::FINAL) => {}
                 PlaceAndQualifiers {
-                    place: Place::Unbound,
+                    place: Place::Undefined,
                     ..
                 } => {
                     // Undeclared attributes are considered members
                 }
                 PlaceAndQualifiers {
-                    place: Place::Type(Type::NominalInstance(instance), _),
+                    place:
+                        Place::Defined(DefinedPlace {
+                            ty: Type::NominalInstance(instance),
+                            ..
+                        }),
                     ..
-                } if instance.class(db).is_known(db, KnownClass::Member) => {
+                } if instance.has_known_class(db, KnownClass::Member) => {
                     // If the attribute is specifically declared with `enum.member`, it is considered a member
                 }
                 _ => {
@@ -217,9 +278,9 @@ pub(crate) fn enum_metadata<'db>(
                 }
             }
 
-            Some(name.clone())
+            Some((name.clone(), value_ty))
         })
-        .collect::<FxOrderSet<_>>();
+        .collect::<FxIndexMap<_, _>>();
 
     if members.is_empty() {
         // Enum subclasses without members are not considered enums.
@@ -237,9 +298,9 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     enum_metadata(db, class).map(|metadata| {
         metadata
             .members
-            .iter()
+            .keys()
             .filter(move |name| Some(*name) != exclude_member)
-            .map(move |name| Type::EnumLiteral(EnumLiteralType::new(db, class, name.clone())))
+            .map(move |name| Type::enum_literal(EnumLiteralType::new(db, class, name.clone())))
     })
 }
 
@@ -251,5 +312,41 @@ pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
         _ => false,
+    }
+}
+
+/// Checks if a class is an enum class by inheritance (either a subtype of `Enum`
+/// or has a metaclass that is a subtype of `EnumType`).
+///
+/// This is a lighter-weight check than `enum_metadata`, which additionally
+/// verifies that the class has members.
+pub(crate) fn is_enum_class_by_inheritance<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> bool {
+    Type::ClassLiteral(ClassLiteral::Static(class))
+        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+        || class
+            .metaclass(db)
+            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
+}
+
+/// Extracts the inner value type from an `enum.nonmember()` wrapper.
+///
+/// At runtime, the enum metaclass unwraps `nonmember(value)`, so accessing the attribute
+/// returns the inner value, not the `nonmember` wrapper.
+///
+/// Returns `Some(value_type)` if the type is a `nonmember[T]`, otherwise `None`.
+pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    match ty {
+        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
+            Some(
+                ty.member(db, "value")
+                    .place
+                    .ignore_possibly_undefined()
+                    .unwrap_or(Type::unknown()),
+            )
+        }
+        _ => None,
     }
 }

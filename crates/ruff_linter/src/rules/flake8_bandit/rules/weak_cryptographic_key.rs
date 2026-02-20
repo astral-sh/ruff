@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [CSRC: Transitioning the Use of Cryptographic Algorithms and Key Lengths](https://csrc.nist.gov/pubs/sp/800/131/a/r2/final)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct WeakCryptographicKey {
     cryptographic_key: CryptographicKey,
 }

@@ -1,7 +1,8 @@
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, CmpOp, Expr, ExprContext, Number};
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{TokenKind, error::RelaxedDecoratorError};
+use crate::error::RelaxedDecoratorError;
 
 /// Set the `ctx` for `Expr::Id`, `Expr::Attribute`, `Expr::Subscript`, `Expr::Starred`,
 /// `Expr::Tuple` and `Expr::List`. If `expr` is either `Expr::Tuple` or `Expr::List`,

@@ -7,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/clause_expect_single_
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..23,
         body: [
             If(
                 StmtIf {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..8,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 3..7,
                             value: true,
                         },
@@ -27,11 +27,11 @@ Module(
             ),
             If(
                 StmtIf {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 9..22,
                     test: BooleanLiteral(
                         ExprBooleanLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 12..16,
                             value: true,
                         },
@@ -39,7 +39,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 18..22,
                             },
                         ),

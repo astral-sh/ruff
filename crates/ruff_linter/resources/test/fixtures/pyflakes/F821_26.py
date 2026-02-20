@@ -13,16 +13,16 @@ CStr2: TypeAlias = Union["C", str]  # always okay
 
 # References to a class from inside the class:
 class C:
-    other: C = ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
+    other: C = ...  # valid in a `.pyi` stub file, and in a `.py` runtime file with deferred annotations
     other2: "C" = ...  # always okay
-    def from_str(self, s: str) -> C: ...  # valid in a `.pyi` stub file, not in a `.py` runtime file
+    def from_str(self, s: str) -> C: ...  # valid in a `.pyi` stub file, and in a `.py` runtime file with deferred annotations
     def from_str2(self, s: str) -> "C": ...  # always okay
 
 # Circular references:
 class A:
-    foo: B  # valid in a `.pyi` stub file, not in a `.py` runtime file
+    foo: B  # valid in a `.pyi` stub file, and in a `.py` runtime file with deferred annotations
     foo2: "B"  # always okay
-    bar: dict[str, B]  # valid in a `.pyi` stub file, not in a `.py` runtime file
+    bar: dict[str, B]  # valid in a `.pyi` stub file, and in a `.py` runtime file with deferred annotations
     bar2: dict[str, "A"]  # always okay
 
 class B:

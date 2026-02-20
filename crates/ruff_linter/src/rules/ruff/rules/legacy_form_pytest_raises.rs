@@ -11,10 +11,11 @@ use std::fmt;
 use crate::{FixAvailability, Violation, checkers::ast::Checker};
 
 /// ## What it does
-/// Checks for non-contextmanager use of `pytest.raises`, `pytest.warns`, and `pytest.deprecated_call`.
+/// Checks for non-context-manager use of `pytest.raises`, `pytest.warns`, and `pytest.deprecated_call`.
 ///
 /// ## Why is this bad?
-/// The context-manager form is more readable, easier to extend, and supports additional kwargs.
+/// The context-manager form is more readable, easier to extend, and supports additional keyword
+/// arguments.
 ///
 /// ## Example
 /// ```python
@@ -44,6 +45,7 @@ use crate::{FixAvailability, Violation, checkers::ast::Checker};
 /// - [`pytest` documentation: `pytest.warns`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-warns)
 /// - [`pytest` documentation: `pytest.deprecated_call`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-deprecated-call)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.15.0")]
 pub(crate) struct LegacyFormPytestRaises {
     context_type: PytestContextType,
 }
@@ -245,16 +247,16 @@ fn generate_with_statement(
         });
 
     let context_call = ast::ExprCall {
-        node_index: AtomicNodeIndex::dummy(),
+        node_index: AtomicNodeIndex::NONE,
         range: TextRange::default(),
         func: legacy_call.func.clone(),
         arguments: ast::Arguments {
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
             args: expected.cloned().as_slice().into(),
             keywords: match_arg
                 .map(|expr| ast::Keyword {
-                    node_index: AtomicNodeIndex::dummy(),
+                    node_index: AtomicNodeIndex::NONE,
                     // Take range from the original expression so that the keyword
                     // argument is generated after positional arguments
                     range: expr.range(),
@@ -267,11 +269,11 @@ fn generate_with_statement(
     };
 
     let func_call = ast::ExprCall {
-        node_index: AtomicNodeIndex::dummy(),
+        node_index: AtomicNodeIndex::NONE,
         range: TextRange::default(),
         func: Box::new(func.clone()),
         arguments: ast::Arguments {
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
             args: func_args.into(),
             keywords: func_keywords.into(),
@@ -280,25 +282,25 @@ fn generate_with_statement(
 
     let body = if let Some(assign_targets) = assign_targets {
         Stmt::Assign(ast::StmtAssign {
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
             targets: assign_targets.to_vec(),
             value: Box::new(func_call.into()),
         })
     } else {
         Stmt::Expr(StmtExpr {
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
             value: Box::new(func_call.into()),
         })
     };
 
     Some(StmtWith {
-        node_index: AtomicNodeIndex::dummy(),
+        node_index: AtomicNodeIndex::NONE,
         range: TextRange::default(),
         is_async: false,
         items: vec![WithItem {
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
             context_expr: context_call.into(),
             optional_vars: optional_vars.map(|var| Box::new(var.clone())),

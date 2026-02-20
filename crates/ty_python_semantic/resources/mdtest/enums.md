@@ -4,6 +4,7 @@
 
 ```py
 from enum import Enum
+from typing import Literal
 
 class Color(Enum):
     RED = 1
@@ -11,13 +12,11 @@ class Color(Enum):
     BLUE = 3
 
 reveal_type(Color.RED)  # revealed: Literal[Color.RED]
-# TODO: This could be `Literal[1]`
-reveal_type(Color.RED.value)  # revealed: Any
-
-# TODO: Should be `Color` or `Literal[Color.RED]`
-reveal_type(Color["RED"])  # revealed: Unknown
+reveal_type(Color.RED.name)  # revealed: Literal["RED"]
+reveal_type(Color.RED.value)  # revealed: Literal[1]
 
 # TODO: Could be `Literal[Color.RED]` to be more precise
+reveal_type(Color["RED"])  # revealed: Color
 reveal_type(Color(1))  # revealed: Color
 
 reveal_type(Color.RED in Color)  # revealed: bool
@@ -155,6 +154,7 @@ python-version = "3.11"
 
 ```py
 from enum import Enum, property as enum_property
+from typing import Any
 from ty_extensions import enum_members
 
 class Answer(Enum):
@@ -167,6 +167,22 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+```
+
+Enum attributes defined using `enum.property` take precedence over generated attributes.
+
+```py
+from enum import Enum, property as enum_property
+
+class Choices(Enum):
+    A = 1
+    B = 2
+
+    @enum_property
+    def value(self) -> Any: ...
+
+# TODO: This should be `Any` - overridden by `@enum_property`
+reveal_type(Choices.A.value)  # revealed: Literal[1]
 ```
 
 ### `types.DynamicClassAttribute`
@@ -247,7 +263,47 @@ reveal_type(enum_members(Color))
 reveal_type(Color.red)
 ```
 
+Multiple aliases to the same member are also supported. This is a regression test for
+<https://github.com/astral-sh/ty/issues/1293>:
+
+```py
+from ty_extensions import enum_members
+
+class ManyAliases(Enum):
+    real_member = "real_member"
+    alias1 = "real_member"
+    alias2 = "real_member"
+    alias3 = "real_member"
+
+    other_member = "other_real_member"
+
+# revealed: tuple[Literal["real_member"], Literal["other_member"]]
+reveal_type(enum_members(ManyAliases))
+
+reveal_type(ManyAliases.real_member)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias1)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias2)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias3)  # revealed: Literal[ManyAliases.real_member]
+
+reveal_type(ManyAliases.real_member.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.real_member.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias1.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias1.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias2.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias2.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias3.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias3.name)  # revealed: Literal["real_member"]
+```
+
 ### Using `auto()`
+
+```toml
+[environment]
+python-version = "3.11"
+```
 
 ```py
 from enum import Enum, auto
@@ -259,6 +315,106 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
+
+class SingleMember(Enum):
+    SINGLE = auto()
+
+reveal_type(SingleMember.SINGLE.value)  # revealed: Literal[1]
+```
+
+Usages of `auto()` can be combined with manual value assignments:
+
+```py
+class Mixed(Enum):
+    MANUAL_1 = -1
+    AUTO_1 = auto()
+    MANUAL_2 = -2
+    AUTO_2 = auto()
+
+reveal_type(Mixed.MANUAL_1.value)  # revealed: Literal[-1]
+reveal_type(Mixed.AUTO_1.value)  # revealed: Literal[1]
+reveal_type(Mixed.MANUAL_2.value)  # revealed: Literal[-2]
+reveal_type(Mixed.AUTO_2.value)  # revealed: Literal[2]
+```
+
+When using `auto()` with `StrEnum`, the value is the lowercase name of the member:
+
+```py
+from enum import StrEnum, auto
+
+class Answer(StrEnum):
+    YES = auto()
+    NO = auto()
+
+reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
+reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+
+class SingleMember(StrEnum):
+    SINGLE = auto()
+
+reveal_type(SingleMember.SINGLE.value)  # revealed: Literal["single"]
+```
+
+Using `auto()` with `IntEnum` also works as expected:
+
+```py
+from enum import IntEnum, auto
+
+class Answer(IntEnum):
+    YES = auto()
+    NO = auto()
+
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
+```
+
+As does using `auto()` for other enums that use `int` as a mixin:
+
+```py
+from enum import Enum, auto
+
+class Answer(int, Enum):
+    YES = auto()
+    NO = auto()
+
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
+```
+
+It's [hard to predict](https://github.com/astral-sh/ruff/pull/20541#discussion_r2381878613) what the
+effect of using `auto()` will be for an arbitrary non-integer mixin, so for anything that isn't a
+`StrEnum` and has a non-`int` mixin, we simply fallback to typeshed's annotation of `Any` for the
+`value` property:
+
+```python
+from enum import Enum, auto
+
+class A(str, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(A.X.value)  # revealed: Any
+
+class B(bytes, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(B.X.value)  # revealed: Any
+
+class C(tuple, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(C.X.value)  # revealed: Any
+
+class D(float, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(D.X.value)  # revealed: Any
 ```
 
 Combining aliases with `auto()`:
@@ -295,6 +451,10 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+
+# `nonmember` attributes are unwrapped to the inner value type when accessed.
+# revealed: int
+reveal_type(Answer.OTHER)
 ```
 
 `member` can also be used as a decorator:
@@ -481,6 +641,62 @@ callable = Printer.STDERR
 callable("Another error!")
 ```
 
+## Special attributes on enum members
+
+### `name` and `_name_`
+
+```py
+from enum import Enum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED._name_)  # revealed: Literal["RED"]
+
+def _(red_or_blue: Literal[Color.RED, Color.BLUE]):
+    reveal_type(red_or_blue.name)  # revealed: Literal["RED", "BLUE"]
+
+def _(any_color: Color):
+    # TODO: Literal["RED", "GREEN", "BLUE"]
+    reveal_type(any_color.name)  # revealed: Any
+```
+
+### `value` and `_value_`
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from enum import Enum, StrEnum
+from typing import Literal
+
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+
+reveal_type(Color.RED.value)  # revealed: Literal[1]
+reveal_type(Color.RED._value_)  # revealed: Literal[1]
+
+reveal_type(Color.GREEN.value)  # revealed: Literal[2]
+reveal_type(Color.GREEN._value_)  # revealed: Literal[2]
+
+class Answer(StrEnum):
+    YES = "yes"
+    NO = "no"
+
+reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
+reveal_type(Answer.YES._value_)  # revealed: Literal["yes"]
+
+reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+reveal_type(Answer.NO._value_)  # revealed: Literal["no"]
+```
+
 ## Properties of enum types
 
 ### Implicitly final
@@ -609,6 +825,12 @@ reveal_type(EnumWithSubclassOfEnumMetaMetaclass.NO)  # revealed: Literal[EnumWit
 # Attributes like `.value` can *not* be accessed on members of these enums:
 # error: [unresolved-attribute]
 EnumWithSubclassOfEnumMetaMetaclass.NO.value
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO._value_
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO.name
+# error: [unresolved-attribute]
+EnumWithSubclassOfEnumMetaMetaclass.NO._name_
 ```
 
 ### Enums with (subclasses of) `EnumType` as metaclass
@@ -681,7 +903,7 @@ def color_name_misses_one_variant(color: Color) -> str:
     elif color is Color.GREEN:
         return "Green"
     else:
-        assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+        assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 
 class Singleton(Enum):
     VALUE = 1
@@ -736,7 +958,7 @@ def color_name_misses_one_variant(color: Color) -> str:
         case Color.GREEN:
             return "Green"
         case _:
-            assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+            assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 
 class Singleton(Enum):
     VALUE = 1
@@ -792,6 +1014,108 @@ class Color(Enum):
         return False
 
 reveal_type(Color.RED != Color.RED)  # revealed: bool
+```
+
+## Generic enums are invalid
+
+Enum classes cannot be generic. Python does not support generic enums, and attempting to create one
+will result in a `TypeError` at runtime.
+
+### PEP 695 syntax
+
+Using PEP 695 type parameters on an enum is invalid:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+
+# error: [invalid-generic-enum] "Enum class `E` cannot be generic"
+class E[T](Enum):
+    A = 1
+    B = 2
+```
+
+### Legacy `Generic` base class
+
+Inheriting from both `Enum` and `Generic[T]` is also invalid:
+
+```py
+from enum import Enum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-generic-enum] "Enum class `F` cannot be generic"
+class F(Enum, Generic[T]):
+    A = 1
+    B = 2
+```
+
+### Swapped order (`Generic` first)
+
+The order of bases doesn't matter; it's still invalid:
+
+```py
+from enum import Enum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-generic-enum] "Enum class `G` cannot be generic"
+class G(Generic[T], Enum):
+    A = 1
+    B = 2
+```
+
+### Enum subclasses
+
+Subclasses of enum base classes also cannot be generic:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum, IntEnum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+# error: [invalid-generic-enum] "Enum class `MyIntEnum` cannot be generic"
+class MyIntEnum[T](IntEnum):
+    A = 1
+
+# error: [invalid-generic-enum] "Enum class `MyFlagEnum` cannot be generic"
+class MyFlagEnum(IntEnum, Generic[T]):
+    A = 1
+```
+
+### Custom enum base class
+
+Even with custom enum subclasses that don't have members, they cannot be made generic:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from enum import Enum
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class MyEnumBase(Enum):
+    def some_method(self) -> None: ...
+
+# error: [invalid-generic-enum] "Enum class `MyEnum` cannot be generic"
+class MyEnum[T](MyEnumBase):
+    A = 1
 ```
 
 ## References

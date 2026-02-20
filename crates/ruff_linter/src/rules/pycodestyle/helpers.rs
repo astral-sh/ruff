@@ -1,4 +1,4 @@
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 
 /// Returns `true` if the name should be considered "ambiguous".
 pub(super) fn is_ambiguous_name(name: &str) -> bool {

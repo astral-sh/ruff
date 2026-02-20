@@ -12,15 +12,13 @@ I001 [*] Import block is un-sorted or un-formatted
 5 |       import sys
   |
 help: Organize imports
-
-ℹ Safe fix
-1 1 | if True:
-  2 |+    import os
-2 3 |     import sys
-3   |-    import os
-4 4 | else:
-5 5 |     import sys
-6 6 |     import os
+1 | if True:
+2 +     import os
+3 |     import sys
+  -     import os
+4 | else:
+5 |     import sys
+6 |     import os
 
 I001 [*] Import block is un-sorted or un-formatted
  --> preserve_indentation.py:5:5
@@ -32,11 +30,9 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_____________^
   |
 help: Organize imports
-
-ℹ Safe fix
-2 2 |     import sys
-3 3 |     import os
-4 4 | else:
-  5 |+    import os
-5 6 |     import sys
-6   |-    import os
+2 |     import sys
+3 |     import os
+4 | else:
+5 +     import os
+6 |     import sys
+  -     import os

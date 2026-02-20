@@ -10,14 +10,12 @@ D208 [*] Docstring is over-indented
 3 | """
   |
 help: Remove over-indentation
-
-ℹ Safe fix
-1 1 | """
-2   |-   Author
-  2 |+Author
-3 3 | """
-4 4 | 
-5 5 | 
+1 | """
+  -    Author
+2 + Author
+3 | """
+4 | 
+5 | 
 
 D208 [*] Docstring is over-indented
   --> D208.py:8:1
@@ -30,16 +28,14 @@ D208 [*] Docstring is over-indented
 10 |             """
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-5 5 | 
-6 6 | class Platform:
-7 7 |     """ Remove sampler
-8   |-            Args:
-  8 |+    Args:
-9 9 |             Returns:
-10 10 |             """
-11 11 | 
+5  | 
+6  | class Platform:
+7  |     """ Remove sampler
+   -             Args:
+8  +     Args:
+9  |             Returns:
+10 |             """
+11 | 
 
 D208 [*] Docstring is over-indented
   --> D208.py:9:1
@@ -51,16 +47,14 @@ D208 [*] Docstring is over-indented
 10 |             """
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-6  6  | class Platform:
-7  7  |     """ Remove sampler
-8  8  |             Args:
-9     |-            Returns:
-   9  |+    Returns:
-10 10 |             """
-11 11 | 
-12 12 | 
+6  | class Platform:
+7  |     """ Remove sampler
+8  |             Args:
+   -             Returns:
+9  +     Returns:
+10 |             """
+11 | 
+12 | 
 
 D208 [*] Docstring is over-indented
   --> D208.py:10:1
@@ -71,16 +65,14 @@ D208 [*] Docstring is over-indented
    | ^
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-7  7  |     """ Remove sampler
-8  8  |             Args:
-9  9  |             Returns:
-10    |-            """
-   10 |+    """
-11 11 | 
-12 12 | 
-13 13 | def memory_test():
+7  |     """ Remove sampler
+8  |             Args:
+9  |             Returns:
+   -             """
+10 +     """
+11 | 
+12 | 
+13 | def memory_test():
 
 D208 [*] Docstring is over-indented
   --> D208.py:24:1
@@ -91,16 +83,14 @@ D208 [*] Docstring is over-indented
    | ^
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-21 21 |     """Over indented last line
-22 22 |     Args:
-23 23 |     Returns:
-24    |-                """
-   24 |+    """
-25 25 | 
-26 26 | 
-27 27 | class Platform:
+21 |     """Over indented last line
+22 |     Args:
+23 |     Returns:
+   -                 """
+24 +     """
+25 | 
+26 | 
+27 | class Platform:
 
 D208 [*] Docstring is over-indented
   --> D208.py:29:1
@@ -113,16 +103,14 @@ D208 [*] Docstring is over-indented
 31 |         """
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-26 26 | 
-27 27 | class Platform:
-28 28 |     """All lines are over indented including the last containing the closing quotes
-29    |-        Args:
-   29 |+    Args:
-30 30 |         Returns:
-31 31 |         """
-32 32 | 
+26 | 
+27 | class Platform:
+28 |     """All lines are over indented including the last containing the closing quotes
+   -         Args:
+29 +     Args:
+30 |         Returns:
+31 |         """
+32 | 
 
 D208 [*] Docstring is over-indented
   --> D208.py:30:1
@@ -134,16 +122,14 @@ D208 [*] Docstring is over-indented
 31 |         """
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-27 27 | class Platform:
-28 28 |     """All lines are over indented including the last containing the closing quotes
-29 29 |         Args:
-30    |-        Returns:
-   30 |+    Returns:
-31 31 |         """
-32 32 | 
-33 33 | class Platform:
+27 | class Platform:
+28 |     """All lines are over indented including the last containing the closing quotes
+29 |         Args:
+   -         Returns:
+30 +     Returns:
+31 |         """
+32 | 
+33 | class Platform:
 
 D208 [*] Docstring is over-indented
   --> D208.py:31:1
@@ -156,16 +142,14 @@ D208 [*] Docstring is over-indented
 33 | class Platform:
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-28 28 |     """All lines are over indented including the last containing the closing quotes
-29 29 |         Args:
-30 30 |         Returns:
-31    |-        """
-   31 |+    """
-32 32 | 
-33 33 | class Platform:
-34 34 |     """All lines are over indented including the last
+28 |     """All lines are over indented including the last containing the closing quotes
+29 |         Args:
+30 |         Returns:
+   -         """
+31 +     """
+32 | 
+33 | class Platform:
+34 |     """All lines are over indented including the last
 
 D208 [*] Docstring is over-indented
   --> D208.py:35:1
@@ -177,16 +161,14 @@ D208 [*] Docstring is over-indented
 36 |         Returns"""
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-32 32 | 
-33 33 | class Platform:
-34 34 |     """All lines are over indented including the last
-35    |-        Args:
-   35 |+    Args:
-36 36 |         Returns"""
-37 37 | 
-38 38 | # OK: This doesn't get flagged because it is accepted when the closing quotes are on a separate line  (see next test). Raises D209
+32 | 
+33 | class Platform:
+34 |     """All lines are over indented including the last
+   -         Args:
+35 +     Args:
+36 |         Returns"""
+37 | 
+38 | # OK: This doesn't get flagged because it is accepted when the closing quotes are on a separate line  (see next test). Raises D209
 
 D208 [*] Docstring is over-indented
   --> D208.py:36:1
@@ -199,13 +181,11 @@ D208 [*] Docstring is over-indented
 38 | # OK: This doesn't get flagged because it is accepted when the closing quotes are on a separate line  (see next test). Raises D209
    |
 help: Remove over-indentation
-
-ℹ Safe fix
-33 33 | class Platform:
-34 34 |     """All lines are over indented including the last
-35 35 |         Args:
-36    |-        Returns"""
-   36 |+    Returns"""
-37 37 | 
-38 38 | # OK: This doesn't get flagged because it is accepted when the closing quotes are on a separate line  (see next test). Raises D209
-39 39 | class Platform:
+33 | class Platform:
+34 |     """All lines are over indented including the last
+35 |         Args:
+   -         Returns"""
+36 +     Returns"""
+37 | 
+38 | # OK: This doesn't get flagged because it is accepted when the closing quotes are on a separate line  (see next test). Raises D209
+39 | class Platform:

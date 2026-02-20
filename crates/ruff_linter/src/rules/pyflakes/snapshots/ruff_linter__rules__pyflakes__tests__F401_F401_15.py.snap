@@ -9,13 +9,11 @@ F401 [*] `pathlib.Path` imported but unused
   |                         ^^^^
   |
 help: Remove unused import: `pathlib.Path`
-
-ℹ Safe fix
-2 2 | from django.db.models import ForeignKey
-3 3 | 
-4 4 | if TYPE_CHECKING:
-5   |-    from pathlib import Path
-  5 |+    pass
-6 6 | 
-7 7 | 
-8 8 | class Foo:
+2 | from django.db.models import ForeignKey
+3 | 
+4 | if TYPE_CHECKING:
+  -     from pathlib import Path
+5 +     pass
+6 | 
+7 | 
+8 | class Foo:

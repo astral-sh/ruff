@@ -7,16 +7,16 @@ input_file: crates/ruff_python_parser/resources/inline/err/mixed_bytes_and_non_b
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..64,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..17,
                     value: StringLiteral(
                         ExprStringLiteral {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..17,
                             value: StringLiteralValue {
                                 inner: Concatenated(
@@ -24,22 +24,24 @@ Module(
                                         strings: [
                                             StringLiteral {
                                                 range: 0..7,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "first",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                             StringLiteral {
                                                 range: 8..17,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ],
@@ -53,11 +55,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 18..36,
                     value: FString(
                         ExprFString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 18..36,
                             value: FStringValue {
                                 inner: Concatenated(
@@ -65,12 +67,12 @@ Module(
                                         FString(
                                             FString {
                                                 range: 18..26,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 elements: [
                                                     Literal(
                                                         InterpolatedStringLiteralElement {
                                                             range: 20..25,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             value: "first",
                                                         },
                                                     ),
@@ -79,18 +81,20 @@ Module(
                                                     quote_style: Single,
                                                     prefix: Regular,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
                                         Literal(
                                             StringLiteral {
                                                 range: 27..36,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
@@ -103,11 +107,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 37..63,
                     value: FString(
                         ExprFString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 37..63,
                             value: FStringValue {
                                 inner: Concatenated(
@@ -115,24 +119,25 @@ Module(
                                         Literal(
                                             StringLiteral {
                                                 range: 37..44,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "first",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
                                         FString(
                                             FString {
                                                 range: 45..54,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 elements: [
                                                     Literal(
                                                         InterpolatedStringLiteralElement {
                                                             range: 47..53,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             value: "second",
                                                         },
                                                     ),
@@ -141,18 +146,20 @@ Module(
                                                     quote_style: Single,
                                                     prefix: Regular,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
                                         Literal(
                                             StringLiteral {
                                                 range: 55..63,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),

@@ -11,15 +11,13 @@ D411 [*] Missing blank line before section ("Yields")
 81 |     ------
    |
 help: Add blank line before "Yields"
-
-ℹ Safe fix
-77 77 | 
-78 78 |     Returns
-79 79 |     -------
-   80 |+
-80 81 |     Yields
-81 82 |     ------
-82 83 | 
+77 | 
+78 |     Returns
+79 |     -------
+80 + 
+81 |     Yields
+82 |     ------
+83 | 
 
 D411 [*] Missing blank line before section ("Returns")
    --> sections.py:134:5
@@ -31,15 +29,13 @@ D411 [*] Missing blank line before section ("Returns")
 136 |     A value of some sort.
     |
 help: Add blank line before "Returns"
-
-ℹ Safe fix
-131 131 |     """Toggle the gizmo.
-132 132 | 
-133 133 |     The function's description.
-    134 |+
-134 135 |     Returns
-135 136 |     -------
-136 137 |     A value of some sort.
+131 |     """Toggle the gizmo.
+132 | 
+133 |     The function's description.
+134 + 
+135 |     Returns
+136 |     -------
+137 |     A value of some sort.
 
 D411 [*] Missing blank line before section ("Raises")
    --> sections.py:227:5
@@ -51,12 +47,10 @@ D411 [*] Missing blank line before section ("Raises")
 228 |     My attention.
     |
 help: Add blank line before "Raises"
-
-ℹ Safe fix
-224 224 |     Returns
-225 225 |     ------
-226 226 |     Many many wonderful things.
-    227 |+
-227 228 |     Raises:
-228 229 |     My attention.
-229 230 |
+224 |     Returns
+225 |     ------
+226 |     Many many wonderful things.
+227 + 
+228 |     Raises:
+229 |     My attention.
+230 |

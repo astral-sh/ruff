@@ -9,7 +9,7 @@ from _typeshed import ReadableBuffer, SupportsRead, SupportsWrite
 from collections.abc import Iterable, MutableSequence
 from types import GenericAlias
 from typing import Any, ClassVar, Literal, SupportsIndex, TypeVar, overload
-from typing_extensions import Self, TypeAlias, deprecated
+from typing_extensions import Self, TypeAlias, deprecated, disjoint_base
 
 _IntTypeCode: TypeAlias = Literal["b", "B", "h", "H", "i", "I", "l", "L", "q", "Q"]
 _FloatTypeCode: TypeAlias = Literal["f", "d"]
@@ -23,6 +23,7 @@ _T = TypeVar("_T", int, float, str)
 
 typecodes: str
 
+@disjoint_base
 class array(MutableSequence[_T]):
     """array(typecode [, initializer]) -> array
 
@@ -208,14 +209,14 @@ class array(MutableSequence[_T]):
         """Return self[key]."""
 
     @overload
-    def __getitem__(self, key: slice, /) -> array[_T]: ...
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> array[_T]: ...
     @overload  # type: ignore[override]
     def __setitem__(self, key: SupportsIndex, value: _T, /) -> None:
         """Set self[key] to value."""
 
     @overload
-    def __setitem__(self, key: slice, value: array[_T], /) -> None: ...
-    def __delitem__(self, key: SupportsIndex | slice, /) -> None:
+    def __setitem__(self, key: slice[SupportsIndex | None], value: array[_T], /) -> None: ...
+    def __delitem__(self, key: SupportsIndex | slice[SupportsIndex | None], /) -> None:
         """Delete self[key]."""
 
     def __add__(self, value: array[_T], /) -> array[_T]:

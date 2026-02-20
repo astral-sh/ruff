@@ -1,3 +1,4 @@
+pub(crate) use builtin_open::*;
 pub(crate) use glob_rule::*;
 pub(crate) use invalid_pathlib_with_suffix::*;
 pub(crate) use os_chmod::*;
@@ -24,10 +25,12 @@ pub(crate) use os_rename::*;
 pub(crate) use os_replace::*;
 pub(crate) use os_rmdir::*;
 pub(crate) use os_sep_split::*;
+pub(crate) use os_symlink::*;
 pub(crate) use os_unlink::*;
 pub(crate) use path_constructor_current_directory::*;
 pub(crate) use replaceable_by_pathlib::*;
 
+mod builtin_open;
 mod glob_rule;
 mod invalid_pathlib_with_suffix;
 mod os_chmod;
@@ -54,6 +57,7 @@ mod os_rename;
 mod os_replace;
 mod os_rmdir;
 mod os_sep_split;
+mod os_symlink;
 mod os_unlink;
 mod path_constructor_current_directory;
 mod replaceable_by_pathlib;

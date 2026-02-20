@@ -2,8 +2,7 @@ use ruff_text_size::Ranged;
 
 use crate::visitor::source_order::SourceOrderVisitor;
 use crate::{
-    self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternArguments,
-    PatternKeyword,
+    self as ast, Alias, AnyNodeRef, AnyParameterRef, ArgOrKeyword, MatchCase, PatternKeyword,
 };
 
 impl ast::ElifElseClause {
@@ -235,50 +234,6 @@ impl ast::ExceptHandlerExceptHandler {
     }
 }
 
-impl ast::PatternMatchValue {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchValue {
-            value,
-            range: _,
-            node_index: _,
-        } = self;
-        visitor.visit_expr(value);
-    }
-}
-
-impl ast::PatternMatchSingleton {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchSingleton {
-            value,
-            range: _,
-            node_index: _,
-        } = self;
-        visitor.visit_singleton(value);
-    }
-}
-
-impl ast::PatternMatchSequence {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchSequence {
-            patterns,
-            range: _,
-            node_index: _,
-        } = self;
-        for pattern in patterns {
-            visitor.visit_pattern(pattern);
-        }
-    }
-}
-
 impl ast::PatternMatchMapping {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
@@ -311,94 +266,18 @@ impl ast::PatternMatchMapping {
     }
 }
 
-impl ast::PatternMatchClass {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchClass {
-            cls,
-            arguments: parameters,
-            range: _,
-            node_index: _,
-        } = self;
-        visitor.visit_expr(cls);
-        visitor.visit_pattern_arguments(parameters);
-    }
-}
-
-impl ast::PatternMatchStar {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchStar {
-            range: _,
-            node_index: _,
-            name,
-        } = self;
-
-        if let Some(name) = name {
-            visitor.visit_identifier(name);
-        }
-    }
-}
-
-impl ast::PatternMatchAs {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchAs {
-            pattern,
-            range: _,
-            node_index: _,
-            name,
-        } = self;
-        if let Some(pattern) = pattern {
-            visitor.visit_pattern(pattern);
-        }
-
-        if let Some(name) = name {
-            visitor.visit_identifier(name);
-        }
-    }
-}
-
-impl ast::PatternMatchOr {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::PatternMatchOr {
-            patterns,
-            range: _,
-            node_index: _,
-        } = self;
-        for pattern in patterns {
-            visitor.visit_pattern(pattern);
-        }
-    }
-}
-
 impl ast::PatternArguments {
     pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        let PatternArguments {
-            range: _,
-            node_index: _,
-            patterns,
-            keywords,
-        } = self;
-
-        for pattern in patterns {
-            visitor.visit_pattern(pattern);
-        }
-
-        for keyword in keywords {
-            visitor.visit_pattern_keyword(keyword);
+        for pattern_or_keyword in self.patterns_source_order() {
+            match pattern_or_keyword {
+                crate::PatternOrKeyword::Pattern(pattern) => visitor.visit_pattern(pattern),
+                crate::PatternOrKeyword::Keyword(keyword) => {
+                    visitor.visit_pattern_keyword(keyword);
+                }
+            }
         }
     }
 }
@@ -461,7 +340,7 @@ impl ast::Parameters {
     where
         V: SourceOrderVisitor<'a> + ?Sized,
     {
-        for parameter in self {
+        for parameter in self.iter_source_order() {
             match parameter {
                 AnyParameterRef::NonVariadic(parameter_with_default) => {
                     visitor.visit_parameter_with_default(parameter_with_default);
@@ -616,67 +495,6 @@ impl ast::TypeParams {
 
         for type_param in type_params {
             visitor.visit_type_param(type_param);
-        }
-    }
-}
-
-impl ast::TypeParamTypeVar {
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamTypeVar {
-            bound,
-            default,
-            name,
-            range: _,
-            node_index: _,
-        } = self;
-
-        visitor.visit_identifier(name);
-        if let Some(expr) = bound {
-            visitor.visit_expr(expr);
-        }
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
-        }
-    }
-}
-
-impl ast::TypeParamTypeVarTuple {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamTypeVarTuple {
-            range: _,
-            node_index: _,
-            name,
-            default,
-        } = self;
-        visitor.visit_identifier(name);
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
-        }
-    }
-}
-
-impl ast::TypeParamParamSpec {
-    #[inline]
-    pub(crate) fn visit_source_order<'a, V>(&'a self, visitor: &mut V)
-    where
-        V: SourceOrderVisitor<'a> + ?Sized,
-    {
-        let ast::TypeParamParamSpec {
-            range: _,
-            node_index: _,
-            name,
-            default,
-        } = self;
-        visitor.visit_identifier(name);
-        if let Some(expr) = default {
-            visitor.visit_expr(expr);
         }
     }
 }

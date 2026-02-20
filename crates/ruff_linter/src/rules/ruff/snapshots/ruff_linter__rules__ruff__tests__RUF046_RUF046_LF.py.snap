@@ -10,9 +10,7 @@ RUF046 [*] Value being cast to `int` is already an integer
   | |______^
   |
 help: Remove unnecessary `int` call
-
-ℹ Safe fix
-1 1 | # \n as newline
-2   |-int(-
-  2 |+(-
-3 3 |     1)
+1 | # \n as newline
+  - int(-
+2 + (-
+3 |     1)

@@ -1,4 +1,4 @@
-use crate::symbols::{SymbolInfo, SymbolsOptions, symbols_for_file};
+use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file};
 use ruff_db::files::File;
 use ty_project::Db;
 
@@ -10,38 +10,51 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         return Vec::new();
     }
 
-    let mut results = Vec::new();
+    let workspace_symbols_span = tracing::debug_span!("workspace_symbols");
+    let _span = workspace_symbols_span.enter();
+
     let project = db.project();
 
-    let options = SymbolsOptions {
-        hierarchical: false, // Workspace symbols are always flat
-        global_only: false,
-        query_string: Some(query.to_string()),
-    };
-
-    // Get all files in the project
+    let query = QueryPattern::fuzzy(query);
     let files = project.files(db);
+    let results = std::sync::Mutex::new(Vec::new());
+    {
+        let db = db.dyn_clone();
+        let files = &files;
+        let results = &results;
+        let query = &query;
+        let workspace_symbols_span = &workspace_symbols_span;
 
-    // For each file, extract symbols and add them to results
-    for file in files.iter() {
-        let file_symbols = symbols_for_file(db, *file, &options);
+        rayon::scope(move |s| {
+            // For each file, extract symbols and add them to results
+            for file in files.iter() {
+                let db = db.dyn_clone();
+                s.spawn(move |_| {
+                    let symbols_for_file_span = tracing::debug_span!(parent: workspace_symbols_span, "symbols_for_file", ?file);
+                    let _entered = symbols_for_file_span.entered();
 
-        for symbol in file_symbols {
-            results.push(WorkspaceSymbolInfo {
-                symbol,
-                file: *file,
-            });
-        }
+                    for (_, symbol) in symbols_for_file(&*db, *file).search(query) {
+                        // It seems like we could do better here than
+                        // locking `results` for every single symbol,
+                        // but this works pretty well as it is.
+                        results.lock().unwrap().push(WorkspaceSymbolInfo {
+                            symbol: symbol.to_owned(),
+                            file: *file,
+                        });
+                    }
+                });
+            }
+        });
     }
 
-    results
+    results.into_inner().unwrap()
 }
 
 /// A symbol found in the workspace, including the file it was found in.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WorkspaceSymbolInfo {
     /// The symbol information
-    pub symbol: SymbolInfo,
+    pub symbol: SymbolInfo<'static>,
     /// The file containing the symbol
     pub file: File,
 }
@@ -58,7 +71,7 @@ mod tests {
     };
 
     #[test]
-    fn test_workspace_symbols_multi_file() {
+    fn workspace_symbols_multi_file() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -85,7 +98,7 @@ API_BASE_URL = 'https://api.example.com'
             )
             .build();
 
-        assert_snapshot!(test.workspace_symbols("ufunc"), @r"
+        assert_snapshot!(test.workspace_symbols("ufunc"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> utils.py:2:5
           |
@@ -97,7 +110,7 @@ API_BASE_URL = 'https://api.example.com'
         info: Function utility_function
         ");
 
-        assert_snapshot!(test.workspace_symbols("data"), @r"
+        assert_snapshot!(test.workspace_symbols("data"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> models.py:2:7
           |
@@ -109,7 +122,7 @@ API_BASE_URL = 'https://api.example.com'
         info: Class DataModel
         ");
 
-        assert_snapshot!(test.workspace_symbols("apibase"), @r"
+        assert_snapshot!(test.workspace_symbols("apibase"), @"
         info[workspace-symbols]: WorkspaceSymbolInfo
          --> constants.py:2:1
           |
@@ -118,6 +131,86 @@ API_BASE_URL = 'https://api.example.com'
           |
         info: Constant API_BASE_URL
         ");
+    }
+
+    #[test]
+    fn members() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+class Test:
+    def from_path(): ...
+<CURSOR>",
+            )
+            .build();
+
+        assert_snapshot!(test.workspace_symbols("from"), @"
+        info[workspace-symbols]: WorkspaceSymbolInfo
+         --> utils.py:3:9
+          |
+        2 | class Test:
+        3 |     def from_path(): ...
+          |         ^^^^^^^^^
+          |
+        info: Method from_path
+        ");
+    }
+
+    #[test]
+    fn ignore_all() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+__all__ = []
+class Test:
+    def from_path(): ...
+<CURSOR>",
+            )
+            .build();
+
+        assert_snapshot!(test.workspace_symbols("from"), @"
+        info[workspace-symbols]: WorkspaceSymbolInfo
+         --> utils.py:4:9
+          |
+        2 | __all__ = []
+        3 | class Test:
+        4 |     def from_path(): ...
+          |         ^^^^^^^^^
+          |
+        info: Method from_path
+        ");
+    }
+
+    #[test]
+    fn ignore_imports() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+import re
+import json as json
+from collections import defaultdict
+foo = 1
+<CURSOR>",
+            )
+            .build();
+
+        assert_snapshot!(test.workspace_symbols("foo"), @"
+        info[workspace-symbols]: WorkspaceSymbolInfo
+         --> utils.py:5:1
+          |
+        3 | import json as json
+        4 | from collections import defaultdict
+        5 | foo = 1
+          | ^^^
+          |
+        info: Variable foo
+        ");
+        assert_snapshot!(test.workspace_symbols("re"), @"No symbols found");
+        assert_snapshot!(test.workspace_symbols("json"), @"No symbols found");
+        assert_snapshot!(test.workspace_symbols("default"), @"No symbols found");
     }
 
     impl CursorTest {

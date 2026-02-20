@@ -44,6 +44,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: The `Any` type](https://docs.python.org/3/library/typing.html#the-any-type)
 /// - [Mypy documentation: Any vs. object](https://mypy.readthedocs.io/en/latest/dynamic_typing.html#any-vs-object)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.271")]
 pub(crate) struct AnyEqNeAnnotation {
     method_name: String,
 }

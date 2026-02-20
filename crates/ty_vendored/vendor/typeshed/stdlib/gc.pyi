@@ -9,7 +9,7 @@ get_stats() -- Return list of dictionaries containing per-generation stats.
 set_debug() -- Set debugging flags.
 get_debug() -- Get debugging flags.
 set_threshold() -- Set the collection thresholds.
-get_threshold() -- Return the current the collection thresholds.
+get_threshold() -- Return the current collection thresholds.
 get_objects() -- Return a list of all objects tracked by the collector.
 is_tracked() -- Returns true if a given object is tracked.
 is_finalized() -- Returns true if a given object has been already finalized.
@@ -123,7 +123,7 @@ def set_debug(flags: int, /) -> None:
     Debugging information is written to sys.stderr.
     """
 
-def set_threshold(threshold0: int, threshold1: int = ..., threshold2: int = ..., /) -> None:
+def set_threshold(threshold0: int, threshold1: int = 0, threshold2: int = 0, /) -> None:
     """set_threshold(threshold0, [threshold1, [threshold2]])
     Set the collection thresholds (the collection frequency).
 

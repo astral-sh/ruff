@@ -7,28 +7,45 @@ input_file: crates/ruff_python_parser/resources/inline/err/implicitly_concatenat
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..47,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
-                    range: 0..7,
+                    node_index: NodeIndex(None),
+                    range: 0..14,
                     value: StringLiteral(
                         ExprStringLiteral {
-                            node_index: AtomicNodeIndex(..),
-                            range: 0..7,
+                            node_index: NodeIndex(None),
+                            range: 0..14,
                             value: StringLiteralValue {
-                                inner: Single(
-                                    StringLiteral {
-                                        range: 0..7,
-                                        node_index: AtomicNodeIndex(..),
-                                        value: "hello",
-                                        flags: StringLiteralFlags {
-                                            quote_style: Single,
-                                            prefix: Empty,
-                                            triple_quoted: false,
-                                        },
+                                inner: Concatenated(
+                                    ConcatenatedStringLiteral {
+                                        strings: [
+                                            StringLiteral {
+                                                range: 0..7,
+                                                node_index: NodeIndex(None),
+                                                value: "hello",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: false,
+                                                },
+                                            },
+                                            StringLiteral {
+                                                range: 8..14,
+                                                node_index: NodeIndex(None),
+                                                value: "world",
+                                                flags: StringLiteralFlags {
+                                                    quote_style: Single,
+                                                    prefix: Empty,
+                                                    triple_quoted: false,
+                                                    unclosed: true,
+                                                },
+                                            },
+                                        ],
+                                        value: "helloworld",
                                     },
                                 ),
                             },
@@ -38,15 +55,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 15..20,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 15..20,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 15..16,
                                     value: Int(
                                         1,
@@ -56,7 +73,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 19..20,
                                     value: Int(
                                         1,
@@ -69,11 +86,11 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 21..40,
                     value: FString(
                         ExprFString {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 21..40,
                             value: FStringValue {
                                 inner: Concatenated(
@@ -81,34 +98,35 @@ Module(
                                         Literal(
                                             StringLiteral {
                                                 range: 21..28,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 value: "hello",
                                                 flags: StringLiteralFlags {
                                                     quote_style: Single,
                                                     prefix: Empty,
                                                     triple_quoted: false,
+                                                    unclosed: false,
                                                 },
                                             },
                                         ),
                                         FString(
                                             FString {
                                                 range: 29..40,
-                                                node_index: AtomicNodeIndex(..),
+                                                node_index: NodeIndex(None),
                                                 elements: [
                                                     Literal(
                                                         InterpolatedStringLiteralElement {
                                                             range: 31..37,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             value: "world ",
                                                         },
                                                     ),
                                                     Interpolation(
                                                         InterpolatedElement {
                                                             range: 37..40,
-                                                            node_index: AtomicNodeIndex(..),
+                                                            node_index: NodeIndex(None),
                                                             expression: Name(
                                                                 ExprName {
-                                                                    node_index: AtomicNodeIndex(..),
+                                                                    node_index: NodeIndex(None),
                                                                     range: 38..39,
                                                                     id: Name("x"),
                                                                     ctx: Load,
@@ -124,6 +142,7 @@ Module(
                                                     quote_style: Single,
                                                     prefix: Regular,
                                                     triple_quoted: false,
+                                                    unclosed: true,
                                                 },
                                             },
                                         ),
@@ -136,15 +155,15 @@ Module(
             ),
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 41..46,
                     value: BinOp(
                         ExprBinOp {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 41..46,
                             left: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 41..42,
                                     value: Int(
                                         2,
@@ -154,7 +173,7 @@ Module(
                             op: Add,
                             right: NumberLiteral(
                                 ExprNumberLiteral {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 45..46,
                                     value: Int(
                                         2,
@@ -176,15 +195,6 @@ Module(
   |         ^^^^^^ Syntax Error: missing closing quote in string literal
 2 | 1 + 1
 3 | 'hello' f'world {x}
-  |
-
-
-  |
-1 | 'hello' 'world
-  |               ^ Syntax Error: Expected a statement
-2 | 1 + 1
-3 | 'hello' f'world {x}
-4 | 2 + 2
   |
 
 

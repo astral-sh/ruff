@@ -12,14 +12,12 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_______________^
   |
 help: Organize imports
-
-ℹ Safe fix
-  1 |+import datetime
-  2 |+import datetime as dt
-  3 |+from datetime import timedelta
-  4 |+from datetime import timezone as tz
-1 5 | import encodings
-2   |-from datetime import timezone as tz
-3   |-from datetime import timedelta
-4   |-import datetime as dt
-5   |-import datetime
+1 + import datetime
+2 + import datetime as dt
+3 + from datetime import timedelta
+4 + from datetime import timezone as tz
+5 | import encodings
+  - from datetime import timezone as tz
+  - from datetime import timedelta
+  - import datetime as dt
+  - import datetime

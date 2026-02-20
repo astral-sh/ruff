@@ -1,9 +1,14 @@
 use std::cmp::Ordering;
 
-use crate::db::Db;
+use salsa::plumbing::AsId;
+
+use crate::{
+    db::Db,
+    types::{LiteralValueTypeKind, bound_super::SuperOwnerKind},
+};
 
 use super::{
-    DynamicType, SuperOwnerKind, TodoType, Type, TypeIsType, class_base::ClassBase,
+    DynamicType, TodoType, Type, TypeGuardLike, TypeGuardType, TypeIsType, class_base::ClassBase,
     subclass_of::SubclassOfInner,
 };
 
@@ -45,28 +50,43 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::Never, _) => Ordering::Less,
         (_, Type::Never) => Ordering::Greater,
 
-        (Type::LiteralString, _) => Ordering::Less,
-        (_, Type::LiteralString) => Ordering::Greater,
+        (Type::LiteralValue(left), Type::LiteralValue(right)) => {
+            match (left.kind(), right.kind()) {
+                (LiteralValueTypeKind::LiteralString, _) => Ordering::Less,
+                (_, LiteralValueTypeKind::LiteralString) => Ordering::Greater,
 
-        (Type::BooleanLiteral(left), Type::BooleanLiteral(right)) => left.cmp(right),
-        (Type::BooleanLiteral(_), _) => Ordering::Less,
-        (_, Type::BooleanLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::Bool(left), LiteralValueTypeKind::Bool(right)) => {
+                    left.cmp(&right)
+                }
+                (LiteralValueTypeKind::Bool(_), _) => Ordering::Less,
+                (_, LiteralValueTypeKind::Bool(_)) => Ordering::Greater,
 
-        (Type::IntLiteral(left), Type::IntLiteral(right)) => left.cmp(right),
-        (Type::IntLiteral(_), _) => Ordering::Less,
-        (_, Type::IntLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::Int(left), LiteralValueTypeKind::Int(right)) => {
+                    left.cmp(&right)
+                }
+                (LiteralValueTypeKind::Int(_), _) => Ordering::Less,
+                (_, LiteralValueTypeKind::Int(_)) => Ordering::Greater,
 
-        (Type::StringLiteral(left), Type::StringLiteral(right)) => left.cmp(right),
-        (Type::StringLiteral(_), _) => Ordering::Less,
-        (_, Type::StringLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::String(left), LiteralValueTypeKind::String(right)) => {
+                    left.cmp(&right)
+                }
+                (LiteralValueTypeKind::String(_), _) => Ordering::Less,
+                (_, LiteralValueTypeKind::String(_)) => Ordering::Greater,
 
-        (Type::BytesLiteral(left), Type::BytesLiteral(right)) => left.cmp(right),
-        (Type::BytesLiteral(_), _) => Ordering::Less,
-        (_, Type::BytesLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::Bytes(left), LiteralValueTypeKind::Bytes(right)) => {
+                    left.cmp(&right)
+                }
+                (LiteralValueTypeKind::Bytes(_), _) => Ordering::Less,
+                (_, LiteralValueTypeKind::Bytes(_)) => Ordering::Greater,
 
-        (Type::EnumLiteral(left), Type::EnumLiteral(right)) => left.cmp(right),
-        (Type::EnumLiteral(_), _) => Ordering::Less,
-        (_, Type::EnumLiteral(_)) => Ordering::Greater,
+                (LiteralValueTypeKind::Enum(left), LiteralValueTypeKind::Enum(right)) => {
+                    left.cmp(&right)
+                }
+            }
+        }
+
+        (Type::LiteralValue(_), _) => Ordering::Less,
+        (_, Type::LiteralValue(_)) => Ordering::Greater,
 
         (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => left.cmp(right),
         (Type::FunctionLiteral(_), _) => Ordering::Less,
@@ -76,23 +96,19 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundMethod(_), _) => Ordering::Less,
         (_, Type::BoundMethod(_)) => Ordering::Greater,
 
-        (Type::MethodWrapper(left), Type::MethodWrapper(right)) => left.cmp(right),
-        (Type::MethodWrapper(_), _) => Ordering::Less,
-        (_, Type::MethodWrapper(_)) => Ordering::Greater,
+        (Type::KnownBoundMethod(left), Type::KnownBoundMethod(right)) => left.cmp(right),
+        (Type::KnownBoundMethod(_), _) => Ordering::Less,
+        (_, Type::KnownBoundMethod(_)) => Ordering::Greater,
 
         (Type::WrapperDescriptor(left), Type::WrapperDescriptor(right)) => left.cmp(right),
         (Type::WrapperDescriptor(_), _) => Ordering::Less,
         (_, Type::WrapperDescriptor(_)) => Ordering::Greater,
 
-        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => left.cmp(right),
         (Type::DataclassDecorator(_), _) => Ordering::Less,
         (_, Type::DataclassDecorator(_)) => Ordering::Greater,
 
-        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => left.cmp(right),
         (Type::DataclassTransformer(_), _) => Ordering::Less,
         (_, Type::DataclassTransformer(_)) => Ordering::Greater,
 
@@ -120,6 +136,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
+                (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => {
+                    left.as_id().cmp(&right.as_id())
+                }
+                (SubclassOfInner::TypeVar(_), _) => Ordering::Less,
+                (_, SubclassOfInner::TypeVar(_)) => Ordering::Greater,
             }
         }
 
@@ -129,6 +150,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypeIs(left), Type::TypeIs(right)) => typeis_ordering(db, *left, *right),
         (Type::TypeIs(_), _) => Ordering::Less,
         (_, Type::TypeIs(_)) => Ordering::Greater,
+
+        (Type::TypeGuard(left), Type::TypeGuard(right)) => typeguard_ordering(db, *left, *right),
+        (Type::TypeGuard(_), _) => Ordering::Less,
+        (_, Type::TypeGuard(_)) => Ordering::Greater,
 
         (Type::NominalInstance(left), Type::NominalInstance(right)) => {
             left.class(db).cmp(&right.class(db))
@@ -142,11 +167,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
-        (Type::NonInferableTypeVar(left), Type::NonInferableTypeVar(right)) => left.cmp(right),
-        (Type::NonInferableTypeVar(_), _) => Ordering::Less,
-        (_, Type::NonInferableTypeVar(_)) => Ordering::Greater,
-
-        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        // This is one place where we want to compare the typevar identities directly, instead of
+        // falling back on `is_same_typevar_as` or `can_be_bound_for`.
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.as_id().cmp(&right.as_id()),
         (Type::TypeVar(_), _) => Ordering::Less,
         (_, Type::TypeVar(_)) => Ordering::Greater,
 
@@ -184,6 +207,17 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
+                (
+                    SuperOwnerKind::InstanceTypeVar(left, _),
+                    SuperOwnerKind::InstanceTypeVar(right, _),
+                ) => left.cmp(&right),
+                (SuperOwnerKind::InstanceTypeVar(..), _) => Ordering::Less,
+                (_, SuperOwnerKind::InstanceTypeVar(..)) => Ordering::Greater,
+                (SuperOwnerKind::ClassTypeVar(left, _), SuperOwnerKind::ClassTypeVar(right, _)) => {
+                    left.cmp(&right)
+                }
+                (SuperOwnerKind::ClassTypeVar(..), _) => Ordering::Less,
+                (_, SuperOwnerKind::ClassTypeVar(..)) => Ordering::Greater,
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
@@ -211,6 +245,14 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypeAlias(left), Type::TypeAlias(right)) => left.cmp(right),
         (Type::TypeAlias(_), _) => Ordering::Less,
         (_, Type::TypeAlias(_)) => Ordering::Greater,
+
+        (Type::TypedDict(left), Type::TypedDict(right)) => left.cmp(right),
+        (Type::TypedDict(_), _) => Ordering::Less,
+        (_, Type::TypedDict(_)) => Ordering::Greater,
+
+        (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => left.cmp(right),
+        (Type::NewTypeInstance(_), _) => Ordering::Less,
+        (_, Type::NewTypeInstance(_)) => Ordering::Greater,
 
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
@@ -243,12 +285,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
             unreachable!("Two equal, normalized intersections should share the same Salsa ID")
         }
-
-        (Type::TypedDict(left), Type::TypedDict(right)) => {
-            left.defining_class.cmp(&right.defining_class)
-        }
-        (Type::TypedDict(_), _) => Ordering::Less,
-        (_, Type::TypedDict(_)) => Ordering::Greater,
     }
 }
 
@@ -261,30 +297,40 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (DynamicType::Unknown, _) => Ordering::Less,
         (_, DynamicType::Unknown) => Ordering::Greater,
 
+        (DynamicType::UnknownGeneric(_), _) => Ordering::Less,
+        (_, DynamicType::UnknownGeneric(_)) => Ordering::Greater,
+
+        (DynamicType::UnspecializedTypeVar, _) => Ordering::Less,
+        (_, DynamicType::UnspecializedTypeVar) => Ordering::Greater,
+
         #[cfg(debug_assertions)]
         (DynamicType::Todo(TodoType(left)), DynamicType::Todo(TodoType(right))) => left.cmp(right),
 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
 
-        (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
-        (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
-
         (DynamicType::TodoUnpack, _) => Ordering::Less,
         (_, DynamicType::TodoUnpack) => Ordering::Greater,
 
-        (DynamicType::TodoTypeAlias, _) => Ordering::Less,
-        (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
+        (DynamicType::TodoStarredExpression, _) => Ordering::Less,
+        (_, DynamicType::TodoStarredExpression) => Ordering::Greater,
+
+        (DynamicType::TodoTypeVarTuple, _) => Ordering::Less,
+        (_, DynamicType::TodoTypeVarTuple) => Ordering::Greater,
+
+        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => left.cmp(&right),
+        (DynamicType::Divergent(_), _) => Ordering::Less,
+        (_, DynamicType::Divergent(_)) => Ordering::Greater,
     }
 }
 
-/// Determine a canonical order for two instances of [`TypeIsType`].
+/// Generic helper for ordering type guard-like types.
 ///
 /// The following criteria are considered, in order:
 /// * Boundness: Unbound precedes bound
 /// * Symbol name: String comparison
 /// * Guarded type: [`union_or_intersection_elements_ordering`]
-fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering {
+fn guard_like_ordering<'db, T: TypeGuardLike<'db>>(db: &'db dyn Db, left: T, right: T) -> Ordering {
     let (left_ty, right_ty) = (left.return_type(db), right.return_type(db));
 
     match (left.place_info(db), right.place_info(db)) {
@@ -298,4 +344,14 @@ fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering
             ordering => ordering,
         },
     }
+}
+
+/// Determine a canonical order for two instances of [`TypeIsType`].
+fn typeis_ordering(db: &dyn Db, left: TypeIsType, right: TypeIsType) -> Ordering {
+    guard_like_ordering(db, left, right)
+}
+
+/// Determine a canonical order for two instances of [`TypeGuardType`].
+fn typeguard_ordering(db: &dyn Db, left: TypeGuardType, right: TypeGuardType) -> Ordering {
+    guard_like_ordering(db, left, right)
 }

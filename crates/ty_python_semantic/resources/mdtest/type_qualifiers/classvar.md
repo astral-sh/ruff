@@ -9,6 +9,7 @@ For more details on the semantics of pure class variables, see [this test](../at
 ## Basic
 
 ```py
+import typing
 from typing import ClassVar, Annotated
 
 class C:
@@ -17,12 +18,14 @@ class C:
     c: ClassVar[Annotated[int, "the annotation for c"]] = 1
     d: ClassVar = 1
     e: "ClassVar[int]" = 1
+    f: typing.ClassVar = 1
 
 reveal_type(C.a)  # revealed: int
 reveal_type(C.b)  # revealed: int
 reveal_type(C.c)  # revealed: int
 reveal_type(C.d)  # revealed: Unknown | Literal[1]
 reveal_type(C.e)  # revealed: int
+reveal_type(C.f)  # revealed: Unknown | Literal[1]
 
 c = C()
 
@@ -36,6 +39,8 @@ c.c = 2
 c.d = 2
 # error: [invalid-attribute-access]
 c.e = 2
+# error: [invalid-attribute-access]
+c.f = 3
 ```
 
 ## From stubs
@@ -96,6 +101,106 @@ class C:
     x: ClassVar[int, str] = 1
 ```
 
+## Trailing comma creates a tuple
+
+A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
+and emit a proper error rather than crashing (see
+[ty#1793](https://github.com/astral-sh/ty/issues/1793)).
+
+```py
+from typing import ClassVar
+
+class C:
+    # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
+    x: ClassVar[(),]
+
+# error: [invalid-attribute-access] "Cannot assign to ClassVar `x` from an instance of type `C`"
+C().x = 42
+reveal_type(C.x)  # revealed: Unknown
+```
+
+This also applies when the trailing comma is inside the brackets (see
+[ty#1768](https://github.com/astral-sh/ty/issues/1768)):
+
+```py
+from typing import ClassVar
+
+class D:
+    # A trailing comma here doesn't change the meaning; it's still one argument.
+    a: ClassVar[int,] = 1
+
+reveal_type(D.a)  # revealed: int
+```
+
+## `ClassVar` cannot contain non-self type variables
+
+`ClassVar` cannot include type variables at any level of nesting.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, TypeVar, ParamSpec, Generic
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class C(Generic[T, P]):
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    a: ClassVar[T]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    b: ClassVar[list[T]]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    c: ClassVar[int | T]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    d: ClassVar[P]
+
+    # No error: no type variables
+    e: ClassVar[int] = 1
+
+# PEP 695 syntax
+class D[T]:
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    x: ClassVar[T]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    y: ClassVar[dict[str, T]]
+```
+
+## `ClassVar` can contain `Self`
+
+`Self` is allowed inside `ClassVar`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import ClassVar, Self
+
+class Base:
+    all_instances: ClassVar[list[Self]]
+
+    def method(self):
+        reveal_type(self.all_instances)  # revealed: list[Self@method]
+
+    @classmethod
+    def cls_method(cls):
+        reveal_type(cls.all_instances)  # revealed: list[Self@cls_method]
+
+reveal_type(Base.all_instances)  # revealed: list[Base]
+
+class Sub(Base): ...
+
+reveal_type(Sub.all_instances)  # revealed: list[Sub]
+```
+
 ## Illegal `ClassVar` in type expression
 
 ```py
@@ -118,6 +223,7 @@ python-version = "3.12"
 
 ```py
 from typing import ClassVar
+from ty_extensions import reveal_mro
 
 # error: [invalid-type-form] "`ClassVar` annotations are only allowed in class-body scopes"
 x: ClassVar[int] = 1
@@ -135,6 +241,7 @@ def f(x: ClassVar[int]) -> None:
     pass
 
 # error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
 def f[T](x: ClassVar[T]) -> T:
     return x
 
@@ -143,6 +250,7 @@ def f() -> ClassVar[int]:
     return 1
 
 # error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
+# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
 def f[T](x: T) -> ClassVar[T]:
     return x
 
@@ -150,8 +258,8 @@ def f[T](x: T) -> ClassVar[T]:
 class Foo(ClassVar[tuple[int]]): ...
 
 # TODO: Show `Unknown` instead of `@Todo` type in the MRO; or ignore `ClassVar` and show the MRO as if `ClassVar` was not there
-# revealed: tuple[<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>]
-reveal_type(Foo.__mro__)
+# revealed: (<class 'Foo'>, @Todo(Inference of subscript on special form), <class 'object'>)
+reveal_mro(Foo)
 ```
 
 [`typing.classvar`]: https://docs.python.org/3/library/typing.html#typing.ClassVar

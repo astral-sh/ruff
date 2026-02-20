@@ -12,11 +12,10 @@ pub(crate) struct Printer {
 }
 
 impl Printer {
-    #[must_use]
-    pub(crate) fn with_verbosity(self, verbosity: VerbosityLevel) -> Self {
+    pub(crate) fn new(verbosity: VerbosityLevel, no_progress: bool) -> Self {
         Self {
             verbosity,
-            no_progress: self.no_progress,
+            no_progress,
         }
     }
 
@@ -157,6 +156,22 @@ impl Stdout {
 
     pub(crate) fn is_enabled(&self) -> bool {
         matches!(self.status, StreamStatus::Enabled)
+    }
+}
+
+impl std::io::Write for Stdout {
+    fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+        match self.status {
+            StreamStatus::Enabled => self.handle().write(buf),
+            StreamStatus::Disabled => Ok(buf.len()),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self.status {
+            StreamStatus::Enabled => self.handle().flush(),
+            StreamStatus::Disabled => Ok(()),
+        }
     }
 }
 

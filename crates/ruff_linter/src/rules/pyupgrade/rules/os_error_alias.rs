@@ -7,6 +7,7 @@ use ruff_python_semantic::SemanticModel;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
+use crate::preview::is_up024_precise_highlighting_enabled;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -35,6 +36,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `OSError`](https://docs.python.org/3/library/exceptions.html#OSError)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.206")]
 pub(crate) struct OSErrorAlias {
     name: Option<String>,
 }
@@ -92,7 +94,20 @@ fn atom_diagnostic(checker: &Checker, target: &Expr) {
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]) {
-    let mut diagnostic = checker.report_diagnostic(OSErrorAlias { name: None }, tuple.range());
+    let Some(first_alias) = aliases.first() else {
+        return;
+    };
+    let diagnostic_range = if is_up024_precise_highlighting_enabled(checker.settings()) {
+        first_alias.range()
+    } else {
+        tuple.range()
+    };
+    let mut diagnostic = checker.report_diagnostic(OSErrorAlias { name: None }, diagnostic_range);
+    if is_up024_precise_highlighting_enabled(checker.settings()) {
+        for alias in aliases.iter().skip(1) {
+            diagnostic.secondary_annotation("", alias.range());
+        }
+    }
     let semantic = checker.semantic();
     if semantic.has_builtin_binding("OSError") {
         // Filter out any `OSErrors` aliases.
@@ -116,7 +131,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 id: Name::new_static("OSError"),
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
             remaining.insert(0, node.into());
         }
@@ -128,7 +143,7 @@ fn tuple_diagnostic(checker: &Checker, tuple: &ast::ExprTuple, aliases: &[&Expr]
                 elts: remaining,
                 ctx: ExprContext::Load,
                 range: TextRange::default(),
-                node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
                 parenthesized: true,
             };
             format!("({})", checker.generator().expr(&node.into()))

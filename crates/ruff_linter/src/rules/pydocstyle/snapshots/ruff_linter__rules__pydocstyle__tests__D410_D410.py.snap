@@ -12,15 +12,13 @@ D410 [*] Missing blank line after section ("Parameters")
 6 |     a : int
   |
 help: Add blank line after "Parameters"
-
-ℹ Safe fix
-7  7  |         _description_
-8  8  |     b : int
-9  9  |         _description_
-   10 |+
-10 11 |     Returns
-11 12 |     -------
-12 13 |     int
+7  |         _description_
+8  |     b : int
+9  |         _description_
+10 + 
+11 |     Returns
+12 |     -------
+13 |     int
 
 D410 [*] Missing blank line after section ("Parameters")
   --> D410.py:21:5
@@ -33,12 +31,10 @@ D410 [*] Missing blank line after section ("Parameters")
 23 |     Returns
    |
 help: Add blank line after "Parameters"
-
-ℹ Safe fix
-20 20 | 
-21 21 |     Parameters
-22 22 |     ----------
-   23 |+
-23 24 |     Returns
-24 25 |     -------
-25 26 |     """
+20 | 
+21 |     Parameters
+22 |     ----------
+23 + 
+24 |     Returns
+25 |     -------
+26 |     """

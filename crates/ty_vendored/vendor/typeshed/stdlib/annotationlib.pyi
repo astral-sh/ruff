@@ -42,6 +42,20 @@ if sys.version_info >= (3, 14):
 
         """
 
+        __slots__ = (
+            "__forward_is_argument__",
+            "__forward_is_class__",
+            "__forward_module__",
+            "__weakref__",
+            "__arg__",
+            "__globals__",
+            "__extra_names__",
+            "__code__",
+            "__ast_node__",
+            "__cell__",
+            "__owner__",
+            "__stringifier_dict__",
+        )
         __forward_is_argument__: bool
         __forward_is_class__: bool
         __forward_module__: str | None
@@ -83,7 +97,7 @@ if sys.version_info >= (3, 14):
             owner: object = None,
             format: Format = Format.VALUE,  # noqa: Y011
         ) -> AnnotationForm: ...
-        @deprecated("Use ForwardRef.evaluate() or typing.evaluate_forward_ref() instead.")
+        @deprecated("Use `ForwardRef.evaluate()` or `typing.evaluate_forward_ref()` instead.")
         def _evaluate(
             self,
             globalns: dict[str, Any] | None,

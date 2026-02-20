@@ -14,15 +14,13 @@ I001 [*] Import block is un-sorted or un-formatted
   | |_________________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-1   |-from ..looooooooooooooong import a
-2   |-from ...mediuuuum import b
-  1 |+from . import d
-3 2 | from .short import c
-4 3 | from ....short import c
-5   |-from . import d
-6 4 | from .mediuuuum import a
-7 5 | from ......short import b
-  6 |+from ...mediuuuum import b
-  7 |+from ..looooooooooooooong import a
+  - from ..looooooooooooooong import a
+  - from ...mediuuuum import b
+1 + from . import d
+2 | from .short import c
+3 | from ....short import c
+  - from . import d
+4 | from .mediuuuum import a
+5 | from ......short import b
+6 + from ...mediuuuum import b
+7 + from ..looooooooooooooong import a

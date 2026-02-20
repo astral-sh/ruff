@@ -35,6 +35,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// This fix is always marked as unsafe since we cannot know
 /// for certain which assignment was intended.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct DuplicateClassFieldDefinition {
     name: String,
 }
@@ -57,17 +58,17 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
     let mut seen_targets: FxHashSet<&str> = FxHashSet::default();
     for stmt in body {
         // Extract the property name from the assignment statement.
-        let target = match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                if let [Expr::Name(id)] = targets.as_slice() {
-                    id
-                } else {
+        let (target, value) = match stmt {
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                let [Expr::Name(target)] = targets.as_slice() else {
                     continue;
-                }
+                };
+
+                (target, Some(&**value))
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
                 if let Expr::Name(id) = target.as_ref() {
-                    id
+                    (id, value.as_deref())
                 } else {
                     continue;
                 }
@@ -76,24 +77,12 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
         };
 
         // If this is an unrolled augmented assignment (e.g., `x = x + 1`), skip it.
-        match stmt {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => {
-                if any_over_expr(value.as_ref(), &|expr| {
-                    expr.as_name_expr().is_some_and(|name| name.id == target.id)
-                }) {
-                    continue;
-                }
-            }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                value: Some(value), ..
-            }) => {
-                if any_over_expr(value.as_ref(), &|expr| {
-                    expr.as_name_expr().is_some_and(|name| name.id == target.id)
-                }) {
-                    continue;
-                }
-            }
-            _ => continue,
+        if let Some(value) = value
+            && any_over_expr(value, &|expr| {
+                expr.as_name_expr().is_some_and(|name| name.id == target.id)
+            })
+        {
+            continue;
         }
 
         if !seen_targets.insert(target.id.as_str()) {

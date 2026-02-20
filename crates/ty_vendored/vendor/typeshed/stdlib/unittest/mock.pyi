@@ -4,7 +4,7 @@ from collections.abc import Awaitable, Callable, Coroutine, Iterable, Mapping, S
 from contextlib import _GeneratorContextManager
 from types import TracebackType
 from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias
+from typing_extensions import ParamSpec, Self, TypeAlias, disjoint_base
 
 _T = TypeVar("_T")
 _TT = TypeVar("_TT", bound=type[Any])
@@ -52,7 +52,7 @@ else:
         "seal",
     )
 
-FILTER_DIR: Any
+FILTER_DIR: bool  # controls the way mock objects respond to `dir` function
 
 class _SentinelObject:
     """A unique, named, sentinel object."""
@@ -65,59 +65,119 @@ class _Sentinel:
 
     def __getattr__(self, name: str) -> Any: ...
 
-sentinel: Any
+sentinel: _Sentinel
 DEFAULT: Any
 
 _ArgsKwargs: TypeAlias = tuple[tuple[Any, ...], Mapping[str, Any]]
 _NameArgsKwargs: TypeAlias = tuple[str, tuple[Any, ...], Mapping[str, Any]]
 _CallValue: TypeAlias = str | tuple[Any, ...] | Mapping[str, Any] | _ArgsKwargs | _NameArgsKwargs
 
-class _Call(tuple[Any, ...]):
-    """
-    A tuple for holding the results of a call to a mock, either in the form
-    `(args, kwargs)` or `(name, args, kwargs)`.
-
-    If args or kwargs are empty then a call tuple will compare equal to
-    a tuple without those values. This makes comparisons less verbose::
-
-        _Call(('name', (), {})) == ('name',)
-        _Call(('name', (1,), {})) == ('name', (1,))
-        _Call(((), {'a': 'b'})) == ({'a': 'b'},)
-
-    The `_Call` object provides a useful shortcut for comparing with call::
-
-        _Call(((1, 2), {'a': 3})) == call(1, 2, a=3)
-        _Call(('foo', (1, 2), {'a': 3})) == call.foo(1, 2, a=3)
-
-    If the _Call has no name then it will match any name.
-    """
-
-    def __new__(
-        cls, value: _CallValue = (), name: str | None = "", parent: _Call | None = None, two: bool = False, from_kall: bool = True
-    ) -> Self: ...
-    def __init__(
-        self,
-        value: _CallValue = (),
-        name: str | None = None,
-        parent: _Call | None = None,
-        two: bool = False,
-        from_kall: bool = True,
-    ) -> None: ...
-    __hash__: ClassVar[None]  # type: ignore[assignment]
-    def __eq__(self, other: object) -> bool: ...
-    def __ne__(self, value: object, /) -> bool: ...
-    def __call__(self, *args: Any, **kwargs: Any) -> _Call: ...
-    def __getattr__(self, attr: str) -> Any: ...
-    def __getattribute__(self, attr: str) -> Any: ...
-    @property
-    def args(self) -> tuple[Any, ...]: ...
-    @property
-    def kwargs(self) -> Mapping[str, Any]: ...
-    def call_list(self) -> Any:
-        """For a call object that represents multiple calls, `call_list`
-        returns a list of all the intermediate calls as well as the
-        final call.
+if sys.version_info >= (3, 12):
+    class _Call(tuple[Any, ...]):
         """
+        A tuple for holding the results of a call to a mock, either in the form
+        `(args, kwargs)` or `(name, args, kwargs)`.
+
+        If args or kwargs are empty then a call tuple will compare equal to
+        a tuple without those values. This makes comparisons less verbose::
+
+            _Call(('name', (), {})) == ('name',)
+            _Call(('name', (1,), {})) == ('name', (1,))
+            _Call(((), {'a': 'b'})) == ({'a': 'b'},)
+
+        The `_Call` object provides a useful shortcut for comparing with call::
+
+            _Call(((1, 2), {'a': 3})) == call(1, 2, a=3)
+            _Call(('foo', (1, 2), {'a': 3})) == call.foo(1, 2, a=3)
+
+        If the _Call has no name then it will match any name.
+        """
+
+        def __new__(
+            cls,
+            value: _CallValue = (),
+            name: str | None = "",
+            parent: _Call | None = None,
+            two: bool = False,
+            from_kall: bool = True,
+        ) -> Self: ...
+        def __init__(
+            self,
+            value: _CallValue = (),
+            name: str | None = None,
+            parent: _Call | None = None,
+            two: bool = False,
+            from_kall: bool = True,
+        ) -> None: ...
+        __hash__: ClassVar[None]  # type: ignore[assignment]
+        def __eq__(self, other: object) -> bool: ...
+        def __ne__(self, value: object, /) -> bool: ...
+        def __call__(self, *args: Any, **kwargs: Any) -> _Call: ...
+        def __getattr__(self, attr: str) -> Any: ...
+        def __getattribute__(self, attr: str) -> Any: ...
+        @property
+        def args(self) -> tuple[Any, ...]: ...
+        @property
+        def kwargs(self) -> Mapping[str, Any]: ...
+        def call_list(self) -> Any:
+            """For a call object that represents multiple calls, `call_list`
+            returns a list of all the intermediate calls as well as the
+            final call.
+            """
+
+else:
+    @disjoint_base
+    class _Call(tuple[Any, ...]):
+        """
+        A tuple for holding the results of a call to a mock, either in the form
+        `(args, kwargs)` or `(name, args, kwargs)`.
+
+        If args or kwargs are empty then a call tuple will compare equal to
+        a tuple without those values. This makes comparisons less verbose::
+
+            _Call(('name', (), {})) == ('name',)
+            _Call(('name', (1,), {})) == ('name', (1,))
+            _Call(((), {'a': 'b'})) == ({'a': 'b'},)
+
+        The `_Call` object provides a useful shortcut for comparing with call::
+
+            _Call(((1, 2), {'a': 3})) == call(1, 2, a=3)
+            _Call(('foo', (1, 2), {'a': 3})) == call.foo(1, 2, a=3)
+
+        If the _Call has no name then it will match any name.
+        """
+
+        def __new__(
+            cls,
+            value: _CallValue = (),
+            name: str | None = "",
+            parent: _Call | None = None,
+            two: bool = False,
+            from_kall: bool = True,
+        ) -> Self: ...
+        def __init__(
+            self,
+            value: _CallValue = (),
+            name: str | None = None,
+            parent: _Call | None = None,
+            two: bool = False,
+            from_kall: bool = True,
+        ) -> None: ...
+        __hash__: ClassVar[None]  # type: ignore[assignment]
+        def __eq__(self, other: object) -> bool: ...
+        def __ne__(self, value: object, /) -> bool: ...
+        def __call__(self, *args: Any, **kwargs: Any) -> _Call: ...
+        def __getattr__(self, attr: str) -> Any: ...
+        def __getattribute__(self, attr: str) -> Any: ...
+        @property
+        def args(self) -> tuple[Any, ...]: ...
+        @property
+        def kwargs(self) -> Mapping[str, Any]: ...
+        def call_list(self) -> Any:
+            """For a call object that represents multiple calls, `call_list`
+            returns a list of all the intermediate calls as well as the
+            final call.
+            """
 
 call: _Call
 
@@ -262,6 +322,7 @@ class NonCallableMock(Base, Any):
     call_count: int
     call_args: _Call | MaybeNone
     call_args_list: _CallList
+    method_calls: _CallList
     mock_calls: _CallList
     def _format_mock_call_signature(self, args: Any, kwargs: Any) -> str: ...
     def _call_matcher(self, _call: tuple[_Call, ...]) -> _Call:
@@ -511,7 +572,10 @@ class _patch_dict:
     def __exit__(self, *args: object) -> Any:
         """Unpatch the dict."""
     start: Any
+    """Activate a patch, returning any created mock."""
+
     stop: Any
+    """Stop an active patch."""
 
 # This class does not exist at runtime, it's a hack to add methods to the
 # patch() function.
@@ -523,27 +587,32 @@ class _patcher:
     # Ideally we'd be able to add an overload for it so that the return type is _patch[MagicMock],
     # but that's impossible with the current type system.
     @overload
-    def __call__(
+    def __call__(  # type: ignore[overload-overlap]
         self,
         target: str,
         new: _T,
-        spec: Any | None = ...,
-        create: bool = ...,
-        spec_set: Any | None = ...,
-        autospec: Any | None = ...,
-        new_callable: Callable[..., Any] | None = ...,
-        **kwargs: Any,
+        spec: Literal[False] | None = None,
+        create: bool = False,
+        spec_set: Literal[False] | None = None,
+        autospec: Literal[False] | None = None,
+        new_callable: None = None,
+        *,
+        unsafe: bool = False,
     ) -> _patch[_T]: ...
     @overload
     def __call__(
         self,
         target: str,
         *,
-        spec: Any | None = ...,
-        create: bool = ...,
-        spec_set: Any | None = ...,
-        autospec: Any | None = ...,
+        # If not False or None, this is passed to new_callable
+        spec: Any | Literal[False] | None = None,
+        create: bool = False,
+        # If not False or None, this is passed to new_callable
+        spec_set: Any | Literal[False] | None = None,
+        autospec: Literal[False] | None = None,
         new_callable: Callable[..., _T],
+        unsafe: bool = False,
+        # kwargs are passed to new_callable
         **kwargs: Any,
     ) -> _patch_pass_arg[_T]: ...
     @overload
@@ -551,25 +620,31 @@ class _patcher:
         self,
         target: str,
         *,
-        spec: Any | None = ...,
-        create: bool = ...,
-        spec_set: Any | None = ...,
-        autospec: Any | None = ...,
-        new_callable: None = ...,
+        spec: Any | bool | None = None,
+        create: bool = False,
+        spec_set: Any | bool | None = None,
+        autospec: Any | bool | None = None,
+        new_callable: None = None,
+        unsafe: bool = False,
+        # kwargs are passed to the MagicMock/AsyncMock constructor
         **kwargs: Any,
     ) -> _patch_pass_arg[MagicMock | AsyncMock]: ...
+    # This overload also covers the case, where new==DEFAULT. In this case, the return type is _patch[Any].
+    # Ideally we'd be able to add an overload for it so that the return type is _patch[MagicMock],
+    # but that's impossible with the current type system.
     @overload
     @staticmethod
     def object(
         target: Any,
         attribute: str,
         new: _T,
-        spec: Any | None = ...,
-        create: bool = ...,
-        spec_set: Any | None = ...,
-        autospec: Any | None = ...,
-        new_callable: Callable[..., Any] | None = ...,
-        **kwargs: Any,
+        spec: Literal[False] | None = None,
+        create: bool = False,
+        spec_set: Literal[False] | None = None,
+        autospec: Literal[False] | None = None,
+        new_callable: None = None,
+        *,
+        unsafe: bool = False,
     ) -> _patch[_T]: ...
     @overload
     @staticmethod
@@ -577,11 +652,15 @@ class _patcher:
         target: Any,
         attribute: str,
         *,
-        spec: Any | None = ...,
-        create: bool = ...,
-        spec_set: Any | None = ...,
-        autospec: Any | None = ...,
+        # If not False or None, this is passed to new_callable
+        spec: Any | Literal[False] | None = None,
+        create: bool = False,
+        # If not False or None, this is passed to new_callable
+        spec_set: Any | Literal[False] | None = None,
+        autospec: Literal[False] | None = None,
         new_callable: Callable[..., _T],
+        unsafe: bool = False,
+        # kwargs are passed to new_callable
         **kwargs: Any,
     ) -> _patch_pass_arg[_T]: ...
     @overload
@@ -590,27 +669,131 @@ class _patcher:
         target: Any,
         attribute: str,
         *,
-        spec: Any | None = ...,
-        create: bool = ...,
-        spec_set: Any | None = ...,
-        autospec: Any | None = ...,
-        new_callable: None = ...,
+        spec: Any | bool | None = None,
+        create: bool = False,
+        spec_set: Any | bool | None = None,
+        autospec: Any | bool | None = None,
+        new_callable: None = None,
+        unsafe: bool = False,
+        # kwargs are passed to the MagicMock/AsyncMock constructor
         **kwargs: Any,
     ) -> _patch_pass_arg[MagicMock | AsyncMock]: ...
+    @overload
     @staticmethod
     def multiple(
-        target: Any,
-        spec: Any | None = ...,
-        create: bool = ...,
-        spec_set: Any | None = ...,
-        autospec: Any | None = ...,
-        new_callable: Any | None = ...,
+        target: Any | str,
+        # If not False or None, this is passed to new_callable
+        spec: Any | Literal[False] | None = None,
+        create: bool = False,
+        # If not False or None, this is passed to new_callable
+        spec_set: Any | Literal[False] | None = None,
+        autospec: Literal[False] | None = None,
+        *,
+        new_callable: Callable[..., _T],
+        # The kwargs must be DEFAULT
+        **kwargs: Any,
+    ) -> _patch_pass_arg[_T]: ...
+    @overload
+    @staticmethod
+    def multiple(
+        target: Any | str,
+        # If not False or None, this is passed to new_callable
+        spec: Any | Literal[False] | None,
+        create: bool,
+        # If not False or None, this is passed to new_callable
+        spec_set: Any | Literal[False] | None,
+        autospec: Literal[False] | None,
+        new_callable: Callable[..., _T],
+        # The kwargs must be DEFAULT
+        **kwargs: Any,
+    ) -> _patch_pass_arg[_T]: ...
+    @overload
+    @staticmethod
+    def multiple(
+        target: Any | str,
+        spec: Any | bool | None = None,
+        create: bool = False,
+        spec_set: Any | bool | None = None,
+        autospec: Any | bool | None = None,
+        new_callable: None = None,
+        # The kwargs are the mock objects or DEFAULT
         **kwargs: Any,
     ) -> _patch[Any]: ...
     @staticmethod
     def stopall() -> None: ...
 
 patch: _patcher
+"""
+`patch` acts as a function decorator, class decorator or a context
+manager. Inside the body of the function or with statement, the `target`
+is patched with a `new` object. When the function/with statement exits
+the patch is undone.
+
+If `new` is omitted, then the target is replaced with an
+`AsyncMock` if the patched object is an async function or a
+`MagicMock` otherwise. If `patch` is used as a decorator and `new` is
+omitted, the created mock is passed in as an extra argument to the
+decorated function. If `patch` is used as a context manager the created
+mock is returned by the context manager.
+
+`target` should be a string in the form `'package.module.ClassName'`. The
+`target` is imported and the specified object replaced with the `new`
+object, so the `target` must be importable from the environment you are
+calling `patch` from. The target is imported when the decorated function
+is executed, not at decoration time.
+
+The `spec` and `spec_set` keyword arguments are passed to the `MagicMock`
+if patch is creating one for you.
+
+In addition you can pass `spec=True` or `spec_set=True`, which causes
+patch to pass in the object being mocked as the spec/spec_set object.
+
+`new_callable` allows you to specify a different class, or callable object,
+that will be called to create the `new` object. By default `AsyncMock` is
+used for async functions and `MagicMock` for the rest.
+
+A more powerful form of `spec` is `autospec`. If you set `autospec=True`
+then the mock will be created with a spec from the object being replaced.
+All attributes of the mock will also have the spec of the corresponding
+attribute of the object being replaced. Methods and functions being
+mocked will have their arguments checked and will raise a `TypeError` if
+they are called with the wrong signature. For mocks replacing a class,
+their return value (the 'instance') will have the same spec as the class.
+
+Instead of `autospec=True` you can pass `autospec=some_object` to use an
+arbitrary object as the spec instead of the one being replaced.
+
+By default `patch` will fail to replace attributes that don't exist. If
+you pass in `create=True`, and the attribute doesn't exist, patch will
+create the attribute for you when the patched function is called, and
+delete it again afterwards. This is useful for writing tests against
+attributes that your production code creates at runtime. It is off by
+default because it can be dangerous. With it switched on you can write
+passing tests against APIs that don't actually exist!
+
+Patch can be used as a `TestCase` class decorator. It works by
+decorating each test method in the class. This reduces the boilerplate
+code when your test methods share a common patchings set. `patch` finds
+tests by looking for method names that start with `patch.TEST_PREFIX`.
+By default this is `test`, which matches the way `unittest` finds tests.
+You can specify an alternative prefix by setting `patch.TEST_PREFIX`.
+
+Patch can be used as a context manager, with the with statement. Here the
+patching applies to the indented block after the with statement. If you
+use "as" then the patched object will be bound to the name after the
+"as"; very useful if `patch` is creating a mock object for you.
+
+Patch will raise a `RuntimeError` if passed some common misspellings of
+the arguments autospec and spec_set. Pass the argument `unsafe` with the
+value True to disable that check.
+
+`patch` takes arbitrary keyword arguments. These will be passed to
+`AsyncMock` if the patched object is asynchronous, to `MagicMock`
+otherwise or to `new_callable` if specified.
+
+`patch.dict(...)`, `patch.multiple(...)` and `patch.object(...)` are
+available for alternate use-cases.
+"""
 
 class MagicMixin(Base):
     def __init__(self, *args: Any, **kw: Any) -> None: ...
@@ -745,14 +928,15 @@ class MagicProxy(Base):
     def create_mock(self) -> Any: ...
     def __get__(self, obj: Any, _type: Any | None = None) -> Any: ...
 
-class _ANY:
+# See https://github.com/python/typeshed/issues/14701
+class _ANY(Any):
     """A helper object that compares equal to everything."""
 
     def __eq__(self, other: object) -> Literal[True]: ...
     def __ne__(self, other: object) -> Literal[False]: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
 
-ANY: Any
+ANY: _ANY
 
 if sys.version_info >= (3, 10):
     def create_autospec(

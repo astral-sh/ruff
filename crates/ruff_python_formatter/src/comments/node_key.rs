@@ -2,7 +2,8 @@ use ruff_python_ast::AnyNodeRef;
 use std::fmt::{Debug, Formatter};
 use std::hash::{Hash, Hasher};
 
-/// Used as key into the [`MultiMap`] storing the comments per node by [`Comments`].
+/// Used as key into the [`MultiMap`](super::MultiMap) storing the comments per node by
+/// [`Comments`](super::Comments).
 ///
 /// Implements equality and hashing based on the address of the [`AnyNodeRef`] to get fast and cheap
 /// hashing/equality comparison.
@@ -69,7 +70,7 @@ mod tests {
     fn equality() {
         let continue_statement = StmtContinue {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         };
 
         let ref_a = NodeRefEqualityKey::from_ref(AnyNodeRef::from(&continue_statement));
@@ -83,7 +84,7 @@ mod tests {
     fn inequality() {
         let continue_statement = StmtContinue {
             range: TextRange::default(),
-            node_index: AtomicNodeIndex::dummy(),
+            node_index: AtomicNodeIndex::NONE,
         };
 
         let boxed = Box::new(continue_statement.clone());

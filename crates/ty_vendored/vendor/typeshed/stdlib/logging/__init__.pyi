@@ -314,7 +314,7 @@ class Logger(Filterer):
         logger.warning("Houston, we have a %s", "bit of a problem", exc_info=True)
         """
 
-    @deprecated("Deprecated; use warning() instead.")
+    @deprecated("Deprecated since Python 3.3. Use `Logger.warning()` instead.")
     def warn(
         self,
         msg: object,
@@ -901,9 +901,9 @@ class LoggerAdapter(Generic[_L]):
     if sys.version_info >= (3, 13):
         def __init__(self, logger: _L, extra: Mapping[str, object] | None = None, merge_extra: bool = False) -> None:
             """
-            Initialize the adapter with a logger and a dict-like object which
-            provides contextual information. This constructor signature allows
-            easy stacking of LoggerAdapters, if so desired.
+            Initialize the adapter with a logger and an optional dict-like object
+            which provides contextual information. This constructor signature
+            allows easy stacking of LoggerAdapters, if so desired.
 
             You can effectively pass keyword arguments as shown in the
             following example:
@@ -1005,7 +1005,7 @@ class LoggerAdapter(Generic[_L]):
         Delegate a warning call to the underlying logger.
         """
 
-    @deprecated("Deprecated; use warning() instead.")
+    @deprecated("Deprecated since Python 3.3. Use `LoggerAdapter.warning()` instead.")
     def warn(
         self,
         msg: object,
@@ -1189,7 +1189,7 @@ def warning(
     format.
     """
 
-@deprecated("Deprecated; use warning() instead.")
+@deprecated("Deprecated since Python 3.3. Use `warning()` instead.")
 def warn(
     msg: object,
     *args: object,
@@ -1464,6 +1464,7 @@ class FileHandler(StreamHandler[TextIOWrapper]):
     encoding: str | None  # undocumented
     delay: bool  # undocumented
     errors: str | None  # undocumented
+    stream: TextIOWrapper | None  # type: ignore[assignment]  # None when delay=True or after close()
     def __init__(
         self, filename: StrPath, mode: str = "a", encoding: str | None = None, delay: bool = False, errors: str | None = None
     ) -> None:
@@ -1548,4 +1549,4 @@ class StringTemplateStyle(PercentStyle):  # undocumented
 
 _STYLES: Final[dict[str, tuple[PercentStyle, str]]]
 
-BASIC_FORMAT: Final[str]
+BASIC_FORMAT: Final = "%(levelname)s:%(name)s:%(message)s"

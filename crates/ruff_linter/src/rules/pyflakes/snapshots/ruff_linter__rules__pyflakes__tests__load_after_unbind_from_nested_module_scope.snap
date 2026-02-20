@@ -11,16 +11,14 @@ F841 [*] Local variable `x` is assigned to but never used
 8 |         pass
   |
 help: Remove assignment to unused variable `x`
-
-ℹ Safe fix
-4 4 | def f():
-5 5 |     try:
-6 6 |         pass
-7   |-    except ValueError as x:
-  7 |+    except ValueError:
-8 8 |         pass
-9 9 | 
-10 10 |     def g():
+4  | def f():
+5  |     try:
+6  |         pass
+   -     except ValueError as x:
+7  +     except ValueError:
+8  |         pass
+9  | 
+10 |     def g():
 
 F841 [*] Local variable `x` is assigned to but never used
   --> <filename>:13:30
@@ -32,13 +30,11 @@ F841 [*] Local variable `x` is assigned to but never used
 14 |             pass
    |
 help: Remove assignment to unused variable `x`
-
-ℹ Safe fix
-10 10 |     def g():
-11 11 |         try:
-12 12 |             pass
-13    |-        except ValueError as x:
-   13 |+        except ValueError:
-14 14 |             pass
-15 15 | 
-16 16 |         # This should resolve to the `x` in `x = 1`.
+10 |     def g():
+11 |         try:
+12 |             pass
+   -         except ValueError as x:
+13 +         except ValueError:
+14 |             pass
+15 | 
+16 |         # This should resolve to the `x` in `x = 1`.

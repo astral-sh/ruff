@@ -18,6 +18,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## References
 /// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.32")]
 pub(crate) struct ExpressionsInStarAssignment;
 
 impl Violation for ExpressionsInStarAssignment {
@@ -44,6 +45,7 @@ impl Violation for ExpressionsInStarAssignment {
 /// ## References
 /// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.32")]
 pub(crate) struct MultipleStarredExpressions;
 
 impl Violation for MultipleStarredExpressions {
@@ -53,27 +55,14 @@ impl Violation for MultipleStarredExpressions {
     }
 }
 
-/// F621, F622
+/// F621
 pub(crate) fn starred_expressions(
     checker: &Checker,
     elts: &[Expr],
     check_too_many_expressions: bool,
-    check_two_starred_expressions: bool,
     location: TextRange,
 ) {
-    let mut has_starred: bool = false;
-    let mut starred_index: Option<usize> = None;
-    for (index, elt) in elts.iter().enumerate() {
-        if elt.is_starred_expr() {
-            if has_starred && check_two_starred_expressions {
-                checker.report_diagnostic(MultipleStarredExpressions, location);
-                return;
-            }
-            has_starred = true;
-            starred_index = Some(index);
-        }
-    }
-
+    let starred_index: Option<usize> = None;
     if check_too_many_expressions {
         if let Some(starred_index) = starred_index {
             if starred_index >= 1 << 8 || elts.len() - starred_index > 1 << 24 {

@@ -28,6 +28,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     value: int
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.270")]
 pub(crate) struct EllipsisInNonEmptyClassBody;
 
 impl Violation for EllipsisInNonEmptyClassBody {

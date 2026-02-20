@@ -13,9 +13,9 @@ The optional first format char indicates byte order, size and alignment:
 The remaining chars indicate types of args and must match exactly;
 these can be preceded by a decimal repeat count:
   x: pad byte (no data); c:char; b:signed byte; B:unsigned byte;
-  ?: _Bool (requires C99; if not available, char is used instead)
-  h:short; H:unsigned short; i:int; I:unsigned int;
+  ?:_Bool; h:short; H:unsigned short; i:int; I:unsigned int;
   l:long; L:unsigned long; f:float; d:double; e:half-float.
+  F:float complex; D:double complex.
 Special cases (preceding decimal count indicates length):
   s:string (array of char); p: pascal string (with count byte).
 Special cases (only available in native format):
@@ -31,6 +31,7 @@ The variable struct.error is an exception raised on errors.
 from _typeshed import ReadableBuffer, WriteableBuffer
 from collections.abc import Iterator
 from typing import Any
+from typing_extensions import disjoint_base
 
 def pack(fmt: str | bytes, /, *v: Any) -> bytes:
     """pack(format, v1, v2, ...) -> bytes
@@ -76,6 +77,7 @@ def iter_unpack(format: str | bytes, buffer: ReadableBuffer, /) -> Iterator[tupl
 def calcsize(format: str | bytes, /) -> int:
     """Return size in bytes of the struct described by the format string."""
 
+@disjoint_base
 class Struct:
     """Struct(fmt) --> compiled struct object"""
 

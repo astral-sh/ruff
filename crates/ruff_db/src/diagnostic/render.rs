@@ -15,7 +15,6 @@ use crate::{
     Db,
     files::File,
     source::{SourceText, line_index, source_text},
-    system::SystemPath,
 };
 
 use super::{
@@ -25,11 +24,15 @@ use super::{
 
 use azure::AzureRenderer;
 use concise::ConciseRenderer;
+use github::GithubRenderer;
 use pylint::PylintRenderer;
 
 mod azure;
 mod concise;
 mod full;
+pub mod github;
+#[cfg(feature = "serde")]
+mod gitlab;
 #[cfg(feature = "serde")]
 mod json;
 #[cfg(feature = "serde")]
@@ -134,7 +137,16 @@ impl std::fmt::Display for DisplayDiagnostics<'_> {
             }
             #[cfg(feature = "junit")]
             DiagnosticFormat::Junit => {
-                junit::JunitRenderer::new(self.resolver).render(f, self.diagnostics)?;
+                junit::JunitRenderer::new(self.resolver, self.config.program)
+                    .render(f, self.diagnostics)?;
+            }
+            #[cfg(feature = "serde")]
+            DiagnosticFormat::Gitlab => {
+                gitlab::GitlabRenderer::new(self.resolver).render(f, self.diagnostics)?;
+            }
+            DiagnosticFormat::Github => {
+                GithubRenderer::new(self.resolver, self.config.program)
+                    .render(f, self.diagnostics)?;
             }
         }
 
@@ -195,9 +207,11 @@ impl<'a> Resolved<'a> {
 struct ResolvedDiagnostic<'a> {
     level: AnnotateLevel,
     id: Option<String>,
+    documentation_url: Option<String>,
     message: String,
     annotations: Vec<ResolvedAnnotation<'a>>,
     is_fixable: bool,
+    header_offset: usize,
 }
 
 impl<'a> ResolvedDiagnostic<'a> {
@@ -229,12 +243,12 @@ impl<'a> ResolvedDiagnostic<'a> {
             // `DisplaySet::format_annotation` for both cases, but this is a small hack to improve
             // the formatting of syntax errors for now. This should also be kept consistent with the
             // concise formatting.
-            Some(diag.secondary_code().map_or_else(
+            diag.secondary_code().map_or_else(
                 || format!("{id}:", id = diag.inner.id),
                 |code| code.to_string(),
-            ))
+            )
         } else {
-            Some(diag.inner.id.to_string())
+            diag.inner.id.to_string()
         };
 
         let level = if config.hide_severity {
@@ -245,12 +259,12 @@ impl<'a> ResolvedDiagnostic<'a> {
 
         ResolvedDiagnostic {
             level,
-            id,
+            id: Some(id),
+            documentation_url: diag.documentation_url().map(ToString::to_string),
             message: diag.inner.message.as_str().to_string(),
             annotations,
-            is_fixable: diag
-                .fix()
-                .is_some_and(|fix| fix.applies(config.fix_applicability)),
+            is_fixable: config.show_fix_status && diag.has_applicable_fix(config),
+            header_offset: diag.inner.header_offset,
         }
     }
 
@@ -277,9 +291,11 @@ impl<'a> ResolvedDiagnostic<'a> {
         ResolvedDiagnostic {
             level: diag.inner.severity.to_annotate(),
             id: None,
+            documentation_url: None,
             message: diag.inner.message.as_str().to_string(),
             annotations,
             is_fixable: false,
+            header_offset: 0,
         }
     }
 
@@ -374,9 +390,11 @@ impl<'a> ResolvedDiagnostic<'a> {
         RenderableDiagnostic {
             level: self.level,
             id: self.id.as_deref(),
+            documentation_url: self.documentation_url.as_deref(),
             message: &self.message,
             snippets_by_input,
             is_fixable: self.is_fixable,
+            header_offset: self.header_offset,
         }
     }
 }
@@ -396,7 +414,7 @@ struct ResolvedAnnotation<'a> {
     line_end: OneIndexed,
     message: Option<&'a str>,
     is_primary: bool,
-    is_file_level: bool,
+    hide_snippet: bool,
     notebook_index: Option<NotebookIndex>,
 }
 
@@ -444,7 +462,7 @@ impl<'a> ResolvedAnnotation<'a> {
             line_end,
             message: ann.get_message(),
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
             notebook_index: resolver.notebook_index(&ann.span.file),
         })
     }
@@ -473,6 +491,7 @@ struct RenderableDiagnostic<'r> {
     /// An ID is always present for top-level diagnostics and always absent for
     /// sub-diagnostics.
     id: Option<&'r str>,
+    documentation_url: Option<&'r str>,
     /// The message emitted with the diagnostic, before any snippets are
     /// rendered.
     message: &'r str,
@@ -484,6 +503,11 @@ struct RenderableDiagnostic<'r> {
     ///
     /// This is rendered as a `[*]` indicator after the diagnostic ID.
     is_fixable: bool,
+    /// Offset to align the header sigil (`-->`) with the subsequent line number separators.
+    ///
+    /// This is only needed for formatter diagnostics where we don't render a snippet via
+    /// `annotate-snippets` and thus the alignment isn't computed automatically.
+    header_offset: usize,
 }
 
 impl RenderableDiagnostic<'_> {
@@ -496,9 +520,13 @@ impl RenderableDiagnostic<'_> {
                 .iter()
                 .map(|snippet| snippet.to_annotate(path))
         });
-        let mut message = self.level.title(self.message).is_fixable(self.is_fixable);
+        let mut message = self
+            .level
+            .title(self.message)
+            .is_fixable(self.is_fixable)
+            .lineno_offset(self.header_offset);
         if let Some(id) = self.id {
-            message = message.id(id);
+            message = message.id_with_url(id, self.documentation_url);
         }
         message.snippets(snippets)
     }
@@ -701,8 +729,8 @@ struct RenderableAnnotation<'r> {
     message: Option<&'r str>,
     /// Whether this annotation is considered "primary" or not.
     is_primary: bool,
-    /// Whether this annotation applies to an entire file, rather than a snippet within it.
-    is_file_level: bool,
+    /// Whether the snippet for this annotation should be hidden instead of rendered.
+    hide_snippet: bool,
 }
 
 impl<'r> RenderableAnnotation<'r> {
@@ -724,7 +752,7 @@ impl<'r> RenderableAnnotation<'r> {
             range,
             message: ann.message,
             is_primary: ann.is_primary,
-            is_file_level: ann.is_file_level,
+            hide_snippet: ann.hide_snippet,
         }
     }
 
@@ -750,7 +778,7 @@ impl<'r> RenderableAnnotation<'r> {
         if let Some(message) = self.message {
             ann = ann.label(message);
         }
-        ann.is_file_level(self.is_file_level)
+        ann.hide_snippet(self.hide_snippet)
     }
 }
 
@@ -791,7 +819,7 @@ where
     T: Db,
 {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(self).as_str())
+        file.path(self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -827,7 +855,7 @@ where
 
 impl FileResolver for &dyn Db {
     fn path(&self, file: File) -> &str {
-        relativize_path(self.system().current_directory(), file.path(*self).as_str())
+        file.path(*self).as_str()
     }
 
     fn input(&self, file: File) -> Input {
@@ -946,14 +974,6 @@ fn context_after(
     line
 }
 
-/// Convert an absolute path to be relative to the current working directory.
-fn relativize_path<'p>(cwd: &SystemPath, path: &'p str) -> &'p str {
-    if let Ok(path) = SystemPath::new(path).strip_prefix(cwd) {
-        return path.as_str();
-    }
-    path
-}
-
 /// Given some source code and annotation ranges, this routine replaces
 /// unprintable characters with printable representations of them.
 ///
@@ -1069,7 +1089,8 @@ impl<'r> EscapedSourceCode<'r> {
                 continue;
             }
             let start = range.start();
-            let end = ceil_char_boundary(&self.text, start + TextSize::from(1));
+            let end =
+                TextSize::try_from(self.text.ceil_char_boundary(start.to_usize() + 1)).unwrap();
             ann.range = TextRange::new(start, end);
         }
 
@@ -1077,84 +1098,29 @@ impl<'r> EscapedSourceCode<'r> {
     }
 }
 
-/// Finds the closest [`TextSize`] not less than the offset given for which
-/// `is_char_boundary` is `true`. Unless the offset given is greater than
-/// the length of the underlying contents, in which case, the length of the
-/// contents is returned.
-///
-/// Can be replaced with `str::ceil_char_boundary` once it's stable.
-///
-/// # Examples
-///
-/// From `std`:
-///
-/// ```
-/// use ruff_db::diagnostic::ceil_char_boundary;
-/// use ruff_text_size::{Ranged, TextLen, TextSize};
-///
-/// let source = "❤️🧡💛💚💙💜";
-/// assert_eq!(source.text_len(), TextSize::from(26));
-/// assert!(!source.is_char_boundary(13));
-///
-/// let closest = ceil_char_boundary(source, TextSize::from(13));
-/// assert_eq!(closest, TextSize::from(14));
-/// assert_eq!(&source[..closest.to_usize()], "❤️🧡💛");
-/// ```
-///
-/// Additional examples:
-///
-/// ```
-/// use ruff_db::diagnostic::ceil_char_boundary;
-/// use ruff_text_size::{Ranged, TextRange, TextSize};
-///
-/// let source = "Hello";
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(0)),
-///     TextSize::from(0)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(5)),
-///     TextSize::from(5)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(6)),
-///     TextSize::from(5)
-/// );
-///
-/// let source = "α";
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(0)),
-///     TextSize::from(0)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(1)),
-///     TextSize::from(2)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(2)),
-///     TextSize::from(2)
-/// );
-///
-/// assert_eq!(
-///     ceil_char_boundary(source, TextSize::from(3)),
-///     TextSize::from(2)
-/// );
-/// ```
-pub fn ceil_char_boundary(text: &str, offset: TextSize) -> TextSize {
-    let upper_bound = offset
-        .to_u32()
-        .saturating_add(4)
-        .min(text.text_len().to_u32());
-    (offset.to_u32()..upper_bound)
-        .map(TextSize::from)
-        .find(|offset| text.is_char_boundary(offset.to_usize()))
-        .unwrap_or_else(|| TextSize::from(upper_bound))
+/// A stub implementation of [`FileResolver`] intended for testing.
+pub struct DummyFileResolver;
+
+impl FileResolver for DummyFileResolver {
+    fn path(&self, _file: File) -> &str {
+        unimplemented!()
+    }
+
+    fn input(&self, _file: File) -> Input {
+        unimplemented!()
+    }
+
+    fn notebook_index(&self, _file: &UnifiedFile) -> Option<NotebookIndex> {
+        None
+    }
+
+    fn is_notebook(&self, _file: &UnifiedFile) -> bool {
+        false
+    }
+
+    fn current_directory(&self) -> &Path {
+        Path::new(".")
+    }
 }
 
 #[cfg(test)]
@@ -1241,7 +1207,7 @@ watermelon
         let diag = env.err().primary("animals", "5", "5", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1265,7 +1231,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         warning[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1285,7 +1251,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         info[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1312,7 +1278,7 @@ watermelon
         let diag = builder.build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1331,7 +1297,7 @@ watermelon
         let diag = builder.build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1352,7 +1318,7 @@ watermelon
         let diag = env.err().primary("non-ascii", "5", "5", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> non-ascii:5:1
           |
@@ -1371,7 +1337,7 @@ watermelon
         let diag = env.err().primary("non-ascii", "2:4", "2:8", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> non-ascii:2:2
           |
@@ -1395,7 +1361,7 @@ watermelon
         env.context(1);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1412,7 +1378,7 @@ watermelon
         env.context(0);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -1427,7 +1393,7 @@ watermelon
         env.context(2);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1444,7 +1410,7 @@ watermelon
         env.context(2);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:11:1
            |
@@ -1461,7 +1427,7 @@ watermelon
         env.context(200);
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:5:1
            |
@@ -1494,7 +1460,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:1:1
            |
@@ -1538,7 +1504,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1563,7 +1529,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1591,7 +1557,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1619,7 +1585,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:1:1
           |
@@ -1644,7 +1610,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:1:1
            |
@@ -1675,7 +1641,7 @@ watermelon
         // window.
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:1:1
            |
@@ -1713,7 +1679,7 @@ watermelon
         let diag = env.err().primary("spacey-animals", "8", "8", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> spacey-animals:8:1
           |
@@ -1730,7 +1696,7 @@ watermelon
         let diag = env.err().primary("spacey-animals", "12", "12", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> spacey-animals:12:1
            |
@@ -1748,7 +1714,7 @@ watermelon
         let diag = env.err().primary("spacey-animals", "13", "13", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> spacey-animals:13:1
            |
@@ -1788,7 +1754,7 @@ watermelon
         // instead of special casing the snippet assembly.
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> spacey-animals:3:1
           |
@@ -1817,7 +1783,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1854,7 +1820,7 @@ watermelon
         );
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1891,7 +1857,7 @@ watermelon
         );
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1919,7 +1885,7 @@ watermelon
         diag.sub(env.sub_warn().primary("fruits", "3", "3", "").build());
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1955,7 +1921,7 @@ watermelon
         diag.sub(env.sub_warn().primary("animals", "11", "11", "").build());
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -1994,7 +1960,7 @@ watermelon
         diag.sub(env.sub_warn().primary("fruits", "3", "3", "").build());
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -2042,7 +2008,7 @@ watermelon
         diag.sub(env.sub_warn().secondary("animals", "3", "3", "").build());
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:3:1
           |
@@ -2078,7 +2044,7 @@ watermelon
         let diag = env.err().primary("animals", "5", "6", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2101,7 +2067,7 @@ watermelon
         let diag = env.err().primary("animals", "5", "7:0", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2121,7 +2087,7 @@ watermelon
         let diag = env.err().primary("animals", "5", "7:1", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2141,7 +2107,7 @@ watermelon
         let diag = env.err().primary("animals", "5:3", "8:8", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:5:4
            |
@@ -2163,7 +2129,7 @@ watermelon
         let diag = env.err().secondary("animals", "5:3", "8:8", "").build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:5:4
            |
@@ -2195,7 +2161,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:4:1
           |
@@ -2224,7 +2190,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:4:1
           |
@@ -2255,7 +2221,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2290,7 +2256,7 @@ watermelon
         // better using only ASCII art.
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2318,7 +2284,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2350,7 +2316,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:3
           |
@@ -2372,7 +2338,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:3
           |
@@ -2405,7 +2371,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:8:1
            |
@@ -2445,7 +2411,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> animals:5:1
           |
@@ -2489,7 +2455,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
          --> fruits:1:1
           |
@@ -2524,7 +2490,7 @@ watermelon
             .build();
         insta::assert_snapshot!(
             env.render(&diag),
-            @r"
+            @"
         error[test-diagnostic]: main diagnostic message
           --> animals:11:1
            |
@@ -2574,7 +2540,7 @@ watermelon
         pub(super) fn new() -> TestEnvironment {
             TestEnvironment {
                 db: TestDb::new(),
-                config: DisplayDiagnosticConfig::default(),
+                config: DisplayDiagnosticConfig::new("ty"),
             }
         }
 
@@ -2585,16 +2551,14 @@ watermelon
             // be `Copy` (which it could be, at time of writing, 2025-03-07),
             // but it seems likely to me that it will grow non-`Copy`
             // configuration. So just deal with this inconvenience for now.
-            let mut config = std::mem::take(&mut self.config);
-            config = config.context(lines);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.context(lines);
         }
 
         /// Set the output format to use in diagnostic rendering.
         pub(super) fn format(&mut self, format: DiagnosticFormat) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.format(format);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.format(format);
         }
 
         /// Enable preview functionality for diagnostic rendering.
@@ -2603,30 +2567,32 @@ watermelon
             reason = "This is currently only used for JSON but will be needed soon for other formats"
         )]
         pub(super) fn preview(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.preview(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.preview(yes);
         }
 
         /// Hide diagnostic severity when rendering.
         pub(super) fn hide_severity(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.hide_severity(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.hide_severity(yes);
         }
 
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.show_fix_status(yes);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.with_show_fix_status(yes);
+        }
+
+        /// Show a diff for the fix when rendering.
+        pub(super) fn show_fix_diff(&mut self, yes: bool) {
+            let config = self.config.clone();
+            self.config = config.show_fix_diff(yes);
         }
 
         /// The lowest fix applicability to show when rendering.
         pub(super) fn fix_applicability(&mut self, applicability: Applicability) {
-            let mut config = std::mem::take(&mut self.config);
-            config = config.fix_applicability(applicability);
-            self.config = config;
+            let config = self.config.clone();
+            self.config = config.with_fix_applicability(applicability);
         }
 
         /// Add a file with the given path and contents to this environment.
@@ -2831,6 +2797,12 @@ watermelon
             self.diag.help(message);
             self
         }
+
+        /// Set the documentation URL for the diagnostic.
+        pub(super) fn documentation_url(mut self, url: impl Into<String>) -> DiagnosticBuilder<'e> {
+            self.diag.set_documentation_url(Some(url.into()));
+            self
+        }
     }
 
     /// A helper builder for tersely populating a `SubDiagnostic`.
@@ -2945,6 +2917,7 @@ def fibonacci(n):
                     TextSize::from(10),
                 ))))
                 .noqa_offset(TextSize::from(7))
+                .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
                 .build(),
             env.builder(
                 "unused-variable",
@@ -2959,11 +2932,13 @@ def fibonacci(n):
                 TextSize::from(99),
             )))
             .noqa_offset(TextSize::from(94))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-variable")
             .build(),
             env.builder("undefined-name", Severity::Error, "Undefined name `a`")
                 .primary("undef.py", "1:3", "1:4", "")
                 .secondary_code("F821")
                 .noqa_offset(TextSize::from(3))
+                .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
                 .build(),
         ];
 
@@ -2996,6 +2971,36 @@ if call(foo
         ];
 
         (env, diagnostics)
+    }
+
+    /// Create Ruff-style diagnostics with sub-diagnostics for testing the various output formats.
+    pub(crate) fn create_sub_diagnostics(
+        format: DiagnosticFormat,
+    ) -> (TestEnvironment, Vec<Diagnostic>) {
+        let mut env = TestEnvironment::new();
+        env.add("/some/path/def.py", "def f(): pass");
+        env.add("call.py", "f()");
+        env.format(format);
+
+        let mut primary_diagnostic = env
+            .builder("undefined-name", Severity::Error, "Undefined name `f`")
+            .primary("call.py", "1:0", "1:1", "")
+            .secondary_code("F821")
+            .noqa_offset(ruff_text_size::TextSize::from(0))
+            .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
+            .build();
+
+        let sub_diagnostic = env
+            .sub_builder(
+                SubDiagnosticSeverity::Info,
+                "Did you mean to import it from `/some/path/def.py`?",
+            )
+            .primary("/some/path/def.py", "1:4", "1:5", "`f` is defined here")
+            .build();
+
+        primary_diagnostic.sub(sub_diagnostic);
+
+        (env, vec![primary_diagnostic])
     }
 
     /// A Jupyter notebook for testing diagnostics.
@@ -3078,6 +3083,7 @@ if call(foo
                     TextSize::from(19),
                 ))))
                 .noqa_offset(TextSize::from(16))
+                .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
                 .build(),
             env.builder(
                 "unused-import",
@@ -3092,6 +3098,7 @@ if call(foo
                 TextSize::from(40),
             ))))
             .noqa_offset(TextSize::from(35))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
             .build(),
             env.builder(
                 "unused-variable",
@@ -3106,6 +3113,7 @@ if call(foo
                 TextSize::from(104),
             ))))
             .noqa_offset(TextSize::from(98))
+            .documentation_url("https://docs.astral.sh/ruff/rules/unused-variable")
             .build(),
         ];
 

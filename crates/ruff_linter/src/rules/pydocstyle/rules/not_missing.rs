@@ -55,12 +55,17 @@ use crate::checkers::ast::Checker;
 /// ## Notebook behavior
 /// This rule is ignored for Jupyter Notebooks.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UndocumentedPublicModule;
 
 impl Violation for UndocumentedPublicModule {
@@ -138,12 +143,17 @@ impl Violation for UndocumentedPublicModule {
 ///         self.points += points
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UndocumentedPublicClass;
 
 impl Violation for UndocumentedPublicClass {
@@ -167,7 +177,12 @@ impl Violation for UndocumentedPublicClass {
 /// If the codebase adheres to a standard format for method docstrings, follow
 /// that format for consistency.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override],
+/// since it is a common practice to document a method on a superclass but not
+/// on an overriding method in a subclass.
+///
 /// ## Example
+///
 /// ```python
 /// class Cat(Animal):
 ///     def greet(self, happy: bool = True):
@@ -178,6 +193,7 @@ impl Violation for UndocumentedPublicClass {
 /// ```
 ///
 /// Use instead (in the NumPy docstring format):
+///
 /// ```python
 /// class Cat(Animal):
 ///     def greet(self, happy: bool = True):
@@ -200,6 +216,7 @@ impl Violation for UndocumentedPublicClass {
 /// ```
 ///
 /// Or (in the Google docstring format):
+///
 /// ```python
 /// class Cat(Animal):
 ///     def greet(self, happy: bool = True):
@@ -225,7 +242,10 @@ impl Violation for UndocumentedPublicClass {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UndocumentedPublicMethod;
 
 impl Violation for UndocumentedPublicMethod {
@@ -316,6 +336,7 @@ impl Violation for UndocumentedPublicMethod {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UndocumentedPublicFunction;
 
 impl Violation for UndocumentedPublicFunction {
@@ -353,12 +374,17 @@ impl Violation for UndocumentedPublicFunction {
 /// __all__ = ["player", "game"]
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UndocumentedPublicPackage;
 
 impl Violation for UndocumentedPublicPackage {
@@ -416,6 +442,7 @@ impl Violation for UndocumentedPublicPackage {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UndocumentedMagicMethod;
 
 impl Violation for UndocumentedMagicMethod {
@@ -465,12 +492,17 @@ impl Violation for UndocumentedMagicMethod {
 /// bar.__doc__  # "Class Bar."
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UndocumentedPublicNestedClass;
 
 impl Violation for UndocumentedPublicNestedClass {
@@ -519,6 +551,7 @@ impl Violation for UndocumentedPublicNestedClass {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Python Docstrings](https://google.github.io/styleguide/pyguide.html#s3.8-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.70")]
 pub(crate) struct UndocumentedPublicInit;
 
 impl Violation for UndocumentedPublicInit {

@@ -12,16 +12,14 @@ D406 [*] Section name should end with a newline ("Returns")
 34 |     A value of some sort.
    |
 help: Add newline after "Returns"
-
-ℹ Safe fix
-29 29 | def superfluous_suffix():  # noqa: D416
-30 30 |     """Toggle the gizmo.
-31 31 | 
-32    |-    Returns:
-   32 |+    Returns
-33 33 |     -------
-34 34 |     A value of some sort.
-35 35 | 
+29 | def superfluous_suffix():  # noqa: D416
+30 |     """Toggle the gizmo.
+31 | 
+   -     Returns:
+32 +     Returns
+33 |     -------
+34 |     A value of some sort.
+35 | 
 
 D406 [*] Section name should end with a newline ("Raises")
    --> sections.py:227:5
@@ -33,16 +31,14 @@ D406 [*] Section name should end with a newline ("Raises")
 228 |     My attention.
     |
 help: Add newline after "Raises"
-
-ℹ Safe fix
-224 224 |     Returns
-225 225 |     ------
-226 226 |     Many many wonderful things.
-227     |-    Raises:
-    227 |+    Raises
-228 228 |     My attention.
-229 229 | 
-230 230 |     """
+224 |     Returns
+225 |     ------
+226 |     Many many wonderful things.
+    -     Raises:
+227 +     Raises
+228 |     My attention.
+229 | 
+230 |     """
 
 D406 [*] Section name should end with a newline ("Parameters")
    --> sections.py:601:5
@@ -55,13 +51,11 @@ D406 [*] Section name should end with a newline ("Parameters")
 603 |     parameters:
     |
 help: Add newline after "Parameters"
-
-ℹ Safe fix
-598 598 | def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
-599 599 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
-600 600 | 
-601     |-    Parameters:
-    601 |+    Parameters
-602 602 |     ----------
-603 603 |     parameters:
-604 604 |         A list of string parameters
+598 | def test_lowercase_sub_section_header_should_be_valid(parameters: list[str], value: int):  # noqa: D213
+599 |     """Test that lower case subsection header is valid even if it has the same name as section kind.
+600 | 
+    -     Parameters:
+601 +     Parameters
+602 |     ----------
+603 |     parameters:
+604 |         A list of string parameters

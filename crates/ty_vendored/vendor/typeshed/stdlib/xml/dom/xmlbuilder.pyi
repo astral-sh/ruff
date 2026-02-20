@@ -1,7 +1,7 @@
 """Implementation of the DOM Level 3 'LS-Load' feature."""
 
 from _typeshed import SupportsRead
-from typing import Any, Literal, NoReturn
+from typing import Any, Final, Literal, NoReturn
 from xml.dom.minidom import Document, Node, _DOMErrorHandler
 
 __all__ = ["DOMBuilder", "DOMEntityResolver", "DOMInputSource"]
@@ -37,10 +37,10 @@ class DOMBuilder:
     entityResolver: DOMEntityResolver | None
     errorHandler: _DOMErrorHandler | None
     filter: DOMBuilderFilter | None
-    ACTION_REPLACE: Literal[1]
-    ACTION_APPEND_AS_CHILDREN: Literal[2]
-    ACTION_INSERT_AFTER: Literal[3]
-    ACTION_INSERT_BEFORE: Literal[4]
+    ACTION_REPLACE: Final = 1
+    ACTION_APPEND_AS_CHILDREN: Final = 2
+    ACTION_INSERT_AFTER: Final = 3
+    ACTION_INSERT_BEFORE: Final = 4
     def __init__(self) -> None: ...
     def setFeature(self, name: str, state: int) -> None: ...
     def supportsFeature(self, name: str) -> bool: ...
@@ -52,9 +52,11 @@ class DOMBuilder:
     def parseWithContext(self, input: DOMInputSource, cnode: Node, action: Literal[1, 2, 3, 4]) -> NoReturn: ...
 
 class DOMEntityResolver:
+    __slots__ = ("_opener",)
     def resolveEntity(self, publicId: str | None, systemId: str) -> DOMInputSource: ...
 
 class DOMInputSource:
+    __slots__ = ("byteStream", "characterStream", "stringData", "encoding", "publicId", "systemId", "baseURI")
     byteStream: SupportsRead[bytes] | None
     characterStream: SupportsRead[str] | None
     stringData: str | None
@@ -68,10 +70,10 @@ class DOMBuilderFilter:
     a DOM instance.
     """
 
-    FILTER_ACCEPT: Literal[1]
-    FILTER_REJECT: Literal[2]
-    FILTER_SKIP: Literal[3]
-    FILTER_INTERRUPT: Literal[4]
+    FILTER_ACCEPT: Final = 1
+    FILTER_REJECT: Final = 2
+    FILTER_SKIP: Final = 3
+    FILTER_INTERRUPT: Final = 4
     whatToShow: int
     def acceptNode(self, element: Node) -> Literal[1, 2, 3, 4]: ...
     def startContainer(self, element: Node) -> Literal[1, 2, 3, 4]: ...
@@ -86,8 +88,8 @@ class DocumentLS:
     def saveXML(self, snode: Node | None) -> str: ...
 
 class DOMImplementationLS:
-    MODE_SYNCHRONOUS: Literal[1]
-    MODE_ASYNCHRONOUS: Literal[2]
+    MODE_SYNCHRONOUS: Final = 1
+    MODE_ASYNCHRONOUS: Final = 2
     def createDOMBuilder(self, mode: Literal[1], schemaType: None) -> DOMBuilder: ...
     def createDOMWriter(self) -> NoReturn: ...
     def createDOMInputSource(self) -> DOMInputSource: ...

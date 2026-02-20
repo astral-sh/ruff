@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Number};
 use ruff_text_size::Ranged;
 
@@ -51,6 +51,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `math.log10`](https://docs.python.org/3/library/math.html#math.log10)
 /// - [Python documentation: `math.e`](https://docs.python.org/3/library/math.html#math.e)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct RedundantLogBase {
     base: Base,
     arg: String,
@@ -151,13 +152,8 @@ fn generate_fix(checker: &Checker, call: &ast::ExprCall, base: Base, arg: &Expr)
         checker.semantic(),
     )?;
 
-    let arg_range = parenthesized_range(
-        arg.into(),
-        call.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    )
-    .unwrap_or(arg.range());
+    let arg_range =
+        parenthesized_range(arg.into(), call.into(), checker.tokens()).unwrap_or(arg.range());
     let arg_str = checker.locator().slice(arg_range);
 
     Ok(Fix::applicable_edits(

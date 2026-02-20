@@ -10,6 +10,7 @@ use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
 };
 use crate::prelude::*;
+use crate::preview::is_fluent_layout_split_first_call_enabled;
 
 #[derive(Default)]
 pub struct FormatExprAttribute {
@@ -47,20 +48,26 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     )
                 };
 
-            if call_chain_layout == CallChainLayout::Fluent {
+            if call_chain_layout.is_fluent() {
                 if parenthesize_value {
                     // Don't propagate the call chain layout.
                     value.format().with_options(Parentheses::Always).fmt(f)?;
                 } else {
                     match value.as_ref() {
                         Expr::Attribute(expr) => {
-                            expr.format().with_options(call_chain_layout).fmt(f)?;
+                            expr.format()
+                                .with_options(call_chain_layout.transition_after_attribute())
+                                .fmt(f)?;
                         }
                         Expr::Call(expr) => {
-                            expr.format().with_options(call_chain_layout).fmt(f)?;
+                            expr.format()
+                                .with_options(call_chain_layout.transition_after_attribute())
+                                .fmt(f)?;
                         }
                         Expr::Subscript(expr) => {
-                            expr.format().with_options(call_chain_layout).fmt(f)?;
+                            expr.format()
+                                .with_options(call_chain_layout.transition_after_attribute())
+                                .fmt(f)?;
                         }
                         _ => {
                             value.format().with_options(Parentheses::Never).fmt(f)?;
@@ -105,8 +112,30 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // Allow the `.` on its own line if this is a fluent call chain
             // and the value either requires parenthesizing or is a call or subscript expression
             // (it's a fluent chain but not the first element).
-            else if call_chain_layout == CallChainLayout::Fluent {
-                if parenthesize_value || value.is_call_expr() || value.is_subscript_expr() {
+            //
+            // In preview we also break _at_ the first call in the chain.
+            // For example:
+            //
+            // ```diff
+            // # stable formatting vs. preview
+            //  x = (
+            // -    df.merge()
+            // +    df
+            // +    .merge()
+            //      .groupby()
+            //      .agg()
+            //      .filter()
+            //  )
+            // ```
+            else if call_chain_layout.is_fluent() {
+                if parenthesize_value
+                    || value.is_call_expr()
+                    || value.is_subscript_expr()
+                    // Remember to update the doc-comment above when
+                    // stabilizing this behavior.
+                    || (is_fluent_layout_split_first_call_enabled(f.context())
+                        && call_chain_layout.is_first_call_like())
+                {
                     soft_line_break().fmt(f)?;
                 }
             }
@@ -148,8 +177,8 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             )
         });
 
-        let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
-            && call_chain_layout == CallChainLayout::Fluent;
+        let is_call_chain_root =
+            self.call_chain_layout == CallChainLayout::Default && call_chain_layout.is_fluent();
         if is_call_chain_root {
             write!(f, [group(&format_inner)])
         } else {
@@ -169,7 +198,8 @@ impl NeedsParentheses for ExprAttribute {
             self.into(),
             context.comments().ranges(),
             context.source(),
-        ) == CallChainLayout::Fluent
+        )
+        .is_fluent()
         {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
@@ -179,7 +209,22 @@ impl NeedsParentheses for ExprAttribute {
             context.comments().ranges(),
             context.source(),
         ) {
-            OptionalParentheses::Never
+            // We have to avoid creating syntax errors like
+            // ```python
+            // variable = (something) # trailing
+            // .my_attribute
+            // ```
+            // See https://github.com/astral-sh/ruff/issues/19350
+            if context
+                .comments()
+                .trailing(self.value.as_ref())
+                .iter()
+                .any(|comment| comment.line_position().is_end_of_line())
+            {
+                OptionalParentheses::Multiline
+            } else {
+                OptionalParentheses::Never
+            }
         } else {
             self.value.needs_parentheses(self.into(), context)
         }

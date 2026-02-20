@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, ExprCall};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::{Applicability, Edit, Fix, Violation};
 
-pub(crate) fn is_keyword_only_argument_non_default(arguments: &ast::Arguments, name: &str) -> bool {
+pub(crate) fn is_keyword_only_argument_non_default(arguments: &Arguments, name: &str) -> bool {
     arguments
         .find_keyword(name)
         .is_some_and(|keyword| !keyword.value.is_none_literal_expr())
@@ -24,10 +24,7 @@ pub(crate) fn is_pathlib_path_call(checker: &Checker, expr: &Expr) -> bool {
 /// Check if the given segments represent a pathlib Path subclass or `PackagePath` with preview mode support.
 /// In stable mode, only checks for `Path` and `PurePath`. In preview mode, also checks for
 /// `PosixPath`, `PurePosixPath`, `WindowsPath`, `PureWindowsPath`, and `PackagePath`.
-pub(crate) fn is_pure_path_subclass_with_preview(
-    checker: &crate::checkers::ast::Checker,
-    segments: &[&str],
-) -> bool {
+pub(crate) fn is_pure_path_subclass_with_preview(checker: &Checker, segments: &[&str]) -> bool {
     let is_core_pathlib = matches!(segments, ["pathlib", "Path" | "PurePath"]);
 
     if is_core_pathlib {
@@ -60,6 +57,7 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
     fn_argument: &str,
     fix_enabled: bool,
     violation: impl Violation,
+    applicability: Applicability,
 ) {
     if call.arguments.len() != 1 {
         return;
@@ -74,33 +72,35 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
 
     let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
 
-    if fix_enabled {
-        diagnostic.try_set_fix(|| {
-            let (import_edit, binding) = checker.importer().get_or_import_symbol(
-                &ImportRequest::import("pathlib", "Path"),
-                call.start(),
-                checker.semantic(),
-            )?;
-
-            let applicability = if checker.comment_ranges().intersects(range) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
-            };
-
-            let replacement = if is_pathlib_path_call(checker, arg) {
-                format!("{arg_code}.{attr}")
-            } else {
-                format!("{binding}({arg_code}).{attr}")
-            };
-
-            Ok(Fix::applicable_edits(
-                Edit::range_replacement(replacement, range),
-                [import_edit],
-                applicability,
-            ))
-        });
+    if !fix_enabled {
+        return;
     }
+
+    diagnostic.try_set_fix(|| {
+        let (import_edit, binding) = checker.importer().get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            call.start(),
+            checker.semantic(),
+        )?;
+
+        let replacement = if is_pathlib_path_call(checker, arg) {
+            format!("{arg_code}.{attr}")
+        } else {
+            format!("{binding}({arg_code}).{attr}")
+        };
+
+        let edit = Edit::range_replacement(replacement, range);
+
+        let applicability = match applicability {
+            Applicability::DisplayOnly => Applicability::DisplayOnly,
+            _ if checker.comment_ranges().intersects(range) => Applicability::Unsafe,
+            _ => applicability,
+        };
+
+        let fix = Fix::applicable_edits(edit, [import_edit], applicability);
+
+        Ok(fix)
+    });
 }
 
 pub(crate) fn get_name_expr(expr: &Expr) -> Option<&ast::ExprName> {
@@ -134,6 +134,7 @@ pub(crate) fn is_file_descriptor(expr: &Expr, semantic: &SemanticModel) -> bool 
     typing::is_int(binding, semantic)
 }
 
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_os_pathlib_two_arg_calls(
     checker: &Checker,
     call: &ExprCall,
@@ -142,6 +143,7 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
     second_arg: &str,
     fix_enabled: bool,
     violation: impl Violation,
+    applicability: Applicability,
 ) {
     let range = call.range();
     let mut diagnostic = checker.report_diagnostic(violation, call.func.range());
@@ -170,10 +172,10 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
                 format!("{binding}({path_code}).{attr}({second_code})")
             };
 
-            let applicability = if checker.comment_ranges().intersects(range) {
-                Applicability::Unsafe
-            } else {
-                Applicability::Safe
+            let applicability = match applicability {
+                Applicability::DisplayOnly => Applicability::DisplayOnly,
+                _ if checker.comment_ranges().intersects(range) => Applicability::Unsafe,
+                _ => applicability,
             };
 
             Ok(Fix::applicable_edits(
@@ -186,7 +188,7 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
 }
 
 pub(crate) fn has_unknown_keywords_or_starred_expr(
-    arguments: &ast::Arguments,
+    arguments: &Arguments,
     allowed: &[&str],
 ) -> bool {
     if arguments.args.iter().any(Expr::is_starred_expr) {
@@ -197,4 +199,18 @@ pub(crate) fn has_unknown_keywords_or_starred_expr(
         Some(arg) => !allowed.contains(&arg.as_str()),
         None => true,
     })
+}
+
+/// Returns `true` if argument `name` is set to a non-default `None` value.
+pub(crate) fn is_argument_non_default(arguments: &Arguments, name: &str, position: usize) -> bool {
+    arguments
+        .find_argument_value(name, position)
+        .is_some_and(|expr| !expr.is_none_literal_expr())
+}
+
+/// Returns `true` if the given call is a top-level expression in its statement.
+/// This means the call's return value is not used, so return type changes don't matter.
+pub(crate) fn is_top_level_expression_in_statement(checker: &Checker) -> bool {
+    checker.semantic().current_expression_parent().is_none()
+        && checker.semantic().current_statement().is_expr_stmt()
 }

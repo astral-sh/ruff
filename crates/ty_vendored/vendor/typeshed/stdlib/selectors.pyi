@@ -8,13 +8,13 @@ import sys
 from _typeshed import FileDescriptor, FileDescriptorLike, Unused
 from abc import ABCMeta, abstractmethod
 from collections.abc import Mapping
-from typing import Any, NamedTuple
+from typing import Any, Final, NamedTuple
 from typing_extensions import Self, TypeAlias
 
 _EventMask: TypeAlias = int
 
-EVENT_READ: _EventMask
-EVENT_WRITE: _EventMask
+EVENT_READ: Final = 1
+EVENT_WRITE: Final = 2
 
 class SelectorKey(NamedTuple):
     """SelectorKey(fileobj, fd, events, data)

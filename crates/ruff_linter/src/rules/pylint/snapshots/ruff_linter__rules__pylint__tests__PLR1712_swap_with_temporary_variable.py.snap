@@ -1,0 +1,68 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLR1712 [*] Unnecessary temporary variable
+ --> swap_with_temporary_variable.py:3:5
+  |
+1 |   # safe fix
+2 |   def foo(x: int, y: int):
+3 | /     temp: int = x
+4 | |     x = y
+5 | |     y = temp
+  | |____________^
+  |
+help: Use `x, y = y, x` instead
+1 | # safe fix
+2 | def foo(x: int, y: int):
+  -     temp: int = x
+  -     x = y
+  -     y = temp
+3 +     x, y = y, x
+4 | 
+5 | 
+6 | # safe fix inside an if condition
+
+PLR1712 [*] Unnecessary temporary variable
+  --> swap_with_temporary_variable.py:11:9
+   |
+ 9 |   def foo(x: int, y: int):
+10 |       if x > 5:
+11 | /         temp: int = x
+12 | |         x = y
+13 | |         y = temp
+   | |________________^
+   |
+help: Use `x, y = y, x` instead
+8  | # safe fix inside an if condition
+9  | def foo(x: int, y: int):
+10 |     if x > 5:
+   -         temp: int = x
+   -         x = y
+   -         y = temp
+11 +         x, y = y, x
+12 | 
+13 | 
+14 | # unsafe fix because the swap statements contain a comment
+
+PLR1712 [*] Unnecessary temporary variable
+  --> swap_with_temporary_variable.py:18:5
+   |
+16 |   # unsafe fix because the swap statements contain a comment
+17 |   def bar(x: int, y: int):
+18 | /     temp: int = x  # comment
+19 | |     x = y
+20 | |     y = temp
+   | |____________^
+   |
+help: Use `x, y = y, x` instead
+15 | 
+16 | # unsafe fix because the swap statements contain a comment
+17 | def bar(x: int, y: int):
+   -     temp: int = x  # comment
+   -     x = y
+   -     y = temp
+18 +     x, y = y, x
+19 | 
+20 | 
+21 | # not a swap statement
+note: This is an unsafe fix and may change runtime behavior

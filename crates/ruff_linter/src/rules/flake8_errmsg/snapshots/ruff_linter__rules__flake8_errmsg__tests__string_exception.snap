@@ -1,0 +1,35 @@
+---
+source: crates/ruff_linter/src/rules/flake8_errmsg/mod.rs
+---
+EM101 [*] Exception must not use a string literal, assign to variable first
+ --> EM101_byte_string.py:2:24
+  |
+1 | def f_byte():
+2 |     raise RuntimeError(b"This is an example exception")
+  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Assign to variable; remove string literal
+1 | def f_byte():
+  -     raise RuntimeError(b"This is an example exception")
+2 +     msg = b"This is an example exception"
+3 +     raise RuntimeError(msg)
+4 | 
+5 | 
+6 | def f_byte_empty():
+note: This is an unsafe fix and may change runtime behavior
+
+EM101 [*] Exception must not use a string literal, assign to variable first
+ --> EM101_byte_string.py:6:24
+  |
+5 | def f_byte_empty():
+6 |     raise RuntimeError(b"")
+  |                        ^^^
+  |
+help: Assign to variable; remove string literal
+3 | 
+4 | 
+5 | def f_byte_empty():
+  -     raise RuntimeError(b"")
+6 +     msg = b""
+7 +     raise RuntimeError(msg)
+note: This is an unsafe fix and may change runtime behavior

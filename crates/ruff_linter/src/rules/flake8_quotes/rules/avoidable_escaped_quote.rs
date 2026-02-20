@@ -32,8 +32,13 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// formatter automatically removes unnecessary escapes, making the rule
 /// redundant.
 ///
+/// ## Options
+///
+/// - `lint.flake8-quotes.inline-quotes`
+///
 /// [formatter]: https://docs.astral.sh/ruff/formatter
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.88")]
 pub(crate) struct AvoidableEscapedQuote;
 
 impl AlwaysFixableViolation for AvoidableEscapedQuote {

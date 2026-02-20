@@ -7,17 +7,17 @@ input_file: crates/ruff_python_parser/resources/inline/err/del_debug_py39.py
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..57,
         body: [
             Delete(
                 StmtDelete {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 43..56,
                     targets: [
                         Name(
                             ExprName {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 47..56,
                                 id: Name("__debug__"),
                                 ctx: Del,

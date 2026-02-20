@@ -599,6 +599,16 @@ impl<'a> SimpleTokenizer<'a> {
                             | "rb"
                             | "rf"
                             | "u"
+                            | "T"
+                            | "TR"
+                            | "Tr"
+                            | "RT"
+                            | "Rt"
+                            | "t"
+                            | "tR"
+                            | "tr"
+                            | "rT"
+                            | "rt"
                     )
                 {
                     self.bogus = true;

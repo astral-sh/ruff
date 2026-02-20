@@ -10,9 +10,7 @@ F401 [*] `.main.MaμToMan` imported but unused
   |                   ^^^^^^^^
   |
 help: Remove unused import: `.main.MaμToMan`
-
-ℹ Safe fix
-3 3 | even if they have characters in them that undergo NFKC normalization
-4 4 | """
-5 5 | 
-6   |-from .main import MaµToMan
+3 | even if they have characters in them that undergo NFKC normalization
+4 | """
+5 | 
+  - from .main import MaµToMan

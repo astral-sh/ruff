@@ -7,20 +7,20 @@ input_file: crates/ruff_python_parser/resources/invalid/re_lexing/line_continuat
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..46,
         body: [
             Expr(
                 StmtExpr {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 0..10,
                     value: Call(
                         ExprCall {
-                            node_index: AtomicNodeIndex(..),
+                            node_index: NodeIndex(None),
                             range: 0..10,
                             func: Name(
                                 ExprName {
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     range: 0..4,
                                     id: Name("call"),
                                     ctx: Load,
@@ -28,11 +28,11 @@ Module(
                             ),
                             arguments: Arguments {
                                 range: 4..10,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 args: [
                                     Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 5..6,
                                             id: Name("a"),
                                             ctx: Load,
@@ -40,7 +40,7 @@ Module(
                                     ),
                                     Name(
                                         ExprName {
-                                            node_index: AtomicNodeIndex(..),
+                                            node_index: NodeIndex(None),
                                             range: 8..9,
                                             id: Name("b"),
                                             ctx: Load,
@@ -55,21 +55,19 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 26..46,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("bar"),
                         range: 30..33,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 33..35,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [],
                         vararg: None,
@@ -80,7 +78,7 @@ Module(
                     body: [
                         Pass(
                             StmtPass {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 42..46,
                             },
                         ),
@@ -95,7 +93,7 @@ Module(
 
   |
 1 | call(a, b, # comment \
-  |                       ^ Syntax Error: Expected ')', found newline
+  |                       ^ Syntax Error: Expected `)`, found newline
 2 |
 3 | def bar():
 4 |     pass

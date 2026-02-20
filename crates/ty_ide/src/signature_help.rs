@@ -6,64 +6,71 @@
 //! types, and documentation. It supports multiple signatures for union types
 //! and overloads.
 
+use crate::Db;
 use crate::docstring::Docstring;
-use crate::goto::DefinitionsOrTargets;
-use crate::{Db, find_node::covering_node};
+use crate::goto::Definitions;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::ResolvedDefinition;
 use ty_python_semantic::SemanticModel;
 use ty_python_semantic::semantic_index::definition::Definition;
-use ty_python_semantic::types::{
+use ty_python_semantic::types::ide_support::{
     CallSignatureDetails, call_signature_details, find_active_signature_from_details,
 };
+use ty_python_semantic::types::{ParameterKind, Type};
 
 // TODO: We may want to add special-case handling for calls to constructors
 // so the class docstring is used in place of (or inaddition to) any docstring
 // associated with the __new__ or __init__ call.
 
 /// Information about a function parameter
-#[derive(Debug, Clone)]
-pub struct ParameterDetails {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParameterDetails<'db> {
     /// The parameter name (e.g., "param1")
     pub name: String,
     /// The parameter label in the signature (e.g., "param1: str")
     pub label: String,
+    /// The annotated type of the parameter. If no annotation was provided, this is `Unknown`.
+    pub ty: Type<'db>,
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
+    /// True if the parameter is positional-only.
+    pub is_positional_only: bool,
 }
 
 /// Information about a function signature
-#[derive(Debug, Clone)]
-pub struct SignatureDetails {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureDetails<'db> {
     /// Text representation of the full signature (including input parameters and return type).
     pub label: String,
     /// Documentation for the signature, typically from the function's docstring.
     pub documentation: Option<Docstring>,
     /// Information about each of the parameters in left-to-right order.
-    pub parameters: Vec<ParameterDetails>,
+    pub parameters: Vec<ParameterDetails<'db>>,
     /// Index of the parameter that corresponds to the argument where the
     /// user's cursor is currently positioned.
     pub active_parameter: Option<usize>,
 }
 
 /// Signature help information for function calls
-#[derive(Debug, Clone)]
-pub struct SignatureHelpInfo {
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SignatureHelpInfo<'db> {
     /// Information about each of the signatures for the function call. We
     /// need to handle multiple because of unions, overloads, and composite
     /// calls like constructors (which invoke both __new__ and __init__).
-    pub signatures: Vec<SignatureDetails>,
+    pub signatures: Vec<SignatureDetails<'db>>,
     /// Index of the "active signature" which is the first signature where
     /// all arguments that are currently present in the code map to parameters.
     pub active_signature: Option<usize>,
 }
 
 /// Signature help information for function calls at the given position
-pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<SignatureHelpInfo> {
+pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<SignatureHelpInfo<'_>> {
     let parsed = parsed_module(db, file).load(db);
 
     // Get the call expression at the given position.
@@ -73,7 +80,7 @@ pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<Signa
 
     // Get signature details from the semantic analyzer.
     let signature_details: Vec<CallSignatureDetails<'_>> =
-        call_signature_details(db, &model, call_expr);
+        call_signature_details(&model, call_expr);
 
     if signature_details.is_empty() {
         return None;
@@ -104,22 +111,47 @@ fn get_call_expr(
 ) -> Option<(&ast::ExprCall, usize)> {
     let root_node: AnyNodeRef = parsed.syntax().into();
 
-    // Create a range from the offset for the covering_node function.
-    // Use length 1 if it fits within the root node, otherwise use zero-length range.
-    let one_char_range = TextRange::at(offset, TextSize::from(1));
-    let range = if root_node.range().contains_range(one_char_range) {
-        one_char_range
-    } else {
-        TextRange::at(offset, TextSize::from(0))
-    };
+    // Find the token under the cursor and use its offset to find the node
+    let token = parsed
+        .tokens()
+        .at_offset(offset)
+        .max_by_key(|token| match token.kind() {
+            TokenKind::Name
+            | TokenKind::String
+            | TokenKind::Complex
+            | TokenKind::Float
+            | TokenKind::Int => 1,
+            _ => 0,
+        })?;
 
     // Find the covering node at the given position that is a function call.
-    let covering_node = covering_node(root_node, range)
-        .find_first(|node| matches!(node, AnyNodeRef::ExprCall(_)))
+    // Note that we are okay with the range being anywhere within a call
+    // expression, even if it's not in the arguments portion of the call
+    // expression. This is because, e.g., a user can request signature
+    // information at a call site, and this should ideally work anywhere
+    // within the call site, even at the function name.
+    let call = covering_node(root_node, token.range())
+        .find_first(|node| {
+            if !node.is_expr_call() {
+                return false;
+            }
+
+            // Close the signature help if the cursor is at the closing parenthesis
+            if token.kind() == TokenKind::Rpar && node.end() == token.end() && offset == token.end()
+            {
+                return false;
+            }
+
+            if token.range().is_empty() && node.end() == token.end() {
+                return false;
+            }
+
+            true
+        })
         .ok()?;
 
     // Get the function call expression.
-    let AnyNodeRef::ExprCall(call_expr) = covering_node.node() else {
+    let AnyNodeRef::ExprCall(call_expr) = call.node() else {
         return None;
     };
 
@@ -145,11 +177,11 @@ fn get_argument_index(call_expr: &ast::ExprCall, offset: TextSize) -> usize {
 }
 
 /// Create signature details from `CallSignatureDetails`.
-fn create_signature_details_from_call_signature_details(
+fn create_signature_details_from_call_signature_details<'db>(
     db: &dyn crate::Db,
-    details: &CallSignatureDetails,
+    details: &CallSignatureDetails<'db>,
     current_arg_index: usize,
-) -> SignatureDetails {
+) -> SignatureDetails<'db> {
     let signature_label = details.label.clone();
 
     let documentation = get_callable_documentation(db, details.definition);
@@ -179,6 +211,8 @@ fn create_signature_details_from_call_signature_details(
         &signature_label,
         documentation.as_ref(),
         &details.parameter_names,
+        &details.parameter_kinds,
+        &details.parameter_types,
     );
     SignatureDetails {
         label: signature_label,
@@ -193,17 +227,18 @@ fn get_callable_documentation(
     db: &dyn crate::Db,
     definition: Option<Definition>,
 ) -> Option<Docstring> {
-    DefinitionsOrTargets::Definitions(vec![ResolvedDefinition::Definition(definition?)])
-        .docstring(db)
+    Definitions(vec![ResolvedDefinition::Definition(definition?)]).docstring(db)
 }
 
 /// Create `ParameterDetails` objects from parameter label offsets.
-fn create_parameters_from_offsets(
+fn create_parameters_from_offsets<'db>(
     parameter_offsets: &[TextRange],
     signature_label: &str,
     docstring: Option<&Docstring>,
     parameter_names: &[String],
-) -> Vec<ParameterDetails> {
+    parameter_kinds: &[ParameterKind],
+    parameter_types: &[Type<'db>],
+) -> Vec<ParameterDetails<'db>> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(docstring) = docstring {
         docstring.parameter_documentation()
@@ -225,11 +260,17 @@ fn create_parameters_from_offsets(
 
             // Get the parameter name for documentation lookup.
             let param_name = parameter_names.get(i).map(String::as_str).unwrap_or("");
+            let is_positional_only = matches!(
+                parameter_kinds.get(i),
+                Some(ParameterKind::PositionalOnly { .. })
+            );
 
             ParameterDetails {
                 name: param_name.to_string(),
                 label,
+                ty: parameter_types[i],
                 documentation: param_docs.get(param_name).cloned(),
+                is_positional_only,
             }
         })
         .collect()
@@ -237,6 +278,9 @@ fn create_parameters_from_offsets(
 
 #[cfg(test)]
 mod tests {
+    use insta::assert_snapshot;
+
+    use crate::MarkupKind;
     use crate::docstring::Docstring;
     use crate::signature_help::SignatureHelpInfo;
     use crate::tests::{CursorTest, cursor_test};
@@ -247,11 +291,11 @@ mod tests {
             r#"
         def example_function(param1: str, param2: int) -> str:
             """This is a docstring for the example function.
-            
+
             Args:
                 param1: The first parameter as a string
                 param2: The second parameter as an integer
-            
+
             Returns:
                 A formatted string combining both parameters
             """
@@ -358,7 +402,7 @@ mod tests {
             f = func_a
         else:
             f = func_b
-        
+
         f(<CURSOR>
         "#,
         );
@@ -403,10 +447,10 @@ mod tests {
 
         @overload
         def process(value: int) -> str: ...
-        
+
         @overload
         def process(value: str) -> int: ...
-        
+
         def process(value):
             if isinstance(value, int):
                 return str(value)
@@ -450,15 +494,369 @@ mod tests {
     }
 
     #[test]
+    fn signature_help_overload_type_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+ab(1<CURSOR>)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int):
+    """the int overload"""
+
+@overload
+def ab(a: str): ...
+    """the str overload"""
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (a: int) -> Unknown
+        ---------------------------------------------
+        the int overload
+
+        -------------- active parameter -------------
+        a: int
+        ---------------------------------------------
+
+        =============== other signature =============
+        (a: str) -> Unknown
+        ---------------------------------------------
+        the real implementation!
+
+        -------------- active parameter -------------
+        a: str
+        ---------------------------------------------
+        ");
+    }
+
+    #[test]
+    fn signature_help_overload_type_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+from mymodule import ab
+
+ab("hello"<CURSOR>)
+"#,
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int):
+    """the int overload"""
+
+@overload
+def ab(a: str):
+    """the str overload"""
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (a: int) -> Unknown
+        ---------------------------------------------
+        the int overload
+
+        -------------- active parameter -------------
+        a: int
+        ---------------------------------------------
+
+        =============== other signature =============
+        (a: str) -> Unknown
+        ---------------------------------------------
+        the str overload
+
+        -------------- active parameter -------------
+        a: str
+        ---------------------------------------------
+        ");
+    }
+
+    #[test]
+    fn signature_help_overload_arity_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+ab(1, 2<CURSOR>)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int):
+    """the two arg overload"""
+
+@overload
+def ab(a: int):
+    """the one arg overload"""
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (a: int, b: int) -> Unknown
+        ---------------------------------------------
+        the two arg overload
+
+        -------------- active parameter -------------
+        b: int
+        ---------------------------------------------
+
+        =============== other signature =============
+        (a: int) -> Unknown
+        ---------------------------------------------
+        the one arg overload
+
+        (no active parameter specified)
+        ");
+    }
+
+    #[test]
+    fn signature_help_overload_arity_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+ab(1<CURSOR>)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, b = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int, b: int):
+    """the two arg overload"""
+
+@overload
+def ab(a: int):
+    """the one arg overload"""
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (a: int, b: int) -> Unknown
+        ---------------------------------------------
+        the two arg overload
+
+        -------------- active parameter -------------
+        a: int
+        ---------------------------------------------
+
+        =============== other signature =============
+        (a: int) -> Unknown
+        ---------------------------------------------
+        the one arg overload
+
+        -------------- active parameter -------------
+        a: int
+        ---------------------------------------------
+        ");
+    }
+
+    #[test]
+    fn signature_help_overload_keyword_disambiguated1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+ab(1, b=2<CURSOR>)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int):
+    """keywordless overload"""
+
+@overload
+def ab(a: int, *, b: int):
+    """b overload"""
+
+@overload
+def ab(a: int, *, c: int):
+    """c overload"""
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (a: int, *, b: int) -> Unknown
+        ---------------------------------------------
+        b overload
+
+        -------------- active parameter -------------
+        b: int
+        ---------------------------------------------
+
+        =============== other signature =============
+        (a: int) -> Unknown
+        ---------------------------------------------
+        keywordless overload
+
+        (no active parameter specified)
+        =============== other signature =============
+        (a: int, *, c: int) -> Unknown
+        ---------------------------------------------
+        c overload
+
+        -------------- active parameter -------------
+        c: int
+        ---------------------------------------------
+        ");
+    }
+
+    #[test]
+    fn signature_help_overload_keyword_disambiguated2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from mymodule import ab
+
+ab(1, c=2<CURSOR>)
+",
+            )
+            .source(
+                "mymodule.py",
+                r#"
+def ab(a, *, b = None, c = None):
+    """the real implementation!"""
+"#,
+            )
+            .source(
+                "mymodule.pyi",
+                r#"
+from typing import overload
+
+@overload
+def ab(a: int):
+    """keywordless overload"""
+
+@overload
+def ab(a: int, *, b: int):
+    """b overload"""
+
+@overload
+def ab(a: int, *, c: int):
+    """c overload"""
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.signature_help_render(), @"
+
+        ============== active signature =============
+        (a: int, *, c: int) -> Unknown
+        ---------------------------------------------
+        c overload
+
+        -------------- active parameter -------------
+        c: int
+        ---------------------------------------------
+
+        =============== other signature =============
+        (a: int) -> Unknown
+        ---------------------------------------------
+        keywordless overload
+
+        (no active parameter specified)
+        =============== other signature =============
+        (a: int, *, b: int) -> Unknown
+        ---------------------------------------------
+        b overload
+
+        -------------- active parameter -------------
+        b: int
+        ---------------------------------------------
+        ");
+    }
+
+    #[test]
     fn signature_help_class_constructor() {
         let test = cursor_test(
             r#"
         class Point:
             """A simple point class representing a 2D coordinate."""
-            
+
             def __init__(self, x: int, y: int):
                 """Initialize a point with x and y coordinates.
-                
+
                 Args:
                     x: The x-coordinate
                     y: The y-coordinate
@@ -501,6 +899,85 @@ mod tests {
                 .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
+    }
+
+    #[test]
+    fn signature_help_generic_method_resolves_typevars() {
+        let test = cursor_test(
+            r#"
+        d: dict[str, int] = {"a": 1}
+        d.get(<CURSOR>
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+
+        // dict.get has multiple overloads; use the active signature
+        let active_idx = result
+            .active_signature
+            .expect("Should have an active signature");
+        let signature = &result.signatures[active_idx];
+
+        // The first parameter of dict.get is `key`, whose annotation is
+        // the TypeVar `_KT`. After TypeVar resolution at this call site,
+        // the parameter type should be `str` (not `_KT`).
+        let key_param = &signature.parameters[0];
+        assert_eq!(key_param.name, "key");
+        let type_display = format!("{}", key_param.ty.display(&test.db));
+        assert_eq!(type_display, "str");
+    }
+
+    #[test]
+    fn signature_help_generic_list_method_resolves_typevars() {
+        let test = cursor_test(
+            r#"
+        items: list[int] = [1, 2, 3]
+        items.append(<CURSOR>
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        assert_eq!(result.signatures.len(), 1);
+
+        let signature = &result.signatures[0];
+
+        // list.append's parameter is typed as `_T`, which should resolve
+        // to `int` for a `list[int]`.
+        let object_param = &signature.parameters[0];
+        let type_display = format!("{}", object_param.ty.display(&test.db));
+        assert_eq!(type_display, "int");
+    }
+
+    #[test]
+    fn signature_help_generic_function_resolves_typevars() {
+        // This tests function-level TypeVar resolution, where the TypeVar
+        // is on the function itself (not inherited from a generic class).
+        // The specialization is inferred purely from the call arguments.
+        let test = cursor_test(
+            r#"
+        def pair[T](a: T, b: T) -> tuple[T, T]:
+            return (a, b)
+
+        def get_name() -> str: ...
+        pair(get_name(), <CURSOR>
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        assert_eq!(result.signatures.len(), 1);
+
+        let signature = &result.signatures[0];
+
+        // `T` should be resolved to `str` from the first argument.
+        let a_param = &signature.parameters[0];
+        assert_eq!(a_param.name, "a");
+        let a_type = format!("{}", a_param.ty.display(&test.db));
+        assert_eq!(a_type, "str");
+
+        let b_param = &signature.parameters[1];
+        assert_eq!(b_param.name, "b");
+        let b_type = format!("{}", b_param.ty.display(&test.db));
+        assert_eq!(b_type, "str");
     }
 
     #[test]
@@ -590,12 +1067,12 @@ mod tests {
             r#"
         from typing import overload
 
-        @overload  
+        @overload
         def process(value: int) -> str: ...
-        
+
         @overload
         def process(value: str, flag: bool) -> int: ...
-        
+
         def process(value, flag=None):
             if isinstance(value, int):
                 return str(value)
@@ -627,7 +1104,7 @@ mod tests {
             r#"
         def documented_function(param1: str, param2: int) -> str:
             """This is a function with parameter documentation.
-            
+
             Args:
                 param1: The first parameter description
                 param2: The second parameter description
@@ -707,6 +1184,57 @@ mod tests {
     }
 
     #[test]
+    fn signature_help_after_closing_paren_at_end_of_file() {
+        let test = cursor_test(
+            r#"
+            def test(a: int) -> int:
+                return 10
+
+            test("test")<CURSOR>"#,
+        );
+
+        // Should not return a signature help
+        assert_eq!(test.signature_help(), None);
+    }
+
+    #[test]
+    fn signature_help_after_closing_paren_in_expression() {
+        let test = cursor_test(
+            r#"
+            def test(a: int) -> int:
+                return 10
+
+            test("test")<CURSOR> + 10
+        "#,
+        );
+
+        // Should not return a signature help
+        assert_eq!(test.signature_help(), None);
+    }
+
+    #[test]
+    fn signature_help_after_closing_paren_nested() {
+        let test = cursor_test(
+            r#"
+        def inner(a: int) -> int:
+            return 10
+
+        def outer(a: int) -> None: ...
+
+        outer(inner("test")<CURSOR> + 10)
+        "#,
+        );
+
+        // Should return the outer signature help
+        let help = test.signature_help().expect("Should have outer help");
+
+        assert_eq!(help.signatures.len(), 1);
+
+        let signature = &help.signatures[0];
+        assert_eq!(signature.label, "(a: int) -> None");
+    }
+
+    #[test]
     fn signature_help_stub_to_implementation_mapping() {
         // Test that when a function is called from a stub file with no docstring,
         // the signature help includes the docstring from the corresponding implementation file
@@ -714,22 +1242,22 @@ mod tests {
             .source(
                 "main.py",
                 r#"
-from lib import func
-result = func(<CURSOR>
+                from lib import func
+                result = func(<CURSOR>
 "#,
             )
             .source(
                 "lib.pyi",
                 r#"
-def func() -> str: ...
+                def func() -> str: ...
 "#,
             )
             .source(
                 "lib.py",
                 r#"
-def func() -> str:
-    """This function does something."""
-    return ""
+                def func() -> str:
+                    """This function does something."""
+                    return ""
 "#,
             )
             .build();
@@ -751,8 +1279,97 @@ def func() -> str:
     }
 
     impl CursorTest {
-        fn signature_help(&self) -> Option<SignatureHelpInfo> {
+        fn signature_help(&self) -> Option<SignatureHelpInfo<'_>> {
             crate::signature_help::signature_help(&self.db, self.cursor.file, self.cursor.offset)
+        }
+
+        fn signature_help_render(&self) -> String {
+            use std::fmt::Write;
+
+            let Some(signature_help) = self.signature_help() else {
+                return "Signature help found no signatures".to_string();
+            };
+            let active_sig_heading = "\n============== active signature =============\n";
+            let second_sig_heading = "\n=============== other signature =============\n";
+            let active_arg_heading = "\n-------------- active parameter -------------\n";
+
+            let mut buf = String::new();
+            if let Some(active_signature) = signature_help.active_signature {
+                let signature = signature_help
+                    .signatures
+                    .get(active_signature)
+                    .expect("failed to find active signature!");
+                write!(
+                    &mut buf,
+                    "{heading}{label}{line}{docs}",
+                    heading = active_sig_heading,
+                    label = signature.label,
+                    line = MarkupKind::PlainText.horizontal_line(),
+                    docs = signature
+                        .documentation
+                        .as_ref()
+                        .map(Docstring::render_plaintext)
+                        .unwrap_or_default(),
+                )
+                .unwrap();
+                if let Some(active_parameter) = signature.active_parameter {
+                    let parameter = signature
+                        .parameters
+                        .get(active_parameter)
+                        .expect("failed to find active parameter!");
+                    write!(
+                        &mut buf,
+                        "{heading}{label}{line}{docs}",
+                        heading = active_arg_heading,
+                        label = parameter.label,
+                        line = MarkupKind::PlainText.horizontal_line(),
+                        docs = parameter.documentation.as_deref().unwrap_or_default(),
+                    )
+                    .unwrap();
+                } else {
+                    writeln!(&mut buf, "\n(no active parameter specified)").unwrap();
+                }
+            } else {
+                writeln!(&mut buf, "\n(no active signature specified)").unwrap();
+            }
+
+            for (idx, signature) in signature_help.signatures.iter().enumerate() {
+                if Some(idx) == signature_help.active_signature {
+                    continue;
+                }
+                write!(
+                    &mut buf,
+                    "{heading}{label}{line}{docs}",
+                    heading = second_sig_heading,
+                    label = signature.label,
+                    line = MarkupKind::PlainText.horizontal_line(),
+                    docs = signature
+                        .documentation
+                        .as_ref()
+                        .map(Docstring::render_plaintext)
+                        .unwrap_or_default(),
+                )
+                .unwrap();
+                if let Some(active_parameter) = signature.active_parameter {
+                    let parameter = signature
+                        .parameters
+                        .get(active_parameter)
+                        .expect("failed to find active parameter!");
+                    write!(
+                        &mut buf,
+                        "{heading}{label}{line}{docs}",
+                        heading = active_arg_heading,
+                        label = parameter.label,
+                        line = MarkupKind::PlainText.horizontal_line(),
+                        docs = parameter.documentation.as_deref().unwrap_or_default(),
+                    )
+                    .unwrap();
+                } else {
+                    write!(&mut buf, "\n(no active parameter specified)").unwrap();
+                }
+            }
+
+            buf
         }
     }
 }

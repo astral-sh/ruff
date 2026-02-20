@@ -14,17 +14,15 @@ I001 [*] Import block is un-sorted or un-formatted
   | |___________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-1  1  | from __future__ import annotations
-   2  |+
-2  3  | import os
-3  4  | import sys
-   5  |+
-4  6  | import pytz
-   7  |+
-5  8  | import django.settings
-   9  |+
-6  10 | from library import foo
-   11 |+
-7  12 | from . import local
+1  | from __future__ import annotations
+2  + 
+3  | import os
+4  | import sys
+5  + 
+6  | import pytz
+7  + 
+8  | import django.settings
+9  + 
+10 | from library import foo
+11 + 
+12 | from . import local

@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::TokenKind;
 use ruff_python_index::Indexer;
-use ruff_python_parser::TokenKind;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -30,6 +30,7 @@ use super::LogicalLine;
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#maximum-line-length
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.3")]
 pub(crate) struct RedundantBackslash;
 
 impl AlwaysFixableViolation for RedundantBackslash {

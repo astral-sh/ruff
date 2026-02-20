@@ -49,6 +49,7 @@ use ruff_text_size::{Ranged, TextRange};
 /// filtered.extend(x for x in original if x % 2)
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct ManualListComprehension {
     is_async: bool,
     comprehension_type: Option<ComprehensionType>,

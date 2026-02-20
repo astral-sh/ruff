@@ -1,0 +1,9 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+PLE1700 `yield from` statement in async function; use `async for` instead
+ --> resources/test/fixtures/syntax_errors/yield_from_in_async_function.py:1:16
+  |
+1 | async def f(): yield from x # error
+  |                ^^^^^^^^^^^^
+  |

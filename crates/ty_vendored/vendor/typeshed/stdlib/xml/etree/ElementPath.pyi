@@ -1,10 +1,10 @@
 from collections.abc import Callable, Generator, Iterable
 from re import Pattern
-from typing import Any, Literal, TypeVar, overload
+from typing import Any, Final, Literal, TypeVar, overload
 from typing_extensions import TypeAlias
 from xml.etree.ElementTree import Element
 
-xpath_tokenizer_re: Pattern[str]
+xpath_tokenizer_re: Final[Pattern[str]]
 
 _Token: TypeAlias = tuple[str, str]
 _Next: TypeAlias = Callable[[], _Token]
@@ -20,7 +20,7 @@ def prepare_descendant(next: _Next, token: _Token) -> _Callback | None: ...
 def prepare_parent(next: _Next, token: _Token) -> _Callback: ...
 def prepare_predicate(next: _Next, token: _Token) -> _Callback | None: ...
 
-ops: dict[str, Callable[[_Next, _Token], _Callback | None]]
+ops: Final[dict[str, Callable[[_Next, _Token], _Callback | None]]]
 
 class _SelectorContext:
     parent_map: dict[Element, Element] | None

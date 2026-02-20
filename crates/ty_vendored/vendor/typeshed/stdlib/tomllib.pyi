@@ -26,7 +26,7 @@ if sys.version_info >= (3, 14):
         @overload
         def __init__(self, msg: str, doc: str, pos: int) -> None: ...
         @overload
-        @deprecated("Deprecated in Python 3.14; Please set 'msg', 'doc' and 'pos' arguments only.")
+        @deprecated("Deprecated since Python 3.14. Set the 'msg', 'doc' and 'pos' arguments only.")
         def __init__(self, msg: str | type = ..., doc: str | type = ..., pos: int | type = ..., *args: Any) -> None: ...
 
 else:

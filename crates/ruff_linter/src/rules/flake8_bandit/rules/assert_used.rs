@@ -33,6 +33,7 @@ use crate::checkers::ast::Checker;
 ///     raise ValueError("Expected positive value.")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.116")]
 pub(crate) struct Assert;
 
 impl Violation for Assert {

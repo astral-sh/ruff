@@ -54,7 +54,7 @@ from types import (
     WrapperDescriptorType,
 )
 from typing import Any, ClassVar, Final, Literal, NamedTuple, Protocol, TypeVar, overload, type_check_only
-from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs, deprecated
+from typing_extensions import ParamSpec, Self, TypeAlias, TypeGuard, TypeIs, deprecated, disjoint_base
 
 if sys.version_info >= (3, 14):
     from annotationlib import Format
@@ -324,6 +324,7 @@ def isgenerator(object: object) -> TypeIs[GeneratorType[Any, Any, Any]]:
         gi_frame        frame object or possibly None once the generator has
                         been exhausted
         gi_running      set to 1 when generator is executing, 0 otherwise
+        gi_suspended    set to 1 when the generator is suspended at a yield point, 0 otherwise
         gi_yieldfrom    object being iterated by yield from or None
 
         __iter__()      defined to support iteration over container
@@ -640,6 +641,7 @@ class Signature:
         to parameters (simulating 'functools.partial' behavior.)
     """
 
+    __slots__ = ("_return_annotation", "_parameters")
     def __init__(
         self, parameters: Sequence[Parameter] | None = None, *, return_annotation: Any = ..., __validate_parameters__: bool = True
     ) -> None:
@@ -842,6 +844,7 @@ class Parameter:
         `Parameter.KEYWORD_ONLY`, `Parameter.VAR_KEYWORD`.
     """
 
+    __slots__ = ("_name", "_kind", "_default", "_annotation")
     def __init__(self, name: str, kind: _ParameterKind, *, default: Any = ..., annotation: Any = ...) -> None: ...
     empty = _empty
 
@@ -890,6 +893,7 @@ class BoundArguments:
         Dict of keyword arguments values.
     """
 
+    __slots__ = ("arguments", "_signature", "__weakref__")
     arguments: OrderedDict[str, Any]
     @property
     def args(self) -> tuple[Any, ...]: ...
@@ -1084,6 +1088,7 @@ def formatargvalues(
 def getmro(cls: type) -> tuple[type, ...]:
     """Return tuple of base classes (including cls) in method resolution order."""
 
+@deprecated("Deprecated since Python 3.5. Use `Signature.bind` and `Signature.bind_partial` instead.")
 def getcallargs(func: Callable[_P, Any], /, *args: _P.args, **kwds: _P.kwargs) -> dict[str, Any]:
     """Get the mapping of arguments to values.
 
@@ -1140,19 +1145,6 @@ if sys.version_info >= (3, 11):
         code_context: list[str] | None
         index: int | None  # type: ignore[assignment]
 
-    class Traceback(_Traceback):
-        positions: dis.Positions | None
-        def __new__(
-            cls,
-            filename: str,
-            lineno: int,
-            function: str,
-            code_context: list[str] | None,
-            index: int | None,
-            *,
-            positions: dis.Positions | None = None,
-        ) -> Self: ...
-
     class _FrameInfo(NamedTuple):
         """_FrameInfo(frame, filename, lineno, function, code_context, index)"""
 
@@ -1163,19 +1155,63 @@ if sys.version_info >= (3, 11):
         code_context: list[str] | None
         index: int | None  # type: ignore[assignment]
 
-    class FrameInfo(_FrameInfo):
-        positions: dis.Positions | None
-        def __new__(
-            cls,
-            frame: FrameType,
-            filename: str,
-            lineno: int,
-            function: str,
-            code_context: list[str] | None,
-            index: int | None,
-            *,
-            positions: dis.Positions | None = None,
-        ) -> Self: ...
+    if sys.version_info >= (3, 12):
+        class Traceback(_Traceback):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+        class FrameInfo(_FrameInfo):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                frame: FrameType,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+    else:
+        @disjoint_base
+        class Traceback(_Traceback):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
+
+        @disjoint_base
+        class FrameInfo(_FrameInfo):
+            positions: dis.Positions | None
+            def __new__(
+                cls,
+                frame: FrameType,
+                filename: str,
+                lineno: int,
+                function: str,
+                code_context: list[str] | None,
+                index: int | None,
+                *,
+                positions: dis.Positions | None = None,
+            ) -> Self: ...
 
 else:
     class Traceback(NamedTuple):

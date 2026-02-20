@@ -17,6 +17,7 @@ class BaseProtocol:
     write-only transport like write pipe
     """
 
+    __slots__ = ()
     def connection_made(self, transport: transports.BaseTransport) -> None:
         """Called when a connection is made.
 
@@ -87,6 +88,8 @@ class Protocol(BaseProtocol):
     * CL: connection_lost()
     """
 
+    # Need annotation or mypy will complain about 'Cannot determine type of "__slots__" in base class'
+    __slots__: tuple[str, ...] = ()
     def data_received(self, data: bytes) -> None:
         """Called when some data is received.
 
@@ -125,6 +128,7 @@ class BufferedProtocol(BaseProtocol):
     * CL: connection_lost()
     """
 
+    __slots__ = ()
     def get_buffer(self, sizehint: int) -> ReadableBuffer:
         """Called to allocate a new receive buffer.
 
@@ -154,6 +158,7 @@ class BufferedProtocol(BaseProtocol):
 class DatagramProtocol(BaseProtocol):
     """Interface for datagram protocol."""
 
+    __slots__ = ()
     def connection_made(self, transport: transports.DatagramTransport) -> None:  # type: ignore[override]
         """Called when a connection is made.
 
@@ -177,6 +182,7 @@ class DatagramProtocol(BaseProtocol):
 class SubprocessProtocol(BaseProtocol):
     """Interface for protocol for subprocess calls."""
 
+    __slots__: tuple[str, ...] = ()
     def pipe_data_received(self, fd: int, data: bytes) -> None:
         """Called when the subprocess writes data into stdout/stderr pipe.
 

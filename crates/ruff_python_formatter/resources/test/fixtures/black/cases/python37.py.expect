@@ -10,6 +10,7 @@ def g():
 
 
 async def func():
+    await ...
     if test:
         out_batched = [
             i

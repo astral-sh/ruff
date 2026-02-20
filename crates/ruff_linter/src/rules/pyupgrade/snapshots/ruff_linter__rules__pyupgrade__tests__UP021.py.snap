@@ -11,16 +11,14 @@ UP021 [*] `universal_newlines` is deprecated, use `text`
 7 | run(["foo"], universal_newlines=True, check=False)
   |
 help: Replace with `text` keyword argument
-
-ℹ Safe fix
-2 2 | from subprocess import run
-3 3 | 
-4 4 | # Errors
-5   |-subprocess.run(["foo"], universal_newlines=True, check=True)
-  5 |+subprocess.run(["foo"], text=True, check=True)
-6 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
-7 7 | run(["foo"], universal_newlines=True, check=False)
-8 8 | 
+2 | from subprocess import run
+3 | 
+4 | # Errors
+  - subprocess.run(["foo"], universal_newlines=True, check=True)
+5 + subprocess.run(["foo"], text=True, check=True)
+6 | subprocess.run(["foo"], universal_newlines=True, text=True)
+7 | run(["foo"], universal_newlines=True, check=False)
+8 | 
 
 UP021 [*] `universal_newlines` is deprecated, use `text`
  --> UP021.py:6:25
@@ -32,16 +30,14 @@ UP021 [*] `universal_newlines` is deprecated, use `text`
 7 | run(["foo"], universal_newlines=True, check=False)
   |
 help: Replace with `text` keyword argument
-
-ℹ Safe fix
-3 3 | 
-4 4 | # Errors
-5 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
-6   |-subprocess.run(["foo"], universal_newlines=True, text=True)
-  6 |+subprocess.run(["foo"], text=True)
-7 7 | run(["foo"], universal_newlines=True, check=False)
-8 8 | 
-9 9 | # OK
+3 | 
+4 | # Errors
+5 | subprocess.run(["foo"], universal_newlines=True, check=True)
+  - subprocess.run(["foo"], universal_newlines=True, text=True)
+6 + subprocess.run(["foo"], text=True)
+7 | run(["foo"], universal_newlines=True, check=False)
+8 | 
+9 | # OK
 
 UP021 [*] `universal_newlines` is deprecated, use `text`
  --> UP021.py:7:14
@@ -54,13 +50,11 @@ UP021 [*] `universal_newlines` is deprecated, use `text`
 9 | # OK
   |
 help: Replace with `text` keyword argument
-
-ℹ Safe fix
-4 4 | # Errors
-5 5 | subprocess.run(["foo"], universal_newlines=True, check=True)
-6 6 | subprocess.run(["foo"], universal_newlines=True, text=True)
-7   |-run(["foo"], universal_newlines=True, check=False)
-  7 |+run(["foo"], text=True, check=False)
-8 8 | 
-9 9 | # OK
-10 10 | subprocess.run(["foo"], check=True)
+4  | # Errors
+5  | subprocess.run(["foo"], universal_newlines=True, check=True)
+6  | subprocess.run(["foo"], universal_newlines=True, text=True)
+   - run(["foo"], universal_newlines=True, check=False)
+7  + run(["foo"], text=True, check=False)
+8  | 
+9  | # OK
+10 | subprocess.run(["foo"], check=True)

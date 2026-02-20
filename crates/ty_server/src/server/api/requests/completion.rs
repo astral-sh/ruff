@@ -3,14 +3,15 @@ use std::time::Instant;
 
 use lsp_types::request::Completion;
 use lsp_types::{
-    CompletionItem, CompletionItemKind, CompletionParams, CompletionResponse, Documentation, Url,
+    CompletionItem, CompletionItemKind, CompletionItemLabelDetails, CompletionList,
+    CompletionParams, CompletionResponse, Documentation, TextEdit, Url,
 };
-use ruff_db::source::{line_index, source_text};
-use ty_ide::completion;
+use ruff_source_file::OneIndexed;
+use ruff_text_size::Ranged;
+use ty_ide::{CompletionKind, completion};
 use ty_project::ProjectDatabase;
-use ty_python_semantic::CompletionKind;
 
-use crate::document::PositionExt;
+use crate::document::{PositionExt, ToRangeExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -43,41 +44,97 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
-        let offset = params.text_document_position.position.to_text_size(
-            &source,
-            &line_index,
+        let Some(offset) = params.text_document_position.position.to_text_size(
+            db,
+            file,
+            snapshot.url(),
             snapshot.encoding(),
-        );
-        let completions = completion(db, file, offset);
+        ) else {
+            return Ok(None);
+        };
+        let settings = snapshot.workspace_settings().completions();
+        let completions = completion(db, settings, file, offset);
         if completions.is_empty() {
             return Ok(None);
         }
 
-        let max_index_len = completions.len().saturating_sub(1).to_string().len();
+        // Safety: we just checked that completions is not empty.
+        let max_index_len = OneIndexed::new(completions.len()).unwrap().digits().get();
         let items: Vec<CompletionItem> = completions
             .into_iter()
             .enumerate()
             .map(|(i, comp)| {
-                let kind = comp.kind(db).map(ty_kind_to_lsp_kind);
+                let kind = comp.kind.map(ty_kind_to_lsp_kind);
+                let type_display = comp.ty.map(|ty| ty.display(db).to_string());
+                let import_edit = comp.import.as_ref().and_then(|edit| {
+                    let range = edit
+                        .range()
+                        .to_lsp_range(db, file, snapshot.encoding())?
+                        .local_range();
+                    Some(TextEdit {
+                        range,
+                        new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
+                    })
+                });
+
+                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let import_suffix = comp
+                    .module_name
+                    .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
+                let (label, label_details) = if snapshot
+                    .resolved_client_capabilities()
+                    .supports_completion_item_label_details()
+                {
+                    let label_details = CompletionItemLabelDetails {
+                        detail: import_suffix,
+                        description: type_display.clone(),
+                    };
+                    (name, Some(label_details))
+                } else {
+                    let label = import_suffix
+                        .map(|suffix| format!("{name}{suffix}"))
+                        .unwrap_or_else(|| name);
+                    (label, None)
+                };
+
+                let documentation = comp.documentation.map(|docstring| {
+                    let (kind, value) = if snapshot
+                        .resolved_client_capabilities()
+                        .prefers_markdown_in_completion()
+                    {
+                        (lsp_types::MarkupKind::Markdown, docstring.render_markdown())
+                    } else {
+                        (
+                            lsp_types::MarkupKind::PlainText,
+                            docstring.render_plaintext(),
+                        )
+                    };
+
+                    Documentation::MarkupContent(lsp_types::MarkupContent { kind, value })
+                });
+
                 CompletionItem {
-                    label: comp.inner.name.into(),
+                    label,
                     kind,
                     sort_text: Some(format!("{i:-max_index_len$}")),
-                    documentation: comp
-                        .documentation
-                        .map(|docstring| Documentation::String(docstring.render_plaintext())),
+                    detail: type_display,
+                    label_details,
+                    insert_text: comp.insert.map(String::from),
+                    additional_text_edits: import_edit.map(|edit| vec![edit]),
+                    documentation,
                     ..Default::default()
                 }
             })
             .collect();
         let len = items.len();
-        let response = CompletionResponse::Array(items);
+        let response = CompletionResponse::List(CompletionList {
+            is_incomplete: true,
+            items,
+        });
         tracing::debug!(
             "Completions request returned {len} suggestions in {elapsed:?}",
             elapsed = Instant::now().duration_since(start)

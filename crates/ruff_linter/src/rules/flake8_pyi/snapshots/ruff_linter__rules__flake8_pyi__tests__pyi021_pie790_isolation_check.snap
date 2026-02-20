@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/flake8_pyi/mod.rs
+---
+PYI021 [*] Docstrings should not be included in stubs
+ --> PYI021_1.pyi:5:5
+  |
+4 | def check_isolation_level(mode: int) -> None:
+5 |     """Will report both, but only fix the first."""  # ERROR PYI021
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 |     ...  # ERROR PIE790
+  |
+help: Remove docstring
+2 | 
+3 | 
+4 | def check_isolation_level(mode: int) -> None:
+  -     """Will report both, but only fix the first."""  # ERROR PYI021
+5 +       # ERROR PYI021
+6 |     ...  # ERROR PIE790
+7 | 
+8 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PIE790 [*] Unnecessary `...` literal
+ --> PYI021_1.pyi:6:5
+  |
+4 | def check_isolation_level(mode: int) -> None:
+5 |     """Will report both, but only fix the first."""  # ERROR PYI021
+6 |     ...  # ERROR PIE790
+  |     ^^^
+  |
+help: Remove unnecessary `...`
+3 | 
+4 | def check_isolation_level(mode: int) -> None:
+5 |     """Will report both, but only fix the first."""  # ERROR PYI021
+  -     ...  # ERROR PIE790
+6 +     # ERROR PIE790
+7 | 
+8 | 
+9 | with nullcontext():

@@ -77,6 +77,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `target-version`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct TryExceptInLoop;
 
 impl Violation for TryExceptInLoop {

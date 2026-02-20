@@ -108,7 +108,7 @@ from ast import (
     unaryop as unaryop,
     withitem as withitem,
 )
-from typing import Literal
+from typing import Final
 
 if sys.version_info >= (3, 12):
     from ast import (
@@ -137,9 +137,9 @@ if sys.version_info >= (3, 10):
         pattern as pattern,
     )
 
-PyCF_ALLOW_TOP_LEVEL_AWAIT: Literal[8192]
-PyCF_ONLY_AST: Literal[1024]
-PyCF_TYPE_COMMENTS: Literal[4096]
+PyCF_ALLOW_TOP_LEVEL_AWAIT: Final = 8192
+PyCF_ONLY_AST: Final = 1024
+PyCF_TYPE_COMMENTS: Final = 4096
 
 if sys.version_info >= (3, 13):
-    PyCF_OPTIMIZED_AST: Literal[33792]
+    PyCF_OPTIMIZED_AST: Final = 33792

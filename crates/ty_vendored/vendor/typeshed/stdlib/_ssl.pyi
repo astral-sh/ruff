@@ -17,7 +17,7 @@ from ssl import (
     SSLZeroReturnError as SSLZeroReturnError,
 )
 from typing import Any, ClassVar, Final, Literal, TypedDict, final, overload, type_check_only
-from typing_extensions import NotRequired, Self, TypeAlias, deprecated
+from typing_extensions import NotRequired, Self, TypeAlias, deprecated, disjoint_base
 
 _PasswordType: TypeAlias = Callable[[], str | bytes | bytearray] | str | bytes | bytearray
 _PCTRTT: TypeAlias = tuple[tuple[str, str], ...]
@@ -117,18 +117,31 @@ def txt2obj(txt: str, name: bool = False) -> tuple[int, str, str, str]:
 def nid2obj(nid: int, /) -> tuple[int, str, str, str]:
     """Lookup NID, short name, long name and OID of an ASN1_OBJECT by NID."""
 
+@disjoint_base
 class _SSLContext:
     check_hostname: bool
     keylog_filename: str | None
     maximum_version: int
     minimum_version: int
     num_tickets: int
+    """Control the number of TLSv1.3 session tickets."""
+
     options: int
     post_handshake_auth: bool
     protocol: int
     if sys.version_info >= (3, 10):
         security_level: int
+        """The current security level."""
+
     sni_callback: Callable[[SSLObject, str, SSLContext], None | int] | None
+    """Set a callback that will be called when a server name is provided by the SSL/TLS client in the SNI extension.
+
+    If the argument is None then the callback is disabled. The method is called
+    with the SSLSocket, the server name as a string, and the SSLContext object.
+
+    See RFC 6066 for details of the SNI extension.
+    """
+
     verify_flags: int
     verify_mode: int
     def __new__(cls, protocol: int, /) -> Self: ...
@@ -181,7 +194,11 @@ class _SSLContext:
 @final
 class MemoryBIO:
     eof: bool
+    """Whether the memory BIO is at EOF."""
+
     pending: int
+    """The number of bytes pending in the memory BIO."""
+
     def __new__(self) -> Self: ...
     def read(self, size: int = -1, /) -> bytes:
         """Read up to size bytes from the memory BIO.

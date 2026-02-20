@@ -1,0 +1,38 @@
+---
+source: crates/ruff/tests/cli/format.rs
+info:
+  program: ruff
+  args:
+    - format
+    - "--no-cache"
+    - "--output-format"
+    - gitlab
+    - "--preview"
+    - "--check"
+    - input.py
+---
+success: false
+exit_code: 1
+----- stdout -----
+[
+  {
+    "check_name": "unformatted",
+    "description": "unformatted: File would be reformatted",
+    "severity": "major",
+    "fingerprint": "d868d7da11a65fcf",
+    "location": {
+      "path": "input.py",
+      "positions": {
+        "begin": {
+          "line": 1,
+          "column": 1
+        },
+        "end": {
+          "line": 2,
+          "column": 1
+        }
+      }
+    }
+  }
+]
+----- stderr -----

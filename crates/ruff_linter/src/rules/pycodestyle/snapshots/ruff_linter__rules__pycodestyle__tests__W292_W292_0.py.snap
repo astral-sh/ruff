@@ -9,8 +9,6 @@ W292 [*] No newline at end of file
   |         ^
   |
 help: Add trailing newline
-
-ℹ Safe fix
-1 1 | def fn() -> None:
-2   |-    pass
-  2 |+    pass
+1 | def fn() -> None:
+  -     pass
+2 +     pass

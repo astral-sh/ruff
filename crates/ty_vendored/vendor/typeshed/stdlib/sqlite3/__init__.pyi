@@ -97,7 +97,7 @@ from sqlite3.dbapi2 import (
 )
 from types import TracebackType
 from typing import Any, Literal, Protocol, SupportsIndex, TypeVar, final, overload, type_check_only
-from typing_extensions import Self, TypeAlias
+from typing_extensions import Self, TypeAlias, disjoint_base
 
 if sys.version_info < (3, 14):
     from sqlite3.dbapi2 import version_info as version_info
@@ -256,6 +256,7 @@ _AdaptedInputData: TypeAlias = _SqliteData | Any
 _Parameters: TypeAlias = SupportsLenAndGetItem[_AdaptedInputData] | Mapping[str, _AdaptedInputData]
 # Controls the legacy transaction handling mode of sqlite3.
 _IsolationLevel: TypeAlias = Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None
+_RowFactoryOptions: TypeAlias = type[Row] | Callable[[Cursor, tuple[Any, ...]], object] | None
 
 @type_check_only
 class _AnyParamWindowAggregateClass(Protocol):
@@ -302,6 +303,7 @@ class OperationalError(DatabaseError): ...
 class ProgrammingError(DatabaseError): ...
 class Warning(Exception): ...
 
+@disjoint_base
 class Connection:
     """SQLite database connection object."""
 
@@ -335,7 +337,7 @@ class Connection:
         def autocommit(self) -> int: ...
         @autocommit.setter
         def autocommit(self, val: int) -> None: ...
-    row_factory: Any
+    row_factory: _RowFactoryOptions
     text_factory: Any
     if sys.version_info >= (3, 12):
         def __init__(
@@ -376,8 +378,8 @@ class Connection:
               Table name.
             column
               Column name.
-            row
-              Row index.
+            rowid
+              Row id.
             readonly
               Open the BLOB without write permissions.
             name
@@ -426,7 +428,7 @@ class Connection:
             self, name: str, num_params: int, aggregate_class: Callable[[], _WindowAggregateClass] | None, /
         ) -> None: ...
 
-    def create_collation(self, name: str, callback: Callable[[str, str], int | SupportsIndex] | None, /) -> None:
+    def create_collation(self, name: str, callback: Callable[[str, str], SupportsIndex] | None, /) -> None:
         """Creates a collation function."""
 
     def create_function(
@@ -610,6 +612,7 @@ class Connection:
         If there was any exception, a rollback takes place; otherwise we commit.
         """
 
+@disjoint_base
 class Cursor:
     """SQLite database cursor class."""
 
@@ -621,7 +624,7 @@ class Cursor:
     def description(self) -> tuple[tuple[str, None, None, None, None, None, None], ...] | MaybeNone: ...
     @property
     def lastrowid(self) -> int | None: ...
-    row_factory: Callable[[Cursor, Row], object] | None
+    row_factory: _RowFactoryOptions
     @property
     def rowcount(self) -> int: ...
     def __init__(self, cursor: Connection, /) -> None: ...
@@ -669,17 +672,18 @@ class PrepareProtocol:
 
     def __init__(self, *args: object, **kwargs: object) -> None: ...
 
+@disjoint_base
 class Row(Sequence[Any]):
     def __new__(cls, cursor: Cursor, data: tuple[Any, ...], /) -> Self: ...
     def keys(self) -> list[str]:
         """Returns the keys of the row."""
 
-    @overload
+    @overload  # Note: really needs int instead of SupportsIndex
     def __getitem__(self, key: int | str, /) -> Any:
         """Return self[key]."""
 
-    @overload
-    def __getitem__(self, key: slice, /) -> tuple[Any, ...]: ...
+    @overload  # Note: SupportsIndex does work within slices.
+    def __getitem__(self, key: slice[SupportsIndex | None], /) -> tuple[Any, ...]: ...
     def __hash__(self) -> int: ...
     def __iter__(self) -> Iterator[Any]:
         """Implement iter(self)."""

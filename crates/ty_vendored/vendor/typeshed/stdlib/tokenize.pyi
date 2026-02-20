@@ -25,8 +25,8 @@ from _typeshed import FileDescriptorOrPath
 from collections.abc import Callable, Generator, Iterable, Sequence
 from re import Pattern
 from token import *
-from typing import Any, NamedTuple, TextIO, type_check_only
-from typing_extensions import TypeAlias
+from typing import Any, Final, NamedTuple, TextIO, type_check_only
+from typing_extensions import TypeAlias, disjoint_base
 
 if sys.version_info < (3, 12):
     # Avoid double assignment to Final name by imports, which pyright objects to.
@@ -123,8 +123,8 @@ if sys.version_info >= (3, 13):
 if sys.version_info >= (3, 14):
     __all__ += ["TSTRING_START", "TSTRING_MIDDLE", "TSTRING_END"]
 
-cookie_re: Pattern[str]
-blank_re: Pattern[bytes]
+cookie_re: Final[Pattern[str]]
+blank_re: Final[Pattern[bytes]]
 
 _Position: TypeAlias = tuple[int, int]
 
@@ -137,9 +137,16 @@ class _TokenInfo(NamedTuple):
     end: _Position
     line: str
 
-class TokenInfo(_TokenInfo):
-    @property
-    def exact_type(self) -> int: ...
+if sys.version_info >= (3, 12):
+    class TokenInfo(_TokenInfo):
+        @property
+        def exact_type(self) -> int: ...
+
+else:
+    @disjoint_base
+    class TokenInfo(_TokenInfo):
+        @property
+        def exact_type(self) -> int: ...
 
 # Backwards compatible tokens can be sequences of a shorter length too
 _Token: TypeAlias = TokenInfo | Sequence[int | str | _Position]
@@ -238,46 +245,46 @@ def group(*choices: str) -> str: ...  # undocumented
 def any(*choices: str) -> str: ...  # undocumented
 def maybe(*choices: str) -> str: ...  # undocumented
 
-Whitespace: str  # undocumented
-Comment: str  # undocumented
-Ignore: str  # undocumented
-Name: str  # undocumented
+Whitespace: Final[str]  # undocumented
+Comment: Final[str]  # undocumented
+Ignore: Final[str]  # undocumented
+Name: Final[str]  # undocumented
 
-Hexnumber: str  # undocumented
-Binnumber: str  # undocumented
-Octnumber: str  # undocumented
-Decnumber: str  # undocumented
-Intnumber: str  # undocumented
-Exponent: str  # undocumented
-Pointfloat: str  # undocumented
-Expfloat: str  # undocumented
-Floatnumber: str  # undocumented
-Imagnumber: str  # undocumented
-Number: str  # undocumented
+Hexnumber: Final[str]  # undocumented
+Binnumber: Final[str]  # undocumented
+Octnumber: Final[str]  # undocumented
+Decnumber: Final[str]  # undocumented
+Intnumber: Final[str]  # undocumented
+Exponent: Final[str]  # undocumented
+Pointfloat: Final[str]  # undocumented
+Expfloat: Final[str]  # undocumented
+Floatnumber: Final[str]  # undocumented
+Imagnumber: Final[str]  # undocumented
+Number: Final[str]  # undocumented
 
 def _all_string_prefixes() -> set[str]: ...  # undocumented
 
-StringPrefix: str  # undocumented
+StringPrefix: Final[str]  # undocumented
 
-Single: str  # undocumented
-Double: str  # undocumented
-Single3: str  # undocumented
-Double3: str  # undocumented
-Triple: str  # undocumented
-String: str  # undocumented
+Single: Final[str]  # undocumented
+Double: Final[str]  # undocumented
+Single3: Final[str]  # undocumented
+Double3: Final[str]  # undocumented
+Triple: Final[str]  # undocumented
+String: Final[str]  # undocumented
 
-Special: str  # undocumented
-Funny: str  # undocumented
+Special: Final[str]  # undocumented
+Funny: Final[str]  # undocumented
 
-PlainToken: str  # undocumented
-Token: str  # undocumented
+PlainToken: Final[str]  # undocumented
+Token: Final[str]  # undocumented
 
-ContStr: str  # undocumented
-PseudoExtras: str  # undocumented
-PseudoToken: str  # undocumented
+ContStr: Final[str]  # undocumented
+PseudoExtras: Final[str]  # undocumented
+PseudoToken: Final[str]  # undocumented
 
-endpats: dict[str, str]  # undocumented
-single_quoted: set[str]  # undocumented
-triple_quoted: set[str]  # undocumented
+endpats: Final[dict[str, str]]  # undocumented
+single_quoted: Final[set[str]]  # undocumented
+triple_quoted: Final[set[str]]  # undocumented
 
-tabsize: int  # undocumented
+tabsize: Final = 8  # undocumented

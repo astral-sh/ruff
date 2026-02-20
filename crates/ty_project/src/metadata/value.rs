@@ -28,8 +28,11 @@ pub enum ValueSource {
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
 
-    /// The value comes from an LSP client configuration.
-    PythonVSCodeExtension,
+    /// The value comes from the user's editor,
+    /// while it's left open if specified as a setting
+    /// or if the value was auto-discovered by the editor
+    /// (e.g., the Python environment)
+    Editor,
 }
 
 impl ValueSource {
@@ -37,7 +40,7 @@ impl ValueSource {
         match self {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
-            ValueSource::PythonVSCodeExtension => None,
+            ValueSource::Editor => None,
         }
     }
 
@@ -86,7 +89,6 @@ impl Drop for ValueSourceGuard {
 /// or if the values were loaded from different sources.
 #[derive(Clone, serde::Serialize, get_size2::GetSize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RangedValue<T> {
     value: T,
     #[serde(skip)]
@@ -100,6 +102,34 @@ pub struct RangedValue<T> {
     range: Option<TextRange>,
 }
 
+#[cfg(feature = "schemars")]
+impl<T> schemars::JsonSchema for RangedValue<T>
+where
+    T: schemars::JsonSchema,
+{
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        T::schema_name()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        T::schema_id()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        T::json_schema(generator)
+    }
+
+    fn _schemars_private_non_optional_json_schema(
+        generator: &mut schemars::SchemaGenerator,
+    ) -> schemars::Schema {
+        T::_schemars_private_non_optional_json_schema(generator)
+    }
+
+    fn _schemars_private_is_option() -> bool {
+        T::_schemars_private_is_option()
+    }
+}
+
 impl<T> RangedValue<T> {
     pub fn new(value: T, source: ValueSource) -> Self {
         Self::with_range(value, source, TextRange::default())
@@ -110,11 +140,7 @@ impl<T> RangedValue<T> {
     }
 
     pub fn python_extension(value: T) -> Self {
-        Self::with_range(
-            value,
-            ValueSource::PythonVSCodeExtension,
-            TextRange::default(),
-        )
+        Self::with_range(value, ValueSource::Editor, TextRange::default())
     }
 
     pub fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
@@ -153,14 +179,13 @@ impl<T> RangedValue<T> {
     }
 }
 
-impl<T> Combine for RangedValue<T> {
-    fn combine(self, _other: Self) -> Self
-    where
-        Self: Sized,
-    {
-        self
+impl<T> Combine for RangedValue<T>
+where
+    T: Combine,
+{
+    fn combine_with(&mut self, other: Self) {
+        self.value.combine_with(other.value);
     }
-    fn combine_with(&mut self, _other: Self) {}
 }
 
 impl<T> IntoIterator for RangedValue<T>
@@ -341,7 +366,7 @@ impl RelativePathBuf {
     }
 
     pub fn python_extension(path: impl AsRef<SystemPath>) -> Self {
-        Self::new(path, ValueSource::PythonVSCodeExtension)
+        Self::new(path, ValueSource::Editor)
     }
 
     /// Returns the relative path as specified by the user.
@@ -371,10 +396,32 @@ impl RelativePathBuf {
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
+            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
         };
 
-        SystemPath::absolute(&self.0, relative_to)
+        // Expand tildes and environment variables in the path (e.g. `~/.cache/foo`).
+        // Use `full_with_context` to route lookups through the `System` trait,
+        // ensuring correct behavior in tests, WASM, and the LSP.
+        let expanded = shellexpand::full_with_context(
+            self.0.as_str(),
+            || system.env_var("HOME").ok(),
+            |var| match system.env_var(var) {
+                Ok(val) => Ok(Some(val)),
+                Err(std::env::VarError::NotPresent) => Ok(None),
+                Err(e) => Err(e),
+            },
+        );
+
+        match &expanded {
+            Ok(path) => SystemPath::absolute(SystemPath::new(path.as_ref()), relative_to),
+            Err(err) => {
+                tracing::warn!(
+                    "Failed to expand variables in path `{}`: {err}",
+                    self.0.as_str()
+                );
+                SystemPath::absolute(&self.0, relative_to)
+            }
+        }
     }
 }
 
@@ -410,14 +457,6 @@ impl RelativeGlobPattern {
         Self::new(pattern, ValueSource::Cli)
     }
 
-    pub(crate) fn source(&self) -> &ValueSource {
-        self.0.source()
-    }
-
-    pub(crate) fn range(&self) -> Option<TextRange> {
-        self.0.range()
-    }
-
     /// Resolves the absolute pattern for `self` based on its origin.
     pub(crate) fn absolute(
         &self,
@@ -427,16 +466,95 @@ impl RelativeGlobPattern {
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
+            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
         };
 
         let pattern = PortableGlobPattern::parse(&self.0, kind)?;
         Ok(pattern.into_absolute(relative_to))
+    }
+
+    pub(crate) fn value(&self) -> &RangedValue<String> {
+        &self.0
     }
 }
 
 impl std::fmt::Display for RelativeGlobPattern {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         self.0.fmt(f)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::Arc;
+
+    use ruff_db::system::{SystemPath, SystemPathBuf, TestSystem};
+
+    use super::{RelativePathBuf, ValueSource};
+
+    #[test]
+    fn tilde_expansion_uses_system_env() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/test/home");
+
+        let path = RelativePathBuf::new(
+            "~/projects",
+            ValueSource::File(Arc::new(SystemPathBuf::from("/project"))),
+        );
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/test/home/projects"));
+    }
+
+    #[test]
+    fn env_var_expansion_uses_system_env() {
+        let system = TestSystem::default();
+        system.set_env_var("MY_DIR", "/custom/dir");
+
+        let path = RelativePathBuf::new(
+            "$MY_DIR/sub",
+            ValueSource::File(Arc::new(SystemPathBuf::from("/project"))),
+        );
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/custom/dir/sub"));
+    }
+
+    #[test]
+    fn undefined_env_var_falls_back_to_literal() {
+        let system = TestSystem::default();
+
+        let path = RelativePathBuf::new(
+            "$NONEXISTENT/foo",
+            ValueSource::File(Arc::new(SystemPathBuf::from("/project"))),
+        );
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        // When the variable is not found, the original path is used as a fallback.
+        assert_eq!(resolved, SystemPathBuf::from("/project/$NONEXISTENT/foo"));
+    }
+
+    #[test]
+    fn no_expansion_needed() {
+        let system = TestSystem::default();
+
+        let path = RelativePathBuf::new(
+            "src/lib.rs",
+            ValueSource::File(Arc::new(SystemPathBuf::from("/project"))),
+        );
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/project/src/lib.rs"));
+    }
+
+    #[test]
+    fn cli_source_resolves_relative_to_cwd() {
+        let system = TestSystem::default();
+        system.set_env_var("HOME", "/test/home");
+
+        let path = RelativePathBuf::cli("~/config");
+        let resolved = path.absolute(SystemPath::new("/project"), &system);
+
+        assert_eq!(resolved, SystemPathBuf::from("/test/home/config"));
     }
 }

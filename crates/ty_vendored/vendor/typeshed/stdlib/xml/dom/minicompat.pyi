@@ -14,6 +14,7 @@ _T = TypeVar("_T")
 StringTypes: tuple[type[str]]
 
 class NodeList(list[_T]):
+    __slots__ = ()
     @property
     def length(self) -> int:
         """The number of nodes in the NodeList."""
@@ -21,6 +22,7 @@ class NodeList(list[_T]):
     def item(self, index: int) -> _T | None: ...
 
 class EmptyNodeList(tuple[()]):
+    __slots__ = ()
     @property
     def length(self) -> Literal[0]:
         """The number of nodes in the NodeList."""

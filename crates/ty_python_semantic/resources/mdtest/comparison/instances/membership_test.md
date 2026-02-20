@@ -21,9 +21,9 @@ class A:
 
 reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
-# error: [unsupported-operator] "Operator `in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[42]` and `A`"
 reveal_type(42 in A())  # revealed: bool
-# error: [unsupported-operator] "Operator `not in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
+# error: [unsupported-operator] "Operator `not in` is not supported between objects of type `Literal[42]` and `A`"
 reveal_type(42 not in A())  # revealed: bool
 ```
 
@@ -63,6 +63,27 @@ reveal_type("hello" in A())  # revealed: bool
 reveal_type("hello" not in A())  # revealed: bool
 reveal_type(42 in A())  # revealed: bool
 reveal_type(42 not in A())  # revealed: bool
+```
+
+## `__contains__` implemented via descriptor
+
+If `__contains__` is implemented as a descriptor (e.g., a class with `__get__` that returns a
+callable), the descriptor protocol should be properly invoked:
+
+```py
+class Target:
+    def __call__(self, item: object) -> bool:
+        return True
+
+class Descriptor:
+    def __get__(self, instance: object, owner: type) -> Target:
+        return Target()
+
+class Container:
+    __contains__: Descriptor = Descriptor()
+
+reveal_type(1 in Container())  # revealed: bool
+reveal_type("hello" not in Container())  # revealed: bool
 ```
 
 ## Wrong Return Type
@@ -127,9 +148,9 @@ class A:
 
 reveal_type(CheckContains() in A())  # revealed: bool
 
-# error: [unsupported-operator] "Operator `in` is not supported for types `CheckIter` and `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `CheckIter` and `A`"
 reveal_type(CheckIter() in A())  # revealed: bool
-# error: [unsupported-operator] "Operator `in` is not supported for types `CheckGetItem` and `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `CheckGetItem` and `A`"
 reveal_type(CheckGetItem() in A())  # revealed: bool
 
 class B:
@@ -155,9 +176,9 @@ class A:
     def __getitem__(self, key: str) -> str:
         return "foo"
 
-# error: [unsupported-operator] "Operator `in` is not supported for types `int` and `A`, in comparing `Literal[42]` with `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal[42]` and `A`"
 reveal_type(42 in A())  # revealed: bool
-# error: [unsupported-operator] "Operator `in` is not supported for types `str` and `A`, in comparing `Literal["hello"]` with `A`"
+# error: [unsupported-operator] "Operator `in` is not supported between objects of type `Literal["hello"]` and `A`"
 reveal_type("hello" in A())  # revealed: bool
 ```
 

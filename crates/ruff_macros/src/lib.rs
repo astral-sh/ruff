@@ -82,7 +82,7 @@ pub fn cache_key(input: TokenStream) -> TokenStream {
     TokenStream::from(stream)
 }
 
-#[proc_macro_derive(ViolationMetadata)]
+#[proc_macro_derive(ViolationMetadata, attributes(violation_metadata))]
 pub fn derive_violation_metadata(item: TokenStream) -> TokenStream {
     let input: DeriveInput = parse_macro_input!(item);
 

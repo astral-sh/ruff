@@ -19,10 +19,11 @@ mod tests {
 
     use crate::pyproject_toml::lint_pyproject_toml;
     use crate::registry::Rule;
+    use crate::rules::pydocstyle::settings::Settings as PydocstyleSettings;
     use crate::settings::LinterSettings;
     use crate::settings::types::{CompiledPerFileIgnoreList, PerFileIgnore, PreviewMode};
     use crate::test::{test_path, test_resource_path};
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"))]
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005_slices.py"))]
@@ -85,6 +86,7 @@ mod tests {
     #[test_case(Rule::InvalidAssertMessageLiteralArgument, Path::new("RUF040.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.py"))]
     #[test_case(Rule::UnnecessaryNestedLiteral, Path::new("RUF041.pyi"))]
+    #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_CR.py"))]
     #[test_case(Rule::UnnecessaryCastToInt, Path::new("RUF046_LF.py"))]
@@ -96,7 +98,8 @@ mod tests {
     #[test_case(Rule::MapIntVersionParsing, Path::new("RUF048_1.py"))]
     #[test_case(Rule::DataclassEnum, Path::new("RUF049.py"))]
     #[test_case(Rule::IfKeyInDictDel, Path::new("RUF051.py"))]
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"))]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"))]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_1.py"))]
     #[test_case(Rule::ClassWithMixedTypeVars, Path::new("RUF053.py"))]
     #[test_case(Rule::FalsyDictGetFallback, Path::new("RUF056.py"))]
     #[test_case(Rule::UnnecessaryRound, Path::new("RUF057.py"))]
@@ -113,9 +116,15 @@ mod tests {
     #[test_case(Rule::MultipleYieldsInContextManager, Path::new("RUF062_0.py"))]
     #[test_case(Rule::MultipleYieldsInContextManager, Path::new("RUF062_1.py"))]
     #[test_case(Rule::NonOctalPermissions, Path::new("RUF064.py"))]
+    #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_0.py"))]
+    #[test_case(Rule::LoggingEagerConversion, Path::new("RUF065_1.py"))]
+    #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
+    #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
+    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
+    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -127,12 +136,29 @@ mod tests {
     }
 
     #[test]
+    fn missing_fstring_syntax_backslash_py311() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/RUF027_0.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY311.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
     fn prefer_parentheses_getitem_tuple() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF031_prefer_parens.py"),
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
+                    ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -148,6 +174,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
+                    ..super::settings::Settings::default()
                 },
                 unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -229,6 +256,24 @@ mod tests {
     }
 
     #[test]
+    fn property_without_return_custom_decorator() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF066_custom_property_decorator.py"),
+            &LinterSettings {
+                pydocstyle: PydocstyleSettings {
+                    property_decorators: ["my_library.custom_property".to_string()]
+                        .into_iter()
+                        .collect(),
+                    ..PydocstyleSettings::default()
+                },
+                ..LinterSettings::for_rule(Rule::PropertyWithoutReturn)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn confusables() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
@@ -242,6 +287,32 @@ mod tests {
             },
         )?;
         assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn confusables_deferred_annotations_diff() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/confusables.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::AmbiguousUnicodeCharacterString,
+                    Rule::AmbiguousUnicodeCharacterDocstring,
+                    Rule::AmbiguousUnicodeCharacterComment,
+                ])
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
+                ..settings::LinterSettings::for_rules(vec![
+                    Rule::AmbiguousUnicodeCharacterString,
+                    Rule::AmbiguousUnicodeCharacterDocstring,
+                    Rule::AmbiguousUnicodeCharacterComment,
+                ])
+            },
+        );
         Ok(())
     }
 
@@ -271,6 +342,24 @@ mod tests {
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
             ]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn range_suppressions() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/suppressions.py"),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedVariable,
+                Rule::AmbiguousVariableName,
+                Rule::UnusedNOQA,
+                Rule::InvalidRuleCode,
+                Rule::InvalidSuppressionComment,
+                Rule::UnmatchedSuppressionComment,
+            ])
+            .with_external_rules(&["TK421"]),
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
@@ -531,15 +620,17 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_1.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_2.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_3.py"))]
-    #[test_case(Rule::PytestRaisesAmbiguousPattern, Path::new("RUF043.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
+    #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
@@ -595,8 +686,8 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"^_+", 1)]
-    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052.py"), r"", 2)]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"), r"^_+", 1)]
+    #[test_case(Rule::UsedDummyVariable, Path::new("RUF052_0.py"), r"", 2)]
     fn custom_regexp_preset(
         rule_code: Rule,
         path: &Path,
@@ -651,13 +742,34 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff").join(path).as_path(),
             &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
                 future_annotations: true,
                 unresolved_target_version: PythonVersion::PY39.into(),
                 ..settings::LinterSettings::for_rule(rule_code)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn strictly_empty_init_modules_ruf067() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/RUF067/modules/__init__.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    strictly_empty_init_modules: false,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::NonEmptyInitModule)
+            },
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    strictly_empty_init_modules: true,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::NonEmptyInitModule)
+            },
+        );
         Ok(())
     }
 }

@@ -13,7 +13,7 @@ mod tests {
     use crate::rules::pep8_naming;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.py"))]
     #[test_case(Rule::AnyEqNeAnnotation, Path::new("PYI032.pyi"))]
@@ -76,6 +76,8 @@ mod tests {
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.py"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.pyi"))]
     #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_2.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_3.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_4.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
     #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
     #[test_case(Rule::StrOrReprDefinedInStub, Path::new("PYI029.py"))]
@@ -138,6 +140,32 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_1.pyi"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_2.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_3.py"))]
+    #[test_case(Rule::RedundantNumericUnion, Path::new("PYI041_4.py"))]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview_{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_pyi").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        );
+        Ok(())
+    }
+
     #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.py"))]
     #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_0.pyi"))]
     #[test_case(Rule::CustomTypeVarForSelf, Path::new("PYI019_1.pyi"))]
@@ -174,22 +202,16 @@ mod tests {
         Ok(())
     }
 
-    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
-    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
-    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
-        let snapshot = format!(
-            "preview__{}_{}",
-            rule_code.noqa_code(),
-            path.to_string_lossy()
-        );
+    #[test_case(Path::new("PYI021_1.pyi"))]
+    fn pyi021_pie790_isolation_check(path: &Path) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_pyi").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
-            },
+            &settings::LinterSettings::for_rules([
+                Rule::DocstringInStub,
+                Rule::UnnecessaryPlaceholder,
+            ]),
         )?;
-        assert_diagnostics!(snapshot, diagnostics);
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 }

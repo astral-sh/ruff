@@ -1,4 +1,4 @@
-use std::{fmt::Formatter, path::Path, sync::Arc};
+use std::{borrow::Cow, fmt::Formatter, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -7,8 +7,9 @@ use ruff_annotate_snippets::Level as AnnotateLevel;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
-    DisplayDiagnostic, DisplayDiagnostics, FileResolver, Input, ceil_char_boundary,
+    DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
 };
+use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
 
 mod render;
@@ -62,12 +63,15 @@ impl Diagnostic {
             id,
             severity,
             message: message.into_diagnostic_message(),
+            custom_concise_message: None,
+            documentation_url: None,
             annotations: vec![],
             subs: vec![],
             fix: None,
             parent: None,
             noqa_offset: None,
             secondary_code: None,
+            header_offset: 0,
         });
         Diagnostic { inner }
     }
@@ -81,18 +85,53 @@ impl Diagnostic {
     /// at time of writing, `ruff_db` depends on `ruff_python_parser` instead of
     /// the other way around. And since we want to do this conversion in a couple
     /// places, it makes sense to centralize it _somewhere_. So it's here for now.
-    ///
-    /// Note that `message` is stored in the primary annotation, _not_ in the primary diagnostic
-    /// message.
     pub fn invalid_syntax(
         span: impl Into<Span>,
         message: impl IntoDiagnosticMessage,
         range: impl Ranged,
     ) -> Diagnostic {
-        let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, "");
+        let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
         let span = span.into().with_range(range.range());
-        diag.annotate(Annotation::primary(span).message(message));
+        diag.annotate(Annotation::primary(span));
         diag
+    }
+
+    /// Adds sub diagnostics that tell the user that this is a bug in ty
+    /// and asks them to open an issue on GitHub.
+    pub fn add_bug_sub_diagnostics(&mut self, url_encoded_title: &str) {
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "This indicates a bug in ty.",
+        ));
+
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title={url_encoded_title}, we'd be very appreciative!"
+            ),
+        ));
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format!(
+                "Platform: {os} {arch}",
+                os = std::env::consts::OS,
+                arch = std::env::consts::ARCH
+            ),
+        ));
+        if let Some(version) = crate::program_version() {
+            self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("Version: {version}"),
+            ));
+        }
+
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format!(
+                "Args: {args:?}",
+                args = std::env::args().collect::<Vec<_>>()
+            ),
+        ));
     }
 
     /// Add an annotation to this diagnostic.
@@ -164,28 +203,8 @@ impl Diagnostic {
     /// Returns the primary message for this diagnostic.
     ///
     /// A diagnostic always has a message, but it may be empty.
-    ///
-    /// NOTE: At present, this routine will return the first primary
-    /// annotation's message as the primary message when the main diagnostic
-    /// message is empty. This is meant to facilitate an incremental migration
-    /// in ty over to the new diagnostic data model. (The old data model
-    /// didn't distinguish between messages on the entire diagnostic and
-    /// messages attached to a particular span.)
     pub fn primary_message(&self) -> &str {
-        if !self.inner.message.as_str().is_empty() {
-            return self.inner.message.as_str();
-        }
-        // FIXME: As a special case, while we're migrating ty
-        // to the new diagnostic data model, we'll look for a primary
-        // message from the primary annotation. This is because most
-        // ty diagnostics are created with an empty diagnostic
-        // message and instead attach the message to the annotation.
-        // Fixing this will require touching basically every diagnostic
-        // in ty, so we do it this way for now to match the old
-        // semantics. ---AG
-        self.primary_annotation()
-            .and_then(|ann| ann.get_message())
-            .unwrap_or_default()
+        self.inner.message.as_str()
     }
 
     /// Introspects this diagnostic and returns what kind of "primary" message
@@ -197,33 +216,33 @@ impl Diagnostic {
     /// contains *essential* information or context for understanding the
     /// diagnostic.
     ///
-    /// The reason why we don't just always return both the main diagnostic
-    /// message and the primary annotation message is because this was written
-    /// in the midst of an incremental migration of ty over to the new
-    /// diagnostic data model. At time of writing, diagnostics were still
-    /// constructed in the old model where the main diagnostic message and the
-    /// primary annotation message were not distinguished from each other. So
-    /// for now, we carefully return what kind of messages this diagnostic
-    /// contains. In effect, if this diagnostic has a non-empty main message
-    /// *and* a non-empty primary annotation message, then the diagnostic is
-    /// 100% using the new diagnostic data model and we can format things
-    /// appropriately.
-    ///
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
     pub fn concise_message(&self) -> ConciseMessage<'_> {
+        if let Some(custom_message) = &self.inner.custom_concise_message {
+            return ConciseMessage::Custom(custom_message.as_str());
+        }
+
         let main = self.inner.message.as_str();
         let annotation = self
             .primary_annotation()
             .and_then(|ann| ann.get_message())
             .unwrap_or_default();
-        match (main.is_empty(), annotation.is_empty()) {
-            (false, true) => ConciseMessage::MainDiagnostic(main),
-            (true, false) => ConciseMessage::PrimaryAnnotation(annotation),
-            (false, false) => ConciseMessage::Both { main, annotation },
-            (true, true) => ConciseMessage::Empty,
+        if annotation.is_empty() {
+            ConciseMessage::MainDiagnostic(main)
+        } else {
+            ConciseMessage::Both { main, annotation }
         }
+    }
+
+    /// Set a custom message for the concise formatting of this diagnostic.
+    ///
+    /// This overrides the default behavior of generating a concise message
+    /// from the main diagnostic message and the primary annotation.
+    pub fn set_concise_message(&mut self, message: impl IntoDiagnosticMessage) {
+        Arc::make_mut(&mut self.inner).custom_concise_message =
+            Some(message.into_diagnostic_message());
     }
 
     /// Returns the severity of this diagnostic.
@@ -325,6 +344,11 @@ impl Diagnostic {
         self.inner.fix.as_ref()
     }
 
+    #[cfg(test)]
+    pub(crate) fn fix_mut(&mut self) -> Option<&mut Fix> {
+        Arc::make_mut(&mut self.inner).fix.as_mut()
+    }
+
     /// Set the fix for this diagnostic.
     pub fn set_fix(&mut self, fix: Fix) {
         debug_assert!(
@@ -332,6 +356,13 @@ impl Diagnostic {
             "Expected a source file for a diagnostic with a fix"
         );
         Arc::make_mut(&mut self.inner).fix = Some(fix);
+    }
+
+    /// If `fix` is `Some`, set the fix for this diagnostic.
+    pub fn set_optional_fix(&mut self, fix: Option<Fix>) {
+        if let Some(fix) = fix {
+            self.set_fix(fix);
+        }
     }
 
     /// Remove the fix for this diagnostic.
@@ -342,6 +373,21 @@ impl Diagnostic {
     /// Returns `true` if the diagnostic contains a [`Fix`].
     pub fn fixable(&self) -> bool {
         self.fix().is_some()
+    }
+
+    /// Returns `true` if the diagnostic is [`fixable`](Diagnostic::fixable) and applies at the
+    /// configured applicability level.
+    pub fn has_applicable_fix(&self, config: &DisplayDiagnosticConfig) -> bool {
+        self.fix()
+            .is_some_and(|fix| fix.applies(config.fix_applicability))
+    }
+
+    pub fn documentation_url(&self) -> Option<&str> {
+        self.inner.documentation_url.as_deref()
+    }
+
+    pub fn set_documentation_url(&mut self, url: Option<String>) {
+        Arc::make_mut(&mut self.inner).documentation_url = url;
     }
 
     /// Returns the offset of the parent statement for this diagnostic if it exists.
@@ -401,11 +447,6 @@ impl Diagnostic {
         self.id().is_invalid_syntax()
     }
 
-    /// Returns the message body to display to the user.
-    pub fn body(&self) -> &str {
-        self.primary_message()
-    }
-
     /// Returns the message of the first sub-diagnostic with a `Help` severity.
     ///
     /// Note that this is used as the fix title/suggestion for some of Ruff's output formats, but in
@@ -415,19 +456,6 @@ impl Diagnostic {
             .iter()
             .find(|sub| matches!(sub.inner.severity, SubDiagnosticSeverity::Help))
             .map(|sub| sub.inner.message.as_str())
-    }
-
-    /// Returns the URL for the rule documentation, if it exists.
-    pub fn to_ruff_url(&self) -> Option<String> {
-        if self.is_invalid_syntax() {
-            None
-        } else {
-            Some(format!(
-                "{}/rules/{}",
-                env!("CARGO_PKG_HOMEPAGE"),
-                self.name()
-            ))
-        }
     }
 
     /// Returns the filename for the message.
@@ -442,24 +470,26 @@ impl Diagnostic {
 
     /// Computes the start source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_start_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().start())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_start_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.start()),
+        )
     }
 
     /// Computes the end source location for the message.
     ///
-    /// Panics if the diagnostic has no primary span, if its file is not a `SourceFile`, or if the
-    /// span has no range.
-    pub fn expect_ruff_end_location(&self) -> LineColumn {
-        self.expect_primary_span()
-            .expect_ruff_file()
-            .to_source_code()
-            .line_column(self.expect_range().end())
+    /// Returns None if the diagnostic has no primary span, if its file is not a `SourceFile`,
+    /// or if the span has no range.
+    pub fn ruff_end_location(&self) -> Option<LineColumn> {
+        Some(
+            self.ruff_source_file()?
+                .to_source_code()
+                .line_column(self.range()?.end()),
+        )
     }
 
     /// Returns the [`SourceFile`] which the message belongs to.
@@ -480,36 +510,44 @@ impl Diagnostic {
         self.primary_span()?.range()
     }
 
-    /// Returns the [`TextRange`] for the diagnostic.
-    ///
-    /// Panics if the diagnostic has no primary span or if the span has no range.
-    pub fn expect_range(&self) -> TextRange {
-        self.range().expect("Expected a range for the primary span")
-    }
-
     /// Returns the ordering of diagnostics based on the start of their ranges, if they have any.
     ///
-    /// Panics if either diagnostic has no primary span, if the span has no range, or if its file is
-    /// not a `SourceFile`.
+    /// Panics if either diagnostic has no primary span, or if its file is not a `SourceFile`.
     pub fn ruff_start_ordering(&self, other: &Self) -> std::cmp::Ordering {
-        (self.expect_ruff_source_file(), self.expect_range().start()).cmp(&(
+        let a = (
+            self.severity().is_fatal(),
+            self.expect_ruff_source_file(),
+            self.range().map(|r| r.start()),
+        );
+        let b = (
+            other.severity().is_fatal(),
             other.expect_ruff_source_file(),
-            other.expect_range().start(),
-        ))
+            other.range().map(|r| r.start()),
+        );
+
+        a.cmp(&b)
+    }
+
+    /// Add an offset for aligning the header sigil with the line number separators in a diff.
+    pub fn set_header_offset(&mut self, offset: usize) {
+        Arc::make_mut(&mut self.inner).header_offset = offset;
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
 struct DiagnosticInner {
     id: DiagnosticId,
+    documentation_url: Option<String>,
     severity: Severity,
     message: DiagnosticMessage,
+    custom_concise_message: Option<DiagnosticMessage>,
     annotations: Vec<Annotation>,
     subs: Vec<SubDiagnostic>,
     fix: Option<Fix>,
     parent: Option<TextSize>,
     noqa_offset: Option<TextSize>,
     secondary_code: Option<SecondaryCode>,
+    header_offset: usize,
 }
 
 struct RenderingSortKey<'a> {
@@ -654,18 +692,6 @@ impl SubDiagnostic {
     /// contains *essential* information or context for understanding the
     /// diagnostic.
     ///
-    /// The reason why we don't just always return both the main diagnostic
-    /// message and the primary annotation message is because this was written
-    /// in the midst of an incremental migration of ty over to the new
-    /// diagnostic data model. At time of writing, diagnostics were still
-    /// constructed in the old model where the main diagnostic message and the
-    /// primary annotation message were not distinguished from each other. So
-    /// for now, we carefully return what kind of messages this diagnostic
-    /// contains. In effect, if this diagnostic has a non-empty main message
-    /// *and* a non-empty primary annotation message, then the diagnostic is
-    /// 100% using the new diagnostic data model and we can format things
-    /// appropriately.
-    ///
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
@@ -675,11 +701,10 @@ impl SubDiagnostic {
             .primary_annotation()
             .and_then(|ann| ann.get_message())
             .unwrap_or_default();
-        match (main.is_empty(), annotation.is_empty()) {
-            (false, true) => ConciseMessage::MainDiagnostic(main),
-            (true, false) => ConciseMessage::PrimaryAnnotation(annotation),
-            (false, false) => ConciseMessage::Both { main, annotation },
-            (true, true) => ConciseMessage::Empty,
+        if annotation.is_empty() {
+            ConciseMessage::MainDiagnostic(main)
+        } else {
+            ConciseMessage::Both { main, annotation }
         }
     }
 }
@@ -727,11 +752,11 @@ pub struct Annotation {
     is_primary: bool,
     /// The diagnostic tags associated with this annotation.
     tags: Vec<DiagnosticTag>,
-    /// Whether this annotation is a file-level or full-file annotation.
+    /// Whether the snippet for this annotation should be hidden.
     ///
     /// When set, rendering will only include the file's name and (optional) range. Everything else
     /// is omitted, including any file snippet or message.
-    is_file_level: bool,
+    hide_snippet: bool,
 }
 
 impl Annotation {
@@ -750,7 +775,7 @@ impl Annotation {
             message: None,
             is_primary: true,
             tags: Vec::new(),
-            is_file_level: false,
+            hide_snippet: false,
         }
     }
 
@@ -767,7 +792,7 @@ impl Annotation {
             message: None,
             is_primary: false,
             tags: Vec::new(),
-            is_file_level: false,
+            hide_snippet: false,
         }
     }
 
@@ -834,19 +859,24 @@ impl Annotation {
         self.tags.push(tag);
     }
 
-    /// Set whether or not this annotation is file-level.
+    /// Set whether or not the snippet on this annotation should be suppressed when rendering.
     ///
-    /// File-level annotations are only rendered with their file name and range, if available. This
-    /// is intended for backwards compatibility with Ruff diagnostics, which historically used
+    /// Such annotations are only rendered with their file name and range, if available. This is
+    /// intended for backwards compatibility with Ruff diagnostics, which historically used
     /// `TextRange::default` to indicate a file-level diagnostic. In the new diagnostic model, a
     /// [`Span`] with a range of `None` should be used instead, as mentioned in the `Span`
     /// documentation.
     ///
     /// TODO(brent) update this usage in Ruff and remove `is_file_level` entirely. See
     /// <https://github.com/astral-sh/ruff/issues/19688>, especially my first comment, for more
-    /// details.
-    pub fn set_file_level(&mut self, yes: bool) {
-        self.is_file_level = yes;
+    /// details. As of 2025-09-26 we also use this to suppress snippet rendering for formatter
+    /// diagnostics, which also need to have a range, so we probably can't eliminate this entirely.
+    pub fn hide_snippet(&mut self, yes: bool) {
+        self.hide_snippet = yes;
+    }
+
+    pub fn is_primary(&self) -> bool {
+        self.is_primary
     }
 }
 
@@ -1001,6 +1031,20 @@ pub enum DiagnosticId {
 
     /// Use of a deprecated setting.
     DeprecatedSetting,
+
+    /// The code needs to be formatted.
+    Unformatted,
+
+    /// Use of an invalid command-line option.
+    InvalidCliOption,
+
+    /// Experimental feature requires preview mode.
+    PreviewFeature,
+
+    /// An internal assumption was violated.
+    ///
+    /// This indicates a bug in the program rather than a user error.
+    InternalError,
 }
 
 impl DiagnosticId {
@@ -1012,6 +1056,13 @@ impl DiagnosticId {
     /// Returns `true` if this `DiagnosticId` represents a lint.
     pub fn is_lint(&self) -> bool {
         matches!(self, DiagnosticId::Lint(_))
+    }
+
+    pub const fn as_lint(&self) -> Option<LintName> {
+        match self {
+            DiagnosticId::Lint(name) => Some(*name),
+            _ => None,
+        }
     }
 
     /// Returns `true` if this `DiagnosticId` represents a lint with the given name.
@@ -1040,6 +1091,10 @@ impl DiagnosticId {
             DiagnosticId::UnnecessaryOverridesSection => "unnecessary-overrides-section",
             DiagnosticId::UselessOverridesSection => "useless-overrides-section",
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
+            DiagnosticId::Unformatted => "unformatted",
+            DiagnosticId::InvalidCliOption => "invalid-cli-option",
+            DiagnosticId::PreviewFeature => "preview-feature",
+            DiagnosticId::InternalError => "internal-error",
         }
     }
 
@@ -1264,6 +1319,8 @@ impl SubDiagnosticSeverity {
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
+    /// The program name used in structured output formats (e.g., JUnit, GitHub).
+    program: &'static str,
     /// The format to use for diagnostic rendering.
     ///
     /// This uses the "full" format by default.
@@ -1294,11 +1351,32 @@ pub struct DisplayDiagnosticConfig {
     hide_severity: bool,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
+    /// Whether to show the diff for an available fix after the main diagnostic.
+    ///
+    /// This currently only applies to `DiagnosticFormat::Full`.
+    show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
+
+    cancellation_token: Option<CancellationToken>,
 }
 
 impl DisplayDiagnosticConfig {
+    pub fn new(program: &'static str) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            program,
+            format: DiagnosticFormat::default(),
+            color: false,
+            context: 2,
+            preview: false,
+            hide_severity: false,
+            show_fix_status: false,
+            show_fix_diff: false,
+            fix_applicability: Applicability::Safe,
+            cancellation_token: None,
+        }
+    }
+
     /// Whether to enable concise diagnostic output or not.
     pub fn format(self, format: DiagnosticFormat) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { format, ..self }
@@ -1334,9 +1412,17 @@ impl DisplayDiagnosticConfig {
     }
 
     /// Whether to show a fix's availability or not.
-    pub fn show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
+    pub fn with_show_fix_status(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             show_fix_status: yes,
+            ..self
+        }
+    }
+
+    /// Whether to show a diff for an available fix after the main diagnostic.
+    pub fn show_fix_diff(self, yes: bool) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            show_fix_diff: yes,
             ..self
         }
     }
@@ -1347,25 +1433,33 @@ impl DisplayDiagnosticConfig {
     /// availability for unsafe or display-only fixes.
     ///
     /// Note that this option is currently ignored when `hide_severity` is false.
-    pub fn fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
+    pub fn with_fix_applicability(self, applicability: Applicability) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             fix_applicability: applicability,
             ..self
         }
     }
-}
 
-impl Default for DisplayDiagnosticConfig {
-    fn default() -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
-            format: DiagnosticFormat::default(),
-            color: false,
-            context: 2,
-            preview: false,
-            hide_severity: false,
-            show_fix_status: false,
-            fix_applicability: Applicability::Safe,
-        }
+    pub fn show_fix_status(&self) -> bool {
+        self.show_fix_status
+    }
+
+    pub fn fix_applicability(&self) -> Applicability {
+        self.fix_applicability
+    }
+
+    pub fn with_cancellation_token(
+        mut self,
+        token: Option<CancellationToken>,
+    ) -> DisplayDiagnosticConfig {
+        self.cancellation_token = token;
+        self
+    }
+
+    pub fn is_canceled(&self) -> bool {
+        self.cancellation_token
+            .as_ref()
+            .is_some_and(|token| token.is_cancelled())
     }
 }
 
@@ -1417,34 +1511,37 @@ pub enum DiagnosticFormat {
     /// Print diagnostics in the format expected by JUnit.
     #[cfg(feature = "junit")]
     Junit,
+    /// Print diagnostics in the JSON format used by GitLab [Code Quality] reports.
+    ///
+    /// [Code Quality]: https://docs.gitlab.com/ci/testing/code_quality/#code-quality-report-format
+    #[cfg(feature = "serde")]
+    Gitlab,
+
+    /// Print diagnostics in the format used by [GitHub Actions] workflow error annotations.
+    ///
+    /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
+    Github,
 }
 
 /// A representation of the kinds of messages inside a diagnostic.
 pub enum ConciseMessage<'a> {
     /// A diagnostic contains a non-empty main message and an empty
     /// primary annotation message.
-    ///
-    /// This strongly suggests that the diagnostic is using the
-    /// "new" data model.
     MainDiagnostic(&'a str),
-    /// A diagnostic contains an empty main message and a non-empty
-    /// primary annotation message.
-    ///
-    /// This strongly suggests that the diagnostic is using the
-    /// "old" data model.
-    PrimaryAnnotation(&'a str),
     /// A diagnostic contains a non-empty main message and a non-empty
     /// primary annotation message.
-    ///
-    /// This strongly suggests that the diagnostic is using the
-    /// "new" data model.
     Both { main: &'a str, annotation: &'a str },
-    /// A diagnostic contains an empty main message and an empty
-    /// primary annotation message.
-    ///
-    /// This indicates that the diagnostic is probably using the old
-    /// model.
-    Empty,
+    /// A custom concise message has been provided.
+    Custom(&'a str),
+}
+
+impl<'a> ConciseMessage<'a> {
+    pub fn to_str(&self) -> Cow<'a, str> {
+        match self {
+            ConciseMessage::MainDiagnostic(s) | ConciseMessage::Custom(s) => Cow::Borrowed(s),
+            ConciseMessage::Both { .. } => Cow::Owned(self.to_string()),
+        }
+    }
 }
 
 impl std::fmt::Display for ConciseMessage<'_> {
@@ -1453,14 +1550,23 @@ impl std::fmt::Display for ConciseMessage<'_> {
             ConciseMessage::MainDiagnostic(main) => {
                 write!(f, "{main}")
             }
-            ConciseMessage::PrimaryAnnotation(annotation) => {
-                write!(f, "{annotation}")
-            }
             ConciseMessage::Both { main, annotation } => {
                 write!(f, "{main}: {annotation}")
             }
-            ConciseMessage::Empty => Ok(()),
+            ConciseMessage::Custom(message) => {
+                write!(f, "{message}")
+            }
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for ConciseMessage<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
     }
 }
 

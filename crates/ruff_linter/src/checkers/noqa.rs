@@ -6,7 +6,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashSet;
 
 use ruff_python_trivia::CommentRanges;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::fix::edits::delete_comment;
 use crate::noqa::{
@@ -18,11 +18,13 @@ use crate::rules::pygrep_hooks;
 use crate::rules::ruff;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
+use crate::suppression::Suppressions;
 use crate::{Edit, Fix, Locator};
 
 use super::ast::LintContext;
 
 /// RUF100
+#[expect(clippy::too_many_arguments)]
 pub(crate) fn check_noqa(
     context: &mut LintContext,
     path: &Path,
@@ -31,16 +33,16 @@ pub(crate) fn check_noqa(
     noqa_line_for: &NoqaMapping,
     analyze_directives: bool,
     settings: &LinterSettings,
+    suppressions: &Suppressions,
 ) -> Vec<usize> {
     // Identify any codes that are globally exempted (within the current file).
     let file_noqa_directives =
         FileNoqaDirectives::extract(locator, comment_ranges, &settings.external, path);
 
     // Extract all `noqa` directives.
-    let mut noqa_directives =
-        NoqaDirectives::from_commented_ranges(comment_ranges, &settings.external, path, locator);
+    let mut noqa_directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
-    if file_noqa_directives.is_empty() && noqa_directives.is_empty() {
+    if file_noqa_directives.is_empty() && noqa_directives.is_empty() && suppressions.is_empty() {
         return Vec::new();
     }
 
@@ -60,15 +62,23 @@ pub(crate) fn check_noqa(
             continue;
         }
 
+        // Apply file-level suppressions first
         if exemption.contains_secondary_code(code) {
             ignored_diagnostics.push(index);
             continue;
         }
 
+        // Apply ranged suppressions next
+        if suppressions.check_diagnostic(diagnostic) {
+            ignored_diagnostics.push(index);
+            continue;
+        }
+
+        // Apply end-of-line noqa suppressions last
         let noqa_offsets = diagnostic
             .parent()
             .into_iter()
-            .chain(std::iter::once(diagnostic.expect_range().start()))
+            .chain(diagnostic.range().map(TextRange::start).into_iter())
             .map(|position| noqa_line_for.resolve(position))
             .unique();
 
@@ -107,6 +117,9 @@ pub(crate) fn check_noqa(
         }
     }
 
+    // Diagnostics for unused/invalid range suppressions
+    suppressions.check_suppressions(context, locator);
+
     // Enforce that the noqa directive was actually used (RUF100), unless RUF100 was itself
     // suppressed.
     if context.is_rule_enabled(Rule::UnusedNOQA)
@@ -128,8 +141,14 @@ pub(crate) fn check_noqa(
                 Directive::All(directive) => {
                     if matches.is_empty() {
                         let edit = delete_comment(directive.range(), locator);
-                        let mut diagnostic = context
-                            .report_diagnostic(UnusedNOQA { codes: None }, directive.range());
+                        let mut diagnostic = context.report_diagnostic(
+                            UnusedNOQA {
+                                codes: None,
+                                kind: ruff::rules::UnusedNOQAKind::Noqa,
+                            },
+                            directive.range(),
+                        );
+                        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     }
                 }
@@ -223,9 +242,11 @@ pub(crate) fn check_noqa(
                                         .map(|code| (*code).to_string())
                                         .collect(),
                                 }),
+                                kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },
                             directive.range(),
                         );
+                        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
                         diagnostic.set_fix(Fix::safe_edit(edit));
                     }
                 }

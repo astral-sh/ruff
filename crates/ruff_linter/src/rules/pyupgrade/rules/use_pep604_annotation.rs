@@ -3,6 +3,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
+use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -44,9 +45,10 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors when
 /// alongside libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10. It may also lead to runtime errors
-/// in unusual and likely incorrect type annotations where the type does not
-/// support the `|` operator.
+/// on Python versions prior to Python 3.10, or as it may remove comments if they
+/// are present within the type annotation being rewritten. It may also lead to
+/// runtime errors in unusual and likely incorrect type annotations where the type
+/// does not  support the `|` operator.
 ///
 /// ## Options
 /// - `target-version`
@@ -54,6 +56,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct NonPEP604AnnotationUnion;
 
 impl Violation for NonPEP604AnnotationUnion {
@@ -100,8 +103,9 @@ impl Violation for NonPEP604AnnotationUnion {
 /// ## Fix safety
 /// This rule's fix is marked as unsafe, as it may lead to runtime errors
 /// using libraries that rely on runtime type annotations, like Pydantic,
-/// on Python versions prior to Python 3.10. It may also lead to runtime errors
-/// in unusual and likely incorrect type annotations where the type does not
+/// on Python versions prior to Python 3.10, or as it may remove comments if they
+/// are present within the type annotation being rewritten. It may also lead to runtime
+/// errors in unusual and likely incorrect type annotations where the type does not
 /// support the `|` operator.
 ///
 /// ## Options
@@ -110,6 +114,7 @@ impl Violation for NonPEP604AnnotationUnion {
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct NonPEP604AnnotationOptional;
 
 impl Violation for NonPEP604AnnotationOptional {
@@ -150,7 +155,9 @@ pub(crate) fn non_pep604_annotation(
         && is_allowed_value(slice)
         && !is_optional_none(operator, slice);
 
-    let applicability = if checker.target_version() >= PythonVersion::PY310 {
+    let has_comments = checker.comment_ranges().intersects(expr.range());
+
+    let applicability = if checker.target_version() >= PythonVersion::PY310 && !has_comments {
         Applicability::Safe
     } else {
         Applicability::Unsafe
@@ -224,13 +231,19 @@ pub(crate) fn non_pep604_annotation(
                     }
                     _ => {
                         // Single argument.
+                        let inner = checker.locator().slice(slice);
+                        let content = if checker.locator().contains_line_break(slice.range()) {
+                            // If the inner expression spans multiple lines, wrap in
+                            // parentheses since the `Union[...]` brackets that
+                            // previously provided implicit line continuation are being
+                            // removed.
+                            format!("({inner})")
+                        } else {
+                            inner.to_string()
+                        };
                         diagnostic.set_fix(Fix::applicable_edit(
                             Edit::range_replacement(
-                                pad(
-                                    checker.locator().slice(slice).to_string(),
-                                    expr.range(),
-                                    checker.locator(),
-                                ),
+                                pad(content, expr.range(), checker.locator()),
                                 expr.range(),
                             ),
                             applicability,

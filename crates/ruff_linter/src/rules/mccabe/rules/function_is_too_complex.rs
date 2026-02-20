@@ -48,6 +48,7 @@ use crate::checkers::ast::Checker;
 /// ## Options
 /// - `lint.mccabe.max-complexity`
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct ComplexStructure {
     name: String,
     complexity: usize,
@@ -502,7 +503,7 @@ def f():
     }
 
     #[test]
-    fn match_case_catch_all_with_seuqnece() -> Result<()> {
+    fn match_case_catch_all_with_sequence() -> Result<()> {
         let source = r"
 def f():
     match subject:

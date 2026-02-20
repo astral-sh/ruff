@@ -50,9 +50,18 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// value = foo.get("bar", 0)
 /// ```
 ///
+/// ## Options
+///
+/// The rule will avoid flagging cases where using the resulting `dict.get` call would exceed the
+/// configured line length, as determined by these options:
+///
+/// - `lint.pycodestyle.max-line-length`
+/// - `indent-width`
+///
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.219")]
 pub(crate) struct IfElseBlockInsteadOfDictGet {
     contents: String,
 }
@@ -190,7 +199,7 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node3 = ast::ExprCall {
         func: Box::new(node2.into()),
@@ -198,17 +207,17 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
             args: Box::from([node1, node]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let node4 = expected_var.clone();
     let node5 = ast::StmtAssign {
         targets: vec![node4],
         value: Box::new(node3.into()),
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let contents = checker.generator().stmt(&node5.into());
 
@@ -299,7 +308,7 @@ pub(crate) fn if_exp_instead_of_dict_get(
         attr: Identifier::new("get".to_string(), TextRange::default()),
         ctx: ExprContext::Load,
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
     let fixed_node = ast::ExprCall {
         func: Box::new(dict_get_node.into()),
@@ -307,10 +316,10 @@ pub(crate) fn if_exp_instead_of_dict_get(
             args: Box::from([dict_key_node, default_value_node]),
             keywords: Box::from([]),
             range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         },
         range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::dummy(),
+        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
 
     let contents = checker.generator().expr(&fixed_node.into());

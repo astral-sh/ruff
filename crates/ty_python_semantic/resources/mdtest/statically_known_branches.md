@@ -1530,7 +1530,7 @@ if flag():
 ```
 
 ```py
-# error: [possibly-unbound-import]
+# error: [possibly-missing-import]
 from module import symbol
 ```
 
@@ -1562,6 +1562,39 @@ if True:
 ```py
 # no error
 from module import symbol
+```
+
+## Non-definitely bound symbols in conditions
+
+When a non-definitely bound symbol is used as a (part of a) condition, we always infer an ambiguous
+truthiness. If we didn't do that, `x` would be considered definitely bound in the following example:
+
+```py
+def _(flag: bool):
+    if flag:
+        ALWAYS_TRUE_IF_BOUND = True
+
+    # error: [possibly-unresolved-reference] "Name `ALWAYS_TRUE_IF_BOUND` used when possibly not defined"
+    if True and ALWAYS_TRUE_IF_BOUND:
+        x = 1
+
+    # no error, x is considered definitely bound
+    x
+```
+
+```py
+def _(flag: bool):
+    if flag:
+        ALWAYS_TRUE_IF_BOUND = True
+
+    # error: [possibly-unresolved-reference] "Name `ALWAYS_TRUE_IF_BOUND` used when possibly not defined"
+    if True and ALWAYS_TRUE_IF_BOUND:
+        x = 1
+    else:
+        x = 2
+
+    # If `ALWAYS_TRUE_IF_BOUND` were not defined, an error would occur, and therefore the `x = 2` branch would never be executed.
+    reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Unreachable code

@@ -11,13 +11,13 @@ use crate::fix;
 use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 
 /// ## What it does
-/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without
-/// `maxsplit=1`
+/// Checks for access to the first or last element of `str.split()` or `str.rsplit()` without a
+/// `maxsplit=1` argument.
 ///
 /// ## Why is this bad?
 /// Calling `str.split()` or `str.rsplit()` without passing `maxsplit=1` splits on every delimiter in the
 /// string. When accessing only the first or last element of the result, it
-/// would be more efficient to only split once.
+/// would be more efficient to split only once.
 ///
 /// ## Example
 /// ```python
@@ -38,12 +38,14 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// ```
 ///
 /// ## Fix Safety
-/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or `**kwargs` arguments, as
-/// adding a `maxsplit` argument to such a call may lead to duplicated arguments.
+/// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or
+/// `**kwargs` arguments, as adding a `maxsplit` argument to such a call may lead to duplicate
+/// arguments.
 #[derive(ViolationMetadata)]
-pub(crate) struct MissingMaxsplitArg {
-    actual_split_type: String,
-    suggested_split_type: String,
+#[violation_metadata(stable_since = "0.15.0")]
+pub(crate) struct MissingMaxsplitArg<'a> {
+    actual_split_type: &'a str,
+    suggested_split_type: &'a str,
 }
 
 /// Represents the index of the slice used for this rule (which can only be 0 or -1)
@@ -52,15 +54,10 @@ enum SliceBoundary {
     Last,
 }
 
-impl AlwaysFixableViolation for MissingMaxsplitArg {
+impl AlwaysFixableViolation for MissingMaxsplitArg<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingMaxsplitArg {
-            actual_split_type: _,
-            suggested_split_type,
-        } = self;
-
-        format!("Replace with `{suggested_split_type}(..., maxsplit=1)`.")
+        "String is split more times than necessary".to_string()
     }
 
     fn fix_title(&self) -> String {
@@ -136,10 +133,31 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
     }
 
     let mut target_instance = value;
-    // a subscripted value could technically be subscripted further ad infinitum, so we
-    // recurse into the subscript expressions until we find the value being subscripted
-    while let Expr::Subscript(ExprSubscript { value, .. }) = target_instance.as_ref() {
-        target_instance = value;
+    // The value being split on could be the result of a chained split, e.g.
+    // `s.split('(')[0].split('[')[0]`. We recurse through subscripts and
+    // split/rsplit calls to find the original string value, since
+    // `str.split()` returns `list[str]` and subscripting that gives a `str`.
+    loop {
+        match target_instance.as_ref() {
+            Expr::Subscript(ExprSubscript { value, .. }) => {
+                target_instance = value;
+            }
+            Expr::Call(ExprCall { func, .. }) => {
+                if let Expr::Attribute(ExprAttribute {
+                    attr,
+                    value: call_value,
+                    ..
+                }) = func.as_ref()
+                {
+                    if matches!(attr.as_str(), "split" | "rsplit") {
+                        target_instance = call_value;
+                        continue;
+                    }
+                }
+                break;
+            }
+            _ => break,
+        }
     }
 
     // Check the function is called on a string
@@ -173,12 +191,8 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         SliceBoundary::Last => "rsplit",
     };
 
-    let maxsplit_argument_edit = fix::edits::add_argument(
-        "maxsplit=1",
-        arguments,
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    );
+    let maxsplit_argument_edit =
+        fix::edits::add_argument("maxsplit=1", arguments, checker.tokens());
 
     // Only change `actual_split_type` if it doesn't match `suggested_split_type`
     let split_type_edit: Option<Edit> = if actual_split_type == suggested_split_type {
@@ -192,8 +206,8 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
 
     let mut diagnostic = checker.report_diagnostic(
         MissingMaxsplitArg {
-            actual_split_type: actual_split_type.to_string(),
-            suggested_split_type: suggested_split_type.to_string(),
+            actual_split_type,
+            suggested_split_type,
         },
         expr.range(),
     );

@@ -13,7 +13,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
 
     for reference in checker.semantic.unresolved_references() {
         if reference.is_wildcard_import() {
-            // F406
+            // F405
             checker.report_diagnostic_if_enabled(
                 pyflakes::rules::UndefinedLocalWithImportStarUsage {
                     name: reference.name(checker.source()).to_string(),
@@ -33,7 +33,7 @@ pub(crate) fn unresolved_references(checker: &Checker) {
                 }
 
                 // Allow __path__.
-                if checker.path.ends_with("__init__.py") {
+                if checker.in_init_module() {
                     if reference.name(checker.source()) == "__path__" {
                         continue;
                     }

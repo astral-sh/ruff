@@ -4,9 +4,7 @@ source: crates/ruff_linter/src/rules/isort/mod.rs
 I002 [*] Missing required import: `import os`
 --> docstring.pyi:1:1
 help: Insert required import: `import os`
-
-ℹ Safe fix
-1 1 | """Hello, world!"""
-  2 |+import os
-2 3 | 
-3 4 | x = 1
+1 | """Hello, world!"""
+2 + import os
+3 | 
+4 | x = 1

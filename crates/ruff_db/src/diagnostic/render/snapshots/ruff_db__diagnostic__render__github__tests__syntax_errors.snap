@@ -1,0 +1,6 @@
+---
+source: crates/ruff_db/src/diagnostic/render/github.rs
+expression: env.render_diagnostics(&diagnostics)
+---
+::error title=ty (invalid-syntax),file=/syntax_errors.py,line=1,endLine=2::syntax_errors.py:1:15: invalid-syntax: Expected one or more symbol names after import
+::error title=ty (invalid-syntax),file=/syntax_errors.py,line=3,endLine=4::syntax_errors.py:3:12: invalid-syntax: Expected ')', found newline

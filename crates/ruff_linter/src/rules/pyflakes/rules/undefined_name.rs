@@ -27,6 +27,7 @@ use crate::Violation;
 /// ## References
 /// - [Python documentation: Naming and binding](https://docs.python.org/3/reference/executionmodel.html#naming-and-binding)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.20")]
 pub(crate) struct UndefinedName {
     pub(crate) name: String,
     pub(crate) minor_version_builtin_added: Option<u8>,

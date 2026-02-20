@@ -175,6 +175,8 @@ class ZipFile:
     filename: str | None
     debug: int
     comment: bytes
+    """The comment text associated with the ZIP file."""
+
     filelist: list[ZipInfo]
     fp: IO[bytes] | None
     NameToInfo: dict[str, ZipInfo]
@@ -217,7 +219,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipWritable,
-            mode: Literal["w", "x"] = ...,
+            mode: Literal["w", "x"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -229,7 +231,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipReadableTellable,
-            mode: Literal["a"] = ...,
+            mode: Literal["a"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -268,7 +270,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipWritable,
-            mode: Literal["w", "x"] = ...,
+            mode: Literal["w", "x"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -279,7 +281,7 @@ class ZipFile:
         def __init__(
             self,
             file: StrPath | _ZipReadableTellable,
-            mode: Literal["a"] = ...,
+            mode: Literal["a"],
             compression: int = 0,
             allowZip64: bool = True,
             compresslevel: int | None = None,
@@ -417,6 +419,29 @@ class PyZipFile(ZipFile):
 class ZipInfo:
     """Class with attributes describing each file in the ZIP archive."""
 
+    __slots__ = (
+        "orig_filename",
+        "filename",
+        "date_time",
+        "compress_type",
+        "compress_level",
+        "comment",
+        "extra",
+        "create_system",
+        "create_version",
+        "extract_version",
+        "reserved",
+        "flag_bits",
+        "volume",
+        "internal_attr",
+        "external_attr",
+        "header_offset",
+        "CRC",
+        "compress_size",
+        "file_size",
+        "_raw_time",
+        "_end_offset",
+    )
     filename: str
     date_time: _DateTuple
     compress_type: int
@@ -460,6 +485,15 @@ class ZipInfo:
         decide based upon the file_size and compress_size, if known,
         False otherwise.
         """
+    if sys.version_info >= (3, 14):
+        def _for_archive(self, archive: ZipFile) -> Self:
+            """Resolve suitable defaults from the archive.
+
+            Resolve the date_time, compression attributes, and external attributes
+            to suitable defaults as used by :method:`ZipFile.writestr`.
+
+            Return self.
+            """
 
 if sys.version_info >= (3, 12):
     from zipfile._path import CompleteDirs as CompleteDirs, Path as Path
@@ -602,8 +636,8 @@ else:
             encoding: str | None = None,
             errors: str | None = None,
             newline: str | None = None,
-            line_buffering: bool = ...,
-            write_through: bool = ...,
+            line_buffering: bool = False,
+            write_through: bool = False,
             *,
             pwd: bytes | None = None,
         ) -> TextIOWrapper:
@@ -626,11 +660,11 @@ else:
         def exists(self) -> bool: ...
         def read_text(
             self,
-            encoding: str | None = ...,
-            errors: str | None = ...,
-            newline: str | None = ...,
-            line_buffering: bool = ...,
-            write_through: bool = ...,
+            encoding: str | None = None,
+            errors: str | None = None,
+            newline: str | None = None,
+            line_buffering: bool = False,
+            write_through: bool = False,
         ) -> str: ...
         def read_bytes(self) -> bytes: ...
         if sys.version_info >= (3, 10):

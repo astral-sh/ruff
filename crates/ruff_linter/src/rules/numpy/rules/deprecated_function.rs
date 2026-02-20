@@ -31,6 +31,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// np.all([True, False])
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.276")]
 pub(crate) struct NumpyDeprecatedFunction {
     existing: String,
     replacement: String,
@@ -80,6 +81,7 @@ pub(crate) fn deprecated_function(checker: &Checker, expr: &Expr) {
             },
             expr.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         diagnostic.try_set_fix(|| {
             let (import_edit, binding) = checker.importer().get_or_import_symbol(
                 &ImportRequest::import_from("numpy", replacement),

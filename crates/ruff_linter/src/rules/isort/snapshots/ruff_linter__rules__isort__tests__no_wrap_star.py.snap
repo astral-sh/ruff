@@ -8,7 +8,5 @@ I001 [*] Import block is un-sorted or un-formatted
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
   |
 help: Organize imports
-
-ℹ Safe fix
-1   |-from .subscription import * # type: ignore  # some very long comment explaining why this needs a type ignore
-  1 |+from .subscription import *  # type: ignore  # some very long comment explaining why this needs a type ignore
+  - from .subscription import * # type: ignore  # some very long comment explaining why this needs a type ignore
+1 + from .subscription import *  # type: ignore  # some very long comment explaining why this needs a type ignore

@@ -1,26 +1,26 @@
 import sys
 from collections.abc import Container, Iterable, Sequence
 from types import ModuleType
-from typing import Any, Literal
+from typing import Any, Final
 
 if sys.platform == "win32":
     from _msi import *
     from _msi import _Database
 
-    AMD64: bool
-    Win64: bool
+    AMD64: Final[bool]
+    Win64: Final[bool]
 
-    datasizemask: Literal[0x00FF]
-    type_valid: Literal[0x0100]
-    type_localizable: Literal[0x0200]
-    typemask: Literal[0x0C00]
-    type_long: Literal[0x0000]
-    type_short: Literal[0x0400]
-    type_string: Literal[0x0C00]
-    type_binary: Literal[0x0800]
-    type_nullable: Literal[0x1000]
-    type_key: Literal[0x2000]
-    knownbits: Literal[0x3FFF]
+    datasizemask: Final = 0x00FF
+    type_valid: Final = 0x0100
+    type_localizable: Final = 0x0200
+    typemask: Final = 0x0C00
+    type_long: Final = 0x0000
+    type_short: Final = 0x0400
+    type_string: Final = 0x0C00
+    type_binary: Final = 0x0800
+    type_nullable: Final = 0x1000
+    type_key: Final = 0x2000
+    knownbits: Final = 0x3FFF
 
     class Table:
         name: str

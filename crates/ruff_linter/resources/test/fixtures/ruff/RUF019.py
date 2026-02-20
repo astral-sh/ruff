@@ -22,3 +22,11 @@ v = "k" in d and d["k"]
 
 if f() in d and d[f()]:
     pass
+
+
+if (
+        "key" in d
+        and  # text
+        d ["key"]
+):
+    ...

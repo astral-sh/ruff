@@ -5,12 +5,12 @@ expression: suite
 [
     Assign(
         StmtAssign {
-            node_index: AtomicNodeIndex(..),
+            node_index: NodeIndex(None),
             range: 0..16,
             targets: [
                 Name(
                     ExprName {
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                         range: 0..4,
                         id: Name("bold"),
                         ctx: Store,
@@ -19,18 +19,19 @@ expression: suite
             ],
             value: StringLiteral(
                 ExprStringLiteral {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 7..16,
                     value: StringLiteralValue {
                         inner: Single(
                             StringLiteral {
                                 range: 7..16,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 value: "\u{3}8[1m",
                                 flags: StringLiteralFlags {
                                     quote_style: Single,
                                     prefix: Empty,
                                     triple_quoted: false,
+                                    unclosed: false,
                                 },
                             },
                         ),

@@ -10,7 +10,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 1,
       "row": 2
     },
-    "filename": "syntax_errors.py",
+    "filename": "/syntax_errors.py",
     "fix": null,
     "location": {
       "column": 15,
@@ -27,7 +27,7 @@ expression: env.render_diagnostics(&diagnostics)
       "column": 1,
       "row": 4
     },
-    "filename": "syntax_errors.py",
+    "filename": "/syntax_errors.py",
     "fix": null,
     "location": {
       "column": 12,

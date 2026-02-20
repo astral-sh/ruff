@@ -35,7 +35,7 @@ magic-trailing-comma       = Respect
 docstring-code             = Disabled
 docstring-code-line-width  = "dynamic"
 preview                    = Enabled
-target_version             = 3.9
+target_version             = 3.10
 source_type                = Stub
 ```
 

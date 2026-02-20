@@ -4,6 +4,7 @@ use itertools::{Itertools, chain};
 use ruff_python_semantic::NodeId;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::{self as ast, Alias, Stmt, StmtRef};
 use ruff_python_semantic::{NameImport, Scope};
 use ruff_text_size::Ranged;
@@ -43,6 +44,7 @@ use crate::{AlwaysFixableViolation, Applicability, Fix};
 /// ## References
 /// - [Python documentation: `__future__` — Future statement definitions](https://docs.python.org/3/library/__future__.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UnnecessaryFutureImport {
     pub names: Vec<String>,
 }
@@ -95,20 +97,35 @@ pub(crate) fn is_import_required_by_isort(
     stmt: StmtRef,
     alias: &Alias,
 ) -> bool {
-    let segments: &[&str] = match stmt {
+    match stmt {
         StmtRef::ImportFrom(ast::StmtImportFrom {
             module: Some(module),
             ..
-        }) => &[module.as_str(), alias.name.as_str()],
-        StmtRef::ImportFrom(ast::StmtImportFrom { module: None, .. }) | StmtRef::Import(_) => {
-            &[alias.name.as_str()]
-        }
-        _ => return false,
-    };
+        }) => {
+            let mut builder = QualifiedNameBuilder::with_capacity(module.split('.').count() + 1);
+            builder.extend(module.split('.'));
+            builder.push(alias.name.as_str());
+            let qualified = builder.build();
 
-    required_imports
-        .iter()
-        .any(|required_import| required_import.qualified_name().segments() == segments)
+            required_imports
+                .iter()
+                .any(|required_import| required_import.qualified_name() == qualified)
+        }
+        StmtRef::ImportFrom(ast::StmtImportFrom { module: None, .. })
+        | StmtRef::Import(ast::StmtImport { .. }) => {
+            let name = alias.name.as_str();
+            let qualified = if name.contains('.') {
+                QualifiedName::from_dotted_name(name)
+            } else {
+                QualifiedName::user_defined(name)
+            };
+
+            required_imports
+                .iter()
+                .any(|required_import| required_import.qualified_name() == qualified)
+        }
+        _ => false,
+    }
 }
 
 /// UP010

@@ -7,37 +7,35 @@ input_file: crates/ruff_python_parser/resources/inline/err/pos_only_py37.py
 ```
 Module(
     ModModule {
-        node_index: AtomicNodeIndex(..),
+        node_index: NodeIndex(None),
         range: 0..136,
         body: [
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 43..61,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 47..50,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 50..56,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 51..52,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 51..52,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 51..52,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -53,11 +51,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 58..61,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 58..61,
                                     },
                                 ),
@@ -68,32 +66,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 62..86,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 66..69,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 69..81,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 70..71,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 70..71,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 70..71,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -103,14 +99,14 @@ Module(
                         args: [
                             ParameterWithDefault {
                                 range: 76..77,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 76..77,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 76..77,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -125,11 +121,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 83..86,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 83..86,
                                     },
                                 ),
@@ -140,32 +136,30 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 87..115,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 91..94,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 94..110,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [
                             ParameterWithDefault {
                                 range: 95..96,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 95..96,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 95..96,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -176,11 +170,11 @@ Module(
                         vararg: Some(
                             Parameter {
                                 range: 98..103,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 name: Identifier {
                                     id: Name("args"),
                                     range: 99..103,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                 },
                                 annotation: None,
                             },
@@ -188,14 +182,14 @@ Module(
                         kwonlyargs: [
                             ParameterWithDefault {
                                 range: 108..109,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 108..109,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("b"),
                                         range: 108..109,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -208,11 +202,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 112..115,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 112..115,
                                     },
                                 ),
@@ -223,33 +217,31 @@ Module(
             ),
             FunctionDef(
                 StmtFunctionDef {
-                    node_index: AtomicNodeIndex(..),
+                    node_index: NodeIndex(None),
                     range: 116..135,
                     is_async: false,
                     decorator_list: [],
                     name: Identifier {
                         id: Name("foo"),
                         range: 120..123,
-                        node_index: AtomicNodeIndex(..),
+                        node_index: NodeIndex(None),
                     },
                     type_params: None,
                     parameters: Parameters {
                         range: 123..130,
-                        node_index: AtomicNodeIndex(
-                            0,
-                        ),
+                        node_index: NodeIndex(None),
                         posonlyargs: [],
                         args: [
                             ParameterWithDefault {
                                 range: 124..125,
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 parameter: Parameter {
                                     range: 124..125,
-                                    node_index: AtomicNodeIndex(..),
+                                    node_index: NodeIndex(None),
                                     name: Identifier {
                                         id: Name("a"),
                                         range: 124..125,
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                     },
                                     annotation: None,
                                 },
@@ -264,11 +256,11 @@ Module(
                     body: [
                         Expr(
                             StmtExpr {
-                                node_index: AtomicNodeIndex(..),
+                                node_index: NodeIndex(None),
                                 range: 132..135,
                                 value: EllipsisLiteral(
                                     ExprEllipsisLiteral {
-                                        node_index: AtomicNodeIndex(..),
+                                        node_index: NodeIndex(None),
                                         range: 132..135,
                                     },
                                 ),
@@ -306,7 +298,7 @@ Module(
 3 | def foo(a, /, b, /): ...
 4 | def foo(a, *args, /, b): ...
 5 | def foo(a, //): ...
-  |            ^^ Syntax Error: Expected ',', found '//'
+  |            ^^ Syntax Error: Expected `,`, found `//`
   |
 
 

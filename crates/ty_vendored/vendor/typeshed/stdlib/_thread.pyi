@@ -9,7 +9,7 @@ from collections.abc import Callable
 from threading import Thread
 from types import TracebackType
 from typing import Any, Final, NoReturn, final, overload
-from typing_extensions import TypeVarTuple, Unpack
+from typing_extensions import TypeVarTuple, Unpack, disjoint_base
 
 _Ts = TypeVarTuple("_Ts")
 
@@ -53,6 +53,8 @@ class RLock:
         to be available for other threads.
         """
     __enter__ = acquire
+    """Lock the lock."""
+
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None:
         """Release the lock."""
     if sys.version_info >= (3, 14):
@@ -315,7 +317,7 @@ def stack_size(size: int = 0, /) -> int:
     the suggested approach in the absence of more specific information).
     """
 
-TIMEOUT_MAX: float
+TIMEOUT_MAX: Final[float]
 
 def get_native_id() -> int:  # only available on some platforms
     """Return a non-negative integer identifying the thread as reported
@@ -350,6 +352,7 @@ class _ExceptHookArgs(structseq[Any], tuple[type[BaseException], BaseException |
         """Thread"""
 
 _excepthook: Callable[[_ExceptHookArgs], Any]
+"""Handle uncaught Thread.run() exception."""
 
 if sys.version_info >= (3, 12):
     def daemon_threads_allowed() -> bool:
@@ -361,6 +364,7 @@ if sys.version_info >= (3, 14):
     def set_name(name: str) -> None:
         """Set the name of the current thread."""
 
+@disjoint_base
 class _local:
     """Thread-local data"""
 

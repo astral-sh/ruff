@@ -1,9 +1,10 @@
 use std::fmt::{self, Display};
 
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::{TokenKind, string::InterpolatedStringKind};
+use crate::string::InterpolatedStringKind;
 
 /// Represents represent errors that occur during parsing and are
 /// returned by the `parse_*` functions.
@@ -78,9 +79,9 @@ pub enum InterpolatedStringErrorType {
 impl std::fmt::Display for InterpolatedStringErrorType {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            Self::UnclosedLbrace => write!(f, "expecting '}}'"),
+            Self::UnclosedLbrace => write!(f, "expecting `}}`"),
             Self::InvalidConversionFlag => write!(f, "invalid conversion character"),
-            Self::SingleRbrace => write!(f, "single '}}' is not allowed"),
+            Self::SingleRbrace => write!(f, "single `}}` is not allowed"),
             Self::UnterminatedString => write!(f, "unterminated string"),
             Self::UnterminatedTripleQuotedString => write!(f, "unterminated triple-quoted string"),
             Self::LambdaWithoutParentheses => {
@@ -232,7 +233,7 @@ impl std::fmt::Display for ParseErrorType {
             ParseErrorType::UnexpectedTokenAfterAsync(kind) => {
                 write!(
                     f,
-                    "Expected 'def', 'with' or 'for' to follow 'async', found {kind}",
+                    "Expected `def`, `with` or `for` to follow `async`, found {kind}",
                 )
             }
             ParseErrorType::InvalidArgumentUnpackingOrder => {
@@ -286,10 +287,10 @@ impl std::fmt::Display for ParseErrorType {
                 f.write_str("Parameter without a default cannot follow a parameter with a default")
             }
             ParseErrorType::ExpectedKeywordParam => {
-                f.write_str("Expected one or more keyword parameter after '*' separator")
+                f.write_str("Expected one or more keyword parameter after `*` separator")
             }
             ParseErrorType::VarParameterWithDefault => {
-                f.write_str("Parameter with '*' or '**' cannot have default value")
+                f.write_str("Parameter with `*` or `**` cannot have default value")
             }
             ParseErrorType::InvalidStarPatternUsage => {
                 f.write_str("Star pattern cannot be used here")

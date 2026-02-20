@@ -14,18 +14,16 @@ I001 [*] Import block is un-sorted or un-formatted
   | |______________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-   1  |+import os
-1  2  | import sys
-   3  |+
-2  4  | import ruff
-   5  |+from ruff import check
-   6  |+
-3  7  | import leading_prefix
-4     |-import os
-   8  |+
-   9  |+from .. import trailing_prefix
-5  10 | from . import leading_prefix
-6     |-from .. import trailing_prefix
-7     |-from ruff import check
+1  + import os
+2  | import sys
+3  + 
+4  | import ruff
+5  + from ruff import check
+6  + 
+7  | import leading_prefix
+   - import os
+8  + 
+9  + from .. import trailing_prefix
+10 | from . import leading_prefix
+   - from .. import trailing_prefix
+   - from ruff import check

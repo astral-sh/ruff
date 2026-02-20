@@ -2,6 +2,7 @@ use std::path::Path;
 
 use js_sys::Error;
 use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -19,7 +20,7 @@ use ruff_python_formatter::{PyFormatContext, QuoteStyle, format_module_ast, pret
 use ruff_python_index::Indexer;
 use ruff_python_parser::{Mode, ParseOptions, Parsed, parse, parse_unchecked};
 use ruff_python_trivia::CommentRanges;
-use ruff_source_file::{LineColumn, OneIndexed};
+use ruff_source_file::{OneIndexed, PositionEncoding as SourcePositionEncoding, SourceLocation};
 use ruff_text_size::Ranged;
 use ruff_workspace::Settings;
 use ruff_workspace::configuration::Configuration;
@@ -98,8 +99,6 @@ pub fn before_main() {}
 
 #[wasm_bindgen(start)]
 pub fn run() {
-    use log::Level;
-
     before_main();
 
     // When the `console_error_panic_hook` feature is enabled, we can call the
@@ -110,13 +109,44 @@ pub fn run() {
     // https://github.com/rustwasm/console_error_panic_hook#readme
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
+}
 
-    console_log::init_with_level(Level::Debug).expect("Initializing logger went wrong.");
+/// Initializes the logger with the given log level.
+///
+/// ## Panics
+/// If this function is called more than once.
+#[wasm_bindgen(js_name = "initLogging")]
+pub fn init_logging(level: LogLevel) {
+    console_log::init_with_level(level.into())
+        .expect("`initLogging` to only be called at most once.");
+}
+
+#[derive(Copy, Clone, Debug)]
+#[wasm_bindgen]
+pub enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LogLevel> for log::Level {
+    fn from(level: LogLevel) -> Self {
+        match level {
+            LogLevel::Trace => log::Level::Trace,
+            LogLevel::Debug => log::Level::Debug,
+            LogLevel::Info => log::Level::Info,
+            LogLevel::Warn => log::Level::Warn,
+            LogLevel::Error => log::Level::Error,
+        }
+    }
 }
 
 #[wasm_bindgen]
 pub struct Workspace {
     settings: Settings,
+    position_encoding: SourcePositionEncoding,
 }
 
 #[wasm_bindgen]
@@ -126,7 +156,7 @@ impl Workspace {
     }
 
     #[wasm_bindgen(constructor)]
-    pub fn new(options: JsValue) -> Result<Workspace, Error> {
+    pub fn new(options: JsValue, position_encoding: PositionEncoding) -> Result<Workspace, Error> {
         let options: Options = serde_wasm_bindgen::from_value(options).map_err(into_error)?;
         let configuration =
             Configuration::from_options(options, Some(Path::new(".")), Path::new("."))
@@ -135,7 +165,10 @@ impl Workspace {
             .into_settings(Path::new("."))
             .map_err(into_error)?;
 
-        Ok(Workspace { settings })
+        Ok(Workspace {
+            settings,
+            position_encoding: position_encoding.into(),
+        })
     }
 
     #[wasm_bindgen(js_name = defaultSettings)]
@@ -179,7 +212,10 @@ impl Workspace {
         let source_type = PySourceType::default();
 
         // TODO(dhruvmanila): Support Jupyter Notebooks
-        let source_kind = SourceKind::Python(contents.to_string());
+        let source_kind = SourceKind::Python {
+            code: contents.to_string(),
+            is_stub: source_type.is_stub(),
+        };
 
         // Use the unresolved version because we don't have a file path.
         let target_version = self.settings.linter.unresolved_target_version;
@@ -203,10 +239,12 @@ impl Workspace {
         // Extract the `# noqa` and `# isort: skip` directives from the source.
         let directives = directives::extract_directives(
             parsed.tokens(),
-            directives::Flags::empty(),
+            directives::Flags::from_settings(&self.settings.linter),
             &locator,
             &indexer,
         );
+
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
 
         // Generate checks.
         let diagnostics = check_path(
@@ -222,29 +260,41 @@ impl Workspace {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
 
         let source_code = locator.to_source_code();
 
         let messages: Vec<ExpandedMessage> = diagnostics
             .into_iter()
-            .map(|msg| ExpandedMessage {
-                code: msg.secondary_code_or_id().to_string(),
-                message: msg.body().to_string(),
-                start_location: source_code.line_column(msg.expect_range().start()).into(),
-                end_location: source_code.line_column(msg.expect_range().end()).into(),
-                fix: msg.fix().map(|fix| ExpandedFix {
-                    message: msg.first_help_text().map(ToString::to_string),
-                    edits: fix
-                        .edits()
-                        .iter()
-                        .map(|edit| ExpandedEdit {
-                            location: source_code.line_column(edit.start()).into(),
-                            end_location: source_code.line_column(edit.end()).into(),
-                            content: edit.content().map(ToString::to_string),
-                        })
-                        .collect(),
-                }),
+            .map(|msg| {
+                let range = msg.range().unwrap_or_default();
+                ExpandedMessage {
+                    code: msg.secondary_code_or_id().to_string(),
+                    message: msg.concise_message().to_string(),
+                    start_location: source_code
+                        .source_location(range.start(), self.position_encoding)
+                        .into(),
+                    end_location: source_code
+                        .source_location(range.end(), self.position_encoding)
+                        .into(),
+                    fix: msg.fix().map(|fix| ExpandedFix {
+                        message: msg.first_help_text().map(ToString::to_string),
+                        edits: fix
+                            .edits()
+                            .iter()
+                            .map(|edit| ExpandedEdit {
+                                location: source_code
+                                    .source_location(edit.start(), self.position_encoding)
+                                    .into(),
+                                end_location: source_code
+                                    .source_location(edit.end(), self.position_encoding)
+                                    .into(),
+                                content: edit.content().map(ToString::to_string),
+                            })
+                            .collect(),
+                    }),
+                }
             })
             .collect();
 
@@ -327,14 +377,37 @@ impl<'a> ParsedModule<'a> {
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct Location {
     pub row: OneIndexed,
+    /// The character offset from the start of the line.
+    ///
+    /// The semantic of the offset depends on the [`PositionEncoding`] used when creating
+    /// the [`Workspace`].
     pub column: OneIndexed,
 }
 
-impl From<LineColumn> for Location {
-    fn from(value: LineColumn) -> Self {
+impl From<SourceLocation> for Location {
+    fn from(value: SourceLocation) -> Self {
         Self {
             row: value.line,
-            column: value.column,
+            column: value.character_offset,
+        }
+    }
+}
+
+#[derive(Default, Copy, Clone)]
+#[wasm_bindgen]
+pub enum PositionEncoding {
+    #[default]
+    Utf8,
+    Utf16,
+    Utf32,
+}
+
+impl From<PositionEncoding> for SourcePositionEncoding {
+    fn from(value: PositionEncoding) -> Self {
+        match value {
+            PositionEncoding::Utf8 => Self::Utf8,
+            PositionEncoding::Utf16 => Self::Utf16,
+            PositionEncoding::Utf32 => Self::Utf32,
         }
     }
 }

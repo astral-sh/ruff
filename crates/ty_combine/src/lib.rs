@@ -1,9 +1,13 @@
+#![warn(
+    clippy::disallowed_methods,
+    reason = "Prefer System trait methods over std methods in ty crates"
+)]
+
 use std::{collections::HashMap, hash::BuildHasher};
 
 use ordermap::OrderMap;
 use ruff_db::system::SystemPathBuf;
 use ruff_python_ast::PythonVersion;
-use ty_python_semantic::PythonPlatform;
 
 /// Combine two values, preferring the values in `self`.
 ///
@@ -140,7 +144,6 @@ macro_rules! impl_noop_combine {
 }
 
 impl_noop_combine!(SystemPathBuf);
-impl_noop_combine!(PythonPlatform);
 impl_noop_combine!(PythonVersion);
 
 // std types

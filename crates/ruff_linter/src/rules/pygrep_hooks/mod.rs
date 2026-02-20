@@ -10,9 +10,10 @@ mod tests {
 
     use crate::registry::Rule;
 
+    use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
-    use crate::{assert_diagnostics, settings};
+    use crate::{assert_diagnostics, assert_diagnostics_diff, settings};
 
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_0.py"))]
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_1.py"))]
@@ -38,14 +39,19 @@ mod tests {
             rule_code.noqa_code(),
             path.to_string_lossy()
         );
-        let diagnostics = test_path(
+
+        assert_diagnostics_diff!(
+            snapshot,
             Path::new("pygrep_hooks").join(path).as_path(),
-            &settings::LinterSettings {
-                preview: PreviewMode::Enabled,
-                ..settings::LinterSettings::for_rule(rule_code)
+            &LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..LinterSettings::for_rule(rule_code)
             },
-        )?;
-        assert_diagnostics!(snapshot, diagnostics);
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            }
+        );
         Ok(())
     }
 }

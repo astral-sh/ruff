@@ -99,7 +99,7 @@ reveal_type(foo(b""))  # revealed: bytes
 ## Methods
 
 ```py
-from typing import overload
+from typing_extensions import Self, overload
 
 class Foo1:
     @overload
@@ -126,6 +126,18 @@ foo2 = Foo2()
 reveal_type(foo2.method)  # revealed: Overload[() -> None, (x: str) -> str]
 reveal_type(foo2.method())  # revealed: None
 reveal_type(foo2.method(""))  # revealed: str
+
+class Foo3:
+    @overload
+    def takes_self_or_int(self: Self, x: Self) -> Self: ...
+    @overload
+    def takes_self_or_int(self: Self, x: int) -> int: ...
+    def takes_self_or_int(self: Self, x: Self | int) -> Self | int:
+        return x
+
+foo3 = Foo3()
+reveal_type(foo3.takes_self_or_int(foo3))  # revealed: Foo3
+reveal_type(foo3.takes_self_or_int(1))  # revealed: int
 ```
 
 ## Constructor
@@ -299,7 +311,7 @@ def func[T](x: T) -> T: ...
 def func[T](x: T | None = None) -> T | None:
     return x
 
-reveal_type(func)  # revealed: Overload[() -> None, (x: T@func) -> T@func]
+reveal_type(func)  # revealed: Overload[() -> None, [T](x: T) -> T]
 reveal_type(func())  # revealed: None
 reveal_type(func(1))  # revealed: Literal[1]
 reveal_type(func(""))  # revealed: Literal[""]
@@ -317,9 +329,8 @@ At least two `@overload`-decorated definitions must be present.
 from typing import overload
 
 @overload
-def func(x: int) -> int: ...
-
 # error: [invalid-overload]
+def func(x: int) -> int: ...
 def func(x: int | str) -> int | str:
     return x
 ```
@@ -345,16 +356,16 @@ non-`@overload`-decorated definition (for the same function/method).
 from typing import overload
 
 @overload
+# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overloaded non-stub function `func` must have an implementation"
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
+    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloaded non-stub function `method` must have an implementation"
     def method(self, x: str) -> str: ...
 ```
 
@@ -406,13 +417,25 @@ Using the `@abstractmethod` decorator requires that the class's metaclass is `AB
 from it.
 
 ```py
-class Foo:
+from abc import ABCMeta
+
+class CustomAbstractMetaclass(ABCMeta): ...
+
+class Fine(metaclass=CustomAbstractMetaclass):
     @overload
     @abstractmethod
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
+    def f(self, x: str) -> str: ...
+
+class Foo:
+    @overload
+    @abstractmethod
     # error: [invalid-overload]
+    def f(self, x: int) -> int: ...
+    @overload
+    @abstractmethod
     def f(self, x: str) -> str: ...
 ```
 
@@ -422,18 +445,112 @@ And, the `@abstractmethod` decorator must be present on all the `@overload`-ed m
 class PartialFoo1(ABC):
     @overload
     @abstractmethod
+    # error: [invalid-overload]
     def f(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
 
 class PartialFoo(ABC):
     @overload
+    # error: [invalid-overload]
     def f(self, x: int) -> int: ...
     @overload
     @abstractmethod
-    # error: [invalid-overload]
     def f(self, x: str) -> str: ...
+```
+
+#### `TYPE_CHECKING` blocks
+
+As in other areas of ty, we treat `TYPE_CHECKING` blocks the same as "inline stub files", so we
+permit overloaded functions to exist without an implementation if all overloads are defined inside
+an `if TYPE_CHECKING` block:
+
+```py
+from typing import overload, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    @overload
+    def a() -> str: ...
+    @overload
+    def a(x: int) -> int: ...
+
+    class F:
+        @overload
+        def method(self) -> None: ...
+        @overload
+        def method(self, x: int) -> int: ...
+
+class G:
+    if TYPE_CHECKING:
+        @overload
+        def method(self) -> None: ...
+        @overload
+        def method(self, x: int) -> int: ...
+
+if TYPE_CHECKING:
+    @overload
+    def b() -> str: ...
+
+if TYPE_CHECKING:
+    @overload
+    def b(x: int) -> int: ...
+
+if TYPE_CHECKING:
+    @overload
+    # not all overloads are in a `TYPE_CHECKING` block, so this is an error
+    def c() -> None: ...  # error: [invalid-overload]
+
+@overload
+def c(x: int) -> int: ...
+```
+
+### `@overload`-decorated functions with non-stub bodies
+
+<!-- snapshot-diagnostics -->
+
+If an `@overload`-decorated function has a non-trivial body, it likely indicates a misunderstanding
+on the part of the user. We emit a warning-level diagnostic to alert them of this.
+
+`...`, `pass` and docstrings are all fine:
+
+```py
+from typing import overload
+
+@overload
+def x(y: int) -> int: ...
+@overload
+def x(y: str) -> str:
+    """Docstring"""
+
+@overload
+def x(y: bytes) -> bytes:
+    pass
+
+@overload
+def x(y: memoryview) -> memoryview:
+    """More docs"""
+    pass
+    ...
+
+def x(y):
+    return y
+```
+
+Anything else, however, will trigger the lint:
+
+```py
+@overload
+def foo(x: int) -> int:
+    return x  # error: [useless-overload-body]
+
+@overload
+def foo(x: str) -> None:
+    """Docstring"""
+    pass
+    print("oh no, a string")  # error: [useless-overload-body]
+
+def foo(x):
+    return x
 ```
 
 ### Inconsistent decorators
@@ -537,6 +654,7 @@ class CheckClassMethod:
     # error: [invalid-overload]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
+            # error: [call-non-callable]
             return cls(x)
         return None
 
@@ -574,10 +692,10 @@ class Foo:
 
     @overload
     @final
+    # error: [invalid-overload]
     def method2(self, x: int) -> int: ...
     @overload
     def method2(self, x: str) -> str: ...
-    # error: [invalid-overload]
     def method2(self, x: int | str) -> int | str:
         return x
 
@@ -585,8 +703,8 @@ class Foo:
     def method3(self, x: int) -> int: ...
     @overload
     @final
-    def method3(self, x: str) -> str: ...
     # error: [invalid-overload]
+    def method3(self, x: str) -> str: ...
     def method3(self, x: int | str) -> int | str:
         return x
 ```
@@ -603,13 +721,22 @@ class Foo:
     def method1(self, x: int) -> int: ...
     @overload
     def method1(self, x: str) -> str: ...
-
     @overload
     def method2(self, x: int) -> int: ...
     @final
     @overload
     # error: [invalid-overload]
     def method2(self, x: str) -> str: ...
+    @overload
+    def method3(self, x: int) -> int: ...
+    @final
+    @overload
+    def method3(self, x: str) -> int: ...  # error: [invalid-overload]
+    @overload
+    @final
+    def method3(self, x: bytes) -> bytes: ...  # error: [invalid-overload]
+    @overload
+    def method3(self, x: bytearray) -> bytearray: ...
 ```
 
 #### `@override`
@@ -643,18 +770,18 @@ class Sub2(Base):
     def method(self, x: int) -> int: ...
     @overload
     @override
-    def method(self, x: str) -> str: ...
     # error: [invalid-overload]
+    def method(self, x: str) -> str: ...
     def method(self, x: int | str) -> int | str:
         return x
 
 class Sub3(Base):
     @overload
     @override
+    # error: [invalid-overload]
     def method(self, x: int) -> int: ...
     @overload
     def method(self, x: str) -> str: ...
-    # error: [invalid-overload]
     def method(self, x: int | str) -> int | str:
         return x
 ```

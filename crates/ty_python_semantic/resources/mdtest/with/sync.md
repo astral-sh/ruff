@@ -47,7 +47,7 @@ class Manager: ...
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
-    ...
+    pass
 ```
 
 ## Context manager without an `__enter__` method
@@ -58,7 +58,7 @@ class Manager:
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__`"
 with Manager():
-    ...
+    pass
 ```
 
 ## Context manager without an `__exit__` method
@@ -69,7 +69,7 @@ class Manager:
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__exit__`"
 with Manager():
-    ...
+    pass
 ```
 
 ## Context manager with non-callable `__enter__` attribute
@@ -82,7 +82,7 @@ class Manager:
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__enter__`"
 with Manager():
-    ...
+    pass
 ```
 
 ## Context manager with non-callable `__exit__` attribute
@@ -97,7 +97,7 @@ class Manager:
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not correctly implement `__exit__`"
 with Manager():
-    ...
+    pass
 ```
 
 ## Context expression with possibly-unbound union variants
@@ -113,7 +113,7 @@ def _(flag: bool):
     class NotAContextManager: ...
     context_expr = Manager1() if flag else NotAContextManager()
 
-    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager1 | NotAContextManager` cannot be used with `with` because the methods `__enter__` and `__exit__` are possibly missing"
     with context_expr as f:
         reveal_type(f)  # revealed: str
 ```
@@ -129,7 +129,7 @@ def _(flag: bool):
 
         def __exit__(self, *args): ...
 
-    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` is possibly unbound"
+    # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because the method `__enter__` may be missing"
     with Manager() as f:
         reveal_type(f)  # revealed: str
 ```
@@ -164,7 +164,7 @@ class Manager:
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
-    ...
+    pass
 ```
 
 ## Incorrect signatures
@@ -179,7 +179,7 @@ class Manager:
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
-    ...
+    pass
 ```
 
 ## Incorrect number of arguments
@@ -193,5 +193,5 @@ class Manager:
 
 # error: [invalid-context-manager] "Object of type `Manager` cannot be used with `with` because it does not implement `__enter__` and `__exit__`"
 with Manager():
-    ...
+    pass
 ```

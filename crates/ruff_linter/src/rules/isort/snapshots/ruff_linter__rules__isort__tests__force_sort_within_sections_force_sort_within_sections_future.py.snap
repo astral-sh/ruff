@@ -9,8 +9,6 @@ I001 [*] Import block is un-sorted or un-formatted
   | |__________________________________^
   |
 help: Organize imports
-
-ℹ Safe fix
-  1 |+from __future__ import annotations
-1 2 | import __future__
-2   |-from __future__ import annotations
+1 + from __future__ import annotations
+2 | import __future__
+  - from __future__ import annotations

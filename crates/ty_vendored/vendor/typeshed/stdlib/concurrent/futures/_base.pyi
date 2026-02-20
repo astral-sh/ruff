@@ -15,8 +15,7 @@ RUNNING: Final = "RUNNING"
 CANCELLED: Final = "CANCELLED"
 CANCELLED_AND_NOTIFIED: Final = "CANCELLED_AND_NOTIFIED"
 FINISHED: Final = "FINISHED"
-_FUTURE_STATES: list[str]
-_STATE_TO_DESCRIPTION_MAP: dict[str, str]
+_STATE_TO_DESCRIPTION_MAP: Final[dict[str, str]]
 LOGGER: Logger
 
 class Error(Exception):
