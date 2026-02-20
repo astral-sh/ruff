@@ -804,19 +804,27 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
-                if negated.is_subtype_of(self.db, element_type) {
-                    // We add `ty` to the union. We just checked that `~ty` is a subtype of an
-                    // existing `element`. This also means that `~ty | ty` is a subtype of
-                    // `element | ty`, because both elements in the first union are subtypes of
-                    // the corresponding elements in the second union. But `~ty | ty` is just
-                    // `object`. Since `object` is a subtype of `element | ty`, we can only
-                    // conclude that `element | ty` must be `object` (object has no other
-                    // supertypes). This means we can simplify the whole union to just
-                    // `object`, since all other potential elements would also be subtypes of
-                    // `object`.
-                    self.collapse_to_object();
-                    return;
+                // Skip the negate/subtype check for intersection-to-intersection pairs.
+                // For intersections, ~(A & B & ...) = ~A | ~B | ..., which is a broad union
+                // of complements. Such a union cannot be a subtype of another intersection
+                // of class types in practice, making this check always false but expensive.
+                if !(ty.is_nontrivial_intersection(self.db)
+                    && element_type.is_nontrivial_intersection(self.db))
+                {
+                    let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                    if negated.is_subtype_of(self.db, element_type) {
+                        // We add `ty` to the union. We just checked that `~ty` is a subtype of an
+                        // existing `element`. This also means that `~ty | ty` is a subtype of
+                        // `element | ty`, because both elements in the first union are subtypes of
+                        // the corresponding elements in the second union. But `~ty | ty` is just
+                        // `object`. Since `object` is a subtype of `element | ty`, we can only
+                        // conclude that `element | ty` must be `object` (object has no other
+                        // supertypes). This means we can simplify the whole union to just
+                        // `object`, since all other potential elements would also be subtypes of
+                        // `object`.
+                        self.collapse_to_object();
+                        return;
+                    }
                 }
             }
         }
