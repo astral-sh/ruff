@@ -186,8 +186,7 @@ def _(x: int | None):
             return
         reveal_type(x)  # revealed: int
 
-    # TODO: should be `int` (the else-branch of `1 + 1 == 2` is unreachable)
-    reveal_type(x)  # revealed: int | None
+    reveal_type(x)  # revealed: int
 ```
 
 This also works when the always-true condition is nested inside a narrowing branch:
@@ -198,9 +197,25 @@ def _(x: int | None):
         if 1 + 1 == 2:
             return
 
-    # TODO: should be `int` (the inner always-true branch makes the outer
-    # if-branch terminal)
-    reveal_type(x)  # revealed: int | None
+    reveal_type(x)  # revealed: int
+```
+
+When the always-true condition syntactically mentions the narrowed variable (e.g., as a function
+argument) but does not actually produce a narrowing constraint for it, the truthiness-based branch
+pruning must still apply:
+
+```py
+from typing import Literal
+
+def always_true(val: object) -> Literal[True]:
+    return True
+
+def _(y: int | None):
+    if y is None:
+        if always_true(y):
+            return
+
+    reveal_type(y)  # revealed: int
 ```
 
 ## Narrowing from `assert` should not affect reassigned variables
