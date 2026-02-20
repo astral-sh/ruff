@@ -11,8 +11,10 @@ use crate::{
         BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
         MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
         Type, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarInstance, UnionBuilder,
+        constraints::ConstraintSet,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
+        relation::{HasRelationToVisitor, IsDisjointVisitor},
         todo_type, visitor,
     },
 };
@@ -735,5 +737,81 @@ impl<'db> BoundSuperType<'db> {
             self.owner(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
         ))
+    }
+
+    pub(crate) fn is_equivalent_to_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        let mut class_equivalence = match (self.pivot_class(db), other.pivot_class(db)) {
+            (ClassBase::Class(left), ClassBase::Class(right)) => Type::from(left)
+                .when_equivalent_to_impl(
+                    db,
+                    Type::from(right),
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+            (ClassBase::Class(_), _) => ConstraintSet::from(false),
+            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => ConstraintSet::from(true),
+            (ClassBase::Dynamic(_), _) => ConstraintSet::from(false),
+            (ClassBase::Generic, ClassBase::Generic) => ConstraintSet::from(true),
+            (ClassBase::Generic, _) => ConstraintSet::from(false),
+            (ClassBase::Protocol, ClassBase::Protocol) => ConstraintSet::from(true),
+            (ClassBase::Protocol, _) => ConstraintSet::from(false),
+            (ClassBase::TypedDict, ClassBase::TypedDict) => ConstraintSet::from(true),
+            (ClassBase::TypedDict, _) => ConstraintSet::from(false),
+        };
+        if class_equivalence.is_never_satisfied(db) {
+            return ConstraintSet::from(false);
+        }
+        let owner_equivalence = match (self.owner(db), other.owner(db)) {
+            (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => Type::from(left)
+                .when_equivalent_to_impl(
+                    db,
+                    Type::from(right),
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+            (SuperOwnerKind::Class(_), _) => ConstraintSet::from(false),
+            (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => Type::from(left)
+                .when_equivalent_to_impl(
+                    db,
+                    Type::from(right),
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+            (SuperOwnerKind::Instance(_), _) => ConstraintSet::from(false),
+            (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => ConstraintSet::from(true),
+            (SuperOwnerKind::Dynamic(_), _) => ConstraintSet::from(false),
+            (
+                SuperOwnerKind::InstanceTypeVar(l_typevar, l_class),
+                SuperOwnerKind::InstanceTypeVar(r_typevar, r_class),
+            )
+            | (
+                SuperOwnerKind::ClassTypeVar(l_typevar, l_class),
+                SuperOwnerKind::ClassTypeVar(r_typevar, r_class),
+            ) => Type::TypeVar(l_typevar)
+                .when_equivalent_to_impl(
+                    db,
+                    Type::TypeVar(r_typevar),
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+                .and(db, || {
+                    Type::from(l_class).when_equivalent_to_impl(
+                        db,
+                        Type::from(r_class),
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                }),
+            (SuperOwnerKind::InstanceTypeVar(..) | SuperOwnerKind::ClassTypeVar(..), _) => {
+                ConstraintSet::from(false)
+            }
+        };
+        class_equivalence.intersect(db, owner_equivalence)
     }
 }
