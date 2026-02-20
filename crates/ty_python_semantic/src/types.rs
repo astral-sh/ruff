@@ -76,7 +76,7 @@ use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
-use crate::types::typed_dict::TypedDictField;
+use crate::types::typed_dict::{SynthesizedTypedDictType, TypedDictField};
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
 pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
@@ -1082,6 +1082,37 @@ impl<'db> Type<'db> {
             Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
             _ => false,
+        }
+    }
+
+    /// If this is a narrowed dictionary instance, returns the dictionary instance and a synthesized type
+    /// dict containing any narrowed keys.
+    ///
+    /// Note that the type must have been previously narrowed using `TypeInferenceBuilder::try_narrow_dict_kwargs`,
+    /// this method does not perform any narrowing itself.
+    fn as_narrowed_dict(
+        &self,
+        db: &'db dyn Db,
+    ) -> Option<(Type<'db>, SynthesizedTypedDictType<'db>)> {
+        let Type::Intersection(intersection) = self else {
+            return None;
+        };
+
+        match intersection.positive(db).iter().collect_tuple() {
+            Some(
+                (
+                    Type::TypedDict(TypedDictType::Synthesized(synthesized)),
+                    other @ Type::NominalInstance(other_instance),
+                )
+                | (
+                    other @ Type::NominalInstance(other_instance),
+                    Type::TypedDict(TypedDictType::Synthesized(synthesized)),
+                ),
+            ) if other_instance.has_known_class(db, KnownClass::Dict) => {
+                Some((*other, *synthesized))
+            }
+
+            _ => None,
         }
     }
 

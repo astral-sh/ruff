@@ -123,7 +123,8 @@ use crate::types::subclass_of::SubclassOfInner;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
 use crate::types::typed_dict::{
-    TypedDictAssignmentKind, TypedDictKeyAssignment, validate_typed_dict_constructor,
+    SynthesizedTypedDictType, TypedDictAssignmentKind, TypedDictField, TypedDictFieldBuilder,
+    TypedDictKeyAssignment, TypedDictSchema, validate_typed_dict_constructor,
     validate_typed_dict_dict_literal,
 };
 use crate::types::{
@@ -2835,7 +2836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let previous_deferred_state =
                 std::mem::replace(&mut self.deferred_state, in_stub.into());
             let mut call_arguments =
-                CallArguments::from_arguments(arguments, |argument, splatted_value| {
+                CallArguments::from_arguments(arguments, |_, argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value, TypeContext::default());
                     if let Some(argument) = argument {
                         self.store_expression_type(argument, ty);
@@ -12199,6 +12200,87 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         Type::function_like_callable(self.db(), Signature::new(parameters, Type::unknown()))
     }
 
+    /// Attempt to narrow a splatted dictionary argument based on the narrowed types of individual
+    /// keys, if any.
+    ///
+    /// Returns the intersection between the dictionary type and a synthesized typed dict of any narrowed
+    /// keys, or `None` otherwise.
+    fn try_narrow_dict_kwargs(
+        &self,
+        argument_type: Type<'db>,
+        argument: &'ast ast::ArgOrKeyword,
+    ) -> Option<Type<'db>> {
+        let db = self.db();
+        let file_scope_id = self.scope().file_scope_id(db);
+        let use_def = self.index.use_def_map(file_scope_id);
+
+        let keyword = argument.as_variadic()?;
+
+        if !argument_type
+            .as_nominal_instance()?
+            .has_known_class(db, KnownClass::Dict)
+        {
+            return None;
+        }
+
+        let definition_key = |definition: Definition<'_>| {
+            let key = match definition.kind(db) {
+                DefinitionKind::DictKeyAssignment(assignment) => assignment.key(self.module()),
+                DefinitionKind::Assignment(assignment) => match assignment.target(self.module()) {
+                    ast::Expr::Subscript(ast::ExprSubscript { slice, .. }) => slice.as_ref(),
+                    _ => return None,
+                },
+                DefinitionKind::AnnotatedAssignment(assignment) => {
+                    match assignment.target(self.module()) {
+                        ast::Expr::Subscript(ast::ExprSubscript { slice, .. }) => slice.as_ref(),
+                        _ => return None,
+                    }
+                }
+                _ => return None,
+            };
+
+            Some(key.as_string_literal_expr()?.value.to_str())
+        };
+
+        // Collect the types of each distinct key.
+        let mut fields: Vec<(Name, TypedDictField<'db>)> = Vec::new();
+
+        for bindings in use_def.member_bindings_at_use(keyword.scoped_use_id(db, self.scope())) {
+            let place = place_from_bindings(db, bindings.clone());
+            let Some(key) = place.first_definition.and_then(definition_key) else {
+                continue;
+            };
+
+            if let Place::Defined(DefinedPlace {
+                ty: field_ty,
+                definedness: Definedness::AlwaysDefined,
+                ..
+            }) = place.place
+            {
+                let field = TypedDictFieldBuilder::new(field_ty).required(true).build();
+                fields.push((Name::new(key), field));
+            }
+        }
+
+        if fields.is_empty() {
+            return None;
+        }
+
+        // Synthesize a typed dict based on any known keys.
+        let schema = TypedDictSchema::from_iter(fields);
+        let synthesized = SynthesizedTypedDictType::new(db, schema);
+
+        // Note that we return an intersection to preserve the original dictionary type,
+        // as it may contain keys that were not explicitly assigned to.
+        Some(IntersectionType::from_elements(
+            db,
+            [
+                argument_type,
+                Type::TypedDict(TypedDictType::Synthesized(synthesized)),
+            ],
+        ))
+    }
+
     fn infer_call_expression(
         &mut self,
         call_expression: &ast::ExprCall,
@@ -12306,11 +12388,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // arguments after matching them to parameters, but before checking that the argument types
         // are assignable to any parameter annotations.
         let mut call_arguments =
-            CallArguments::from_arguments(arguments, |argument, splatted_value| {
+            CallArguments::from_arguments(arguments, |arg_or_keyword, argument, splatted_value| {
                 let ty = self.infer_expression(splatted_value, TypeContext::default());
                 if let Some(argument) = argument {
                     self.store_expression_type(argument, ty);
+                } else if let Some(ty) = self.try_narrow_dict_kwargs(ty, arg_or_keyword) {
+                    return ty;
                 }
+
                 ty
             });
 

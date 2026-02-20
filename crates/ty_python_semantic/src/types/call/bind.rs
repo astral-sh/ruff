@@ -4085,48 +4085,62 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     *parameter_index,
                 );
             }
-        } else {
-            let mut value_type_fallback = |argument_type: Type<'db>| {
-                let (key_type, value_type) = argument_type.unpack_keys_and_items(self.db)?;
 
-                if !key_type
-                    .when_assignable_to(
-                        self.db,
-                        KnownClass::Str.to_instance(self.db),
-                        self.inferable_typevars,
-                    )
-                    .is_always_satisfied(self.db)
-                {
-                    self.errors.push(BindingError::InvalidKeyType {
-                        argument_index: adjusted_argument_index,
-                        provided_ty: key_type,
-                    });
-                }
+            return;
+        }
 
-                Some(value_type)
-            };
+        let mut value_type_fallback = |argument_type: Type<'db>| {
+            let (key_type, value_type) = argument_type.unpack_keys_and_items(self.db)?;
 
-            let value_type = if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
-                Some(paramspec)
-            } else {
-                value_type_fallback(argument_type)
-            };
-
-            let Some(value_type) = value_type else {
-                return;
-            };
-
-            for (argument_type, parameter_index) in
-                std::iter::repeat(value_type).zip(&self.argument_matches[argument_index].parameters)
+            if !key_type
+                .when_assignable_to(
+                    self.db,
+                    KnownClass::Str.to_instance(self.db),
+                    self.inferable_typevars,
+                )
+                .is_always_satisfied(self.db)
             {
-                self.check_argument_type(
-                    argument_index,
-                    adjusted_argument_index,
-                    Argument::Keywords,
-                    argument_type,
-                    *parameter_index,
-                );
+                self.errors.push(BindingError::InvalidKeyType {
+                    argument_index: adjusted_argument_index,
+                    provided_ty: key_type,
+                });
             }
+
+            Some(value_type)
+        };
+
+        let value_type = if let Some(paramspec) = argument_type.as_paramspec_typevar(self.db) {
+            Some(paramspec)
+        } else if let Some((dict, _)) = argument_type.as_narrowed_dict(self.db) {
+            value_type_fallback(dict)
+        } else {
+            value_type_fallback(argument_type)
+        };
+
+        let Some(value_type) = value_type else {
+            return;
+        };
+
+        for (value_type, parameter_index) in
+            std::iter::repeat(value_type).zip(&self.argument_matches[argument_index].parameters)
+        {
+            // Attempt to narrow the value type of known dictionary keys.
+            let value_type = if let Some((_, narrowed)) = argument_type.as_narrowed_dict(self.db)
+                && let Some(name) = self.signature.parameters()[*parameter_index].keyword_name()
+                && let Some(item) = narrowed.items(self.db).get(name)
+            {
+                item.declared_ty
+            } else {
+                value_type
+            };
+
+            self.check_argument_type(
+                argument_index,
+                adjusted_argument_index,
+                Argument::Keywords,
+                value_type,
+                *parameter_index,
+            );
         }
     }
 

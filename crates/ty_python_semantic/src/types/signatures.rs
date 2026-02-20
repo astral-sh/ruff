@@ -2559,6 +2559,15 @@ impl<'db> Parameter<'db> {
         )
     }
 
+    /// Returns the name of this parameter if it is a keyword-only or standard parameter.
+    pub(crate) fn keyword_name(&self) -> Option<&Name> {
+        match &self.kind {
+            ParameterKind::PositionalOrKeyword { name, .. }
+            | ParameterKind::KeywordOnly { name, .. } => Some(name),
+            _ => None,
+        }
+    }
+
     pub(crate) fn callable_by_name(&self, name: &str) -> bool {
         match &self.kind {
             ParameterKind::PositionalOrKeyword {
