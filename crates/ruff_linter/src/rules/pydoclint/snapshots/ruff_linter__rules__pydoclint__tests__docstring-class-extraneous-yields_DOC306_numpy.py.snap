@@ -1,0 +1,18 @@
+---
+source: crates/ruff_linter/src/rules/pydoclint/mod.rs
+---
+DOC306 The class docstring does not need a `Yields` section, because __init__() cannot yield anything
+  --> DOC306_numpy.py:8:1
+   |
+ 6 |       Docstring of the class
+ 7 |
+ 8 | /     Yields
+ 9 | |     ------
+10 | |     int
+11 | |         Some int for yield.
+12 | |     """
+   | |____^
+13 |
+14 |       def __init__(self, a: int, b: int) -> None:
+   |
+help: Please remove `Yields` section from class docstring
