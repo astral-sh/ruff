@@ -1,3 +1,9 @@
+// The routines in this module are currently unused, but we may want to use or
+// adapt them in the future (e.g. to provide a deterministic ordering of types).
+//
+// Note: using `#![expect(dead_code)]` here produces false-positive errors
+// claiming the lint expectation is unfulfilled (reason unknown), so we use
+// `#![allow(dead_code)]` instead.
 #![allow(dead_code)]
 
 use std::cmp::Ordering;
