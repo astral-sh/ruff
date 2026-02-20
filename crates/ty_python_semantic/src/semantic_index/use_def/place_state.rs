@@ -263,18 +263,7 @@ pub(crate) struct LiveBinding {
     pub(crate) binding: ScopedDefinitionId,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
-    /// Number of reachability-gated narrowing merges this binding has been through.
-    /// When this exceeds [`MAX_NARROWING_GATING_MERGES`], we fall back to simple OR
-    /// to avoid mixing too many reachability atoms into the narrowing TDD.
-    narrowing_depth: u8,
 }
-
-/// Maximum number of reachability-gated narrowing merges per binding before falling
-/// back to simple OR. In functions with many if-branches, each merge can inject
-/// reachability atoms into the narrowing TDD, causing exponential blowup during
-/// evaluation. This limit ensures graceful degradation for deeply merged bindings
-/// while preserving full precision for simple code.
-const MAX_NARROWING_GATING_MERGES: u8 = 12;
 
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
 
@@ -284,7 +273,6 @@ impl Bindings {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-            narrowing_depth: 0,
         };
         Self {
             unbound_narrowing_constraint: None,
@@ -317,7 +305,6 @@ impl Bindings {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
-            narrowing_depth: 0,
         });
         self.latest_place_version
     }
@@ -381,18 +368,12 @@ impl Bindings {
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
 
-                    let max_depth = a.narrowing_depth.max(b.narrowing_depth);
-                    let (narrowing_constraint, new_depth) = if a.narrowing_constraint
+                    let narrowing_constraint = if a.narrowing_constraint
                         == ScopedNarrowingConstraint::ALWAYS_TRUE
                         && b.narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
                     {
                         // short-circuit: if both sides are ALWAYS_TRUE, the result is ALWAYS_TRUE without needing to create a new TDD node.
-                        (ScopedNarrowingConstraint::ALWAYS_TRUE, max_depth)
-                    } else if max_depth > MAX_NARROWING_GATING_MERGES {
-                        // Too many gated merges for this binding: fall back to simple OR to avoid TDD bloat from reachability atoms.
-                        let narrowing = reachability_constraints
-                            .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint);
-                        (narrowing, max_depth)
+                        ScopedNarrowingConstraint::ALWAYS_TRUE
                     } else {
                         // A branch contributes narrowing only when it is reachable.
                         // Without this gating, `OR(a_narrowing, b_narrowing)` allows an unreachable
@@ -402,16 +383,14 @@ impl Bindings {
                             .add_and_constraint(a.narrowing_constraint, a.reachability_constraint);
                         let b_narrowing_gated = reachability_constraints
                             .add_and_constraint(b.narrowing_constraint, b.reachability_constraint);
-                        let narrowing = reachability_constraints
-                            .add_or_constraint(a_narrowing_gated, b_narrowing_gated);
-                        (narrowing, max_depth + 1)
+                        reachability_constraints
+                            .add_or_constraint(a_narrowing_gated, b_narrowing_gated)
                     };
 
                     self.live_bindings.push(LiveBinding {
                         binding: a.binding,
                         narrowing_constraint,
                         reachability_constraint,
-                        narrowing_depth: new_depth,
                     });
                 }
 
