@@ -453,7 +453,7 @@ pub(crate) use todo_type;
 ///
 /// # Ordering
 /// Ordering is based on the property instance's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the property instance was garbage collected and recreated.
+/// The id may change between runs, or when the property instance was garbage collected and recreated
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct PropertyInstanceType<'db> {
