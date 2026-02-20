@@ -79,6 +79,15 @@ pub(crate) fn enum_metadata<'db>(
     let use_def_map = use_def_map(db, scope_id);
     let table = place_table(db, scope_id);
 
+    // When an enum has a custom `__new__`, the raw assignment type doesn't represent the
+    // member's value — `__new__` unpacks the arguments and explicitly sets `_value_`.
+    // Fall back to the `_value_` annotation type (if declared) or `Any`.
+    let custom_new_value_ty = if has_custom_enum_new(db, class) {
+        Some(enum_value_annotation_type(db, class).unwrap_or(Type::any()))
+    } else {
+        None
+    };
+
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
 
@@ -276,7 +285,8 @@ pub(crate) fn enum_metadata<'db>(
                 }
             }
 
-            Some((name.clone(), value_ty))
+            let final_value_ty = custom_new_value_ty.unwrap_or(value_ty);
+            Some((name.clone(), final_value_ty))
         })
         .collect::<FxIndexMap<_, _>>();
 
@@ -345,6 +355,91 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
                     .unwrap_or(Type::unknown()),
             )
         }
+        _ => None,
+    }
+}
+
+/// Returns `true` if the enum class (or a class in its MRO) defines a custom `__new__` method.
+///
+/// When an enum has a custom `__new__`, the assigned tuple values are unpacked as arguments to
+/// `__new__`, and `_value_` is explicitly set inside the method body. This means we can't infer
+/// the member's value type from the raw assignment — we need to fall back to the `_value_`
+/// annotation (if any) or `Any`.
+///
+/// We skip classes that are expected to have standard `__new__` implementations:
+/// `object`, `Enum`, `StrEnum`, `int`, `str`, `float`, `complex`, `bytes`, and `bool`.
+fn has_custom_enum_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    // Check the enum class itself
+    if has_own_dunder_new(db, class) {
+        return true;
+    }
+
+    // Walk the MRO (skipping the class itself) looking for a custom `__new__`
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .any(|mro_class| {
+            let Some(static_class) = mro_class.class_literal(db).as_static() else {
+                return false;
+            };
+
+            // Skip known classes with standard `__new__` implementations
+            if matches!(
+                static_class.known(db),
+                Some(
+                    KnownClass::Object
+                        | KnownClass::Enum
+                        | KnownClass::StrEnum
+                        | KnownClass::Int
+                        | KnownClass::Str
+                        | KnownClass::Float
+                        | KnownClass::Complex
+                        | KnownClass::Bytes
+                        | KnownClass::Bool
+                )
+            ) {
+                return false;
+            }
+
+            // Skip classes defined in stub files (e.g. `IntEnum.__new__`, `IntFlag.__new__`
+            // from typeshed). These `__new__` definitions exist for typing purposes and
+            // don't represent custom value transformations.
+            if static_class.body_scope(db).file(db).is_stub(db) {
+                return false;
+            }
+
+            has_own_dunder_new(db, static_class)
+        })
+}
+
+/// Returns `true` if the class defines `__new__` directly in its own body scope.
+fn has_own_dunder_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
+    let scope = class.body_scope(db);
+    let table = place_table(db, scope);
+    table.symbol_id("__new__").is_some_and(|symbol_id| {
+        let bindings = use_def_map(db, scope).reachable_symbol_bindings(symbol_id);
+        matches!(place_from_bindings(db, bindings).place, Place::Defined(_))
+    })
+}
+
+/// When an enum class has a custom `__new__`, look up the `_value_` annotation
+/// on the class itself to determine the value type. Returns `None` if no annotation
+/// is found on the enum class's own body.
+fn enum_value_annotation_type<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<Type<'db>> {
+    let scope_id = class.body_scope(db);
+    let use_def = use_def_map(db, scope_id);
+    let table = place_table(db, scope_id);
+
+    let symbol_id = table.symbol_id("_value_")?;
+    let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
+    let declared = place_from_declarations(db, declarations).ignore_conflicting_declarations();
+
+    match declared.place {
+        Place::Defined(DefinedPlace { ty, .. }) if !ty.is_dynamic() => Some(ty),
         _ => None,
     }
 }
