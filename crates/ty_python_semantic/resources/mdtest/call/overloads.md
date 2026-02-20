@@ -1786,6 +1786,45 @@ def _(arg: tuple[A | B, Any]):
     reveal_type(f(*(arg,)))  # revealed: Unknown
 ```
 
+### Unknown argument with TypeVar overload
+
+When an `Unknown` argument is passed to an overloaded function where one overload has a concrete
+parameter type and another uses a TypeVar, the parameter types must not be considered equivalent
+during step 5's "participating parameter" determination. If TypeVar solving were allowed during that
+equivalence check, the solver could find an assignment (e.g. `T = None`) that makes the parameters
+look equivalent, causing step 5 to skip filtering entirely and incorrectly pick the first overload.
+
+`overloaded.pyi`:
+
+```pyi
+from typing import TypeVar, overload, Literal, Iterable
+
+T = TypeVar("T")
+
+@overload
+def f(components: Iterable[None]) -> Literal[b""]: ...
+@overload
+def f(components: Iterable[T | None]) -> T: ...
+```
+
+```py
+from overloaded import f
+from nonexistent_module import something_unknown  # error: [unresolved-import]
+
+reveal_type(something_unknown)  # revealed: Unknown
+
+# The result should be `Unknown`, not `Literal[b""]`.
+reveal_type(f(something_unknown))  # revealed: Unknown
+reveal_type(f((something_unknown, something_unknown, something_unknown)))  # revealed: Unknown
+reveal_type(f((something_unknown, None, something_unknown)))  # revealed: Unknown
+
+# Concrete arguments should still resolve correctly.
+def _(s: str):
+    reveal_type(f((s, s, None)))  # revealed: str
+
+reveal_type(f((None, None, None)))  # revealed: Literal[b""]
+```
+
 ## Bidirectional Type Inference
 
 ```toml

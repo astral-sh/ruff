@@ -935,7 +935,6 @@ impl<'db> Type<'db> {
                     target.when_equivalent_to_impl(
                         db,
                         Type::object(),
-                        inferable,
                         relation_visitor,
                         disjointness_visitor,
                     )
@@ -1348,7 +1347,6 @@ impl<'db> Type<'db> {
                         .when_equivalent_to_impl(
                             db,
                             Type::from(right),
-                            inferable,
                             relation_visitor,
                             disjointness_visitor,
                         ),
@@ -1370,7 +1368,6 @@ impl<'db> Type<'db> {
                         .when_equivalent_to_impl(
                             db,
                             Type::from(right),
-                            inferable,
                             relation_visitor,
                             disjointness_visitor,
                         ),
@@ -1379,7 +1376,6 @@ impl<'db> Type<'db> {
                         Type::from(left).when_equivalent_to_impl(
                             db,
                             Type::from(right),
-                            inferable,
                             relation_visitor,
                             disjointness_visitor,
                         )
@@ -1400,7 +1396,6 @@ impl<'db> Type<'db> {
                         .when_equivalent_to_impl(
                             db,
                             Type::TypeVar(r_typevar),
-                            inferable,
                             relation_visitor,
                             disjointness_visitor,
                         )
@@ -1408,7 +1403,6 @@ impl<'db> Type<'db> {
                             Type::from(l_class).when_equivalent_to_impl(
                                 db,
                                 Type::from(r_class),
-                                inferable,
                                 relation_visitor,
                                 disjointness_visitor,
                             )
@@ -1664,39 +1658,30 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other, InferableTypeVars::None)
-            .is_always_satisfied(db)
+        self.when_equivalent_to(db, other).is_always_satisfied(db)
     }
 
     pub(crate) fn when_equivalent_to(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         let relation_visitor = HasRelationToVisitor::default();
         let disjointness_visitor = IsDisjointVisitor::default();
-        self.when_equivalent_to_impl(
-            db,
-            other,
-            inferable,
-            &relation_visitor,
-            &disjointness_visitor,
-        )
+        self.when_equivalent_to_impl(db, other, &relation_visitor, &disjointness_visitor)
     }
 
     pub(crate) fn when_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
             other,
-            inferable,
+            InferableTypeVars::None,
             TypeRelation::PureRedundancy,
             relation_visitor,
             disjointness_visitor,
@@ -1705,7 +1690,7 @@ impl<'db> Type<'db> {
             other.has_relation_to_impl(
                 db,
                 self,
-                inferable,
+                InferableTypeVars::None,
                 TypeRelation::PureRedundancy,
                 relation_visitor,
                 disjointness_visitor,
@@ -2485,13 +2470,7 @@ impl<'db> Type<'db> {
 
             (Type::BoundSuper(_), Type::BoundSuper(_)) => disjointness_visitor
                 .visit((self, other), || {
-                    self.when_equivalent_to_impl(
-                        db,
-                        other,
-                        inferable,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
+                    self.when_equivalent_to_impl(db, other, relation_visitor, disjointness_visitor)
                 })
                 .negate(db),
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
