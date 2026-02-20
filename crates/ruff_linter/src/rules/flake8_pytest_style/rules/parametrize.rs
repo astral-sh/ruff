@@ -204,6 +204,7 @@ impl Violation for PytestParametrizeNamesWrongType {
 pub(crate) struct PytestParametrizeValuesWrongType {
     values: types::ParametrizeValuesType,
     row: types::ParametrizeValuesRowType,
+    is_multi_named: bool,
 }
 
 impl Violation for PytestParametrizeValuesWrongType {
@@ -211,13 +212,31 @@ impl Violation for PytestParametrizeValuesWrongType {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestParametrizeValuesWrongType { values, row } = self;
-        format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_multi_named,
+        } = self;
+        let row_suffix = if *is_multi_named {
+            format!(" of `{row}`")
+        } else {
+            String::new()
+        };
+        format!("Wrong values type in `pytest.mark.parametrize` expected `{values}`{row_suffix}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestParametrizeValuesWrongType { values, row } = self;
-        Some(format!("Use `{values}` of `{row}` for parameter values"))
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_multi_named,
+        } = self;
+        let row_suffix = if *is_multi_named {
+            format!(" of `{row}`")
+        } else {
+            String::new()
+        };
+        Some(format!("Use `{values}`{row_suffix} for parameter values"))
     }
 }
 
@@ -524,6 +543,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_multi_named,
                     },
                     values.range(),
                 );
@@ -571,6 +591,7 @@ fn check_values(checker: &Checker, names: &Expr, values: &Expr) {
                     PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
+                        is_multi_named,
                     },
                     values.range(),
                 );
@@ -775,6 +796,7 @@ fn handle_value_rows(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
+                            is_multi_named: true,
                         },
                         elt.range(),
                     );
@@ -817,6 +839,7 @@ fn handle_value_rows(
                         PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
+                            is_multi_named: true,
                         },
                         elt.range(),
                     );
