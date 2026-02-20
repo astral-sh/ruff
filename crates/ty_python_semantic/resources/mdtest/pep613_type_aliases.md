@@ -460,3 +460,27 @@ BadTypeAlias14: TypeAlias = Literal[-3.14]  # error: [invalid-type-form]
 # error: [invalid-type-form]
 BadTypeAlias14: TypeAlias = Literal[3.14]
 ```
+
+## No type qualifiers
+
+The right-hand side of a type alias definition is a [type expression], not an annotation expression.
+Type qualifiers like `ClassVar` and `Final` are only valid in annotation expressions, so they cannot
+appear in type alias definitions:
+
+```py
+from typing_extensions import ClassVar, Final, Required, NotRequired, ReadOnly, TypeAlias, Unpack
+from dataclasses import InitVar
+
+bad1: TypeAlias = ClassVar[str]  # error: [invalid-type-form]
+bad2: TypeAlias = ClassVar  # error: [invalid-type-form]
+bad3: TypeAlias = Final[int]  # error: [invalid-type-form]
+bad4: TypeAlias = Final  # error: [invalid-type-form]
+bad5: TypeAlias = Required[int]  # error: [invalid-type-form]
+bad6: TypeAlias = NotRequired[int]  # error: [invalid-type-form]
+bad7: TypeAlias = ReadOnly[int]  # error: [invalid-type-form]
+bad8: TypeAlias = Unpack[tuple[int, ...]]  # error: [invalid-type-form]
+bad9: TypeAlias = InitVar[int]  # error: [invalid-type-form]
+bad10: TypeAlias = InitVar  # error: [invalid-type-form]
+```
+
+[type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

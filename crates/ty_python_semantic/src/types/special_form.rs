@@ -331,6 +331,59 @@ impl SpecialFormType {
         }
     }
 
+    /// Return `true` if this special form type is valid in a type-expression context (and not
+    /// just in an *annotation* expression context). See the following section of the typing
+    /// specification for more details:
+    /// <https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions>
+    pub(super) const fn is_valid_in_type_expression(self) -> bool {
+        match self {
+            Self::ClassVar
+            | Self::Final
+            | Self::Required
+            | Self::NotRequired
+            | SpecialFormType::ReadOnly
+            | SpecialFormType::Unpack
+            | SpecialFormType::TypeAlias => false,
+            Self::Annotated
+            | SpecialFormType::Any
+            | SpecialFormType::Literal
+            | SpecialFormType::LiteralString
+            | SpecialFormType::Optional
+            | SpecialFormType::Union
+            | SpecialFormType::NoReturn
+            | SpecialFormType::Never
+            | SpecialFormType::Tuple
+            | SpecialFormType::List
+            | SpecialFormType::Dict
+            | SpecialFormType::Set
+            | SpecialFormType::FrozenSet
+            | SpecialFormType::ChainMap
+            | SpecialFormType::Counter
+            | SpecialFormType::DefaultDict
+            | SpecialFormType::Deque
+            | SpecialFormType::OrderedDict
+            | SpecialFormType::Type
+            | SpecialFormType::Unknown
+            | SpecialFormType::AlwaysTruthy
+            | SpecialFormType::AlwaysFalsy
+            | SpecialFormType::Not
+            | SpecialFormType::Intersection
+            | SpecialFormType::TypeOf
+            | SpecialFormType::CallableTypeOf
+            | SpecialFormType::Top
+            | SpecialFormType::Bottom
+            | SpecialFormType::Callable
+            | SpecialFormType::TypingSelf
+            | SpecialFormType::Concatenate
+            | SpecialFormType::TypeGuard
+            | SpecialFormType::TypedDict
+            | SpecialFormType::TypeIs
+            | SpecialFormType::Protocol
+            | SpecialFormType::Generic
+            | SpecialFormType::NamedTuple => true,
+        }
+    }
+
     /// Return `Some(KnownClass)` if this special form is an alias
     /// to a standard library class.
     pub(super) const fn aliased_stdlib_class(self) -> Option<KnownClass> {
