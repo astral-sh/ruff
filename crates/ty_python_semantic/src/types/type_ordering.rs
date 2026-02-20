@@ -553,7 +553,7 @@ pub(super) fn type_ordering<'db>(
                 }
             }
 
-            unreachable!("Two equal unions should share the same Salsa ID")
+            Ordering::Equal
         }
         (Type::Union(_), _) => Ordering::Less,
         (_, Type::Union(_)) => Ordering::Greater,
@@ -590,7 +590,7 @@ pub(super) fn type_ordering<'db>(
                 }
             }
 
-            unreachable!("Two equal intersections should share the same Salsa ID")
+            Ordering::Equal
         }
     }
 }
