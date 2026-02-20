@@ -1471,9 +1471,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ));
                 Some(unpackable.as_current_assignment(unpack))
             }
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                Some(unpackable.as_current_assignment(None))
-            }
+            ast::Expr::Name(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_) => Some(unpackable.as_current_assignment(None)),
             _ => None,
         };
 
