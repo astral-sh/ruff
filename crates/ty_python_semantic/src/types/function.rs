@@ -80,18 +80,15 @@ use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_definition_types,
-    walk_signature,
+    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
+    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 
@@ -1220,24 +1217,6 @@ impl<'db> FunctionType<'db> {
         )
     }
 
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self.normalized(db) == other.normalized(db) {
-            return ConstraintSet::from(true);
-        }
-        if self.literal(db) != other.literal(db) {
-            return ConstraintSet::from(false);
-        }
-        let self_signature = self.signature(db);
-        let other_signature = other.signature(db);
-        self_signature.is_equivalent_to_impl(db, other_signature, inferable, visitor)
-    }
-
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -1249,26 +1228,6 @@ impl<'db> FunctionType<'db> {
         for signature in &signatures.overloads {
             signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
-    }
-
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let literal = self.literal(db);
-        let updated_signature = self
-            .updated_signature(db)
-            .map(|signature| signature.normalized_impl(db, visitor));
-        let updated_last_definition_signature = self
-            .updated_last_definition_signature(db)
-            .map(|signature| signature.normalized_impl(db, visitor));
-        Self::new(
-            db,
-            literal,
-            updated_signature,
-            updated_last_definition_signature,
-        )
     }
 
     pub(crate) fn recursive_type_normalized_impl(

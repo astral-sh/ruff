@@ -1146,8 +1146,7 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
+                                let constraints = ty_a.when_equivalent_to(db, *ty_b);
                                 let tracked = InternedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -2482,14 +2481,7 @@ impl<'db> CallableBinding<'db> {
                         overload.signature.parameters()[parameter_index].annotated_type();
                     let first_parameter_type = &mut first_parameter_types[parameter_index];
                     if let Some(first_parameter_type) = first_parameter_type {
-                        if !first_parameter_type
-                            .when_equivalent_to(
-                                db,
-                                current_parameter_type,
-                                overload.inferable_typevars,
-                            )
-                            .is_always_satisfied(db)
-                        {
+                        if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
                             participating_parameter_indexes.insert(parameter_index);
                         }
                     } else {
@@ -2630,12 +2622,7 @@ impl<'db> CallableBinding<'db> {
                 matching_overloads.all(|(_, overload)| {
                     overload
                         .return_type()
-                        .when_equivalent_to(
-                            db,
-                            first_overload_return_type,
-                            overload.inferable_typevars,
-                        )
-                        .is_always_satisfied(db)
+                        .is_equivalent_to(db, first_overload_return_type)
                 })
             } else {
                 // No matching overload

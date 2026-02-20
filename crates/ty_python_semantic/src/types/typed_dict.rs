@@ -19,14 +19,12 @@ use super::diagnostic::{
 use super::{ApplyTypeMappingVisitor, IntersectionBuilder, Type, TypeMapping, visitor};
 use crate::Db;
 use crate::semantic_index::definition::Definition;
+use crate::types::TypeContext;
 use crate::types::TypeDefinition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
-use crate::types::{NormalizedVisitor, TypeContext};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 
 bitflags! {
     /// Used for `TypedDict` class parameters.
@@ -313,50 +311,6 @@ impl<'db> TypedDictType<'db> {
             TypedDictType::Class(defining_class) => defining_class.type_definition(db),
             TypedDictType::Synthesized(_) => None,
         }
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            TypedDictType::Class(_) => {
-                let synthesized = SynthesizedTypedDictType::new(db, self.items(db));
-                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
-            }
-            TypedDictType::Synthesized(synthesized) => {
-                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
-            }
-        }
-    }
-
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: TypedDictType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        // TODO: `closed` and `extra_items` support will go here. Until then we don't look at the
-        // params at all, because `total` is already incorporated into `FieldKind`.
-
-        // Since both sides' fields are pre-sorted into `BTreeMap`s, we can iterate over them in
-        // sorted order instead of paying for a lookup for each field, as long as their lengths are
-        // the same.
-        if self.items(db).len() != other.items(db).len() {
-            return ConstraintSet::from(false);
-        }
-        self.items(db).iter().zip(other.items(db)).when_all(
-            db,
-            |((name, field), (other_name, other_field))| {
-                if name != other_name || field.flags != other_field.flags {
-                    return ConstraintSet::from(false);
-                }
-                field.declared_ty.is_equivalent_to_impl(
-                    db,
-                    other_field.declared_ty,
-                    inferable,
-                    visitor,
-                )
-            },
-        )
     }
 
     /// Two `TypedDict`s `A` and `B` are disjoint if it's impossible to come up with a third
@@ -1102,18 +1056,6 @@ impl<'db> SynthesizedTypedDictType<'db> {
 
         SynthesizedTypedDictType::new(db, items)
     }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let items = self
-            .items(db)
-            .iter()
-            .map(|(name, field)| {
-                let field = field.clone().normalized_impl(db, visitor);
-                (name.clone(), field)
-            })
-            .collect::<TypedDictSchema<'db>>();
-        Self::new(db, items)
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, get_size2::GetSize, salsa::Update)]
@@ -1181,17 +1123,6 @@ impl<'db> TypedDictField<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             flags: self.flags,
             first_declaration: self.first_declaration,
-        }
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self {
-            declared_ty: self.declared_ty.normalized_impl(db, visitor),
-            flags: self.flags,
-            // A normalized typed-dict field does not hold onto the original declaration,
-            // since a normalized typed-dict is an abstract type where equality does not depend
-            // on the source-code definition.
-            first_declaration: None,
         }
     }
 }

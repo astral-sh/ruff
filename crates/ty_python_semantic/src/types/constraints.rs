@@ -709,15 +709,6 @@ impl<'db> ConstrainedTypeVar<'db> {
         ConstraintAssignment::Negative(self)
     }
 
-    fn normalized(self, db: &'db dyn Db) -> Self {
-        Self::new(
-            db,
-            self.typevar(db),
-            self.lower(db).normalized(db),
-            self.upper(db).normalized(db),
-        )
-    }
-
     /// Defines the ordering of the variables in a constraint set BDD.
     ///
     /// If we only care about _correctness_, we can choose any ordering that we want, as long as
@@ -1843,7 +1834,7 @@ impl<'db> Node<'db> {
                     Node::AlwaysFalse => {}
                     Node::AlwaysTrue => self.clauses.push(self.current_clause.clone()),
                     Node::Interior(interior) => {
-                        let interior_constraint = interior.constraint(db).normalized(db);
+                        let interior_constraint = interior.constraint(db);
                         self.current_clause.push(interior_constraint.when_true());
                         self.visit_node(db, interior.if_true(db));
                         self.current_clause.pop();
@@ -2729,8 +2720,6 @@ impl<'db> InteriorNode<'db> {
             // non-empty.
             match left_constraint.intersect(db, right_constraint) {
                 IntersectionResult::Simplified(intersection_constraint) => {
-                    let intersection_constraint = intersection_constraint.normalized(db);
-
                     // If the intersection is non-empty, we need to create a new constraint to
                     // represent that intersection. We also need to add the new constraint to our
                     // seen set and (if we haven't already seen it) to the to-visit queue.

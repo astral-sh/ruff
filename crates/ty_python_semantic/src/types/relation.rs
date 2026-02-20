@@ -87,30 +87,31 @@ pub(crate) enum TypeRelation<'db> {
     /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Assignability,
 
-    /// The "redundancy" relation.
+    /// The "pure redundancy" relation.
     ///
-    /// The redundancy relation dictates whether the union `A | B` can be safely simplified
-    /// to the type `A` without downstream consequences on ty's inference of types elsewhere.
+    /// The pure redundancy relation dictates whether two types represent the same set of
+    /// possible sets of runtime values: that is, whether they have the same top materialization
+    /// and the same bottom materialization.
     ///
-    /// For a pair of [fully static] types `A` and `B`, the redundancy relation between `A`
+    /// For a pair of [fully static] types `A` and `B`, the pure redundancy relation between `A`
     /// and `B` is the same as the subtyping relation.
     ///
     /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
-    /// redundancy relation sits in between the subtyping relation and the assignability relation.
-    /// `D` can be said to be redundant in a union with `C` if the top materialization of the type
-    /// `C | D` is equivalent to the top materialization of `C`, *and* the bottom materialization
-    /// of `C | D` is equivalent to the bottom materialization of `C`.
-    /// More concisely: `D <: C` iff `Top[C | D] == Top[C]` AND `Bottom[C | D] == Bottom[C]`.
+    /// pure redundancy relation sits in between the subtyping relation and the assignability
+    /// relation. `D` can be said to be purely redundant in a union with `C` if the top
+    /// materialization of the type `C | D` is equivalent to the top materialization of `C`,
+    /// *and* the bottom materialization of `C | D` is equivalent to the bottom materialization
+    /// of `C`.  More concisely: `D <: C` iff `Top[C | D] == Top[C]` AND `Bottom[C | D] == Bottom[C]`.
     ///
-    /// Practically speaking, in most respects the redundancy relation is the same as the subtyping
-    /// relation. It is redundant to add `bool` to a union that includes `int`, because `bool` is a
-    /// subtype of `int`, so inference of attribute access or binary expressions on the union
-    /// `int | bool` would always produce a type that represents the same set of possible sets of
-    /// runtime values as if ty had inferred the attribute access or binary expression on `int`
-    /// alone.
+    /// Practically speaking, in most respects the pure redundancy relation is the same as the
+    /// subtyping relation. It is redundant to add `bool` to a union that includes `int`,
+    /// because `bool` is a subtype of `int`, so inference of attribute access or binary
+    /// expressions on the union `int | bool` would always produce a type that represents the
+    /// same set of possible sets of runtime values as if ty had inferred the attribute access
+    /// or binary expression on `int` alone.
     ///
-    /// Where the redundancy relation differs from the subtyping relation is that there are a
-    /// number of simplifications that can be made when simplifying unions that are not
+    /// Where the pure redundancy relation differs from the subtyping relation is that there are
+    /// a number of simplifications that can be made when simplifying unions that are not
     /// strictly permitted by the subtyping relation. For example, it is safe to avoid adding
     /// `Any` to a union that already includes `Any`, because `Any` already represents an
     /// unknown set of possible sets of runtime values that can materialize to any type in a
@@ -135,9 +136,29 @@ pub(crate) enum TypeRelation<'db> {
     /// materialization of `Any` and `int | Any` may be the same type (`object`), but the
     /// two differ in their bottom materializations (`Never` and `int`, respectively).
     ///
-    /// Despite the above principles, there is one exceptional type that should never be union-simplified: the `Divergent` type.
-    /// This is a kind of dynamic type, but it acts as a marker to track recursive type structures.
-    /// If this type is accidentally eliminated by simplification, the fixed-point iteration will not converge.
+    /// This relation is used for type equivalence checks, where both directions of the
+    /// relation are tested (i.e. `A` is equivalent to `B` iff `A` is purely redundant in a
+    /// union with `B` *and* `B` is purely redundant in a union with `A`).
+    ///
+    /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
+    /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
+    PureRedundancy,
+
+    /// The "redundancy" relation, used for union simplification.
+    ///
+    /// This relation is a practical adaptation of the [pure redundancy](`Self::PureRedundancy`)
+    /// relation for use in union simplification. It shares the same theoretical basis (comparing
+    /// top and bottom materializations), but may differ in minor respects to better serve the
+    /// needs of union simplification. For example, for a pair of literal values of the same kind
+    /// (e.g. two `bool` literals), this relation is asymmetric: a promotable literal (such as
+    /// `True`) is considered redundant with a non-promotable literal of the same kind (such as
+    /// `Literal[True]`), but not vice versa. This ensures that union simplification preserves
+    /// the unpromotable form of a literal value.
+    ///
+    /// Note: `Divergent` types (dynamic types used as markers to track recursive type structures)
+    /// must never be eliminated by union simplification, as doing so would prevent the fixed-point
+    /// iteration from converging. This is enforced by an early-return branch in `has_relation_to_impl`
+    /// that applies to both this relation and `PureRedundancy`.
     ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
@@ -207,6 +228,7 @@ impl TypeRelation<'_> {
         match self {
             TypeRelation::Assignability
             | TypeRelation::ConstraintSetAssignability
+            | TypeRelation::PureRedundancy
             | TypeRelation::Redundancy => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
                 ty.subtyping_is_always_reflexive()
@@ -461,7 +483,7 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(match relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                    TypeRelation::Redundancy => match target {
+                    TypeRelation::Redundancy | TypeRelation::PureRedundancy => match target {
                         Type::Dynamic(_) => true,
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
                         _ => false,
@@ -471,7 +493,7 @@ impl<'db> Type<'db> {
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                 TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                TypeRelation::Redundancy => match self {
+                TypeRelation::Redundancy | TypeRelation::PureRedundancy => match self {
                     Type::Dynamic(_) => true,
                     Type::Intersection(intersection) => {
                         // If a `Divergent` type is involved, it must not be eliminated.
@@ -811,6 +833,7 @@ impl<'db> Type<'db> {
                     let self_ty = match relation {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy
+                        | TypeRelation::PureRedundancy
                         | TypeRelation::SubtypingAssuming(_) => self,
                         TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                             self.bottom_materialization(db)
@@ -820,6 +843,7 @@ impl<'db> Type<'db> {
                         let neg_ty = match relation {
                             TypeRelation::Subtyping
                             | TypeRelation::Redundancy
+                            | TypeRelation::PureRedundancy
                             | TypeRelation::SubtypingAssuming(_) => neg_ty,
                             TypeRelation::Assignability
                             | TypeRelation::ConstraintSetAssignability => {
@@ -925,7 +949,14 @@ impl<'db> Type<'db> {
             (left, Type::AlwaysTruthy) => ConstraintSet::from(left.bool(db).is_always_true()),
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
-                target.when_equivalent_to(db, Type::object(), inferable)
+                relation_visitor.visit((self, target, relation), || {
+                    target.when_equivalent_to_impl(
+                        db,
+                        Type::object(),
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
             }
 
             // These clauses handle type variants that include function literals. A function
@@ -1328,8 +1359,8 @@ impl<'db> Type<'db> {
 
             (Type::Callable(_), _) => ConstraintSet::from(false),
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
-                self.when_equivalent_to(db, target, inferable)
+            (Type::BoundSuper(left), Type::BoundSuper(right)) => {
+                left.is_equivalent_to_impl(db, right, relation_visitor, disjointness_visitor)
             }
             (Type::BoundSuper(_), _) => KnownClass::Super.to_instance(db).has_relation_to_impl(
                 db,
@@ -1576,126 +1607,44 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other, InferableTypeVars::None)
-            .is_always_satisfied(db)
+        self.when_equivalent_to(db, other).is_always_satisfied(db)
     }
 
     pub(crate) fn when_equivalent_to(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
-        self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
+        let relation_visitor = HasRelationToVisitor::default();
+        let disjointness_visitor = IsDisjointVisitor::default();
+        self.when_equivalent_to_impl(db, other, &relation_visitor, &disjointness_visitor)
     }
 
-    pub(crate) fn is_equivalent_to_impl(
+    pub(crate) fn when_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        if self == other {
-            return ConstraintSet::from(true);
-        }
-
-        match (self, other) {
-            // The `Divergent` type is a special type that is not equivalent to other kinds of dynamic types,
-            // which prevents `Divergent` from being eliminated during union reduction.
-            (Type::Dynamic(_), Type::Dynamic(DynamicType::Divergent(_)))
-            | (Type::Dynamic(DynamicType::Divergent(_)), Type::Dynamic(_)) => {
-                ConstraintSet::from(false)
-            }
-            (Type::Dynamic(_), Type::Dynamic(_)) => ConstraintSet::from(true),
-
-            (Type::SubclassOf(first), Type::SubclassOf(second)) => {
-                match (first.subclass_of(), second.subclass_of()) {
-                    (first, second) if first == second => ConstraintSet::from(true),
-                    (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                        ConstraintSet::from(true)
-                    }
-                    _ => ConstraintSet::from(false),
-                }
-            }
-
-            (Type::TypeAlias(self_alias), _) => {
-                let self_alias_ty = self_alias.value_type(db).normalized(db);
-                visitor.visit((self_alias_ty, other), || {
-                    self_alias_ty.is_equivalent_to_impl(db, other, inferable, visitor)
-                })
-            }
-
-            (_, Type::TypeAlias(other_alias)) => {
-                let other_alias_ty = other_alias.value_type(db).normalized(db);
-                visitor.visit((self, other_alias_ty), || {
-                    self.is_equivalent_to_impl(db, other_alias_ty, inferable, visitor)
-                })
-            }
-
-            (Type::NewTypeInstance(self_newtype), Type::NewTypeInstance(other_newtype)) => {
-                ConstraintSet::from(self_newtype.is_equivalent_to_impl(db, other_newtype))
-            }
-
-            (Type::NominalInstance(first), Type::NominalInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::Union(first), Type::Union(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::Intersection(first), Type::Intersection(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.is_equivalent_to_impl(db, target_function, inferable, visitor)
-            }
-            (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
-                self_method.is_equivalent_to_impl(db, target_method, inferable, visitor)
-            }
-            (Type::KnownBoundMethod(self_method), Type::KnownBoundMethod(target_method)) => {
-                self_method.is_equivalent_to_impl(db, target_method, inferable, visitor)
-            }
-            (Type::Callable(first), Type::Callable(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-
-            (Type::LiteralValue(left), Type::LiteralValue(right)) => {
-                ConstraintSet::from(left.kind() == right.kind())
-            }
-
-            (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
-            (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
-            | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
-                ConstraintSet::from(n.is_object() && protocol.normalized(db) == nominal)
-            }
-            // An instance of an enum class is equivalent to an enum literal of that class,
-            // if that enum has only has one member.
-            (Type::NominalInstance(instance), Type::LiteralValue(literal))
-            | (Type::LiteralValue(literal), Type::NominalInstance(instance))
-                if literal.is_enum() =>
-            {
-                let literal = literal.as_enum().unwrap();
-                if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
-                    return ConstraintSet::from(false);
-                }
-                ConstraintSet::from(is_single_member_enum(db, instance.class_literal(db)))
-            }
-
-            (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
-                left.is_equivalent_to_impl(db, right, inferable, visitor)
-            }
-
-            (Type::TypedDict(left), Type::TypedDict(right)) => visitor.visit((self, other), || {
-                left.is_equivalent_to_impl(db, right, inferable, visitor)
-            }),
-
-            _ => ConstraintSet::from(false),
-        }
+        self.has_relation_to_impl(
+            db,
+            other,
+            InferableTypeVars::None,
+            TypeRelation::PureRedundancy,
+            relation_visitor,
+            disjointness_visitor,
+        )
+        .and(db, || {
+            other.has_relation_to_impl(
+                db,
+                self,
+                InferableTypeVars::None,
+                TypeRelation::PureRedundancy,
+                relation_visitor,
+                disjointness_visitor,
+            )
+        })
     }
 
     /// Return true if `self & other` should simplify to `Never`:
@@ -2468,9 +2417,9 @@ impl<'db> Type<'db> {
                 )
             }
 
-            (Type::BoundSuper(_), Type::BoundSuper(_)) => {
-                self.when_equivalent_to(db, other, inferable).negate(db)
-            }
+            (Type::BoundSuper(left), Type::BoundSuper(right)) => left
+                .is_equivalent_to_impl(db, right, relation_visitor, disjointness_visitor)
+                .negate(db),
             (Type::BoundSuper(_), other) | (other, Type::BoundSuper(_)) => {
                 KnownClass::Super.to_instance(db).is_disjoint_from_impl(
                     db,

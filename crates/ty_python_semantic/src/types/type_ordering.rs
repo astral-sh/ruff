@@ -1,3 +1,11 @@
+// The routines in this module are currently unused, but we may want to use or
+// adapt them in the future (e.g. to provide a deterministic ordering of types).
+//
+// Note: using `#![expect(dead_code)]` here produces false-positive errors
+// claiming the lint expectation is unfulfilled (reason unknown), so we use
+// `#![allow(dead_code)]` instead.
+#![allow(dead_code)]
+
 use std::cmp::Ordering;
 
 use salsa::plumbing::AsId;
@@ -31,17 +39,6 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
     left: &Type<'db>,
     right: &Type<'db>,
 ) -> Ordering {
-    debug_assert_eq!(
-        *left,
-        left.normalized(db),
-        "`left` must be normalized before a meaningful ordering can be established"
-    );
-    debug_assert_eq!(
-        *right,
-        right.normalized(db),
-        "`right` must be normalized before a meaningful ordering can be established"
-    );
-
     if left == right {
         return Ordering::Equal;
     }
