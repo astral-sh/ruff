@@ -52,7 +52,7 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
                 let data: DiagnosticData = match serde_json::from_value(data) {
                     Ok(data) => data,
                     Err(err) => {
-                        tracing::warn!("Failed to deserialize diagnostic data: {err}");
+                        tracing_unlikely::warn!("Failed to deserialize diagnostic data: {err}");
                         continue;
                     }
                 };

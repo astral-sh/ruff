@@ -27,6 +27,7 @@ strum = { workspace = true }
 strum_macros = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+tracing-unlikely = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }

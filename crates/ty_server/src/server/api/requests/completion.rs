@@ -135,7 +135,7 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
             is_incomplete: true,
             items,
         });
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Completions request returned {len} suggestions in {elapsed:?}",
             elapsed = Instant::now().duration_since(start)
         );

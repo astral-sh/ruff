@@ -25,6 +25,7 @@ schemars = { workspace = true, optional = true }
 serde = { workspace = true, optional = true }
 static_assertions = { workspace = true }
 tracing = { workspace = true }
+tracing-unlikely = { workspace = true }
 unicode-width = { workspace = true }
 
 [dev-dependencies]

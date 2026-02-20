@@ -16,7 +16,7 @@ pub fn goto_type_definition(
 
     let ty = goto_target.inferred_type(&model)?;
 
-    tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+    tracing_unlikely::debug!("Inferred type of covering node is {}", ty.display(db));
 
     let navigation_targets = ty.navigation_targets(db);
 

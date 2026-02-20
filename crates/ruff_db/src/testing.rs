@@ -116,7 +116,7 @@ fn query_name<Q>(_query: &Q) -> &'static str {
 /// use ruff_db::testing::setup_logging;
 /// let _logging = setup_logging();
 ///
-/// tracing::info!("This message will be printed to stderr");
+/// tracing_unlikely::info!("This message will be printed to stderr");
 /// ```
 pub fn setup_logging() -> LoggingGuard {
     LoggingBuilder::new().build()
@@ -172,7 +172,7 @@ impl LoggingBuilder {
                 .with_timer(tracing_subscriber::fmt::time()),
         );
 
-        let guard = tracing::subscriber::set_default(subscriber);
+        let guard = tracing_unlikely::subscriber::set_default(subscriber);
 
         LoggingGuard { _guard: guard }
     }
@@ -186,7 +186,7 @@ impl Default for LoggingBuilder {
 
 #[must_use = "Dropping the guard unregisters the tracing subscriber."]
 pub struct LoggingGuard {
-    _guard: tracing::subscriber::DefaultGuard,
+    _guard: tracing_unlikely::subscriber::DefaultGuard,
 }
 
 #[test]

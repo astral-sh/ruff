@@ -42,7 +42,7 @@ impl TestDb {
         Self {
             storage: salsa::Storage::new(Some(Box::new({
                 move |event| {
-                    tracing::trace!("event: {:?}", event);
+                    tracing_unlikely::trace!("event: {:?}", event);
                 }
             }))),
             system: TestSystem::default(),

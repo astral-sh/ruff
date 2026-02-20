@@ -73,7 +73,7 @@ impl RuffSettings {
             fn transform(&self, mut configuration: Configuration) -> Configuration {
                 let fallback = find_fallback_target_version(self.inner.1);
                 if let Some(fallback) = fallback {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Derived `target-version` from found `requires-python`: {fallback:?}"
                     );
                     configuration.target_version = Some(fallback.into());
@@ -85,7 +85,7 @@ impl RuffSettings {
 
         find_user_settings_toml()
             .and_then(|user_settings| {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Loading settings from user configuration file: `{}`",
                     user_settings.display()
                 );
@@ -105,7 +105,7 @@ impl RuffSettings {
             .unwrap_or_else(|| {
                 let fallback = find_fallback_target_version(root);
                 if let Some(fallback) = fallback {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Derived `target-version` from found `requires-python` for fallback configuration: {fallback:?}"
                     );
                 }
@@ -162,7 +162,7 @@ impl RuffSettingsIndex {
         is_default_workspace: bool,
     ) -> Self {
         if editor_settings.configuration_preference == ConfigurationPreference::EditorOnly {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Using editor-only settings for workspace: {} (skipped indexing)",
                 root.display()
             );
@@ -172,7 +172,7 @@ impl RuffSettingsIndex {
             };
         }
 
-        tracing::debug!("Indexing settings for workspace: {}", root.display());
+        tracing_unlikely::debug!("Indexing settings for workspace: {}", root.display());
 
         let mut has_error = false;
         let mut respect_gitignore = None;
@@ -194,7 +194,10 @@ impl RuffSettingsIndex {
                         ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
                     ) {
                         Ok(settings) => {
-                            tracing::debug!("Loaded settings from: `{}`", pyproject.display());
+                            tracing_unlikely::debug!(
+                                "Loaded settings from: `{}`",
+                                pyproject.display()
+                            );
                             respect_gitignore = Some(settings.file_resolver.respect_gitignore);
 
                             index.insert(
@@ -207,7 +210,7 @@ impl RuffSettingsIndex {
                             break;
                         }
                         error => {
-                            tracing::error!(
+                            tracing_unlikely::error!(
                                 "{:#}",
                                 error
                                     .with_context(|| {
@@ -225,7 +228,7 @@ impl RuffSettingsIndex {
                 }
                 Ok(None) => continue,
                 Err(err) => {
-                    tracing::error!("{err:#}");
+                    tracing_unlikely::error!("{err:#}");
                     has_error = true;
                     continue;
                 }
@@ -300,14 +303,17 @@ impl RuffSettingsIndex {
                         .unwrap_or_else(|| fallback.clone());
 
                     if match_exclusion(&directory, file_name, &settings.file_resolver.exclude) {
-                        tracing::debug!("Ignored path via `exclude`: {}", directory.display());
+                        tracing_unlikely::debug!(
+                            "Ignored path via `exclude`: {}",
+                            directory.display()
+                        );
                         return WalkState::Skip;
                     } else if match_exclusion(
                         &directory,
                         file_name,
                         &settings.file_resolver.extend_exclude,
                     ) {
-                        tracing::debug!(
+                        tracing_unlikely::debug!(
                             "Ignored path via `extend-exclude`: {}",
                             directory.display()
                         );
@@ -323,7 +329,7 @@ impl RuffSettingsIndex {
                             ruff_workspace::resolver::ConfigurationOrigin::Ancestor,
                         ) {
                             Ok(settings) => {
-                                tracing::debug!(
+                                tracing_unlikely::debug!(
                                     "Loaded settings from: `{}` for `{}`",
                                     pyproject.display(),
                                     directory.display()
@@ -337,7 +343,7 @@ impl RuffSettingsIndex {
                                 );
                             }
                             error => {
-                                tracing::error!(
+                                tracing_unlikely::error!(
                                     "{:#}",
                                     error
                                         .with_context(|| {
@@ -354,7 +360,7 @@ impl RuffSettingsIndex {
                     }
                     Ok(None) => {}
                     Err(err) => {
-                        tracing::error!("{err:#}");
+                        tracing_unlikely::error!("{err:#}");
                         has_error.store(true, Ordering::Relaxed);
                     }
                 }
@@ -448,14 +454,14 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
         let editor_configuration = if let Some(configuration) = configuration {
             match configuration {
                 ResolvedConfiguration::FilePath(path) => {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Combining settings from editor-specified configuration file at: {}",
                         path.display()
                     );
                     match open_configuration_file(&path) {
                         Ok(config_from_file) => editor_configuration.combine(config_from_file),
                         err => {
-                            tracing::error!(
+                            tracing_unlikely::error!(
                                 "{:?}",
                                 err.context("Unable to load editor-specified configuration file")
                                     .unwrap_err()
@@ -465,13 +471,13 @@ impl ConfigurationTransformer for EditorConfigurationTransformer<'_> {
                     }
                 }
                 ResolvedConfiguration::Inline(options) => {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Combining settings from editor-specified inline configuration"
                     );
                     match Configuration::from_options(*options, None, project_root) {
                         Ok(configuration) => editor_configuration.combine(configuration),
                         Err(err) => {
-                            tracing::error!(
+                            tracing_unlikely::error!(
                                 "Unable to load editor-specified inline configuration: {err:?}",
                             );
                             editor_configuration

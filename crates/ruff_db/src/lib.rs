@@ -131,7 +131,7 @@ mod tests {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
                     move |event| {
-                        tracing::trace!("event: {:?}", event);
+                        tracing_unlikely::trace!("event: {:?}", event);
                         let mut events = events.lock().unwrap();
                         events.push(event);
                     }

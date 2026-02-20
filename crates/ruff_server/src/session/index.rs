@@ -223,13 +223,15 @@ impl Index {
                         let workspace_path = self.settings.keys().next().unwrap();
                         settings.ruff_settings.get(&workspace_path.join("untitled"))
                     } else {
-                        tracing::debug!("Use the fallback settings for the new document '{url}'.");
+                        tracing_unlikely::debug!(
+                            "Use the fallback settings for the new document '{url}'."
+                        );
                         settings.ruff_settings.fallback()
                     }
                 }
             })
             .unwrap_or_else(|| {
-                tracing::warn!(
+                tracing_unlikely::warn!(
                     "No settings available for {} - falling back to default settings",
                     url
                 );
@@ -319,7 +321,9 @@ impl Index {
         // may need revisiting in the future as we support more editors with notebook support.
         if let DocumentKey::NotebookCell(uri) = key {
             if self.notebook_cells.remove(uri).is_none() {
-                tracing::warn!("Tried to remove a notebook cell that does not exist: {uri}",);
+                tracing_unlikely::warn!(
+                    "Tried to remove a notebook cell that does not exist: {uri}",
+                );
             }
             return Ok(());
         }
@@ -367,7 +371,7 @@ impl Index {
         } else {
             // If there's only a single workspace, use that configuration for an untitled document.
             if self.settings.len() == 1 {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Falling back to configuration of the only active workspace for the new document '{url}'."
                 );
                 self.settings.values().next()
@@ -421,7 +425,7 @@ impl WorkspaceSettingsIndex {
     ) -> crate::Result<()> {
         let workspace_url = workspace.url();
         if workspace_url.scheme() != "file" {
-            tracing::info!("Ignoring non-file workspace URL: {workspace_url}");
+            tracing_unlikely::info!("Ignoring non-file workspace URL: {workspace_url}");
             client.show_warning_message(format_args!(
                 "Ruff does not support non-file workspaces; Ignoring {workspace_url}"
             ));
@@ -455,7 +459,7 @@ impl WorkspaceSettingsIndex {
             workspace.is_default(),
         );
 
-        tracing::info!("Registering workspace: {}", workspace_path.display());
+        tracing_unlikely::info!("Registering workspace: {}", workspace_path.display());
         self.insert(
             workspace_path,
             WorkspaceSettings {

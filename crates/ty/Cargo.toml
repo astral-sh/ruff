@@ -39,6 +39,7 @@ serde_json = { workspace = true }
 tracing = { workspace = true, features = ["release_max_level_debug"] }
 tracing-flame = { workspace = true }
 tracing-subscriber = { workspace = true }
+tracing-unlikely = { workspace = true }
 wild = { workspace = true }
 
 [target.'cfg(all(not(target_os = "macos"), not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]

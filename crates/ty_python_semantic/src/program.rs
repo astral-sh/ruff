@@ -57,18 +57,18 @@ impl Program {
         } = settings;
 
         if self.search_paths(db) != &search_paths {
-            tracing::debug!("Updating search paths");
+            tracing_unlikely::debug!("Updating search paths");
             search_paths.try_register_static_roots(db);
             self.set_search_paths(db).to(search_paths);
         }
 
         if &python_platform != self.python_platform(db) {
-            tracing::debug!("Updating python platform: `{python_platform:?}`");
+            tracing_unlikely::debug!("Updating python platform: `{python_platform:?}`");
             self.set_python_platform(db).to(python_platform);
         }
 
         if &python_version != self.python_version_with_source(db) {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Updating python version: Python {version}",
                 version = python_version.version
             );

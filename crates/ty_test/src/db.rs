@@ -37,7 +37,7 @@ impl Db {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
                 move |event| {
-                    tracing::trace!("event: {:?}", event);
+                    tracing_unlikely::trace!("event: {:?}", event);
                 }
             }))),
             vendored: ty_vendored::file_system().clone(),

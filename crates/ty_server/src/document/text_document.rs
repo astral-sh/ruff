@@ -104,7 +104,7 @@ impl TextDocument {
             },
         ] = changes.as_slice()
         {
-            tracing::debug!("Fast path - replacing entire document");
+            tracing_unlikely::debug!("Fast path - replacing entire document");
             self.modify(|contents, version| {
                 contents.clone_from(text);
                 *version = new_version;

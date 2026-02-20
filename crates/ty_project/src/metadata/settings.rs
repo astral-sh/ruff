@@ -125,12 +125,12 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
     };
 
     let Some(second) = matching_overrides.next() else {
-        tracing::debug!("Applying override for file `{path}`: {}", first.files);
+        tracing_unlikely::debug!("Applying override for file `{path}`: {}", first.files);
         // If the file matches only one override, return that override's settings.
         return FileSettings::File(Arc::clone(&first.settings));
     };
 
-    let mut filters = tracing::enabled!(tracing::Level::DEBUG)
+    let mut filters = tracing_unlikely::enabled!(tracing_unlikely::Level::DEBUG)
         .then(|| format!("({}), ({})", first.files, second.files));
 
     let mut overrides = vec![Arc::clone(&first.options), Arc::clone(&second.options)];
@@ -146,7 +146,7 @@ pub(crate) fn file_settings(db: &dyn Db, file: File) -> FileSettings {
     }
 
     if let Some(filters) = &filters {
-        tracing::debug!("Applying multiple overrides for file `{path}`: {filters}");
+        tracing_unlikely::debug!("Applying multiple overrides for file `{path}`: {filters}");
     }
 
     merge_overrides(db, overrides, ())

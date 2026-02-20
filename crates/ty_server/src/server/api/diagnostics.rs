@@ -85,7 +85,7 @@ impl Diagnostics {
                 };
 
                 let Some(url) = url else {
-                    tracing::warn!("Unable to find notebook cell");
+                    tracing_unlikely::warn!("Unable to find notebook cell");
                     continue;
                 };
 
@@ -259,7 +259,7 @@ pub(crate) fn publish_settings_diagnostics(
             if let Some(span) = diagnostic.primary_span() {
                 let file = span.expect_ty_file();
                 let Some(url) = file_to_url(db, file) else {
-                    tracing::debug!("Failed to convert file to URL at {}", file.path(db));
+                    tracing_unlikely::debug!("Failed to convert file to URL at {}", file.path(db));
                     continue;
                 };
                 diagnostics_by_url.entry(url).or_default().push(diagnostic);
@@ -318,7 +318,7 @@ pub(super) fn compute_diagnostics(
     encoding: PositionEncoding,
 ) -> Option<Diagnostics> {
     let Some(file) = document.notebook_or_file(db) else {
-        tracing::info!(
+        tracing_unlikely::info!(
             "No file found for snapshot for `{}`",
             document.notebook_or_file_path()
         );

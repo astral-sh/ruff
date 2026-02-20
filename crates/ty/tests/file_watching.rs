@@ -79,7 +79,7 @@ impl TestCase {
     where
         M: MatchEvent,
     {
-        tracing::debug!("Try stopping watch with timeout {:?}", timeout);
+        tracing_unlikely::debug!("Try stopping watch with timeout {:?}", timeout);
 
         let watcher = self
             .watcher
@@ -111,9 +111,9 @@ impl TestCase {
         }
 
         watcher.flush();
-        tracing::debug!("Flushed file watcher");
+        tracing_unlikely::debug!("Flushed file watcher");
         watcher.stop();
-        tracing::debug!("Stopping file watcher");
+        tracing_unlikely::debug!("Stopping file watcher");
 
         // Consume remaining events
         for event in &self.changes_receiver {

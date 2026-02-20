@@ -32,7 +32,7 @@ impl ChangeResult {
 }
 
 impl ProjectDatabase {
-    #[tracing::instrument(level = "debug", skip(self, changes, project_options_overrides))]
+    #[tracing_unlikely::instrument(level = "debug", skip(self, changes, project_options_overrides))]
     pub fn apply_changes(
         &mut self,
         changes: Vec<ChangeEvent>,
@@ -59,7 +59,7 @@ impl ProjectDatabase {
         let mut sync_recursively = BTreeSet::default();
 
         for change in changes {
-            tracing::trace!("Handle change: {:?}", change);
+            tracing_unlikely::trace!("Handle change: {:?}", change);
 
             if let Some(path) = change.system_path() {
                 if let Some(config_file) = &config_file_override {
@@ -193,7 +193,7 @@ impl ProjectDatabase {
                         if directory_included || path == project_root {
                             // TODO: Shouldn't it be enough to simply traverse the project files and remove all
                             // that start with the given path?
-                            tracing::debug!(
+                            tracing_unlikely::debug!(
                                 "Reload project because of a path that could have been a directory."
                             );
 
@@ -203,7 +203,7 @@ impl ProjectDatabase {
                             // the deleted path is the project configuration.
                             result.project_changed = true;
                         } else if !directory_included {
-                            tracing::debug!(
+                            tracing_unlikely::debug!(
                                 "Skipping reload because directory '{path}' isn't included in the project"
                             );
                         }
@@ -254,7 +254,7 @@ impl ProjectDatabase {
             match new_project_metadata {
                 Ok(mut metadata) => {
                     if let Err(error) = metadata.apply_configuration_files(self.system()) {
-                        tracing::error!(
+                        tracing_unlikely::error!(
                             "Failed to apply configuration files, continuing without applying them: {error}"
                         );
                     }
@@ -269,23 +269,23 @@ impl ProjectDatabase {
                             program.update_from_settings(self, program_settings);
                         }
                         Err(error) => {
-                            tracing::error!(
+                            tracing_unlikely::error!(
                                 "Failed to convert metadata to program settings, continuing without applying them: {error}"
                             );
                         }
                     }
 
                     if metadata.root() == project.root(self) {
-                        tracing::debug!("Reloading project after structural change");
+                        tracing_unlikely::debug!("Reloading project after structural change");
                         project.reload(self, metadata);
                     } else {
                         match Project::from_metadata(self, metadata) {
                             Ok(new_project) => {
-                                tracing::debug!("Replace project after structural change");
+                                tracing_unlikely::debug!("Replace project after structural change");
                                 project = new_project;
                             }
                             Err(error) => {
-                                tracing::error!(
+                                tracing_unlikely::error!(
                                     "Keeping old project configuration because loading the new settings failed with: {error}"
                                 );
 
@@ -299,7 +299,7 @@ impl ProjectDatabase {
                     }
                 }
                 Err(error) => {
-                    tracing::error!(
+                    tracing_unlikely::error!(
                         "Failed to load project, keeping old project configuration: {error}"
                     );
                 }
@@ -315,7 +315,7 @@ impl ProjectDatabase {
                     program.update_from_settings(self, program_settings);
                 }
                 Err(error) => {
-                    tracing::error!("Failed to resolve program settings: {error}");
+                    tracing_unlikely::error!("Failed to resolve program settings: {error}");
                 }
             }
         }

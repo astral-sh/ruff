@@ -197,14 +197,14 @@ impl<'a> ProjectFilesWalker<'a> {
                                 return match directory_included {
                                     IncludeResult::Included { .. } => WalkState::Continue,
                                     IncludeResult::Excluded => {
-                                        tracing::debug!(
+                                        tracing_unlikely::debug!(
                                             "Skipping directory '{path}' because it is excluded by a default or `src.exclude` pattern",
                                             path=entry.path()
                                         );
                                         WalkState::Skip
                                     }
                                     IncludeResult::NotIncluded => {
-                                        tracing::debug!(
+                                        tracing_unlikely::debug!(
                                             "Skipping directory `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI",
                                             path=entry.path()
                                         );
@@ -240,14 +240,14 @@ impl<'a> ProjectFilesWalker<'a> {
                                         }
                                     }
                                     IncludeResult::Excluded => {
-                                        tracing::debug!(
+                                        tracing_unlikely::debug!(
                                             "Ignoring file `{path}` because it is excluded by a default or `src.exclude` pattern.",
                                             path=entry.path()
                                         );
                                         return WalkState::Skip;
                                     }
                                     IncludeResult::NotIncluded => {
-                                        tracing::debug!(
+                                        tracing_unlikely::debug!(
                                             "Ignoring file `{path}` because it doesn't match any `src.include` pattern or path specified on the CLI.",
                                             path=entry.path()
                                         );

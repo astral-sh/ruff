@@ -67,6 +67,7 @@ tempfile = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
+tracing-unlikely = { workspace = true }
 walkdir = { workspace = true }
 wild = { workspace = true }
 

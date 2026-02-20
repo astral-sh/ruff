@@ -1719,7 +1719,7 @@ impl<'db> Signature<'db> {
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        tracing::trace!(
+        tracing_unlikely::trace!(
             "Checking variance of `{tvar}` in `{self:?}`",
             tvar = typevar.typevar(db).name(db)
         );

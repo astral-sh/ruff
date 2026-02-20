@@ -9622,7 +9622,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // The name of the module being imported
         let Some(full_module_name) = ModuleName::new(name) else {
-            tracing::debug!("Failed to resolve import due to invalid syntax");
+            tracing_unlikely::debug!("Failed to resolve import due to invalid syntax");
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -9771,7 +9771,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .unwrap_or_else(|| AnyNodeRef::from(import_from));
         let module = module.as_deref();
 
-        tracing::trace!(
+        tracing_unlikely::trace!(
             "Resolving import statement from module `{}` into file `{}`",
             format_import_from_module(*level, module),
             self.file().path(self.db()),
@@ -9781,12 +9781,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let module_name = match module_name {
             Ok(module_name) => module_name,
             Err(ModuleNameResolutionError::InvalidSyntax) => {
-                tracing::debug!("Failed to resolve import due to invalid syntax");
+                tracing_unlikely::debug!("Failed to resolve import due to invalid syntax");
                 // Invalid syntax diagnostics are emitted elsewhere.
                 return;
             }
             Err(ModuleNameResolutionError::TooManyDots) => {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Relative module resolution `{}` failed: too many leading dots",
                     format_import_from_module(*level, module),
                 );
@@ -9800,7 +9800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             }
             Err(ModuleNameResolutionError::UnknownCurrentModule) => {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Relative module resolution `{}` failed: could not resolve file `{}` to a module \
                     (try adjusting configured search paths?)",
                     format_import_from_module(*level, module),
@@ -16840,7 +16840,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let extra =
             (!string_annotations.is_empty() || cycle_recovery.is_some() || !bindings.is_empty() || !diagnostics.is_empty() || !all_definitely_bound).then(|| {
                 if bindings.len() > 20 {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Inferred expression region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
                         self.region,
                         bindings.len()
@@ -16916,7 +16916,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         if bindings.len() > 20 {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Inferred definition region `{:?}` contains {} bindings. Lookups by linear scan might be slow.",
                 self.region,
                 bindings.len(),
@@ -16924,7 +16924,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         if declarations.len() > 20 {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Inferred declaration region `{:?}` contains {} declarations. Lookups by linear scan might be slow.",
                 self.region,
                 declarations.len(),

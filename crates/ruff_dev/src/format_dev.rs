@@ -20,12 +20,12 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use serde::Deserialize;
 use similar::{ChangeTag, TextDiff};
 use tempfile::NamedTempFile;
-use tracing::{debug, error, info, info_span};
 use tracing_indicatif::IndicatifLayer;
 use tracing_indicatif::span_ext::IndicatifSpanExt;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
+use tracing_unlikely::{debug, error, info, info_span};
 
 use ruff::args::{ConfigArguments, FormatArguments, FormatCommand, GlobalConfigArgs, LogLevelArgs};
 use ruff::resolve::resolve;
@@ -280,10 +280,10 @@ pub(crate) fn main(args: &Args) -> anyhow::Result<ExitCode> {
 fn setup_logging(log_level_args: &LogLevelArgs, log_file: Option<&Path>) -> io::Result<()> {
     // Custom translation since we need the tracing type for `EnvFilter`
     let log_level = match LogLevel::from(log_level_args) {
-        LogLevel::Default => tracing::Level::INFO,
-        LogLevel::Verbose => tracing::Level::DEBUG,
-        LogLevel::Quiet => tracing::Level::WARN,
-        LogLevel::Silent => tracing::Level::ERROR,
+        LogLevel::Default => tracing_unlikely::Level::INFO,
+        LogLevel::Verbose => tracing_unlikely::Level::DEBUG,
+        LogLevel::Quiet => tracing_unlikely::Level::WARN,
+        LogLevel::Silent => tracing_unlikely::Level::ERROR,
     };
     // 1. `RUST_LOG=`, 2. explicit CLI log level, 3. info, the ruff default
     let filter_layer = EnvFilter::try_from_default_env().unwrap_or_else(|_| {
@@ -445,7 +445,7 @@ fn format_dev_multi_project(
     Ok(total_errors == 0)
 }
 
-#[tracing::instrument]
+#[tracing_unlikely::instrument]
 fn format_dev_project(
     files: &[PathBuf],
     stability_check: bool,
@@ -805,7 +805,7 @@ impl From<io::Error> for CheckFileError {
     }
 }
 
-#[tracing::instrument(skip_all, fields(input_path = % input_path.display()))]
+#[tracing_unlikely::instrument(skip_all, fields(input_path = % input_path.display()))]
 fn format_dev_file(
     input_path: &Path,
     stability_check: bool,

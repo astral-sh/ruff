@@ -32,7 +32,7 @@ use crate::source::source_text;
 /// more than 200 modules. Parsed ASTs within the same revision are never evicted by Salsa.
 #[salsa::tracked(returns(ref), no_eq, heap_size=ruff_memory_usage::heap_size, lru=200)]
 pub fn parsed_module(db: &dyn Db, file: File) -> ParsedModule {
-    let _span = tracing::trace_span!("parsed_module", ?file).entered();
+    let _span = tracing_unlikely::trace_span!("parsed_module", ?file).entered();
 
     let parsed = parsed_module_impl(db, file);
 
@@ -116,7 +116,7 @@ impl ParsedModule {
             None => {
                 // Re-parse the file.
                 let parsed = indexed::IndexedModule::new(parsed_module_impl(db, self.file));
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "File `{}` was reparsed after being collected in the current Salsa revision",
                     self.file.path(db)
                 );

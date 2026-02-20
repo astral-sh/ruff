@@ -150,7 +150,7 @@ impl Options {
             .cloned()
             .unwrap_or_else(|| {
                 let default = PythonPlatform::default();
-                tracing::info!("Defaulting to python-platform `{default}`");
+                tracing_unlikely::info!("Defaulting to python-platform `{default}`");
                 default
             });
 
@@ -176,7 +176,9 @@ impl Options {
             Ok(python_environment) => python_environment,
             Err(err) => {
                 if misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Default settings failed to discover local Python environment");
+                    tracing_unlikely::debug!(
+                        "Default settings failed to discover local Python environment"
+                    );
                     None
                 } else {
                     return Err(err);
@@ -200,7 +202,7 @@ impl Options {
                 Ok(paths) => paths,
                 Err(err) => {
                     if misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!(
+                        tracing_unlikely::debug!(
                             "Default settings failed to discover site-packages directory"
                         );
                         SitePackagesPaths::default()
@@ -220,14 +222,14 @@ impl Options {
                 Some((_, false)) | None => site_packages_paths,
             }
         } else {
-            tracing::debug!("No virtual environment found");
+            tracing_unlikely::debug!("No virtual environment found");
             self_environment.map(|(paths, _)| paths).unwrap_or_default()
         };
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
             // For now this is considered non-fatal, we don't Need this for anything.
             python_environment.real_stdlib_path(system).map_err(|err| {
-                tracing::info!("No real stdlib found, stdlib goto-definition may have degraded quality: {err}");
+                tracing_unlikely::info!("No real stdlib found, stdlib goto-definition may have degraded quality: {err}");
             }).ok()
         });
 
@@ -252,7 +254,7 @@ impl Options {
             misconfiguration_mode,
         )?;
 
-        tracing::info!(
+        tracing_unlikely::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
             python_version = python_version.version
         );
@@ -298,7 +300,7 @@ impl Options {
             // Check for `./src` directory (src-layout)
             let src = project_root.join("src");
             if system.is_directory(&src) && !is_package(&src) {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Including `./src` in `environment.root` because a `./src` directory exists and is not a package"
                 );
                 roots.push(src);
@@ -311,7 +313,7 @@ impl Options {
                 && !is_package(&project_name_dir)
                 && !roots.contains(&project_name_dir)
             {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Including `./{project_name}` in `environment.root` because a `./{project_name}/{project_name}` directory exists and `./{project_name}` is not a package"
                 );
                 roots.push(project_name_dir);
@@ -321,7 +323,7 @@ impl Options {
             // https://github.com/PyO3/maturin/blob/979fe1db42bb9e58bc150fa6fc45360b377288bf/README.md?plain=1#L88-L99
             let python = project_root.join("python");
             if system.is_directory(&python) && !is_package(&python) && !roots.contains(&python) {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Including `./python` in `environment.root` because a `./python` directory exists and is not a package"
                 );
                 roots.push(python);
@@ -352,7 +354,7 @@ impl Options {
                 let path = match SystemPathBuf::from_path_buf(path) {
                     Ok(path) => path,
                     Err(path) => {
-                        tracing::debug!(
+                        tracing_unlikely::debug!(
                             "Skipping `{path}` listed in `PYTHONPATH` because the path is not valid UTF-8",
                             path = path.display()
                         );
@@ -363,13 +365,13 @@ impl Options {
                 let abspath = SystemPath::absolute(path, system.current_directory());
 
                 if !system.is_directory(&abspath) {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Skipping `{abspath}` listed in `PYTHONPATH` because the path doesn't exist or isn't a directory"
                     );
                     continue;
                 }
 
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Adding `{abspath}` from the `PYTHONPATH` environment variable to `extra_paths`"
                 );
 
@@ -545,7 +547,7 @@ fn self_environment_search_paths(
     let ty_path = SystemPath::from_std_path(exe_path.as_path())?;
 
     let environment = PythonEnvironment::new(ty_path, SysPrefixPathOrigin::SelfEnvironment, system)
-        .inspect_err(|err| tracing::debug!("Failed to discover ty's environment: {err}"))
+        .inspect_err(|err| tracing_unlikely::debug!("Failed to discover ty's environment: {err}"))
         .ok()?;
 
     let is_virtual_env = environment.is_virtual();
@@ -553,11 +555,11 @@ fn self_environment_search_paths(
     let search_paths = environment
         .site_packages_paths(system)
         .inspect_err(|err| {
-            tracing::debug!("Failed to discover site-packages in ty's environment: {err}");
+            tracing_unlikely::debug!("Failed to discover site-packages in ty's environment: {err}");
         })
         .ok()?;
 
-    tracing::debug!("Using site-packages from ty's environment");
+    tracing_unlikely::debug!("Using site-packages from ty's environment");
     Some((search_paths, is_virtual_env))
 }
 

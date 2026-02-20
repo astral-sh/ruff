@@ -1,4 +1,4 @@
-use tracing::Level;
+use tracing_unlikely::Level;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_formatter::{
@@ -48,7 +48,7 @@ use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 /// If `range` doesn't point to a valid char boundaries.
 ///
 /// [`IndentWidth`]: `ruff_formatter::IndentWidth`
-#[tracing::instrument(name = "format_range", level = Level::TRACE, skip_all)]
+#[tracing_unlikely::instrument(name = "format_range", level = Level::TRACE, skip_all)]
 pub fn format_range(
     source: &str,
     range: TextRange,

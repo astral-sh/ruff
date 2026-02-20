@@ -44,25 +44,25 @@ impl<'a> RealWorldProject<'a> {
     /// Setup a real-world project for benchmarking
     pub fn setup(self) -> Result<InstalledProject<'a>> {
         let start = Instant::now();
-        tracing::debug!("Setting up project {}", self.name);
+        tracing_unlikely::debug!("Setting up project {}", self.name);
 
         // Create project directory in cargo target
         let project_root = get_project_cache_dir(self.name)?;
 
         // Clone the repository if it doesn't exist, or update if it does
         if project_root.exists() {
-            tracing::debug!("Updating repository for project '{}'...", self.name);
+            tracing_unlikely::debug!("Updating repository for project '{}'...", self.name);
             let start = std::time::Instant::now();
             update_repository(&project_root, self.commit)?;
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Repository update completed in {:.2}s",
                 start.elapsed().as_secs_f64()
             );
         } else {
-            tracing::debug!("Cloning repository for project '{}'...", self.name);
+            tracing_unlikely::debug!("Cloning repository for project '{}'...", self.name);
             let start = std::time::Instant::now();
             clone_repository(self.repository, &project_root, self.commit)?;
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Repository clone completed in {:.2}s",
                 start.elapsed().as_secs_f64()
             );
@@ -74,19 +74,19 @@ impl<'a> RealWorldProject<'a> {
         };
 
         // Install dependencies if specified
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Installing {} dependencies for project '{}'...",
             checkout.project().dependencies.len(),
             checkout.project().name
         );
         let start_install = std::time::Instant::now();
         install_dependencies(&checkout)?;
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Dependency installation completed in {:.2}s",
             start_install.elapsed().as_secs_f64()
         );
 
-        tracing::debug!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
+        tracing_unlikely::debug!("Project setup took: {:.2}s", start.elapsed().as_secs_f64());
 
         Ok(InstalledProject {
             path: checkout.path,
@@ -280,7 +280,7 @@ fn install_dependencies(checkout: &Checkout) -> Result<()> {
     );
 
     if checkout.project().dependencies.is_empty() {
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "No dependencies to install for project '{}'",
             checkout.project().name
         );

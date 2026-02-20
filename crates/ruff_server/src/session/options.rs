@@ -116,7 +116,7 @@ impl ClientOptions {
             match ResolvedConfiguration::try_from(configuration) {
                 Ok(configuration) => Some(configuration),
                 Err(err) => {
-                    tracing::error!("Failed to load settings from `configuration`: {err}");
+                    tracing_unlikely::error!("Failed to load settings from `configuration`: {err}");
                     contains_invalid_settings = true;
                     None
                 }
@@ -192,7 +192,7 @@ impl ClientOptions {
         }
         if !unknown.is_empty() {
             *contains_invalid_settings = true;
-            tracing::error!("Unknown rule selectors found in `{key}`: {unknown:?}");
+            tracing_unlikely::error!("Unknown rule selectors found in `{key}`: {unknown:?}");
         }
         if known.is_empty() { None } else { Some(known) }
     }
@@ -379,7 +379,7 @@ impl AllOptions {
         Self::from_init_options(
             serde_json::from_value(options)
                 .map_err(|err| {
-                    tracing::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
+                    tracing_unlikely::error!("Failed to deserialize initialization options: {err}. Falling back to default client settings...");
                     client.show_error_message("Ruff received invalid client settings - falling back to default client settings.");
                 })
                 .unwrap_or_default(),

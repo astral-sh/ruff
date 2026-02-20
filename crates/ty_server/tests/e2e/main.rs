@@ -218,7 +218,7 @@ impl TestServer {
     ) -> Self {
         setup_tracing();
 
-        tracing::debug!("Starting test client with capabilities {:#?}", capabilities);
+        tracing_unlikely::debug!("Starting test client with capabilities {:#?}", capabilities);
 
         let (server_connection, client_connection) = Connection::memory();
 
@@ -399,7 +399,7 @@ impl TestServer {
         }
 
         let id = self.next_request_id();
-        tracing::debug!("Client sends request `{}` with ID {}", R::METHOD, id);
+        tracing_unlikely::debug!("Client sends request `{}` with ID {}", R::METHOD, id);
         let request = lsp_server::Request::new(id.clone(), R::METHOD.to_string(), params);
         self.send(Message::Request(request));
         id
@@ -411,7 +411,7 @@ impl TestServer {
         N: Notification,
     {
         let notification = lsp_server::Notification::new(N::METHOD.to_string(), params);
-        tracing::debug!("Client sends notification `{}`", N::METHOD);
+        tracing_unlikely::debug!("Client sends notification `{}`", N::METHOD);
         self.send(Message::Notification(notification));
     }
 
@@ -540,7 +540,7 @@ impl TestServer {
     ) -> Result<N::Params, ServerMessageError> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
-                tracing::info!("Retrying to receive `{}` notification", N::METHOD);
+                tracing_unlikely::info!("Retrying to receive `{}` notification", N::METHOD);
             }
             let notification = self
                 .notifications
@@ -627,7 +627,7 @@ impl TestServer {
     ) -> Result<(RequestId, R::Params), ServerMessageError> {
         for retry_count in 0..RETRY_COUNT {
             if retry_count > 0 {
-                tracing::info!("Retrying to receive `{}` request", R::METHOD);
+                tracing_unlikely::info!("Retrying to receive `{}` request", R::METHOD);
             }
             let request = self
                 .requests
@@ -679,18 +679,18 @@ impl TestServer {
     fn handle_message(&mut self, message: Message) {
         match message {
             Message::Request(request) => {
-                tracing::debug!("Received server request `{}`", &request.method);
+                tracing_unlikely::debug!("Received server request `{}`", &request.method);
                 self.requests.push_back(request);
             }
             Message::Response(response) => {
-                tracing::debug!("Received server response for request {}", &response.id);
+                tracing_unlikely::debug!("Received server response for request {}", &response.id);
                 self.responses
                     .entry(response.id.clone())
                     .or_default()
                     .push(response);
             }
             Message::Notification(notification) => {
-                tracing::debug!("Received notification `{}`", &notification.method);
+                tracing_unlikely::debug!("Received notification `{}`", &notification.method);
                 self.notifications.push_back(notification);
             }
         }
@@ -753,18 +753,20 @@ impl TestServer {
                         }
                     },
                     Some(section) => {
-                        tracing::debug!("Unrecognized section `{section}` for {scope_uri}");
+                        tracing_unlikely::debug!(
+                            "Unrecognized section `{section}` for {scope_uri}"
+                        );
                         serde_json::Value::Null
                     }
                     None => {
-                        tracing::debug!(
+                        tracing_unlikely::debug!(
                             "No section specified for workspace configuration of {scope_uri}",
                         );
                         serde_json::Value::Null
                     }
                 }
             } else {
-                tracing::debug!("No workspace configuration provided for {scope_uri}");
+                tracing_unlikely::debug!("No workspace configuration provided for {scope_uri}");
                 serde_json::Value::Null
             };
             results.push(config_value);
@@ -1130,7 +1132,7 @@ impl Drop for TestServer {
                         // Good, the server terminated
                     }
                     Err(RecvTimeoutError::Timeout) => {
-                        tracing::warn!(
+                        tracing_unlikely::warn!(
                             "The server didn't exit within 20ms after receiving the EXIT notification"
                         );
                     }

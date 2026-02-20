@@ -74,7 +74,7 @@ impl DocumentKey {
             if let Ok(path) = url.to_file_path() {
                 Self::File(SystemPathBuf::from_path_buf(path).expect("URL to be valid UTF-8"))
             } else {
-                tracing::warn!(
+                tracing_unlikely::warn!(
                     "Treating `file:` url `{url}` as opaque URL as it isn't a valid file path"
                 );
                 Self::Opaque(url.to_string())

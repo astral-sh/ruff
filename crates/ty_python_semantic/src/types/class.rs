@@ -2498,7 +2498,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// would depend on the class's AST and rerun for every change in that file.
     #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
-        tracing::trace!(
+        tracing_unlikely::trace!(
             "StaticClassLiteral::explicit_bases_query: {}",
             self.name(db)
         );
@@ -2608,7 +2608,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// Return the types of the decorators on this class
     #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
     fn decorators(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
-        tracing::trace!("StaticClassLiteral::decorators: {}", self.name(db));
+        tracing_unlikely::trace!("StaticClassLiteral::decorators: {}", self.name(db));
 
         let module = parsed_module(db, self.file(db)).load(db);
 
@@ -2683,7 +2683,7 @@ impl<'db> StaticClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Mro<'db>, StaticMroError<'db>> {
-        tracing::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
+        tracing_unlikely::trace!("StaticClassLiteral::try_mro: {}", self.name(db));
         Mro::of_static_class(db, self, specialization)
     }
 
@@ -2854,7 +2854,7 @@ impl<'db> StaticClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
-        tracing::trace!("StaticClassLiteral::try_metaclass: {}", self.name(db));
+        tracing_unlikely::trace!("StaticClassLiteral::try_metaclass: {}", self.name(db));
 
         // Identify the class's own metaclass (or take the first base class's metaclass).
         let mut base_classes = self.fully_static_explicit_bases(db).peekable();
@@ -4867,7 +4867,7 @@ impl<'db> StaticClassLiteral<'db> {
             result
         }
 
-        tracing::trace!("Class::inheritance_cycle: {}", self.name(db));
+        tracing_unlikely::trace!("Class::inheritance_cycle: {}", self.name(db));
 
         let visited_classes = &mut IndexSet::new();
         if !is_cyclically_defined_recursive(db, self, &mut IndexSet::new(), visited_classes) {
@@ -7367,7 +7367,7 @@ impl KnownClass {
                 static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> =
                     LazyLock::new(Mutex::default);
                 if MESSAGES.lock().unwrap().insert(class) {
-                    tracing::info!(
+                    tracing_unlikely::info!(
                         "Wrong number of types when specializing {}. \
                  Falling back to default specialization for the symbol instead.",
                         class.display(db)
@@ -7475,9 +7475,9 @@ impl KnownClass {
                         lookup_error,
                         KnownClassLookupError::ClassPossiblyUnbound { .. }
                     ) {
-                        tracing::info!("{}", lookup_error.display(db, class));
+                        tracing_unlikely::info!("{}", lookup_error.display(db, class));
                     } else {
-                        tracing::info!(
+                        tracing_unlikely::info!(
                             "{}. Falling back to `Unknown` for the symbol instead.",
                             lookup_error.display(db, class)
                         );

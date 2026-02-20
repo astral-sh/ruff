@@ -744,7 +744,7 @@ impl<'db> SymbolVisitor<'db> {
         // If `__all__` was found but wasn't recognized,
         // then we emit a diagnostic message indicating as such.
         if self.all_invalid {
-            tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
+            tracing_unlikely::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
         }
         // We want to filter out some of the symbols we collected.
         // Specifically, to respect conventions around library
@@ -869,7 +869,7 @@ impl<'db> SymbolVisitor<'db> {
                 ImportedFrom::import_from(self.db, self.file, ast, import_kind)
             }
         }) else {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Dropping imported symbol {name} since its module name could not be discovered",
             );
             return None;
@@ -1039,7 +1039,7 @@ impl<'db> SymbolVisitor<'db> {
                     import_from,
                     ImportKind::Wildcard,
                 ) else {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Dropping wildcard imported symbol {name} since \
                          its module name could not be discovered",
                         name = symbol.name,

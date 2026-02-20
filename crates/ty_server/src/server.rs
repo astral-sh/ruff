@@ -63,22 +63,22 @@ impl Server {
         }
 
         if let Some(error) = deserialization_error {
-            tracing::error!("Failed to deserialize initialization options: {error}");
+            tracing_unlikely::error!("Failed to deserialize initialization options: {error}");
         }
 
-        tracing::debug!("Client info: {client_info:#?}");
-        tracing::debug!("Initialization options: {initialization_options:#?}");
+        tracing_unlikely::debug!("Client info: {client_info:#?}");
+        tracing_unlikely::debug!("Initialization options: {initialization_options:#?}");
 
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
 
-        tracing::debug!("Resolved client capabilities: {resolved_client_capabilities}");
+        tracing_unlikely::debug!("Resolved client capabilities: {resolved_client_capabilities}");
 
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
         let server_capabilities =
             server_capabilities(position_encoding, resolved_client_capabilities);
 
         let version = ruff_db::program_version().unwrap_or("Unknown");
-        tracing::info!("Version: {version}");
+        tracing_unlikely::info!("Version: {version}");
 
         connection.initialize_finish(
             id,
@@ -115,7 +115,7 @@ impl Server {
                     .current_directory()
                     .as_std_path()
                     .to_path_buf();
-                tracing::warn!(
+                tracing_unlikely::warn!(
                     "No workspace(s) were provided during initialization. \
                     Using the current working directory from the fallback system as a \
                     default workspace: {}",
@@ -196,7 +196,7 @@ impl ServerPanicHookHandler {
             use std::io::Write;
 
             let backtrace = std::backtrace::Backtrace::force_capture();
-            tracing::error!("{panic_info}\n{backtrace}");
+            tracing_unlikely::error!("{panic_info}\n{backtrace}");
 
             // we also need to print to stderr directly for when using `$logTrace` because
             // the message won't be sent to the client.

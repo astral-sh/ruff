@@ -115,7 +115,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
         let result = Self::run_with_snapshot(db, &snapshot, client, params);
 
         if let Err(err) = &result {
-            tracing::error!("An error occurred with request ID {id}: {err}");
+            tracing_unlikely::error!("An error occurred with request ID {id}: {err}");
             client.show_error_message(format!(
                 "ty encountered a problem. {}",
                 snapshot.client_name().log_guidance()
@@ -155,7 +155,7 @@ pub(super) trait BackgroundRequestHandler: RetriableRequestHandler {
         let result = Self::run(&snapshot, client, params);
 
         if let Err(err) = &result {
-            tracing::error!("An error occurred with request ID {id}: {err}");
+            tracing_unlikely::error!("An error occurred with request ID {id}: {err}");
             client.show_error_message(format!(
                 "ty encountered a problem. {}",
                 snapshot.client_name().log_guidance()

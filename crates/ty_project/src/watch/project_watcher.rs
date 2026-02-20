@@ -1,7 +1,7 @@
 use std::fmt::{Formatter, Write};
 use std::hash::Hasher;
 
-use tracing::info;
+use tracing_unlikely::info;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
@@ -104,7 +104,7 @@ impl ProjectWatcher {
             // Ruff otherwise stills works as expected.
             if let Err(error) = self.watcher.watch(path) {
                 // TODO: Log a user-facing warning.
-                tracing::warn!(
+                tracing_unlikely::warn!(
                     "Failed to setup watcher for path `{path}`: {error}. You have to restart Ruff after making changes to files under this path or you might see stale results."
                 );
                 self.has_errored_paths = true;

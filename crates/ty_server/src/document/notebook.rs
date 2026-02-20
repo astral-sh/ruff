@@ -73,19 +73,20 @@ impl NotebookDocument {
             .cells
             .iter()
             .map(|cell| {
-                let cell_text =
-                    if let Ok(document) = index.document(&DocumentKey::from_url(&cell.url)) {
-                        if let Some(text_document) = document.as_text() {
-                            Some(text_document.contents().to_string())
-                        } else {
-                            tracing::warn!("Non-text document found for cell `{}`", cell.url);
-                            None
-                        }
+                let cell_text = if let Ok(document) =
+                    index.document(&DocumentKey::from_url(&cell.url))
+                {
+                    if let Some(text_document) = document.as_text() {
+                        Some(text_document.contents().to_string())
                     } else {
-                        tracing::warn!("Text document not found for cell `{}`", cell.url);
+                        tracing_unlikely::warn!("Non-text document found for cell `{}`", cell.url);
                         None
                     }
-                    .unwrap_or_default();
+                } else {
+                    tracing_unlikely::warn!("Text document not found for cell `{}`", cell.url);
+                    None
+                }
+                .unwrap_or_default();
 
                 let source = ruff_notebook::SourceValue::String(cell_text);
                 match cell.kind {

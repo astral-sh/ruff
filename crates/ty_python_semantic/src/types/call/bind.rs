@@ -2105,14 +2105,14 @@ impl<'db> CallableBinding<'db> {
         // before checking.
         let argument_types = argument_types.with_self(self.bound_type);
 
-        let _span = tracing::trace_span!(
+        let _span = tracing_unlikely::trace_span!(
             "CallableBinding::check_types",
             arguments = %argument_types.display(db),
             signature = %self.signature_type.display(db),
         )
         .entered();
 
-        tracing::trace!(
+        tracing_unlikely::trace!(
             target: "ty_python_semantic::types::call::bind",
             matching_overload_index = ?self.matching_overload_index(),
             "after step 1",
@@ -2148,7 +2148,7 @@ impl<'db> CallableBinding<'db> {
             overload.check_types(db, argument_types.as_ref(), call_expression_tcx);
         }
 
-        tracing::trace!(
+        tracing_unlikely::trace!(
             target: "ty_python_semantic::types::call::bind",
             matching_overload_index = ?self.matching_overload_index(),
             "after step 2",
@@ -2166,7 +2166,7 @@ impl<'db> CallableBinding<'db> {
                 // If two or more candidate overloads remain, proceed to step 4.
                 self.filter_overloads_containing_variadic(&indexes);
 
-                tracing::trace!(
+                tracing_unlikely::trace!(
                     target: "ty_python_semantic::types::call::bind",
                     matching_overload_index = ?self.matching_overload_index(),
                     "after step 4",
@@ -2176,7 +2176,7 @@ impl<'db> CallableBinding<'db> {
                     MatchingOverloadIndex::None => {
                         // This shouldn't be possible because step 4 can only filter out overloads
                         // when there _is_ a matching variadic argument.
-                        tracing::debug!("All overloads have been filtered out in step 4");
+                        tracing_unlikely::debug!("All overloads have been filtered out in step 4");
                         return None;
                     }
                     MatchingOverloadIndex::Single(_) => {
@@ -2191,7 +2191,7 @@ impl<'db> CallableBinding<'db> {
                             &indexes,
                         );
 
-                        tracing::trace!(
+                        tracing_unlikely::trace!(
                             target: "ty_python_semantic::types::call::bind",
                             matching_overload_index = ?self.matching_overload_index(),
                             "after step 5",
@@ -2242,7 +2242,7 @@ impl<'db> CallableBinding<'db> {
                 }
             }
             if !is_argument_assignable_to_any_overload {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Argument at {argument_index} (`{}`) is not assignable to any of the \
                     remaining overloads, skipping argument type expansion",
                     argument_type.display(db)
@@ -2297,7 +2297,7 @@ impl<'db> CallableBinding<'db> {
                     overload.match_parameters(db, expanded_arguments, &mut argument_forms);
                 }
 
-                tracing::trace!(
+                tracing_unlikely::trace!(
                     target: "ty_python_semantic::types::call::bind",
                     matching_overload_index = ?self.matching_overload_index(),
                     "after step 1",
@@ -2309,7 +2309,7 @@ impl<'db> CallableBinding<'db> {
                     overload.check_types(db, expanded_arguments, call_expression_tcx);
                 }
 
-                tracing::trace!(
+                tracing_unlikely::trace!(
                     target: "ty_python_semantic::types::call::bind",
                     matching_overload_index = ?self.matching_overload_index(),
                     "after step 2",
@@ -2323,7 +2323,7 @@ impl<'db> CallableBinding<'db> {
                     MatchingOverloadIndex::Multiple(matching_overload_indexes) => {
                         self.filter_overloads_containing_variadic(&matching_overload_indexes);
 
-                        tracing::trace!(
+                        tracing_unlikely::trace!(
                             target: "ty_python_semantic::types::call::bind",
                             matching_overload_index = ?self.matching_overload_index(),
                             "after step 4",
@@ -2331,7 +2331,7 @@ impl<'db> CallableBinding<'db> {
 
                         match self.matching_overload_index() {
                             MatchingOverloadIndex::None => {
-                                tracing::debug!(
+                                tracing_unlikely::debug!(
                                     "All overloads have been filtered out in step 4 during argument type expansion"
                                 );
                                 None
@@ -2344,7 +2344,7 @@ impl<'db> CallableBinding<'db> {
                                     &indexes,
                                 );
 
-                                tracing::trace!(
+                                tracing_unlikely::trace!(
                                     target: "ty_python_semantic::types::call::bind",
                                     matching_overload_index = ?self.matching_overload_index(),
                                     "after step 5",

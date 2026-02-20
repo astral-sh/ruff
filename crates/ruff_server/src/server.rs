@@ -102,7 +102,7 @@ impl Server {
             workspace_options.unwrap_or_default(),
         )?;
 
-        tracing::debug!("Negotiated position encoding: {position_encoding:?}");
+        tracing_unlikely::debug!("Negotiated position encoding: {position_encoding:?}");
 
         let global = global_options.into_settings(client.clone());
 
@@ -345,7 +345,7 @@ impl ServerPanicHookHandler {
             use std::io::Write;
 
             let backtrace = std::backtrace::Backtrace::force_capture();
-            tracing::error!("{panic_info}\n{backtrace}");
+            tracing_unlikely::error!("{panic_info}\n{backtrace}");
 
             // we also need to print to stderr directly for when using `$logTrace` because
             // the message won't be sent to the client.

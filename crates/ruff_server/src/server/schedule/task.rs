@@ -81,7 +81,7 @@ impl Task {
     {
         Self::sync(move |_, client| {
             if let Err(err) = client.respond(&id, result) {
-                tracing::error!("Unable to send immediate response: {err}");
+                tracing_unlikely::error!("Unable to send immediate response: {err}");
             }
         })
     }

@@ -29,7 +29,7 @@ impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
             // Get workspace symbols matching the query
             let start = std::time::Instant::now();
             let workspace_symbol_infos = workspace_symbols(db, query);
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Found {len} workspace symbols in {elapsed:?}",
                 len = workspace_symbol_infos.len(),
                 elapsed = std::time::Instant::now().duration_since(start)
@@ -44,7 +44,7 @@ impl BackgroundRequestHandler for WorkspaceSymbolRequestHandler {
 
                 let Some(symbol) = convert_to_lsp_symbol_information(db, file, symbol, encoding)
                 else {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Failed to convert symbol '{}' to LSP symbol information",
                         file.path(db)
                     );

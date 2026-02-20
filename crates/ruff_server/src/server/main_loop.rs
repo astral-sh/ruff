@@ -44,7 +44,7 @@ impl Server {
                                 .register(req.id.clone(), req.method.clone());
 
                             if self.session.is_shutdown_requested() {
-                                tracing::warn!(
+                                tracing_unlikely::warn!(
                                     "Received request after server shutdown was requested, discarding"
                                 );
                                 client.respond_err(
@@ -68,7 +68,7 @@ impl Server {
                                     ));
                                 }
 
-                                tracing::debug!("Received exit notification, exiting");
+                                tracing_unlikely::debug!("Received exit notification, exiting");
                                 return Ok(());
                             }
 
@@ -85,7 +85,7 @@ impl Server {
                             {
                                 handler(&client, response);
                             } else {
-                                tracing::error!(
+                                tracing_unlikely::error!(
                                     "Received a response with ID {}, which was not expected",
                                     response.id
                                 );
@@ -106,11 +106,11 @@ impl Server {
                         .complete(&response.id)
                     {
                         let duration = start_time.elapsed();
-                        tracing::trace!(name: "message response", method, %response.id, duration = format_args!("{:0.2?}", duration));
+                        tracing_unlikely::trace!(name: "message response", method, %response.id, duration = format_args!("{:0.2?}", duration));
 
                         self.connection.sender.send(Message::Response(response))?;
                     } else {
-                        tracing::trace!(
+                        tracing_unlikely::trace!(
                             "Ignoring response for canceled request id={}",
                             response.id
                         );
@@ -179,7 +179,7 @@ impl Server {
             };
 
             let response_handler = |_: &Client, ()| {
-                tracing::info!("Configuration file watcher successfully registered");
+                tracing_unlikely::info!("Configuration file watcher successfully registered");
             };
 
             if let Err(err) = client.send_request::<lsp_types::request::RegisterCapability>(
@@ -187,12 +187,12 @@ impl Server {
                 params,
                 response_handler,
             ) {
-                tracing::error!(
+                tracing_unlikely::error!(
                     "An error occurred when trying to register the configuration file watcher: {err}"
                 );
             }
         } else {
-            tracing::warn!(
+            tracing_unlikely::warn!(
                 "LSP client does not support dynamic capability registration - automatic configuration reloading will not be available."
             );
         }

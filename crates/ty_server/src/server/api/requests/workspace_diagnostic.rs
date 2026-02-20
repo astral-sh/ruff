@@ -109,7 +109,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
         params: WorkspaceDiagnosticParams,
     ) -> Result<WorkspaceDiagnosticReportResult> {
         if !snapshot.global_settings().diagnostic_mode().is_workspace() {
-            tracing::debug!("Workspace diagnostics is disabled; returning empty report");
+            tracing_unlikely::debug!("Workspace diagnostics is disabled; returning empty report");
             return Ok(WorkspaceDiagnosticReportResult::Report(
                 WorkspaceDiagnosticReport { items: vec![] },
             ));
@@ -165,7 +165,7 @@ impl BackgroundRequestHandler for WorkspaceDiagnosticRequestHandler {
                 .all(|item| matches!(item, WorkspaceDocumentDiagnosticReport::Unchanged(_)));
 
             if all_unchanged {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Suspending workspace diagnostic request, all diagnostics are unchanged or the project has no diagnostics"
                 );
 
@@ -271,7 +271,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
             if let Some(file) = diagnostic.primary_span().map(|span| span.expect_ty_file()) {
                 by_file.entry(file).or_default().push(diagnostic);
             } else {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Ignoring diagnostic without a file: {diagnostic}",
                     diagnostic = diagnostic.primary_message()
                 );
@@ -373,7 +373,7 @@ impl<'a> ResponseWriter<'a> {
         diagnostics: &[Diagnostic],
     ) {
         let Some(url) = file_to_url(db, file) else {
-            tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
+            tracing_unlikely::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
         };
 

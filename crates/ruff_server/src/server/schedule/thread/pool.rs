@@ -81,11 +81,15 @@ impl Pool {
                             // dispatching requests/notifications etc).
                             if let Err(error) = std::panic::catch_unwind(AssertUnwindSafe(job.f)) {
                                 if let Some(msg) = error.downcast_ref::<String>() {
-                                    tracing::error!("Worker thread panicked with: {msg}; aborting");
+                                    tracing_unlikely::error!(
+                                        "Worker thread panicked with: {msg}; aborting"
+                                    );
                                 } else if let Some(msg) = error.downcast_ref::<&str>() {
-                                    tracing::error!("Worker thread panicked with: {msg}; aborting");
+                                    tracing_unlikely::error!(
+                                        "Worker thread panicked with: {msg}; aborting"
+                                    );
                                 } else {
-                                    tracing::error!(
+                                    tracing_unlikely::error!(
                                         "Worker thread panicked with: {error:?}; aborting"
                                     );
                                 }

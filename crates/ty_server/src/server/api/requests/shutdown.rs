@@ -13,7 +13,7 @@ impl RequestHandler for ShutdownHandler {
 
 impl SyncRequestHandler for ShutdownHandler {
     fn run(session: &mut Session, client: &Client, _params: ()) -> crate::server::Result<()> {
-        tracing::debug!("Received shutdown request, waiting for exit notification");
+        tracing_unlikely::debug!("Received shutdown request, waiting for exit notification");
 
         // Respond to any pending workspace diagnostic requests
         if let Some(suspended_workspace_request) =

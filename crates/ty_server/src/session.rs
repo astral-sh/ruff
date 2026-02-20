@@ -226,7 +226,7 @@ impl Session {
             .and_then(|request| {
                 if !self.request_queue.incoming().is_pending(&request.id) {
                     // Clear out the suspended request if the request has been cancelled.
-                    tracing::debug!("Skipping suspended workspace diagnostics request `{}` because it was cancelled", request.id);
+                    tracing_unlikely::debug!("Skipping suspended workspace diagnostics request `{}` because it was cancelled", request.id);
                     return None;
                 }
 
@@ -268,7 +268,7 @@ impl Session {
                     if request.method == Shutdown::METHOD {
                         return Some(message);
                     }
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Deferring `{}` request until all workspaces are initialized",
                         request.method
                     );
@@ -281,7 +281,7 @@ impl Session {
                     if notification.method == Exit::METHOD {
                         return Some(message);
                     }
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Deferring `{}` notification until all workspaces are initialized",
                         notification.method
                     );
@@ -548,10 +548,10 @@ impl Session {
             .clone()
             .combine(options);
 
-        tracing::debug!("Initializing workspace `{url}`: {options:#?}");
+        tracing_unlikely::debug!("Initializing workspace `{url}`: {options:#?}");
 
         let Ok(root) = url.to_file_path() else {
-            tracing::debug!("Ignoring workspace with non-path root: {url}");
+            tracing_unlikely::debug!("Ignoring workspace with non-path root: {url}");
             return;
         };
 
@@ -559,7 +559,7 @@ impl Session {
         let root = match SystemPathBuf::from_path_buf(root) {
             Ok(root) => root,
             Err(root) => {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Ignoring workspace with non-UTF8 root: {root}",
                     root = root.display()
                 );
@@ -569,11 +569,11 @@ impl Session {
 
         let settings = options.into_settings(&root, client, &*self.native_system);
         let Some(workspace) = self.workspaces.workspaces.get_mut(&root) else {
-            tracing::debug!("Ignoring workspace `{url}` since it was not registered");
+            tracing_unlikely::debug!("Ignoring workspace `{url}` since it was not registered");
             return;
         };
         if workspace.is_initialized() {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Ignoring workspace initialization for `{url}` \
                  since it has already been initialized"
             );
@@ -617,7 +617,7 @@ impl Session {
         let (root, db) = match project {
             Ok(db) => (root, db),
             Err(err) => {
-                tracing::error!(
+                tracing_unlikely::error!(
                     "Failed to create project for workspace `{url}`: {err:#}. \
                         Falling back to default settings"
                 );
@@ -717,7 +717,7 @@ impl Session {
             .client_capabilities()
             .supports_workspace_configuration()
         {
-            tracing::info!(
+            tracing_unlikely::info!(
                 "Client does not support workspace configuration, initializing workspaces \
                  using the initialization options"
             );
@@ -739,12 +739,14 @@ impl Session {
             })
             .collect();
 
-        tracing::debug!("Requesting workspace configuration for workspaces");
+        tracing_unlikely::debug!("Requesting workspace configuration for workspaces");
         client.send_request::<lsp_types::request::WorkspaceConfiguration>(
             self,
             lsp_types::ConfigurationParams { items },
             move |client, result: Vec<serde_json::Value>| {
-                tracing::debug!("Received workspace configurations, initializing workspaces");
+                tracing_unlikely::debug!(
+                    "Received workspace configurations, initializing workspaces"
+                );
 
                 // This shouldn't fail because, as per the spec, the client needs to provide a
                 // `null` value even if it cannot provide a configuration for a workspace.
@@ -761,14 +763,14 @@ impl Session {
                     .zip(result)
                     .map(|(url, value)| {
                         if value.is_null() {
-                            tracing::debug!(
+                            tracing_unlikely::debug!(
                                 "No workspace options provided for {url}, using default options"
                             );
                             return (url, ClientOptions::default());
                         }
                         let options: ClientOptions =
                             serde_json::from_value(value).unwrap_or_else(|err| {
-                                tracing::error!(
+                                tracing_unlikely::error!(
                                     "Failed to deserialize workspace options for {url}: {err}. \
                                         Using default options"
                                 );
@@ -797,7 +799,7 @@ impl Session {
         client: &Client,
         url: &Url,
     ) -> anyhow::Result<()> {
-        tracing::info!("Removing workspace folder: {url}");
+        tracing_unlikely::info!("Removing workspace folder: {url}");
 
         let path = url
             .to_file_path()
@@ -917,12 +919,12 @@ impl Session {
 
             match diagnostic_mode {
                 DiagnosticMode::Off => {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Skipping registration of diagnostic capability because diagnostics are turned off"
                     );
                 }
                 DiagnosticMode::OpenFilesOnly | DiagnosticMode::Workspace => {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
                     );
                     registrations.push(Registration {
@@ -979,7 +981,7 @@ impl Session {
             self,
             RegistrationParams { registrations },
             |_: &Client, ()| {
-                tracing::debug!("Registered dynamic capabilities");
+                tracing_unlikely::debug!("Registered dynamic capabilities");
             },
         );
     }
@@ -996,7 +998,7 @@ impl Session {
 
         for unregistration in &unregistrations {
             if !self.registrations.remove(&unregistration.method) {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Unregistration for `{}` was requested, but it was not registered",
                     unregistration.method
                 );
@@ -1009,7 +1011,7 @@ impl Session {
                 unregisterations: unregistrations,
             },
             |_: &Client, ()| {
-                tracing::debug!("Unregistered dynamic capabilities");
+                tracing_unlikely::debug!("Unregistered dynamic capabilities");
             },
         );
     }
@@ -1043,7 +1045,7 @@ impl Session {
         }
 
         if !self.client_capabilities().supports_file_watcher() {
-            tracing::warn!(
+            tracing_unlikely::warn!(
                 "Your LSP client doesn't support file watching: \
                  You may see stale results when files change outside the editor"
             );
@@ -1062,7 +1064,7 @@ impl Session {
         // simply wouldn't result in any file notifications for changes
         // to files outside of the project root.
         let watchers = if !self.client_capabilities().supports_relative_file_watcher() {
-            tracing::warn!(
+            tracing_unlikely::warn!(
                 "Your LSP client doesn't support file watching outside of project: \
                  You may see stale results when dependencies change"
             );
@@ -1216,7 +1218,7 @@ impl Session {
                             project.open_file(db, file);
                         }
                     }
-                    Err(err) => tracing::warn!("Failed to open file {system_path}: {err}"),
+                    Err(err) => tracing_unlikely::warn!("Failed to open file {system_path}: {err}"),
                 }
             }
             AnySystemPath::SystemVirtual(virtual_path) => {
@@ -1366,7 +1368,7 @@ impl DocumentSnapshot {
     pub(crate) fn to_notebook_or_file(&self, db: &dyn Db) -> Option<File> {
         let file = self.document.notebook_or_file(db);
         if file.is_none() {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Failed to resolve file: file not found for `{}`",
                 self.document.url()
             );
@@ -1627,7 +1629,7 @@ impl SuspendedWorkspaceDiagnosticRequest {
             return Some(self);
         }
 
-        tracing::debug!("Resuming workspace diagnostics request after revision bump");
+        tracing_unlikely::debug!("Resuming workspace diagnostics request after revision bump");
         client.queue_action(Action::RetryRequest(lsp_server::Request {
             id: self.id,
             method: WorkspaceDiagnosticRequest::METHOD.to_string(),
@@ -1891,7 +1893,7 @@ impl DocumentHandle {
                         // file should exists for this handler in this branch. This is because every
                         // close call is preceded by an open call, which ensures that the file is
                         // interned in the lookup table (`Files`).
-                        tracing::warn!("Salsa file does not exists for {}", system_path);
+                        tracing_unlikely::warn!("Salsa file does not exists for {}", system_path);
                     }
 
                     // For non-virtual files, we clear diagnostics if:
@@ -1912,7 +1914,10 @@ impl DocumentHandle {
                         // Bump the file's revision back to using the file system's revision.
                         virtual_file.sync(db);
                     } else {
-                        tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
+                        tracing_unlikely::warn!(
+                            "Salsa virtual file does not exists for {}",
+                            virtual_path
+                        );
                     }
 
                     // Always clear diagnostics for virtual files, as they don't really exist on disk
@@ -1950,6 +1955,6 @@ pub(super) fn warn_about_unknown_options(
                 .unwrap_or_else(|_| format!("{unknown_options:?}"))
         )
     };
-    tracing::warn!("{message}");
+    tracing_unlikely::warn!("{message}");
     client.show_warning_message(message);
 }

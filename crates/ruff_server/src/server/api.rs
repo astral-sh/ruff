@@ -72,7 +72,7 @@ pub(super) fn request(req: server::Request) -> Task {
         }
         lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
         method => {
-            tracing::warn!("Received request {method} which does not have a handler");
+            tracing_unlikely::warn!("Received request {method} which does not have a handler");
             let result: Result<()> = Err(Error::new(
                 anyhow!("Unknown request: {method}"),
                 server::ErrorCode::MethodNotFound,
@@ -81,7 +81,7 @@ pub(super) fn request(req: server::Request) -> Task {
         }
     }
     .unwrap_or_else(|err| {
-        tracing::error!("Encountered error when routing request with ID {id}: {err}");
+        tracing_unlikely::error!("Encountered error when routing request with ID {id}: {err}");
 
         Task::sync(move |_session, client| {
             client.show_error_message(
@@ -129,16 +129,16 @@ pub(super) fn notification(notif: server::Notification) -> Task {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
         lsp_types::notification::SetTrace::METHOD => {
-            tracing::trace!("Ignoring `setTrace` notification");
+            tracing_unlikely::trace!("Ignoring `setTrace` notification");
             return Task::nothing();
         }
         method => {
-            tracing::warn!("Received notification {method} which does not have a handler.");
+            tracing_unlikely::warn!("Received notification {method} which does not have a handler.");
             return Task::nothing();
         }
     }
     .unwrap_or_else(|err| {
-        tracing::error!("Encountered error when routing notification: {err}");
+        tracing_unlikely::error!("Encountered error when routing notification: {err}");
         Task::sync(|_session, client| {
             client.show_error_message(
                 "Ruff failed to handle a notification from the editor. Check the logs for more details."
@@ -153,7 +153,7 @@ where
 {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::sync(move |session, client: &Client| {
-        let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+        let _span = tracing_unlikely::debug_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, client, params);
         respond::<R>(&id, result, client);
     }))
@@ -178,17 +178,19 @@ where
         let url = R::document_url(&params).into_owned();
 
         let Some(snapshot) = session.take_snapshot(R::document_url(&params).into_owned()) else {
-            tracing::warn!("Ignoring request because snapshot for path `{url:?}` doesn't exist.");
+            tracing_unlikely::warn!(
+                "Ignoring request because snapshot for path `{url:?}` doesn't exist."
+            );
             return Box::new(|_| {});
         };
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing_unlikely::debug_span!("request", %id, method = R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::trace!(
+                tracing_unlikely::trace!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -237,9 +239,9 @@ where
 fn sync_notification_task<N: SyncNotificationHandler>(notif: server::Notification) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::sync(move |session, client| {
-        let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+        let _span = tracing_unlikely::debug_span!("notification", method = N::METHOD).entered();
         if let Err(err) = N::run(session, client, params) {
-            tracing::error!("An error occurred while running {id}: {err}");
+            tracing_unlikely::error!("An error occurred while running {id}: {err}");
             client
                 .show_error_message("Ruff encountered a problem. Check the logs for more details.");
         }
@@ -260,13 +262,13 @@ where
         let url = N::document_url(&params);
 
         let Some(snapshot) = session.take_snapshot((*url).clone()) else {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Ignoring notification because snapshot for url `{url}` doesn't exist."
             );
             return Box::new(|_| {});
         };
         Box::new(move |client| {
-            let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+            let _span = tracing_unlikely::debug_span!("notification", method = N::METHOD).entered();
 
             let result =
                 match std::panic::catch_unwind(|| N::run_with_snapshot(snapshot, client, params)) {
@@ -278,7 +280,7 @@ where
                             format!("notification handler for {id} failed")
                         };
 
-                        tracing::error!(message);
+                        tracing_unlikely::error!(message);
                         client.show_error_message(
                             "Ruff encountered a panic. Check the logs for more details.",
                         );
@@ -287,7 +289,7 @@ where
                 };
 
             if let Err(err) = result {
-                tracing::error!("An error occurred while running {id}: {err}");
+                tracing_unlikely::error!("An error occurred while running {id}: {err}");
                 client.show_error_message(
                     "Ruff encountered a problem. Check the logs for more details.",
                 );
@@ -333,11 +335,11 @@ fn respond<Req>(
     Req: RequestHandler,
 {
     if let Err(err) = &result {
-        tracing::error!("An error occurred with request ID {id}: {err}");
+        tracing_unlikely::error!("An error occurred with request ID {id}: {err}");
         client.show_error_message("Ruff encountered a problem. Check the logs for more details.");
     }
     if let Err(err) = client.respond(id, result) {
-        tracing::error!("Failed to send response: {err}");
+        tracing_unlikely::error!("Failed to send response: {err}");
     }
 }
 
@@ -345,7 +347,7 @@ fn respond<Req>(
 /// to the user.
 fn respond_silent_error(id: RequestId, client: &Client, error: lsp_server::ResponseError) {
     if let Err(err) = client.respond_err(id, error) {
-        tracing::error!("Failed to send response: {err}");
+        tracing_unlikely::error!("Failed to send response: {err}");
     }
 }
 

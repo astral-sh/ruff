@@ -1031,7 +1031,7 @@ mod resolve_definition {
     use ruff_python_ast as ast;
     use ruff_python_stdlib::sys::is_builtin_module;
     use rustc_hash::FxHashSet;
-    use tracing::trace;
+    use tracing_unlikely::trace;
     use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
     use crate::Db;
@@ -1323,7 +1323,7 @@ mod resolve_definition {
     }
 
     /// Given a definition that may be in a stub file, find the "real" definition in a non-stub.
-    #[tracing::instrument(skip_all)]
+    #[tracing_unlikely::instrument(skip_all)]
     pub fn map_stub_definition<'db>(
         db: &'db dyn Db,
         def: &ResolvedDefinition<'db>,

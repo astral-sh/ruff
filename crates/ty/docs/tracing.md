@@ -98,7 +98,7 @@ use ruff_db::testing::setup_logging;
 fn test() {
     let _logging = setup_logging();
 
-    tracing::info!("This message will be printed to stderr");
+    tracing_unlikely::info!("This message will be printed to stderr");
 }
 ```
 

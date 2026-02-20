@@ -79,7 +79,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             })
             .collect();
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Inlay hint request returned {} hints in {:?}",
             inlay_hints.len(),
             start.elapsed()

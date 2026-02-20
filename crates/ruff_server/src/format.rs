@@ -68,7 +68,7 @@ fn format_internal(
                 // Special case - syntax/parse errors are handled here instead of
                 // being propagated as visible server errors.
                 Err(FormatModuleError::ParseError(error)) => {
-                    tracing::warn!("Unable to format document: {error}");
+                    tracing_unlikely::warn!("Unable to format document: {error}");
                     Ok(None)
                 }
                 Err(err) => Err(err.into()),
@@ -76,7 +76,9 @@ fn format_internal(
         }
         SourceType::Markdown => {
             if !formatter_settings.preview.is_enabled() {
-                tracing::warn!("Markdown formatting is experimental, enable preview mode.");
+                tracing_unlikely::warn!(
+                    "Markdown formatting is experimental, enable preview mode."
+                );
                 return Ok(None);
             }
 
@@ -86,7 +88,7 @@ fn format_internal(
             }
         }
         SourceType::Toml(_) => {
-            tracing::warn!("Formatting TOML files not supported");
+            tracing_unlikely::warn!("Formatting TOML files not supported");
             Ok(None)
         }
     }
@@ -109,7 +111,7 @@ fn format_external(
             Some(path),
         ),
         SourceType::Toml(_) => {
-            tracing::warn!("Formatting TOML files not supported");
+            tracing_unlikely::warn!("Formatting TOML files not supported");
             return Ok(None);
         }
     };
@@ -128,11 +130,11 @@ pub(crate) fn format_range(
     let py_source_type = match source_type {
         SourceType::Python(py_source_type) => py_source_type,
         SourceType::Markdown => {
-            tracing::warn!("Range formatting for Markdown files not supported");
+            tracing_unlikely::warn!("Range formatting for Markdown files not supported");
             return Ok(None);
         }
         SourceType::Toml(_) => {
-            tracing::warn!("Formatting TOML files not supported");
+            tracing_unlikely::warn!("Formatting TOML files not supported");
             return Ok(None);
         }
     };
@@ -168,7 +170,7 @@ fn format_range_internal(
         // Special case - syntax/parse errors are handled here instead of
         // being propagated as visible server errors.
         Err(FormatModuleError::ParseError(error)) => {
-            tracing::warn!("Unable to format document range: {error}");
+            tracing_unlikely::warn!("Unable to format document range: {error}");
             Ok(None)
         }
         Err(err) => Err(err.into()),
@@ -324,7 +326,7 @@ impl UvFormatCommand {
             let stderr = String::from_utf8_lossy(&result.stderr);
             // We don't propagate format errors due to invalid syntax
             if stderr.contains("Failed to parse") {
-                tracing::warn!("Unable to format document: {}", stderr);
+                tracing_unlikely::warn!("Unable to format document: {}", stderr);
                 return Ok(None);
             }
             // Special-case for when `uv format` is not available

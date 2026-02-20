@@ -64,9 +64,9 @@ pub fn run(preview: Option<bool>) -> Result<()> {
     };
 
     if let Err(err) = result.as_ref() {
-        tracing::warn!("Server shut down with an error: {err}");
+        tracing_unlikely::warn!("Server shut down with an error: {err}");
     } else {
-        tracing::info!("Server shut down");
+        tracing_unlikely::info!("Server shut down");
     }
 
     result

@@ -232,7 +232,7 @@ impl Project {
     }
 
     pub fn reload(self, db: &mut dyn Db, metadata: ProjectMetadata) {
-        tracing::debug!("Reloading project");
+        tracing_unlikely::debug!("Reloading project");
         assert_eq!(self.root(db), metadata.root());
 
         if &metadata != self.metadata(db) {
@@ -260,10 +260,10 @@ impl Project {
 
     /// Checks the project and its dependencies according to the project's check mode.
     pub(crate) fn check(self, db: &ProjectDatabase, reporter: &mut dyn ProgressReporter) {
-        let project_span = tracing::debug_span!("Project::check");
+        let project_span = tracing_unlikely::debug_span!("Project::check");
         let _span = project_span.enter();
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Checking {} in project '{name}'",
             self.check_mode(db),
             name = self.name(db)
@@ -300,7 +300,7 @@ impl Project {
                     let reporter = &*reporter;
                     scope.spawn(move |_| {
                         let check_file_span =
-                            tracing::debug_span!(parent: project_span, "check_file", ?file);
+                            tracing_unlikely::debug_span!(parent: project_span, "check_file", ?file);
                         let _entered = check_file_span.entered();
 
                         match check_file_impl(&db, file) {
@@ -333,7 +333,7 @@ impl Project {
             });
         };
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Checking all files took {:.3}s",
             check_start.elapsed().as_secs_f64(),
         );
@@ -352,7 +352,7 @@ impl Project {
 
     /// Opens a file in the project.
     pub fn open_file(self, db: &mut dyn Db, file: File) {
-        tracing::debug!("Opening file `{}`", file.path(db));
+        tracing_unlikely::debug!("Opening file `{}`", file.path(db));
 
         let mut open_files = self.take_open_files(db);
         open_files.insert(file);
@@ -361,7 +361,7 @@ impl Project {
 
     /// Closes a file in the project.
     pub fn close_file(self, db: &mut dyn Db, file: File) -> bool {
-        tracing::debug!("Closing file `{}`", file.path(db));
+        tracing_unlikely::debug!("Closing file `{}`", file.path(db));
 
         let mut open_files = self.take_open_files(db);
         let removed = open_files.remove(&file);
@@ -374,7 +374,7 @@ impl Project {
     }
 
     pub fn set_included_paths(self, db: &mut dyn Db, paths: Vec<SystemPathBuf>) {
-        tracing::debug!("Setting included paths: {paths}", paths = paths.len());
+        tracing_unlikely::debug!("Setting included paths: {paths}", paths = paths.len());
 
         self.set_included_paths_list(db).to(paths);
         self.reload_files(db);
@@ -423,16 +423,16 @@ impl Project {
     }
 
     /// Sets the open files in the project.
-    #[tracing::instrument(level = "debug", skip(self, db))]
+    #[tracing_unlikely::instrument(level = "debug", skip(self, db))]
     pub fn set_open_files(self, db: &mut dyn Db, open_files: FxHashSet<File>) {
-        tracing::debug!("Set open project files (count: {})", open_files.len());
+        tracing_unlikely::debug!("Set open project files (count: {})", open_files.len());
 
         self.set_open_fileset(db).to(open_files);
     }
 
     /// This takes the open files from the project and returns them.
     fn take_open_files(self, db: &mut dyn Db) -> FxHashSet<File> {
-        tracing::debug!("Take open project files");
+        tracing_unlikely::debug!("Take open project files");
 
         // Salsa will cancel any pending queries and remove its own reference to `open_files`
         // so that the reference counter to `open_files` now drops to 1.
@@ -483,9 +483,9 @@ impl Project {
         }
     }
 
-    #[tracing::instrument(level = "debug", skip(self, db))]
+    #[tracing_unlikely::instrument(level = "debug", skip(self, db))]
     pub fn remove_file(self, db: &mut dyn Db, file: File) {
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Removing file `{}` from project `{}`",
             file.path(db),
             self.name(db)
@@ -499,7 +499,7 @@ impl Project {
     }
 
     pub fn add_file(self, db: &mut dyn Db, file: File) {
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Adding file `{}` to project `{}`",
             file.path(db),
             self.name(db)
@@ -530,14 +530,14 @@ impl Project {
         match files.get() {
             Index::Lazy(vacant) => {
                 let _entered =
-                    tracing::debug_span!("Project::index_files", project = %self.name(db))
+                    tracing_unlikely::debug_span!("Project::index_files", project = %self.name(db))
                         .entered();
                 let start = ruff_db::Instant::now();
 
                 let walker = ProjectFilesWalker::new(db);
                 let (files, diagnostics) = walker.collect_set(db);
 
-                tracing::info!(
+                tracing_unlikely::info!(
                     "Indexed {} file(s) in {:.3}s",
                     files.len(),
                     start.elapsed().as_secs_f64()
@@ -549,7 +549,7 @@ impl Project {
     }
 
     pub fn reload_files(self, db: &mut dyn Db) {
-        tracing::debug!("Reloading files for project `{}`", self.name(db));
+        tracing_unlikely::debug!("Reloading files for project `{}`", self.name(db));
 
         if !self.file_set(db).is_lazy() {
             // Force a re-index of the files in the next revision.

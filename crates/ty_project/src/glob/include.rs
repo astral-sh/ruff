@@ -6,7 +6,7 @@ use ruff_db::system::SystemPath;
 use std::fmt::Formatter;
 use std::path::{MAIN_SEPARATOR, MAIN_SEPARATOR_STR};
 use std::sync::Arc;
-use tracing::warn;
+use tracing_unlikely::warn;
 
 use crate::glob::portable::AbsolutePortableGlobPattern;
 

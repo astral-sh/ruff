@@ -3047,6 +3047,7 @@ dependencies = [
  "tikv-jemallocator",
  "toml",
  "tracing",
+ "tracing-unlikely",
  "walkdir",
  "wild",
 ]
@@ -3087,6 +3088,7 @@ dependencies = [
  "serde_json",
  "tikv-jemallocator",
  "tracing",
+ "tracing-unlikely",
  "ty_project",
 ]
 
@@ -3144,6 +3146,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "tracing-subscriber",
+ "tracing-unlikely",
  "ty_static",
  "web-time",
  "which",
@@ -3187,6 +3190,7 @@ dependencies = [
  "tracing",
  "tracing-indicatif",
  "tracing-subscriber",
+ "tracing-unlikely",
  "ty",
  "ty_project",
  "ty_python_semantic",
@@ -3217,6 +3221,7 @@ dependencies = [
  "serde",
  "static_assertions",
  "tracing",
+ "tracing-unlikely",
  "unicode-width",
 ]
 
@@ -3451,6 +3456,7 @@ dependencies = [
  "static_assertions",
  "thiserror 2.0.18",
  "tracing",
+ "tracing-unlikely",
 ]
 
 [[package]]
@@ -3602,6 +3608,7 @@ dependencies = [
  "tracing",
  "tracing-log",
  "tracing-subscriber",
+ "tracing-unlikely",
 ]
 
 [[package]]
@@ -4463,6 +4470,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "tracing-unlikely"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "34f6444cc2c0fb300b0450b4fd46375fb0812c6448f5a2148f821bcaea0abafe"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "tryfn"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4505,6 +4521,7 @@ dependencies = [
  "tracing",
  "tracing-flame",
  "tracing-subscriber",
+ "tracing-unlikely",
  "ty_combine",
  "ty_module_resolver",
  "ty_project",
@@ -4583,6 +4600,7 @@ dependencies = [
  "salsa",
  "smallvec",
  "tracing",
+ "tracing-unlikely",
  "ty_module_resolver",
  "ty_project",
  "ty_python_semantic",
@@ -4611,6 +4629,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.18",
  "tracing",
+ "tracing-unlikely",
  "ty_vendored",
 ]
 
@@ -4650,6 +4669,7 @@ dependencies = [
  "thiserror 2.0.18",
  "toml",
  "tracing",
+ "tracing-unlikely",
  "ty_combine",
  "ty_module_resolver",
  "ty_python_semantic",
@@ -4704,6 +4724,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.18",
  "tracing",
+ "tracing-unlikely",
  "ty_combine",
  "ty_module_resolver",
  "ty_site_packages",
@@ -4743,6 +4764,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "tracing-subscriber",
+ "tracing-unlikely",
  "ty_combine",
  "ty_ide",
  "ty_module_resolver",
@@ -4767,6 +4789,7 @@ dependencies = [
  "strum",
  "strum_macros",
  "tracing",
+ "tracing-unlikely",
  "ty_static",
  "which",
 ]
@@ -4807,6 +4830,7 @@ dependencies = [
  "thiserror 2.0.18",
  "toml",
  "tracing",
+ "tracing-unlikely",
  "ty_module_resolver",
  "ty_python_semantic",
  "ty_static",
@@ -4841,6 +4865,7 @@ dependencies = [
  "ruff_text_size",
  "serde-wasm-bindgen",
  "tracing",
+ "tracing-unlikely",
  "ty_ide",
  "ty_project",
  "ty_python_semantic",

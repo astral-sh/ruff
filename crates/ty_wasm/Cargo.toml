@@ -43,6 +43,7 @@ js-sys = { workspace = true }
 log = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
+tracing-unlikely = { workspace = true }
 # Not a direct dependency but required to compile for Wasm.
 uuid = { workspace = true, features = ["js"] }
 

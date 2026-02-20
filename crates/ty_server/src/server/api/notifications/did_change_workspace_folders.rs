@@ -29,7 +29,7 @@ impl SyncNotificationHandler for DidChangeWorkspaceFoldersHandler {
                     .join(", ")
             }
         };
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Workspace folder change notification, to add: {to_add}, to remove: {to_remove}",
             to_add = format_workspace_folders(&params.event.added),
             to_remove = format_workspace_folders(&params.event.removed),
@@ -42,13 +42,13 @@ impl SyncNotificationHandler for DidChangeWorkspaceFoldersHandler {
                     added_workspace_folder = true;
                 }
                 Ok(false) => {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Workspace folder `{uri}` has already been added",
                         uri = folder.uri,
                     );
                 }
                 Err(err) => {
-                    tracing::error!(
+                    tracing_unlikely::error!(
                         "Failed to add workspace folder `{uri}`: {err}",
                         uri = folder.uri,
                     );
@@ -68,7 +68,7 @@ impl SyncNotificationHandler for DidChangeWorkspaceFoldersHandler {
             // be small. So we prefer a simpler implementation for now.
             // ---AG
             if let Err(err) = session.remove_workspace_folder(client, &folder.uri) {
-                tracing::error!(
+                tracing_unlikely::error!(
                     "Failed to remove workspace folder `{uri}`: {err}",
                     uri = folder.uri,
                 );

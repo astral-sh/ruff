@@ -21,7 +21,7 @@ impl Workspaces {
     ) -> std::result::Result<Workspaces, WorkspacesError> {
         let mut client_options_for_url = |url: &Url| {
             workspace_options.remove(url).unwrap_or_else(|| {
-                tracing::info!(
+                tracing_unlikely::info!(
                     "No workspace options found for {}, using default options",
                     url
                 );
@@ -40,7 +40,7 @@ impl Workspaces {
                     .collect()
             } else {
                 let current_dir = std::env::current_dir().map_err(WorkspacesError::Io)?;
-                tracing::info!(
+                tracing_unlikely::info!(
                     "No workspace(s) were provided during initialization. \
                 Using the current working directory as a default workspace: {}",
                     current_dir.display()

@@ -188,7 +188,7 @@ pub(crate) fn check(
     if let Some(notebook) = query.as_notebook() {
         for (index, diagnostic) in lsp_diagnostics {
             let Some(uri) = notebook.cell_uri_by_index(index) else {
-                tracing::warn!("Unable to find notebook cell at index {index}.");
+                tracing_unlikely::warn!("Unable to find notebook cell at index {index}.");
                 continue;
             };
             diagnostics_map

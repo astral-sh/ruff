@@ -114,7 +114,7 @@ struct WatcherInner {
 impl Watcher {
     /// Sets up file watching for `path`.
     pub fn watch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        tracing::debug!("Watching path: `{path}`");
+        tracing_unlikely::debug!("Watching path: `{path}`");
 
         self.inner_mut()
             .watcher
@@ -123,7 +123,7 @@ impl Watcher {
 
     /// Stops file watching for `path`.
     pub fn unwatch(&mut self, path: &SystemPath) -> notify::Result<()> {
-        tracing::debug!("Unwatching path: `{path}`");
+        tracing_unlikely::debug!("Unwatching path: `{path}`");
 
         self.inner_mut().watcher.unwatch(path.as_std_path())
     }
@@ -134,7 +134,7 @@ impl Watcher {
     ///
     /// The call blocks until the watcher has stopped.
     pub fn stop(mut self) {
-        tracing::debug!("Stop file watcher");
+        tracing_unlikely::debug!("Stop file watcher");
         self.set_stop();
     }
 
@@ -184,7 +184,7 @@ struct Debouncer {
 
 impl Debouncer {
     fn add_result(&mut self, result: notify::Result<notify::Event>) {
-        tracing::trace!("Handling file watcher event: {result:?}");
+        tracing_unlikely::trace!("Handling file watcher event: {result:?}");
         match result {
             Ok(event) => self.add_event(event),
             Err(error) => self.add_error(error),
@@ -197,7 +197,7 @@ impl Debouncer {
         // are IO errors. All other errors should really only happen when adding or removing a watched folders.
         // It's not clear what an upstream handler should do in the case of an IOError (other than logging it).
         // That's what we do for now as well.
-        tracing::warn!("File watcher error: {error:?}");
+        tracing_unlikely::warn!("File watcher error: {error:?}");
     }
 
     fn add_event(&mut self, event: notify::Event) {
@@ -219,14 +219,14 @@ impl Debouncer {
         // There are cases where paths can be empty.
         // https://github.com/astral-sh/ruff/issues/14222
         let Some(path) = event.paths.into_iter().next() else {
-            tracing::debug!("Ignoring change event with kind '{kind:?}' without a path",);
+            tracing_unlikely::debug!("Ignoring change event with kind '{kind:?}' without a path",);
             return;
         };
 
         let path = match SystemPathBuf::from_path_buf(path) {
             Ok(path) => path,
             Err(path) => {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Ignore change to non-UTF8 path `{path}`: {kind:?}",
                     path = path.display()
                 );
@@ -364,7 +364,7 @@ impl Debouncer {
             }
 
             EventKind::Any => {
-                tracing::debug!("Skipping any FS event for `{path}`");
+                tracing_unlikely::debug!("Skipping any FS event for `{path}`");
                 return;
             }
         };

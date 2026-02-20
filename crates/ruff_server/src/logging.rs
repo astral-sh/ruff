@@ -7,12 +7,12 @@
 use core::str;
 use serde::Deserialize;
 use std::{path::PathBuf, str::FromStr, sync::Arc};
-use tracing::level_filters::LevelFilter;
 use tracing_subscriber::{
     Layer,
     fmt::{format::FmtSpan, time::ChronoLocal, writer::BoxMakeWriter},
     layer::SubscriberExt,
 };
+use tracing_unlikely::level_filters::LevelFilter;
 
 pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Path>) {
     let log_file = log_file
@@ -62,7 +62,7 @@ pub(crate) fn init_logging(log_level: LogLevel, log_file: Option<&std::path::Pat
             .with_filter(LogLevelFilter { filter: log_level }),
     );
 
-    tracing::subscriber::set_global_default(subscriber)
+    tracing_unlikely::subscriber::set_global_default(subscriber)
         .expect("should be able to set global default subscriber");
 
     tracing_log::LogTracer::init().unwrap();
@@ -83,13 +83,13 @@ pub(crate) enum LogLevel {
 }
 
 impl LogLevel {
-    fn trace_level(self) -> tracing::Level {
+    fn trace_level(self) -> tracing_unlikely::Level {
         match self {
-            Self::Error => tracing::Level::ERROR,
-            Self::Warn => tracing::Level::WARN,
-            Self::Info => tracing::Level::INFO,
-            Self::Debug => tracing::Level::DEBUG,
-            Self::Trace => tracing::Level::TRACE,
+            Self::Error => tracing_unlikely::Level::ERROR,
+            Self::Warn => tracing_unlikely::Level::WARN,
+            Self::Info => tracing_unlikely::Level::INFO,
+            Self::Debug => tracing_unlikely::Level::DEBUG,
+            Self::Trace => tracing_unlikely::Level::TRACE,
         }
     }
 }
@@ -102,19 +102,19 @@ struct LogLevelFilter {
 impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
     fn enabled(
         &self,
-        meta: &tracing::Metadata<'_>,
+        meta: &tracing_unlikely::Metadata<'_>,
         _: &tracing_subscriber::layer::Context<'_, S>,
     ) -> bool {
         let filter = if meta.target().starts_with("ruff") {
             self.filter.trace_level()
         } else {
-            tracing::Level::INFO
+            tracing_unlikely::Level::INFO
         };
 
         meta.level() <= &filter
     }
 
-    fn max_level_hint(&self) -> Option<tracing::level_filters::LevelFilter> {
+    fn max_level_hint(&self) -> Option<tracing_unlikely::level_filters::LevelFilter> {
         Some(LevelFilter::from_level(self.filter.trace_level()))
     }
 }

@@ -6,12 +6,12 @@ use colored::Colorize;
 use std::fmt;
 use std::fs::File;
 use std::io::{BufWriter, IsTerminal};
-use tracing::{Event, Subscriber};
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::filter::LevelFilter;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::{FmtContext, FormatEvent, FormatFields};
 use tracing_subscriber::registry::LookupSpan;
+use tracing_unlikely::{Event, Subscriber};
 use ty_static::EnvVars;
 
 /// Logging flags to `#[command(flatten)]` into your CLI
@@ -65,19 +65,19 @@ pub(crate) enum VerbosityLevel {
     /// Silent output. Does not show any logging output or summary information.
     Silent,
 
-    /// Quiet output.  Only shows Ruff and ty events up to the [`ERROR`](tracing::Level::ERROR).
+    /// Quiet output.  Only shows Ruff and ty events up to the [`ERROR`](tracing_unlikely::Level::ERROR).
     /// Silences output except for summary information.
     Quiet,
 
-    /// Default output level. Only shows Ruff and ty events up to the [`WARN`](tracing::Level::WARN).
+    /// Default output level. Only shows Ruff and ty events up to the [`WARN`](tracing_unlikely::Level::WARN).
     #[default]
     Default,
 
-    /// Enables verbose output. Emits Ruff and ty events up to the [`INFO`](tracing::Level::INFO).
+    /// Enables verbose output. Emits Ruff and ty events up to the [`INFO`](tracing_unlikely::Level::INFO).
     /// Corresponds to `-v`.
     Verbose,
 
-    /// Enables a more verbose tracing format and emits Ruff and ty events up to [`DEBUG`](tracing::Level::DEBUG).
+    /// Enables a more verbose tracing format and emits Ruff and ty events up to [`DEBUG`](tracing_unlikely::Level::DEBUG).
     /// Corresponds to `-vv`
     ExtraVerbose,
 
@@ -251,13 +251,21 @@ where
             if ansi {
                 let formatted_level = level.to_string();
                 match *level {
-                    tracing::Level::TRACE => {
+                    tracing_unlikely::Level::TRACE => {
                         write!(writer, "{} ", formatted_level.purple().bold())?;
                     }
-                    tracing::Level::DEBUG => write!(writer, "{} ", formatted_level.blue().bold())?,
-                    tracing::Level::INFO => write!(writer, "{} ", formatted_level.green().bold())?,
-                    tracing::Level::WARN => write!(writer, "{} ", formatted_level.yellow().bold())?,
-                    tracing::Level::ERROR => write!(writer, "{} ", level.to_string().red().bold())?,
+                    tracing_unlikely::Level::DEBUG => {
+                        write!(writer, "{} ", formatted_level.blue().bold())?;
+                    }
+                    tracing_unlikely::Level::INFO => {
+                        write!(writer, "{} ", formatted_level.green().bold())?;
+                    }
+                    tracing_unlikely::Level::WARN => {
+                        write!(writer, "{} ", formatted_level.yellow().bold())?;
+                    }
+                    tracing_unlikely::Level::ERROR => {
+                        write!(writer, "{} ", level.to_string().red().bold())?;
+                    }
                 }
             } else {
                 write!(writer, "{level} ")?;

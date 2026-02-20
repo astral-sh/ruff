@@ -22,7 +22,7 @@ pub fn all_symbols<'db>(
         return Vec::new();
     }
 
-    let all_symbols_span = tracing::debug_span!("all_symbols");
+    let all_symbols_span = tracing_unlikely::debug_span!("all_symbols");
     let _span = all_symbols_span.enter();
 
     let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
@@ -85,7 +85,7 @@ pub fn all_symbols<'db>(
                     continue;
                 }
                 s.spawn(move |_| {
-                    let symbols_for_file_span = tracing::debug_span!(
+                    let symbols_for_file_span = tracing_unlikely::debug_span!(
                         parent: all_symbols_span,
                         "symbols_for_file_global_only",
                         path = %file.path(&*db),

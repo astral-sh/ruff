@@ -8,13 +8,13 @@ use std::sync::Arc;
 
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use serde::Deserialize;
-use tracing::Metadata;
-use tracing::level_filters::LevelFilter;
-use tracing::subscriber::Interest;
 use tracing_subscriber::Layer;
 use tracing_subscriber::fmt::time::ChronoLocal;
 use tracing_subscriber::fmt::writer::BoxMakeWriter;
 use tracing_subscriber::layer::SubscriberExt;
+use tracing_unlikely::Metadata;
+use tracing_unlikely::level_filters::LevelFilter;
+use tracing_unlikely::subscriber::Interest;
 
 pub fn init_logging(log_level: LogLevel, log_file: Option<&SystemPath>) {
     let log_file = log_file
@@ -59,7 +59,7 @@ pub fn init_logging(log_level: LogLevel, log_file: Option<&SystemPath>) {
             .with_filter(LogLevelFilter { filter: log_level }),
     );
 
-    tracing::subscriber::set_global_default(subscriber)
+    tracing_unlikely::subscriber::set_global_default(subscriber)
         .expect("should be able to set global default subscriber");
 }
 
@@ -78,13 +78,13 @@ pub enum LogLevel {
 }
 
 impl LogLevel {
-    fn trace_level(self) -> tracing::Level {
+    fn trace_level(self) -> tracing_unlikely::Level {
         match self {
-            Self::Error => tracing::Level::ERROR,
-            Self::Warn => tracing::Level::WARN,
-            Self::Info => tracing::Level::INFO,
-            Self::Debug => tracing::Level::DEBUG,
-            Self::Trace => tracing::Level::TRACE,
+            Self::Error => tracing_unlikely::Level::ERROR,
+            Self::Warn => tracing_unlikely::Level::WARN,
+            Self::Info => tracing_unlikely::Level::INFO,
+            Self::Debug => tracing_unlikely::Level::DEBUG,
+            Self::Trace => tracing_unlikely::Level::TRACE,
         }
     }
 }
@@ -102,7 +102,7 @@ impl LogLevelFilter {
         {
             self.filter.trace_level()
         } else {
-            tracing::Level::WARN
+            tracing_unlikely::Level::WARN
         };
 
         meta.level() <= &filter
@@ -112,7 +112,7 @@ impl LogLevelFilter {
 impl<S> tracing_subscriber::layer::Filter<S> for LogLevelFilter {
     fn enabled(
         &self,
-        meta: &tracing::Metadata<'_>,
+        meta: &tracing_unlikely::Metadata<'_>,
         _: &tracing_subscriber::layer::Context<'_, S>,
     ) -> bool {
         self.is_enabled(meta)

@@ -21,7 +21,7 @@ use ruff_notebook::NotebookIndex;
 use ruff_python_parser::ParseError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use thiserror::Error;
-use tracing::debug;
+use tracing_unlikely::debug;
 
 use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_diagnostics::{Edit, Fix, SourceMap};
@@ -255,7 +255,7 @@ pub(crate) fn format(
 }
 
 /// Format the file at the given [`Path`].
-#[tracing::instrument(level = "debug", skip_all, fields(path = %path.display()))]
+#[tracing_unlikely::instrument(level = "debug", skip_all, fields(path = %path.display()))]
 pub(crate) fn format_path(
     path: &Path,
     settings: &FormatterSettings,

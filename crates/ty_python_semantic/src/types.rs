@@ -134,8 +134,8 @@ mod property_tests;
 mod subscript;
 
 pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
-    let _span = tracing::trace_span!("check_types", ?file).entered();
-    tracing::debug!("Checking file '{path}'", path = file.path(db));
+    let _span = tracing_unlikely::trace_span!("check_types", ?file).entered();
+    tracing_unlikely::debug!("Checking file '{path}'", path = file.path(db));
 
     let start = Instant::now();
 
@@ -167,7 +167,7 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
 
     let elapsed = start.elapsed();
     if elapsed >= Duration::from_millis(100) {
-        tracing::info!(
+        tracing_unlikely::info!(
             "Checking file `{path}` took more than 100ms ({elapsed:?})",
             path = file.path(db)
         );
@@ -2632,7 +2632,7 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        tracing::trace!("class_member: {}.{}", self.display(db), name);
+        tracing_unlikely::trace!("class_member: {}.{}", self.display(db), name);
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
@@ -2792,7 +2792,7 @@ impl<'db> Type<'db> {
         instance: Option<Type<'db>>,
         owner: Type<'db>,
     ) -> Option<(Type<'db>, AttributeKind)> {
-        tracing::trace!(
+        tracing_unlikely::trace!(
             "try_call_dunder_get: {}, {}, {}",
             self.display(db),
             instance.unwrap_or_else(|| Type::none(db)).display(db),
@@ -3205,7 +3205,7 @@ impl<'db> Type<'db> {
         name: Name,
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
-        tracing::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
+        tracing_unlikely::trace!("member_lookup_with_policy: {}.{}", self.display(db), name);
         if name == "__class__" {
             return Place::bound(self.dunder_class(db)).into();
         }
@@ -7153,7 +7153,7 @@ impl<'db> From<&Type<'db>> for Type<'db> {
 
 impl<'db> VarianceInferable<'db> for Type<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
-        tracing::trace!(
+        tracing_unlikely::trace!(
             "Checking variance of '{tvar}' in `{ty:?}`",
             tvar = typevar.typevar(db).name(db),
             ty = self.display(db),
@@ -7238,7 +7238,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
         };
 
-        tracing::trace!(
+        tracing_unlikely::trace!(
             "Result of variance of '{tvar}' in `{ty:?}` is `{v:?}`",
             tvar = typevar.typevar(db).name(db),
             ty = self.display(db),
@@ -9137,7 +9137,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         db: &'db dyn Db,
         polarity: TypeVarVariance,
     ) -> TypeVarVariance {
-        let _span = tracing::trace_span!("variance_with_polarity").entered();
+        let _span = tracing_unlikely::trace_span!("variance_with_polarity").entered();
         match self.typevar(db).explicit_variance(db) {
             Some(explicit_variance) => explicit_variance.compose(polarity),
             None => match self.binding_context(db) {

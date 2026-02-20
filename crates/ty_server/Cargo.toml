@@ -39,6 +39,7 @@ shellexpand = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true, features = ["chrono"] }
+tracing-unlikely = { workspace = true }
 
 [target.'cfg(target_vendor = "apple")'.dependencies]
 libc = { workspace = true }

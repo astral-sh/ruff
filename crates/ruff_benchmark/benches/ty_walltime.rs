@@ -83,7 +83,7 @@ fn check_project(db: &ProjectDatabase, project_name: &str, max_diagnostics: usiz
     );
 
     if (max_diagnostics - diagnostics) as f64 / max_diagnostics as f64 > 0.10 {
-        tracing::warn!(
+        tracing_unlikely::warn!(
             "The expected diagnostics for project `{project_name}` can be reduced: expected {max_diagnostics} but got {diagnostics}"
         );
     }

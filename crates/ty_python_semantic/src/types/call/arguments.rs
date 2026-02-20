@@ -238,7 +238,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
 
                 let expansion_size = expanded_types.len() * state.len();
                 if expansion_size > MAX_TOTAL_EXPANSION {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Skipping argument type expansion as it would exceed the \
                             maximum number of expansions ({MAX_TOTAL_EXPANSION})"
                     );

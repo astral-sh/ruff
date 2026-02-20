@@ -22,7 +22,7 @@ impl super::SyncNotificationHandler for DidClose {
         let key = session.key_from_url(uri);
         // Publish an empty diagnostic report for the document. This will de-register any existing diagnostics.
         let Some(snapshot) = session.take_snapshot(key.clone().into_url()) else {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Unable to close document with key {key} - the snapshot was unavailable"
             );
             return Ok(());

@@ -59,7 +59,7 @@ impl ProjectMetadata {
         root: &SystemPath,
         system: &dyn System,
     ) -> Result<Self, ProjectMetadataError> {
-        tracing::debug!("Using overridden configuration file at '{path}'");
+        tracing_unlikely::debug!("Using overridden configuration file at '{path}'");
 
         let config_file = ConfigurationFile::from_path(path.clone(), system).map_err(|error| {
             ProjectMetadataError::ConfigurationFileError {
@@ -141,7 +141,7 @@ impl ProjectMetadata {
         path: &SystemPath,
         system: &dyn System,
     ) -> Result<ProjectMetadata, ProjectMetadataError> {
-        tracing::debug!("Searching for a project in '{path}'");
+        tracing_unlikely::debug!("Searching for a project in '{path}'");
 
         if !system.is_directory(path) {
             return Err(ProjectMetadataError::NotADirectory(path.to_path_buf()));
@@ -190,12 +190,12 @@ impl ProjectMetadata {
                     .is_some_and(|project| project.ty().is_some())
                 {
                     // TODO: Consider using a diagnostic here
-                    tracing::warn!(
+                    tracing_unlikely::warn!(
                         "Ignoring the `tool.ty` section in `{pyproject_path}` because `{ty_toml_path}` takes precedence."
                     );
                 }
 
-                tracing::debug!("Found project at '{}'", project_root);
+                tracing_unlikely::debug!("Found project at '{}'", project_root);
 
                 let metadata = ProjectMetadata::from_options(
                     options,
@@ -227,7 +227,7 @@ impl ProjectMetadata {
                         )?;
 
                 if has_ty_section {
-                    tracing::debug!("Found project at '{}'", project_root);
+                    tracing_unlikely::debug!("Found project at '{}'", project_root);
 
                     return Ok(metadata);
                 }
@@ -241,14 +241,14 @@ impl ProjectMetadata {
 
         // No project found, but maybe a pyproject.toml was found.
         let metadata = if let Some(closest_project) = closest_project {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Project without `tool.ty` section: '{}'",
                 closest_project.root()
             );
 
             closest_project
         } else {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "The ancestor directories contain no `pyproject.toml`. Falling back to a virtual project."
             );
 
@@ -311,7 +311,7 @@ impl ProjectMetadata {
         system: &dyn System,
     ) -> Result<(), ConfigurationFileError> {
         if let Some(user) = ConfigurationFile::user(system)? {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Applying user-level configuration loaded from `{path}`.",
                 path = user.path()
             );

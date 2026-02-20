@@ -44,7 +44,7 @@ impl OsSystem {
 
         let case_sensitivity = detect_case_sensitivity(cwd);
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Architecture: {}, OS: {}, case-sensitive: {case_sensitivity}",
             std::env::consts::ARCH,
             std::env::consts::OS,
@@ -310,7 +310,7 @@ impl OsSystem {
         let Ok(canonicalized) = SystemPathBuf::from_path_buf(canonicalized) else {
             // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
             // that a symlink is involved. Fall back to the slow path.
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{path}` is not valid UTF-8"
             );
             return None;
@@ -323,7 +323,7 @@ impl OsSystem {
         // `path` pointed to a symlink (or some other none reversible path normalization happened).
         // In this case, fall back to the slow path.
         if simplified_canonicalized.as_str().to_lowercase() != simplified.as_str().to_lowercase() {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Falling back to the slow case-sensitive path existence check for `{simplified}` because the canonicalized path `{simplified_canonicalized}` differs not only by casing"
             );
             return None;
@@ -419,12 +419,15 @@ impl CaseSensitivePathsCache {
         if let dashmap::Entry::Occupied(entry) = &entry {
             // Only do a cached lookup if the directory hasn't changed.
             if entry.get().last_modification_time == last_modification_time {
-                tracing::trace!("Use cached case-sensitive entry for directory `{}`", parent);
+                tracing_unlikely::trace!(
+                    "Use cached case-sensitive entry for directory `{}`",
+                    parent
+                );
                 return Ok(entry.get().names.contains(file_name));
             }
         }
 
-        tracing::trace!(
+        tracing_unlikely::trace!(
             "Reading directory `{}` for its case-sensitive filenames",
             parent
         );
@@ -448,7 +451,7 @@ impl CaseSensitivePathsCache {
             names,
         });
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Caching the case-sensitive paths for directory `{parent}` took {:?}",
             start.elapsed()
         );
@@ -513,7 +516,7 @@ impl DirectoryWalker for OsDirectoryWalker {
                         // These aren't fatal for us. We should keep going even if an ignore file contains a syntax error.
                         // But we log the error here for better visibility (same as ripgrep, Ruff ignores it)
                         if let Some(error) = entry.error() {
-                            tracing::warn!("{error}");
+                            tracing_unlikely::warn!("{error}");
                         }
 
                         match SystemPathBuf::from_path_buf(entry.into_path()) {
@@ -543,7 +546,7 @@ impl DirectoryWalker for OsDirectoryWalker {
                             // This should only be reached when the error is a `.ignore` file related error
                             // (which, should not be reported here but the `ignore` crate doesn't distinguish between ignore and IO errors).
                             // Let's log the error to at least make it visible.
-                            tracing::warn!("Failed to traverse directory: {error}.");
+                            tracing_unlikely::warn!("Failed to traverse directory: {error}.");
                             ignore::WalkState::Continue
                         }
                     },

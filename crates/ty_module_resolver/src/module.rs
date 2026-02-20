@@ -180,7 +180,7 @@ fn all_submodule_names_for_package<'db>(
             db.system()
                 .read_directory(parent_directory)
                 .inspect_err(|err| {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Failed to read {parent_directory:?} when looking for \
                          its possible submodules: {err}"
                     );

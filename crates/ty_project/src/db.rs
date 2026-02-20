@@ -51,19 +51,21 @@ impl ProjectDatabase {
     {
         let mut db = Self {
             project: None,
-            storage: salsa::Storage::new(if tracing::enabled!(tracing::Level::TRACE) {
-                Some(Box::new({
-                    move |event: Event| {
-                        if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
-                            return;
-                        }
+            storage: salsa::Storage::new(
+                if tracing_unlikely::enabled!(tracing_unlikely::Level::TRACE) {
+                    Some(Box::new({
+                        move |event: Event| {
+                            if matches!(event.kind, salsa::EventKind::WillCheckCancellation) {
+                                return;
+                            }
 
-                        tracing::trace!("Salsa event: {event:?}");
-                    }
-                }))
-            } else {
-                None
-            }),
+                            tracing_unlikely::trace!("Salsa event: {event:?}");
+                        }
+                    }))
+                } else {
+                    None
+                },
+            ),
             files: Files::default(),
             system: Arc::new(system),
         };
@@ -104,7 +106,7 @@ impl ProjectDatabase {
         self.project().check(self, reporter);
     }
 
-    #[tracing::instrument(level = "debug", skip(self))]
+    #[tracing_unlikely::instrument(level = "debug", skip(self))]
     pub fn check_file(&self, file: File) -> Vec<Diagnostic> {
         self.project().check_file(self, file)
     }
@@ -112,7 +114,7 @@ impl ProjectDatabase {
     /// Set the check mode for the project.
     pub fn set_check_mode(&mut self, mode: CheckMode) {
         if self.project().check_mode(self) != mode {
-            tracing::debug!("Updating project to check {mode}");
+            tracing_unlikely::debug!("Updating project to check {mode}");
             self.project().set_check_mode(self).to(mode);
         }
     }
@@ -151,7 +153,7 @@ impl ProjectDatabase {
                 // Salsa currently does not expose a way to track the heap size of interned
                 // query arguments.
                 if !ingredient.debug_name().contains("interned_arguments") {
-                    tracing::warn!(
+                    tracing_unlikely::warn!(
                         "expected `heap_size` to be provided by Salsa struct `{}`",
                         ingredient.debug_name()
                     );
@@ -165,7 +167,9 @@ impl ProjectDatabase {
 
         memos.sort_by_key(|(query, memo)| {
             let heap_size = memo.heap_size_of_fields().unwrap_or_else(|| {
-                tracing::warn!("expected `heap_size` to be provided by Salsa query `{query}`");
+                tracing_unlikely::warn!(
+                    "expected `heap_size` to be provided by Salsa query `{query}`"
+                );
                 0
             });
 

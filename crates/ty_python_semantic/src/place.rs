@@ -1086,7 +1086,7 @@ fn symbol_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    let _span = tracing::trace_span!("symbol", ?name).entered();
+    let _span = tracing_unlikely::trace_span!("symbol", ?name).entered();
 
     let is_known_module = |known_module| {
         file_to_module(db, scope.file(db)).is_some_and(|module| module.is_known(db, known_module))
@@ -1137,7 +1137,7 @@ fn place_impl<'db>(
     requires_explicit_reexport: RequiresExplicitReExport,
     considered_definitions: ConsideredDefinitions,
 ) -> PlaceAndQualifiers<'db> {
-    let _span = tracing::trace_span!("place_impl", ?place).entered();
+    let _span = tracing_unlikely::trace_span!("place_impl", ?place).entered();
 
     place_table(db, scope)
         .place_id(place)

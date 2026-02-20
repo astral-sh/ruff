@@ -3,7 +3,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use thiserror::Error;
-use tracing::Level;
+use tracing_unlikely::Level;
 
 pub use range::format_range;
 use ruff_formatter::prelude::*;
@@ -132,7 +132,7 @@ impl From<&FormatModuleError> for Diagnostic {
     }
 }
 
-#[tracing::instrument(name = "format", level = Level::TRACE, skip_all)]
+#[tracing_unlikely::instrument(name = "format", level = Level::TRACE, skip_all)]
 pub fn format_module_source(
     source: &str,
     options: PyFormatOptions,

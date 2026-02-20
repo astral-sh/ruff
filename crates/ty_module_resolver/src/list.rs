@@ -61,7 +61,7 @@ fn list_modules_in<'db>(
     db: &'db dyn Db,
     search_path: SearchPathIngredient<'db>,
 ) -> Vec<Module<'db>> {
-    tracing::debug!("Listing modules in search path '{}'", search_path.path(db));
+    tracing_unlikely::debug!("Listing modules in search path '{}'", search_path.path(db));
     let mut lister = Lister::new(db, search_path.path(db));
     match search_path.path(db).as_path() {
         SystemOrVendoredPathRef::System(system_search_path) => {

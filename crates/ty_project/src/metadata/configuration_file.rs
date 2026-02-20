@@ -44,7 +44,7 @@ impl ConfigurationFile {
 
         let ty_toml_path = configuration_directory.join("ty").join("ty.toml");
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Searching for a user-level configuration at `{path}`",
             path = &ty_toml_path
         );

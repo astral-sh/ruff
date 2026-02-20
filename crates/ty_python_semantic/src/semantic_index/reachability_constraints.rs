@@ -1059,7 +1059,7 @@ impl ReachabilityConstraints {
     }
 
     fn analyze_single(db: &dyn Db, predicate: &Predicate) -> Truthiness {
-        let _span = tracing::trace_span!("analyze_single", ?predicate).entered();
+        let _span = tracing_unlikely::trace_span!("analyze_single", ?predicate).entered();
 
         match predicate.node {
             PredicateNode::Expression(test_expr) => {
@@ -1136,7 +1136,7 @@ impl ReachabilityConstraints {
                         if all_names.contains(symbol.name()) {
                             Some(RequiresExplicitReExport::No)
                         } else {
-                            tracing::trace!(
+                            tracing_unlikely::trace!(
                                 "Symbol `{}` (via star import) not found in `__all__` of `{}`",
                                 symbol.name(),
                                 referenced_file.path(db)

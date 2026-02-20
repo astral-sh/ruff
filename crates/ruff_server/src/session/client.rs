@@ -50,12 +50,12 @@ impl Client {
     {
         let response_handler = Box::new(move |client: &Client, response: lsp_server::Response| {
             let _span =
-                tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
+                tracing_unlikely::debug_span!("client_response", id=%response.id, method = R::METHOD)
                     .entered();
 
             match (response.error, response.result) {
                 (Some(err), _) => {
-                    tracing::error!(
+                    tracing_unlikely::error!(
                         "Got an error from the client (code {code}, method {method}): {message}",
                         code = err.code,
                         message = err.message,
@@ -65,7 +65,7 @@ impl Client {
                 (None, Some(response)) => match serde_json::from_value(response) {
                     Ok(response) => response_handler(client, response),
                     Err(error) => {
-                        tracing::error!(
+                        tracing_unlikely::error!(
                             "Failed to deserialize client response (method={method}): {error}",
                             method = R::METHOD
                         );
@@ -80,7 +80,7 @@ impl Client {
                         // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
                         response_handler(client, serde_json::from_value(Value::Null).unwrap());
                     } else {
-                        tracing::error!(
+                        tracing_unlikely::error!(
                             "Invalid client response: did not contain a result or error (method={method})",
                             method = R::METHOD
                         );
@@ -206,7 +206,7 @@ impl Client {
         let result = self.show_message(message, lsp_types::MessageType::WARNING);
 
         if let Err(err) = result {
-            tracing::error!("Failed to send warning message to the client: {err}");
+            tracing_unlikely::error!("Failed to send warning message to the client: {err}");
         }
     }
 
@@ -218,7 +218,7 @@ impl Client {
         let result = self.show_message(message, lsp_types::MessageType::ERROR);
 
         if let Err(err) = result {
-            tracing::error!("Failed to send error message to the client: {err}");
+            tracing_unlikely::error!("Failed to send error message to the client: {err}");
         }
     }
 
@@ -226,7 +226,7 @@ impl Client {
         let method_name = session.request_queue_mut().incoming_mut().cancel(&id);
 
         if let Some(method_name) = method_name {
-            tracing::debug!("Cancelled request id={id} method={method_name}");
+            tracing_unlikely::debug!("Cancelled request id={id} method={method_name}");
             let error = ResponseError {
                 code: ErrorCode::RequestCanceled as i32,
                 message: "request was cancelled by client".to_owned(),

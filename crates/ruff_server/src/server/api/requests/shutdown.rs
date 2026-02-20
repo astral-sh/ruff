@@ -10,7 +10,7 @@ impl RequestHandler for ShutdownHandler {
 
 impl SyncRequestHandler for ShutdownHandler {
     fn run(session: &mut Session, _client: &Client, _params: ()) -> crate::server::Result<()> {
-        tracing::debug!("Received shutdown request, waiting for shutdown notification");
+        tracing_unlikely::debug!("Received shutdown request, waiting for shutdown notification");
         session.set_shutdown_requested(true);
         Ok(())
     }

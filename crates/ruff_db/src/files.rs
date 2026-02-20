@@ -90,7 +90,7 @@ impl Files {
             .or_insert_with(|| {
                 let metadata = db.system().path_metadata(path);
 
-                tracing::trace!("Adding file '{absolute}'");
+                tracing_unlikely::trace!("Adding file '{absolute}'");
 
                 let durability = self
                     .root(db, &absolute)
@@ -139,7 +139,7 @@ impl Files {
                     Err(_) => return Err(FileError::NotFound),
                 };
 
-                tracing::trace!("Adding vendored file `{}`", path);
+                tracing_unlikely::trace!("Adding vendored file `{}`", path);
                 let file = File::builder(FilePath::Vendored(path.to_path_buf()))
                     .permissions(Some(0o444))
                     .revision(metadata.revision())
@@ -160,7 +160,7 @@ impl Files {
     /// This will always create a new file, overwriting any existing file at `path` in the internal
     /// storage.
     pub fn virtual_file(&self, db: &dyn Db, path: &SystemVirtualPath) -> VirtualFile {
-        tracing::trace!("Adding virtual file {}", path);
+        tracing_unlikely::trace!("Adding virtual file {}", path);
         let virtual_file = VirtualFile(
             File::builder(FilePath::SystemVirtual(path.to_path_buf()))
                 .path_durability(Durability::HIGH)
@@ -232,7 +232,7 @@ impl Files {
     /// That's why [`File::sync_path`] and [`File::sync_path`] is preferred if it is known that the path is a file.
     pub fn sync_recursively(db: &mut dyn Db, path: &SystemPath) {
         let path = SystemPath::absolute(path, db.system().current_directory());
-        tracing::debug!("Syncing all files in '{path}'");
+        tracing_unlikely::debug!("Syncing all files in '{path}'");
 
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
@@ -259,7 +259,7 @@ impl Files {
     /// Refreshing the state of every file is expensive. It requires iterating over all known files and
     /// issuing a system call to get the latest status of each file.
     pub fn sync_all(db: &mut dyn Db) {
-        tracing::debug!("Syncing all files");
+        tracing_unlikely::debug!("Syncing all files");
         let inner = Arc::clone(&db.files().inner);
         for entry in inner.system_by_path.iter_mut() {
             File::sync_system_path(db, entry.key(), Some(*entry.value()));
@@ -459,19 +459,19 @@ impl File {
         let mut clear_override = false;
 
         if file.status(db) != status {
-            tracing::debug!("Updating the status of `{}`", file.path(db));
+            tracing_unlikely::debug!("Updating the status of `{}`", file.path(db));
             file.set_status(db).to(status);
             clear_override = true;
         }
 
         if file.revision(db) != revision {
-            tracing::debug!("Updating the revision of `{}`", file.path(db));
+            tracing_unlikely::debug!("Updating the revision of `{}`", file.path(db));
             file.set_revision(db).to(revision);
             clear_override = true;
         }
 
         if file.permissions(db) != permission {
-            tracing::debug!("Updating the permissions of `{}`", file.path(db));
+            tracing_unlikely::debug!("Updating the permissions of `{}`", file.path(db));
             file.set_permissions(db).to(permission);
         }
 
@@ -548,7 +548,7 @@ impl VirtualFile {
     /// Increments the revision of the underlying [`File`].
     pub fn sync(&self, db: &mut dyn Db) {
         let file = self.0;
-        tracing::debug!("Updating the revision of `{}`", file.path(db));
+        tracing_unlikely::debug!("Updating the revision of `{}`", file.path(db));
         let current_revision = file.revision(db);
         file.set_revision(db)
             .to(FileRevision::new(current_revision.as_u128() + 1));
@@ -556,7 +556,7 @@ impl VirtualFile {
 
     /// Closes the virtual file.
     pub fn close(&self, db: &mut dyn Db) {
-        tracing::debug!("Closing virtual file `{}`", self.0.path(db));
+        tracing_unlikely::debug!("Closing virtual file `{}`", self.0.path(db));
         self.0.set_status(db).to(FileStatus::NotFound);
     }
 }

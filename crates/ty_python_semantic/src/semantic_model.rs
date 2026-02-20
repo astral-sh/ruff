@@ -138,7 +138,7 @@ impl<'db> SemanticModel<'db> {
         let module_name = match ModuleName::from_import_statement(self.db, self.file, import) {
             Ok(module_name) => module_name,
             Err(err) => {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Could not extract module name from `{module:?}` with level {level}: {err:?}",
                     module = import.module,
                     level = import.level,
@@ -155,7 +155,7 @@ impl<'db> SemanticModel<'db> {
         module_name: &ModuleName,
     ) -> Vec<Completion<'db>> {
         let Some(module) = resolve_module(self.db, self.file, module_name) else {
-            tracing::debug!("Could not resolve module from `{module_name:?}`");
+            tracing_unlikely::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
         self.submodule_completions(&module)
@@ -165,7 +165,7 @@ impl<'db> SemanticModel<'db> {
     /// it were imported by this model's `File`.
     fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
         let Some(module) = resolve_module(self.db, self.file, module_name) else {
-            tracing::debug!("Could not resolve module from `{module_name:?}`");
+            tracing_unlikely::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
         let ty = Type::module_literal(self.db, self.file, module);

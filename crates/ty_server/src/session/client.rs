@@ -89,7 +89,7 @@ impl Client {
                 params: request.params,
             }))
         {
-            tracing::error!(
+            tracing_unlikely::error!(
                 "Failed to send request `{}` because the client sender is closed: {err}",
                 request.method
             );
@@ -108,7 +108,7 @@ impl Client {
                     params,
                 )))
         {
-            tracing::error!(
+            tracing_unlikely::error!(
                 "Failed to send notification `{method}` because the client sender is closed: {err}",
                 method = N::METHOD,
             );
@@ -127,7 +127,7 @@ impl Client {
                     Value::Null,
                 )))
         {
-            tracing::error!(
+            tracing_unlikely::error!(
                 "Failed to send notification `{method}` because the client sender is closed: {err}",
             );
         }
@@ -213,7 +213,7 @@ impl Client {
         let method_name = session.request_queue_mut().incoming_mut().cancel(&id);
 
         if let Some(method_name) = method_name {
-            tracing::debug!("Cancelled request id={id} method={method_name}");
+            tracing_unlikely::debug!("Cancelled request id={id} method={method_name}");
             let error = ResponseError {
                 code: ErrorCode::RequestCanceled as i32,
                 message: "request was cancelled by client".to_owned(),
@@ -230,7 +230,7 @@ impl Client {
                     error: Some(error),
                 }))
             {
-                tracing::error!(
+                tracing_unlikely::error!(
                     "Failed to send cancellation response for request `{method_name}` because the client sender is closed: {err}",
                 );
             }
@@ -250,12 +250,12 @@ impl ClientResponseHandler {
         Self(Box::new(
             move |client: &Client, response: lsp_server::Response| {
                 let _span =
-                    tracing::debug_span!("client_response", id=%response.id, method = R::METHOD)
+                    tracing_unlikely::debug_span!("client_response", id=%response.id, method = R::METHOD)
                         .entered();
 
                 match (response.error, response.result) {
                     (Some(err), _) => {
-                        tracing::error!(
+                        tracing_unlikely::error!(
                             "Got an error from the client (code {code}, method {method}): {message}",
                             code = err.code,
                             message = &err.message,
@@ -265,7 +265,7 @@ impl ClientResponseHandler {
                     (None, Some(response)) => match serde_json::from_value(response) {
                         Ok(response) => response_handler(client, response),
                         Err(error) => {
-                            tracing::error!(
+                            tracing_unlikely::error!(
                                 "Failed to deserialize client response (method={method}): {error}",
                                 method = R::METHOD
                             );
@@ -280,7 +280,7 @@ impl ClientResponseHandler {
                             // hit it if the concrete type is `()`, so the `unwrap()` is safe here.
                             response_handler(client, serde_json::from_value(Value::Null).unwrap());
                         } else {
-                            tracing::error!(
+                            tracing_unlikely::error!(
                                 "Invalid client response: did not contain a result or error (method={method})",
                                 method = R::METHOD
                             );

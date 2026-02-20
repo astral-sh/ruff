@@ -199,6 +199,7 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
     "ansi",
     "smallvec",
 ] }
+tracing-unlikely = { version = "0.1.0" }
 tryfn = { version = "0.2.1" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
@@ -223,6 +224,7 @@ ignored = [
     "get-size2",
     "ty_completion_bench",
     "ty_completion_eval",
+    "tracing",
 ]
 
 [workspace.lints.rust]

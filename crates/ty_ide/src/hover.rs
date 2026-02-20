@@ -55,7 +55,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
             contents.push(HoverContent::Docstring(Docstring::new(docstring)));
         }
     } else if let Some(ty) = goto_target.inferred_type(&model) {
-        tracing::debug!("Inferred type of covering node is {}", ty.display(db));
+        tracing_unlikely::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
         contents.push(match ty {
             Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => typevar

@@ -111,7 +111,7 @@ pub(super) fn request(req: server::Request) -> Task {
         lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
         method => {
-            tracing::warn!("Received request {method} which does not have a handler");
+            tracing_unlikely::warn!("Received request {method} which does not have a handler");
             let result: Result<()> = Err(Error::new(
                 anyhow!("Unknown request: {method}"),
                 server::ErrorCode::MethodNotFound,
@@ -120,7 +120,7 @@ pub(super) fn request(req: server::Request) -> Task {
         }
     }
     .unwrap_or_else(|err| {
-        tracing::error!("Encountered error when routing request with ID {id}: {err}");
+        tracing_unlikely::error!("Encountered error when routing request with ID {id}: {err}");
 
         Task::sync(move |session, client| {
             if matches!(err.code, ErrorCode::InternalError) {
@@ -173,17 +173,19 @@ pub(super) fn notification(notif: server::Notification) -> Task {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
         lsp_types::notification::SetTrace::METHOD => {
-            tracing::trace!("Ignoring `setTrace` notification");
+            tracing_unlikely::trace!("Ignoring `setTrace` notification");
             return Task::nothing();
         }
 
         method => {
-            tracing::warn!("Received notification {method} which does not have a handler.");
+            tracing_unlikely::warn!(
+                "Received notification {method} which does not have a handler."
+            );
             return Task::nothing();
         }
     }
     .unwrap_or_else(|err| {
-        tracing::error!("Encountered error when routing notification: {err}");
+        tracing_unlikely::error!("Encountered error when routing notification: {err}");
         Task::sync(move |session, client| {
             if matches!(err.code, ErrorCode::InternalError) {
                 client.show_error_message(format!(
@@ -201,7 +203,7 @@ where
 {
     let (id, params) = cast_request::<R>(req)?;
     Ok(Task::sync(move |session, client: &Client| {
-        let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+        let _span = tracing_unlikely::debug_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, client, params);
         respond::<R>(&id, result, client, session.client_name().log_guidance());
     }))
@@ -230,12 +232,12 @@ where
         let log_guidance = snapshot.0.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing_unlikely::debug_span!("request", %id, method = R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -276,7 +278,7 @@ where
 
         let Ok(document) = session.snapshot_document(&url) else {
             let reason = format!("Document {url} is not open in the session");
-            tracing::warn!(
+            tracing_unlikely::warn!(
                 "Ignoring request id={id} method={} because {reason}",
                 R::METHOD
             );
@@ -298,12 +300,12 @@ where
         let log_guidance = document.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
+            let _span = tracing_unlikely::debug_span!("request", %id, method = R::METHOD).entered();
 
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::debug!(
+                tracing_unlikely::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -338,14 +340,14 @@ fn panic_response<R>(
         // If the query supports retry, re-queue the request.
         // The query is still likely to succeed if the user modified any other document.
         if let Some(request) = request {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "request id={} method={} was cancelled by salsa, re-queueing for retry",
                 request.id,
                 request.method
             );
             client.retry(request);
         } else {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "request id={} was cancelled by salsa, sending content modified",
                 id
             );
@@ -369,9 +371,9 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
 ) -> Result<Task> {
     let (id, params) = cast_notification::<N>(notif)?;
     Ok(Task::sync(move |session, client| {
-        let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+        let _span = tracing_unlikely::debug_span!("notification", method = N::METHOD).entered();
         if let Err(err) = N::run(session, client, params) {
-            tracing::error!("An error occurred while running {id}: {err}");
+            tracing_unlikely::error!("An error occurred while running {id}: {err}");
             client.show_error_message(format!(
                 "ty encountered a problem. {}",
                 session.client_name().log_guidance()
@@ -400,7 +402,7 @@ where
         let url = N::document_url(&params);
         let Ok(snapshot) = session.snapshot_document(&url) else {
             let reason = format!("Document {url} is not open in the session");
-            tracing::warn!(
+            tracing_unlikely::warn!(
                 "Ignoring notification id={id} method={} because {reason}",
                 N::METHOD
             );
@@ -410,21 +412,21 @@ where
         let log_guidance = snapshot.client_name().log_guidance();
 
         Box::new(move |client| {
-            let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
+            let _span = tracing_unlikely::debug_span!("notification", method = N::METHOD).entered();
 
             let result = match ruff_db::panic::catch_unwind(|| {
                 N::run_with_snapshot(snapshot, client, params)
             }) {
                 Ok(result) => result,
                 Err(panic) => {
-                    tracing::error!("An error occurred while running {id}: {panic}");
+                    tracing_unlikely::error!("An error occurred while running {id}: {panic}");
                     client.show_error_message(format!("ty encountered a panic. {log_guidance}"));
                     return;
                 }
             };
 
             if let Err(err) = result {
-                tracing::error!("An error occurred while running {id}: {err}");
+                tracing_unlikely::error!("An error occurred while running {id}: {err}");
                 client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
             }
         })
@@ -469,7 +471,7 @@ fn respond<Req>(
     Req: RequestHandler,
 {
     if let Err(err) = &result {
-        tracing::error!("An error occurred with request ID {id}: {err}");
+        tracing_unlikely::error!("An error occurred with request ID {id}: {err}");
         client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
     }
     client.respond(id, result);

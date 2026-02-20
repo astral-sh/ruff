@@ -64,7 +64,7 @@ impl Project {
             return Ok(None);
         };
 
-        tracing::debug!("Resolving requires-python constraint: `{requires_python}`");
+        tracing_unlikely::debug!("Resolving requires-python constraint: `{requires_python}`");
 
         let ranges = release_specifiers_to_ranges((**requires_python).clone());
         let Some((lower, _)) = ranges.bounding_range() else {
@@ -98,7 +98,7 @@ impl Project {
 
         let minor = versions.next().copied().unwrap_or_default();
 
-        tracing::debug!("Resolved requires-python constraint to: {major}.{minor}");
+        tracing_unlikely::debug!("Resolved requires-python constraint to: {major}.{minor}");
 
         let major =
             u8::try_from(major).map_err(|_| ResolveRequiresPythonError::TooLargeMajor(major))?;

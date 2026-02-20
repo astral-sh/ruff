@@ -171,7 +171,7 @@ impl PythonEnvironment {
             path: &SystemPath,
             origin: SysPrefixPathOrigin,
         ) -> Result<PythonEnvironment, SitePackagesDiscoveryError> {
-            tracing::debug!("Resolving {origin}: {path}");
+            tracing_unlikely::debug!("Resolving {origin}: {path}");
             PythonEnvironment::new(path, origin, system)
         }
 
@@ -189,7 +189,7 @@ impl PythonEnvironment {
                 .map(Some);
         }
 
-        tracing::debug!("Discovering virtual environment in `{project_root}`");
+        tracing_unlikely::debug!("Discovering virtual environment in `{project_root}`");
         let virtual_env_directory = project_root.join(".venv");
 
         match PythonEnvironment::new(
@@ -200,7 +200,7 @@ impl PythonEnvironment {
             Ok(environment) => return Ok(Some(environment)),
             Err(err) => {
                 if system.is_directory(&virtual_env_directory) {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Ignoring automatically detected virtual environment at `{}`: {}",
                         &virtual_env_directory,
                         err
@@ -428,7 +428,9 @@ impl VirtualEnvironment {
         system: &dyn System,
     ) -> SitePackagesDiscoveryResult<Self> {
         let pyvenv_cfg_path = path.join("pyvenv.cfg");
-        tracing::debug!("Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'");
+        tracing_unlikely::debug!(
+            "Attempting to parse virtual environment metadata at '{pyvenv_cfg_path}'"
+        );
 
         let pyvenv_cfg = match system.read_to_string(&pyvenv_cfg_path) {
             Ok(pyvenv_cfg) => pyvenv_cfg,
@@ -486,7 +488,7 @@ impl VirtualEnvironment {
                 .and_then(|sys_prefix| {
                     PythonEnvironment::new(sys_prefix, SysPrefixPathOrigin::DerivedFromPyvenvCfg, system)
                     .inspect_err(|err| {
-                        tracing::warn!(
+                        tracing_unlikely::warn!(
                             "Failed to resolve the parent environment of this ephemeral uv virtual environment \
                             from the `extends-environment` value specified in the `pyvenv.cfg` file at {pyvenv_cfg_path}. \
                             Imports will not be resolved correctly if they refer to packages installed into the parent \
@@ -525,7 +527,7 @@ impl VirtualEnvironment {
             parent_environment,
         };
 
-        tracing::trace!("Resolved metadata for virtual environment: {metadata:?}");
+        tracing_unlikely::trace!("Resolved metadata for virtual environment: {metadata:?}");
         Ok(metadata)
     }
 
@@ -556,7 +558,7 @@ impl VirtualEnvironment {
                     site_packages_directories.extend(parent_environment_site_packages);
                 }
                 Err(err) => {
-                    tracing::warn!(
+                    tracing_unlikely::warn!(
                         "Failed to resolve the site-packages directories of this ephemeral uv virtual environment's \
                         parent environment. Imports will not be resolved correctly if they refer to packages installed \
                         into the parent environment. Underlying error: {err}"
@@ -582,12 +584,12 @@ impl VirtualEnvironment {
                     Ok(system_directories) => {
                         site_packages_directories.extend(system_directories);
                     }
-                    Err(error) => tracing::warn!(
+                    Err(error) => tracing_unlikely::warn!(
                         "{error}. System site-packages will not be used for module resolution."
                     ),
                 }
             } else {
-                tracing::warn!(
+                tracing_unlikely::warn!(
                     "Failed to resolve `sys.prefix` of the system Python installation \
 from the `home` value in the `pyvenv.cfg` file at `{}`. \
 System site-packages will not be used for module resolution.",
@@ -596,7 +598,7 @@ System site-packages will not be used for module resolution.",
             }
         }
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Resolved site-packages directories for this virtual environment are: {site_packages_directories}"
         );
         Ok(site_packages_directories)
@@ -636,17 +638,17 @@ System site-packages will not be used for module resolution.",
                 system,
             );
             match &real_stdlib_directory {
-                Ok(path) => tracing::debug!(
+                Ok(path) => tracing_unlikely::debug!(
                     "Resolved real stdlib path for this virtual environment is: {path}"
                 ),
-                Err(_) => tracing::debug!(
+                Err(_) => tracing_unlikely::debug!(
                     "Failed to resolve real stdlib path for this virtual environment"
                 ),
             }
             real_stdlib_directory
         } else {
             let cfg_path = root_path.join("pyvenv.cfg");
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Failed to resolve `sys.prefix` of the system Python installation \
 from the `home` value in the `pyvenv.cfg` file at `{cfg_path}`. \
 System stdlib will not be used for module definitions.",
@@ -903,7 +905,7 @@ impl SystemEnvironment {
             system,
         )?;
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Resolved site-packages directories for this environment are: {site_packages_directories}"
         );
         Ok(site_packages_directories)
@@ -925,7 +927,7 @@ impl SystemEnvironment {
             system,
         )?;
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Resolved real stdlib directory for this environment is: {stdlib_directory:?}"
         );
         Ok(stdlib_directory)
@@ -1217,7 +1219,7 @@ fn site_packages_directories_from_sys_prefix(
     implementation: PythonImplementation,
     system: &dyn System,
 ) -> SitePackagesDiscoveryResult<SitePackagesPaths> {
-    tracing::debug!(
+    tracing_unlikely::debug!(
         "Searching for site-packages directory in sys.prefix {}",
         sys_prefix_path.inner
     );
@@ -1325,7 +1327,9 @@ fn site_packages_directories_from_sys_prefix(
 
     for lib_dir in UnixLibDir::iter() {
         let Ok(directory_iterator) = system.read_directory(&sys_prefix_path.join(lib_dir)) else {
-            tracing::debug!("Could not find a `<sys.prefix>/{lib_dir}` directory; continuing");
+            tracing_unlikely::debug!(
+                "Could not find a `<sys.prefix>/{lib_dir}` directory; continuing"
+            );
             continue;
         };
 
@@ -1400,7 +1404,7 @@ fn real_stdlib_directory_from_sys_prefix(
     implementation: PythonImplementation,
     system: &dyn System,
 ) -> StdlibDiscoveryResult<SystemPathBuf> {
-    tracing::debug!(
+    tracing_unlikely::debug!(
         "Searching for real stdlib directory in sys.prefix {}",
         sys_prefix_path.inner
     );

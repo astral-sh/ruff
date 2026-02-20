@@ -15,7 +15,7 @@ use crate::system::System;
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let path = file.path(db);
-    let _span = tracing::trace_span!("source_text", file = %path).entered();
+    let _span = tracing_unlikely::trace_span!("source_text", file = %path).entered();
     let mut read_error = None;
 
     if let Some(source) = file.source_text_override(db) {
@@ -25,7 +25,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     let kind = if is_notebook(db.system(), path) {
         file.read_to_notebook(db)
             .unwrap_or_else(|error| {
-                tracing::debug!("Failed to read notebook '{path}': {error}");
+                tracing_unlikely::debug!("Failed to read notebook '{path}': {error}");
 
                 read_error = Some(SourceTextError::FailedToReadNotebook(error.to_string()));
                 Notebook::empty()
@@ -34,7 +34,7 @@ pub fn source_text(db: &dyn Db, file: File) -> SourceText {
     } else {
         file.read_to_string(db)
             .unwrap_or_else(|error| {
-                tracing::debug!("Failed to read file '{path}': {error}");
+                tracing_unlikely::debug!("Failed to read file '{path}': {error}");
 
                 read_error = Some(SourceTextError::FailedToReadFile(error.to_string()));
                 String::new()
@@ -204,7 +204,7 @@ pub enum SourceTextError {
 /// Computes the [`LineIndex`] for `file`.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub fn line_index(db: &dyn Db, file: File) -> LineIndex {
-    let _span = tracing::trace_span!("line_index", ?file).entered();
+    let _span = tracing_unlikely::trace_span!("line_index", ?file).entered();
 
     let source = source_text(db, file);
 

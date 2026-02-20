@@ -97,7 +97,7 @@ impl Index {
                 )
             });
 
-        tracing::info!(
+        tracing_unlikely::info!(
             "version: {}, new_version: {}",
             notebook.version(),
             new_version
@@ -122,7 +122,7 @@ impl Index {
             let Ok(document_mut) =
                 self.document_mut(&DocumentKey::from_url(&updated_cell.document.uri))
             else {
-                tracing::warn!(
+                tracing_unlikely::warn!(
                     "Could not find document for cell {}",
                     updated_cell.document.uri
                 );
@@ -151,7 +151,7 @@ impl Index {
 
         let notebook = self.document(notebook_key).unwrap().as_notebook().unwrap();
         let ruff_notebook = notebook.to_ruff_notebook(self);
-        tracing::debug!("Updated notebook: {:?}", ruff_notebook.source_code());
+        tracing_unlikely::debug!("Updated notebook: {:?}", ruff_notebook.source_code());
 
         Ok(())
     }

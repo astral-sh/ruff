@@ -84,7 +84,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let printer = Printer::new(verbosity, args.no_progress);
 
-    tracing::debug!("Version: {}", version::version());
+    tracing_unlikely::debug!("Version: {}", version::version());
 
     // The base path to which all CLI arguments are relative to.
     let cwd = {
@@ -181,7 +181,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         Ok("full") => write!(stdout, "{}", db.salsa_memory_dump().display_full())?,
         Ok("json") => writeln!(stdout, "{}", db.salsa_memory_dump().to_json())?,
         Ok(other) => {
-            tracing::warn!(
+            tracing_unlikely::warn!(
                 "Unknown value for `TY_MEMORY_REPORT`: `{other}`. Valid values are `short`, `full`, and `json`."
             );
         }
@@ -277,7 +277,7 @@ impl MainLoop {
     }
 
     fn watch(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
-        tracing::debug!("Starting watch mode");
+        tracing_unlikely::debug!("Starting watch mode");
         let sender = self.sender.clone();
         let watcher = watch::directory_watcher(move |event| {
             sender.send(MainLoopMessage::ApplyChanges(event)).unwrap();
@@ -294,14 +294,14 @@ impl MainLoop {
 
         let result = self.main_loop(db);
 
-        tracing::debug!("Exiting main loop");
+        tracing_unlikely::debug!("Exiting main loop");
 
         result
     }
 
     fn main_loop(mut self, db: &mut ProjectDatabase) -> Result<ExitStatus> {
         // Schedule the first check.
-        tracing::debug!("Starting main loop");
+        tracing_unlikely::debug!("Starting main loop");
 
         let mut revision = 0u64;
 
@@ -330,7 +330,7 @@ impl MainLoop {
                             }
                             Err(cancelled) => {
                                 bar.finish_and_clear();
-                                tracing::debug!("Check has been cancelled: {cancelled:?}");
+                                tracing_unlikely::debug!("Check has been cancelled: {cancelled:?}");
                             }
                         }
                     });
@@ -341,14 +341,14 @@ impl MainLoop {
                     revision: check_revision,
                 } => {
                     if check_revision != revision {
-                        tracing::debug!(
+                        tracing_unlikely::debug!(
                             "Discarding check result for outdated revision: current: {revision}, result revision: {check_revision}"
                         );
                         continue;
                     }
 
                     if db.project().files(db).is_empty() {
-                        tracing::warn!("No python files found under the given path(s)");
+                        tracing_unlikely::warn!("No python files found under the given path(s)");
                     }
 
                     let result = match self.mode {
@@ -402,7 +402,7 @@ impl MainLoop {
                     };
 
                     if exit_status.is_internal_error() {
-                        tracing::warn!(
+                        tracing_unlikely::warn!(
                             "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
                         );
                     }
@@ -433,7 +433,7 @@ impl MainLoop {
                 }
             }
 
-            tracing::debug!("Waiting for next main loop message.");
+            tracing_unlikely::debug!("Waiting for next main loop message.");
         }
 
         Ok(ExitStatus::Success)

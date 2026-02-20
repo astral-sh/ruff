@@ -88,7 +88,7 @@ pub fn suppress_all_diagnostics(
         }
 
         let Some(path) = file.path(db).as_system_path() else {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Skipping file `{}` with non-system path because vendored and system virtual file paths are read-only",
                 file.path(db)
             );
@@ -98,7 +98,7 @@ pub fn suppress_all_diagnostics(
 
         let parsed = parsed_module(db, file);
         if parsed.load(db).has_syntax_errors() {
-            tracing::warn!("Skipping file `{path}` with syntax errors",);
+            tracing_unlikely::warn!("Skipping file `{path}` with syntax errors",);
             continue;
         }
 
@@ -121,13 +121,13 @@ pub fn suppress_all_diagnostics(
             .collect();
 
         if fixable_diagnostics.is_empty() {
-            tracing::debug!(
+            tracing_unlikely::debug!(
                 "Skipping file `{path}` because it contains no suppressable diagnostics"
             );
             continue;
         }
 
-        tracing::debug!(
+        tracing_unlikely::debug!(
             "Suppressing {} diagnostics in `{path}`.",
             fixable_diagnostics.len()
         );

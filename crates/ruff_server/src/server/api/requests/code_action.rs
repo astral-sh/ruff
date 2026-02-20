@@ -53,7 +53,9 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
                     // cell in parallel and the server would send a workspace edit with the same
                     // content which would result in applying the same edit multiple times
                     // resulting in (possibly) duplicate code.
-                    tracing::debug!("Ignoring `source.fixAll` code action for a notebook cell");
+                    tracing_unlikely::debug!(
+                        "Ignoring `source.fixAll` code action for a notebook cell"
+                    );
                 } else {
                     response.push(fix_all(&snapshot).with_failure_code(ErrorCode::InternalError)?);
                 }
@@ -70,7 +72,7 @@ impl super::BackgroundDocumentRequestHandler for CodeActions {
                     // cell in parallel and the server would send a workspace edit with the same
                     // content which would result in applying the same edit multiple times
                     // resulting in (possibly) duplicate code.
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Ignoring `source.organizeImports` code action for a notebook cell"
                     );
                 } else {

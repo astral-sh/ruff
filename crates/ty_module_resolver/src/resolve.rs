@@ -212,16 +212,16 @@ fn resolve_module_query<'db>(
 ) -> Option<Module<'db>> {
     let name = module_name.name(db);
     let mode = module_name.mode(db);
-    let _span = tracing::trace_span!("resolve_module", %name).entered();
+    let _span = tracing_unlikely::trace_span!("resolve_module", %name).entered();
 
     let Some(resolved) = resolve_name(db, name, mode) else {
-        tracing::debug!("Module `{name}` not found in search paths");
+        tracing_unlikely::debug!("Module `{name}` not found in search paths");
         return None;
     };
 
     let module = match resolved {
         ResolvedName::FileModule(module) => {
-            tracing::trace!(
+            tracing_unlikely::trace!(
                 "Resolved module `{name}` to `{path}`",
                 path = module.file.path(db)
             );
@@ -234,7 +234,7 @@ fn resolve_module_query<'db>(
             )
         }
         ResolvedName::NamespacePackage => {
-            tracing::trace!("Module `{name}` is a namespace package");
+            tracing_unlikely::trace!("Module `{name}` is a namespace package");
             Module::namespace_package(db, name.clone())
         }
     };
@@ -261,7 +261,7 @@ fn desperately_resolve_module<'db>(
 ) -> Option<Module<'db>> {
     let name = module_name.name(db);
     let mode = module_name.mode(db);
-    let _span = tracing::trace_span!("desperately_resolve_module", %name).entered();
+    let _span = tracing_unlikely::trace_span!("desperately_resolve_module", %name).entered();
 
     let Some(resolved) = desperately_resolve_name(db, importing_file, name, mode) else {
         let extra = match module_name.mode(db) {
@@ -271,13 +271,15 @@ fn desperately_resolve_module<'db>(
                 "stubs not allowed but some shadowing allowed"
             }
         };
-        tracing::debug!("Module `{name}` not found while looking in parent dirs ({extra})");
+        tracing_unlikely::debug!(
+            "Module `{name}` not found while looking in parent dirs ({extra})"
+        );
         return None;
     };
 
     let module = match resolved {
         ResolvedName::FileModule(module) => {
-            tracing::trace!(
+            tracing_unlikely::trace!(
                 "Resolved module `{name}` to `{path}`",
                 path = module.file.path(db)
             );
@@ -290,7 +292,7 @@ fn desperately_resolve_module<'db>(
             )
         }
         ResolvedName::NamespacePackage => {
-            tracing::trace!("Module `{name}` is a namespace package");
+            tracing_unlikely::trace!("Module `{name}` is a namespace package");
             Module::namespace_package(db, name.clone())
         }
     };
@@ -325,7 +327,7 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
 /// the file itself as `importing_file` to various subroutines.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
-    let _span = tracing::trace_span!("file_to_module", ?file).entered();
+    let _span = tracing_unlikely::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
@@ -576,13 +578,13 @@ impl SearchPaths {
 
         for path in extra_paths {
             let path = canonicalize(path, system);
-            tracing::debug!("Adding extra search-path `{path}`");
+            tracing_unlikely::debug!("Adding extra search-path `{path}`");
 
             match SearchPath::extra(system, path) {
                 Ok(path) => static_paths.push(path),
                 Err(err) => {
                     if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid extra search-path: {err}");
+                        tracing_unlikely::debug!("Skipping invalid extra search-path: {err}");
                     } else {
                         return Err(err.into());
                     }
@@ -591,12 +593,12 @@ impl SearchPaths {
         }
 
         for src_root in src_roots {
-            tracing::debug!("Adding first-party search path `{src_root}`");
+            tracing_unlikely::debug!("Adding first-party search path `{src_root}`");
             match SearchPath::first_party(system, src_root.to_path_buf()) {
                 Ok(path) => static_paths.push(path),
                 Err(err) => {
                     if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid first-party search-path: {err}");
+                        tracing_unlikely::debug!("Skipping invalid first-party search-path: {err}");
                     } else {
                         return Err(err.into());
                     }
@@ -606,7 +608,7 @@ impl SearchPaths {
 
         let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
             let typeshed = canonicalize(typeshed, system);
-            tracing::debug!("Adding custom-stdlib search path `{typeshed}`");
+            tracing_unlikely::debug!("Adding custom-stdlib search path `{typeshed}`");
 
             let versions_path = typeshed.join("stdlib/VERSIONS");
 
@@ -623,7 +625,7 @@ impl SearchPaths {
                 Ok(results) => results,
                 Err(err) => {
                     if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping custom-stdlib search-path: {err}");
+                        tracing_unlikely::debug!("Skipping custom-stdlib search-path: {err}");
                         (
                             vendored_typeshed_versions(vendored),
                             SearchPath::vendored_stdlib(),
@@ -634,7 +636,7 @@ impl SearchPaths {
                 }
             }
         } else {
-            tracing::debug!("Using vendored stdlib");
+            tracing_unlikely::debug!("Using vendored stdlib");
             (
                 vendored_typeshed_versions(vendored),
                 SearchPath::vendored_stdlib(),
@@ -646,7 +648,7 @@ impl SearchPaths {
                 Ok(path) => Some(path),
                 Err(err) => {
                     if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
+                        tracing_unlikely::debug!("Skipping invalid real-stdlib search-path: {err}");
                         None
                     } else {
                         return Err(err.into());
@@ -660,12 +662,14 @@ impl SearchPaths {
         let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
 
         for path in site_packages_paths {
-            tracing::debug!("Adding site-packages search path `{path}`");
+            tracing_unlikely::debug!("Adding site-packages search path `{path}`");
             match SearchPath::site_packages(system, path.clone()) {
                 Ok(path) => site_packages.push(path),
                 Err(err) => {
                     if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid site-packages search-path: {err}");
+                        tracing_unlikely::debug!(
+                            "Skipping invalid site-packages search-path: {err}"
+                        );
                     } else {
                         return Err(err.into());
                     }
@@ -810,7 +814,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
     db: &'db dyn Db,
     mode: ModuleResolveModeIngredient<'db>,
 ) -> Vec<SearchPath> {
-    tracing::debug!("Resolving dynamic module resolution paths");
+    tracing_unlikely::debug!("Resolving dynamic module resolution paths");
 
     let SearchPaths {
         static_paths,
@@ -874,7 +878,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         let pth_file_iterator = match PthFileIterator::new(db, site_packages_dir) {
             Ok(iterator) => iterator,
             Err(error) => {
-                tracing::warn!(
+                tracing_unlikely::warn!(
                     "Failed to search for editable installation in {site_packages_dir}: {error}"
                 );
                 continue;
@@ -897,7 +901,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
             if existing_paths.insert(Cow::Owned(installation.clone())) {
                 match SearchPath::editable(system, installation.clone()) {
                     Ok(search_path) => {
-                        tracing::debug!(
+                        tracing_unlikely::debug!(
                             "Adding editable installation to module resolution path {path}",
                             path = installation
                         );
@@ -922,7 +926,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
                     }
 
                     Err(error) => {
-                        tracing::debug!("Skipping editable installation: {error}");
+                        tracing_unlikely::debug!("Skipping editable installation: {error}");
                     }
                 }
             }
@@ -1057,7 +1061,7 @@ impl<'db> Iterator for PthFileIterator<'db> {
             let contents = match system.read_to_string(&path) {
                 Ok(contents) => contents,
                 Err(error) => {
-                    tracing::warn!("Failed to read .pth file `{path}`: {error}");
+                    tracing_unlikely::warn!("Failed to read .pth file `{path}`: {error}");
                     continue;
                 }
             };
@@ -1130,7 +1134,7 @@ fn resolve_name_impl<'a>(
             match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
                 Ok((package_kind, _, ResolvedName::FileModule(module))) => {
                     if package_kind.is_root() && module.kind.is_module() {
-                        tracing::trace!(
+                        tracing_unlikely::trace!(
                             "Search path `{search_path}` contains a module \
                              named `{stub_name}` but a standalone module isn't a valid stub."
                         );
@@ -1142,12 +1146,12 @@ fn resolve_name_impl<'a>(
                     is_namespace_package = true;
                 }
                 Err((PackageKind::Root, _)) => {
-                    tracing::trace!(
+                    tracing_unlikely::trace!(
                         "Search path `{search_path}` contains no stub package named `{stub_name}`."
                     );
                 }
                 Err((PackageKind::Regular, PyTyped::Partial)) => {
-                    tracing::trace!(
+                    tracing_unlikely::trace!(
                         "Stub-package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a partial package, keep going."
                     );
@@ -1155,14 +1159,14 @@ fn resolve_name_impl<'a>(
                     // fall through to looking for a non-stub package
                 }
                 Err((PackageKind::Regular, _)) => {
-                    tracing::trace!(
+                    tracing_unlikely::trace!(
                         "Stub-package in `{search_path}` doesn't contain module: `{name}`"
                     );
                     // stub exists, but the module doesn't.
                     return None;
                 }
                 Err((PackageKind::Namespace, _)) => {
-                    tracing::trace!(
+                    tracing_unlikely::trace!(
                         "Stub-package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a namespace package, keep going."
                     );
@@ -1181,12 +1185,12 @@ fn resolve_name_impl<'a>(
             }
             Err(kind) => match kind {
                 (PackageKind::Root, _) => {
-                    tracing::trace!(
+                    tracing_unlikely::trace!(
                         "Search path `{search_path}` contains no package named `{name}`."
                     );
                 }
                 (PackageKind::Regular, PyTyped::Partial) => {
-                    tracing::trace!(
+                    tracing_unlikely::trace!(
                         "Package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a partial package, keep going."
                     );
@@ -1194,11 +1198,13 @@ fn resolve_name_impl<'a>(
                 (PackageKind::Regular, _) => {
                     // For regular packages, don't search the next search path. All files of that
                     // package must be in the same location
-                    tracing::trace!("Package in `{search_path}` doesn't contain module: `{name}`");
+                    tracing_unlikely::trace!(
+                        "Package in `{search_path}` doesn't contain module: `{name}`"
+                    );
                     return None;
                 }
                 (PackageKind::Namespace, _) => {
-                    tracing::trace!(
+                    tracing_unlikely::trace!(
                         "Package in `{search_path}` doesn't contain module: \
                          `{name}` but it is a namespace package, keep going."
                     );

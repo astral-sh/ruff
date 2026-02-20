@@ -33,13 +33,13 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             let system_path = match path {
                 AnySystemPath::System(system) => system,
                 AnySystemPath::SystemVirtual(path) => {
-                    tracing::debug!("Ignoring virtual path from change event: `{path}`");
+                    tracing_unlikely::debug!("Ignoring virtual path from change event: `{path}`");
                     continue;
                 }
             };
 
             let Some(db) = session.project_db_for_path(&system_path) else {
-                tracing::trace!(
+                tracing_unlikely::trace!(
                     "Ignoring change event for `{system_path}` because it's not in any workspace"
                 );
                 continue;
@@ -59,7 +59,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
                     kind: DeletedKind::Any,
                 },
                 _ => {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Ignoring unsupported change event type: `{:?}` for {system_path}",
                         change.typ
                     );
@@ -78,7 +78,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
         }
 
         for (root, changes) in events_by_db {
-            tracing::debug!("Applying changes to `{root}`");
+            tracing_unlikely::debug!("Applying changes to `{root}`");
 
             session.apply_changes(&AnySystemPath::System(root.clone()), changes);
             publish_settings_diagnostics(session, client, root);

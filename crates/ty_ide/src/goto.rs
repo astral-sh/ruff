@@ -765,7 +765,7 @@ impl GotoTarget<'_> {
         offset: TextSize,
         tokens: &Tokens,
     ) -> Option<GotoTarget<'a>> {
-        tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
+        tracing_unlikely::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
         let node = covering_node.node();
         let string_annotation = match node {
@@ -1002,7 +1002,7 @@ impl GotoTarget<'_> {
                 Some(AnyNodeRef::StmtGlobal(_)) => Some(GotoTarget::Globals { identifier }),
                 None => None,
                 Some(parent) => {
-                    tracing::debug!(
+                    tracing_unlikely::debug!(
                         "Missing `GoToTarget` for identifier with parent {:?}",
                         parent.kind()
                     );

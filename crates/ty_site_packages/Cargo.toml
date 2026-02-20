@@ -26,6 +26,7 @@ indexmap = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 tracing = { workspace = true }
+tracing-unlikely = { workspace = true }
 
 [target.'cfg(not(target_family = "wasm"))'.dependencies]
 which = { workspace = true }

@@ -71,7 +71,8 @@ impl<'db> ProtocolClass<'db> {
     /// in the protocol's class body. If any are assigned to, they are not taken into account in
     /// the protocol's list of members.
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
-        let _span = tracing::trace_span!("protocol_members", "class='{}'", self.name(db)).entered();
+        let _span = tracing_unlikely::trace_span!("protocol_members", "class='{}'", self.name(db))
+            .entered();
         cached_protocol_interface(db, *self)
     }
 
