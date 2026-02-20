@@ -475,90 +475,11 @@ impl From<bool> for ConstraintSet<'_> {
     }
 }
 
-#[salsa::tracked(returns(ref))]
-fn stable_definition_ordering_key<'db>(
-    db: &'db dyn Db,
-    definition: crate::semantic_index::definition::Definition<'db>,
-) -> String {
-    format!(
-        "{}::{:?}::{:?}",
-        definition.file(db).path(db),
-        definition.file_scope(db),
-        definition.place(db),
-    )
-}
-
-#[salsa::tracked(returns(ref))]
-fn stable_bound_typevar_ordering_key<'db>(
-    db: &'db dyn Db,
-    typevar: BoundTypeVarInstance<'db>,
-) -> String {
-    let identity = typevar.typevar(db).identity(db);
-    let identity_definition = identity
-        .definition(db)
-        .map(|definition| stable_definition_ordering_key(db, definition).as_str())
-        .unwrap_or("<none>");
-    let binding_context = match typevar.binding_context(db) {
-        crate::types::BindingContext::Definition(definition) => {
-            format!(
-                "definition:{}",
-                stable_definition_ordering_key(db, definition)
-            )
-        }
-        crate::types::BindingContext::Synthetic => String::from("synthetic"),
-    };
-
-    format!(
-        "name:{}|kind:{:?}|identity_definition:{identity_definition}|binding_context:{binding_context}|paramspec_attr:{:?}",
-        identity.name(db),
-        identity.kind(db),
-        typevar.paramspec_attr(db),
-    )
-}
-
-fn stable_type_ordering_key<'db>(db: &'db dyn Db, ty: Type<'db>) -> String {
-    match ty {
-        Type::TypeVar(typevar) => {
-            format!(
-                "TypeVar({})",
-                stable_bound_typevar_ordering_key(db, typevar)
-            )
-        }
-        Type::Union(union) => {
-            let mut elements: Vec<_> = union
-                .elements(db)
-                .iter()
-                .map(|element| stable_type_ordering_key(db, *element))
-                .collect();
-            elements.sort_unstable();
-            format!("Union({})", elements.join("|"))
-        }
-        Type::Intersection(intersection) => {
-            let mut positive: Vec<_> = intersection
-                .positive(db)
-                .iter()
-                .map(|element| stable_type_ordering_key(db, *element))
-                .collect();
-            positive.sort_unstable();
-
-            let mut negative: Vec<_> = intersection
-                .negative(db)
-                .iter()
-                .map(|element| stable_type_ordering_key(db, *element))
-                .collect();
-            negative.sort_unstable();
-
-            format!(
-                "Intersection(positive:{};negative:{})",
-                positive.join("&"),
-                negative.join("&"),
-            )
-        }
-        _ => ty.display(db).to_string(),
-    }
-}
-
 impl<'db> BoundTypeVarInstance<'db> {
+    fn ordering(self, db: &'db dyn Db) -> impl Ord {
+        Type::TypeVar(self).ordering(db)
+    }
+
     /// Returns whether this typevar can be the lower or upper bound of another typevar in a
     /// constraint set.
     ///
@@ -569,7 +490,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// within a BDD — it means that if a typevar has another typevar as a bound, all of the
     /// constraints that apply to the bound will appear lower in the BDD.
     fn can_be_bound_for(self, db: &'db dyn Db, typevar: Self) -> bool {
-        stable_bound_typevar_ordering_key(db, self) > stable_bound_typevar_ordering_key(db, typevar)
+        self.ordering(db) > typevar.ordering(db)
     }
 }
 
@@ -834,20 +755,12 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// and working with BDDs. We don't do that, but we have tried to make some simple choices that
     /// have clear wins.
     ///
-    /// We use a deterministic structural key rather than Salsa IDs, so that BDD variable
-    /// ordering is stable across runs.
-    #[salsa::tracked(returns(ref))]
-    fn stable_ordering_key(self, db: &'db dyn Db) -> String {
-        format!(
-            "{}|{}|{}",
-            stable_bound_typevar_ordering_key(db, self.typevar(db)),
-            stable_type_ordering_key(db, self.lower(db)),
-            stable_type_ordering_key(db, self.upper(db)),
-        )
-    }
-
     fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        self.stable_ordering_key(db)
+        (
+            self.typevar(db).ordering(db),
+            self.lower(db).ordering(db),
+            self.upper(db).ordering(db),
+        )
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -2514,8 +2427,7 @@ impl<'db> InteriorNode<'db> {
                 let mut solution = Vec::with_capacity(mappings.len());
                 let mut sorted_mappings: Vec<_> = mappings.drain().collect();
                 sorted_mappings.sort_by(|(left_typevar, _), (right_typevar, _)| {
-                    stable_bound_typevar_ordering_key(db, *left_typevar)
-                        .cmp(stable_bound_typevar_ordering_key(db, *right_typevar))
+                    left_typevar.ordering(db).cmp(&right_typevar.ordering(db))
                 });
                 for (bound_typevar, bounds) in sorted_mappings {
                     match bound_typevar.typevar(db).require_bound_or_constraints(db) {
@@ -4485,17 +4397,17 @@ mod tests {
     #[test]
     fn test_display_graph_output() {
         let expected = indoc! {r#"
-            <0> (U = bool) 2/4
-            ┡━₁ <1> (U = str) 1/4
-            │   ┡━₁ <2> (T = bool) 4/4
-            │   │   ┡━₁ <3> (T = str) 3/3
+            <0> (T = bool) 4/4
+            ┡━₁ <1> (T = str) 3/3
+            │   ┡━₁ <2> (U = bool) 2/2
+            │   │   ┡━₁ <3> (U = str) 1/1
             │   │   │   ┡━₁ always
             │   │   │   └─₀ always
-            │   │   └─₀ <4> (T = str) 3/3
+            │   │   └─₀ <4> (U = str) 1/1
             │   │       ┡━₁ always
             │   │       └─₀ never
             │   └─₀ <2> SHARED
-            └─₀ <5> (U = str) 1/4
+            └─₀ <5> (T = str) 3/3
                 ┡━₁ <2> SHARED
                 └─₀ never
         "#}

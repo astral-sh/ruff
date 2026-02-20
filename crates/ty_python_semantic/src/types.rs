@@ -810,6 +810,38 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+#[derive(Copy, Clone)]
+pub(crate) struct TypeOrdering<'db> {
+    db: &'db dyn Db,
+    ty: Type<'db>,
+}
+
+impl Eq for TypeOrdering<'_> {}
+
+impl PartialEq for TypeOrdering<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl PartialOrd for TypeOrdering<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TypeOrdering<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        debug_assert!(std::ptr::eq(self.db, other.db));
+        union_or_intersection_elements_ordering(
+            self.db,
+            &self.ty,
+            &other.ty,
+            type_ordering::OrderingPurpose::Determinism,
+        )
+    }
+}
+
 /// Helper for `recursive_type_normalized_impl` for `TypeGuardLike` types.
 fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
@@ -857,6 +889,10 @@ impl<'db> Type<'db> {
 
     pub(crate) const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
+    }
+
+    pub(crate) fn ordering(self, db: &'db dyn Db) -> TypeOrdering<'db> {
+        TypeOrdering { db, ty: self }
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
