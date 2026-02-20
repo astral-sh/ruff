@@ -10914,7 +10914,6 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => Type::PropertyInstance(self_property).when_equivalent_to_impl(
                 db,
                 Type::PropertyInstance(other_property),
-                inferable,
                 relation_visitor,
                 disjointness_visitor,
             ),
