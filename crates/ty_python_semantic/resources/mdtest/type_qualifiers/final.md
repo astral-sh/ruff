@@ -460,6 +460,7 @@ class C(B):
 from typing import Final, ClassVar, Annotated
 
 class Base:
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     X: ClassVar[Final[int]] = 1
     Y: Annotated[Final[int], "metadata"] = 2
 
@@ -581,14 +582,14 @@ LEGAL_D: Final
 LEGAL_D = 1
 
 class C:
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     LEGAL_E: ClassVar[Final[int]] = 1
-    LEGAL_F: Final[ClassVar[int]] = 1
-    LEGAL_G: Annotated[Final[ClassVar[int]], "metadata"] = 1
+    LEGAL_F: Annotated[Final[int], "metadata"] = 1
 
     def __init__(self):
-        self.LEGAL_H: Final[int] = 1
-        self.LEGAL_I: Final[int]
-        self.LEGAL_I = 1
+        self.LEGAL_G: Final[int] = 1
+        self.LEGAL_H: Final[int]
+        self.LEGAL_H = 1
 
 # error: [invalid-type-form] "`Final` is not allowed in function parameter annotations"
 def f(ILLEGAL: Final[int]) -> None:

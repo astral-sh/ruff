@@ -2203,6 +2203,17 @@ impl<'db> StaticClassLiteral<'db> {
         })
     }
 
+    /// Returns `true` if this class is a dataclass-like class.
+    ///
+    /// This covers `@dataclass`-decorated classes, as well as classes created via
+    /// `dataclass_transform` (function-based, metaclass-based, and base-class-based).
+    pub(crate) fn is_dataclass_like(self, db: &'db dyn Db) -> bool {
+        matches!(
+            CodeGeneratorKind::from_class(db, ClassLiteral::Static(self), None),
+            Some(CodeGeneratorKind::DataclassLike(_))
+        )
+    }
+
     /// Returns a new [`StaticClassLiteral`] with the given dataclass params, preserving all other fields.
     pub(crate) fn with_dataclass_params(
         self,
