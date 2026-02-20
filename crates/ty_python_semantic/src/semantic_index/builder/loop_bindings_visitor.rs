@@ -4,33 +4,46 @@ use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use crate::semantic_index::place::PlaceExpr;
 use crate::semantic_index::symbol::Symbol;
 
-/// Do a pre-walk of a `while` loop to collect all the places that are bound, prior to visiting the
-/// loop with `SemanticIndexBuilder`. This walk includes bindings in nested loops, but not in
-/// nested scopes. (I.e. we don't descend into function bodies or class definitions.) We need this
-/// pre-walk so that we can synthesize "loop header definitions" that are visible to the loop body
-/// (and condition). See `LoopHeader`.
+/// Collected definitions from a loop body: bound places and declared places.
+pub(crate) struct LoopDefinitions {
+    pub(crate) bound_places: Vec<PlaceExpr>,
+    pub(crate) declared_places: Vec<PlaceExpr>,
+}
+
+/// Do a pre-walk of a `while` loop to collect all the places that are bound and/or declared, prior
+/// to visiting the loop with `SemanticIndexBuilder`. This walk includes definitions in nested
+/// loops, but not in nested scopes. (I.e. we don't descend into function bodies or class
+/// definitions.) We need this pre-walk so that we can synthesize "loop header definitions" that are
+/// visible to the loop body (and condition). See `LoopHeader`.
 /// TODO: Handle `nonlocal` bindings from nested scopes somehow.
-pub(crate) fn collect_while_loop_bindings(while_stmt: &ast::StmtWhile) -> Vec<PlaceExpr> {
+pub(crate) fn collect_while_loop_definitions(while_stmt: &ast::StmtWhile) -> LoopDefinitions {
     let mut collector = LoopBindingsVisitor::default();
     collector.visit_expr(&while_stmt.test);
     collector.visit_body(&while_stmt.body);
-    collector.bound_places
+    LoopDefinitions {
+        bound_places: collector.bound_places,
+        declared_places: collector.declared_places,
+    }
 }
 
-/// Like `collect_while_loop_bindings` above, but for `for` loops.
-pub(crate) fn collect_for_loop_bindings(for_stmt: &ast::StmtFor) -> Vec<PlaceExpr> {
+/// Like `collect_while_loop_definitions` above, but for `for` loops.
+pub(crate) fn collect_for_loop_definitions(for_stmt: &ast::StmtFor) -> LoopDefinitions {
     let mut collector = LoopBindingsVisitor::default();
     collector.add_place_from_target(&for_stmt.target);
     collector.visit_body(&for_stmt.body);
-    collector.bound_places
+    LoopDefinitions {
+        bound_places: collector.bound_places,
+        declared_places: collector.declared_places,
+    }
 }
 
-/// The visitor that powers `collect_while_loop_bindings` and `collect_for_loop_bindings`.
+/// The visitor that powers `collect_while_loop_definitions` and `collect_for_loop_definitions`.
 ///
 /// This visitor doesn't walk nested function/class definitions since those are different scopes.
 #[derive(Debug, Default)]
 pub(crate) struct LoopBindingsVisitor {
     bound_places: Vec<PlaceExpr>,
+    declared_places: Vec<PlaceExpr>,
 }
 
 impl LoopBindingsVisitor {
@@ -77,7 +90,12 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                 self.visit_expr(&node.value);
             }
             ast::Stmt::AnnAssign(node) => {
+                // An annotated assignment is always a declaration.
+                if let ast::Expr::Name(name) = &*node.target {
+                    self.declared_places.push(PlaceExpr::from_expr_name(name));
+                }
                 if let Some(value) = &node.value {
+                    // With a value, it's also a binding.
                     self.add_place_from_target(&node.target);
                     self.visit_expr(value);
                 }
@@ -118,7 +136,10 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
             ast::Stmt::Import(node) => {
                 for alias in &node.names {
                     let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                    // Imports are DeclarationAndBinding.
                     self.bound_places
+                        .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                    self.declared_places
                         .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
                 }
             }
@@ -126,18 +147,27 @@ impl<'ast> Visitor<'ast> for LoopBindingsVisitor {
                 for alias in &node.names {
                     if &*alias.name != "*" {
                         let name = alias.asname.as_ref().unwrap_or(&alias.name);
+                        // ImportFrom are DeclarationAndBinding.
                         self.bound_places
+                            .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
+                        self.declared_places
                             .push(PlaceExpr::Symbol(Symbol::new(name.id.clone())));
                     }
                 }
             }
             ast::Stmt::FunctionDef(node) => {
+                // Function definitions are DeclarationAndBinding.
                 self.bound_places
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+                self.declared_places
                     .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
                 // Don't descend into function bodies - they're different scopes.
             }
             ast::Stmt::ClassDef(node) => {
+                // Class definitions are DeclarationAndBinding.
                 self.bound_places
+                    .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
+                self.declared_places
                     .push(PlaceExpr::Symbol(Symbol::new(node.name.id.clone())));
                 // Don't descend into class bodies - they're different scopes.
             }
@@ -200,7 +230,7 @@ mod tests {
     use ruff_python_parser::parse_module;
     use ruff_python_trivia::textwrap::dedent;
 
-    // Test collecting `while` loop bindings.
+    // Test collecting `while` loop definitions.
 
     fn collect_while_loop_place_names(code: &str) -> Vec<String> {
         let parsed = parse_module(code).expect("valid Python code");
@@ -208,7 +238,24 @@ mod tests {
         let ast::Stmt::While(while_stmt) = stmt else {
             panic!("Expected a while statement");
         };
-        collect_while_loop_bindings(while_stmt)
+        collect_while_loop_definitions(while_stmt)
+            .bound_places
+            .into_iter()
+            .map(|place| match place {
+                PlaceExpr::Symbol(sym) => sym.name().to_string(),
+                PlaceExpr::Member(member) => member.to_string(),
+            })
+            .collect()
+    }
+
+    fn collect_while_loop_declared_names(code: &str) -> Vec<String> {
+        let parsed = parse_module(code).expect("valid Python code");
+        let stmt = &parsed.suite()[0];
+        let ast::Stmt::While(while_stmt) = stmt else {
+            panic!("Expected a while statement");
+        };
+        collect_while_loop_definitions(while_stmt)
+            .declared_places
             .into_iter()
             .map(|place| match place {
                 PlaceExpr::Symbol(sym) => sym.name().to_string(),
@@ -264,7 +311,27 @@ mod tests {
         assert_eq!(bindings, vec!["x", "y"]);
     }
 
-    // Test collecting `for` loop bindings.
+    #[test]
+    fn test_collect_while_loop_declarations() {
+        let declarations = collect_while_loop_declared_names(&dedent(
+            "
+            while True:
+                x: int = 1
+                y: str
+                import mod_a
+                from pkg import name_b
+                def func(): ...
+                class MyClass: ...
+                z = 42
+            ",
+        ));
+        assert_eq!(
+            declarations,
+            vec!["x", "y", "mod_a", "name_b", "func", "MyClass"]
+        );
+    }
+
+    // Test collecting `for` loop definitions.
 
     fn collect_for_loop_place_names(code: &str) -> Vec<String> {
         let parsed = parse_module(code).expect("valid Python code");
@@ -272,7 +339,8 @@ mod tests {
         let ast::Stmt::For(for_stmt) = stmt else {
             panic!("Expected a for statement");
         };
-        collect_for_loop_bindings(for_stmt)
+        collect_for_loop_definitions(for_stmt)
+            .bound_places
             .into_iter()
             .map(|place| match place {
                 PlaceExpr::Symbol(sym) => sym.name().to_string(),
@@ -466,10 +534,33 @@ mod tests {
                 expected_bindings.insert(0, "for_loop_var");
             }
 
-            let bindings = match loop_kind {
-                LoopKind::While => collect_while_loop_place_names(&code_snippet),
-                LoopKind::For => collect_for_loop_place_names(&code_snippet),
+            let definitions = match loop_kind {
+                LoopKind::While => {
+                    let parsed = parse_module(&code_snippet).expect("valid Python code");
+                    let stmt = &parsed.suite()[0];
+                    let ast::Stmt::While(while_stmt) = stmt else {
+                        panic!("Expected a while statement");
+                    };
+                    collect_while_loop_definitions(while_stmt)
+                }
+                LoopKind::For => {
+                    let parsed = parse_module(&code_snippet).expect("valid Python code");
+                    let stmt = &parsed.suite()[0];
+                    let ast::Stmt::For(for_stmt) = stmt else {
+                        panic!("Expected a for statement");
+                    };
+                    collect_for_loop_definitions(for_stmt)
+                }
             };
+
+            let bindings: Vec<String> = definitions
+                .bound_places
+                .into_iter()
+                .map(|place| match place {
+                    PlaceExpr::Symbol(sym) => sym.name().to_string(),
+                    PlaceExpr::Member(member) => member.to_string(),
+                })
+                .collect();
 
             assert_eq!(bindings, expected_bindings);
         }

@@ -136,8 +136,8 @@ use crate::types::{
     TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
     TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, declaration_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5027,37 +5027,71 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
 
-        let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
+        if loop_header_kind.is_binding() {
+            let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
 
-        for live_binding in loop_header.bindings_for_place(place) {
-            // Skip unreachable bindings.
-            if !use_def.is_reachable(db, live_binding.reachability_constraint) {
-                continue;
+            for live_binding in loop_header.bindings_for_place(place) {
+                // Skip unreachable bindings.
+                if !use_def.is_reachable(db, live_binding.reachability_constraint) {
+                    continue;
+                }
+
+                // Boundness analysis is handled by looking at these bindings again in
+                // `place_from_bindings_impl`. Here we're only concerned with the type.
+                let def_state = use_def.definition(live_binding.binding);
+                let def = match def_state {
+                    DefinitionState::Defined(def) => def,
+                    DefinitionState::Deleted | DefinitionState::Undefined => continue,
+                };
+
+                // This loop header is visible to itself. Filter it out to avoid a pointless cycle.
+                if def == definition {
+                    continue;
+                }
+
+                let binding_ty = binding_type(db, def);
+                let narrowed_ty = use_def
+                    .narrowing_evaluator(live_binding.narrowing_constraint)
+                    .narrow(db, binding_ty, place);
+
+                union.add_in_place(narrowed_ty);
             }
 
-            // Boundness analysis is handled by looking at these bindings again in
-            // `place_from_bindings_impl`. Here we're only concerned with the type.
-            let def_state = use_def.definition(live_binding.binding);
-            let def = match def_state {
-                DefinitionState::Defined(def) => def,
-                DefinitionState::Deleted | DefinitionState::Undefined => continue,
-            };
-
-            // This loop header is visible to itself. Filter it out to avoid a pointless cycle.
-            if def == definition {
-                continue;
-            }
-
-            let binding_ty = binding_type(db, def);
-            let narrowed_ty = use_def
-                .narrowing_evaluator(live_binding.narrowing_constraint)
-                .narrow(db, binding_ty, place);
-
-            union.add_in_place(narrowed_ty);
+            self.bindings
+                .insert(definition, union.build(), self.multi_inference_state);
         }
 
-        self.bindings
-            .insert(definition, union.build(), self.multi_inference_state);
+        if loop_header_kind.is_declaration() {
+            let mut union = UnionBuilder::new(db);
+            let mut qualifiers = TypeQualifiers::empty();
+
+            for live_declaration in loop_header.declarations_for_place(place) {
+                // Skip unreachable declarations.
+                if !use_def.is_reachable(db, live_declaration.reachability_constraint) {
+                    continue;
+                }
+
+                let def_state = use_def.definition(live_declaration.declaration);
+                let def = match def_state {
+                    DefinitionState::Defined(def) => def,
+                    DefinitionState::Deleted | DefinitionState::Undefined => continue,
+                };
+
+                // This loop header is visible to itself. Filter it out to avoid a pointless cycle.
+                if def == definition {
+                    continue;
+                }
+
+                let ty = declaration_type(db, def);
+                union.add_in_place(ty.inner_type());
+                qualifiers |= ty.qualifiers();
+            }
+
+            let declared_ty =
+                TypeAndQualifiers::new(union.build(), TypeOrigin::Declared, qualifiers);
+            self.declarations
+                .insert(definition, declared_ty, self.multi_inference_state);
+        }
     }
 
     fn infer_match_statement(&mut self, match_statement: &ast::StmtMatch) {

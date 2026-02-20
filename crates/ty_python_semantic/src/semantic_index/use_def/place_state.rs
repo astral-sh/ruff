@@ -78,10 +78,10 @@ pub(super) struct Declarations {
 }
 
 /// One of the live declarations for a single place at some point in control flow.
-#[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
-pub(super) struct LiveDeclaration {
-    pub(super) declaration: ScopedDefinitionId,
-    pub(super) reachability_constraint: ScopedReachabilityConstraintId,
+#[derive(Clone, Copy, Debug, PartialEq, Eq, get_size2::GetSize)]
+pub(crate) struct LiveDeclaration {
+    pub(crate) declaration: ScopedDefinitionId,
+    pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
 }
 
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
@@ -419,11 +419,12 @@ impl PlaceState {
         &mut self,
         declaration_id: ScopedDefinitionId,
         reachability_constraint: ScopedReachabilityConstraintId,
+        previous_definitions: PreviousDefinitions,
     ) {
         self.declarations.record_declaration(
             declaration_id,
             reachability_constraint,
-            PreviousDefinitions::AreShadowed,
+            previous_definitions,
         );
     }
 
@@ -651,6 +652,7 @@ mod tests {
         sym.record_declaration(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            PreviousDefinitions::AreShadowed,
         );
 
         assert_declarations(&sym, &["1"]);
@@ -662,10 +664,12 @@ mod tests {
         sym.record_declaration(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            PreviousDefinitions::AreShadowed,
         );
         sym.record_declaration(
             ScopedDefinitionId::from_u32(2),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            PreviousDefinitions::AreShadowed,
         );
 
         assert_declarations(&sym, &["2"]);
@@ -678,12 +682,14 @@ mod tests {
         sym.record_declaration(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            PreviousDefinitions::AreShadowed,
         );
 
         let mut sym2 = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);
         sym2.record_declaration(
             ScopedDefinitionId::from_u32(2),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            PreviousDefinitions::AreShadowed,
         );
 
         sym.merge(sym2, &mut reachability_constraints);
@@ -698,6 +704,7 @@ mod tests {
         sym.record_declaration(
             ScopedDefinitionId::from_u32(1),
             ScopedReachabilityConstraintId::ALWAYS_TRUE,
+            PreviousDefinitions::AreShadowed,
         );
 
         let sym2 = PlaceState::undefined(ScopedReachabilityConstraintId::ALWAYS_TRUE);

@@ -492,6 +492,8 @@ pub(crate) struct LoopHeaderDefinitionNodeRef<'ast, 'db> {
     pub(crate) loop_stmt: LoopStmtRef<'ast>,
     pub(crate) place: ScopedPlaceId,
     pub(crate) loop_token: LoopToken<'db>,
+    pub(crate) is_binding: bool,
+    pub(crate) is_declaration: bool,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -673,6 +675,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 loop_stmt,
                 place,
                 loop_token,
+                is_binding,
+                is_declaration,
             }) => DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
                 loop_token,
                 loop_stmt: match loop_stmt {
@@ -680,6 +684,8 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                     LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
                 },
                 place,
+                is_binding,
+                is_declaration,
             }),
         }
     }
@@ -1025,8 +1031,16 @@ impl DefinitionKind<'_> {
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
-            | DefinitionKind::ExceptHandler(_)
-            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
+            | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
+            DefinitionKind::LoopHeader(loop_header) => {
+                match (loop_header.is_binding, loop_header.is_declaration) {
+                    (true, true) => DefinitionCategory::DeclarationAndBinding,
+                    (true, false) => DefinitionCategory::Binding,
+                    (false, true) => DefinitionCategory::Declaration,
+                    // Every loop header should be at least one of binding or declaration.
+                    (false, false) => DefinitionCategory::Binding,
+                }
+            }
         }
     }
 
@@ -1367,6 +1381,8 @@ pub struct LoopHeaderDefinitionKind<'db> {
     loop_token: LoopToken<'db>,
     loop_stmt: LoopStmtKind,
     place: ScopedPlaceId,
+    is_binding: bool,
+    is_declaration: bool,
 }
 
 #[derive(Clone, Debug, get_size2::GetSize)]
@@ -1382,6 +1398,14 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
 
     pub(crate) fn place(&self) -> ScopedPlaceId {
         self.place
+    }
+
+    pub(crate) fn is_binding(&self) -> bool {
+        self.is_binding
+    }
+
+    pub(crate) fn is_declaration(&self) -> bool {
+        self.is_declaration
     }
 
     pub(crate) fn range(&self, module: &ParsedModuleRef) -> TextRange {
