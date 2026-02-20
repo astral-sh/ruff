@@ -1,4 +1,8 @@
-use crate::diagnostic::{Diagnostic, FileResolver, Severity, SubDiagnosticSeverity};
+use ruff_text_size::TextRange;
+
+use crate::diagnostic::{
+    Annotation, Diagnostic, FileResolver, Severity, SubDiagnosticSeverity, UnifiedFile,
+};
 
 pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
@@ -87,25 +91,12 @@ impl<'a> GithubRenderer<'a> {
                 write!(f, "{id}:", id = diagnostic.id())?;
             }
 
-            write!(f, " {}%0A", diagnostic.concise_message())?;
+            write!(f, " {}", diagnostic.concise_message())?;
 
-            for annotation in diagnostic.secondary_annotations() {
-                let span = annotation.get_span();
-                let file = span.file();
-                let diagnostic_source = file.diagnostic_source(self.resolver);
-                let source_code = diagnostic_source.as_source_code();
-                if let Some(message) = annotation.get_message()
-                    && let Some(range) = span.range()
-                {
-                    let start_location = source_code.line_column(range.start());
-                    write!(
-                        f,
-                        "  {path}:{row}:{column}: {message}%0A",
-                        path = file.relative_path(self.resolver).display(),
-                        row = start_location.line,
-                        column = start_location.column,
-                    )?;
-                }
+            for annotation in diagnostic.secondary_annotations().filter_map(|annotation| {
+                GithubAnnotation::from_annotation(annotation, self.resolver)
+            }) {
+                write!(f, "%0A{annotation}")?;
             }
 
             for subdiagnostic in diagnostic.sub_diagnostics() {
@@ -115,50 +106,33 @@ impl<'a> GithubRenderer<'a> {
                     SubDiagnosticSeverity::Warning => "warning",
                     SubDiagnosticSeverity::Error | SubDiagnosticSeverity::Fatal => "error",
                 };
-                let mut rendered_primary = false;
-                if let Some(annotation) = subdiagnostic.primary_annotation() {
-                    let span = annotation.get_span();
-                    let file = span.file();
+                if let Some(annotation) = subdiagnostic.primary_annotation()
+                    && let span = annotation.get_span()
+                    && let file = span.file()
+                    && let Some(range) = span.range()
+                {
                     let diagnostic_source = file.diagnostic_source(self.resolver);
                     let source_code = diagnostic_source.as_source_code();
                     let message = subdiagnostic.concise_message();
-                    if let Some(range) = span.range() {
-                        rendered_primary = true;
-                        let start_location = source_code.line_column(range.start());
-                        write!(
-                            f,
-                            "  {path}:{row}:{column}: {severity}: {message}%0A",
-                            path = file.relative_path(self.resolver).display(),
-                            row = start_location.line,
-                            column = start_location.column,
-                        )?;
-                    }
+                    let start_location = source_code.line_column(range.start());
+                    write!(
+                        f,
+                        "%0A  {path}:{row}:{column}: {severity}: {message}",
+                        path = file.relative_path(self.resolver).display(),
+                        row = start_location.line,
+                        column = start_location.column,
+                    )?;
+                } else {
+                    write!(f, "%0A  {severity}: {}", subdiagnostic.concise_message())?;
                 }
 
-                if !rendered_primary {
-                    write!(f, "  {severity}: {}%0A", subdiagnostic.concise_message())?;
-                }
-
-                for annotation in subdiagnostic.annotations() {
-                    if annotation.is_primary() {
-                        continue;
-                    }
-                    let span = annotation.get_span();
-                    let file = span.file();
-                    let diagnostic_source = file.diagnostic_source(self.resolver);
-                    let source_code = diagnostic_source.as_source_code();
-                    if let Some(message) = annotation.get_message()
-                        && let Some(range) = span.range()
-                    {
-                        let start_location = source_code.line_column(range.start());
-                        write!(
-                            f,
-                            "    {path}:{row}:{column}: {message}%0A",
-                            path = file.relative_path(self.resolver).display(),
-                            row = start_location.line,
-                            column = start_location.column,
-                        )?;
-                    }
+                for annotation in subdiagnostic
+                    .secondary_annotations()
+                    .filter_map(|annotation| {
+                        GithubAnnotation::from_annotation(annotation, self.resolver)
+                    })
+                {
+                    write!(f, "%0A  {annotation}")?;
                 }
             }
 
@@ -166,6 +140,42 @@ impl<'a> GithubRenderer<'a> {
         }
 
         Ok(())
+    }
+}
+
+struct GithubAnnotation<'a> {
+    message: &'a str,
+    range: TextRange,
+    file: &'a UnifiedFile,
+    resolver: &'a dyn FileResolver,
+}
+
+impl<'a> GithubAnnotation<'a> {
+    fn from_annotation(annotation: &'a Annotation, resolver: &'a dyn FileResolver) -> Option<Self> {
+        let span = annotation.get_span();
+        Some(Self {
+            message: annotation.get_message()?,
+            range: span.range()?,
+            file: span.file(),
+            resolver,
+        })
+    }
+}
+
+impl std::fmt::Display for GithubAnnotation<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let diagnostic_source = self.file.diagnostic_source(self.resolver);
+        let source_code = diagnostic_source.as_source_code();
+        let start_location = source_code.line_column(self.range.start());
+        write!(
+            f,
+            "  {path}:{row}:{column}:",
+            path = self.file.relative_path(self.resolver).display(),
+            row = start_location.line,
+            column = start_location.column,
+        )?;
+
+        write!(f, " {message}", message = self.message)
     }
 }
 
@@ -197,7 +207,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @"::error title=ty (test-diagnostic)::test-diagnostic: main diagnostic message%0A",
+            @"::error title=ty (test-diagnostic)::test-diagnostic: main diagnostic message",
         );
     }
 }
