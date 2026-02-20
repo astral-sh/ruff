@@ -266,11 +266,13 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
     order_elements: bool,
+    check_redundancy: bool,
     /// This is enabled when joining types in a `cycle_recovery` function.
     /// Since a cycle cannot be created within a `cycle_recovery` function,
     /// execution of `is_redundant_with` is skipped.
@@ -285,6 +287,7 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             order_elements: false,
+            check_redundancy: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
         }
@@ -300,9 +303,15 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
+    pub(crate) fn check_redundancy(mut self, val: bool) -> Self {
+        self.check_redundancy = val;
+        self
+    }
+
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
         if self.cycle_recovery {
+            self.check_redundancy = false;
             self.unpack_aliases = false;
         }
         self
@@ -667,7 +676,7 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && self.check_redundancy;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -721,19 +730,27 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
-                if negated.is_subtype_of(self.db, element_type) {
-                    // We add `ty` to the union. We just checked that `~ty` is a subtype of an
-                    // existing `element`. This also means that `~ty | ty` is a subtype of
-                    // `element | ty`, because both elements in the first union are subtypes of
-                    // the corresponding elements in the second union. But `~ty | ty` is just
-                    // `object`. Since `object` is a subtype of `element | ty`, we can only
-                    // conclude that `element | ty` must be `object` (object has no other
-                    // supertypes). This means we can simplify the whole union to just
-                    // `object`, since all other potential elements would also be subtypes of
-                    // `object`.
-                    self.collapse_to_object();
-                    return;
+                // Skip the negate/subtype check for intersection-to-intersection pairs.
+                // For intersections, ~(A & B & ...) = ~A | ~B | ..., which is a broad union
+                // of complements. Such a union cannot be a subtype of another intersection
+                // of class types in practice, making this check always false but expensive.
+                if !(ty.is_nontrivial_intersection(self.db)
+                    && element_type.is_nontrivial_intersection(self.db))
+                {
+                    let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                    if negated.is_subtype_of(self.db, element_type) {
+                        // We add `ty` to the union. We just checked that `~ty` is a subtype of an
+                        // existing `element`. This also means that `~ty | ty` is a subtype of
+                        // `element | ty`, because both elements in the first union are subtypes of
+                        // the corresponding elements in the second union. But `~ty | ty` is just
+                        // `object`. Since `object` is a subtype of `element | ty`, we can only
+                        // conclude that `element | ty` must be `object` (object has no other
+                        // supertypes). This means we can simplify the whole union to just
+                        // `object`, since all other potential elements would also be subtypes of
+                        // `object`.
+                        self.collapse_to_object();
+                        return;
+                    }
                 }
             }
         }
