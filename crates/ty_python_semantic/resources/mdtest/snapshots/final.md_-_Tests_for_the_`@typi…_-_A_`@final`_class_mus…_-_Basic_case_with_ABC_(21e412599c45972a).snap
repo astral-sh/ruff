@@ -34,7 +34,7 @@ error[abstract-method-in-final-class]: Final class `Derived` has unimplemented a
    |
  9 | @final
 10 | class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` has unimplemented abstract method `foo`"
-   |       ^^^^^^^ `foo` is unimplemented
+   |       ^^^^^^^ Abstract method `foo` is unimplemented
 11 |     pass
    |
   ::: src/mdtest_snippet.py:6:9

@@ -67,7 +67,7 @@ error[abstract-method-in-final-class]: Final class `PartiallyImplemented` has un
    |
 16 | @final
 17 | class PartiallyImplemented(Base):  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^^^^^^^^^^^^ `baz` is unimplemented
+   |       ^^^^^^^^^^^^^^^^^^^^ Abstract method `baz` is unimplemented
 18 |     def foo(self) -> int:
 19 |         return 42
    |

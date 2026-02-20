@@ -36,7 +36,7 @@ error[abstract-method-in-final-class]: Final class `Child` has unimplemented abs
    |
 11 | @final
 12 | class Child(Parent):  # error: [abstract-method-in-final-class]
-   |       ^^^^^ `method` is unimplemented
+   |       ^^^^^ Abstract method `method` is unimplemented
 13 |     pass
    |
   ::: src/mdtest_snippet.py:6:9
