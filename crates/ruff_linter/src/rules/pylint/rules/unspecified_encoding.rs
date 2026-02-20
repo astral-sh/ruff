@@ -4,8 +4,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Expr, name::QualifiedName};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
-use ruff_text_size::{Ranged, TextRange};
 use ruff_python_semantic::analyze::typing::{PathlibPathChecker, TypeChecker};
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::add_argument;
@@ -143,7 +143,6 @@ impl<'a> Callee<'a> {
                     }
                 }
             }
-            
             // Indirect: f().open() where f() returns Path
             else if PathlibPathChecker::match_initializer(value.as_ref(), semantic) {
                 return Some(Callee::Pathlib(attr));
