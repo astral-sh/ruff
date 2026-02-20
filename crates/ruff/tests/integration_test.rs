@@ -26,6 +26,10 @@ use ruff::run;
 
 const BIN_NAME: &str = "ruff";
 
+fn tempdir_filter(path: &Path) -> String {
+    format!(r#"{}\\?/?"#, regex::escape(path.to_str().unwrap()))
+}
+
 fn ruff_cmd() -> Command {
     Command::new(get_cargo_bin(BIN_NAME))
 }
@@ -198,6 +202,66 @@ import bar   # unused import
     ----- stderr -----
     ");
 
+    Ok(())
+}
+
+#[test]
+fn check_mapped_extension_files() -> Result<()> {
+    let tempdir = TempDir::new()?;
+    fs::write(
+        tempdir.path().join("pyproject.toml"),
+        r#"
+[tool.ruff]
+extension = {foo="python", bar="markdown"}
+"#,
+    )?;
+    fs::write(
+        tempdir.path().join("test.foo"),
+        r"
+print( 'hello' )
+",
+    )?;
+    fs::write(
+        tempdir.path().join("test.bar"),
+        r"
+Text string
+
+```py
+print( 'hello' )
+```
+",
+    )?;
+
+    insta::with_settings!({filters => vec![
+        (&*tempdir_filter(tempdir.path()), "TEMPDIR/"),
+    ]}, {
+        assert_cmd_snapshot!(
+            ruff_cmd()
+                .args(["format", "--no-cache", "--preview", "--check", &tempdir.path().to_string_lossy()]),
+            @r#"
+        success: false
+        exit_code: 1
+        ----- stdout -----
+        unformatted: File would be reformatted
+         --> TEMPDIR/test.bar:1:1
+        2 | Text string
+        3 | 
+        4 | ```py
+          - print( 'hello' )
+        5 + print("hello")
+        6 | ```
+
+        unformatted: File would be reformatted
+         --> TEMPDIR/test.foo:1:1
+          - 
+          - print( 'hello' )
+        1 + print("hello")
+
+        2 files would be reformatted
+
+        ----- stderr -----
+        "#);
+    });
     Ok(())
 }
 
