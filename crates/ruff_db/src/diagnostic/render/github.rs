@@ -93,6 +93,9 @@ impl<'a> GithubRenderer<'a> {
 
             write!(f, " {}", diagnostic.concise_message())?;
 
+            // After rendering the main diagnostic, render its secondary annotations and
+            // sub-diagnostics. Note that lines within a single diagnostic must be separated by
+            // URL-encoded newlines (`%0A`) to render properly in GitHub annotations.
             for annotation in diagnostic.secondary_annotations().filter_map(|annotation| {
                 GithubAnnotation::from_annotation(annotation, self.resolver)
             }) {
