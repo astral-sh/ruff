@@ -205,6 +205,8 @@ def _(x: int | None):
 This also works when the always-true condition is nested inside a narrowing branch:
 
 ```py
+from typing import Literal
+
 def _(x: int | None):
     if x is None:
         if 1 + 1 == 2:
@@ -215,6 +217,16 @@ def _(x: int | None):
 def _(x: int | None):
     if x is None:
         if needs_inference:
+            return
+
+    reveal_type(x)  # revealed: int
+
+def always_true(val: object) -> Literal[True]:
+    return True
+
+def _(x: int | None):
+    if x is None:
+        if always_true(x):
             return
 
     reveal_type(x)  # revealed: int
