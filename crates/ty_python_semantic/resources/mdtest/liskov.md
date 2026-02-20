@@ -72,7 +72,7 @@ class Sub8(Super):
     def method(self, x: int, *args, **kwargs): ...  # fine
 
 class Sub9(Super):
-    def method(self, x: int, extra_positional_arg=42, /): ... # fine
+    def method(self, x: int, extra_positional_arg=42, /): ...  # fine
 
 class Sub10(Super):
     def method(self, x: int, extra_pos_or_kw_arg=42): ...  # fine
@@ -140,7 +140,11 @@ If a child class's method definition is Liskov-compatible with the method defini
 class, Liskov compatibility must also nonetheless be checked with respect to the method definition
 on its grandparent class. This is because type checkers will treat the child class as a subtype of
 the grandparent class just as much as they treat it as a subtype of the parent class, so
-substitutability with respect to the grandparent class is just as important:
+substitutability with respect to the grandparent class is just as important.
+
+However, if the parent class itself already has an LSP violation with an ancestor, we do not report
+the same violation for the child class. This is because the child class cannot fix the violation
+without introducing a new, worse violation against its immediate parent's contract.
 
 <!-- snapshot-diagnostics -->
 
@@ -156,12 +160,30 @@ class Parent(Grandparent):
     def method(self, x: str) -> None: ...  # error: [invalid-method-override]
 
 class Child(Parent):
-    # compatible with the signature of `Parent.method`, but not with `Grandparent.method`:
-    def method(self, x: str) -> None: ...  # error: [invalid-method-override]
+    # compatible with the signature of `Parent.method`, but not with `Grandparent.method`.
+    # However, since `Parent.method` already violates LSP with `Grandparent.method`,
+    # we don't report the same violation for `Child` -- it's inherited from `Parent`.
+    def method(self, x: str) -> None: ...
 
 class OtherChild(Parent):
     # compatible with the signature of `Grandparent.method`, but not with `Parent.method`:
     def method(self, x: int) -> None: ...  # error: [invalid-method-override]
+
+class ChildWithNewViolation(Parent):
+    # incompatible with BOTH `Parent.method` (str) and `Grandparent.method` (int).
+    # We report the violation against the immediate parent (`Parent`), not the grandparent.
+    def method(self, x: bytes) -> None: ...  # error: [invalid-method-override]
+
+class GrandparentWithReturnType:
+    def method(self) -> int: ...
+
+class ParentWithReturnType(GrandparentWithReturnType):
+    def method(self) -> str: ...  # error: [invalid-method-override]
+
+class ChildWithReturnType(ParentWithReturnType):
+    # Returns `int` again -- compatible with `GrandparentWithReturnType.method`,
+    # but not with `ParentWithReturnType.method`. We report against the immediate parent.
+    def method(self) -> int: ...  # error: [invalid-method-override]
 
 class GradualParent(Grandparent):
     def method(self, x: Any) -> None: ...
@@ -190,8 +212,9 @@ class C(B):
     foo = get
 
 class D(C):
-    # compatible with `C.get` and `B.get`, but not with `A.get`
-    def get(self, my_default): ...  # error: [invalid-method-override]
+    # compatible with `C.get` and `B.get`, but not with `A.get`.
+    # Since `B.get` already violates LSP with `A.get`, we don't report for `D`.
+    def get(self, my_default): ...
 ```
 
 ## Non-generic methods on generic classes work as expected
@@ -388,10 +411,11 @@ python-version = "3.13"
 ```
 
 ```pyi
-from dataclasses import dataclass
+from dataclasses import dataclass, InitVar
 from typing_extensions import Self
 
 class Grandparent: ...
+
 class Parent(Grandparent):
     def __new__(cls, x: int) -> Self: ...
     def __init__(self, x: int) -> None: ...
@@ -402,14 +426,14 @@ class Child(Parent):
 
 @dataclass(init=False)
 class DataSuper:
-    x: int
+    x: InitVar[int]
 
     def __post_init__(self, x: int) -> None:
         self.x = x
 
 @dataclass(init=False)
 class DataSub(DataSuper):
-    y: str
+    y: InitVar[str]
 
     def __post_init__(self, x: int, y: str) -> None:
         self.y = y
@@ -453,6 +477,18 @@ class Bad:
     x: int
     def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
         return self.x == other.x
+```
+
+## Class-private names do not override
+
+```py
+class X:
+    def __get_value(self) -> int:
+        return 0
+
+class Y(X):
+    def __get_value(self) -> str:
+        return "s"
 ```
 
 ## Synthesized methods
@@ -582,6 +618,32 @@ class GoodChild2(Parent):
     def class_method(cls, x: object) -> bool: ...
     @staticmethod
     def static_method(x: object) -> bool: ...
+```
+
+## Overloaded methods with positional-only parameters with defaults
+
+When a base class has an overloaded method where one overload accepts only keyword arguments
+(`**kwargs`), and the subclass overrides it with a positional-only parameter that has a default, the
+override should be valid because callers can still call it without positional arguments.
+
+```pyi
+from typing import overload
+
+class Base:
+    @overload
+    def method(self, x: int, /) -> None: ...
+    @overload
+    def method(self, **kwargs: int) -> None: ...
+    def method(self, *args, **kwargs) -> None: ...
+
+class GoodChild(Base):
+    # This should be fine: the positional-only parameter has a default,
+    # so calls like `obj.method(a=1)` are still valid
+    def method(self, x: int = 0, /, **kwargs: int) -> None: ...
+
+class BadChild(Base):
+    # `x` has no default, so `obj.method(a=1)` would fail
+    def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
 ```
 
 ## Definitely bound members with no reachable definitions(!)

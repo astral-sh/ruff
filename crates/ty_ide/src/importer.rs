@@ -362,11 +362,18 @@ impl<'ast> MembersInScope<'ast> {
             .collect();
         MembersInScope { at, map }
     }
+
+    pub(crate) fn find_member(&self, symbol_name: &str) -> Option<&MemberInScope> {
+        self.map
+            .iter()
+            .find(|(name, _)| *name == symbol_name)
+            .map(|(_, member)| member)
+    }
 }
 
 #[derive(Debug)]
-struct MemberInScope<'ast> {
-    ty: Type<'ast>,
+pub(crate) struct MemberInScope<'ast> {
+    pub(crate) ty: Type<'ast>,
     kind: MemberImportKind<'ast>,
 }
 
@@ -950,7 +957,7 @@ mod tests {
     fn empty_source_qualified() {
         let test = cursor_test("<CURSOR>");
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         collections.defaultdict
         ");
@@ -960,7 +967,7 @@ mod tests {
     fn empty_source_unqualified() {
         let test = cursor_test("<CURSOR>");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         defaultdict
         ");
@@ -975,7 +982,7 @@ import collections
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         collections.defaultdict
         ");
@@ -990,7 +997,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         defaultdict
         ");
@@ -1005,7 +1012,7 @@ from collections import *
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import *
         defaultdict
         ");
@@ -1020,7 +1027,7 @@ import collections as c
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections as c
         c.defaultdict
         ");
@@ -1035,7 +1042,7 @@ from collections import defaultdict as ddict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict as ddict
         ddict
         ");
@@ -1050,7 +1057,7 @@ from collections import Counter
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter, defaultdict
         defaultdict
         ");
@@ -1065,7 +1072,7 @@ from collections import Counter as C
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter as C, defaultdict
         defaultdict
         ");
@@ -1080,7 +1087,7 @@ from collections import Counter, OrderedDict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter, OrderedDict, defaultdict
         defaultdict
         ");
@@ -1095,7 +1102,7 @@ from collections import Counter as C, OrderedDict as OD
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter as C, OrderedDict as OD, defaultdict
         defaultdict
         ");
@@ -1110,7 +1117,7 @@ from collections import Counter;
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import Counter, defaultdict;
         defaultdict
         ");
@@ -1142,7 +1149,7 @@ from collections import (Counter)
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import (Counter, defaultdict)
         defaultdict
         ");
@@ -1157,7 +1164,7 @@ from collections import (Counter,)
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import (Counter, defaultdict,)
         defaultdict
         ");
@@ -1175,7 +1182,7 @@ from collections import (
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import (
             Counter,
             OrderedDict, defaultdict,
@@ -1196,7 +1203,7 @@ from collections import (
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import (
             Counter,
             OrderedDict, defaultdict
@@ -1216,7 +1223,7 @@ from collections import (
             )
             .build();
         assert_snapshot!(
-            test.import("package.foo", "Bar"), @r"
+            test.import("package.foo", "Bar"), @"
         from ...foo import Foo, Bar
         Bar
         ");
@@ -1231,7 +1238,7 @@ from collections import
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         defaultdict
         ");
@@ -1252,7 +1259,7 @@ from collections import ()
         // always be some cases like this that won't make
         // sense.
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import ()
         from collections import defaultdict
         defaultdict
@@ -1270,7 +1277,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         import re
         from collections import defaultdict
@@ -1289,7 +1296,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         import re
         defaultdict
@@ -1307,7 +1314,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         from collections import defaultdict
         defaultdict
@@ -1324,7 +1331,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import OrderedDict
         from collections import defaultdict
         defaultdict
@@ -1341,7 +1348,7 @@ import collections
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import OrderedDict, defaultdict
         import collections
         defaultdict
@@ -1360,13 +1367,13 @@ from collections import defaultdict
         // we add another import at the top-level
         // of the module.
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         collections.defaultdict
         from collections import defaultdict
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         defaultdict
         from collections import defaultdict
@@ -1386,7 +1393,7 @@ from collections import defaultdict
         // we add another import at the top-level
         // of the module.
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         def foo():
             collections.defaultdict
@@ -1405,7 +1412,7 @@ def foo():
         ",
         );
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
 
         def foo():
@@ -1423,7 +1430,7 @@ from __future__ import annotations
         ",
         );
         assert_snapshot!(
-            test.import("typing", "TypeVar"), @r"
+            test.import("typing", "TypeVar"), @"
         from __future__ import annotations
         import typing
 
@@ -1443,6 +1450,7 @@ from __future__ import annotations
         );
         assert_snapshot!(
             test.import("typing", "TypeVar"), @r#"
+
         "This is a module level docstring"
         from __future__ import annotations
         import typing
@@ -1461,13 +1469,13 @@ defaultdict = 1
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         defaultdict = 1
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         defaultdict = 1
         (collections.defaultdict)
@@ -1484,13 +1492,13 @@ collections = 1
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         collections = 1
         (defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         collections = 1
         (defaultdict)
@@ -1526,14 +1534,14 @@ defaultdict = 2
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         collections = 1
         defaultdict = 2
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         collections = 1
         defaultdict = 2
@@ -1551,13 +1559,13 @@ def foo():
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         def foo():
             (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         def foo():
             (defaultdict)
@@ -1574,13 +1582,13 @@ def defaultdict():
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         def defaultdict():
             (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         def defaultdict():
             (collections.defaultdict)
@@ -1597,13 +1605,13 @@ def collections():
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         def collections():
             (defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         def collections():
             (defaultdict)
@@ -1621,14 +1629,14 @@ import defaultdict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         import defaultdict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         import defaultdict
 
@@ -1647,14 +1655,14 @@ from foo import collections
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         from collections import defaultdict
         from foo import collections
 
         (defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         from foo import collections
 
@@ -1673,14 +1681,14 @@ from othermodule import defaultdict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         from othermodule import defaultdict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         from othermodule import defaultdict
 
@@ -1699,14 +1707,14 @@ import defaultdict as ddict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         import defaultdict as ddict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         import defaultdict as ddict
 
@@ -1725,14 +1733,14 @@ from othermodule import something as defaultdict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         from othermodule import something as defaultdict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         import collections
         from othermodule import something as defaultdict
 
@@ -1751,14 +1759,14 @@ import defaultdict as ddict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         import defaultdict as ddict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         import defaultdict as ddict
 
@@ -1777,14 +1785,14 @@ from foo import defaultdict as ddict
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         from foo import defaultdict as ddict
 
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         from foo import defaultdict as ddict
 
@@ -1807,7 +1815,7 @@ import numpy as np
         );
 
         assert_snapshot!(
-            test.import("collections", "defaultdict"), @r"
+            test.import("collections", "defaultdict"), @"
         import collections
         import json
         import re
@@ -1818,7 +1826,7 @@ import numpy as np
         (collections.defaultdict)
         ");
         assert_snapshot!(
-            test.import_from("collections", "defaultdict"), @r"
+            test.import_from("collections", "defaultdict"), @"
         from collections import defaultdict
         import json
         import re
@@ -1849,7 +1857,7 @@ import numpy as np
             .build();
 
         assert_snapshot!(
-            test.import("foo", "Bar"), @r"
+            test.import("foo", "Bar"), @"
         import foo
         import json
         import re
@@ -1860,7 +1868,7 @@ import numpy as np
         (foo.Bar)
         ");
         assert_snapshot!(
-            test.import_from("foo", "Bar"), @r"
+            test.import_from("foo", "Bar"), @"
         from foo import Bar
         import json
         import re
@@ -2109,7 +2117,7 @@ except ImportError:
             .build();
 
         assert_snapshot!(
-            test.import("quux", "MAGIC"), @r"
+            test.import("quux", "MAGIC"), @"
         import quux
         try:
             from foo import MAGIC
@@ -2119,7 +2127,7 @@ except ImportError:
         (quux.MAGIC)
         ");
         assert_snapshot!(
-            test.import_from("quux", "MAGIC"), @r"
+            test.import_from("quux", "MAGIC"), @"
         import quux
         try:
             from foo import MAGIC
@@ -2154,7 +2162,7 @@ except ImportError:
             .build();
 
         assert_snapshot!(
-            test.import("foo", "MAGIC"), @r"
+            test.import("foo", "MAGIC"), @"
         import foo
         try:
             from foo import MAGIC
@@ -2164,7 +2172,7 @@ except ImportError:
         (foo.MAGIC)
         ");
         assert_snapshot!(
-            test.import_from("foo", "MAGIC"), @r"
+            test.import_from("foo", "MAGIC"), @"
         from foo import MAGIC
         try:
             from foo import MAGIC
@@ -2195,7 +2203,7 @@ except ImportError:
             .build();
 
         assert_snapshot!(
-            test.import("bar", "MAGIC"), @r"
+            test.import("bar", "MAGIC"), @"
         import bar
         try:
             from foo import MAGIC
@@ -2205,7 +2213,7 @@ except ImportError:
         (bar.MAGIC)
         ");
         assert_snapshot!(
-            test.import_from("bar", "MAGIC"), @r"
+            test.import_from("bar", "MAGIC"), @"
         import bar
         try:
             from foo import MAGIC
@@ -2224,7 +2232,7 @@ except ImportError:
         ",
         );
         assert_snapshot!(
-            test.module("collections"), @r"
+            test.module("collections"), @"
         import collections
         collections
         ");
@@ -2239,7 +2247,7 @@ import collections
         ",
         );
         assert_snapshot!(
-            test.module("collections"), @r"
+            test.module("collections"), @"
         import collections
         collections
         ");
@@ -2254,7 +2262,7 @@ from collections import defaultdict
         ",
         );
         assert_snapshot!(
-            test.module("collections"), @r"
+            test.module("collections"), @"
         import collections
         from collections import defaultdict
         collections
@@ -2278,7 +2286,7 @@ from collections import abc
         ",
         );
         assert_snapshot!(
-            test.module("collections.abc"), @r"
+            test.module("collections.abc"), @"
         import collections.abc
         from collections import abc
         collections.abc

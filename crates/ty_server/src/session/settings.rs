@@ -7,11 +7,16 @@ use ty_project::metadata::options::ProjectOptionsOverrides;
 pub(crate) struct GlobalSettings {
     pub(super) diagnostic_mode: DiagnosticMode,
     pub(super) experimental: ExperimentalSettings,
+    pub(super) show_syntax_errors: bool,
 }
 
 impl GlobalSettings {
     pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
         self.diagnostic_mode
+    }
+
+    pub(crate) fn show_syntax_errors(&self) -> bool {
+        self.show_syntax_errors
     }
 }
 

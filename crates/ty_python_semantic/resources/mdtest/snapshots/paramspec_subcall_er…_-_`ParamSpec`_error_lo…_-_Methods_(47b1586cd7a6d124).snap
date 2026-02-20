@@ -1,0 +1,97 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: paramspec_subcall_error_location.md - `ParamSpec` error locations - Methods
+mdtest path: crates/ty_python_semantic/resources/mdtest/paramspec_subcall_error_location.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Callable
+ 2 | 
+ 3 | class Foo:
+ 4 |     def method[**P, T](self, fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+ 5 | 
+ 6 | def fn1(a: int, b: int, c: int) -> None: ...
+ 7 | 
+ 8 | foo = Foo()
+ 9 | 
+10 | # error: [invalid-argument-type]
+11 | # error: [invalid-argument-type]
+12 | # error: [unknown-argument]
+13 | foo.method(fn1, "a", 2, c="c", unknown=1)
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to bound method `method` is incorrect
+  --> src/mdtest_snippet.py:13:17
+   |
+11 | # error: [invalid-argument-type]
+12 | # error: [unknown-argument]
+13 | foo.method(fn1, "a", 2, c="c", unknown=1)
+   |                 ^^^ Expected `int`, found `Literal["a"]`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+3 | class Foo:
+4 |     def method[**P, T](self, fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |         ^^^^^^         ---- Parameter declared here
+5 |
+6 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to bound method `method` is incorrect
+  --> src/mdtest_snippet.py:13:25
+   |
+11 | # error: [invalid-argument-type]
+12 | # error: [unknown-argument]
+13 | foo.method(fn1, "a", 2, c="c", unknown=1)
+   |                         ^^^^^ Expected `int`, found `Literal["c"]`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:4:9
+  |
+3 | class Foo:
+4 |     def method[**P, T](self, fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |         ^^^^^^                                   ------------- Parameter declared here
+5 |
+6 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[unknown-argument]: Argument `unknown` does not match any known parameter of bound method `method`
+  --> src/mdtest_snippet.py:13:32
+   |
+11 | # error: [invalid-argument-type]
+12 | # error: [unknown-argument]
+13 | foo.method(fn1, "a", 2, c="c", unknown=1)
+   |                                ^^^^^^^^^
+   |
+info: Method signature here
+ --> src/mdtest_snippet.py:4:9
+  |
+3 | class Foo:
+4 |     def method[**P, T](self, fn: Callable[P, T], *args: P.args, **kwargs: P.kwargs): ...
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 |
+6 | def fn1(a: int, b: int, c: int) -> None: ...
+  |
+info: rule `unknown-argument` is enabled by default
+
+```

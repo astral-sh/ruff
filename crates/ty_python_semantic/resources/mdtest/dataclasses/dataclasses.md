@@ -110,14 +110,98 @@ reveal_type(D.__init__)  # revealed: (self: D, x: int) -> None
 ```
 
 If attributes without default values are declared after attributes with default values, a
-`TypeError` will be raised at runtime. Ideally, we would emit a diagnostic in that case:
+`TypeError` will be raised at runtime. We emit a diagnostic in that case:
 
 ```py
+from dataclasses import field
+
 @dataclass
 class D:
     x: int = 1
-    # TODO: this should be an error: field without default defined after field with default
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
     y: str
+
+@dataclass
+class E:
+    x: int = field(default=3)
+    y: int = field(default_factory=lambda: 4)
+    # error: [dataclass-field-order]
+    z: str
+
+import sys
+
+@dataclass
+class F:
+    x: int = 1
+    if sys.version_info > (3, 7):
+        # error: [dataclass-field-order]
+        y: str
+```
+
+Fields with `init=False` do not participate in the ordering check since they don't appear in
+`__init__`:
+
+```py
+@dataclass
+class GoodWithInitFalse:
+    x: int = 1
+    y: str = field(init=False)
+    z: float = 2.0
+
+@dataclass
+class BadWithInitFalse:
+    x: int = 1
+    y: str = field(init=False)
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float
+```
+
+Keyword-only fields (using `kw_only=True`) also don't participate in the positional ordering check:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+@dataclass
+class GoodWithKwOnly:
+    x: int = 1
+    y: str = field(kw_only=True)
+    z: float = field(kw_only=True, default=2.0)
+
+@dataclass
+class AlsoGoodWithKwOnly:
+    x: int = field(kw_only=True, default=1)
+    y: str
+
+@dataclass
+class BadWithKwOnly:
+    x: int = 1
+    y: str = field(kw_only=True)
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float
+```
+
+Fields after a `KW_ONLY` sentinel are also keyword-only and don't participate in ordering checks:
+
+```py
+from dataclasses import KW_ONLY
+
+@dataclass
+class GoodWithKwOnlySentinel:
+    x: int = 1
+    _: KW_ONLY
+    y: str
+    z: float = 2.0
+
+@dataclass
+class BadWithKwOnlySentinel:
+    x: int = 1
+    # error: [dataclass-field-order] "Required field `y` cannot be defined after fields with default values"
+    y: str
+    _: KW_ONLY
+    z: float
 ```
 
 Pure class attributes (`ClassVar`) are not included in the signature of `__init__`:
@@ -174,6 +258,7 @@ from ty_extensions import TypeOf
 class SomeClass: ...
 
 def some_function() -> None: ...
+
 @dataclass
 class D:
     function_literal: TypeOf[some_function]
@@ -218,7 +303,7 @@ be included in the signature of `__init__`. This is a case that we currently don
 @dataclass
 class D:
     # (x) is an expression, not a "simple name"
-    (x): int = 1
+    (x): int = 1  # fmt: skip
 
 # TODO: should ideally not include a `x` parameter
 reveal_type(D.__init__)  # revealed:(self: D, x: int = 1) -> None
@@ -349,16 +434,25 @@ GenericWithOrder[int](1) < GenericWithOrder[int](1)
 GenericWithOrder[int](1) < GenericWithOrder[str]("a")  # error: [unsupported-operator]
 ```
 
-If a class already defines one of the comparison methods, a `TypeError` is raised at runtime.
-Ideally, we would emit a diagnostic in that case:
+If a class already defines one of the comparison methods, a `TypeError` is raised at runtime and a
+diagnostic is emitted.
 
 ```py
 @dataclass(order=True)
-class AlreadyHasCustomDunderLt:
+class InvalidCustomOrderDunderOverrides:
     x: int
 
-    # TODO: Ideally, we would emit a diagnostic here
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__lt__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
     def __lt__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__le__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
+    def __le__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__gt__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
+    def __gt__(self, other: object) -> bool:
+        return False
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__ge__` in dataclass `InvalidCustomOrderDunderOverrides` with `order=True`"
+    def __ge__(self, other: object) -> bool:
         return False
 ```
 
@@ -443,7 +537,7 @@ frozen_instance = MyFrozenClass(1)
 frozen_instance.x = 2  # error: [invalid-assignment]
 ```
 
-If `__setattr__()` or `__delattr__()` is defined in the class, we should emit a diagnostic.
+If `__setattr__()` or `__delattr__()` is defined in the class, a diagnostic is emitted.
 
 ```py
 from dataclasses import dataclass
@@ -452,10 +546,10 @@ from dataclasses import dataclass
 class MyFrozenClass:
     x: int
 
-    # TODO: Emit a diagnostic here
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__setattr__` in frozen dataclass `MyFrozenClass`"
     def __setattr__(self, name: str, value: object) -> None: ...
 
-    # TODO: Emit a diagnostic here
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__delattr__` in frozen dataclass `MyFrozenClass`"
     def __delattr__(self, name: str) -> None: ...
 ```
 
@@ -583,7 +677,7 @@ from module import NotFrozenBase
 
 @final
 @dataclass(frozen=True)
-@total_ordering
+@total_ordering  # error: [invalid-total-ordering]
 class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
     y: str
 ```
@@ -699,6 +793,34 @@ class C:
 
 C(x=1)
 C(1)
+```
+
+No fields of a `kw_only=True` dataclass participate in field ordering checks.
+
+```py
+from dataclasses import dataclass, field
+
+@dataclass(kw_only=True)
+class KwOnlyClassGood:
+    x: int = 1
+    y: str
+
+@dataclass(kw_only=True)
+class KwOnlyClassAlsoGood:
+    x: int
+    y: str = "default"
+    z: float
+```
+
+The class-level `kw_only` parameter can be overridden per-field.
+
+```py
+@dataclass(kw_only=True)
+class KwOnlyClassWithPositionalField:
+    x: int = 1
+    y: str = field(kw_only=False, default="hello")
+    # error: [dataclass-field-order] "Required field `z` cannot be defined after fields with default values"
+    z: float = field(kw_only=False)
 ```
 
 ### `kw_only` - Python < 3.10
@@ -1208,7 +1330,7 @@ def uses_dataclass[T](x: T) -> ChildOfParentDataclass[T]:
 # revealed: (self: ParentDataclass[Unknown], value: Unknown) -> None
 reveal_type(ParentDataclass.__init__)
 
-# revealed: (self: ParentDataclass[T@ChildOfParentDataclass], value: T@ChildOfParentDataclass) -> None
+# revealed: [T](self: ParentDataclass[T], value: T) -> None
 reveal_type(ChildOfParentDataclass.__init__)
 
 result_int = uses_dataclass(42)
@@ -1329,6 +1451,41 @@ class C:
     field: AcceptsStrAndInt = AcceptsStrAndInt()
 
 reveal_type(C.__init__)  # revealed: (self: C, field: str | int = ...) -> None
+```
+
+### Intersections of descriptor `__set__` types
+
+When the descriptor type is an intersection, the generated `__init__` parameter should use the
+intersection of the acceptable `value` types from `__set__`.
+
+```py
+from dataclasses import dataclass
+from typing import Callable, cast
+from ty_extensions import Intersection
+
+class A: ...
+class B: ...
+
+def set_a(self: "DescA", instance: object, value: A) -> None: ...
+def set_b(self: "DescB", instance: object, value: B) -> None: ...
+
+class DescA:
+    # We use callable attributes instead of regular methods here because regular methods currently
+    # trigger a separate known issue where method attributes on intersections can collapse to `Never`:
+    # https://github.com/astral-sh/ty/issues/2428
+    __set__: Callable[["DescA", object, A], None] = set_a
+
+class DescB:
+    __set__: Callable[["DescB", object, B], None] = set_b
+
+@dataclass
+class C:
+    field: Intersection[DescA, DescB] = cast(
+        Intersection[DescA, DescB],
+        DescA(),
+    )
+
+reveal_type(C.__init__)  # revealed: (self: C, field: A & B = ...) -> None
 ```
 
 ## `dataclasses.field`
@@ -1682,9 +1839,266 @@ def sequence4(cls: type) -> type:
 class Foo: ...
 
 ordered_foo = dataclass(order=True)(Foo)
-reveal_type(ordered_foo)  # revealed: type[Foo] & Any
-# TODO: should be `Foo & Any`
-reveal_type(ordered_foo())  # revealed: @Todo(Type::Intersection.call)
-# TODO: should be `Any`
-reveal_type(ordered_foo() < ordered_foo())  # revealed: @Todo(Type::Intersection.call)
+reveal_type(ordered_foo)  # revealed: <class 'Foo'>
+reveal_type(ordered_foo())  # revealed: Foo
+reveal_type(ordered_foo() < ordered_foo())  # revealed: bool
+```
+
+## Dynamic class literals
+
+Dynamic classes created with `type()` can be wrapped with `dataclass()` as a function:
+
+```py
+from dataclasses import dataclass
+
+# Basic dynamic class wrapped with dataclass
+DynamicFoo = type("DynamicFoo", (), {})
+DynamicFoo = dataclass(DynamicFoo)
+
+# The class is recognized as a dataclass
+reveal_type(DynamicFoo.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+# Can create instances
+instance = DynamicFoo()
+reveal_type(instance)  # revealed: DynamicFoo
+```
+
+Dynamic classes that inherit from a dataclass base also work:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Base:
+    x: int
+
+# Dynamic class inheriting from a dataclass
+DynamicChild = type("DynamicChild", (Base,), {})
+DynamicChild = dataclass(DynamicChild)
+
+reveal_type(DynamicChild.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+```
+
+## Invalid `@dataclass` applications
+
+### NamedTuple classes (functional form)
+
+Applying `@dataclass` to a `namedtuple` class created via the functional form is problematic because
+the namedtuple machinery conflicts with dataclass semantics:
+
+```py
+from collections import namedtuple
+from dataclasses import dataclass
+
+NT = namedtuple("NT", "x y")
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(NT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(NT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(namedtuple("Inline1", "a b"))
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(namedtuple("Inline2", "a b"))
+```
+
+The same applies to `typing.NamedTuple` used in functional form:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple
+
+TNT = NamedTuple("TNT", [("x", int), ("y", int)])
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(TNT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(TNT)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(NamedTuple("Inline1", [("a", str)]))
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(NamedTuple("Inline2", [("a", str)]))
+```
+
+### Enum classes (functional form)
+
+Applying `@dataclass` to a functional `Enum` class should also be detected:
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+E = Enum("E", "A B C")
+
+# TODO: should emit `invalid-dataclass`
+dataclass(E)
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(E)
+
+# TODO: should emit `invalid-dataclass`
+dataclass(Enum("Inline1", "X Y"))
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(Enum("Inline2", "X Y"))
+```
+
+### TypedDict classes (functional form)
+
+Applying `@dataclass` to a functional `TypedDict` class should also be detected:
+
+```py
+from dataclasses import dataclass
+from typing import TypedDict
+
+TD = TypedDict("TD", {"x": int})
+
+# TODO: should emit `invalid-dataclass`
+dataclass(TD)
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(TD)
+
+# TODO: should emit `invalid-dataclass`
+dataclass(TypedDict("Inline1", {"a": str}))
+
+# TODO: should emit `invalid-dataclass`
+dataclass()(TypedDict("Inline2", {"a": str}))
+```
+
+### Enum classes
+
+Applying `@dataclass` to an enum class is
+[explicitly not supported](https://docs.python.org/3/howto/enum.html#dataclass-support):
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+@dataclass
+# error: [invalid-dataclass] "Enum class `Color` cannot be decorated with `@dataclass`"
+class Color(Enum):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+This also applies to classes that inherit from an enum class:
+
+```py
+from dataclasses import dataclass
+from enum import Enum
+
+class BaseColor(Enum):
+    def fancy_mixin_method(self) -> str:
+        return "hi"
+
+@dataclass
+# error: [invalid-dataclass]
+class Color(BaseColor):
+    RED = 1
+    GREEN = 2
+    BLUE = 3
+```
+
+### Protocol classes
+
+Applying `@dataclass` to a protocol class is invalid because protocols define abstract interfaces
+and cannot be instantiated:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+@dataclass
+# error: [invalid-dataclass] "Protocol class `Greeter` cannot be decorated with `@dataclass`"
+class Greeter(Protocol):
+    def greet(self) -> str: ...
+```
+
+This also applies to classes that extend a protocol while remaining a protocol themselves:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+class BaseProtocol(Protocol):
+    def method(self) -> None: ...
+
+@dataclass
+# error: [invalid-dataclass]
+class ExtendedProtocol(BaseProtocol, Protocol):
+    def other_method(self) -> None: ...
+```
+
+However, concrete classes that implement a protocol (without inheriting from `Protocol` directly)
+can be decorated with `@dataclass`:
+
+```py
+from dataclasses import dataclass
+from typing import Protocol
+
+class Greetable(Protocol):
+    name: str
+    def greet(self) -> str: ...
+
+@dataclass
+class Person(Greetable):
+    name: str
+    def greet(self) -> str:
+        return f"Hello, {self.name}!"
+
+reveal_type(Person)  # revealed: <class 'Person'>
+```
+
+### Using `dataclass()` as a function
+
+The same restrictions apply when using `dataclass()` as a function call instead of a decorator:
+
+```py
+from dataclasses import dataclass
+from typing import NamedTuple, TypedDict, Protocol
+from enum import Enum
+
+class MyTuple(NamedTuple):
+    x: int
+
+class MyDict(TypedDict):
+    x: int
+
+class MyEnum(Enum):
+    A = 1
+
+class MyProtocol(Protocol):
+    def method(self) -> None: ...
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass(MyTuple)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `NamedTuple` class"
+dataclass()(MyTuple)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
+dataclass(MyDict)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a `TypedDict` class"
+dataclass()(MyDict)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
+dataclass(MyEnum)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
+dataclass()(MyEnum)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
+dataclass(MyProtocol)
+
+# error: [invalid-dataclass] "Cannot use `dataclass()` on a protocol class"
+dataclass()(MyProtocol)
 ```

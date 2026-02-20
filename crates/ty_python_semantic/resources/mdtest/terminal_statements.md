@@ -144,10 +144,6 @@ are likely visible after the loop body, since loops do not introduce new scopes.
 infinite loops are one exception — if control never leaves the loop body, bindings inside of the
 loop are not visible outside of it.)
 
-TODO: We are not currently modeling the cyclic control flow for loops, pending fixpoint support in
-Salsa. The false positives in this section are because of that, and not our terminal statement
-support. See [ruff#14160](https://github.com/astral-sh/ruff/issues/14160) for more details.
-
 ```py
 def resolved_reference(cond: bool) -> str:
     while True:
@@ -168,8 +164,7 @@ def continue_in_then_branch(cond: bool, i: int):
             x = "loop"
             reveal_type(x)  # revealed: Literal["loop"]
         reveal_type(x)  # revealed: Literal["loop"]
-    # TODO: Should be Literal["before", "loop", "continue"]
-    reveal_type(x)  # revealed: Literal["before", "loop"]
+    reveal_type(x)  # revealed: Literal["before", "continue", "loop"]
 
 def continue_in_else_branch(cond: bool, i: int):
     x = "before"
@@ -182,8 +177,7 @@ def continue_in_else_branch(cond: bool, i: int):
             reveal_type(x)  # revealed: Literal["continue"]
             continue
         reveal_type(x)  # revealed: Literal["loop"]
-    # TODO: Should be Literal["before", "loop", "continue"]
-    reveal_type(x)  # revealed: Literal["before", "loop"]
+    reveal_type(x)  # revealed: Literal["before", "loop", "continue"]
 
 def continue_in_both_branches(cond: bool, i: int):
     x = "before"
@@ -196,8 +190,7 @@ def continue_in_both_branches(cond: bool, i: int):
             x = "continue2"
             reveal_type(x)  # revealed: Literal["continue2"]
             continue
-    # TODO: Should be Literal["before", "continue1", "continue2"]
-    reveal_type(x)  # revealed: Literal["before"]
+    reveal_type(x)  # revealed: Literal["before", "continue1", "continue2"]
 
 def continue_in_nested_then_branch(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -215,8 +208,7 @@ def continue_in_nested_then_branch(cond1: bool, cond2: bool, i: int):
                 reveal_type(x)  # revealed: Literal["loop2"]
             reveal_type(x)  # revealed: Literal["loop2"]
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
-    # TODO: Should be Literal["before", "loop1", "loop2", "continue"]
-    reveal_type(x)  # revealed: Literal["before", "loop1", "loop2"]
+    reveal_type(x)  # revealed: Literal["before", "loop1", "continue", "loop2"]
 
 def continue_in_nested_else_branch(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -234,8 +226,7 @@ def continue_in_nested_else_branch(cond1: bool, cond2: bool, i: int):
                 continue
             reveal_type(x)  # revealed: Literal["loop2"]
         reveal_type(x)  # revealed: Literal["loop1", "loop2"]
-    # TODO: Should be Literal["before", "loop1", "loop2", "continue"]
-    reveal_type(x)  # revealed: Literal["before", "loop1", "loop2"]
+    reveal_type(x)  # revealed: Literal["before", "loop1", "loop2", "continue"]
 
 def continue_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
     x = "before"
@@ -253,8 +244,7 @@ def continue_in_both_nested_branches(cond1: bool, cond2: bool, i: int):
                 reveal_type(x)  # revealed: Literal["continue2"]
                 continue
         reveal_type(x)  # revealed: Literal["loop"]
-    # TODO: Should be Literal["before", "loop", "continue1", "continue2"]
-    reveal_type(x)  # revealed: Literal["before", "loop"]
+    reveal_type(x)  # revealed: Literal["before", "loop", "continue1", "continue2"]
 ```
 
 ## `break`
@@ -618,9 +608,7 @@ def g(x: int | None):
     if x is None:
         sys.exit(1)
 
-    # TODO: should be just `int`, not `int | None`
-    # See https://github.com/astral-sh/ty/issues/685
-    reveal_type(x)  # revealed: int | None
+    reveal_type(x)  # revealed: int
 ```
 
 ### Possibly unresolved diagnostics

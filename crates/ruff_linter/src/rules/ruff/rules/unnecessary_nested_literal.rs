@@ -57,7 +57,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Typing documentation: Legal parameters for `Literal` at type check time](https://typing.python.org/en/latest/spec/literal.html#legal-parameters-for-literal-at-type-check-time)
 ///
-/// [PEP 586](https://peps.python.org/pep-0586/)
+/// [PEP 586]: https://peps.python.org/pep-0586/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct UnnecessaryNestedLiteral;

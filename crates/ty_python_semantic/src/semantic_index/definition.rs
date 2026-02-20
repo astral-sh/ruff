@@ -5,11 +5,12 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
+use crate::semantic_index::LoopToken;
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::{FileScopeId, ScopeId};
 use crate::semantic_index::symbol::ScopedSymbolId;
@@ -275,6 +276,7 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Assignment(AssignmentDefinitionNodeRef<'ast, 'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionNodeRef<'ast>),
     AugmentedAssignment(&'ast ast::StmtAugAssign),
+    DictKeyAssignment(DictKeyAssignmentNodeRef<'ast, 'db>),
     Comprehension(ComprehensionDefinitionNodeRef<'ast, 'db>),
     VariadicPositionalParameter(&'ast ast::Parameter),
     VariadicKeywordParameter(&'ast ast::Parameter),
@@ -285,6 +287,7 @@ pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     TypeVar(&'ast ast::TypeParamTypeVar),
     ParamSpec(&'ast ast::TypeParamParamSpec),
     TypeVarTuple(&'ast ast::TypeParamTypeVarTuple),
+    LoopHeader(LoopHeaderDefinitionNodeRef<'ast, 'db>),
 }
 
 impl<'ast> From<&'ast ast::StmtFunctionDef> for DefinitionNodeRef<'ast, '_> {
@@ -335,6 +338,12 @@ impl<'ast> From<&'ast ast::TypeParamTypeVarTuple> for DefinitionNodeRef<'ast, '_
     }
 }
 
+impl<'ast, 'db> From<LoopHeaderDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(value: LoopHeaderDefinitionNodeRef<'ast, 'db>) -> Self {
+        Self::LoopHeader(value)
+    }
+}
+
 impl<'ast> From<ImportDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
     fn from(node_ref: ImportDefinitionNodeRef<'ast>) -> Self {
         Self::Import(node_ref)
@@ -368,6 +377,12 @@ impl<'ast, 'db> From<AssignmentDefinitionNodeRef<'ast, 'db>> for DefinitionNodeR
 impl<'ast> From<AnnotatedAssignmentDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
     fn from(node_ref: AnnotatedAssignmentDefinitionNodeRef<'ast>) -> Self {
         Self::AnnotatedAssignment(node_ref)
+    }
+}
+
+impl<'ast, 'db> From<DictKeyAssignmentNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
+    fn from(node_ref: DictKeyAssignmentNodeRef<'ast, 'db>) -> Self {
+        Self::DictKeyAssignment(node_ref)
     }
 }
 
@@ -424,6 +439,8 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
+    pub(crate) module: &'ast ast::Identifier,
+    pub(crate) module_index: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -439,6 +456,13 @@ pub(crate) struct AnnotatedAssignmentDefinitionNodeRef<'ast> {
     pub(crate) annotation: &'ast ast::Expr,
     pub(crate) value: Option<&'ast ast::Expr>,
     pub(crate) target: &'ast ast::Expr,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct DictKeyAssignmentNodeRef<'ast, 'db> {
+    pub(crate) key: &'ast ast::Expr,
+    pub(crate) value: &'ast ast::Expr,
+    pub(crate) assignment: Definition<'db>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -461,6 +485,19 @@ pub(crate) struct ForStmtDefinitionNodeRef<'ast, 'db> {
 pub(crate) struct ExceptHandlerDefinitionNodeRef<'ast> {
     pub(crate) handler: &'ast ast::ExceptHandlerExceptHandler,
     pub(crate) is_star: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct LoopHeaderDefinitionNodeRef<'ast, 'db> {
+    pub(crate) loop_stmt: LoopStmtRef<'ast>,
+    pub(crate) place: ScopedPlaceId,
+    pub(crate) loop_token: LoopToken<'db>,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum LoopStmtRef<'ast> {
+    While(&'ast ast::StmtWhile),
+    For(&'ast ast::StmtFor),
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -506,8 +543,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }),
             DefinitionNodeRef::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
                 node,
+                module,
+                module_index,
             }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
+                module: AstNodeRef::new(parsed, module),
+                module_index,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
@@ -550,6 +591,15 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::AugmentedAssignment(augmented_assignment) => {
                 DefinitionKind::AugmentedAssignment(AstNodeRef::new(parsed, augmented_assignment))
             }
+            DefinitionNodeRef::DictKeyAssignment(DictKeyAssignmentNodeRef {
+                key,
+                value,
+                assignment,
+            }) => DefinitionKind::DictKeyAssignment(DictKeyAssignmentKind {
+                key: AstNodeRef::new(parsed, key),
+                value: AstNodeRef::new(parsed, value),
+                assignment,
+            }),
             DefinitionNodeRef::For(ForStmtDefinitionNodeRef {
                 unpack,
                 iterable,
@@ -619,6 +669,18 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             DefinitionNodeRef::TypeVarTuple(node) => {
                 DefinitionKind::TypeVarTuple(AstNodeRef::new(parsed, node))
             }
+            DefinitionNodeRef::LoopHeader(LoopHeaderDefinitionNodeRef {
+                loop_stmt,
+                place,
+                loop_token,
+            }) => DefinitionKind::LoopHeader(LoopHeaderDefinitionKind {
+                loop_token,
+                loop_stmt: match loop_stmt {
+                    LoopStmtRef::While(stmt) => LoopStmtKind::While(AstNodeRef::new(parsed, stmt)),
+                    LoopStmtRef::For(stmt) => LoopStmtKind::For(AstNodeRef::new(parsed, stmt)),
+                },
+                place,
+            }),
         }
     }
 
@@ -634,7 +696,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-            Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef { node }) => node.into(),
+            Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef { node, .. }) => {
+                node.into()
+            }
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
             Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
@@ -658,6 +722,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }) => DefinitionNodeKey(NodeKey::from_node(target)),
             Self::AnnotatedAssignment(ann_assign) => ann_assign.node.into(),
             Self::AugmentedAssignment(node) => node.into(),
+            Self::DictKeyAssignment(node) => DefinitionNodeKey(NodeKey::from_node(node.key)),
             Self::For(ForStmtDefinitionNodeRef {
                 target,
                 iterable: _,
@@ -683,6 +748,10 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             Self::TypeVar(node) => node.into(),
             Self::ParamSpec(node) => node.into(),
             Self::TypeVarTuple(node) => node.into(),
+            Self::LoopHeader(LoopHeaderDefinitionNodeRef { loop_stmt, .. }) => match loop_stmt {
+                LoopStmtRef::While(stmt) => stmt.into(),
+                LoopStmtRef::For(stmt) => stmt.into(),
+            },
         }
     }
 }
@@ -742,6 +811,7 @@ pub enum DefinitionKind<'db> {
     Assignment(AssignmentDefinitionKind<'db>),
     AnnotatedAssignment(AnnotatedAssignmentDefinitionKind),
     AugmentedAssignment(AstNodeRef<ast::StmtAugAssign>),
+    DictKeyAssignment(DictKeyAssignmentKind<'db>),
     For(ForStmtDefinitionKind<'db>),
     Comprehension(ComprehensionDefinitionKind<'db>),
     VariadicPositionalParameter(AstNodeRef<ast::Parameter>),
@@ -753,6 +823,7 @@ pub enum DefinitionKind<'db> {
     TypeVar(AstNodeRef<ast::TypeParamTypeVar>),
     ParamSpec(AstNodeRef<ast::TypeParamParamSpec>),
     TypeVarTuple(AstNodeRef<ast::TypeParamTypeVarTuple>),
+    LoopHeader(LoopHeaderDefinitionKind<'db>),
 }
 
 impl DefinitionKind<'_> {
@@ -797,6 +868,16 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Function(_))
     }
 
+    pub(crate) const fn is_loop_header(&self) -> bool {
+        matches!(self, DefinitionKind::LoopHeader(_))
+    }
+
+    /// Returns `true` if this definition is user-visible (i.e., not an internal
+    /// control-flow construct like a loop header definition).
+    pub(crate) const fn is_user_visible(&self) -> bool {
+        !self.is_loop_header()
+    }
+
     /// Returns the [`TextRange`] of the definition target.
     ///
     /// A definition target would mainly be the node representing the place being defined i.e.,
@@ -805,7 +886,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
-            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.target_range(module),
             DefinitionKind::StarImport(import) => import.alias(module).range(),
             DefinitionKind::Function(function) => function.node(module).name.range(),
             DefinitionKind::Class(class) => class.node(module).name.range(),
@@ -815,6 +896,9 @@ impl DefinitionKind<'_> {
             DefinitionKind::AnnotatedAssignment(assign) => assign.target.node(module).range(),
             DefinitionKind::AugmentedAssignment(aug_assign) => {
                 aug_assign.node(module).target.range()
+            }
+            DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
+                dict_key_assignment.key.node(module).range()
             }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
@@ -835,6 +919,7 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeVarTuple(type_var_tuple) => {
                 type_var_tuple.node(module).name.range()
             }
+            DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
         }
     }
 
@@ -843,7 +928,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
-            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.module(module).range(),
             DefinitionKind::StarImport(import) => import.import(module).range(),
             DefinitionKind::Function(function) => function.node(module).range(),
             DefinitionKind::Class(class) => class.node(module).range(),
@@ -865,6 +950,9 @@ impl DefinitionKind<'_> {
                 full_range
             }
             DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.node(module).range(),
+            DefinitionKind::DictKeyAssignment(dict_key_assignment) => {
+                dict_key_assignment.key.node(module).range()
+            }
             DefinitionKind::For(for_stmt) => for_stmt.target.node(module).range(),
             DefinitionKind::Comprehension(comp) => comp.target(module).range(),
             DefinitionKind::VariadicPositionalParameter(parameter) => {
@@ -880,6 +968,7 @@ impl DefinitionKind<'_> {
             DefinitionKind::TypeVar(type_var) => type_var.node(module).range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.node(module).range(),
+            DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
         }
     }
 
@@ -927,7 +1016,8 @@ impl DefinitionKind<'_> {
                 }
             }
             // all of these bind values without declaring a type
-            DefinitionKind::NamedExpression(_)
+            DefinitionKind::DictKeyAssignment(_)
+            | DefinitionKind::NamedExpression(_)
             | DefinitionKind::Assignment(_)
             | DefinitionKind::AugmentedAssignment(_)
             | DefinitionKind::For(_)
@@ -935,7 +1025,20 @@ impl DefinitionKind<'_> {
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
             | DefinitionKind::ImportFromSubmodule(_)
-            | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
+            | DefinitionKind::ExceptHandler(_)
+            | DefinitionKind::LoopHeader(_) => DefinitionCategory::Binding,
+        }
+    }
+
+    /// Returns the value expression for assignment-based definitions.
+    ///
+    /// Returns `Some` for `Assignment` and `AnnotatedAssignment` (if it has a value),
+    /// `None` for all other definition kinds.
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> Option<&'ast ast::Expr> {
+        match self {
+            DefinitionKind::Assignment(assignment) => Some(assignment.value(module)),
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(module),
+            _ => None,
         }
     }
 }
@@ -1083,11 +1186,39 @@ impl ImportFromDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromSubmoduleDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
+    module: AstNodeRef<ast::Identifier>,
+    module_index: usize,
 }
 
 impl ImportFromSubmoduleDefinitionKind {
     pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
+    }
+
+    pub fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+        self.module.node(module)
+    }
+
+    pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+        let module_ident = self.module(module);
+        let module_str = module_ident.as_str();
+
+        // Find the dot that terminates the target component.
+        let Some((end_offset, _)) = module_str.match_indices('.').nth(self.module_index) else {
+            // This shouldn't happen but just in case, provide a safe default
+            return module_ident.range();
+        };
+
+        // Find the start of the target component (after the previous dot, or string start).
+        let start_offset = module_str[..end_offset].rfind('.').map_or(0, |pos| pos + 1);
+
+        let Ok(start) = TextSize::try_from(start_offset) else {
+            return module_ident.range();
+        };
+        let Ok(end) = TextSize::try_from(end_offset) else {
+            return module_ident.range();
+        };
+        TextRange::new(start, end) + module_ident.start()
     }
 }
 
@@ -1130,6 +1261,23 @@ impl AnnotatedAssignmentDefinitionKind {
 
     pub(crate) fn target<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.target.node(module)
+    }
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct DictKeyAssignmentKind<'db> {
+    pub(crate) key: AstNodeRef<ast::Expr>,
+    pub(crate) value: AstNodeRef<ast::Expr>,
+    pub(crate) assignment: Definition<'db>,
+}
+
+impl DictKeyAssignmentKind<'_> {
+    pub(crate) fn key<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.key.node(module)
+    }
+
+    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+        self.value.node(module)
     }
 }
 
@@ -1211,6 +1359,39 @@ impl ExceptHandlerDefinitionKind {
     }
 }
 
+/// Definition kind for a loop header entry.
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct LoopHeaderDefinitionKind<'db> {
+    /// The `LoopHeader` struct isn't ready when this type of definition is created. Instead we
+    /// look it up later by passing this token to `get_loop_header`.
+    loop_token: LoopToken<'db>,
+    loop_stmt: LoopStmtKind,
+    place: ScopedPlaceId,
+}
+
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub(crate) enum LoopStmtKind {
+    While(AstNodeRef<ast::StmtWhile>),
+    For(AstNodeRef<ast::StmtFor>),
+}
+
+impl<'db> LoopHeaderDefinitionKind<'db> {
+    pub(crate) fn loop_token(&self) -> LoopToken<'db> {
+        self.loop_token
+    }
+
+    pub(crate) fn place(&self) -> ScopedPlaceId {
+        self.place
+    }
+
+    pub(crate) fn range(&self, module: &ParsedModuleRef) -> TextRange {
+        match &self.loop_stmt {
+            LoopStmtKind::While(stmt) => stmt.node(module).range(),
+            LoopStmtKind::For(stmt) => stmt.node(module).range(),
+        }
+    }
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
 pub(crate) struct DefinitionNodeKey(NodeKey);
 
@@ -1276,6 +1457,18 @@ impl From<&ast::StmtAnnAssign> for DefinitionNodeKey {
 
 impl From<&ast::StmtAugAssign> for DefinitionNodeKey {
     fn from(node: &ast::StmtAugAssign) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtWhile> for DefinitionNodeKey {
+    fn from(node: &ast::StmtWhile) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtFor> for DefinitionNodeKey {
+    fn from(node: &ast::StmtFor) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

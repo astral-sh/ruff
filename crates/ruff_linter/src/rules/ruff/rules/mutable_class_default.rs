@@ -8,8 +8,8 @@ use ruff_text_size::Ranged;
 use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::rules::ruff::helpers::{
-    dataclass_kind, has_default_copy_semantics, is_class_var_annotation, is_final_annotation,
-    is_special_attribute,
+    dataclass_kind, has_default_copy_semantics, is_class_var_annotation,
+    is_ctypes_structure_fields, is_final_annotation, is_special_attribute,
 };
 
 /// ## What it does
@@ -91,7 +91,11 @@ pub(crate) struct MutableClassDefault;
 impl Violation for MutableClassDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Mutable class attributes should be annotated with `typing.ClassVar`".to_string()
+        "Mutable default value for class attribute".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Consider initializing in `__init__` or annotating with `typing.ClassVar`".to_string())
     }
 }
 
@@ -140,6 +144,14 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                             .is_some_and(|name| class_var_targets.contains(&name.id))
                 }) && is_mutable_expr(value, checker.semantic())
                 {
+                    // The `_fields_` property of a `ctypes.Structure` base class has its
+                    // immutability enforced  by the base class itself which will throw an error if
+                    // it's set a second time
+                    // See: https://docs.python.org/3/library/ctypes.html#ctypes.Structure._fields_
+                    if is_ctypes_structure_fields(class_def, checker.semantic(), targets) {
+                        return;
+                    }
+
                     // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
                     if has_default_copy_semantics(class_def, checker.semantic()) {
                         return;

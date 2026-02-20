@@ -97,6 +97,9 @@ pub(super) fn request(req: server::Request) -> Task {
         requests::SelectionRangeRequestHandler::METHOD => background_document_request_task::<
             requests::SelectionRangeRequestHandler,
         >(req, BackgroundSchedule::Worker),
+        requests::FoldingRangeRequestHandler::METHOD => background_document_request_task::<
+            requests::FoldingRangeRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::DocumentSymbolRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentSymbolRequestHandler,
         >(req, BackgroundSchedule::Worker),
@@ -119,9 +122,12 @@ pub(super) fn request(req: server::Request) -> Task {
     .unwrap_or_else(|err| {
         tracing::error!("Encountered error when routing request with ID {id}: {err}");
 
-        Task::sync(move |_session, client| {
+        Task::sync(move |session, client| {
             if matches!(err.code, ErrorCode::InternalError) {
-                client.show_error_message("ty failed to handle a request from the editor. Check the logs for more details.");
+                client.show_error_message(format!(
+                    "ty failed to handle a request from the editor. {}",
+                    session.client_name().log_guidance()
+                ));
             }
 
             respond_silent_error(
@@ -160,6 +166,9 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notifications::DidChangeWatchedFiles::METHOD => {
             sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
         }
+        notifications::DidChangeWorkspaceFoldersHandler::METHOD => {
+            sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif)
+        }
         lsp_types::notification::Cancel::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)
         }
@@ -175,11 +184,12 @@ pub(super) fn notification(notif: server::Notification) -> Task {
     }
     .unwrap_or_else(|err| {
         tracing::error!("Encountered error when routing notification: {err}");
-        Task::sync(move |_session, client| {
+        Task::sync(move |session, client| {
             if matches!(err.code, ErrorCode::InternalError) {
-                client.show_error_message(
-                    "ty failed to handle a notification from the editor. Check the logs for more details."
-                );
+                client.show_error_message(format!(
+                    "ty failed to handle a notification from the editor. {}",
+                    session.client_name().log_guidance()
+                ));
             }
         })
     })
@@ -193,7 +203,7 @@ where
     Ok(Task::sync(move |session, client: &Client| {
         let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
         let result = R::run(session, client, params);
-        respond::<R>(&id, result, client);
+        respond::<R>(&id, result, client, session.client_name().log_guidance());
     }))
 }
 
@@ -217,6 +227,7 @@ where
         // SAFETY: The `snapshot` is safe to move across the unwind boundary because it is not used
         // after unwinding.
         let snapshot = AssertUnwindSafe(session.snapshot_session());
+        let log_guidance = snapshot.0.client_name().log_guidance();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -224,7 +235,7 @@ where
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::trace!(
+                tracing::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -238,7 +249,7 @@ where
                 let snapshot = snapshot;
                 R::handle_request(&id, snapshot.0, client, params);
             }) {
-                panic_response::<R>(&id, client, &error, retry);
+                panic_response::<R>(&id, client, &error, retry, log_guidance);
             }
         })
     }))
@@ -284,6 +295,7 @@ where
 
         let path = document.notebook_or_file_path();
         let db = session.project_db(path).clone();
+        let log_guidance = document.client_name().log_guidance();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -291,7 +303,7 @@ where
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::trace!(
+                tracing::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -306,7 +318,7 @@ where
                     R::handle_request(&id, &db, document, client, params);
                 });
             }) {
-                panic_response::<R>(&id, client, &error, retry);
+                panic_response::<R>(&id, client, &error, retry, log_guidance);
             }
         })
     }))
@@ -317,6 +329,7 @@ fn panic_response<R>(
     client: &Client,
     error: &PanicError,
     request: Option<lsp_server::Request>,
+    log_guidance: &str,
 ) where
     R: traits::RetriableRequestHandler,
 {
@@ -325,14 +338,14 @@ fn panic_response<R>(
         // If the query supports retry, re-queue the request.
         // The query is still likely to succeed if the user modified any other document.
         if let Some(request) = request {
-            tracing::trace!(
+            tracing::debug!(
                 "request id={} method={} was cancelled by salsa, re-queueing for retry",
                 request.id,
                 request.method
             );
             client.retry(request);
         } else {
-            tracing::trace!(
+            tracing::debug!(
                 "request id={} was cancelled by salsa, sending content modified",
                 id
             );
@@ -346,6 +359,7 @@ fn panic_response<R>(
                 error: anyhow!("request handler {error}"),
             }),
             client,
+            log_guidance,
         );
     }
 }
@@ -358,7 +372,10 @@ fn sync_notification_task<N: traits::SyncNotificationHandler>(
         let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
         if let Err(err) = N::run(session, client, params) {
             tracing::error!("An error occurred while running {id}: {err}");
-            client.show_error_message("ty encountered a problem. Check the logs for more details.");
+            client.show_error_message(format!(
+                "ty encountered a problem. {}",
+                session.client_name().log_guidance()
+            ));
 
             return;
         }
@@ -390,6 +407,8 @@ where
             return Box::new(|_| {});
         };
 
+        let log_guidance = snapshot.client_name().log_guidance();
+
         Box::new(move |client| {
             let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
 
@@ -399,18 +418,14 @@ where
                 Ok(result) => result,
                 Err(panic) => {
                     tracing::error!("An error occurred while running {id}: {panic}");
-                    client.show_error_message(
-                        "ty encountered a panic. Check the logs for more details.",
-                    );
+                    client.show_error_message(format!("ty encountered a panic. {log_guidance}"));
                     return;
                 }
             };
 
             if let Err(err) = result {
                 tracing::error!("An error occurred while running {id}: {err}");
-                client.show_error_message(
-                    "ty encountered a problem. Check the logs for more details.",
-                );
+                client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
             }
         })
     }))
@@ -449,12 +464,13 @@ fn respond<Req>(
     id: &RequestId,
     result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,
     client: &Client,
+    log_guidance: &str,
 ) where
     Req: RequestHandler,
 {
     if let Err(err) = &result {
         tracing::error!("An error occurred with request ID {id}: {err}");
-        client.show_error_message("ty encountered a problem. Check the logs for more details.");
+        client.show_error_message(format!("ty encountered a problem. {log_guidance}"));
     }
     client.respond(id, result);
 }

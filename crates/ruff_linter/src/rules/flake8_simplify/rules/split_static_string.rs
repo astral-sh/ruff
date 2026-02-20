@@ -9,8 +9,6 @@ use std::cmp::Ordering;
 use std::fmt::{Display, Formatter};
 
 use crate::checkers::ast::Checker;
-use crate::preview::is_maxsplit_without_separator_fix_enabled;
-use crate::settings::LinterSettings;
 use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -113,9 +111,7 @@ pub(crate) fn split_static_string(
     let sep_arg = arguments.find_argument_value("sep", 0);
     let split_replacement = if let Some(sep) = sep_arg {
         match sep {
-            Expr::NoneLiteral(_) => {
-                split_default(str_value, maxsplit_value, method, checker.settings())
-            }
+            Expr::NoneLiteral(_) => split_default(str_value, maxsplit_value, method),
             Expr::StringLiteral(sep_value) => {
                 let sep_value_str = sep_value.value.to_str();
                 Some(split_sep(str_value, sep_value_str, maxsplit_value, method))
@@ -126,7 +122,7 @@ pub(crate) fn split_static_string(
             }
         }
     } else {
-        split_default(str_value, maxsplit_value, method, checker.settings())
+        split_default(str_value, maxsplit_value, method)
     };
 
     let mut diagnostic = checker.report_diagnostic(SplitStaticString { method }, call.range());
@@ -196,15 +192,9 @@ fn construct_replacement(elts: &[&str], flags: StringLiteralFlags) -> Expr {
     })
 }
 
-fn split_default(
-    str_value: &StringLiteralValue,
-    max_split: i32,
-    method: Method,
-    settings: &LinterSettings,
-) -> Option<Expr> {
+fn split_default(str_value: &StringLiteralValue, max_split: i32, method: Method) -> Option<Expr> {
     let string_val = str_value.to_str();
     match max_split.cmp(&0) {
-        Ordering::Greater if !is_maxsplit_without_separator_fix_enabled(settings) => None,
         Ordering::Greater | Ordering::Equal => {
             let Ok(max_split) = usize::try_from(max_split) else {
                 return None;

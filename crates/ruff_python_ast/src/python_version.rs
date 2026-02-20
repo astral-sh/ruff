@@ -35,6 +35,10 @@ impl PythonVersion {
         major: 3,
         minor: 14,
     };
+    pub const PY315: PythonVersion = PythonVersion {
+        major: 3,
+        minor: 15,
+    };
 
     pub fn iter() -> impl Iterator<Item = PythonVersion> {
         [
@@ -46,6 +50,7 @@ impl PythonVersion {
             PythonVersion::PY312,
             PythonVersion::PY313,
             PythonVersion::PY314,
+            PythonVersion::PY315,
         ]
         .into_iter()
     }
@@ -61,7 +66,7 @@ impl PythonVersion {
 
     /// The latest Python version supported in preview
     pub fn latest_preview() -> Self {
-        let latest_preview = Self::PY314;
+        let latest_preview = Self::PY315;
         debug_assert!(latest_preview >= Self::latest());
         latest_preview
     }

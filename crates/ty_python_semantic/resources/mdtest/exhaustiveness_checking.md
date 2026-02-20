@@ -471,7 +471,6 @@ def i[T: (int, str)](x: T) -> T:
         case str():
             pass
         case _:
-            reveal_type(x)  # revealed: Never
             assert_never(x)
 
     return x

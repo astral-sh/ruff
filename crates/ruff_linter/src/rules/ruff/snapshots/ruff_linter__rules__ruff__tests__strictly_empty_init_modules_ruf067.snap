@@ -1,0 +1,344 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+--- Linter settings ---
+-linter.ruff.strictly_empty_init_modules = false
++linter.ruff.strictly_empty_init_modules = true
+
+--- Summary ---
+Removed: 5
+Added: 24
+
+--- Removed ---
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:12:1
+   |
+10 | __all__ = __all__ = __all__
+11 |
+12 | MY_CONSTANT = 5
+   | ^^^^^^^^^^^^^^^
+13 | """This is an important constant."""
+   |
+
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:15:1
+   |
+13 | """This is an important constant."""
+14 |
+15 | os.environ["FOO"] = 1
+   | ^^^^^^^^^^^^^^^^^^^^^
+   |
+
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:18:1
+   |
+18 | / def foo():
+19 | |     return Path("foo.py")
+   | |_________________________^
+20 |
+21 |   def __getattr__(name):  # ok
+   |
+
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:26:1
+   |
+24 |   __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+25 |
+26 | / if os.environ["FOO"] != "1":  # RUF067
+27 | |     MY_CONSTANT = 4  # ok, don't flag nested statements
+   | |___________________^
+28 |
+29 |   if TYPE_CHECKING:  # ok
+   |
+
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:48:1
+   |
+47 | # non-`extend_path` assignments are not allowed
+48 | __path__ = 5  # RUF067
+   | ^^^^^^^^^^^^
+49 |
+50 | # also allow `__author__`
+   |
+
+
+
+--- Added ---
+RUF067 `__init__` module should not contain any code
+ --> __init__.py:1:1
+  |
+1 | """This is the module docstring."""
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 |
+3 | # convenience imports:
+  |
+
+
+RUF067 `__init__` module should not contain any code
+ --> __init__.py:4:1
+  |
+3 | # convenience imports:
+4 | import os
+  | ^^^^^^^^^
+5 | from pathlib import Path
+  |
+
+
+RUF067 `__init__` module should not contain any code
+ --> __init__.py:5:1
+  |
+3 | # convenience imports:
+4 | import os
+5 | from pathlib import Path
+  | ^^^^^^^^^^^^^^^^^^^^^^^^
+6 |
+7 | __all__ = ["MY_CONSTANT"]
+  |
+
+
+RUF067 `__init__` module should not contain any code
+ --> __init__.py:7:1
+  |
+5 | from pathlib import Path
+6 |
+7 | __all__ = ["MY_CONSTANT"]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
+8 | __all__ += ["foo"]
+9 | __all__: list[str] = __all__
+  |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:8:1
+   |
+ 7 | __all__ = ["MY_CONSTANT"]
+ 8 | __all__ += ["foo"]
+   | ^^^^^^^^^^^^^^^^^^
+ 9 | __all__: list[str] = __all__
+10 | __all__ = __all__ = __all__
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:9:1
+   |
+ 7 | __all__ = ["MY_CONSTANT"]
+ 8 | __all__ += ["foo"]
+ 9 | __all__: list[str] = __all__
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 | __all__ = __all__ = __all__
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:10:1
+   |
+ 8 | __all__ += ["foo"]
+ 9 | __all__: list[str] = __all__
+10 | __all__ = __all__ = __all__
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | MY_CONSTANT = 5
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:12:1
+   |
+10 | __all__ = __all__ = __all__
+11 |
+12 | MY_CONSTANT = 5
+   | ^^^^^^^^^^^^^^^
+13 | """This is an important constant."""
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:13:1
+   |
+12 | MY_CONSTANT = 5
+13 | """This is an important constant."""
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |
+15 | os.environ["FOO"] = 1
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:15:1
+   |
+13 | """This is an important constant."""
+14 |
+15 | os.environ["FOO"] = 1
+   | ^^^^^^^^^^^^^^^^^^^^^
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:18:1
+   |
+18 | / def foo():
+19 | |     return Path("foo.py")
+   | |_________________________^
+20 |
+21 |   def __getattr__(name):  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:21:1
+   |
+19 |       return Path("foo.py")
+20 |
+21 | / def __getattr__(name):  # ok
+22 | |     return name
+   | |_______________^
+23 |
+24 |   __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:24:1
+   |
+22 |     return name
+23 |
+24 | __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 | if os.environ["FOO"] != "1":  # RUF067
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:26:1
+   |
+24 |   __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+25 |
+26 | / if os.environ["FOO"] != "1":  # RUF067
+27 | |     MY_CONSTANT = 4  # ok, don't flag nested statements
+   | |___________________^
+28 |
+29 |   if TYPE_CHECKING:  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:29:1
+   |
+27 |       MY_CONSTANT = 4  # ok, don't flag nested statements
+28 |
+29 | / if TYPE_CHECKING:  # ok
+30 | |     MY_CONSTANT = 3
+   | |___________________^
+31 |
+32 |   import typing
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:32:1
+   |
+30 |     MY_CONSTANT = 3
+31 |
+32 | import typing
+   | ^^^^^^^^^^^^^
+33 |
+34 | if typing.TYPE_CHECKING: # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:34:1
+   |
+32 |   import typing
+33 |
+34 | / if typing.TYPE_CHECKING: # ok
+35 | |     MY_CONSTANT = 2
+   | |___________________^
+36 |
+37 |   __version__ = "1.2.3"  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:37:1
+   |
+35 |     MY_CONSTANT = 2
+36 |
+37 | __version__ = "1.2.3"  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^
+38 |
+39 | def __dir__():  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:39:1
+   |
+37 |   __version__ = "1.2.3"  # ok
+38 |
+39 | / def __dir__():  # ok
+40 | |     return ["foo"]
+   | |__________________^
+41 |
+42 |   import pkgutil
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:42:1
+   |
+40 |     return ["foo"]
+41 |
+42 | import pkgutil
+   | ^^^^^^^^^^^^^^
+43 |
+44 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:44:1
+   |
+42 | import pkgutil
+43 |
+44 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+45 | __path__ = unknown.extend_path(__path__, __name__)  # also ok
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:45:1
+   |
+44 | __path__ = pkgutil.extend_path(__path__, __name__)  # ok
+45 | __path__ = unknown.extend_path(__path__, __name__)  # also ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+46 |
+47 | # non-`extend_path` assignments are not allowed
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:48:1
+   |
+47 | # non-`extend_path` assignments are not allowed
+48 | __path__ = 5  # RUF067
+   | ^^^^^^^^^^^^
+49 |
+50 | # also allow `__author__`
+   |
+
+
+RUF067 `__init__` module should not contain any code
+  --> __init__.py:51:1
+   |
+50 | # also allow `__author__`
+51 | __author__ = "The Author"  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |

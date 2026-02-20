@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: tuples.md - Comparison: Tuples - Chained comparisons with elements that incorrectly implement `__bool__`
 mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/tuples.md

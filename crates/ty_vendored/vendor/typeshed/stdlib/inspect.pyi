@@ -324,6 +324,7 @@ def isgenerator(object: object) -> TypeIs[GeneratorType[Any, Any, Any]]:
         gi_frame        frame object or possibly None once the generator has
                         been exhausted
         gi_running      set to 1 when generator is executing, 0 otherwise
+        gi_suspended    set to 1 when the generator is suspended at a yield point, 0 otherwise
         gi_yieldfrom    object being iterated by yield from or None
 
         __iter__()      defined to support iteration over container
@@ -1087,6 +1088,7 @@ def formatargvalues(
 def getmro(cls: type) -> tuple[type, ...]:
     """Return tuple of base classes (including cls) in method resolution order."""
 
+@deprecated("Deprecated since Python 3.5. Use `Signature.bind` and `Signature.bind_partial` instead.")
 def getcallargs(func: Callable[_P, Any], /, *args: _P.args, **kwds: _P.kwargs) -> dict[str, Any]:
     """Get the mapping of arguments to values.
 

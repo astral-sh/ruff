@@ -1208,7 +1208,7 @@ def _(flag: bool):
     reveal_type(C1.y)  # revealed: int | str
 
     C1.y = 100
-    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:8'>`"
+    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3:15'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:8:15'>`"
     C1.y = "problematic"
 
     class C2:
@@ -1285,13 +1285,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
+    # error: [unresolved-attribute] "Attribute `x` is not defined on `<class 'C2'>` in union `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
+    # error: [unresolved-attribute] "Attribute `x` is not defined on `C2` in union `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1465,6 +1465,40 @@ def _(flag: bool):
     # handling in `validate_attribute_assignment` for this.
     # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'>`"
     C.x = 1
+```
+
+## Unions with some paths unbound
+
+If the symbol is unbound in some elements of the union, that's also an error:
+
+```py
+def f(x: list[int], y: list[int] | None, z: None):
+    x.index
+    # error: [unresolved-attribute] "Attribute `index` is not defined on `None` in union `list[int] | None`"
+    y.index
+    # error: [unresolved-attribute] "Object of type `None` has no attribute `index`"
+    z.index
+```
+
+This is also true of type aliases of unions, and of special-case `NewType`s that have a union as a
+base type:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NewType
+
+type MaybeList = list[int] | None
+FloatNT = NewType("FloatNT", float)
+
+def g(x: MaybeList, y: FloatNT):
+    # error: [unresolved-attribute] "Attribute `index` is not defined on `None` in union `MaybeList`"
+    x.index
+    # error: [unresolved-attribute] "Attribute `hex` is not defined on `int` in union `FloatNT`"
+    y.hex
 ```
 
 ## Inherited class attributes
@@ -1867,11 +1901,148 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
-        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
+        # error: [invalid-assignment]
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
 ThisFails().x
+```
+
+## Metaclasses with custom `__getattr__` methods
+
+A class is an instance of its metaclass. When attribute lookup on a class fails, Python falls back
+to `type(cls).__getattr__`, the metaclass's `__getattr__` method. This is analogous to how instance
+attribute access falls back to the class's `__getattr__`.
+
+### Basic
+
+```py
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.whatever)  # revealed: int
+```
+
+### Class attributes take precedence
+
+If the class defines the attribute directly, it takes precedence over the metaclass `__getattr__`:
+
+```py
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    x: str = "hello"
+
+reveal_type(Foo.x)  # revealed: str
+reveal_type(Foo.unknown)  # revealed: int
+```
+
+### Instance `__getattr__` is separate
+
+A `__getattr__` defined on the class itself applies to instance attribute access, not class
+attribute access. A `__getattr__` on the metaclass applies to class attribute access:
+
+```py
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    def __getattr__(self, name: str) -> str:
+        return "a"
+
+# Class access uses the metaclass __getattr__
+reveal_type(Foo.unknown)  # revealed: int
+
+# Instance access uses the class __getattr__
+reveal_type(Foo().unknown)  # revealed: str
+```
+
+### Possibly unbound class attributes
+
+If a class attribute is possibly unbound, the type is unioned with the metaclass `__getattr__`
+return type:
+
+```py
+def flag() -> bool:
+    return True
+
+class Meta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    if flag():
+        maybe: str = "hello"
+
+reveal_type(Foo.maybe)  # revealed: str | int
+```
+
+### Inherited from a base metaclass
+
+`__getattr__` defined on a base metaclass is found via the metaclass MRO:
+
+```py
+class BaseMeta(type):
+    def __getattr__(cls, name: str) -> int:
+        return 1
+
+class Meta(BaseMeta): ...
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.whatever)  # revealed: int
+```
+
+## Metaclasses with custom `__getattribute__` methods
+
+If a metaclass provides a custom `__getattribute__`, we use its return type for unknown attributes
+on the class. Known class attributes still take precedence, matching the behavior of type checkers
+like mypy and pyright.
+
+### Basic
+
+```py
+class Meta(type):
+    def __getattribute__(cls, name: str, /) -> int:
+        return 1
+
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.whatever)  # revealed: int
+```
+
+### Class attributes take precedence
+
+```py
+class Meta(type):
+    def __getattribute__(cls, name: str) -> int:
+        return 1
+
+class Foo(metaclass=Meta):
+    x: str = "hello"
+
+reveal_type(Foo.x)  # revealed: str
+reveal_type(Foo.unknown)  # revealed: int
+```
+
+### `__getattribute__` takes precedence over `__getattr__`
+
+```py
+class Meta(type):
+    def __getattribute__(cls, name: str) -> int:
+        return 1
+
+    def __getattr__(cls, name: str) -> str:
+        return "a"
+
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo.x)  # revealed: int
 ```
 
 ## Classes with custom `__setattr__` methods
@@ -1954,11 +2125,12 @@ of type `Never`):
 ```py
 from typing_extensions import Never, Any
 
-def _(n: Never):
-    reveal_type(n.__setattr__)  # revealed: Never
+def _(never: Never):
+    reveal_type(never.__setattr__)  # revealed: Never
 
+def _(never: Never):
     # No error:
-    n.non_existing = 1
+    never.non_existing = 1
 ```
 
 And similarly for `Any`:
@@ -2002,6 +2174,64 @@ def _(ns: argparse.Namespace):
     ns.whatever = 42
 ```
 
+### `__setattr__` is a fallback for explicitly defined attributes
+
+When a class has both a custom `__setattr__` method and explicitly defined attributes, the
+`__setattr__` method is treated as a fallback. The type of the explicit attribute takes precedence
+over the `__setattr__` parameter type.
+
+This matches the behavior of other type checkers and reflects the common pattern in libraries like
+PyTorch, where `__setattr__` may have a narrow type signature but forwards to
+`super().__setattr__()` for attributes that don't match.
+
+```py
+from typing import Union
+
+class Tensor: ...
+
+class Module:
+    def __setattr__(self, name: str, value: Union[Tensor, "Module"]) -> None:
+        super().__setattr__(name, value)
+
+class MyModule(Module):
+    some_param: int  # Explicit attribute with type `int`
+
+def use_module(m: MyModule, param: int) -> None:
+    # This is allowed because `some_param` is explicitly defined with type `int`,
+    # even though `__setattr__` only accepts `Union[Tensor, Module]`.
+    m.some_param = param
+
+    # But assigning to an attribute that's not explicitly defined will still
+    # use `__setattr__` for validation.
+    # error: [unresolved-attribute] "Cannot assign object of type `int` to attribute `undefined_param` on type `MyModule` with custom `__setattr__` method."
+    m.undefined_param = param
+```
+
+### `__setattr__` returning `Never` blocks all assignments
+
+When `__setattr__` returns `Never` (indicating an immutable class), all attribute assignments are
+blocked, even if the value type doesn't match `__setattr__`'s parameter type.
+
+```py
+from typing import NoReturn
+
+class Immutable:
+    x: float
+
+    def __setattr__(self, name: str, value: int) -> NoReturn:
+        raise AttributeError("Immutable")
+
+def _(obj: Immutable) -> None:
+    # Even though `"foo"` doesn't match `__setattr__`'s `value: int` parameter,
+    # we still detect that `__setattr__` returns `Never` and block the assignment.
+    # error: [invalid-assignment] "Cannot assign to attribute `x` on type `Immutable` whose `__setattr__` method returns `Never`/`NoReturn`"
+    obj.x = "foo"
+
+    # Same for assignments that would match `__setattr__`'s parameter type.
+    # error: [invalid-assignment] "Cannot assign to attribute `x` on type `Immutable` whose `__setattr__` method returns `Never`/`NoReturn`"
+    obj.x = 42
+```
+
 ## Objects of all types have a `__class__` method
 
 The type of `x.__class__` is the same as `x`'s meta-type. `x.__class__` is always the same value as
@@ -2036,8 +2266,8 @@ def f(a: int, b: typing_extensions.LiteralString, c: int | str, d: type[str]):
     reveal_type(b.__class__)  # revealed: <class 'str'>
     reveal_type(type(b))  # revealed: <class 'str'>
 
-    reveal_type(c.__class__)  # revealed: type[int] | type[str]
-    reveal_type(type(c))  # revealed: type[int] | type[str]
+    reveal_type(c.__class__)  # revealed: type[int | str]
+    reveal_type(type(c))  # revealed: type[int | str]
 
     # `type[type]`, a.k.a., either the class `type` or some subclass of `type`.
     # It would be incorrect to infer `Literal[type]` here,
@@ -2072,7 +2302,7 @@ mod.global_symbol = "b"
 mod.global_symbol = 1
 
 # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `global_symbol` of type `str`"
-(_, mod.global_symbol) = (..., 1)
+_, mod.global_symbol = (..., 1)
 
 # TODO: this should be an error, but we do not understand list unpackings yet.
 [_, mod.global_symbol] = [1, 2]
@@ -2513,8 +2743,9 @@ class Toggle:
         if check(self.y):
             self.y = True
 
-reveal_type(Toggle().x)  # revealed: Literal[True]
-reveal_type(Toggle().y)  # revealed:  Unknown | Literal[True]
+# Literal[True] or undefined
+reveal_type(Toggle().x)  # revealed: Literal[True] | Unknown
+reveal_type(Toggle().y)  # revealed: Unknown | Literal[True]
 ```
 
 Make sure that the growing union of literals `Literal[0, 1, 2, ...]` collapses to `int` during
@@ -2628,9 +2859,11 @@ reveal_type(C().x)  # revealed: int
 
 ### Attributes defined in methods with unknown decorators
 
-When an attribute is defined in a method that is decorated with an unknown decorator, we consider it
-to be accessible on both the class itself and instances of that class. This is consistent with the
-gradual guarantee, because the unknown decorator *could* be an alias for `builtins.classmethod`.
+When an attribute is defined in a method that is decorated with an unknown decorator, the method is
+treated as a regular instance method. The attribute is accessible on instances but not on the class
+itself. We don't assume that an unknown decorator might be an alias for `@classmethod`, because that
+would cause the attribute to pollute class-level lookups and potentially override instance-level
+declarations.
 
 ```py
 # error: [unresolved-import]
@@ -2641,8 +2874,57 @@ class C:
     def f(self):
         self.x: int = 1
 
-reveal_type(C.x)  # revealed: int
+# error: [unresolved-attribute]
+reveal_type(C.x)  # revealed: Unknown
 reveal_type(C().x)  # revealed: int
+
+class D:
+    def __init__(self):
+        self.x: int = 1
+
+    @unknown_decorator
+    def f(self):
+        self.x = 2
+
+reveal_type(D().x)  # revealed: int
+```
+
+### Attributes declared in `__init__` but also assigned in a decorated method
+
+When an attribute is declared with a type annotation in `__init__`, and then assigned (without
+annotation) in a method decorated with a known decorator like `@cache`, we should respect the
+declared type from `__init__`. The decorated method's assignment should not cause the type to
+include `Unknown`.
+
+```py
+from functools import cache
+
+class C:
+    def __init__(self) -> None:
+        self.x: int = 0
+
+    @cache
+    def method(self) -> None:
+        self.x = 1
+
+def f(c: C) -> None:
+    reveal_type(c.x)  # revealed: int
+```
+
+### Attributes defined in a property
+
+Instance attributes can be defined in a `@property` getter. Properties are still instance methods
+that take `self`, so attribute assignments in them should be recognized.
+
+```py
+class C:
+    @property
+    def prop(self) -> int:
+        self.x: int = 1
+        return self.x
+
+def f(c: C) -> None:
+    reveal_type(c.x)  # revealed: int
 ```
 
 ## Enum classes
@@ -2773,6 +3055,23 @@ import baz
 reveal_type(foo.bar)  # revealed: Unknown
 # error: [possibly-missing-attribute]
 reveal_type(baz.bar)  # revealed: Unknown
+```
+
+## Diagnostic for function attribute accessed on `Callable` type
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable
+
+def f(x: Callable):
+    x.__name__  # error: [unresolved-attribute]
+    x.__annotate__  # error: [unresolved-attribute]
 ```
 
 ## References

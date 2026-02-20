@@ -30,6 +30,17 @@ INT002 `format` method argument is resolved before function call; consider `_("s
 5 | _gettext("{}".format("line"))  # no lint
   |
 
+INT002 `format` method in plural argument is resolved before function call
+ --> INT002.py:3:31
+  |
+1 | _("{}".format("line"))
+2 | gettext("{}".format("line"))
+3 | ngettext("{}".format("line"), "{}".format("lines"), 2)
+  |                               ^^^^^^^^^^^^^^^^^^^^
+4 |
+5 | _gettext("{}".format("line"))  # no lint
+  |
+
 INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
   --> INT002.py:18:21
    |
@@ -51,6 +62,16 @@ INT002 `format` method argument is resolved before function call; consider `_("s
 21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
    |
 
+INT002 `format` method in plural argument is resolved before function call
+  --> INT002.py:19:49
+   |
+18 | gettext_mod.gettext("Hello, {}!".format(name))
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |                                                 ^^^^^^^^^^^^^^^^^^^^^^^^^^
+20 | gettext_fn("Hello, {}!".format(name))
+21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |
+
 INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
   --> INT002.py:20:12
    |
@@ -68,6 +89,15 @@ INT002 `format` method argument is resolved before function call; consider `_("s
 20 | gettext_fn("Hello, {}!".format(name))
 21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+INT002 `format` method in plural argument is resolved before function call
+  --> INT002.py:21:40
+   |
+19 | gettext_mod.ngettext("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+20 | gettext_fn("Hello, {}!".format(name))
+21 | ngettext_fn("Hello, {}!".format(name), "Hello, {}s!".format(name), 2)
+   |                                        ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 
 INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
@@ -159,4 +189,13 @@ INT002 `format` method argument is resolved before function call; consider `_("s
 48 | builtins.gettext("{}".format("line"))
 49 | builtins.ngettext("{}".format("line"), "{}".format("lines"), 2)
    |                   ^^^^^^^^^^^^^^^^^^^
+   |
+
+INT002 `format` method in plural argument is resolved before function call
+  --> INT002.py:49:40
+   |
+47 | builtins._("{}".format("line"))
+48 | builtins.gettext("{}".format("line"))
+49 | builtins.ngettext("{}".format("line"), "{}".format("lines"), 2)
+   |                                        ^^^^^^^^^^^^^^^^^^^^
    |

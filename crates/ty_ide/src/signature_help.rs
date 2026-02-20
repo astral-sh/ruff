@@ -34,8 +34,8 @@ pub struct ParameterDetails<'db> {
     pub name: String,
     /// The parameter label in the signature (e.g., "param1: str")
     pub label: String,
-    /// The annotated type of the parameter, if any
-    pub ty: Option<Type<'db>>,
+    /// The annotated type of the parameter. If no annotation was provided, this is `Unknown`.
+    pub ty: Type<'db>,
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
@@ -237,7 +237,7 @@ fn create_parameters_from_offsets<'db>(
     docstring: Option<&Docstring>,
     parameter_names: &[String],
     parameter_kinds: &[ParameterKind],
-    parameter_types: &[Option<Type<'db>>],
+    parameter_types: &[Type<'db>],
 ) -> Vec<ParameterDetails<'db>> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(docstring) = docstring {
@@ -264,12 +264,11 @@ fn create_parameters_from_offsets<'db>(
                 parameter_kinds.get(i),
                 Some(ParameterKind::PositionalOnly { .. })
             );
-            let ty = parameter_types.get(i).copied().flatten();
 
             ParameterDetails {
                 name: param_name.to_string(),
                 label,
-                ty,
+                ty: parameter_types[i],
                 documentation: param_docs.get(param_name).cloned(),
                 is_positional_only,
             }
@@ -528,7 +527,8 @@ def ab(a: str): ...
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int) -> Unknown
         ---------------------------------------------
@@ -583,7 +583,8 @@ def ab(a: str):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int) -> Unknown
         ---------------------------------------------
@@ -638,7 +639,8 @@ def ab(a: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, b: int) -> Unknown
         ---------------------------------------------
@@ -691,7 +693,8 @@ def ab(a: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, b: int) -> Unknown
         ---------------------------------------------
@@ -750,7 +753,8 @@ def ab(a: int, *, c: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, *, b: int) -> Unknown
         ---------------------------------------------
@@ -815,7 +819,8 @@ def ab(a: int, *, c: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, *, c: int) -> Unknown
         ---------------------------------------------
@@ -894,6 +899,85 @@ def ab(a: int, *, c: int):
                 .map(Docstring::render_plaintext),
             Some(expected_docstring.to_string())
         );
+    }
+
+    #[test]
+    fn signature_help_generic_method_resolves_typevars() {
+        let test = cursor_test(
+            r#"
+        d: dict[str, int] = {"a": 1}
+        d.get(<CURSOR>
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+
+        // dict.get has multiple overloads; use the active signature
+        let active_idx = result
+            .active_signature
+            .expect("Should have an active signature");
+        let signature = &result.signatures[active_idx];
+
+        // The first parameter of dict.get is `key`, whose annotation is
+        // the TypeVar `_KT`. After TypeVar resolution at this call site,
+        // the parameter type should be `str` (not `_KT`).
+        let key_param = &signature.parameters[0];
+        assert_eq!(key_param.name, "key");
+        let type_display = format!("{}", key_param.ty.display(&test.db));
+        assert_eq!(type_display, "str");
+    }
+
+    #[test]
+    fn signature_help_generic_list_method_resolves_typevars() {
+        let test = cursor_test(
+            r#"
+        items: list[int] = [1, 2, 3]
+        items.append(<CURSOR>
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        assert_eq!(result.signatures.len(), 1);
+
+        let signature = &result.signatures[0];
+
+        // list.append's parameter is typed as `_T`, which should resolve
+        // to `int` for a `list[int]`.
+        let object_param = &signature.parameters[0];
+        let type_display = format!("{}", object_param.ty.display(&test.db));
+        assert_eq!(type_display, "int");
+    }
+
+    #[test]
+    fn signature_help_generic_function_resolves_typevars() {
+        // This tests function-level TypeVar resolution, where the TypeVar
+        // is on the function itself (not inherited from a generic class).
+        // The specialization is inferred purely from the call arguments.
+        let test = cursor_test(
+            r#"
+        def pair[T](a: T, b: T) -> tuple[T, T]:
+            return (a, b)
+
+        def get_name() -> str: ...
+        pair(get_name(), <CURSOR>
+        "#,
+        );
+
+        let result = test.signature_help().expect("Should have signature help");
+        assert_eq!(result.signatures.len(), 1);
+
+        let signature = &result.signatures[0];
+
+        // `T` should be resolved to `str` from the first argument.
+        let a_param = &signature.parameters[0];
+        assert_eq!(a_param.name, "a");
+        let a_type = format!("{}", a_param.ty.display(&test.db));
+        assert_eq!(a_type, "str");
+
+        let b_param = &signature.parameters[1];
+        assert_eq!(b_param.name, "b");
+        let b_type = format!("{}", b_param.ty.display(&test.db));
+        assert_eq!(b_type, "str");
     }
 
     #[test]

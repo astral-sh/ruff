@@ -442,6 +442,8 @@ class FileIO(RawIOBase, _RawIOBase, BinaryIO):  # type: ignore[misc]  # incompat
     """
 
     mode: str
+    """String giving the file mode"""
+
     # The type of "name" equals the argument passed in to the constructor,
     # but that can make FileIO incompatible with other I/O types that assume
     # "name" is a str. In the future, making FileIO generic might help.
@@ -629,8 +631,25 @@ class _TextIOBase(_IOBase):
     """
 
     encoding: str
+    """Encoding of the text stream.
+
+    Subclasses should override.
+    """
+
     errors: str | None
+    """The error setting of the decoder or encoder.
+
+    Subclasses should override.
+    """
+
     newlines: str | tuple[str, ...] | None
+    """Line endings translated so far.
+
+    Only line endings translated during reading are considered.
+
+    Subclasses should override.
+    """
+
     def __iter__(self) -> Iterator[str]:  # type: ignore[override]
         """Implement iter(self)."""
 

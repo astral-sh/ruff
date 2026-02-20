@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: attributes.md - Attributes - Invalid access to attribute
 mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md

@@ -51,12 +51,19 @@ expression: initialization_result
     "renameProvider": {
       "prepareProvider": true
     },
+    "foldingRangeProvider": true,
     "declarationProvider": true,
     "executeCommandProvider": {
       "commands": [
         "ty.printDebugInformation"
       ],
       "workDoneProgress": false
+    },
+    "workspace": {
+      "workspaceFolders": {
+        "supported": true,
+        "changeNotifications": true
+      }
     },
     "semanticTokensProvider": {
       "legend": {

@@ -82,3 +82,10 @@ def get_key():
 
 ages = {"Tom": 23, "Maria": 23, "Dog": 11}
 age = ages.get(get_key(), None)
+
+
+age = ages.get(
+    "Cat",
+    # text
+    None,
+)

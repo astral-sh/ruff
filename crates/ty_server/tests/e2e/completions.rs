@@ -320,21 +320,30 @@ re.match('', '', fla<CURSOR>
         "label": "FloatingPointError",
         "kind": 7,
         "detail": "<class 'FloatingPointError'>",
-        "documentation": "Floating-point operation failed.\n",
+        "documentation": {
+          "kind": "plaintext",
+          "value": "Floating-point operation failed.\n"
+        },
         "sortText": "1"
       },
       {
         "label": "PythonFinalizationError",
         "kind": 7,
         "detail": "<class 'PythonFinalizationError'>",
-        "documentation": "Operation blocked during Python finalization.\n",
+        "documentation": {
+          "kind": "plaintext",
+          "value": "Operation blocked during Python finalization.\n"
+        },
         "sortText": "2"
       },
       {
         "label": "float",
         "kind": 7,
         "detail": "<class 'float'>",
-        "documentation": "Convert a string or number to a floating-point number, if possible.\n",
+        "documentation": {
+          "kind": "plaintext",
+          "value": "Convert a string or number to a floating-point number, if possible.\n"
+        },
         "sortText": "3"
       }
     ]

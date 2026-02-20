@@ -132,6 +132,75 @@ class D:
 reveal_type(D.a)  # revealed: int
 ```
 
+## `ClassVar` cannot contain non-self type variables
+
+`ClassVar` cannot include type variables at any level of nesting.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import ClassVar, TypeVar, ParamSpec, Generic
+
+T = TypeVar("T")
+P = ParamSpec("P")
+
+class C(Generic[T, P]):
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    a: ClassVar[T]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    b: ClassVar[list[T]]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    c: ClassVar[int | T]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    d: ClassVar[P]
+
+    # No error: no type variables
+    e: ClassVar[int] = 1
+
+# PEP 695 syntax
+class D[T]:
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    x: ClassVar[T]
+
+    # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    y: ClassVar[dict[str, T]]
+```
+
+## `ClassVar` can contain `Self`
+
+`Self` is allowed inside `ClassVar`.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import ClassVar, Self
+
+class Base:
+    all_instances: ClassVar[list[Self]]
+
+    def method(self):
+        reveal_type(self.all_instances)  # revealed: list[Self@method]
+
+    @classmethod
+    def cls_method(cls):
+        reveal_type(cls.all_instances)  # revealed: list[Self@cls_method]
+
+reveal_type(Base.all_instances)  # revealed: list[Base]
+
+class Sub(Base): ...
+
+reveal_type(Sub.all_instances)  # revealed: list[Sub]
+```
+
 ## Illegal `ClassVar` in type expression
 
 ```py
@@ -172,6 +241,7 @@ def f(x: ClassVar[int]) -> None:
     pass
 
 # error: [invalid-type-form] "`ClassVar` is not allowed in function parameter annotations"
+# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
 def f[T](x: ClassVar[T]) -> T:
     return x
 
@@ -180,6 +250,7 @@ def f() -> ClassVar[int]:
     return 1
 
 # error: [invalid-type-form] "`ClassVar` is not allowed in function return type annotations"
+# error: [invalid-type-form] "`ClassVar` cannot contain type variables"
 def f[T](x: T) -> ClassVar[T]:
     return x
 

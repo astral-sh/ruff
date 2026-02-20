@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: intersections.md - Comparison: Intersections - Diagnostics - Unsupported operators for positive contributions
 mdtest path: crates/ty_python_semantic/resources/mdtest/comparison/intersections.md

@@ -234,7 +234,7 @@ And, as the return type:
 
 ```py
 def _(c: Callable[[int, str], Callable[[int], int]]):
-    reveal_type(c)  # revealed: (int, str, /) -> (int, /) -> int
+    reveal_type(c)  # revealed: (int, str, /) -> ((int, /) -> int)
 ```
 
 ## Gradual form
@@ -367,7 +367,7 @@ def f_wrong(c: Callable[[], None]):
     # error: [unresolved-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
     c.__qualname__
 
-    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."
+    # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`"
     c.__qualname__ = "my_callable"
 ```
 

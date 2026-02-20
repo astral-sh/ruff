@@ -6,7 +6,7 @@ import importPlugin from "eslint-plugin-import";
 export default tseslint.config(
   tseslint.configs.eslintRecommended,
   tseslint.configs.recommended,
-  reactHooks.configs["recommended-latest"],
+  reactHooks.configs.flat.recommended,
   importPlugin.flatConfigs.recommended,
   importPlugin.flatConfigs.typescript,
   {

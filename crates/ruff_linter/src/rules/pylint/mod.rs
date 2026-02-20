@@ -46,6 +46,10 @@ mod tests {
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"))]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"))]
     #[test_case(Rule::ComparisonWithItself, Path::new("comparison_with_itself.py"))]
+    #[test_case(
+        Rule::SwapWithTemporaryVariable,
+        Path::new("swap_with_temporary_variable.py")
+    )]
     #[test_case(Rule::EqWithoutHash, Path::new("eq_without_hash.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment.py"))]
     #[test_case(Rule::EmptyComment, Path::new("empty_comment_line_continuation.py"))]

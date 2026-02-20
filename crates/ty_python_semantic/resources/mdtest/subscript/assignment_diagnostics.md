@@ -121,7 +121,7 @@ class Animal(TypedDict):
 def _(being: Person | Animal) -> None:
     # error: [invalid-key]
     # error: [invalid-key]
-    being["surname"] = "unknown"
+    being["nane"] = "unknown"
 ```
 
 ## Wrong value type for one element of a union

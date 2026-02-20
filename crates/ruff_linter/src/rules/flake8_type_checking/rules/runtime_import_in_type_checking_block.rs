@@ -123,11 +123,12 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
         };
 
         if binding.context.is_typing()
-            && binding.references().any(|reference_id| {
+            && let Some(runtime_reference) = binding.references().find_map(|reference_id| {
                 let reference = checker.semantic().reference(reference_id);
 
-                reference.in_runtime_context()
-                    && !(ignore_dunder_all_references && reference.in_dunder_all_definition())
+                (reference.in_runtime_context()
+                    && !(ignore_dunder_all_references && reference.in_dunder_all_definition()))
+                .then_some(reference)
             })
         {
             let Some(node_id) = binding.source else {
@@ -141,6 +142,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                 range: binding.range(),
                 parent_range: binding.parent_range(checker.semantic()),
                 needs_future_import: false, // TODO(brent) See #19359.
+                runtime_reference: Some(runtime_reference),
             };
 
             if checker.rule_is_ignored(Rule::RuntimeImportInTypeCheckingBlock, import.start())
@@ -197,6 +199,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     import,
                     range,
                     parent_range,
+                    runtime_reference,
                     ..
                 } in imports
                 {
@@ -207,6 +210,9 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                         },
                         range,
                     );
+                    if let Some(runtime_reference) = runtime_reference {
+                        diagnostic.secondary_annotation("Used at runtime here", runtime_reference);
+                    }
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }
@@ -225,6 +231,7 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                     import,
                     range,
                     parent_range,
+                    runtime_reference,
                     ..
                 } in imports
                 {
@@ -235,6 +242,9 @@ pub(crate) fn runtime_import_in_type_checking_block(checker: &Checker, scope: &S
                         },
                         range,
                     );
+                    if let Some(runtime_reference) = runtime_reference {
+                        diagnostic.secondary_annotation("Used at runtime here", runtime_reference);
+                    }
                     if let Some(range) = parent_range {
                         diagnostic.set_parent(range.start());
                     }

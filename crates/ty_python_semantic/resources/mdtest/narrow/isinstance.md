@@ -213,8 +213,7 @@ def f(x: dict[str, int] | list[str], y: object):
         reveal_type(x)  # revealed: list[str]
 
     if isinstance(y, t.Callable):
-        # TODO: a better top-materialization for `Callable`s (https://github.com/astral-sh/ty/issues/1426)
-        reveal_type(y)  # revealed: () -> object
+        reveal_type(y)  # revealed: Top[(...) -> object]
 ```
 
 ## Class types
@@ -556,4 +555,44 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(y)  # revealed: type[Contravariant[Never]]
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
+```
+
+## Narrowing with TypedDict unions
+
+Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
+during type ordering of normalized intersection types. Regression test for
+<https://github.com/astral-sh/ty/issues/2451>.
+
+```py
+from typing import Any, TypedDict, cast
+
+class A(TypedDict):
+    x: str
+
+class B(TypedDict):
+    y: str
+
+T = int | A | B
+
+def test(a: Any, items: list[T]) -> None:
+    combined = a or items
+    v = combined[0]
+    if isinstance(v, dict):
+        cast(T, v)  # no panic
+```
+
+## Narrowing with named expressions (walrus operator)
+
+When `isinstance()` is used with a named expression, the target of the named expression should be
+narrowed.
+
+```py
+def get_value() -> int | str:
+    return 1
+
+def f():
+    if isinstance(x := get_value(), int):
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: str
 ```
