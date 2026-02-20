@@ -274,7 +274,7 @@ impl FStringConversion {
             return Ok(Self::EmptyLiteral);
         }
 
-        // Parse the format string
+        // Parse the format string.
         let format_string = if raw {
             FormatString::from_raw_str(contents)
         } else {
