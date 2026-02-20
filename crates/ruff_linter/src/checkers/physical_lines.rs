@@ -78,6 +78,10 @@ pub(crate) fn check_physical_lines(
     if enforce_copyright_notice {
         missing_copyright_notice(locator, settings, context);
     }
+
+    if context.is_rule_enabled(Rule::TooManyLines) {
+        pylint::rules::too_many_lines(locator, settings, context);
+    }
 }
 
 #[cfg(test)]
