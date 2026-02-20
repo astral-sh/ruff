@@ -44,7 +44,7 @@ This is another case handled separately in ty, where a `.` provokes relative mod
 but where the module name is not resolvable.
 
 ```py
-from .does_not_exist import add  # error: [unresolved-import]
+from .does_not_exist import add  # error: [no-parent-package]
 
 stat = add(10, 15)
 ```
@@ -54,7 +54,7 @@ stat = add(10, 15)
 Like the previous test, but with sub-modules to ensure the span is correct.
 
 ```py
-from .does_not_exist.foo.bar import add  # error: [unresolved-import]
+from .does_not_exist.foo.bar import add  # error: [no-parent-package]
 
 stat = add(10, 15)
 ```
