@@ -703,9 +703,9 @@ impl FormatString {
     fn parse(text: &str, is_raw: bool) -> Result<Self, FormatParseError> {
         let mut cur_text: &str = text;
         let mut parts: Vec<FormatPart> = Vec::new();
-        // Try to parse both literals and bracketed format parts until we
-        // run out of text
         while !cur_text.is_empty() {
+            // Try to parse both literals and bracketed format parts until we
+            // run out of text
             cur_text = FormatString::parse_literal(cur_text, is_raw)
                 .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
                 .map(|(part, new_text)| {
