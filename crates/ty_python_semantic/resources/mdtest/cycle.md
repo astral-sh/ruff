@@ -54,8 +54,7 @@ JSONPrimitive = Union[str, int, float, bool, None]
 JSONValue = TypeAliasType("JSONValue", 'Union[JSONPrimitive, Sequence["JSONValue"], Mapping[str, "JSONValue"]]')
 
 def _(x: JSONValue):
-    # TODO: should be `JSONValue`
-    reveal_type(x)  # revealed: Divergent
+    reveal_type(x)  # revealed: Sequence[JSONValue] | int | float | None | Mapping[str, JSONValue]
 ```
 
 ## Self-referential legacy type variables
