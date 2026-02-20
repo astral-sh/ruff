@@ -178,7 +178,7 @@ error[abstract-method-in-final-class]: Final class `Q` has unimplemented abstrac
 12 |
 13 | @final
 14 | class Q(P): ...  # error: [abstract-method-in-final-class]
-   |       ^ `still_abstractmethod` is unimplemented
+   |       ^ Abstract method `still_abstractmethod` is unimplemented
 15 |
 16 | class R(Protocol):
    |
@@ -208,7 +208,7 @@ error[abstract-method-in-final-class]: Final class `S` has unimplemented abstrac
 19 |
 20 | @final
 21 | class S(R): ...  # error: [abstract-method-in-final-class]
-   |       ^ `also_still_abstractmethod` is unimplemented
+   |       ^ Abstract method `also_still_abstractmethod` is unimplemented
 22 |
 23 | class Raises(Protocol):
    |
@@ -233,7 +233,7 @@ error[abstract-method-in-final-class]: Final class `RaisesSub` has unimplemented
    |
 27 | @final
 28 | class RaisesSub(Raises): ...  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^ `even_this_is_abstract` is unimplemented
+   |       ^^^^^^^^^ Abstract method `even_this_is_abstract` is unimplemented
 29 |
 30 | class AlsoRaises(Protocol):
    |
@@ -264,7 +264,7 @@ error[abstract-method-in-final-class]: Final class `AlsoRaisesSub` has unimpleme
    |
 34 | @final
 35 | class AlsoRaisesSub(AlsoRaises): ...  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^^^^^ `also_abstractmethod` is unimplemented
+   |       ^^^^^^^^^^^^^ Abstract method `also_abstractmethod` is unimplemented
 36 |
 37 | type NotImplementedErrorAlias = NotImplementedError
    |
@@ -295,7 +295,7 @@ error[abstract-method-in-final-class]: Final class `StrangeSub` has unimplemente
    |
 44 |     @final
 45 |     class StrangeSub(Strange): ...  # error: [abstract-method-in-final-class]
-   |           ^^^^^^^^^^ `weird_abstractmethod` is unimplemented
+   |           ^^^^^^^^^^ Abstract method `weird_abstractmethod` is unimplemented
 46 |
 47 | class HasOverloads(Protocol):
    |
@@ -331,7 +331,7 @@ error[abstract-method-in-final-class]: Final class `HasOverloadSub` has unimplem
 52 |
 53 | @final
 54 | class HasOverloadSub(HasOverloads): ...  # error: [abstract-method-in-final-class]
-   |       ^^^^^^^^^^^^^^ `foo` is unimplemented
+   |       ^^^^^^^^^^^^^^ Abstract method `foo` is unimplemented
 55 |
 56 | class RaisesDifferentException(Protocol):
    |
@@ -355,7 +355,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstractSub` has unimplem
     |
 122 | @final
 123 | class HasAbstractSub(HasAbstract): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 124 |
 125 | @final
     |
@@ -386,7 +386,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract2Sub` has unimple
     |
 125 | @final
 126 | class HasAbstract2Sub(HasAbstract2): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 127 |
 128 | @final
     |
@@ -417,7 +417,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract3Sub` has unimple
     |
 128 | @final
 129 | class HasAbstract3Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 130 |
 131 | @final
     |
@@ -449,7 +449,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract4Sub` has unimple
     |
 131 | @final
 132 | class HasAbstract4Sub(HasAbstract4): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 133 |
 134 | @final
     |
@@ -481,7 +481,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract5Sub` has unimple
     |
 134 | @final
 135 | class HasAbstract5Sub(HasAbstract5): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 136 |
 137 | @final
     |
@@ -513,7 +513,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract6Sub` has unimple
     |
 137 | @final
 138 | class HasAbstract6Sub(HasAbstract6): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 139 |
 140 | @final
     |
@@ -545,7 +545,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract7Sub` has unimple
     |
 140 | @final
 141 | class HasAbstract7Sub(HasAbstract7): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 142 |
 143 | @final
     |
@@ -576,7 +576,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract8Sub` has unimple
     |
 143 | @final
 144 | class HasAbstract8Sub(HasAbstract8): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 145 |
 146 | @final
     |
@@ -607,7 +607,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract9Sub` has unimple
     |
 146 | @final
 147 | class HasAbstract9Sub(HasAbstract9): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
 148 |
 149 | @final
     |
@@ -639,7 +639,7 @@ error[abstract-method-in-final-class]: Final class `HasAbstract10Sub` has unimpl
     |
 149 | @final
 150 | class HasAbstract10Sub(HasAbstract10): ...  # error: [abstract-method-in-final-class]
-    |       ^^^^^^^^^^^^^^^^ `a` is unimplemented
+    |       ^^^^^^^^^^^^^^^^ Abstract method `a` is unimplemented
     |
    ::: src/mdtest_snippet.py:118:9
     |
