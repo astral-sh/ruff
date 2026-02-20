@@ -2,8 +2,10 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
 use ruff_python_ast::{self as ast, Expr};
+use ruff_python_parser::semantic_errors::SemanticSyntaxContext;
 use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_source_file::LineRanges;
+
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -157,10 +159,31 @@ pub(crate) fn non_pep604_annotation(
 
     let has_comments = checker.comment_ranges().intersects(expr.range());
 
+    let future_import = checker.target_version() < PythonVersion::PY310
+        && checker.settings().future_annotations
+        && !checker.future_annotations_or_stub();
+
     let applicability = if checker.target_version() >= PythonVersion::PY310 && !has_comments {
         Applicability::Safe
     } else {
         Applicability::Unsafe
+    };
+
+    let create_fix = |replacement: String| {
+        let edit = Edit::range_replacement(
+            pad(replacement, expr.range(), checker.locator()),
+            expr.range(),
+        );
+
+        if future_import {
+            Fix::applicable_edits(
+                edit,
+                vec![checker.importer().add_future_import()],
+                applicability,
+            )
+        } else {
+            Fix::applicable_edit(edit, applicability)
+        }
     };
 
     match operator {
@@ -189,18 +212,8 @@ pub(crate) fn non_pep604_annotation(
                                 break;
                             }
                         }
-
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(
-                                    checker.generator().expr(&pep_604_optional(inner)),
-                                    expr.range(),
-                                    checker.locator(),
-                                ),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        let replacement = checker.generator().expr(&pep_604_optional(inner));
+                        diagnostic.set_fix(create_fix(replacement));
                     }
                 }
             }
@@ -217,22 +230,13 @@ pub(crate) fn non_pep604_annotation(
                         // Invalid type annotation.
                     }
                     Expr::Tuple(ast::ExprTuple { elts, .. }) => {
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(
-                                    checker.generator().expr(&pep_604_union(elts)),
-                                    expr.range(),
-                                    checker.locator(),
-                                ),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        let replacement = checker.generator().expr(&pep_604_union(elts));
+                        diagnostic.set_fix(create_fix(replacement));
                     }
                     _ => {
                         // Single argument.
                         let inner = checker.locator().slice(slice);
-                        let content = if checker.locator().contains_line_break(slice.range()) {
+                        let replacement = if checker.locator().contains_line_break(slice.range()) {
                             // If the inner expression spans multiple lines, wrap in
                             // parentheses since the `Union[...]` brackets that
                             // previously provided implicit line continuation are being
@@ -241,13 +245,7 @@ pub(crate) fn non_pep604_annotation(
                         } else {
                             inner.to_string()
                         };
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(content, expr.range(), checker.locator()),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                        diagnostic.set_fix(create_fix(replacement));
                     }
                 }
             }
