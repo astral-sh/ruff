@@ -10,6 +10,7 @@ use rustc_hash::FxHashSet;
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits;
+use crate::rules::flake8_return::has_conditional_body;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
 /// ## What it does
@@ -233,21 +234,4 @@ impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
         visitor::walk_body(self, body);
         self.sibling = sibling;
     }
-}
-
-/// Returns `true` if the [`ast::StmtWith`] statement is known to have a conditional body
-/// (e.g., `contextlib.suppress`), meaning its body may or may not execute.
-fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool {
-    with.items.iter().any(|item| {
-        let ast::WithItem {
-            context_expr: Expr::Call(ast::ExprCall { func, .. }),
-            ..
-        } = item
-        else {
-            return false;
-        };
-        semantic
-            .resolve_qualified_name(func)
-            .is_some_and(|qualified_name| qualified_name.segments() == ["contextlib", "suppress"])
-    })
 }
