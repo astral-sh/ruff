@@ -1158,18 +1158,18 @@ impl ReachabilityConstraints {
                     return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
                 };
 
-                let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
-                    .fold((true, true), |(none, all), overload| {
-                        let overload_returns_never =
-                            overload.return_ty.is_equivalent_to(db, Type::Never);
+                let mut no_overloads_return_never = true;
+                let mut all_overloads_return_never = true;
+                let mut any_overload_is_generic = false;
 
-                        (
-                            none && !overload_returns_never,
-                            all && overload_returns_never,
-                        )
-                    });
+                for overload in overloads_iterator {
+                    let returns_never = overload.return_ty.is_equivalent_to(db, Type::Never);
+                    no_overloads_return_never &= !returns_never;
+                    all_overloads_return_never &= returns_never;
+                    any_overload_is_generic |= overload.return_ty.has_typevar(db);
+                }
 
-                if no_overloads_return_never {
+                if no_overloads_return_never && !any_overload_is_generic {
                     Truthiness::AlwaysFalse
                 } else if all_overloads_return_never {
                     Truthiness::AlwaysTrue

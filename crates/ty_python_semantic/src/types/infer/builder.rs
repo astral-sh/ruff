@@ -9159,6 +9159,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if is_pep_613_type_alias {
+                let is_valid_special_form = |ty: Type<'db>| match ty {
+                    Type::SpecialForm(special_form) => special_form.is_valid_in_type_expression(),
+                    Type::ClassLiteral(literal)
+                        if literal.is_known(self.db(), KnownClass::InitVar) =>
+                    {
+                        false
+                    }
+                    _ => true,
+                };
+
+                let is_invalid = match value {
+                    ast::Expr::Subscript(sub) => {
+                        !is_valid_special_form(self.expression_type(&sub.value))
+                    }
+                    _ => !is_valid_special_form(self.expression_type(value)),
+                };
+
+                if is_invalid
+                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, value)
+                {
+                    builder.into_diagnostic(
+                        "Type qualifiers are not allowed in type alias definitions",
+                    );
+                }
+
                 let inferred_ty =
                     if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = inferred_ty {
                         let identity = TypeVarIdentity::new(

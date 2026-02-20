@@ -903,8 +903,11 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 let self_suffix_length = self.suffix_elements().len();
                 let suffix_overflow = self_suffix_length.saturating_sub(suffix_length);
                 let suffix_underflow = suffix_length.saturating_sub(self_suffix_length);
-                let prefix = (self.iter_prefix_elements().take(prefix_length))
-                    .chain(std::iter::repeat_n(self.variable(), prefix_underflow));
+                // Compute the variable element first, since underflow positions can
+                // receive any element that could appear in the variable portion.
+                // For example, `tuple[I0, *tuple[I1, ...], I2]` unpacked as
+                // `[a, b, *c]` means `b` could be `I1` (variable non-empty) or
+                // `I2` (variable empty, suffix shifts left), so it should be `I1 | I2`.
                 let variable = UnionType::from_elements_leave_aliases(
                     db,
                     self.iter_prefix_elements()
@@ -912,7 +915,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         .chain(std::iter::once(self.variable()))
                         .chain(self.iter_suffix_elements().take(suffix_overflow)),
                 );
-                let suffix = std::iter::repeat_n(self.variable(), suffix_underflow)
+                let prefix = (self.iter_prefix_elements().take(prefix_length))
+                    .chain(std::iter::repeat_n(variable, prefix_underflow));
+                let suffix = std::iter::repeat_n(variable, suffix_underflow)
                     .chain(self.iter_suffix_elements().skip(suffix_overflow));
                 Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
