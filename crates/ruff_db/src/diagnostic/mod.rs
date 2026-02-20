@@ -707,6 +707,10 @@ impl SubDiagnostic {
             ConciseMessage::Both { main, annotation }
         }
     }
+
+    pub(crate) fn severity(&self) -> SubDiagnosticSeverity {
+        self.inner.severity
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]

@@ -1,4 +1,4 @@
-use crate::diagnostic::{Diagnostic, FileResolver, Severity};
+use crate::diagnostic::{Diagnostic, FileResolver, Severity, SubDiagnosticSeverity};
 
 pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
@@ -88,6 +88,79 @@ impl<'a> GithubRenderer<'a> {
             }
 
             writeln!(f, " {}", diagnostic.concise_message())?;
+
+            for annotation in diagnostic.secondary_annotations() {
+                let span = annotation.get_span();
+                let file = span.file();
+                let diagnostic_source = file.diagnostic_source(self.resolver);
+                let source_code = diagnostic_source.as_source_code();
+                if let Some(message) = annotation.get_message()
+                    && let Some(range) = span.range()
+                {
+                    let start_location = source_code.line_column(range.start());
+                    writeln!(
+                        f,
+                        "  {path}:{row}:{column}: {message}",
+                        path = file.relative_path(self.resolver).display(),
+                        row = start_location.line,
+                        column = start_location.column,
+                    )?;
+                }
+            }
+
+            for subdiagnostic in diagnostic.sub_diagnostics() {
+                let severity = match subdiagnostic.severity() {
+                    SubDiagnosticSeverity::Help => "help",
+                    SubDiagnosticSeverity::Info => "notice",
+                    SubDiagnosticSeverity::Warning => "warning",
+                    SubDiagnosticSeverity::Error | SubDiagnosticSeverity::Fatal => "error",
+                };
+                let mut rendered_primary = false;
+                if let Some(annotation) = subdiagnostic.primary_annotation() {
+                    let span = annotation.get_span();
+                    let file = span.file();
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
+                    let message = subdiagnostic.concise_message();
+                    if let Some(range) = span.range() {
+                        rendered_primary = true;
+                        let start_location = source_code.line_column(range.start());
+                        writeln!(
+                            f,
+                            "  {path}:{row}:{column}: {severity}: {message}",
+                            path = file.relative_path(self.resolver).display(),
+                            row = start_location.line,
+                            column = start_location.column,
+                        )?;
+                    }
+                }
+
+                if !rendered_primary {
+                    writeln!(f, "  {severity}: {}", subdiagnostic.concise_message())?;
+                }
+
+                for annotation in subdiagnostic.annotations() {
+                    if annotation.is_primary() {
+                        continue;
+                    }
+                    let span = annotation.get_span();
+                    let file = span.file();
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
+                    if let Some(message) = annotation.get_message()
+                        && let Some(range) = span.range()
+                    {
+                        let start_location = source_code.line_column(range.start());
+                        writeln!(
+                            f,
+                            "    {path}:{row}:{column}: {message}",
+                            path = file.relative_path(self.resolver).display(),
+                            row = start_location.line,
+                            column = start_location.column,
+                        )?;
+                    }
+                }
+            }
         }
 
         Ok(())
