@@ -987,37 +987,6 @@ print('hello')
     }
 
     #[test]
-    fn single_ignore_suppression() {
-        let source = "
-print('hello')  # ruff:ignore[code]
-";
-        assert_debug_snapshot!(
-            Suppressions::debug(source),
-            @r##"
-        Suppressions {
-            valid: [
-                Suppression {
-                    covered_source: "print('hello')  # ruff:ignore[code]",
-                    code: "code",
-                    disable_comment: SuppressionComment {
-                        text: "# ruff:ignore[code]",
-                        action: Ignore,
-                        codes: [
-                            "code",
-                        ],
-                        reason: "",
-                    },
-                    enable_comment: None,
-                },
-            ],
-            invalid: [],
-            errors: [],
-        }
-        "##,
-        );
-    }
-
-    #[test]
     fn single_range_suppression() {
         let source = "
 # ruff: disable[foo]
@@ -1680,6 +1649,136 @@ def bar():
                     kind: MissingCodes,
                 },
             ],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_suppression_trailing_one_line() {
+        let source = "
+print('hello')  # ruff:ignore[code]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "print('hello')  # ruff:ignore[code]",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[code]",
+                        action: Ignore,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_suppression_trailing_first_line() {
+        let source = "
+print(  # ruff:ignore[code]
+    'hello'
+)
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "print(  # ruff:ignore[code]\n    'hello'\n)",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[code]",
+                        action: Ignore,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_suppression_trailing_inner_line() {
+        let source = "
+print(
+    'hello'  # ruff:ignore[code]
+)
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "    'hello'  # ruff:ignore[code]",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[code]",
+                        action: Ignore,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_suppression_trailing_last_line() {
+        let source = "
+print(
+    'hello'
+)  # ruff:ignore[code]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "print(\n    'hello'\n)  # ruff:ignore[code]",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[code]",
+                        action: Ignore,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
         }
         "##,
         );
