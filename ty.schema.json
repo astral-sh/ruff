@@ -1355,6 +1355,16 @@
             }
           ]
         },
+        "unsafe-init-on-instance": {
+          "title": "detects explicit calls to `__init__` on existing instances",
+          "description": "## What it does\nChecks for explicit calls to `__init__` on existing object instances.\n\n## Why is this bad?\nThe Liskov Substitution Principle is deliberately not enforced on\n`__init__`, since constructors are permitted to have incompatible\nsignatures across class hierarchies. Because of this, `__init__` is also\nexcluded from variance inference for generic classes. Calling `__init__`\ndirectly on an instance is therefore unsound: the type checker cannot\nverify that the call matches the actual runtime type's constructor.\n\nUse `super().__init__(...)` to call a parent class's constructor, or\nextract the logic you want to re-call into a separate method.\n\n## Examples\n```python\nclass Foo:\n    def __init__(self, x: int) -> None: ...\n\nobj = Foo(1)\nobj.__init__(2)  # Error\n\nclass Bar(Foo):\n    def __init__(self, x: int) -> None:\n        super().__init__(x)  # OK: using super()\n        Foo.__init__(self, x)  # OK: unbound call on class literal\n```",
+          "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "unsupported-base": {
           "title": "detects class bases that are unsupported as ty could not feasibly calculate the class's MRO",
           "description": "## What it does\nChecks for class definitions that have bases which are unsupported by ty.\n\n## Why is this bad?\nIf a class has a base that is an instance of a complex type such as a union type,\nty will not be able to resolve the [method resolution order] (MRO) for the class.\nThis will lead to an inferior understanding of your codebase and unpredictable\ntype-checking behavior.\n\n## Examples\n```python\nimport datetime\n\nclass A: ...\nclass B: ...\n\nif datetime.date.today().weekday() != 6:\n    C = A\nelse:\n    C = B\n\nclass D(C): ...  # error: [unsupported-base]\n```\n\n[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order",

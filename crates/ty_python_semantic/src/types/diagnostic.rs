@@ -131,6 +131,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNDEFINED_REVEAL);
     registry.register_lint(&UNKNOWN_ARGUMENT);
     registry.register_lint(&POSITIONAL_ONLY_PARAMETER_AS_KWARG);
+    registry.register_lint(&UNSAFE_INIT_ON_INSTANCE);
     registry.register_lint(&UNRESOLVED_ATTRIBUTE);
     registry.register_lint(&UNRESOLVED_IMPORT);
     registry.register_lint(&UNRESOLVED_REFERENCE);
@@ -2565,6 +2566,41 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for explicit calls to `__init__` on existing object instances.
+    ///
+    /// ## Why is this bad?
+    /// The Liskov Substitution Principle is deliberately not enforced on
+    /// `__init__`, since constructors are permitted to have incompatible
+    /// signatures across class hierarchies. Because of this, `__init__` is also
+    /// excluded from variance inference for generic classes. Calling `__init__`
+    /// directly on an instance is therefore unsound: the type checker cannot
+    /// verify that the call matches the actual runtime type's constructor.
+    ///
+    /// Use `super().__init__(...)` to call a parent class's constructor, or
+    /// extract the logic you want to re-call into a separate method.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class Foo:
+    ///     def __init__(self, x: int) -> None: ...
+    ///
+    /// obj = Foo(1)
+    /// obj.__init__(2)  # Error
+    ///
+    /// class Bar(Foo):
+    ///     def __init__(self, x: int) -> None:
+    ///         super().__init__(x)  # OK: using super()
+    ///         Foo.__init__(self, x)  # OK: unbound call on class literal
+    /// ```
+    pub(crate) static UNSAFE_INIT_ON_INSTANCE = {
+        summary: "detects explicit calls to `__init__` on existing instances",
+        status: LintStatus::stable("0.0.18"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for binary expressions, comparisons, and unary expressions where
     /// the operands don't support the operator.
     ///
@@ -4233,6 +4269,25 @@ pub(crate) fn report_call_to_abstract_method(
     );
     sub.annotate(Annotation::primary(spans.name));
     diag.sub(sub);
+}
+
+pub(crate) fn report_unsafe_init_on_instance<'db>(
+    context: &InferContext<'db, '_>,
+    call: &ast::ExprCall,
+    value_type: Type<'db>,
+) {
+    let Some(builder) = context.report_lint(&UNSAFE_INIT_ON_INSTANCE, call) else {
+        return;
+    };
+    let db = context.db();
+    let mut diag = builder.into_diagnostic(format_args!(
+        "Explicit call to `__init__` on instance of type `{}`",
+        value_type.display(db),
+    ));
+    diag.info(
+        "`__init__` is excluded from Liskov substitution checks, \
+         so calling it on an existing instance may violate type safety",
+    );
 }
 
 pub(crate) fn report_undeclared_protocol_member(
