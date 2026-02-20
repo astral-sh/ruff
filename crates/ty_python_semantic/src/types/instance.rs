@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
@@ -22,7 +23,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     LiteralValueTypeKind, NormalizedVisitor, TypeContext, TypeMapping, VarianceInferable,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
@@ -180,6 +181,20 @@ impl<'db> Type<'db> {
             {
                 return result;
             }
+        }
+
+        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
+        // methods (except `__iter__`, but that returns the self type recursively, which gets
+        // normalized to `Any`). We don't want generators with different return types to be
+        // assignable to each other. In this case we use the result of the nominal check above.
+        if Program::get(db).python_version(db) < PythonVersion::PY313
+            && let Some(self_protocol) = self.as_protocol_instance()
+            && let Protocol::FromClass(self_class) = self_protocol.inner
+            && let Protocol::FromClass(proto_class) = protocol.inner
+            && self_class.known(db) == Some(KnownClass::Generator)
+            && proto_class.known(db) == Some(KnownClass::Generator)
+        {
+            return result;
         }
 
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
@@ -803,12 +818,26 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsEquivalentVisitor<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
         }
+
+        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
+        // methods (except `__iter__`, but that returns the self type recursively, which gets
+        // normalized to `Any`). We don't want generators with different return types to be
+        // equivalent to each other. In this case we compare the `ClassType`s nominally.
+        if Program::get(db).python_version(db) < PythonVersion::PY313
+            && let Protocol::FromClass(self_class) = self.inner
+            && let Protocol::FromClass(other_class) = other.inner
+            && self_class.known(db) == Some(KnownClass::Generator)
+            && other_class.known(db) == Some(KnownClass::Generator)
+        {
+            return (*self_class).is_equivalent_to_impl(db, *other_class, inferable, visitor);
+        }
+
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
             return ConstraintSet::from(true);
