@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::fmt::Write;
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -7,7 +8,8 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
-use crate::types::{CallableTypeKind, TypeContext};
+use crate::types::type_ordering::OrderingPurpose;
+use crate::types::{CallableTypeKind, TypeContext, type_ordering};
 use crate::{
     Db, FxOrderSet,
     place::{
@@ -731,6 +733,46 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             ProtocolMemberKind::Property(property) => Type::PropertyInstance(*property),
             ProtocolMemberKind::Other(ty) => *ty,
         }
+    }
+
+    pub(super) fn ordering(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        ordering_purpose: OrderingPurpose,
+    ) -> Ordering {
+        self.name
+            .cmp(other.name)
+            .then_with(|| self.qualifiers.cmp(&other.qualifiers))
+            .then_with(|| match (self.kind, other.kind) {
+                (ProtocolMemberKind::Method(left), ProtocolMemberKind::Method(right)) => {
+                    type_ordering(
+                        db,
+                        &Type::Callable(left),
+                        &Type::Callable(right),
+                        ordering_purpose,
+                    )
+                }
+                (ProtocolMemberKind::Method(_), _) => Ordering::Less,
+                (_, ProtocolMemberKind::Method(_)) => Ordering::Greater,
+
+                (ProtocolMemberKind::Property(left), ProtocolMemberKind::Property(right)) => {
+                    type_ordering(
+                        db,
+                        &Type::PropertyInstance(left),
+                        &Type::PropertyInstance(right),
+                        ordering_purpose,
+                    )
+                }
+                (ProtocolMemberKind::Property(_), ProtocolMemberKind::Other(_)) => Ordering::Less,
+                (ProtocolMemberKind::Other(_), ProtocolMemberKind::Property(_)) => {
+                    Ordering::Greater
+                }
+
+                (ProtocolMemberKind::Other(left), ProtocolMemberKind::Other(right)) => {
+                    type_ordering(db, &left, &right, ordering_purpose)
+                }
+            })
     }
 
     pub(super) fn has_disjoint_type_from(

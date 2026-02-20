@@ -94,6 +94,10 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn len(&self) -> usize {
+        self.overloads.len()
+    }
+
     pub(crate) fn with_inherited_generic_context(
         &self,
         db: &'db dyn Db,

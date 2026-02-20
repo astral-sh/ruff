@@ -182,6 +182,12 @@ impl Default for DataclassTransformerFlags {
 
 /// Metadata for a dataclass-transformer. Stored inside a `Type::DataclassTransformer(…)`
 /// instance that we use as the return type for `dataclass_transform(…)` calls.
+///
+/// ## Ordering
+///
+/// Ordering is based on the Salsa ID assigned to the `DataclassTransformerParams` instance, and not on
+/// the values of the fields. The ID may change between runs, or when the instance was garbage collected and
+/// recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DataclassTransformerParams<'db> {

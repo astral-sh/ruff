@@ -419,7 +419,7 @@ impl Hash for MemberExprRef<'_> {
 
 /// Uniquely identifies a member in a scope.
 #[newtype_index]
-#[derive(get_size2::GetSize, salsa::Update)]
+#[derive(get_size2::GetSize, salsa::Update, PartialOrd, Ord)]
 pub struct ScopedMemberId;
 
 /// The members of a scope. Allows lookup by member path and [`ScopedMemberId`].
