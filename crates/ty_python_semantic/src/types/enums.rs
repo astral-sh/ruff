@@ -81,9 +81,9 @@ pub(crate) fn enum_metadata<'db>(
 
     // When an enum has a custom `__new__`, the raw assignment type doesn't represent the
     // member's value — `__new__` unpacks the arguments and explicitly sets `_value_`.
-    // Fall back to the `_value_` annotation type (if declared) or `Any`.
+    // Fall back to `Any` for the member's value type.
     let custom_new_value_ty = if has_custom_enum_new(db, class) {
-        Some(enum_value_annotation_type(db, class).unwrap_or(Type::any()))
+        Some(Type::any())
     } else {
         None
     };
@@ -363,11 +363,7 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
 ///
 /// When an enum has a custom `__new__`, the assigned tuple values are unpacked as arguments to
 /// `__new__`, and `_value_` is explicitly set inside the method body. This means we can't infer
-/// the member's value type from the raw assignment — we need to fall back to the `_value_`
-/// annotation (if any) or `Any`.
-///
-/// We skip classes that are expected to have standard `__new__` implementations:
-/// `object`, `Enum`, `StrEnum`, `int`, `str`, `float`, `complex`, `bytes`, and `bool`.
+/// the member's value type from the raw assignment — we fall back to `Any`.
 fn has_custom_enum_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> bool {
     // Check the enum class itself
     if has_own_dunder_new(db, class) {
@@ -384,28 +380,18 @@ fn has_custom_enum_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> 
                 return false;
             };
 
-            // Skip known classes with standard `__new__` implementations
-            if matches!(
-                static_class.known(db),
-                Some(
-                    KnownClass::Object
-                        | KnownClass::Enum
-                        | KnownClass::StrEnum
-                        | KnownClass::Int
-                        | KnownClass::Str
-                        | KnownClass::Float
-                        | KnownClass::Complex
-                        | KnownClass::Bytes
-                        | KnownClass::Bool
-                )
-            ) {
-                return false;
-            }
-
-            // Skip classes defined in stub files (e.g. `IntEnum.__new__`, `IntFlag.__new__`
-            // from typeshed). These `__new__` definitions exist for typing purposes and
-            // don't represent custom value transformations.
-            if static_class.body_scope(db).file(db).is_stub(db) {
+            // Skip classes defined in vendored typeshed (e.g. `object.__new__`,
+            // `int.__new__`, `IntEnum.__new__`, `IntFlag.__new__`). These `__new__`
+            // definitions exist for typing purposes and don't represent custom value
+            // transformations. We specifically check for vendored paths rather than all
+            // stub files, because a user-provided `.pyi` stub for a library with a
+            // custom `__new__` should still be recognized.
+            if static_class
+                .body_scope(db)
+                .file(db)
+                .path(db)
+                .is_vendored_path()
+            {
                 return false;
             }
 
@@ -421,25 +407,4 @@ fn has_own_dunder_new<'db>(db: &'db dyn Db, class: StaticClassLiteral<'db>) -> b
         let bindings = use_def_map(db, scope).reachable_symbol_bindings(symbol_id);
         matches!(place_from_bindings(db, bindings).place, Place::Defined(_))
     })
-}
-
-/// When an enum class has a custom `__new__`, look up the `_value_` annotation
-/// on the class itself to determine the value type. Returns `None` if no annotation
-/// is found on the enum class's own body.
-fn enum_value_annotation_type<'db>(
-    db: &'db dyn Db,
-    class: StaticClassLiteral<'db>,
-) -> Option<Type<'db>> {
-    let scope_id = class.body_scope(db);
-    let use_def = use_def_map(db, scope_id);
-    let table = place_table(db, scope_id);
-
-    let symbol_id = table.symbol_id("_value_")?;
-    let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-    let declared = place_from_declarations(db, declarations).ignore_conflicting_declarations();
-
-    match declared.place {
-        Place::Defined(DefinedPlace { ty, .. }) if !ty.is_dynamic() => Some(ty),
-        _ => None,
-    }
 }

@@ -1121,8 +1121,8 @@ class MyEnum[T](MyEnumBase):
 ## Custom `__new__`
 
 When an enum defines a custom `__new__` method, the raw assignment values are unpacked as arguments
-to `__new__`, and `_value_` is explicitly set inside the method body. The member's `.value` type is
-determined by the `_value_` annotation (if declared) or falls back to `Any`.
+to `__new__`, and `_value_` is explicitly set inside the method body. The member's `.value` type
+falls back to `Any`.
 
 ### Custom `__new__` with tuple values
 
@@ -1145,28 +1145,6 @@ reveal_type(Planet.EARTH.value)  # revealed: Any
 
 # `.name` still works correctly
 reveal_type(Planet.MERCURY.name)  # revealed: Literal["MERCURY"]
-```
-
-### Custom `__new__` with `_value_` annotation
-
-```py
-from enum import Enum
-
-class Planet(Enum):
-    _value_: float
-
-    def __new__(cls, mass: float, radius: float) -> "Planet":
-        obj = object.__new__(cls)
-        obj._value_ = mass
-        return obj
-    MERCURY = (3.303e23, 2.4397e6)
-    VENUS = (4.869e24, 6.0518e6)
-    EARTH = (5.976e24, 6.37814e6)
-
-# With a `_value_: float` annotation, values are inferred as `int | float`
-# (`float` widens to `int | float` per PEP 484 numeric tower rules)
-reveal_type(Planet.MERCURY.value)  # revealed: int | float
-reveal_type(Planet.VENUS.value)  # revealed: int | float
 ```
 
 ### Custom `__init__` without `__new__`
