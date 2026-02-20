@@ -9,7 +9,7 @@ use rustc_hash::FxHashMap;
 
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::type_ordering::OrderingPurpose;
-use crate::types::{CallableTypeKind, TypeContext, union_or_intersection_elements_ordering};
+use crate::types::{CallableTypeKind, TypeContext, type_ordering};
 use crate::{
     Db, FxOrderSet,
     place::{
@@ -746,7 +746,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             .then_with(|| self.qualifiers.cmp(&other.qualifiers))
             .then_with(|| match (self.kind, other.kind) {
                 (ProtocolMemberKind::Method(left), ProtocolMemberKind::Method(right)) => {
-                    union_or_intersection_elements_ordering(
+                    type_ordering(
                         db,
                         &Type::Callable(left),
                         &Type::Callable(right),
@@ -757,7 +757,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 (_, ProtocolMemberKind::Method(_)) => Ordering::Greater,
 
                 (ProtocolMemberKind::Property(left), ProtocolMemberKind::Property(right)) => {
-                    union_or_intersection_elements_ordering(
+                    type_ordering(
                         db,
                         &Type::PropertyInstance(left),
                         &Type::PropertyInstance(right),
@@ -770,7 +770,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 }
 
                 (ProtocolMemberKind::Other(left), ProtocolMemberKind::Other(right)) => {
-                    union_or_intersection_elements_ordering(db, &left, &right, ordering_purpose)
+                    type_ordering(db, &left, &right, ordering_purpose)
                 }
             })
     }

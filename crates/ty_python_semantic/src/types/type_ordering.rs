@@ -32,7 +32,7 @@ use super::{
 /// create here is not user-facing. However, it doesn't really "make sense" for `Type` to implement
 /// [`Ord`] in terms of the semantics. There are many different ways in which you could plausibly
 /// sort a list of types; this is only one (somewhat arbitrary, at times) possible ordering.
-pub(super) fn union_or_intersection_elements_ordering<'db>(
+pub(super) fn type_ordering<'db>(
     db: &'db dyn Db,
     left: &Type<'db>,
     right: &Type<'db>,
@@ -99,7 +99,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (LiteralValueTypeKind::Enum(left), LiteralValueTypeKind::Enum(right)) => {
                     match ordering_purpose {
                         OrderingPurpose::Normalization => left.cmp(&right),
-                        OrderingPurpose::Determinism => union_or_intersection_elements_ordering(
+                        OrderingPurpose::Determinism => type_ordering(
                             db,
                             &left.enum_class_instance(db),
                             &right.enum_class_instance(db),
@@ -133,14 +133,14 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 
         (Type::BoundMethod(left), Type::BoundMethod(right)) => match ordering_purpose {
             OrderingPurpose::Normalization => left.cmp(right),
-            OrderingPurpose::Determinism => union_or_intersection_elements_ordering(
+            OrderingPurpose::Determinism => type_ordering(
                 db,
                 &left.self_instance(db),
                 &right.self_instance(db),
                 ordering_purpose,
             )
             .then_with(|| {
-                union_or_intersection_elements_ordering(
+                type_ordering(
                     db,
                     &Type::FunctionLiteral(left.function(db)),
                     &Type::FunctionLiteral(right.function(db)),
@@ -172,8 +172,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 let right_specs = right.field_specifiers(db);
                 left_specs.len().cmp(&right_specs.len()).then_with(|| {
                     for (l, r) in left_specs.iter().zip(right_specs) {
-                        let spec_cmp =
-                            union_or_intersection_elements_ordering(db, l, r, ordering_purpose);
+                        let spec_cmp = type_ordering(db, l, r, ordering_purpose);
                         if spec_cmp != Ordering::Equal {
                             return spec_cmp;
                         }
@@ -194,12 +193,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                         let right_specs = right.field_specifiers(db);
                         left_specs.len().cmp(&right_specs.len()).then_with(|| {
                             for (l, r) in left_specs.iter().zip(right_specs) {
-                                let spec_cmp = union_or_intersection_elements_ordering(
-                                    db,
-                                    l,
-                                    r,
-                                    ordering_purpose,
-                                );
+                                let spec_cmp = type_ordering(db, l, r, ordering_purpose);
                                 if spec_cmp != Ordering::Equal {
                                     return spec_cmp;
                                 }
@@ -249,14 +243,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
                     dynamic_elements_ordering(db, left, right, ordering_purpose)
                 }
-                (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => {
-                    union_or_intersection_elements_ordering(
-                        db,
-                        &Type::TypeVar(left),
-                        &Type::TypeVar(right),
-                        ordering_purpose,
-                    )
-                }
+                (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => type_ordering(
+                    db,
+                    &Type::TypeVar(left),
+                    &Type::TypeVar(right),
+                    ordering_purpose,
+                ),
                 (SubclassOfInner::TypeVar(_), _) => Ordering::Less,
                 (_, SubclassOfInner::TypeVar(_)) => Ordering::Greater,
             }
@@ -277,14 +269,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypeGuard(_), _) => Ordering::Less,
         (_, Type::TypeGuard(_)) => Ordering::Greater,
 
-        (Type::NominalInstance(left), Type::NominalInstance(right)) => {
-            union_or_intersection_elements_ordering(
-                db,
-                &Type::from(left.class(db)),
-                &Type::from(right.class(db)),
-                ordering_purpose,
-            )
-        }
+        (Type::NominalInstance(left), Type::NominalInstance(right)) => type_ordering(
+            db,
+            &Type::from(left.class(db)),
+            &Type::from(right.class(db)),
+            ordering_purpose,
+        ),
         (Type::NominalInstance(_), _) => Ordering::Less,
         (_, Type::NominalInstance(_)) => Ordering::Greater,
 
@@ -366,12 +356,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::BoundSuper(left), Type::BoundSuper(right)) => {
             (match (left.pivot_class(db), right.pivot_class(db)) {
                 (ClassBase::Class(left), ClassBase::Class(right)) => {
-                    union_or_intersection_elements_ordering(
-                        db,
-                        &Type::from(left),
-                        &Type::from(right),
-                        ordering_purpose,
-                    )
+                    type_ordering(db, &Type::from(left), &Type::from(right), ordering_purpose)
                 }
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
@@ -391,29 +376,22 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
             })
             .then_with(|| match (left.owner(db), right.owner(db)) {
                 (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => {
-                    union_or_intersection_elements_ordering(
-                        db,
-                        &Type::from(left),
-                        &Type::from(right),
-                        ordering_purpose,
-                    )
+                    type_ordering(db, &Type::from(left), &Type::from(right), ordering_purpose)
                 }
                 (SuperOwnerKind::Class(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
-                (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
-                    union_or_intersection_elements_ordering(
-                        db,
-                        &Type::from(left.class(db)),
-                        &Type::from(right.class(db)),
-                        ordering_purpose,
-                    )
-                }
+                (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => type_ordering(
+                    db,
+                    &Type::from(left.class(db)),
+                    &Type::from(right.class(db)),
+                    ordering_purpose,
+                ),
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
                 (
                     SuperOwnerKind::InstanceTypeVar(left, _),
                     SuperOwnerKind::InstanceTypeVar(right, _),
-                ) => union_or_intersection_elements_ordering(
+                ) => type_ordering(
                     db,
                     &Type::TypeVar(left),
                     &Type::TypeVar(right),
@@ -422,7 +400,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::InstanceTypeVar(..), _) => Ordering::Less,
                 (_, SuperOwnerKind::InstanceTypeVar(..)) => Ordering::Greater,
                 (SuperOwnerKind::ClassTypeVar(left, _), SuperOwnerKind::ClassTypeVar(right, _)) => {
-                    union_or_intersection_elements_ordering(
+                    type_ordering(
                         db,
                         &Type::TypeVar(left),
                         &Type::TypeVar(right),
@@ -455,15 +433,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::PropertyInstance(left), Type::PropertyInstance(right)) => match ordering_purpose {
             OrderingPurpose::Normalization => left.cmp(right),
             OrderingPurpose::Determinism => match (left.getter(db), right.getter(db)) {
-                (Some(left), Some(right)) => {
-                    union_or_intersection_elements_ordering(db, &left, &right, ordering_purpose)
-                }
+                (Some(left), Some(right)) => type_ordering(db, &left, &right, ordering_purpose),
                 (Some(_), None) => Ordering::Less,
                 (None, Some(_)) => Ordering::Greater,
                 (None, None) => match (left.setter(db), right.setter(db)) {
-                    (Some(left), Some(right)) => {
-                        union_or_intersection_elements_ordering(db, &left, &right, ordering_purpose)
-                    }
+                    (Some(left), Some(right)) => type_ordering(db, &left, &right, ordering_purpose),
                     (Some(_), _) => Ordering::Less,
                     (_, Some(_)) => Ordering::Greater,
                     (None, None) => {
@@ -487,7 +461,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (Some(left), Some(right)) => definition_ordering(db, left, right, ordering_purpose),
                 (Some(_), None) => Ordering::Less,
                 (None, Some(_)) => Ordering::Greater,
-                (None, None) => union_or_intersection_elements_ordering(
+                (None, None) => type_ordering(
                     db,
                     &left.value_type(db),
                     &right.value_type(db),
@@ -501,14 +475,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypedDict(left), Type::TypedDict(right)) => match ordering_purpose {
             OrderingPurpose::Normalization => left.cmp(right),
             OrderingPurpose::Determinism => match (left, right) {
-                (TypedDictType::Class(left), TypedDictType::Class(right)) => {
-                    union_or_intersection_elements_ordering(
-                        db,
-                        &Type::from(*left),
-                        &Type::from(*right),
-                        ordering_purpose,
-                    )
-                }
+                (TypedDictType::Class(left), TypedDictType::Class(right)) => type_ordering(
+                    db,
+                    &Type::from(*left),
+                    &Type::from(*right),
+                    ordering_purpose,
+                ),
                 (TypedDictType::Class(_), TypedDictType::Synthesized(_)) => Ordering::Less,
                 (TypedDictType::Synthesized(_), TypedDictType::Class(_)) => Ordering::Greater,
                 (TypedDictType::Synthesized(left), TypedDictType::Synthesized(right)) => {
@@ -522,7 +494,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                             if name_cmp != Ordering::Equal {
                                 return name_cmp;
                             }
-                            let ty_cmp = union_or_intersection_elements_ordering(
+                            let ty_cmp = type_ordering(
                                 db,
                                 &left_field.declared_ty,
                                 &right_field.declared_ty,
@@ -573,8 +545,7 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
             }
 
             for (left, right) in left_elements.iter().zip(right_elements) {
-                let ordering =
-                    union_or_intersection_elements_ordering(db, left, right, ordering_purpose);
+                let ordering = type_ordering(db, left, right, ordering_purpose);
                 if ordering != Ordering::Equal {
                     return ordering;
                 }
@@ -604,16 +575,14 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
             }
 
             for (left, right) in left_positive.iter().zip(right_positive) {
-                let ordering =
-                    union_or_intersection_elements_ordering(db, left, right, ordering_purpose);
+                let ordering = type_ordering(db, left, right, ordering_purpose);
                 if ordering != Ordering::Equal {
                     return ordering;
                 }
             }
 
             for (left, right) in left_negative.iter().zip(right_negative) {
-                let ordering =
-                    union_or_intersection_elements_ordering(db, left, right, ordering_purpose);
+                let ordering = type_ordering(db, left, right, ordering_purpose);
                 if ordering != Ordering::Equal {
                     return ordering;
                 }
@@ -678,7 +647,7 @@ fn dynamic_elements_ordering<'db>(
 /// The following criteria are considered, in order:
 /// * Boundness: Unbound precedes bound
 /// * Symbol name: String comparison
-/// * Guarded type: [`union_or_intersection_elements_ordering`]
+/// * Guarded type: [`type_ordering`]
 fn guard_like_ordering<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
     left: T,
@@ -691,14 +660,10 @@ fn guard_like_ordering<'db, T: TypeGuardLike<'db>>(
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
 
-        (None, None) => {
-            union_or_intersection_elements_ordering(db, &left_ty, &right_ty, ordering_purpose)
-        }
+        (None, None) => type_ordering(db, &left_ty, &right_ty, ordering_purpose),
 
         (Some(_), Some(_)) => match left.place_name(db).cmp(&right.place_name(db)) {
-            Ordering::Equal => {
-                union_or_intersection_elements_ordering(db, &left_ty, &right_ty, ordering_purpose)
-            }
+            Ordering::Equal => type_ordering(db, &left_ty, &right_ty, ordering_purpose),
             ordering => ordering,
         },
     }
@@ -784,7 +749,7 @@ fn known_bound_method_deterministic_ordering<'db>(
         (
             KnownBoundMethodType::FunctionTypeDunderGet(l),
             KnownBoundMethodType::FunctionTypeDunderGet(r),
-        ) => union_or_intersection_elements_ordering(
+        ) => type_ordering(
             db,
             &Type::FunctionLiteral(l),
             &Type::FunctionLiteral(r),
@@ -796,7 +761,7 @@ fn known_bound_method_deterministic_ordering<'db>(
         (
             KnownBoundMethodType::FunctionTypeDunderCall(l),
             KnownBoundMethodType::FunctionTypeDunderCall(r),
-        ) => union_or_intersection_elements_ordering(
+        ) => type_ordering(
             db,
             &Type::FunctionLiteral(l),
             &Type::FunctionLiteral(r),
@@ -808,7 +773,7 @@ fn known_bound_method_deterministic_ordering<'db>(
         (
             KnownBoundMethodType::PropertyDunderGet(l),
             KnownBoundMethodType::PropertyDunderGet(r),
-        ) => union_or_intersection_elements_ordering(
+        ) => type_ordering(
             db,
             &Type::PropertyInstance(l),
             &Type::PropertyInstance(r),
@@ -820,7 +785,7 @@ fn known_bound_method_deterministic_ordering<'db>(
         (
             KnownBoundMethodType::PropertyDunderSet(l),
             KnownBoundMethodType::PropertyDunderSet(r),
-        ) => union_or_intersection_elements_ordering(
+        ) => type_ordering(
             db,
             &Type::PropertyInstance(l),
             &Type::PropertyInstance(r),
@@ -927,7 +892,7 @@ fn known_instance_deterministic_ordering<'db>(
                 }
                 (Some(_), None) => Ordering::Less,
                 (None, Some(_)) => Ordering::Greater,
-                (None, None) => union_or_intersection_elements_ordering(
+                (None, None) => type_ordering(
                     db,
                     &l.value_type(db),
                     &r.value_type(db),
@@ -955,12 +920,9 @@ fn known_instance_deterministic_ordering<'db>(
             .then_with(|| l.kw_only(db).cmp(&r.kw_only(db)))
             .then_with(|| l.alias(db).cmp(&r.alias(db)))
             .then_with(|| match (l.default_type(db), r.default_type(db)) {
-                (Some(l_ty), Some(r_ty)) => union_or_intersection_elements_ordering(
-                    db,
-                    &l_ty,
-                    &r_ty,
-                    OrderingPurpose::Determinism,
-                ),
+                (Some(l_ty), Some(r_ty)) => {
+                    type_ordering(db, &l_ty, &r_ty, OrderingPurpose::Determinism)
+                }
                 (Some(_), None) => Ordering::Less,
                 (None, Some(_)) => Ordering::Greater,
                 (None, None) => Ordering::Equal,
@@ -990,12 +952,7 @@ fn known_instance_deterministic_ordering<'db>(
 
         (KnownInstanceType::UnionType(l), KnownInstanceType::UnionType(r)) => {
             match (l.union_type(db), r.union_type(db)) {
-                (Ok(l_ty), Ok(r_ty)) => union_or_intersection_elements_ordering(
-                    db,
-                    l_ty,
-                    r_ty,
-                    OrderingPurpose::Determinism,
-                ),
+                (Ok(l_ty), Ok(r_ty)) => type_ordering(db, l_ty, r_ty, OrderingPurpose::Determinism),
                 (Ok(_), Err(_)) => Ordering::Less,
                 (Err(_), Ok(_)) => Ordering::Greater,
                 // Both errors: fall back to Salsa ID
@@ -1006,56 +963,34 @@ fn known_instance_deterministic_ordering<'db>(
         (_, KnownInstanceType::UnionType(_)) => Ordering::Greater,
 
         (KnownInstanceType::Literal(l), KnownInstanceType::Literal(r)) => {
-            union_or_intersection_elements_ordering(
-                db,
-                &l.inner(db),
-                &r.inner(db),
-                OrderingPurpose::Determinism,
-            )
+            type_ordering(db, &l.inner(db), &r.inner(db), OrderingPurpose::Determinism)
         }
         (KnownInstanceType::Literal(_), _) => Ordering::Less,
         (_, KnownInstanceType::Literal(_)) => Ordering::Greater,
 
         (KnownInstanceType::Annotated(l), KnownInstanceType::Annotated(r)) => {
-            union_or_intersection_elements_ordering(
-                db,
-                &l.inner(db),
-                &r.inner(db),
-                OrderingPurpose::Determinism,
-            )
+            type_ordering(db, &l.inner(db), &r.inner(db), OrderingPurpose::Determinism)
         }
         (KnownInstanceType::Annotated(_), _) => Ordering::Less,
         (_, KnownInstanceType::Annotated(_)) => Ordering::Greater,
 
         (KnownInstanceType::TypeGenericAlias(l), KnownInstanceType::TypeGenericAlias(r)) => {
-            union_or_intersection_elements_ordering(
-                db,
-                &l.inner(db),
-                &r.inner(db),
-                OrderingPurpose::Determinism,
-            )
+            type_ordering(db, &l.inner(db), &r.inner(db), OrderingPurpose::Determinism)
         }
         (KnownInstanceType::TypeGenericAlias(_), _) => Ordering::Less,
         (_, KnownInstanceType::TypeGenericAlias(_)) => Ordering::Greater,
 
-        (KnownInstanceType::Callable(l), KnownInstanceType::Callable(r)) => {
-            union_or_intersection_elements_ordering(
-                db,
-                &Type::Callable(l),
-                &Type::Callable(r),
-                OrderingPurpose::Determinism,
-            )
-        }
+        (KnownInstanceType::Callable(l), KnownInstanceType::Callable(r)) => type_ordering(
+            db,
+            &Type::Callable(l),
+            &Type::Callable(r),
+            OrderingPurpose::Determinism,
+        ),
         (KnownInstanceType::Callable(_), _) => Ordering::Less,
         (_, KnownInstanceType::Callable(_)) => Ordering::Greater,
 
         (KnownInstanceType::LiteralStringAlias(l), KnownInstanceType::LiteralStringAlias(r)) => {
-            union_or_intersection_elements_ordering(
-                db,
-                &l.inner(db),
-                &r.inner(db),
-                OrderingPurpose::Determinism,
-            )
+            type_ordering(db, &l.inner(db), &r.inner(db), OrderingPurpose::Determinism)
         }
         (KnownInstanceType::LiteralStringAlias(_), _) => Ordering::Less,
         (_, KnownInstanceType::LiteralStringAlias(_)) => Ordering::Greater,
@@ -1090,12 +1025,8 @@ fn signatures_deterministic_ordering<'db>(
                 return params_cmp;
             }
 
-            let ret_cmp = union_or_intersection_elements_ordering(
-                db,
-                &l.return_ty,
-                &r.return_ty,
-                OrderingPurpose::Determinism,
-            );
+            let ret_cmp =
+                type_ordering(db, &l.return_ty, &r.return_ty, OrderingPurpose::Determinism);
             if ret_cmp != Ordering::Equal {
                 return ret_cmp;
             }
@@ -1126,7 +1057,7 @@ fn parameters_deterministic_ordering<'db>(
                     return name_cmp;
                 }
 
-                let ty_cmp = union_or_intersection_elements_ordering(
+                let ty_cmp = type_ordering(
                     db,
                     &l.annotated_type(),
                     &r.annotated_type(),
@@ -1138,12 +1069,8 @@ fn parameters_deterministic_ordering<'db>(
 
                 match (l.default_type(), r.default_type()) {
                     (Some(l_default), Some(r_default)) => {
-                        let default_cmp = union_or_intersection_elements_ordering(
-                            db,
-                            &l_default,
-                            &r_default,
-                            OrderingPurpose::Determinism,
-                        );
+                        let default_cmp =
+                            type_ordering(db, &l_default, &r_default, OrderingPurpose::Determinism);
                         if default_cmp != Ordering::Equal {
                             return default_cmp;
                         }
@@ -1181,7 +1108,7 @@ fn generic_context_deterministic_ordering<'db>(
 
     left_vars.len().cmp(&right_vars.len()).then_with(|| {
         for (l, r) in left_vars.zip(right_vars) {
-            let cmp = union_or_intersection_elements_ordering(
+            let cmp = type_ordering(
                 db,
                 &Type::TypeVar(l),
                 &Type::TypeVar(r),
@@ -1209,12 +1136,7 @@ fn specialization_deterministic_ordering<'db>(
             let right_types = right.types(db);
             left_types.len().cmp(&right_types.len()).then_with(|| {
                 for (l, r) in left_types.iter().zip(right_types.iter()) {
-                    let cmp = union_or_intersection_elements_ordering(
-                        db,
-                        l,
-                        r,
-                        OrderingPurpose::Determinism,
-                    );
+                    let cmp = type_ordering(db, l, r, OrderingPurpose::Determinism);
                     if cmp != Ordering::Equal {
                         return cmp;
                     }
@@ -1263,18 +1185,13 @@ fn named_tuple_spec_deterministic_ordering<'db>(
                     if name_cmp != Ordering::Equal {
                         return name_cmp;
                     }
-                    let ty_cmp = union_or_intersection_elements_ordering(
-                        db,
-                        &l.ty,
-                        &r.ty,
-                        OrderingPurpose::Determinism,
-                    );
+                    let ty_cmp = type_ordering(db, &l.ty, &r.ty, OrderingPurpose::Determinism);
                     if ty_cmp != Ordering::Equal {
                         return ty_cmp;
                     }
                     match (&l.default, &r.default) {
                         (Some(l_default), Some(r_default)) => {
-                            let default_cmp = union_or_intersection_elements_ordering(
+                            let default_cmp = type_ordering(
                                 db,
                                 l_default,
                                 r_default,
