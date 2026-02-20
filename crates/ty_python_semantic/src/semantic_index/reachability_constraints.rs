@@ -958,9 +958,21 @@ impl ReachabilityConstraints {
                 let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
                 let true_ty = narrow!(node.if_true, true_accumulated);
 
+                // Narrowing can only produce subtypes of `base_ty`, so
+                // if one branch already returns `base_ty`, skip the other.
+                if true_ty == base_ty {
+                    memo.insert(key, base_ty);
+                    return base_ty;
+                }
+
                 // False branch: predicate doesn't hold → accumulate negative narrowing
                 let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
                 let false_ty = narrow!(node.if_false, false_accumulated);
+
+                if false_ty == base_ty {
+                    memo.insert(key, base_ty);
+                    return base_ty;
+                }
 
                 // We won't do a union type redundancy check here, as it only needs to be performed once for the final result.
                 UnionType::from_elements_no_redundancy_check(db, [true_ty, false_ty])
