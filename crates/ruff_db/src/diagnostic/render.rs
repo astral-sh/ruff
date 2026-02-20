@@ -2908,7 +2908,11 @@ def fibonacci(n):
         env.format(format);
 
         let mut primary_diagnostic = env
-            .builder("undefined-name", Severity::Error, "Undefined name `fibonaccii`")
+            .builder(
+                "undefined-name",
+                Severity::Error,
+                "Undefined name `fibonaccii`",
+            )
             .primary("fib.py", "12:15", "12:25", "")
             .secondary_code("F821")
             .noqa_offset(ruff_text_size::TextSize::from(0))
@@ -2938,7 +2942,6 @@ def fibonacci(n):
                 ))))
                 .noqa_offset(TextSize::from(7))
                 .documentation_url("https://docs.astral.sh/ruff/rules/unused-import")
-
                 .build(),
             env.builder(
                 "unused-variable",
@@ -2961,7 +2964,7 @@ def fibonacci(n):
                 .noqa_offset(TextSize::from(3))
                 .documentation_url("https://docs.astral.sh/ruff/rules/undefined-name")
                 .build(),
-                primary_diagnostic,
+            primary_diagnostic,
         ];
 
         (env, diagnostics)

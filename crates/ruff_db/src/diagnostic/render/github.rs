@@ -87,7 +87,7 @@ impl<'a> GithubRenderer<'a> {
                 write!(f, "{id}:", id = diagnostic.id())?;
             }
 
-            writeln!(f, " {}", diagnostic.concise_message())?;
+            write!(f, " {}%0A", diagnostic.concise_message())?;
 
             for annotation in diagnostic.secondary_annotations() {
                 let span = annotation.get_span();
@@ -98,9 +98,9 @@ impl<'a> GithubRenderer<'a> {
                     && let Some(range) = span.range()
                 {
                     let start_location = source_code.line_column(range.start());
-                    writeln!(
+                    write!(
                         f,
-                        "  {path}:{row}:{column}: {message}",
+                        "  {path}:{row}:{column}: {message}%0A",
                         path = file.relative_path(self.resolver).display(),
                         row = start_location.line,
                         column = start_location.column,
@@ -111,7 +111,7 @@ impl<'a> GithubRenderer<'a> {
             for subdiagnostic in diagnostic.sub_diagnostics() {
                 let severity = match subdiagnostic.severity() {
                     SubDiagnosticSeverity::Help => "help",
-                    SubDiagnosticSeverity::Info => "notice",
+                    SubDiagnosticSeverity::Info => "info",
                     SubDiagnosticSeverity::Warning => "warning",
                     SubDiagnosticSeverity::Error | SubDiagnosticSeverity::Fatal => "error",
                 };
@@ -125,9 +125,9 @@ impl<'a> GithubRenderer<'a> {
                     if let Some(range) = span.range() {
                         rendered_primary = true;
                         let start_location = source_code.line_column(range.start());
-                        writeln!(
+                        write!(
                             f,
-                            "  {path}:{row}:{column}: {severity}: {message}",
+                            "  {path}:{row}:{column}: {severity}: {message}%0A",
                             path = file.relative_path(self.resolver).display(),
                             row = start_location.line,
                             column = start_location.column,
@@ -136,7 +136,7 @@ impl<'a> GithubRenderer<'a> {
                 }
 
                 if !rendered_primary {
-                    writeln!(f, "  {severity}: {}", subdiagnostic.concise_message())?;
+                    write!(f, "  {severity}: {}%0A", subdiagnostic.concise_message())?;
                 }
 
                 for annotation in subdiagnostic.annotations() {
@@ -151,9 +151,9 @@ impl<'a> GithubRenderer<'a> {
                         && let Some(range) = span.range()
                     {
                         let start_location = source_code.line_column(range.start());
-                        writeln!(
+                        write!(
                             f,
-                            "    {path}:{row}:{column}: {message}",
+                            "    {path}:{row}:{column}: {message}%0A",
                             path = file.relative_path(self.resolver).display(),
                             row = start_location.line,
                             column = start_location.column,
@@ -161,6 +161,8 @@ impl<'a> GithubRenderer<'a> {
                     }
                 }
             }
+
+            writeln!(f)?;
         }
 
         Ok(())
@@ -195,7 +197,7 @@ mod tests {
 
         insta::assert_snapshot!(
             env.render(&diag),
-            @"::error title=ty (test-diagnostic)::test-diagnostic: main diagnostic message",
+            @"::error title=ty (test-diagnostic)::test-diagnostic: main diagnostic message%0A",
         );
     }
 }
