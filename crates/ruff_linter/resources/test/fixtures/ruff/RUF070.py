@@ -52,6 +52,16 @@ def foo():
     x =1
     yield x  # RUF070 (no space after `=`)
 
+def foo():
+    x = yield 1
+    yield x  # RUF070 (yield as assigned value, fix adds parentheses)
+
+# Assignment inside `with`, yield outside
+def foo():
+    with open("foo.txt") as f:
+        x = f.read()
+    yield x  # RUF070
+
 
 ###
 # Non-errors
@@ -175,7 +185,11 @@ def foo():
     x: int = 1
     yield x
 
-# Yield expression as assigned value (inlining would produce `yield yield 1`)
+# Assignment inside `with` using `contextlib.suppress` (body may not execute)
+import contextlib
+
 def foo():
-    x = yield 1
+    x = default()
+    with contextlib.suppress(Exception):
+        x = something()
     yield x

@@ -4,6 +4,7 @@ use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Identifier, Stmt};
+use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 
@@ -74,7 +75,7 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
     };
 
     let visitor = {
-        let mut visitor = YieldVisitor::new();
+        let mut visitor = YieldVisitor::new(checker.semantic());
         visitor.visit_body(&function_def.body);
         visitor
     };
@@ -96,9 +97,6 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
             id: assigned_id, ..
         })] = assign.targets.as_slice()
             && yielded_id == assigned_id
-            // Skip when the assigned value is a yield expression, since inlining would
-            // produce `yield yield ...` which is a syntax error.
-            && !matches!(assign.value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
             && !visitor.annotations.contains(assigned_id.as_str())
             && !visitor.non_locals.contains(assigned_id.as_str())
             && let Some(assigned_binding) = function_scope
@@ -122,10 +120,6 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
                     value.range(),
                 )
                 .try_set_fix(|| {
-                    // Delete the `yield x` expression statement. There's no need to treat
-                    // this as an isolated edit, since we're editing the preceding statement,
-                    // so no conflicting edit would be allowed to remove that preceding
-                    // statement.
                     let delete_yield =
                         edits::delete_stmt(stmt, None, checker.locator(), checker.indexer());
 
@@ -137,6 +131,8 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
                         .context("Expected an equals token")?;
 
                     let keyword = if is_yield_from { "yield from" } else { "yield" };
+                    let needs_parens =
+                        matches!(assign.value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_));
 
                     let replace_assign = Edit::range_replacement(
                         if eq_token.end() < assign.value.start() {
@@ -147,13 +143,21 @@ pub(crate) fn unnecessary_assign_before_yield(checker: &Checker, function_stmt: 
                         TextRange::new(assign.start(), eq_token.range().end()),
                     );
 
-                    Ok(Fix::unsafe_edits(replace_assign, [delete_yield]))
+                    let mut edits = vec![replace_assign, delete_yield];
+                    if needs_parens {
+                        edits.push(Edit::insertion("(".to_string(), assign.value.start()));
+                        edits.push(Edit::insertion(")".to_string(), assign.value.end()));
+                    }
+
+                    Ok(Fix::unsafe_edits(edits.remove(0), edits))
                 });
         }
     }
 }
 
-struct YieldVisitor<'a> {
+struct YieldVisitor<'semantic, 'a> {
+    /// The semantic model of the current file.
+    semantic: &'semantic SemanticModel<'a>,
     /// The non-local variables in the current function.
     non_locals: FxHashSet<&'a str>,
     /// The annotated variables in the current function.
@@ -164,9 +168,10 @@ struct YieldVisitor<'a> {
     sibling: Option<&'a Stmt>,
 }
 
-impl YieldVisitor<'_> {
-    fn new() -> Self {
+impl<'semantic, 'a> YieldVisitor<'semantic, 'a> {
+    fn new(semantic: &'semantic SemanticModel<'a>) -> Self {
         Self {
+            semantic,
             non_locals: FxHashSet::default(),
             annotations: FxHashSet::default(),
             assignment_yield: Vec::new(),
@@ -175,7 +180,7 @@ impl YieldVisitor<'_> {
     }
 }
 
-impl<'a> Visitor<'a> for YieldVisitor<'a> {
+impl<'a> Visitor<'a> for YieldVisitor<'_, 'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::ClassDef(_) | Stmt::FunctionDef(_) => {
@@ -196,11 +201,23 @@ impl<'a> Visitor<'a> for YieldVisitor<'a> {
                 }
             }
             Stmt::Expr(ast::StmtExpr { value, .. }) => {
-                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_))
-                    && let Some(Stmt::Assign(stmt_assign)) = self.sibling
-                {
-                    self.assignment_yield
-                        .push((stmt_assign, value.as_ref(), stmt));
+                if matches!(value.as_ref(), Expr::Yield(_) | Expr::YieldFrom(_)) {
+                    match self.sibling {
+                        Some(Stmt::Assign(stmt_assign)) => {
+                            self.assignment_yield
+                                .push((stmt_assign, value.as_ref(), stmt));
+                        }
+                        Some(Stmt::With(with)) => {
+                            if let Some(stmt_assign) =
+                                with.body.last().and_then(Stmt::as_assign_stmt)
+                                && !has_conditional_body(with, self.semantic)
+                            {
+                                self.assignment_yield
+                                    .push((stmt_assign, value.as_ref(), stmt));
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             }
             _ => {}
@@ -216,4 +233,21 @@ impl<'a> Visitor<'a> for YieldVisitor<'a> {
         visitor::walk_body(self, body);
         self.sibling = sibling;
     }
+}
+
+/// Returns `true` if the [`ast::StmtWith`] statement is known to have a conditional body
+/// (e.g., `contextlib.suppress`), meaning its body may or may not execute.
+fn has_conditional_body(with: &ast::StmtWith, semantic: &SemanticModel) -> bool {
+    with.items.iter().any(|item| {
+        let ast::WithItem {
+            context_expr: Expr::Call(ast::ExprCall { func, .. }),
+            ..
+        } = item
+        else {
+            return false;
+        };
+        semantic
+            .resolve_qualified_name(func)
+            .is_some_and(|qualified_name| qualified_name.segments() == ["contextlib", "suppress"])
+    })
 }

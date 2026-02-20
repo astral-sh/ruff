@@ -228,6 +228,8 @@ RUF070 [*] Unnecessary assignment to `x` before `yield` statement
 52 |     x =1
 53 |     yield x  # RUF070 (no space after `=`)
    |           ^
+54 |
+55 | def foo():
    |
 help: Remove unnecessary assignment
 49 |     yield x  # RUF070
@@ -237,6 +239,48 @@ help: Remove unnecessary assignment
    -     yield x  # RUF070 (no space after `=`)
 52 +     yield 1
 53 | 
+54 | def foo():
+55 |     x = yield 1
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:57:11
+   |
+55 | def foo():
+56 |     x = yield 1
+57 |     yield x  # RUF070 (yield as assigned value, fix adds parentheses)
+   |           ^
+58 |
+59 | # Assignment inside `with`, yield outside
+   |
+help: Remove unnecessary assignment
+53 |     yield x  # RUF070 (no space after `=`)
 54 | 
-55 | ###
+55 | def foo():
+   -     x = yield 1
+   -     yield x  # RUF070 (yield as assigned value, fix adds parentheses)
+56 +     yield (yield 1)
+57 | 
+58 | # Assignment inside `with`, yield outside
+59 | def foo():
+note: This is an unsafe fix and may change runtime behavior
+
+RUF070 [*] Unnecessary assignment to `x` before `yield` statement
+  --> RUF070.py:63:11
+   |
+61 |     with open("foo.txt") as f:
+62 |         x = f.read()
+63 |     yield x  # RUF070
+   |           ^
+   |
+help: Remove unnecessary assignment
+59 | # Assignment inside `with`, yield outside
+60 | def foo():
+61 |     with open("foo.txt") as f:
+   -         x = f.read()
+   -     yield x  # RUF070
+62 +         yield f.read()
+63 | 
+64 | 
+65 | ###
 note: This is an unsafe fix and may change runtime behavior
