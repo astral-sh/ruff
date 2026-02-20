@@ -51,6 +51,11 @@ pub enum Level {
     /// The lint is enabled and diagnostic should have a warning severity.
     Warn,
 
+    /// # Hint
+    ///
+    /// The lint is enabled and diagnostic should have a hint severity.
+    Hint,
+
     /// # Error
     ///
     /// The lint is enabled and diagnostics have an error severity.
@@ -66,6 +71,10 @@ impl Level {
         matches!(self, Level::Warn)
     }
 
+    pub const fn is_hint(self) -> bool {
+        matches!(self, Level::Hint)
+    }
+
     pub const fn is_ignore(self) -> bool {
         matches!(self, Level::Ignore)
     }
@@ -76,6 +85,7 @@ impl fmt::Display for Level {
         match self {
             Level::Ignore => f.write_str("ignore"),
             Level::Warn => f.write_str("warn"),
+            Level::Hint => f.write_str("hint"),
             Level::Error => f.write_str("error"),
         }
     }
@@ -88,6 +98,7 @@ impl TryFrom<Level> for Severity {
         match level {
             Level::Ignore => Err(()),
             Level::Warn => Ok(Severity::Warning),
+            Level::Hint => Ok(Severity::Hint),
             Level::Error => Ok(Severity::Error),
         }
     }
