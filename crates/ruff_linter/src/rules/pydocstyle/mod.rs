@@ -34,6 +34,10 @@ mod tests {
     #[test_case(Rule::FirstWordUncapitalized, Path::new("D.py"))]
     #[test_case(Rule::FirstWordUncapitalized, Path::new("D403.py"))]
     #[test_case(Rule::UnnecessaryMultilineDocstring, Path::new("D.py"))]
+    #[test_case(
+        Rule::OneLineDocstringShouldBeMultiLine,
+        Path::new("D219.py")
+    )]
     #[test_case(Rule::DocstringTabIndentation, Path::new("D.py"))]
     #[test_case(Rule::UndocumentedMagicMethod, Path::new("D.py"))]
     #[test_case(Rule::MultiLineSummaryFirstLine, Path::new("D.py"))]
@@ -110,6 +114,19 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn multi_line_docstring_with_summary_on_second_line() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D219.py"),
+            &settings::LinterSettings::for_rules([
+                Rule::OneLineDocstringShouldBeMultiLine,
+                Rule::MultiLineSummarySecondLine,
+            ]),
+        )?;
+        assert_diagnostics!("D219_D213.py", diagnostics);
         Ok(())
     }
 

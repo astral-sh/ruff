@@ -47,6 +47,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::EscapeSequenceInDocstring,
         Rule::FirstWordUncapitalized,
         Rule::UnnecessaryMultilineDocstring,
+        Rule::OneLineDocstringShouldBeMultiLine,
         Rule::DocstringTabIndentation,
         Rule::MultiLineSummaryFirstLine,
         Rule::MultiLineSummarySecondLine,
@@ -203,6 +204,9 @@ pub(crate) fn definitions(checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::UnnecessaryMultilineDocstring) {
                 pydocstyle::rules::one_liner(checker, &docstring);
+            }
+            if checker.is_rule_enabled(Rule::OneLineDocstringShouldBeMultiLine) {
+                pydocstyle::rules::multi_line_docstring(checker, &docstring);
             }
             if checker
                 .any_rule_enabled(&[Rule::BlankLineAfterFunction, Rule::BlankLineBeforeFunction])
