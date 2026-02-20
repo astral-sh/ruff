@@ -368,12 +368,12 @@ impl Bindings {
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
 
-                    let narrowing_constraint = if a.narrowing_constraint
-                        == ScopedNarrowingConstraint::ALWAYS_TRUE
-                        && b.narrowing_constraint == ScopedNarrowingConstraint::ALWAYS_TRUE
-                    {
-                        // short-circuit: if both sides are ALWAYS_TRUE, the result is ALWAYS_TRUE without needing to create a new TDD node.
-                        ScopedNarrowingConstraint::ALWAYS_TRUE
+                    let narrowing_constraint = if a.narrowing_constraint == b.narrowing_constraint {
+                        // short-circuit: if both sides have the same constraint, we can use that constraint without needing to create a new TDD node.
+                        a.narrowing_constraint
+                    } else if a.reachability_constraint == b.reachability_constraint {
+                        reachability_constraints
+                            .add_or_constraint(a.narrowing_constraint, b.narrowing_constraint)
                     } else {
                         // A branch contributes narrowing only when it is reachable.
                         // Without this gating, `OR(a_narrowing, b_narrowing)` allows an unreachable
