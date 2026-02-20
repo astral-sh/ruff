@@ -104,7 +104,8 @@ use crate::types::diagnostic::{
     report_match_pattern_against_typed_dict, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_rebound_typevar, report_unsupported_augmented_assignment, report_unsupported_base,
+    report_rebound_typevar, report_unsafe_init_on_instance,
+    report_unsupported_augmented_assignment, report_unsupported_base,
     report_unsupported_binary_operation, report_unsupported_comparison,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
@@ -12482,6 +12483,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {}
         }
 
+        // Check for explicit `__init__` calls on existing instances.
+        // This is unsound because Liskov is not enforced on `__init__`,
+        // and `__init__` is excluded from variance inference.
+        if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = func.as_ref()
+            && attr.id.as_str() == "__init__"
+        {
+            let value_type = self.expression_type(value);
+            if !is_allowed_init_receiver(self.db(), value_type) {
+                report_unsafe_init_on_instance(&self.context, call_expression, value_type);
+            }
+        }
+
         let class = match callable_type {
             Type::ClassLiteral(class) => Some(ClassType::NonGeneric(class)),
             Type::GenericAlias(generic) => Some(ClassType::Generic(generic)),
@@ -17207,6 +17220,44 @@ pub(crate) struct UnsupportedComparisonError<'db> {
     pub(crate) op: ast::CmpOp,
     pub(crate) left_ty: Type<'db>,
     pub(crate) right_ty: Type<'db>,
+}
+
+/// Returns `true` if calling `receiver.__init__(...)` should be allowed
+/// without emitting `unsafe-init-on-instance`.
+///
+/// Calling `__init__` is allowed when the receiver is a class (unbound call),
+/// a `super()` proxy, or a gradual/bottom type.
+fn is_allowed_init_receiver<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty {
+        Type::ClassLiteral(_) | Type::GenericAlias(_) | Type::SubclassOf(_) => true,
+
+        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => true,
+
+        Type::BoundSuper(_) | Type::Dynamic(_) | Type::Never => true,
+
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .all(|elem| is_allowed_init_receiver(db, *elem)),
+
+        Type::Intersection(intersection) => intersection
+            .positive(db)
+            .iter()
+            .any(|elem| is_allowed_init_receiver(db, *elem)),
+
+        Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(db) {
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                is_allowed_init_receiver(db, bound)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
+                .elements(db)
+                .iter()
+                .all(|constraint| is_allowed_init_receiver(db, *constraint)),
+            None => false,
+        },
+
+        _ => false,
+    }
 }
 
 fn format_import_from_module(level: u32, module: Option<&str>) -> String {
