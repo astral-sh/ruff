@@ -535,6 +535,29 @@ static_assert(is_equivalent_to(Top[GenericContravariant[Any]], GenericContravari
 static_assert(is_equivalent_to(Bottom[GenericContravariant[Any]], GenericContravariant[object]))
 ```
 
+When all invariant type parameters are fully static (e.g. type variables rather than gradual types
+like `Any`), `Top` simplifies away since there is no dynamic component to materialize:
+
+```py
+class Foo: ...
+
+T_bounded = TypeVar("T_bounded", bound=Foo)
+T_unbounded = TypeVar("T_unbounded")
+
+class InvariantBounded(Generic[T_bounded]):
+    x: T_bounded
+
+class InvariantUnbounded(Generic[T_unbounded]):
+    x: T_unbounded
+
+def f(
+    bounded: Top[InvariantBounded[T_bounded]],
+    unbounded: Top[InvariantUnbounded[T_unbounded]],
+):
+    reveal_type(bounded)  # revealed: InvariantBounded[T_bounded@f]
+    reveal_type(unbounded)  # revealed: InvariantUnbounded[T_unbounded@f]
+```
+
 Parameters in callable are contravariant, so the variance should be flipped:
 
 ```py
