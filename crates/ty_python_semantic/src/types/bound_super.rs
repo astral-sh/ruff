@@ -739,6 +739,14 @@ impl<'db> BoundSuperType<'db> {
         ))
     }
 
+    /// Check whether two `BoundSuperType`s are equivalent by recursing into
+    /// their fields.
+    ///
+    /// Despite the name, this is called from `Type::has_relation_to_impl`,
+    /// not from `Type::is_equivalent_to_impl`. `Type::has_relation_to_impl`
+    /// cannot simply delegate to `Type::is_equivalent_to_impl` for this
+    /// case, because `Type::is_equivalent_to_impl` itself delegates back to
+    /// `Type::has_relation_to_impl`, which would cause an infinite loop.
     pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
