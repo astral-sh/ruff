@@ -517,21 +517,22 @@ impl<'a> SuppressionsBuilder<'a> {
             // Standalone suppression comments
 
             if suppression.action == SuppressionAction::Ignore {
-                if let Some(_indent) = indentation_at_offset(suppression.range.start(), self.source)
+                let range = if let Some(_indent) =
+                    indentation_at_offset(suppression.range.start(), self.source)
                 {
                     // own-line ignore
-                    todo!()
+                    Self::standalone_comment_range(suppression.range, before, after)
                 } else {
                     // trailing ignore
-                    let range = self.trailing_comment_range(suppression.range, before, after);
-                    for code in suppression.codes_as_str(self.source) {
-                        self.valid.push(Suppression {
-                            code: code.into(),
-                            range,
-                            used: false.into(),
-                            comments: SuppressionComments::Single(suppression.clone()),
-                        });
-                    }
+                    self.trailing_comment_range(suppression.range, before, after)
+                };
+                for code in suppression.codes_as_str(self.source) {
+                    self.valid.push(Suppression {
+                        code: code.into(),
+                        range,
+                        used: false.into(),
+                        comments: SuppressionComments::Single(suppression.clone()),
+                    });
                 }
                 suppressions.next();
                 continue;
@@ -689,6 +690,45 @@ impl<'a> SuppressionsBuilder<'a> {
                 });
             }
         }
+    }
+
+    fn standalone_comment_range(range: TextRange, before: &[Token], after: &[Token]) -> TextRange {
+        let mut end = range.end();
+        let mut has_intermediary = false;
+
+        for prev_token in before.iter().rev() {
+            match prev_token.kind() {
+                TokenKind::Newline => {
+                    break;
+                }
+                TokenKind::NonLogicalNewline | TokenKind::Comment => {}
+                _ => {
+                    has_intermediary = true;
+                    break;
+                }
+            }
+        }
+
+        let mut seen_nonlogical_newline = false;
+        for next_token in after {
+            match next_token.kind() {
+                TokenKind::Newline => {
+                    break;
+                }
+                TokenKind::Comment => {}
+                TokenKind::NonLogicalNewline if has_intermediary => {
+                    if seen_nonlogical_newline {
+                        break;
+                    }
+                    seen_nonlogical_newline = true;
+                }
+                _ => {
+                    end = next_token.end();
+                }
+            }
+        }
+
+        TextRange::new(range.start(), max(end, range.end()))
     }
 
     fn trailing_comment_range(
@@ -1771,6 +1811,203 @@ print(
                         action: Ignore,
                         codes: [
                             "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_suppression_standalone_single_line() {
+        let source = "
+# ruff:ignore[code]
+print('hello')
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff:ignore[code]\nprint('hello')",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[code]",
+                        action: Ignore,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_suppression_standalone_multiline_top() {
+        let source = "
+# ruff:ignore[code]
+print(
+    'hello'
+)
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff:ignore[code]\nprint(\n    'hello'\n)",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[code]",
+                        action: Ignore,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_suppression_standalone_multiline_inner() {
+        let source = "
+print(
+    # ruff:ignore[code]
+    'hello'
+)
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff:ignore[code]\n    'hello'",
+                    code: "code",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[code]",
+                        action: Ignore,
+                        codes: [
+                            "code",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn ignore_suppression_combined() {
+        let source = "
+print('hello')  # ruff:ignore[alpha]
+
+# ruff:ignore[beta]
+def foo(
+    arg1,
+    # ruff:ignore[gamma]
+    arg2,
+):
+    print(  # ruff:ignore[delta]
+        'hello'
+    )
+
+bar = [
+    1,
+]  # ruff:ignore[epsilon]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "print('hello')  # ruff:ignore[alpha]",
+                    code: "alpha",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[alpha]",
+                        action: Ignore,
+                        codes: [
+                            "alpha",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+                Suppression {
+                    covered_source: "# ruff:ignore[beta]\ndef foo(\n    arg1,\n    # ruff:ignore[gamma]\n    arg2,\n):",
+                    code: "beta",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[beta]",
+                        action: Ignore,
+                        codes: [
+                            "beta",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+                Suppression {
+                    covered_source: "# ruff:ignore[gamma]\n    arg2,",
+                    code: "gamma",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[gamma]",
+                        action: Ignore,
+                        codes: [
+                            "gamma",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+                Suppression {
+                    covered_source: "    print(  # ruff:ignore[delta]\n        'hello'\n    )",
+                    code: "delta",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[delta]",
+                        action: Ignore,
+                        codes: [
+                            "delta",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: None,
+                },
+                Suppression {
+                    covered_source: "bar = [\n    1,\n]  # ruff:ignore[epsilon]",
+                    code: "epsilon",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff:ignore[epsilon]",
+                        action: Ignore,
+                        codes: [
+                            "epsilon",
                         ],
                         reason: "",
                     },
