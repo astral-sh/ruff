@@ -228,7 +228,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ModuleLiteral(_), _) => Ordering::Less,
         (_, Type::ModuleLiteral(_)) => Ordering::Greater,
 
-        (Type::ClassLiteral(left), Type::ClassLiteral(right)) => left.cmp(right),
+        (Type::ClassLiteral(left), Type::ClassLiteral(right)) => match ordering_purpose {
+            OrderingPurpose::Normalization => left.cmp(right),
+            OrderingPurpose::Determinism => {
+                class_literal_deterministic_ordering(db, *left, *right)
+            }
+        },
         (Type::ClassLiteral(_), _) => Ordering::Less,
         (_, Type::ClassLiteral(_)) => Ordering::Greater,
 
@@ -735,6 +740,24 @@ fn definition_ordering(
             .then_with(|| left.file_scope(db).cmp(&right.file_scope(db)))
             .then_with(|| left.place(db).cmp(&right.place(db))),
     }
+}
+
+fn class_literal_deterministic_ordering<'db>(
+    db: &'db dyn Db,
+    left: super::class::ClassLiteral<'db>,
+    right: super::class::ClassLiteral<'db>,
+) -> Ordering {
+    left.known(db)
+        .map(|known| known.name(db))
+        .cmp(&right.known(db).map(|known| known.name(db)))
+        .then_with(|| match (left.definition(db), right.definition(db)) {
+            (Some(left), Some(right)) => {
+                definition_ordering(db, left, right, OrderingPurpose::Determinism)
+            }
+            (Some(_), None) => Ordering::Less,
+            (None, Some(_)) => Ordering::Greater,
+            (None, None) => left.name(db).as_str().cmp(right.name(db).as_str()),
+        })
 }
 
 fn binding_context_ordering(db: &dyn Db, left: BindingContext, right: BindingContext) -> Ordering {
