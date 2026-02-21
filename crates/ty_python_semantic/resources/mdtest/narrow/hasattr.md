@@ -43,9 +43,9 @@ def _(obj: FinalClass):
         reveal_type(obj.spam)  # revealed: Unknown
 ```
 
-When the corresponding attribute is already defined on the class, `hasattr` narrowing does not
-change the type. `<Protocol with members 'spam'>` is a supertype of `WithSpam`, and so
-`WithSpam & <Protocol …>` simplifies to `WithSpam`:
+When the corresponding attribute is already defined on the class, `hasattr` narrowing intersects the
+type with the protocol. Since structural and nominal types are never considered redundant,
+`WithSpam & <Protocol with members 'spam'>` is not simplified:
 
 ```py
 class WithSpam:
@@ -53,7 +53,7 @@ class WithSpam:
 
 def _(obj: WithSpam):
     if hasattr(obj, "spam"):
-        reveal_type(obj)  # revealed: WithSpam
+        reveal_type(obj)  # revealed: WithSpam & <Protocol with members 'spam'>
         reveal_type(obj.spam)  # revealed: int
     else:
         reveal_type(obj)  # revealed: Never
