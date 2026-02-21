@@ -32,11 +32,8 @@ specifies ty's implementation of Python's import resolution algorithm.
 */
 
 use std::borrow::Cow;
-use std::fmt;
 use std::iter::FusedIterator;
-use std::str::Split;
 
-use compact_str::format_compact;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
@@ -219,27 +216,10 @@ fn resolve_module_query<'db>(
         return None;
     };
 
-    let module = match resolved {
-        ResolvedName::FileModule(module) => {
-            tracing::trace!(
-                "Resolved module `{name}` to `{path}`",
-                path = module.file.path(db)
-            );
-            Module::file_module(
-                db,
-                name.clone(),
-                module.kind,
-                module.search_path,
-                module.file,
-            )
-        }
-        ResolvedName::NamespacePackage => {
-            tracing::trace!("Module `{name}` is a namespace package");
-            Module::namespace_package(db, name.clone())
-        }
-    };
-
-    Some(module)
+    resolved
+        .into_iter()
+        .next()
+        .map(|candidate| candidate.into_module(db, name.clone()))
 }
 
 /// Like `resolve_module_query` but for cases where it failed to resolve the module
@@ -275,27 +255,10 @@ fn desperately_resolve_module<'db>(
         return None;
     };
 
-    let module = match resolved {
-        ResolvedName::FileModule(module) => {
-            tracing::trace!(
-                "Resolved module `{name}` to `{path}`",
-                path = module.file.path(db)
-            );
-            Module::file_module(
-                db,
-                name.clone(),
-                module.kind,
-                module.search_path,
-                module.file,
-            )
-        }
-        ResolvedName::NamespacePackage => {
-            tracing::trace!("Module `{name}` is a namespace package");
-            Module::namespace_package(db, name.clone())
-        }
-    };
-
-    Some(module)
+    resolved
+        .into_iter()
+        .next()
+        .map(|candidate| candidate.into_module(db, name.clone()))
 }
 
 /// Resolves the module for the given path.
@@ -1083,7 +1046,7 @@ struct ModuleNameIngredient<'db> {
 
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
-fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedName> {
+fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedNames> {
     let search_paths = search_paths(db, mode);
     resolve_name_impl(db, name, mode, search_paths)
 }
@@ -1097,9 +1060,105 @@ fn desperately_resolve_name(
     importing_file: File,
     name: &ModuleName,
     mode: ModuleResolveMode,
-) -> Option<ResolvedName> {
+) -> Option<ResolvedNames> {
     let search_paths = absolute_desperate_search_paths(db, importing_file);
     resolve_name_impl(db, name, mode, search_paths.iter().flatten())
+}
+
+#[derive(Debug, Clone, Copy)]
+enum ResolvedModule {
+    NamespacePackage,
+    LegacyNamespacePackage(File),
+    RegularPackage(File),
+    Module(File),
+}
+
+#[derive(Debug, Clone)]
+struct ModuleResolutionCandidate {
+    path: ModulePath,
+    module: ResolvedModule,
+    py_typed: PyTyped,
+}
+
+impl ModuleResolutionCandidate {
+    // Is this some kind of namespace package?
+    fn is_any_namespace_package(&self) -> bool {
+        match self.module {
+            ResolvedModule::NamespacePackage => true,
+            ResolvedModule::LegacyNamespacePackage(_) => true,
+            ResolvedModule::RegularPackage(_) => false,
+            ResolvedModule::Module(_) => false,
+        }
+    }
+
+    // This is the module we were actually interested in resolving, complete the resolution
+    fn into_module(self, db: &'_ dyn Db, name: ModuleName) -> Module<'_> {
+        match self.module {
+            ResolvedModule::NamespacePackage => {
+                tracing::trace!("Resolve namespace package `{name}`");
+                Module::namespace_package(db, name)
+            }
+            ResolvedModule::LegacyNamespacePackage(file) => {
+                // legacy namespace packages behave like regular packages
+                // when they're the target of the resolution
+                tracing::trace!(
+                    "Resolved legacy namespace package `{name}` to `{path}`",
+                    path = file.path(db)
+                );
+                Module::file_module(
+                    db,
+                    name,
+                    ModuleKind::Package,
+                    self.path.into_search_path(),
+                    file,
+                )
+            }
+            ResolvedModule::RegularPackage(file) => {
+                tracing::trace!(
+                    "Resolved package `{name}` to `{path}`",
+                    path = file.path(db)
+                );
+                Module::file_module(
+                    db,
+                    name,
+                    ModuleKind::Package,
+                    self.path.into_search_path(),
+                    file,
+                )
+            }
+            ResolvedModule::Module(file) => {
+                tracing::trace!("Resolved module `{name}` to `{path}`", path = file.path(db));
+                Module::file_module(
+                    db,
+                    name,
+                    ModuleKind::Module,
+                    self.path.into_search_path(),
+                    file,
+                )
+            }
+        }
+    }
+
+    fn missing_submodule_is_terminal(&self) -> bool {
+        if matches!(self.py_typed, PyTyped::Partial) {
+            return false;
+        }
+
+        // Only regular packages are truly terminal, as a later `foo/__init__.py`
+        // can shadow `foo.py`. Both shadow namespace packages.
+        matches!(self.module, ResolvedModule::RegularPackage(_))
+    }
+
+    fn to_str<'a>(&self, db: &'a dyn Db) -> Cow<'a, str> {
+        match self.module {
+            ResolvedModule::NamespacePackage => {
+                Cow::Owned(self.path.to_system_path().unwrap_or_default().to_string())
+            }
+            ResolvedModule::LegacyNamespacePackage(file) => Cow::Borrowed(file.path(db).as_str()),
+            ResolvedModule::RegularPackage(file) => Cow::Borrowed(file.path(db).as_str()),
+            ResolvedModule::Module(file) => Cow::Borrowed(file.path(db).as_str()),
+        }
+    }
 }
 
 fn resolve_name_impl<'a>(
@@ -1107,131 +1166,155 @@ fn resolve_name_impl<'a>(
     name: &ModuleName,
     mode: ModuleResolveMode,
     search_paths: impl Iterator<Item = &'a SearchPath>,
-) -> Option<ResolvedName> {
+) -> Option<ResolvedNames> {
     let python_version = db.python_version();
-    let resolver_state = ResolverContext::new(db, python_version, mode);
+    let context = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
+    let mut stub_name = None;
 
-    let name = RelaxedModuleName::new(name);
-    let stub_name = name.to_stub_package();
-    let mut is_namespace_package = false;
+    let mut cur_candidates = search_paths
+        .filter_map(|search_path| {
+            // When a builtin module is imported, standard module resolution is bypassed:
+            // the module name always resolves to the stdlib module,
+            // even if there's a module of the same name in the first-party root
+            // (which would normally result in the stdlib module being overridden).
+            // TODO: offer a diagnostic if there is a first-party module of the same name
+            if is_non_shadowable && !search_path.is_standard_library() {
+                return None;
+            }
 
-    for search_path in search_paths {
-        // When a builtin module is imported, standard module resolution is bypassed:
-        // the module name always resolves to the stdlib module,
-        // even if there's a module of the same name in the first-party root
-        // (which would normally result in the stdlib module being overridden).
-        // TODO: offer a diagnostic if there is a first-party module of the same name
-        if is_non_shadowable && !search_path.is_standard_library() {
-            continue;
-        }
+            Some(ModuleResolutionCandidate {
+                path: search_path.to_module_path(),
+                module: ResolvedModule::NamespacePackage,
+                py_typed: PyTyped::Untyped,
+            })
+        })
+        .collect::<Vec<_>>();
+    let mut next_candidates = vec![];
 
-        if !search_path.is_standard_library() && resolver_state.mode.stubs_allowed() {
-            match resolve_name_in_search_path(&resolver_state, &stub_name, search_path) {
-                Ok((package_kind, _, ResolvedName::FileModule(module))) => {
-                    if package_kind.is_root() && module.kind.is_module() {
+    // FIXME?: because we have to search every candidate on each step of this loop,
+    // in theory we can search them all in parallel. However we need to join the parallelism
+    // at the end of each iteration, and after the first iteration in 99% of cases we will have
+    // reduced down to a single candidate, so maybe meh?
+    let mut is_root = true;
+    for component in name.components() {
+        // Search for the next component in every search-path
+        for mut candidate in cur_candidates.drain(..) {
+            // On the first iteration, look for `mypackage-stubs` as well
+            // Optimization: stdlib never has these `-stubs`
+            if is_root
+                && context.mode.stubs_allowed()
+                && !candidate.path.search_path().is_standard_library()
+            {
+                let stub_name = stub_name.get_or_insert_with(|| format!("{component}-stubs"));
+                let mut stub_candidate = candidate.clone();
+                if resolve_name_in_search_path(&context, &mut stub_candidate, stub_name).is_ok() {
+                    // `mypackage-stubs.py(i)` is not a valid result
+                    if matches!(stub_candidate.module, ResolvedModule::Module(_)) {
                         tracing::trace!(
-                            "Search path `{search_path}` contains a module \
-                             named `{stub_name}` but a standalone module isn't a valid stub."
+                            "Search path `{}` contains a module \
+                            named `{stub_name}` but a standalone module isn't a valid stub.",
+                            candidate.path.search_path()
                         );
                     } else {
-                        return Some(ResolvedName::FileModule(module));
+                        let shadows_all = stub_candidate.missing_submodule_is_terminal();
+                        next_candidates.push(stub_candidate);
+                        if shadows_all {
+                            break;
+                        }
                     }
                 }
-                Ok((_, _, ResolvedName::NamespacePackage)) => {
-                    is_namespace_package = true;
+            }
+
+            if resolve_name_in_search_path(&context, &mut candidate, component).is_err() {
+                if candidate.missing_submodule_is_terminal() {
+                    // Everything after this package should be shadowed out by this failure
+                    // But the previous results are still in play because they would have
+                    // shadowed this one out anyway.
+                    break;
                 }
-                Err((PackageKind::Root, _)) => {
-                    tracing::trace!(
-                        "Search path `{search_path}` contains no stub package named `{stub_name}`."
-                    );
-                }
-                Err((PackageKind::Regular, PyTyped::Partial)) => {
-                    tracing::trace!(
-                        "Stub-package in `{search_path}` doesn't contain module: \
-                         `{name}` but it is a partial package, keep going."
-                    );
-                    // stub exists, but the module doesn't. But this is a partial package,
-                    // fall through to looking for a non-stub package
-                }
-                Err((PackageKind::Regular, _)) => {
-                    tracing::trace!(
-                        "Stub-package in `{search_path}` doesn't contain module: `{name}`"
-                    );
-                    // stub exists, but the module doesn't.
-                    return None;
-                }
-                Err((PackageKind::Namespace, _)) => {
-                    tracing::trace!(
-                        "Stub-package in `{search_path}` doesn't contain module: \
-                         `{name}` but it is a namespace package, keep going."
-                    );
-                    // stub exists, but the module doesn't. But this is a namespace package,
-                    // fall through to looking for a non-stub package
-                }
+                continue;
+            }
+            let shadows_all = candidate.missing_submodule_is_terminal();
+            next_candidates.push(candidate);
+            if shadows_all {
+                break;
             }
         }
 
-        match resolve_name_in_search_path(&resolver_state, &name, search_path) {
-            Ok((_, _, ResolvedName::FileModule(module))) => {
-                return Some(ResolvedName::FileModule(module));
+        // Now that we have several candidates, we need to reject candidates that are shadowed.
+        // There are only two valid situations where we should proceed into the next iteration
+        // with multiple candidates:
+        //
+        // * All the candidates are namespace packages
+        // * `mypackage-stubs` is a candidate with `PyTyped::Partial`
+        //
+        // The existence of a single non-namespace package will shadow
+        // all namespace packages *regardless of search-path order*.
+        //
+        // Similarly, the existence of a single regular package will shadow
+        // all modules (mymod.py) *regardless of search-path order*.
+        //
+        // This is implemented with the `retain` that follows.
+        //
+        // We can't do this "delete all namespace packages" eagerly because we want a
+        // `PyTyped::Partial` regular package to shadow namespace packages after it.
+        // (FIXME: I guess we could just set a flag not to add them...)
+
+        // First record what kinds of things we found
+        let mut found_regular_package = None;
+        let mut found_module = None;
+        let mut found_legacy_namespace_package = None;
+        for candidate in &next_candidates {
+            match (candidate.module, candidate.py_typed) {
+                (ResolvedModule::LegacyNamespacePackage(file), _) => {
+                    found_legacy_namespace_package = Some(file);
+                }
+                (ResolvedModule::RegularPackage(file), PyTyped::Untyped | PyTyped::Full) => {
+                    found_regular_package = Some(file);
+                }
+                (ResolvedModule::Module(file), PyTyped::Untyped | PyTyped::Full) => {
+                    found_module = Some(file);
+                }
+                _ => {}
             }
-            Ok((_, _, ResolvedName::NamespacePackage)) => {
-                is_namespace_package = true;
-            }
-            Err(kind) => match kind {
-                (PackageKind::Root, _) => {
-                    tracing::trace!(
-                        "Search path `{search_path}` contains no package named `{name}`."
-                    );
-                }
-                (PackageKind::Regular, PyTyped::Partial) => {
-                    tracing::trace!(
-                        "Package in `{search_path}` doesn't contain module: \
-                         `{name}` but it is a partial package, keep going."
-                    );
-                }
-                (PackageKind::Regular, _) => {
-                    // For regular packages, don't search the next search path. All files of that
-                    // package must be in the same location
-                    tracing::trace!("Package in `{search_path}` doesn't contain module: `{name}`");
-                    return None;
-                }
-                (PackageKind::Namespace, _) => {
-                    tracing::trace!(
-                        "Package in `{search_path}` doesn't contain module: \
-                         `{name}` but it is a namespace package, keep going."
-                    );
-                }
-            },
         }
+
+        next_candidates.retain(|candidate| {
+            if let Some(_legacy) = found_legacy_namespace_package && !matches!(candidate.module, ResolvedModule::LegacyNamespacePackage(_)) {
+                // TODO: it would be nice to emit a warning about this but we just assume it's fine
+            }
+
+            // Regular packages shadow anything that isn't a regular package independent of order
+            if let Some(package) = found_regular_package && !matches!(candidate.module, ResolvedModule::RegularPackage(_)) {
+                tracing::trace!("Discarding namespace package `{}` because a regular package of the same name was found: {}", 
+                    candidate.to_str(db),
+                    package.path(db).as_str(),
+                );
+                return false;
+            }
+            // Modules shadow namespace packages independent of order
+            if let Some(module) = found_module && candidate.is_any_namespace_package() {
+                tracing::trace!("Discarding namespace package `{}` because a module of the same name was found: {}", 
+                    candidate.to_str(db),
+                    module.path(db).as_str(),
+                );
+                return false;
+            }
+            true
+        });
+
+        if next_candidates.is_empty() {
+            return None;
+        }
+
+        // Advance to the next level of candidates while reusing allocations
+        // (we used `drain` so cur_candidates is empty)
+        std::mem::swap(&mut cur_candidates, &mut next_candidates);
+        is_root = false;
     }
 
-    if is_namespace_package {
-        return Some(ResolvedName::NamespacePackage);
-    }
-
-    None
-}
-
-#[derive(Debug)]
-enum ResolvedName {
-    /// A module that resolves to a file.
-    FileModule(ResolvedFileModule),
-
-    /// The module name resolved to a namespace package.
-    ///
-    /// For example, `from opentelemetry import trace, metrics` where
-    /// `opentelemetry` is a namespace package (and `trace` and `metrics` are
-    /// sub packages).
-    NamespacePackage,
-}
-
-#[derive(Debug)]
-struct ResolvedFileModule {
-    kind: ModuleKind,
-    search_path: SearchPath,
-    file: File,
+    Some(cur_candidates)
 }
 
 /// Attempts to resolve a module name in a particular search path.
@@ -1250,45 +1333,41 @@ struct ResolvedFileModule {
 /// Upon error, the kind of the parent package is returned.
 fn resolve_name_in_search_path(
     context: &ResolverContext,
-    name: &RelaxedModuleName,
-    search_path: &SearchPath,
-) -> Result<(PackageKind, PyTyped, ResolvedName), (PackageKind, PyTyped)> {
-    let mut components = name.components();
-    let module_name = components.next_back().unwrap();
-
-    let resolved_package = resolve_package(search_path, components, context)?;
-
-    let mut package_path = resolved_package.path;
-
+    candidate: &mut ModuleResolutionCandidate,
+    module_name: &str,
+) -> Result<(), ()> {
+    if matches!(candidate.module, ResolvedModule::Module(_)) {
+        tracing::trace!(
+            "The non-package {} cannot have child",
+            candidate.to_str(context.db)
+        );
+        return Err(());
+    }
+    let package_path = &mut candidate.path;
     package_path.push(module_name);
 
     // Check for a regular package first (highest priority)
     package_path.push("__init__");
-    if let Some(regular_package) = resolve_file_module(&package_path, context) {
-        return Ok((
-            resolved_package.kind,
-            resolved_package.typed,
-            ResolvedName::FileModule(ResolvedFileModule {
-                search_path: search_path.clone(),
-                kind: ModuleKind::Package,
-                file: regular_package,
-            }),
-        ));
+    if let Some(init) = resolve_file_module(package_path, context) {
+        // Remove the `__init__` component for any potential next step
+        package_path.pop();
+        candidate.py_typed = package_path
+            .py_typed(context)
+            .inherit_parent(candidate.py_typed);
+        if is_legacy_namespace_package(package_path, context, init) {
+            candidate.module = ResolvedModule::LegacyNamespacePackage(init);
+        } else {
+            candidate.module = ResolvedModule::RegularPackage(init);
+        }
+        return Ok(());
     }
 
     // Check for a file module next
     package_path.pop();
 
-    if let Some(file_module) = resolve_file_module(&package_path, context) {
-        return Ok((
-            resolved_package.kind,
-            resolved_package.typed,
-            ResolvedName::FileModule(ResolvedFileModule {
-                file: file_module,
-                kind: ModuleKind::Module,
-                search_path: search_path.clone(),
-            }),
-        ));
+    if let Some(file_module) = resolve_file_module(package_path, context) {
+        candidate.module = ResolvedModule::Module(file_module);
+        return Ok(());
     }
 
     // Last resort, check if a folder with the given name exists. If so,
@@ -1308,7 +1387,7 @@ fn resolve_name_in_search_path(
     // simply skip this check which also helps performance. If typeshed
     // ever uses namespace packages, ensure that this check also takes the
     // `VERSIONS` file into consideration.
-    if !search_path.is_standard_library() && package_path.is_directory(context) {
+    if !package_path.search_path().is_standard_library() && package_path.is_directory(context) {
         if let Some(path) = package_path.to_system_path() {
             let system = context.db.system();
             if system.case_sensitivity().is_case_sensitive()
@@ -1317,17 +1396,19 @@ fn resolve_name_in_search_path(
                     package_path.search_path().as_system_path().unwrap(),
                 )
             {
-                return Ok((
-                    resolved_package.kind,
-                    resolved_package.typed,
-                    ResolvedName::NamespacePackage,
-                ));
+                candidate.py_typed = package_path
+                    .py_typed(context)
+                    .inherit_parent(candidate.py_typed);
+                candidate.module = ResolvedModule::NamespacePackage;
+                return Ok(());
             }
         }
     }
 
-    Err((resolved_package.kind, resolved_package.typed))
+    Err(())
 }
+
+type ResolvedNames = Vec<ModuleResolutionCandidate>;
 
 /// If `module` exists on disk with either a `.pyi` or `.py` extension,
 /// return the [`File`] corresponding to that path.
@@ -1366,90 +1447,6 @@ pub(super) fn resolve_file_module(
     Some(file)
 }
 
-/// Attempt to resolve the parent package of a module.
-///
-/// `module_search_path` should be the directory to start looking for the
-/// parent package.
-///
-/// `components` should be the full module name of the parent package. This
-/// specifically should not include the basename of the module. So e.g.,
-/// for `foo.bar.baz`, `components` should be `[foo, bar]`. It follows that
-/// `components` may be empty (in which case, the parent package is the root).
-///
-/// Upon success, the path to the package and its "kind" (root, regular or
-/// namespace) is returned. Upon error, the kind of the package is still
-/// returned based on how many components were found and whether `__init__.py`
-/// is present.
-fn resolve_package<'a, 'db, I>(
-    module_search_path: &SearchPath,
-    components: I,
-    resolver_state: &ResolverContext<'db>,
-) -> Result<ResolvedPackage, (PackageKind, PyTyped)>
-where
-    I: Iterator<Item = &'a str>,
-{
-    let mut package_path = module_search_path.to_module_path();
-
-    // `true` if inside a folder that is a namespace package (has no `__init__.py`).
-    // Namespace packages are special because they can be spread across multiple search paths.
-    // https://peps.python.org/pep-0420/
-    let mut in_namespace_package = false;
-
-    // `true` if resolving a sub-package. For example, `true` when resolving `bar` of `foo.bar`.
-    let mut in_sub_package = false;
-
-    let mut typed = package_path.py_typed(resolver_state);
-
-    // For `foo.bar.baz`, test that `foo` and `bar` both contain a `__init__.py`.
-    for folder in components {
-        package_path.push(folder);
-        typed = package_path.py_typed(resolver_state).inherit_parent(typed);
-
-        let is_regular_package = package_path.is_regular_package(resolver_state);
-
-        if is_regular_package {
-            // This is the only place where we need to consider the existence of legacy namespace
-            // packages, as we are explicitly searching for the *parent* package of the module
-            // we actually want. Here, such a package should be treated as a PEP-420 ("modern")
-            // namespace package. In all other contexts it acts like a normal package and needs
-            // no special handling.
-            in_namespace_package = is_legacy_namespace_package(&package_path, resolver_state);
-        } else if package_path.is_directory(resolver_state)
-            // Pure modules hide namespace packages with the same name
-            && resolve_file_module(&package_path, resolver_state).is_none()
-        {
-            // A directory without an `__init__.py(i)` is a namespace package,
-            // continue with the next folder.
-            in_namespace_package = true;
-        } else if in_namespace_package {
-            // Package not found but it is part of a namespace package.
-            return Err((PackageKind::Namespace, typed));
-        } else if in_sub_package {
-            // A regular sub package wasn't found.
-            return Err((PackageKind::Regular, typed));
-        } else {
-            // We couldn't find `foo` for `foo.bar.baz`, search the next search path.
-            return Err((PackageKind::Root, typed));
-        }
-
-        in_sub_package = true;
-    }
-
-    let kind = if in_namespace_package {
-        PackageKind::Namespace
-    } else if in_sub_package {
-        PackageKind::Regular
-    } else {
-        PackageKind::Root
-    };
-
-    Ok(ResolvedPackage {
-        kind,
-        path: package_path,
-        typed,
-    })
-}
-
 /// Determines whether a package is a legacy namespace package.
 ///
 /// Before PEP 420 introduced implicit namespace packages, the ecosystem developed
@@ -1479,18 +1476,13 @@ where
 /// we will just get confused if you mess it up).
 fn is_legacy_namespace_package(
     package_path: &ModulePath,
-    resolver_state: &ResolverContext,
+    context: &ResolverContext,
+    init: File,
 ) -> bool {
     // Just an optimization, the stdlib and typeshed are never legacy namespace packages
     if package_path.search_path().is_standard_library() {
         return false;
     }
-
-    let mut package_path = package_path.clone();
-    package_path.push("__init__");
-    let Some(init) = resolve_file_module(&package_path, resolver_state) else {
-        return false;
-    };
 
     // This is all syntax-only analysis so it *could* be fooled but it's really unlikely.
     //
@@ -1499,42 +1491,11 @@ fn is_legacy_namespace_package(
     //
     // The downside is if you write slightly different syntax we will fail to detect the idiom,
     // but hey, this is better than nothing!
-    let parsed = ruff_db::parsed::parsed_module(resolver_state.db, init);
+    let parsed = ruff_db::parsed::parsed_module(context.db, init);
     let mut visitor = LegacyNamespacePackageVisitor::default();
-    visitor.visit_body(parsed.load(resolver_state.db).suite());
+    visitor.visit_body(parsed.load(context.db).suite());
 
     visitor.is_legacy_namespace_package
-}
-
-#[derive(Debug)]
-struct ResolvedPackage {
-    path: ModulePath,
-    kind: PackageKind,
-    typed: PyTyped,
-}
-
-#[derive(Copy, Clone, Eq, PartialEq, Debug)]
-enum PackageKind {
-    /// A root package or module. E.g. `foo` in `foo.bar.baz` or just `foo`.
-    Root,
-
-    /// A regular sub-package where the parent contains an `__init__.py`.
-    ///
-    /// For example, `bar` in `foo.bar` when the `foo` directory contains an `__init__.py`.
-    Regular,
-
-    /// A sub-package in a namespace package. A namespace package is a package
-    /// without an `__init__.py`.
-    ///
-    /// For example, `bar` in `foo.bar` if the `foo` directory contains no
-    /// `__init__.py`.
-    Namespace,
-}
-
-impl PackageKind {
-    pub(crate) const fn is_root(self) -> bool {
-        matches!(self, PackageKind::Root)
-    }
 }
 
 /// Info about the `py.typed` file for this package
@@ -1584,34 +1545,6 @@ impl<'db> ResolverContext<'db> {
 
     pub(super) fn vendored(&self) -> &VendoredFileSystem {
         self.db.vendored()
-    }
-}
-
-/// A [`ModuleName`] but with relaxed semantics to allow `<package>-stubs.path`
-#[derive(Debug)]
-struct RelaxedModuleName(compact_str::CompactString);
-
-impl RelaxedModuleName {
-    fn new(name: &ModuleName) -> Self {
-        Self(name.as_str().into())
-    }
-
-    fn components(&self) -> Split<'_, char> {
-        self.0.split('.')
-    }
-
-    fn to_stub_package(&self) -> Self {
-        if let Some((package, rest)) = self.0.split_once('.') {
-            Self(format_compact!("{package}-stubs.{rest}"))
-        } else {
-            Self(format_compact!("{package}-stubs", package = self.0))
-        }
-    }
-}
-
-impl fmt::Display for RelaxedModuleName {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.0.fmt(f)
     }
 }
 
@@ -2005,14 +1938,12 @@ mod tests {
             asyncio: 3.8-               # 'Regular' package on py38+
             asyncio.tasks: 3.9-3.11     # Submodule on py39+ only
             functools: 3.8-             # Top-level single-file module
-            xml: 3.8-3.8                # Namespace package on py38 only
         ";
 
         const STDLIB: &[FileSpec] = &[
             ("asyncio/__init__.pyi", ""),
             ("asyncio/tasks.pyi", ""),
             ("functools.pyi", ""),
-            ("xml/etree.pyi", ""),
         ];
 
         const TYPESHED: MockedTypeshed = MockedTypeshed {
@@ -2025,7 +1956,7 @@ mod tests {
             .with_python_version(PythonVersion::PY38)
             .build();
 
-        let existing_modules = create_module_names(&["asyncio", "functools", "xml.etree"]);
+        let existing_modules = create_module_names(&["asyncio", "functools"]);
         for module_name in existing_modules {
             let resolved_module =
                 resolve_module_confident(&db, &module_name).unwrap_or_else(|| {
@@ -2049,16 +1980,12 @@ mod tests {
             asyncio: 3.8-               # 'Regular' package on py38+
             asyncio.tasks: 3.9-3.11     # Submodule on py39+ only
             collections: 3.9-           # 'Regular' package on py39+
-            importlib: 3.9-             # Namespace package on py39+
-            xml: 3.8-3.8                # Namespace package on 3.8 only
         ";
 
         const STDLIB: &[FileSpec] = &[
             ("collections/__init__.pyi", ""),
             ("asyncio/__init__.pyi", ""),
             ("asyncio/tasks.pyi", ""),
-            ("importlib/abc.pyi", ""),
-            ("xml/etree.pyi", ""),
         ];
 
         const TYPESHED: MockedTypeshed = MockedTypeshed {
@@ -2071,13 +1998,7 @@ mod tests {
             .with_python_version(PythonVersion::PY38)
             .build();
 
-        let nonexisting_modules = create_module_names(&[
-            "collections",
-            "importlib",
-            "importlib.abc",
-            "xml",
-            "asyncio.tasks",
-        ]);
+        let nonexisting_modules = create_module_names(&["collections", "asyncio.tasks"]);
 
         for module_name in nonexisting_modules {
             assert!(
@@ -2094,7 +2015,6 @@ mod tests {
             asyncio.tasks: 3.9-3.11     # Submodule on py39+ only
             collections: 3.9-           # 'Regular' package on py39+
             functools: 3.8-             # Top-level single-file module
-            importlib: 3.9-             # Namespace package on py39+
         ";
 
         const STDLIB: &[FileSpec] = &[
@@ -2102,7 +2022,6 @@ mod tests {
             ("asyncio/tasks.pyi", ""),
             ("collections/__init__.pyi", ""),
             ("functools.pyi", ""),
-            ("importlib/abc.pyi", ""),
         ];
 
         const TYPESHED: MockedTypeshed = MockedTypeshed {
@@ -2115,13 +2034,8 @@ mod tests {
             .with_python_version(PythonVersion::PY39)
             .build();
 
-        let existing_modules = create_module_names(&[
-            "asyncio",
-            "functools",
-            "importlib.abc",
-            "collections",
-            "asyncio.tasks",
-        ]);
+        let existing_modules =
+            create_module_names(&["asyncio", "functools", "collections", "asyncio.tasks"]);
 
         for module_name in existing_modules {
             let resolved_module =
@@ -2523,7 +2437,7 @@ mod tests {
     fn adding_file_to_search_path_with_lower_priority_does_not_invalidate_query() {
         const TYPESHED: MockedTypeshed = MockedTypeshed {
             versions: "functools: 3.8-",
-            stdlib_files: &[("functools.pyi", "def update_wrapper(): ...")],
+            stdlib_files: &[("functools/__init__.pyi", "def update_wrapper(): ...")],
         };
 
         let TestCase {
@@ -2537,7 +2451,7 @@ mod tests {
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
-        let stdlib_functools_path = stdlib.join("functools.pyi");
+        let stdlib_functools_path = stdlib.join("functools/__init__.pyi");
 
         let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
         assert_eq!(functools_module.search_path(&db).unwrap(), &stdlib);
@@ -2549,7 +2463,7 @@ mod tests {
         // Adding a file to site-packages does not invalidate the query,
         // since site-packages takes lower priority in the module resolution
         db.clear_salsa_events();
-        let site_packages_functools_path = site_packages.join("functools.py");
+        let site_packages_functools_path = site_packages.join("functools/__init__.py");
         db.write_file(&site_packages_functools_path, "f: int")
             .unwrap();
         let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
