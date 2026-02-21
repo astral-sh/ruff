@@ -533,9 +533,9 @@ type("Foo", (Base,), {b"attr": 1})
 
 ## `type[...]` as base class
 
-`type[...]` (SubclassOf) types cannot be used as base classes. When a `type[...]` is used in the
-bases tuple, we emit a diagnostic and insert `Unknown` into the MRO. This gives exactly one
-diagnostic about the unsupported base, rather than cascading errors:
+`type[...]` (SubclassOf) types are valid class bases, but ty cannot determine the exact class, so it
+cannot solve the MRO. `Unknown` is inserted into the MRO and `unsupported-dynamic-base` is emitted.
+This gives exactly one diagnostic rather than cascading errors:
 
 ```py
 from ty_extensions import reveal_mro
@@ -555,6 +555,18 @@ def f(x: type[Base]):
 
     # Attributes from `Unknown` are accessible without further errors
     reveal_type(child.base_attr)  # revealed: Unknown
+```
+
+`type[Any]` and `type[Unknown]` already carry the dynamic kind, so no diagnostic is needed — the MRO
+being unknowable is inherent to `Any`/`Unknown`, not a ty limitation:
+
+```py
+from typing import Any
+
+def g(x: type[Any]):
+    # No diagnostic: `Any` base is fine as-is
+    Child = type("Child", (x,), {})
+    reveal_type(Child)  # revealed: <class 'Child'>
 ```
 
 ## MRO errors
