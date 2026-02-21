@@ -27,7 +27,7 @@ use crate::types::relation::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, SelfBinding, TypeContext, TypeMapping, VarianceInferable,
+    ParamSpecAttrKind, SelfBinding, TypeContext, TypeMapping, UnionBuilder, VarianceInferable,
     infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
@@ -372,6 +372,117 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
+    fn single_required_positional_parameter_type(signature: &Signature<'db>) -> Option<Type<'db>> {
+        if signature.parameters().len() != 1 {
+            return None;
+        }
+        let parameter = signature.parameters().get(0)?;
+
+        match parameter.kind() {
+            ParameterKind::PositionalOnly {
+                default_type: None, ..
+            }
+            | ParameterKind::PositionalOrKeyword {
+                default_type: None, ..
+            } => Some(parameter.annotated_type()),
+            _ => None,
+        }
+    }
+
+    fn is_unary_overload_aggregate_candidate_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        // Keep aggregate probing away from inference-sensitive shapes and defer them to the
+        // legacy path, which already handles dynamic/typevar interactions.
+        !ty.has_dynamic(db) && !ty.has_typevar_or_typevar_instance(db)
+    }
+
+    /// Fast path for unary callable assignability: compare overload sets by aggregating
+    /// overlapping parameter domains and return types.
+    ///
+    /// This is intentionally accept-only. If the probe does not definitely succeed, it returns
+    /// `None` and callers should fall back to legacy per-overload relation checks.
+    fn try_unary_overload_aggregate_relation(
+        db: &'db dyn Db,
+        self_signatures: &[Signature<'db>],
+        other_signature: &Signature<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+    ) -> Option<ConstraintSet<'db>> {
+        let other_parameter_type =
+            Self::single_required_positional_parameter_type(other_signature)?;
+        // Keep this aggregate path narrowly scoped to unary target callables whose parameter
+        // domain is an explicit union.
+        //
+        // Broader overload-set assignability (non-union unary domains, higher arity,
+        // typevars/dynamic interactions) needs dedicated relation logic.
+        if !matches!(other_parameter_type, Type::Union(_))
+            || !Self::is_unary_overload_aggregate_candidate_type(db, other_parameter_type)
+            || !Self::is_unary_overload_aggregate_candidate_type(db, other_signature.return_ty)
+        {
+            return None;
+        }
+
+        let mut parameter_type_union = UnionBuilder::new(db);
+        let mut return_type_union = UnionBuilder::new(db);
+        let mut has_overlapping_domain = false;
+        // Keep speculative aggregate checks isolated from the caller's cycle visitors. If the
+        // aggregate probe fails, fallback should behave like the legacy `when_any` path.
+        let aggregate_relation_visitor = HasRelationToVisitor::default();
+        let aggregate_disjointness_visitor = IsDisjointVisitor::default();
+
+        for self_signature in self_signatures {
+            let self_parameter_type =
+                Self::single_required_positional_parameter_type(self_signature)?;
+            if !Self::is_unary_overload_aggregate_candidate_type(db, self_parameter_type)
+                || !Self::is_unary_overload_aggregate_candidate_type(db, self_signature.return_ty)
+            {
+                return None;
+            }
+            let signatures_are_disjoint = self_parameter_type
+                .is_disjoint_from_impl(
+                    db,
+                    other_parameter_type,
+                    inferable,
+                    &aggregate_disjointness_visitor,
+                    &aggregate_relation_visitor,
+                )
+                .is_always_satisfied(db);
+
+            if signatures_are_disjoint {
+                continue;
+            }
+
+            has_overlapping_domain = true;
+            parameter_type_union = parameter_type_union.add(self_parameter_type);
+            return_type_union = return_type_union.add(self_signature.return_ty);
+        }
+
+        if !has_overlapping_domain {
+            return None;
+        }
+
+        // Function assignability here is parameter-contravariant and return-covariant.
+        let parameters_cover_target = other_parameter_type.has_relation_to_impl(
+            db,
+            parameter_type_union.build(),
+            inferable,
+            relation,
+            &aggregate_relation_visitor,
+            &aggregate_disjointness_visitor,
+        );
+        let returns_match_target = return_type_union.build().has_relation_to_impl(
+            db,
+            other_signature.return_ty,
+            inferable,
+            relation,
+            &aggregate_relation_visitor,
+            &aggregate_disjointness_visitor,
+        );
+        let aggregate_relation = parameters_cover_target.and(db, || returns_match_target);
+        aggregate_relation
+            .is_always_satisfied(db)
+            .then_some(aggregate_relation)
+    }
+
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
     fn has_relation_to_inner(
@@ -504,17 +615,31 @@ impl<'db> CallableSignature<'db> {
             }
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
-            (_, [_]) => self_signatures.iter().when_any(db, |self_signature| {
-                Self::has_relation_to_inner(
-                    db,
-                    std::slice::from_ref(self_signature),
-                    other_signatures,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+            (_, [other_signature]) => {
+                if (relation.is_assignability() || relation.is_constraint_set_assignability())
+                    && let Some(aggregate_relation) = Self::try_unary_overload_aggregate_relation(
+                        db,
+                        self_signatures,
+                        other_signature,
+                        inferable,
+                        relation,
+                    )
+                {
+                    return aggregate_relation;
+                }
+
+                self_signatures.iter().when_any(db, |self_signature| {
+                    Self::has_relation_to_inner(
+                        db,
+                        std::slice::from_ref(self_signature),
+                        other_signatures,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+            }
 
             // `self` is definitely not overloaded while `other` is possibly overloaded.
             ([_], _) => other_signatures.iter().when_all(db, |other_signature| {
