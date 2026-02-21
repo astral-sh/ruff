@@ -49,7 +49,7 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
-use crate::types::function::FunctionType;
+use crate::types::function::{FunctionDecorators, FunctionType};
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
@@ -98,6 +98,25 @@ fn definition_cycle_initial<'db>(
     definition: Definition<'db>,
 ) -> DefinitionInference<'db> {
     DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
+}
+
+/// Infer just the known-decorator flags for a function definition.
+///
+/// This is a lightweight query that avoids the cycle risk of calling
+/// `infer_definition_types` when we need to check decorators while
+/// already inside definition inference (e.g. checking `Self` in a
+/// `@staticmethod`).
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn function_known_decorators<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> FunctionDecorators {
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
+        .finish_function_decorators()
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
