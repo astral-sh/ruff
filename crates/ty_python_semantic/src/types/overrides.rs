@@ -217,8 +217,7 @@ fn check_class_declaration<'db>(
                             &member.name,
                             *first_reachable_definition,
                         );
-                    } else {
-                        let expected_type = enum_info.value_sunder_type;
+                    } else if let Some(expected_type) = enum_info.value_annotation {
                         if !member_value_type.is_assignable_to(db, expected_type) {
                             if let Some(builder) = context.report_lint(
                                 &INVALID_ASSIGNMENT,
