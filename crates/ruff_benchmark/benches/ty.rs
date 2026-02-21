@@ -658,6 +658,70 @@ class E(Enum):
     });
 }
 
+/// Benchmark for narrowing a large union type through multiple match statements.
+///
+/// This is extracted from egglog-python's `pretty.py`, where a ~30-class union type
+/// (`AllDecls`) is narrowed by exhaustive match statements.
+///
+/// Sample code structure:
+/// ```python
+/// from __future__ import annotations
+/// from dataclasses import dataclass
+///
+/// @dataclass
+/// class C0:
+///     value: int
+/// ...
+///
+/// AllDecls = C0 | C1 | ...
+///
+/// def process(decl: AllDecls) -> None:
+///     match decl:
+///         case C0(): pass
+///         ...
+///         case _: pass
+/// ```
+fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 30;
+    const NUM_MATCH_BRANCHES: usize = 29;
+
+    setup_rayon();
+
+    let mut code =
+        "from __future__ import annotations\nfrom dataclasses import dataclass\n\n".to_string();
+
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "@dataclass\nclass C{i}:\n    value: int\n").ok();
+    }
+
+    code.push_str("AllDecls = ");
+    for i in 0..NUM_CLASSES {
+        if i > 0 {
+            code.push_str(" | ");
+        }
+        write!(&mut code, "C{i}").ok();
+    }
+    code.push_str("\n\n");
+
+    code.push_str("def process(decl: AllDecls) -> None:\n    match decl:\n");
+    for i in 0..NUM_MATCH_BRANCHES {
+        writeln!(&mut code, "        case C{i}():\n            pass",).ok();
+    }
+    code.push_str("        case _:\n            pass\n\n");
+
+    criterion.bench_function("ty_micro[large_union_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -820,6 +884,7 @@ criterion_group!(
     benchmark_many_enum_members,
     benchmark_many_enum_members_2,
     benchmark_very_large_tuple,
+    benchmark_large_union_narrowing,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);
