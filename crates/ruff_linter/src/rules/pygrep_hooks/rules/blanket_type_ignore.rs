@@ -41,6 +41,10 @@ use crate::checkers::ast::LintContext;
 /// [tool.mypy]
 /// enable_error_code = ["ignore-without-code"]
 /// ```
+///
+/// For the list of possible error codes, see:
+/// - <https://mypy.readthedocs.io/en/stable/error_codes.html>
+/// - <https://mypy.readthedocs.io/en/stable/error_code_list.html>
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.187")]
 pub(crate) struct BlanketTypeIgnore;
