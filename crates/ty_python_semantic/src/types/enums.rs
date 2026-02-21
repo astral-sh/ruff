@@ -19,17 +19,8 @@ pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
 
-    /// The type used for `.value` access when no `_value_` annotation exists.
-    ///
-    /// When `__init__` is defined, this is `Any` (since values are processed
-    /// through `__init__`). Otherwise, falls back to `Unknown` (use inferred type).
-    pub(crate) value_sunder_type: Type<'db>,
-
     /// The explicit `_value_` annotation type, if declared.
-    ///
-    /// This is kept separate from `value_sunder_type` because `.value` access
-    /// always prefers the `_value_` annotation, even when `__init__` exists.
-    value_annotation: Option<Type<'db>>,
+    pub(crate) value_annotation: Option<Type<'db>>,
 
     /// The custom `__init__` function, if defined on this enum.
     ///
@@ -45,7 +36,6 @@ impl<'db> EnumMetadata<'db> {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
-            value_sunder_type: Type::Dynamic(DynamicType::Unknown),
             value_annotation: None,
             init_function: None,
         }
@@ -56,14 +46,15 @@ impl<'db> EnumMetadata<'db> {
     /// Priority: explicit `_value_` annotation, then `__init__` → `Any`,
     /// then the inferred member value type.
     pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
+        if !self.members.contains_key(member_name) {
+            return None;
+        }
         if let Some(annotation) = self.value_annotation {
-            // Check the member exists, but use the declared annotation type.
-            self.members.contains_key(member_name).then_some(annotation)
+            Some(annotation)
+        } else if self.init_function.is_some() {
+            Some(Type::Dynamic(DynamicType::Any))
         } else {
-            match self.value_sunder_type {
-                Type::Dynamic(DynamicType::Unknown) => self.members.get(member_name).copied(),
-                declared => self.members.contains_key(member_name).then_some(declared),
-            }
+            self.members.get(member_name).copied()
         }
     }
 
@@ -336,20 +327,9 @@ pub(crate) fn enum_metadata<'db>(
 
     let init_function = custom_init(db, scope_id);
 
-    // Determine the type for `.value` access and simple member value validation:
-    // (a) If `__init__` is defined, fall back to `Any` for `.value` access
-    //     (member value validation is handled separately via call synthesis).
-    // (b) Otherwise, use an explicit `_value_` annotation if present.
-    // (c) Otherwise, fall back to `Unknown` (use inferred member value type).
-    let value_sunder_type = init_function
-        .map(|_| Type::Dynamic(DynamicType::Any))
-        .or(value_annotation)
-        .unwrap_or(Type::Dynamic(DynamicType::Unknown));
-
     Some(EnumMetadata {
         members,
         aliases,
-        value_sunder_type,
         value_annotation,
         init_function,
     })
