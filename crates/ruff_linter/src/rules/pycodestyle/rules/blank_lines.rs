@@ -927,12 +927,10 @@ impl<'a, 'b> BlankLinesChecker<'a, 'b> {
                     )));
                 } else {
                     diagnostic.set_fix(Fix::safe_edit(Edit::insertion(
-                        self.stylist.line_ending().repeat(
-                            (expected_blank_lines_before_definition
-                                - line.preceding_blank_lines.count())
-                                as usize,
-                        ),
-                        self.locator.line_start(state.last_non_comment_line_end),
+                        self.stylist
+                            .line_ending()
+                            .repeat(expected_blank_lines_before_definition as usize),
+                        self.locator.line_start(line.first_token_range.start()),
                     )));
                 }
             }

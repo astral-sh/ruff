@@ -1010,3 +1010,20 @@ class Bar:
                 return 1
             return 2
 # end
+
+
+# E302
+"""Test that ruff fails"""
+
+
+import pytest
+
+# whatever
+# whatever 2
+
+# whatever 3
+@pytest.mark.skip
+def test_ruff_fails() -> None:
+    """A test case that causes ruff to have an infinite loop"""
+    return
+# end
