@@ -799,8 +799,7 @@ impl<'db> FunctionLiteral<'db> {
     /// statements, or if it is a `Protocol` method that only has a docstring,
     /// or if it is a `Protocol` method whose body only consists of a single
     /// `raise NotImplementedError` statement.
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn as_abstract_method(
+    pub(super) fn as_abstract_method(
         self,
         db: &'db dyn Db,
         enclosing_class: ClassType<'db>,
@@ -808,30 +807,53 @@ impl<'db> FunctionLiteral<'db> {
         if self.has_known_decorator(db, FunctionDecorators::ABSTRACT_METHOD) {
             return Some(AbstractMethodKind::Explicit);
         }
-        let definition = self.definition(db);
-        let file = definition.file(db);
-        if file.is_stub(db) {
+        if self.definition(db).file(db).is_stub(db) {
             return None;
         }
         if !enclosing_class.is_protocol(db) {
             return None;
         }
-        let (_, implementation) = self.overloads_and_implementation(db);
-        let Some(implementation) = implementation else {
-            return Some(AbstractMethodKind::ImplicitDueToStubBody);
-        };
-        let module = parsed_module(db, file).load(db);
-        let node = implementation.node(db, file, &module);
-        let body_kind = function_body_kind(db, node, |expr| {
-            definition_expression_type(db, definition, expr)
-        });
-        match body_kind {
+        match self.body_kind(db) {
             FunctionBodyKind::Stub => Some(AbstractMethodKind::ImplicitDueToStubBody),
             FunctionBodyKind::AlwaysRaisesNotImplementedError => {
                 Some(AbstractMethodKind::ImplicitDueToAlwaysRaising)
             }
             FunctionBodyKind::Regular => None,
         }
+    }
+
+    /// Returns the [`FunctionBodyKind`] of this function.
+    ///
+    /// For functions without an implementation (e.g., overloaded functions),
+    /// returns [`FunctionBodyKind::Stub`].
+    #[salsa::tracked]
+    fn body_kind(self, db: &'db dyn Db) -> FunctionBodyKind {
+        let (_, implementation) = self.overloads_and_implementation(db);
+        let Some(implementation) = implementation else {
+            return FunctionBodyKind::Stub;
+        };
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let node = implementation.node(db, file, &module);
+        function_body_kind(db, node, |expr| {
+            definition_expression_type(db, definition, expr)
+        })
+    }
+
+    /// Returns `true` if this function has a trivial body.
+    ///
+    /// A trivial body is one that consists only of `...`, `pass`, or
+    /// `raise NotImplementedError`.
+    ///
+    /// Methods defined in stub files are never considered to have trivial bodies,
+    /// since stubs use `...` as a placeholder regardless of the runtime implementation.
+    pub(crate) fn has_trivial_body(self, db: &'db dyn Db) -> bool {
+        !self.definition(db).file(db).is_stub(db)
+            && matches!(
+                self.body_kind(db),
+                FunctionBodyKind::Stub | FunctionBodyKind::AlwaysRaisesNotImplementedError
+            )
     }
 }
 
@@ -1074,6 +1096,11 @@ impl<'db> FunctionType<'db> {
     /// a diagnostic.
     pub(crate) fn spans(self, db: &'db dyn Db) -> FunctionSpans {
         self.literal(db).spans(db)
+    }
+
+    /// Returns `true` if this function has a trivial body.
+    pub(crate) fn has_trivial_body(self, db: &'db dyn Db) -> bool {
+        self.literal(db).has_trivial_body(db)
     }
 
     /// Returns all of the overload signatures and the implementation definition, if any, of this
@@ -1325,18 +1352,13 @@ fn is_instance_truthiness<'db>(
             always_true_if(is_instance(&newtype.concrete_base_type(db)))
         }
 
-        Type::BooleanLiteral(..)
-        | Type::BytesLiteral(..)
-        | Type::IntLiteral(..)
-        | Type::StringLiteral(..)
-        | Type::LiteralString
-        | Type::ModuleLiteral(..)
-        | Type::EnumLiteral(..)
-        | Type::FunctionLiteral(..) => always_true_if(
-            ty.literal_fallback_instance(db)
-                .as_ref()
-                .is_some_and(is_instance),
-        ),
+        Type::LiteralValue(..) | Type::ModuleLiteral(..) | Type::FunctionLiteral(..) => {
+            always_true_if(
+                ty.literal_fallback_instance(db)
+                    .as_ref()
+                    .is_some_and(is_instance),
+            )
+        }
 
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 
@@ -1573,6 +1595,8 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.reveal_mro`
     RevealMro,
+    /// `struct.unpack`
+    Unpack,
 }
 
 impl KnownFunction {
@@ -1654,6 +1678,9 @@ impl KnownFunction {
             | Self::RevealMro
             | Self::AllMembers => module.is_ty_extensions(),
             Self::ImportModule => module.is_importlib(),
+            Self::Unpack => {
+                matches!(module, KnownModule::Struct)
+            }
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
             Self::NamedTuple => matches!(module, KnownModule::Collections),
@@ -1693,11 +1720,14 @@ impl KnownFunction {
             }
 
             KnownFunction::HasMember => {
-                let [Some(ty), Some(Type::StringLiteral(member))] = parameter_types else {
+                let [Some(ty), Some(Type::LiteralValue(literal))] = parameter_types else {
+                    return;
+                };
+                let Some(member) = literal.as_string() else {
                     return;
                 };
                 let ty_members = all_members(db, *ty);
-                overload.set_return_type(Type::BooleanLiteral(
+                overload.set_return_type(Type::bool_literal(
                     ty_members.iter().any(|m| m.name == member.value(db)),
                 ));
             }
@@ -1742,8 +1772,8 @@ impl KnownFunction {
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
-                        asserted_ty.display(db),
                         actual_ty.display(db),
+                        asserted_ty.display(db),
                     ));
                 }
             }
@@ -1813,7 +1843,7 @@ impl KnownFunction {
                         .map(|s| s.value(db))
                     {
                         builder.into_diagnostic(format_args!("Static assertion error: {message}"))
-                    } else if *parameter_ty == Type::BooleanLiteral(false) {
+                    } else if *parameter_ty == Type::bool_literal(false) {
                         builder.into_diagnostic(
                             "Static assertion error: argument evaluates to `False`",
                         )
@@ -1847,8 +1877,8 @@ impl KnownFunction {
                 let contains_unknown_or_todo =
                     |ty| matches!(ty, Type::Dynamic(dynamic) if dynamic != DynamicType::Any);
                 if source_type.is_equivalent_to(db, *casted_type)
-                    && !any_over_type(db, *source_type, &contains_unknown_or_todo, true)
-                    && !any_over_type(db, *casted_type, &contains_unknown_or_todo, true)
+                    && !any_over_type(db, *source_type, true, contains_unknown_or_todo)
+                    && !any_over_type(db, *casted_type, true, contains_unknown_or_todo)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
                         let source_display = source_type.display(db).to_string();
@@ -2138,8 +2168,10 @@ impl KnownFunction {
             }
 
             known @ (KnownFunction::DunderImport | KnownFunction::ImportModule) => {
-                let [Some(Type::StringLiteral(full_module_name)), rest @ ..] = parameter_types
-                else {
+                let [Some(first), rest @ ..] = parameter_types else {
+                    return;
+                };
+                let Some(full_module_name) = first.as_string_literal() else {
                     return;
                 };
 
@@ -2264,6 +2296,7 @@ pub(crate) mod tests {
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,
                 KnownFunction::TotalOrdering => KnownModule::Functools,
+                KnownFunction::Unpack => KnownModule::Struct,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)

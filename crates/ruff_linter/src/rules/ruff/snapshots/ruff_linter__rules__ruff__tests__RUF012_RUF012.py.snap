@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
   --> RUF012.py:9:34
    |
  7 |     }
@@ -11,8 +11,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 10 |     immutable_annotation: Sequence[int] = []
 11 |     without_annotation = []
    |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
   --> RUF012.py:11:26
    |
  9 |     mutable_default: list[int] = []
@@ -22,8 +23,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 12 |     class_variable: ClassVar[list[int]] = []
 13 |     final_variable: Final[list[int]] = []
    |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
   --> RUF012.py:25:26
    |
 23 |     mutable_default: list[int] = []
@@ -33,8 +35,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 26 |     perfectly_fine: list[int] = field(default_factory=list)
 27 |     class_variable: ClassVar[list[int]] = []
    |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:103:38
     |
 101 |     class K(SQLModel):
@@ -44,8 +47,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 104 |
 105 | from sqlmodel import SQLModel
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:128:36
     |
 126 |     }
@@ -55,8 +59,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 129 |     immutable_annotation: 'Sequence[int]'= []
 130 |     without_annotation = []
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:129:44
     |
 128 |     mutable_default: 'list[int]' = []
@@ -65,8 +70,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 130 |     without_annotation = []
 131 |     class_variable: 'ClassVar[list[int]]' = []
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:130:26
     |
 128 |     mutable_default: 'list[int]' = []
@@ -76,8 +82,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 131 |     class_variable: 'ClassVar[list[int]]' = []
 132 |     final_variable: 'Final[list[int]]' = []
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:131:45
     |
 129 |     immutable_annotation: 'Sequence[int]'= []
@@ -87,8 +94,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 132 |     final_variable: 'Final[list[int]]' = []
 133 |     class_variable_without_subscript: 'ClassVar' = []
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:132:42
     |
 130 |     without_annotation = []
@@ -98,8 +106,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 133 |     class_variable_without_subscript: 'ClassVar' = []
 134 |     final_variable_without_subscript: 'Final' = []
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:133:52
     |
 131 |     class_variable: 'ClassVar[list[int]]' = []
@@ -108,8 +117,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
     |                                                    ^^
 134 |     final_variable_without_subscript: 'Final' = []
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:134:49
     |
 132 |     final_variable: 'Final[list[int]]' = []
@@ -117,8 +127,9 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 134 |     final_variable_without_subscript: 'Final' = []
     |                                                 ^^
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`
 
-RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
+RUF012 Mutable default value for class attribute
    --> RUF012.py:146:12
     |
 144 | # Lint should trigger RUF012 only  for the `test` field and not the `_fields_`
@@ -128,3 +139,4 @@ RUF012 Mutable class attributes should be annotated with `typing.ClassVar`
 147 |     _fields_ = [
 148 |         ("attr_set", ctypes.c_uint64),
     |
+help: Consider initializing in `__init__` or annotating with `typing.ClassVar`

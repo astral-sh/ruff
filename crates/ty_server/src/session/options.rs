@@ -1,13 +1,14 @@
 use std::collections::HashMap;
 
 use lsp_types::Url;
-use ruff_db::system::{SystemPath, SystemPathBuf};
+use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use ty_combine::Combine;
 use ty_ide::{CompletionSettings, InlayHintSettings};
+use ty_project::CheckMode;
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
@@ -200,19 +201,32 @@ pub struct WorkspaceOptions {
 }
 
 impl WorkspaceOptions {
-    pub(crate) fn into_settings(self, root: &SystemPath, client: &Client) -> WorkspaceSettings {
-        let configuration_file =
-            self.configuration_file
-                .and_then(|config_file| match shellexpand::full(&config_file) {
-                    Ok(path) => Some(SystemPath::absolute(&*path, root)),
-                    Err(error) => {
-                        client.show_error_message(format_args!(
-                            "Failed to expand the environment variables \
-                            for the `ty.configuration_file` setting: {error}"
-                        ));
-                        None
-                    }
-                });
+    pub(crate) fn into_settings(
+        self,
+        root: &SystemPath,
+        client: &Client,
+        system: &dyn System,
+    ) -> WorkspaceSettings {
+        let configuration_file = self.configuration_file.and_then(|config_file| {
+            match shellexpand::full_with_context(
+                &config_file,
+                || system.env_var("HOME").ok(),
+                |var| match system.env_var(var) {
+                    Ok(val) => Ok(Some(val)),
+                    Err(std::env::VarError::NotPresent) => Ok(None),
+                    Err(e) => Err(e),
+                },
+            ) {
+                Ok(path) => Some(SystemPath::absolute(&*path, root)),
+                Err(error) => {
+                    client.show_error_message(format_args!(
+                        "Failed to expand the environment variables \
+                                for the `ty.configuration_file` setting: {error}"
+                    ));
+                    None
+                }
+            }
+        });
 
         let options_overrides =
             self.configuration.and_then(|map| {
@@ -367,6 +381,17 @@ impl DiagnosticMode {
     /// Returns `true` if the diagnostic mode is set to check only currently open files.
     pub(crate) const fn is_open_files_only(self) -> bool {
         matches!(self, DiagnosticMode::OpenFilesOnly)
+    }
+
+    /// Returns this diagnostic mode as a check mode.
+    ///
+    /// This returns `None` when diagnostics are disabled.
+    pub(crate) const fn to_check_mode(self) -> Option<CheckMode> {
+        match self {
+            DiagnosticMode::Off => None,
+            DiagnosticMode::OpenFilesOnly => Some(CheckMode::OpenFiles),
+            DiagnosticMode::Workspace => Some(CheckMode::AllFiles),
+        }
     }
 
     pub(crate) const fn is_off(self) -> bool {

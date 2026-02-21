@@ -22,37 +22,39 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
  7 |         if flag:
  8 |             def __iter__(self) -> Iterator:
  9 |                 return Iterator()
-10 |         else:
-11 |             def __iter__(self, invalid_extra_arg) -> Iterator:
-12 |                 return Iterator()
-13 | 
-14 |     # error: [not-iterable]
-15 |     for x in Iterable1():
-16 |         reveal_type(x)  # revealed: int
-17 | 
-18 |     class Iterable2:
-19 |         if flag:
-20 |             def __iter__(self) -> Iterator:
-21 |                 return Iterator()
-22 |         else:
-23 |             __iter__: None = None
-24 | 
-25 |     # error: [not-iterable]
-26 |     for x in Iterable2():
-27 |         # TODO: `int` would probably be better here:
-28 |         reveal_type(x)  # revealed: int | Unknown
+10 | 
+11 |         else:
+12 |             def __iter__(self, invalid_extra_arg) -> Iterator:
+13 |                 return Iterator()
+14 | 
+15 |     # error: [not-iterable]
+16 |     for x in Iterable1():
+17 |         reveal_type(x)  # revealed: int
+18 | 
+19 |     class Iterable2:
+20 |         if flag:
+21 |             def __iter__(self) -> Iterator:
+22 |                 return Iterator()
+23 | 
+24 |         else:
+25 |             __iter__: None = None
+26 | 
+27 |     # error: [not-iterable]
+28 |     for x in Iterable2():
+29 |         # TODO: `int` would probably be better here:
+30 |         reveal_type(x)  # revealed: int | Unknown
 ```
 
 # Diagnostics
 
 ```
 error[not-iterable]: Object of type `Iterable1` may not be iterable
-  --> src/mdtest_snippet.py:15:14
+  --> src/mdtest_snippet.py:16:14
    |
-14 |     # error: [not-iterable]
-15 |     for x in Iterable1():
+15 |     # error: [not-iterable]
+16 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-16 |         reveal_type(x)  # revealed: int
+17 |         reveal_type(x)  # revealed: int
    |
 info: Its `__iter__` method may have an invalid signature
 info: Type of `__iter__` is `(bound method Iterable1.__iter__() -> Iterator) | (bound method Iterable1.__iter__(invalid_extra_arg) -> Iterator)`
@@ -63,13 +65,13 @@ info: rule `not-iterable` is enabled by default
 
 ```
 error[not-iterable]: Object of type `Iterable2` may not be iterable
-  --> src/mdtest_snippet.py:26:14
+  --> src/mdtest_snippet.py:28:14
    |
-25 |     # error: [not-iterable]
-26 |     for x in Iterable2():
+27 |     # error: [not-iterable]
+28 |     for x in Iterable2():
    |              ^^^^^^^^^^^
-27 |         # TODO: `int` would probably be better here:
-28 |         reveal_type(x)  # revealed: int | Unknown
+29 |         # TODO: `int` would probably be better here:
+30 |         reveal_type(x)  # revealed: int | Unknown
    |
 info: Its `__iter__` attribute (with type `(bound method Iterable2.__iter__() -> Iterator) | None`) may not be callable
 info: rule `not-iterable` is enabled by default

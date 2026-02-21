@@ -16,8 +16,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
-    TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    KnownInstanceType, LiteralValueTypeKind, SpecialFormType, SubclassOfInner, SubclassOfType,
+    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -242,11 +242,9 @@ impl ClassInfoConstraintFunction {
 
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
-            | Type::BooleanLiteral(_)
+            | Type::LiteralValue(_)
             | Type::BoundMethod(_)
             | Type::BoundSuper(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
             | Type::Callable(_)
             | Type::DataclassDecorator(_)
             | Type::Never
@@ -255,9 +253,6 @@ impl ClassInfoConstraintFunction {
             | Type::FunctionLiteral(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
-            | Type::LiteralString
-            | Type::StringLiteral(_)
-            | Type::IntLiteral(_)
             | Type::KnownInstance(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
@@ -477,10 +472,17 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
             .elements(db)
             .iter()
             .any(|ty| could_compare_equal(db, left_ty, *ty)),
-        // Boolean literals and int literals are disjoint, and single valued, and yet
-        // `True == 1` and `False == 0`.
-        (Type::BooleanLiteral(b), Type::IntLiteral(i))
-        | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => i64::from(b) == i,
+        (Type::LiteralValue(left), Type::LiteralValue(right)) => {
+            match (left.kind(), right.kind()) {
+                // Boolean literals and int literals are disjoint, and single valued, and yet
+                // `True == 1` and `False == 0`.
+                (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(i))
+                | (LiteralValueTypeKind::Int(i), LiteralValueTypeKind::Bool(b)) => {
+                    i64::from(b) == i.as_i64()
+                }
+                _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
+            }
+        }
         // We assume that tuples use `tuple.__eq__` which only returns True
         // for other tuples, so they cannot compare equal to non-tuple types.
         (Type::NominalInstance(instance), _) if instance.tuple_spec(db).is_some() => false,
@@ -640,8 +642,17 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ///   where the returned `Literal` types are mutually consistent in their truthiness.
     fn is_base_type_narrowable_by_len(db: &'db dyn Db, ty: Type<'db>) -> bool {
         match ty {
-            Type::StringLiteral(_) | Type::LiteralString | Type::BytesLiteral(_) => true,
             Type::NominalInstance(instance) if instance.tuple_spec(db).is_some() => true,
+            Type::LiteralValue(literal)
+                if matches!(
+                    literal.kind(),
+                    LiteralValueTypeKind::String(_)
+                        | LiteralValueTypeKind::LiteralString
+                        | LiteralValueTypeKind::Bytes(_)
+                ) =>
+            {
+                true
+            }
             _ => ty.len(db).is_some_and(|len_ty| {
                 let len_ty_bool = len_ty.bool(db);
                 len_ty_bool != Truthiness::Ambiguous && len_ty_bool == ty.bool(db)
@@ -770,7 +781,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     // other string literal could compare equal to it), or it is not a string
                     // literal, in which case (given that it is single-valued), LiteralString
                     // cannot compare equal to it.
-                    Type::LiteralString => true,
+                    Type::LiteralValue(literal) if literal.is_literal_string() => true,
                     _ => !could_compare_equal(db, lhs_ty, rhs_ty),
                 }
             }
@@ -791,7 +802,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     {
                         UnionType::from_elements(
                             db,
-                            [Type::BooleanLiteral(true), Type::BooleanLiteral(false)]
+                            [Type::bool_literal(true), Type::bool_literal(false)]
                                 .into_iter()
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )
@@ -828,20 +839,20 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_ne(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
-        match (lhs_ty, rhs_ty) {
-            (Type::NominalInstance(instance), Type::IntLiteral(i))
+        match (lhs_ty, rhs_ty.as_literal_value_kind()) {
+            (Type::NominalInstance(instance), Some(LiteralValueTypeKind::Int(i)))
                 if instance.has_known_class(self.db, KnownClass::Bool) =>
             {
-                if i == 0 {
-                    Some(Type::BooleanLiteral(false).negate(self.db))
-                } else if i == 1 {
-                    Some(Type::BooleanLiteral(true).negate(self.db))
+                if i.as_i64() == 0 {
+                    Some(Type::bool_literal(false).negate(self.db))
+                } else if i.as_i64() == 1 {
+                    Some(Type::bool_literal(true).negate(self.db))
                 } else {
                     None
                 }
             }
-            (_, Type::BooleanLiteral(b)) => Some(
-                UnionType::from_elements(self.db, [rhs_ty, Type::IntLiteral(i64::from(b))])
+            (_, Some(LiteralValueTypeKind::Bool(b))) => Some(
+                UnionType::from_elements(self.db, [rhs_ty, Type::int_literal(i64::from(b))])
                     .negate(self.db),
             ),
             _ if rhs_ty.is_single_valued(self.db) => Some(rhs_ty.negate(self.db)),
@@ -951,6 +962,28 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         is_positive: bool,
     ) -> Option<Type<'db>> {
         let op = if is_positive { op } else { op.negate() };
+
+        // `Divergent` shows up as an initial value in cycle recovery. If it appears on either side
+        // of a potentially narrowing comparison, we don't want it to turn that comparison into a
+        // no-op (e.g. because `Divergent` is not a singleton in the `IsNot` branch below), because
+        // that could result in an initial type inference result that's too wide. Then, even if the
+        // next cycle iteration resolved all the `Divergent` values and correctly narrowed the
+        // type, we'd be stuck with the too-wide answer from the first iteration, because
+        // `Type::cycle_normalized` only ever widens and never narrows from one iteration to the
+        // next (to avoid oscillations). To prevent this, we have `Divergent` "poison" any value
+        // that's compared to it, so that `Type::cycle_normalized` can see it and skip the widening
+        // union step.
+        //
+        // For an extended discussion of the case that originally encountered this problem, see the
+        // "`Divergent` in narrowing conditions doesn't run afoul of 'monotonic widening' in cycle
+        // recovery" mdtest case in `while_loop.md`. See also
+        // https://github.com/astral-sh/ruff/pull/22794#issuecomment-3852095578.
+        if lhs_ty.is_divergent() {
+            return Some(lhs_ty);
+        }
+        if rhs_ty.is_divergent() {
+            return Some(rhs_ty);
+        }
 
         match op {
             ast::CmpOp::IsNot => {
@@ -1066,37 +1099,31 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .expression_type(&*subscript.value)
                 .resolve_type_alias(self.db)
             && let Some(subscript_place_expr) = PlaceExpr::try_from_expr(&subscript.value)
-            && let Type::IntLiteral(index) = inference.expression_type(&*subscript.slice)
+            && let Some(index) = inference
+                .expression_type(&*subscript.slice)
+                .as_int_literal()
             && let Ok(index) = i32::try_from(index)
             && let rhs_ty = inference.expression_type(&comparators[0])
             && rhs_ty.is_singleton(self.db)
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
-            let union_elements = union.elements(self.db);
-            let filtered: Vec<_> = union_elements
-                .iter()
-                .filter(|elem| {
-                    elem.as_nominal_instance()
-                        .and_then(|inst| inst.tuple_spec(self.db))
-                        .and_then(|spec| spec.py_index(self.db, index).ok())
-                        .is_none_or(|el_ty| {
-                            if is_positive_check {
-                                // `is X` context: keep tuples where element could be X
-                                !el_ty.is_disjoint_from(self.db, rhs_ty)
-                            } else {
-                                // `is not X` context: keep tuples where element is not always X
-                                !el_ty.is_subtype_of(self.db, rhs_ty)
-                            }
-                        })
-                })
-                .copied()
-                .collect();
-            if filtered.len() < union_elements.len() {
+            let filtered = union.filter(self.db, |elem| {
+                elem.as_nominal_instance()
+                    .and_then(|inst| inst.tuple_spec(self.db))
+                    .and_then(|spec| spec.py_index(self.db, index).ok())
+                    .is_none_or(|el_ty| {
+                        if is_positive_check {
+                            // `is X` context: keep tuples where element could be X
+                            !el_ty.is_disjoint_from(self.db, rhs_ty)
+                        } else {
+                            // `is not X` context: keep tuples where element is not always X
+                            !el_ty.is_subtype_of(self.db, rhs_ty)
+                        }
+                    })
+            });
+            if filtered != Type::Union(union) {
                 let place = self.expect_place(&subscript_place_expr);
-                constraints.insert(
-                    place,
-                    NarrowingConstraint::replacement(UnionType::from_elements(self.db, filtered)),
-                );
+                constraints.insert(place, NarrowingConstraint::replacement(filtered));
             }
         }
 
@@ -1110,37 +1137,52 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //         if union["tag"] == "foo":
         //             reveal_type(union)  # Foo
         //
-        // Importantly, `my_typeddict_union["tag"]` isn't the place we're going to constraint.
+        // Importantly, `my_typeddict_union["tag"]` isn't the place we're going to constrain.
         // Instead, we're going to constrain `my_typeddict_union` itself.
-        if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq])
-            && let ast::Expr::Subscript(subscript) = &**left
-        {
+        if matches!(&**ops, [ast::CmpOp::Eq | ast::CmpOp::NotEq]) {
             // For `==`, we use equality semantics on the `if` branch (is_positive=true).
             // For `!=`, we use equality semantics on the `else` branch (is_positive=false).
             let constrain_with_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
-            if let Some((place, constraint)) = self.narrow_typeddict_subscript(
-                inference.expression_type(&*subscript.value),
-                &subscript.value,
-                inference.expression_type(&*subscript.slice),
-                inference.expression_type(&comparators[0]),
-                constrain_with_equality,
-            ) {
-                constraints.insert(place, constraint);
+
+            let mut narrow_subscript = |subscript: &ast::ExprSubscript, other_type: Type<'db>| {
+                let value_type = inference.expression_type(&*subscript.value);
+                let slice_type = inference.expression_type(&*subscript.slice);
+
+                if let Some((place, constraint)) = self.narrow_typeddict_subscript(
+                    value_type,
+                    &subscript.value,
+                    slice_type,
+                    other_type,
+                    constrain_with_equality,
+                ) {
+                    constraints
+                        .entry(place)
+                        .and_modify(|existing| {
+                            *existing = existing.merge_constraint_and(constraint.clone(), self.db);
+                        })
+                        .or_insert(constraint);
+                } else if let Some((place, constraint)) = self.narrow_tuple_subscript(
+                    value_type,
+                    &subscript.value,
+                    slice_type,
+                    other_type,
+                    constrain_with_equality,
+                ) {
+                    constraints
+                        .entry(place)
+                        .and_modify(|existing| {
+                            *existing = existing.merge_constraint_and(constraint.clone(), self.db);
+                        })
+                        .or_insert(constraint);
+                }
+            };
+
+            if let ast::Expr::Subscript(subscript) = &**left {
+                narrow_subscript(subscript, inference.expression_type(&comparators[0]));
             }
 
-            // Narrow tagged unions of tuples with `Literal` elements, for example:
-            //
-            //     def _(t: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
-            //         if t[0] == "a":
-            //             reveal_type(t)  # tuple[Literal["a"], A]
-            if let Some((place, constraint)) = self.narrow_tuple_subscript(
-                inference.expression_type(&*subscript.value),
-                &subscript.value,
-                inference.expression_type(&*subscript.slice),
-                inference.expression_type(&comparators[0]),
-                constrain_with_equality,
-            ) {
-                constraints.insert(place, constraint);
+            if let ast::Expr::Subscript(subscript) = &comparators[0] {
+                narrow_subscript(subscript, inference.expression_type(&**left));
             }
         }
 
@@ -1156,7 +1198,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //     if "foo" not in u:
         //         reveal_type(u)  # revealed: Bar
         if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
-            && let Type::StringLiteral(key) = inference.expression_type(&**left)
+            && let Some(key) = inference.expression_type(&**left).as_string_literal()
             && let Some(rhs_place_expr) = PlaceExpr::try_from_expr(&comparators[0])
             && let rhs_type = inference.expression_type(&comparators[0])
             && is_or_contains_typeddict(self.db, rhs_type)
@@ -1220,7 +1262,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
             let lhs_ty = last_rhs_ty.unwrap_or_else(|| inference.expression_type(left));
             let rhs_ty = inference.expression_type(right);
-            last_rhs_ty = Some(rhs_ty);
 
             // Narrowing for:
             // - `if type(x) is Y`
@@ -1271,6 +1312,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                                 .negate_if(self.db, !is_positive),
                         ),
                     );
+                    last_rhs_ty = Some(rhs_ty);
                     continue;
                 }
             }
@@ -1316,6 +1358,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         *existing = existing.merge_constraint_and(constraint.clone(), self.db);
                     })
                     .or_insert(constraint);
+
+                // Use the narrowed type for subsequent comparisons in a chain.
+                last_rhs_ty = Some(IntersectionType::from_elements(self.db, [rhs_ty, ty]));
+            } else {
+                last_rhs_ty = Some(rhs_ty);
             }
         }
         Some(constraints)
@@ -1329,20 +1376,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     ) -> Option<NarrowingConstraints<'db>> {
         let inference = infer_expression_types(self.db, expression, TypeContext::default());
 
+        if let Some(type_guard_call_constraints) =
+            self.evaluate_type_guard_call(inference, expr_call, is_positive)
+        {
+            return Some(type_guard_call_constraints);
+        }
+
         let callable_ty = inference.expression_type(&*expr_call.func);
 
         match callable_ty {
-            Type::FunctionLiteral(function_type)
-                if matches!(
-                    function_type.known(self.db),
-                    None | Some(KnownFunction::RevealType)
-                ) =>
-            {
-                self.evaluate_type_guard_call(inference, expr_call, is_positive)
-            }
-            Type::BoundMethod(_) => {
-                self.evaluate_type_guard_call(inference, expr_call, is_positive)
-            }
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
             // (i.e., whether E is non-empty). We only narrow the parts of the type where we know
             // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
@@ -1430,7 +1472,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     // Helper to evaluate TypeGuard/TypeIs narrowing for a call expression.
-    // Used for both direct function calls and bound method calls.
+    // This is based on the call expression's return type, so it applies to any callable type.
     fn evaluate_type_guard_call(
         &mut self,
         inference: &ExpressionInference<'db>,
@@ -1476,8 +1518,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
         let ty = match singleton {
             ast::Singleton::None => Type::none(self.db),
-            ast::Singleton::True => Type::BooleanLiteral(true),
-            ast::Singleton::False => Type::BooleanLiteral(false),
+            ast::Singleton::True => Type::bool_literal(true),
+            ast::Singleton::False => Type::bool_literal(false),
         };
         let ty = ty.negate_if(self.db, !is_positive);
         Some(NarrowingConstraints::from_iter([(
@@ -1683,9 +1725,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             return None;
         }
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
-        let Type::StringLiteral(key_literal) = subscript_key_type else {
-            return None;
-        };
+        let key_literal = subscript_key_type.as_string_literal()?;
         if !is_supported_tag_literal(rhs_type) {
             return None;
         }
@@ -1758,9 +1798,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         };
 
         // The subscript index must be an integer literal.
-        let Type::IntLiteral(index) = subscript_index_type else {
-            return None;
-        };
+        let index = subscript_index_type.as_int_literal()?;
         let index = i32::try_from(index).ok()?;
 
         // The comparison value must be a supported literal type.
@@ -1785,33 +1823,25 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
 
         // Filter the union based on whether each tuple element at the index could match the rhs.
-        let union_elements = union.elements(self.db);
-        let filtered: Vec<_> = union_elements
-            .iter()
-            .filter(|elem| {
-                elem.as_nominal_instance()
-                    .and_then(|inst| inst.tuple_spec(self.db))
-                    .and_then(|spec| spec.py_index(self.db, index).ok())
-                    .is_none_or(|el_ty| {
-                        if constrain_with_equality {
-                            // Keep tuples where element could be equal to rhs.
-                            !el_ty.is_disjoint_from(self.db, rhs_type)
-                        } else {
-                            // Keep tuples where element is not always equal to rhs.
-                            !el_ty.is_subtype_of(self.db, rhs_type)
-                        }
-                    })
-            })
-            .copied()
-            .collect();
+        let filtered = union.filter(self.db, |elem| {
+            elem.as_nominal_instance()
+                .and_then(|inst| inst.tuple_spec(self.db))
+                .and_then(|spec| spec.py_index(self.db, index).ok())
+                .is_none_or(|el_ty| {
+                    if constrain_with_equality {
+                        // Keep tuples where element could be equal to rhs.
+                        !el_ty.is_disjoint_from(self.db, rhs_type)
+                    } else {
+                        // Keep tuples where element is not always equal to rhs.
+                        !el_ty.is_subtype_of(self.db, rhs_type)
+                    }
+                })
+        });
 
         // Only create a constraint if we actually narrowed something.
-        if filtered.len() < union_elements.len() {
+        if filtered != Type::Union(union) {
             let place = self.expect_place(&subscript_place_expr);
-            Some((
-                place,
-                NarrowingConstraint::replacement(UnionType::from_elements(self.db, filtered)),
-            ))
+            Some((place, NarrowingConstraint::replacement(filtered)))
         } else {
             None
         }
@@ -1853,12 +1883,7 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         | Type::PropertyInstance(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
-        | Type::IntLiteral(_)
-        | Type::BooleanLiteral(_)
-        | Type::StringLiteral(_)
-        | Type::EnumLiteral(_)
-        | Type::LiteralString
-        | Type::BytesLiteral(_)
+        | Type::LiteralValue(_)
         | Type::TypeVar(_)
         | Type::BoundSuper(_)
         | Type::TypeIs(_)
@@ -1869,10 +1894,14 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 
 fn is_supported_tag_literal(ty: Type) -> bool {
     matches!(
-        ty,
+        ty.as_literal_value_kind(),
         // TODO: We'd like to support `EnumLiteral` also, but we have to be careful with types like
         // `IntEnum` and `StrEnum` that have custom `__eq__` methods.
-        Type::StringLiteral(_) | Type::BytesLiteral(_) | Type::IntLiteral(_)
+        Some(
+            LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+                | LiteralValueTypeKind::Int(_)
+        )
     )
 }
 
@@ -1942,12 +1971,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         | Type::PropertyInstance(_)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
-        | Type::IntLiteral(_)
-        | Type::BooleanLiteral(_)
-        | Type::StringLiteral(_)
-        | Type::EnumLiteral(_)
-        | Type::LiteralString
-        | Type::BytesLiteral(_)
+        | Type::LiteralValue(_)
         | Type::TypeVar(_)
         | Type::BoundSuper(_)
         | Type::TypeIs(_)
@@ -2070,13 +2094,14 @@ impl<'db, 'a> PossiblyNarrowedPlacesBuilder<'db, 'a> {
             self.add_narrowing_target(comparator, &mut places);
         }
 
-        // For subscript expressions on the left, the subscript base can also be narrowed
-        // (TypedDict and tuple discriminated union narrowing)
-        if let ast::Expr::Subscript(subscript) = &*expr_compare.left {
-            if let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value) {
-                if let Some(place) = self.places.place_id((&place_expr).into()) {
-                    places.insert(place);
-                }
+        // For subscript expressions on either side, the subscript base can also be narrowed.
+        // (TypedDict and tuple discriminated union narrowing.)
+        for expr in std::iter::once(&*expr_compare.left).chain(&expr_compare.comparators) {
+            if let ast::Expr::Subscript(subscript) = expr
+                && let Some(place_expr) = PlaceExpr::try_from_expr(&subscript.value)
+                && let Some(place) = self.places.place_id((&place_expr).into())
+            {
+                places.insert(place);
             }
         }
 

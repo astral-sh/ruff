@@ -1595,8 +1595,13 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an async context.
     pub fn in_async_context(&self) -> bool {
         for scope in self.current_scopes() {
-            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
-                return *is_async;
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false

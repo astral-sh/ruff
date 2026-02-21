@@ -81,6 +81,47 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
+### `replace-imports-with-any`
+
+A list of module glob patterns whose imports should be replaced with `typing.Any`.
+
+Unlike `allowed-unresolved-imports`, this setting replaces the module's type information
+with `typing.Any` even if the module can be resolved. Import diagnostics are
+unconditionally suppressed for matching modules.
+
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+When multiple patterns match, later entries take precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+---
+
 ### `respect-type-ignore-comments`
 
 Whether ty should respect `type: ignore` comments.
@@ -159,16 +200,20 @@ Path to your project's Python environment or interpreter.
 ty uses the `site-packages` directory of your project's Python environment
 to resolve third-party (and, in some cases, first-party) imports in your code.
 
-If you're using a project management tool such as uv, you should not generally need
-to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
-environment variable to point to your project's virtual environment. ty can also infer
-the location of your environment from an activated Conda environment, and will look for
-a `.venv` directory in the project root if none of the above apply.
+This can be a path to:
 
-Passing a path to a Python executable is supported, but passing a path to a dynamic executable
-(such as a shim) is not currently supported.
+- A Python interpreter, e.g. `.venv/bin/python3`
+- A virtual environment directory, e.g. `.venv`
+- A system Python [`sys.prefix`] directory, e.g. `/usr`
 
-This option can be used to point to virtual or system Python environments.
+If you're using a project management tool such as uv, you should not generally need to
+specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment
+variable to point to your project's virtual environment. ty can also infer the location of
+your environment from an activated Conda environment, and will look for a `.venv` directory
+in the project root if none of the above apply. Failing that, ty will look for a `python3`
+or `python` binary available in `PATH`.
+
+[`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
 
 **Default value**: `null`
 
@@ -526,6 +571,47 @@ any module where the first component contains the substring `test`, use `*test*.
 
 ---
 
+#### `replace-imports-with-any`
+
+A list of module glob patterns whose imports should be replaced with `typing.Any`.
+
+Unlike `allowed-unresolved-imports`, this setting replaces the module's type information
+with `typing.Any` even if the module can be resolved. Import diagnostics are
+unconditionally suppressed for matching modules.
+
+- Prefix a pattern with `!` to exclude matching modules
+
+When multiple patterns match, later entries take precedence.
+
+Glob patterns can be used in combinations with each other. For example, to suppress errors for
+any module where the first component contains the substring `test`, use `*test*.**`.
+
+When multiple patterns match, later entries take precedence.
+
+**Default value**: `[]`
+
+**Type**: `list[str]`
+
+**Example usage**:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.overrides.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [overrides.analysis]
+    # Replace all pandas and numpy imports with Any
+    replace-imports-with-any = ["pandas.**", "numpy.**"]
+    ```
+
+---
+
 #### `respect-type-ignore-comments`
 
 Whether ty should respect `type: ignore` comments.
@@ -800,7 +886,7 @@ Defaults to `full`.
 
 **Default value**: `full`
 
-**Type**: `full | concise`
+**Type**: `full | concise | github | gitlab | junit`
 
 **Example usage**:
 

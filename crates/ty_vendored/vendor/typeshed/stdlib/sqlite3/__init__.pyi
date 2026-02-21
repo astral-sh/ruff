@@ -428,7 +428,7 @@ class Connection:
             self, name: str, num_params: int, aggregate_class: Callable[[], _WindowAggregateClass] | None, /
         ) -> None: ...
 
-    def create_collation(self, name: str, callback: Callable[[str, str], int | SupportsIndex] | None, /) -> None:
+    def create_collation(self, name: str, callback: Callable[[str, str], SupportsIndex] | None, /) -> None:
         """Creates a collation function."""
 
     def create_function(

@@ -258,6 +258,40 @@ a_person: Person
 a_person = {"name": "Alice"}
 ```
 
+Constructor validation should also run when the call target is a generic alias or a `type[...]`
+value:
+
+```py
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar("T")
+
+class MyGenTD(TypedDict, Generic[T]):
+    a: int
+    b: T
+
+class MyTD(TypedDict):
+    a: int
+
+MyStrTD = MyGenTD[str]
+
+# error: [invalid-argument-type] "Invalid argument to key "a""
+x = MyStrTD(a="foo", b="ok")
+
+# No error: `a` is int, `b` is str (matches T=str)
+w = MyStrTD(a=1, b="ok")
+
+# error: [invalid-argument-type] "Invalid argument to key "b""
+v = MyStrTD(a=1, b=42)
+
+# error: [invalid-argument-type]
+y = MyTD(a="foo")
+
+def _(ATD: type[MyTD]):
+    # error: [invalid-argument-type]
+    z = ATD(a="foo")
+```
+
 All of these have an invalid type for the `name` field:
 
 ```py
@@ -1349,6 +1383,7 @@ class Person(TypedDict):
     name: str
     surname: str
     age: int | None
+    leg: str
 
 class Animal(TypedDict):
     name: str
@@ -1361,8 +1396,8 @@ def _(person: Person):
     person["name"] = "Alice"
     person["age"] = 30
 
-    # error: [invalid-key] "Unknown key "naem" for TypedDict `Person` - did you mean "name"?"
-    person["naem"] = "Alice"
+    # error: [invalid-key] "Unknown key "nane" for TypedDict `Person` - did you mean "name"?"
+    person["nane"] = "Alice"
 
 def _(person: Person):
     person[NAME_FINAL] = "Alice"
@@ -1385,8 +1420,8 @@ def _(being: Person | Animal):
     # error: [invalid-assignment] "Invalid assignment to key "name" with declared type `str` on TypedDict `Animal`: value of type `Literal[1]`"
     being["name"] = 1
 
-    # error: [invalid-key] "Unknown key "surname" for TypedDict `Animal` - did you mean "name"?"
-    being["surname"] = "unknown"
+    # error: [invalid-key] "Unknown key "leg" for TypedDict `Animal` - did you mean "legs"?"
+    being["leg"] = "unknown"
 
 def _(centaur: Intersection[Person, Animal]):
     centaur["name"] = "Chiron"
@@ -1911,9 +1946,9 @@ class Person(TypedDict):
     age: int | None
 
 def access_invalid_literal_string_key(person: Person):
-    person["naem"]  # error: [invalid-key]
+    person["nane"]  # error: [invalid-key]
 
-NAME_KEY: Final = "naem"
+NAME_KEY: Final = "nane"
 
 def access_invalid_key(person: Person):
     person[NAME_KEY]  # error: [invalid-key]
@@ -1925,7 +1960,7 @@ def write_to_key_with_wrong_type(person: Person):
     person["age"] = "42"  # error: [invalid-assignment]
 
 def write_to_non_existing_key(person: Person):
-    person["naem"] = "Alice"  # error: [invalid-key]
+    person["nane"] = "Alice"  # error: [invalid-key]
 
 def write_to_non_literal_string_key(person: Person, str_key: str):
     person[str_key] = "Alice"  # error: [invalid-key]
@@ -1956,7 +1991,7 @@ If the key uses single quotes, the autofix preserves that quoting style:
 ```py
 def write_to_non_existing_key_single_quotes(person: Person):
     # error: [invalid-key]
-    person['naem'] = "Alice"  # fmt: skip
+    person['nane'] = "Alice"  # fmt: skip
 ```
 
 ## Import aliases
@@ -2325,7 +2360,7 @@ class Bing(TypedDict):
 def _(u: Foo | Bar | Baz | Bing):
     if u["tag"] == "foo":
         reveal_type(u)  # revealed: Foo
-    elif u["tag"] == 42:
+    elif 42 == u["tag"]:
         reveal_type(u)  # revealed: Bar
     elif u["tag"] == b"baz":
         reveal_type(u)  # revealed: Baz

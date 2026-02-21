@@ -3,9 +3,11 @@ use crate::goto::{GotoTarget, find_goto_target};
 use crate::{Db, MarkupKind, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast as ast;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
+use ty_python_semantic::types::ide_support::typed_dict_key_hover;
 use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel, TypeQualifiers};
 
@@ -20,17 +22,38 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
         }
     }
 
-    let docs = goto_target
-        .get_definition_targets(
-            &model,
-            ty_python_semantic::ImportAliasResolution::ResolveAliases,
-        )
-        .and_then(|definitions| definitions.docstring(db))
-        .map(HoverContent::Docstring);
+    let typed_dict_key = match &goto_target {
+        GotoTarget::Expression(ast::ExprRef::Subscript(subscript))
+        | GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
+            typed_dict_key_hover(&model, subscript)
+        }
+        _ => None,
+    };
+
+    let docs = if typed_dict_key.is_some() {
+        None
+    } else {
+        goto_target
+            .get_definition_targets(
+                &model,
+                ty_python_semantic::ImportAliasResolution::ResolveAliases,
+            )
+            .and_then(|definitions| definitions.docstring(db))
+            .map(HoverContent::Docstring)
+    };
 
     let mut contents = Vec::new();
     if let Some(signature) = goto_target.call_type_simplified_by_overloads(&model) {
         contents.push(HoverContent::Signature(signature));
+    } else if let Some(typed_dict_key) = typed_dict_key {
+        contents.push(HoverContent::TypedDictKey {
+            owner: typed_dict_key.owner,
+            key: typed_dict_key.key,
+            ty: typed_dict_key.declared_ty,
+        });
+        if let Some(docstring) = typed_dict_key.docstring {
+            contents.push(HoverContent::Docstring(Docstring::new(docstring)));
+        }
     } else if let Some(ty) = goto_target.inferred_type(&model) {
         tracing::debug!("Inferred type of covering node is {}", ty.display(db));
         let qualifiers = goto_target.type_qualifiers(&model);
@@ -125,6 +148,11 @@ impl fmt::Display for DisplayHover<'_, '_> {
 pub enum HoverContent<'db> {
     Signature(String),
     Type(Type<'db>, Option<TypeVarVariance>, TypeQualifiers),
+    TypedDictKey {
+        owner: String,
+        key: String,
+        ty: Type<'db>,
+    },
     Docstring(Docstring),
 }
 
@@ -142,6 +170,22 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
     db: &'db dyn Db,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
+}
+
+impl<'db> DisplayHoverContent<'_, 'db> {
+    fn ty_string_and_syntax(&self, ty: &Type<'db>) -> (String, &'static str) {
+        // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
+        // render poorly with python syntax-highlighting but well as xml
+        let ty_string = ty
+            .display_with(self.db, DisplaySettings::default().multiline())
+            .to_string();
+        let syntax = if ty_string.starts_with('<') {
+            "xml"
+        } else {
+            "python"
+        };
+        (ty_string, syntax)
+    }
 }
 
 impl fmt::Display for DisplayHoverContent<'_, '_> {
@@ -170,18 +214,15 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     format!(" ({})", names.join(", "))
                 };
 
-                // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
-                // render poorly with python syntax-highlighting but well as xml
-                let ty_string = ty
-                    .display_with(self.db, DisplaySettings::default().multiline())
-                    .to_string();
-                let syntax = if ty_string.starts_with('<') {
-                    "xml"
-                } else {
-                    "python"
-                };
+                let (ty_string, syntax) = self.ty_string_and_syntax(ty);
                 self.kind
                     .fenced_code_block(format!("{ty_string}{variance}{qualifier_suffix}"), syntax)
+                    .fmt(f)
+            }
+            HoverContent::TypedDictKey { owner, key, ty } => {
+                let (ty_string, syntax) = self.ty_string_and_syntax(ty);
+                self.kind
+                    .fenced_code_block(format!("(key of {owner}) {key}: {ty_string}"), syntax)
                     .fmt(f)
             }
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
@@ -193,6 +234,8 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
 mod tests {
     use crate::tests::{CursorTest, cursor_test};
     use crate::{MarkupKind, hover};
+    use std::fmt::Write as _;
+
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{
         Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig, LintName,
@@ -260,7 +303,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         def my_func(
             a,
             b
@@ -315,7 +358,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         def my_func(
             a,
             b
@@ -384,7 +427,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -446,7 +489,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -621,7 +664,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <class 'MyClass'>
         ---------------------------------------------
         This is such a great class!!
@@ -686,7 +729,7 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         bound method MyClass.my_method(
             a,
             b
@@ -2002,7 +2045,7 @@ def ab(a: int, *, c: int):
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -2556,7 +2599,7 @@ def function():
         )
         .unwrap();
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         <module 'lib'>
         ---------------------------------------------
         The cool lib_py module!
@@ -2956,7 +2999,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -3045,7 +3088,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int
         ---------------------------------------------
         This is the docs for this value
@@ -3085,7 +3128,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         str (Final)
         ---------------------------------------------
         ```python
@@ -3115,7 +3158,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         Literal[1] (Final)
         ---------------------------------------------
         ```python
@@ -3146,7 +3189,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         Literal[1] (Final)
         ---------------------------------------------
         ```python
@@ -3179,7 +3222,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int (ClassVar)
         ---------------------------------------------
         ```python
@@ -3212,7 +3255,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         int (Final)
         ---------------------------------------------
         ```python
@@ -3305,6 +3348,205 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
+    #[test]
+    fn hover_subscript_literal_index() {
+        let test = cursor_test(
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values[0<CURSOR>])
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        str
+        ---------------------------------------------
+        ```python
+        str
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:7
+          |
+        2 | values: list[str] = ["a", "b"]
+        3 | print(values[0])
+          |       ^^^^^^^^-
+          |       |       |
+          |       |       Cursor offset
+          |       source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_subscript_literal_index_variants() {
+        let cases = [
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values[<CURSOR>0])
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values[0<CURSOR>])
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values<CURSOR>[0])
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values<CURSOR>[-1])
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values[<CURSOR>-1])
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values[-<CURSOR>1])
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values[-1<CURSOR>])
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values[+<CURSOR>1])
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        print(values[+1<CURSOR>])
+        "#,
+        ];
+
+        let mut output = String::new();
+        for (index, case) in cases.iter().enumerate() {
+            let test = cursor_test(case);
+            let hover = test.hover();
+            write!(output, "case {index}:\n{hover}\n\n").unwrap();
+        }
+        assert_snapshot!(output);
+    }
+
+    #[test]
+    fn hover_subscript_non_literal_index() {
+        let test = cursor_test(
+            r#"
+        values: list[str] = ["a", "b"]
+        def get_index() -> int: ...
+        idx = get_index()
+        print(values[-<CURSOR>idx])
+        "#,
+        );
+
+        assert_snapshot!(test.hover());
+    }
+
+    #[test]
+    fn hover_subscript_slice_literal_bounds_list_variants() {
+        let list_cases = [
+            r#"
+        values: list[str] = ["a", "b"]
+        values[1<CURSOR>:]
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        values[:<CURSOR>-1]
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        values[:-<CURSOR>1]
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        values[: -1<CURSOR>]
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        values[<CURSOR>:2]
+        "#,
+            r#"
+        values: list[str] = ["a", "b"]
+        values[:<CURSOR>2]
+        "#,
+        ];
+
+        let mut output = String::new();
+        for (index, case) in list_cases.iter().enumerate() {
+            let test = cursor_test(case);
+            let hover = test.hover();
+            write!(output, "list case {index}:\n{hover}\n\n").unwrap();
+        }
+        assert_snapshot!(output);
+    }
+
+    #[test]
+    fn hover_subscript_slice_literal_bounds_string_variants() {
+        let string_cases = [
+            r#"
+        def f(s: str):
+            s[<CURSOR>1:-1]
+        "#,
+            r#"
+        def f(s: str):
+            s[1:<CURSOR>-1]
+        "#,
+            r#"
+        def f(s: str):
+            s[1:-<CURSOR>1]
+        "#,
+        ];
+
+        let mut output = String::new();
+        for (index, case) in string_cases.iter().enumerate() {
+            let test = cursor_test(case);
+            let hover = test.hover();
+            write!(output, "string case {index}:\n{hover}\n\n").unwrap();
+        }
+        assert_snapshot!(output);
+    }
+
+    #[test]
+    fn hover_typed_dict_key_literal() {
+        let test = cursor_test(
+            r#"
+        from typing import TypedDict
+
+        class Person(TypedDict):
+            """A person in the database"""
+
+            name: str
+            """The person's full legal name"""
+
+        person: Person = {"name": "Sarah"}
+        person["na<CURSOR>me"]
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        (key of Person) name: str
+        ---------------------------------------------
+        The person's full legal name
+
+        ---------------------------------------------
+        ```python
+        (key of Person) name: str
+        ```
+        ---
+        The person's full legal name
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:8
+           |
+        10 | person: Person = {"name": "Sarah"}
+        11 | person["name"]
+           |        ^^^-^^
+           |        |  |
+           |        |  Cursor offset
+           |        source
+           |
+        "#);
     }
 
     #[test]
@@ -4305,7 +4547,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         list[Unknown | int]
         ---------------------------------------------
         ```python
@@ -4328,7 +4570,7 @@ def function():
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @"
         list[int | str]
         ---------------------------------------------
         ```python
@@ -4731,7 +4973,7 @@ def function():
             )
             .unwrap();
 
-            let config = DisplayDiagnosticConfig::default()
+            let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
                 .format(DiagnosticFormat::Full);
 

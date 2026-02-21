@@ -42,7 +42,6 @@ ellipsis (`...`) or `pass`.
 
 ```pyi
 def f() -> int: ...
-
 def f() -> int:
     pass
 
@@ -166,7 +165,7 @@ else:
 reveal_type(f)  # revealed: def f() -> int
 
 if not TYPE_CHECKING:
-    ...
+    pass
 elif True:
     def g() -> str: ...
 
@@ -183,7 +182,7 @@ else:
 reveal_type(i)  # revealed: def i() -> str
 
 if False:
-    ...
+    pass
 elif TYPE_CHECKING:
     def j() -> str: ...
 
@@ -191,7 +190,7 @@ else:
     def j_() -> str: ...  # error: [empty-body]
 
 if False:
-    ...
+    pass
 elif not TYPE_CHECKING:
     def k_() -> str: ...  # error: [empty-body]
 

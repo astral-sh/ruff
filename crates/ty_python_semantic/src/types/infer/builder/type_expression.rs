@@ -15,9 +15,9 @@ use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind,
-    UnionBuilder, UnionType, any_over_type, todo_type,
+    KnownInstanceType, LintDiagnosticGuard, LiteralValueTypeKind, Parameter, Parameters,
+    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
+    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -59,16 +59,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         let annotation_ty = self.infer_type_expression(expression);
         self.deferred_state = previous_deferred_state;
         annotation_ty
-    }
-
-    /// Similar to [`infer_type_expression`], but accepts an optional expression.
-    ///
-    /// [`infer_type_expression`]: TypeInferenceBuilder::infer_type_expression_with_state
-    pub(super) fn infer_optional_type_expression(
-        &mut self,
-        expression: Option<&ast::Expr>,
-    ) -> Option<Type<'db>> {
-        expression.map(|expr| self.infer_type_expression(expr))
     }
 
     fn report_invalid_type_expression(
@@ -893,7 +883,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         // instead of two. So until we properly support these, specialize all remaining type
         // variables with a `@Todo` type (since we don't know which of the type arguments
         // belongs to the remaining type variables).
-        if any_over_type(self.db(), value_ty, &|ty| ty.is_divergent(), true) {
+        if any_over_type(self.db(), value_ty, true, |ty| ty.is_divergent()) {
             let value_ty = value_ty.apply_specialization(
                 db,
                 generic_context.specialize(
@@ -1190,7 +1180,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             Type::GenericAlias(_) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
             }
-            Type::StringLiteral(_) => {
+            Type::LiteralValue(literal) if literal.is_string() => {
                 self.infer_type_expression(slice);
                 // For stringified TypeAlias; remove once properly supported
                 todo_type!("string literal subscripted in type expression")
@@ -1731,10 +1721,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .copied();
 
                     let probably_meant_literal = argument_elements.all(|ty| match ty {
-                        Type::StringLiteral(_)
-                        | Type::BytesLiteral(_)
-                        | Type::EnumLiteral(_)
-                        | Type::BooleanLiteral(_) => true,
+                        Type::LiteralValue(literal)
+                            if matches!(
+                                literal.kind(),
+                                LiteralValueTypeKind::String(_)
+                                    | LiteralValueTypeKind::Bytes(_)
+                                    | LiteralValueTypeKind::Enum(_)
+                                    | LiteralValueTypeKind::Bool(_)
+                            ) =>
+                        {
+                            true
+                        }
                         Type::NominalInstance(instance) => {
                             instance.has_known_class(db, KnownClass::NoneType)
                         }
@@ -1772,7 +1769,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         &mut self,
         parameters: &'param ast::Expr,
     ) -> Result<Type<'db>, Vec<&'param ast::Expr>> {
-        Ok(match parameters {
+        let ty = match parameters {
             ast::Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
                 let value_ty = self.infer_expression(value, TypeContext::default());
                 if matches!(value_ty, Type::SpecialForm(SpecialFormType::Literal)) {
@@ -1824,6 +1821,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             literal @ ast::Expr::NumberLiteral(number) if number.value.is_int() => {
                 self.infer_expression(literal, TypeContext::default())
             }
+
             // for negative and positive numbers
             ast::Expr::UnaryOp(u)
                 if matches!(u.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
@@ -1848,8 +1846,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         return Ok(ty.inner(self.db()));
                     }
                     // `Literal[SomeEnum.Member]`
-                    Type::EnumLiteral(_) => {
-                        return Ok(subscript_ty);
+                    Type::LiteralValue(literal) if literal.is_enum() => {
+                        // Avoid promoting values originating from an explicitly annotated literal type.
+                        return Ok(Type::LiteralValue(literal.to_unpromotable()));
                     }
                     // `Literal[SingletonEnum.Member]`, where `SingletonEnum.Member` simplifies to
                     // just `SingletonEnum`.
@@ -1868,6 +1867,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_expression(parameters, TypeContext::default());
                 return Err(vec![parameters]);
             }
+        };
+
+        Ok(if let Type::LiteralValue(literal) = ty {
+            // Avoid promoting values originating from an explicitly annotated literal type.
+            Type::LiteralValue(literal.to_unpromotable())
+        } else {
+            ty
         })
     }
 

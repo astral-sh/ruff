@@ -38,6 +38,7 @@ class ForkServer:
         """
 
 if sys.version_info >= (3, 14):
+    # `sys_argv` parameter added in Python 3.14.3
     def main(
         listener_fd: int | None,
         alive_r: FileDescriptorLike,
@@ -45,7 +46,21 @@ if sys.version_info >= (3, 14):
         main_path: str | None = None,
         sys_path: list[str] | None = None,
         *,
+        sys_argv: list[str] | None = None,
         authkey_r: int | None = None,
+    ) -> None:
+        """Run forkserver."""
+
+elif sys.version_info >= (3, 13):
+    # `sys_argv` parameter added in Python 3.13.12
+    def main(
+        listener_fd: int | None,
+        alive_r: FileDescriptorLike,
+        preload: Sequence[str],
+        main_path: str | None = None,
+        sys_path: list[str] | None = None,
+        *,
+        sys_argv: list[str] | None = None,
     ) -> None:
         """Run forkserver."""
 

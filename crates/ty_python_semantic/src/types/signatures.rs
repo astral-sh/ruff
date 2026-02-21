@@ -27,8 +27,8 @@ use crate::types::relation::{
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
-    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, infer_complete_scope_types,
-    todo_type,
+    ParamSpecAttrKind, SelfBinding, TypeContext, TypeMapping, VarianceInferable,
+    infer_complete_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -710,6 +710,7 @@ impl<'db> Signature<'db> {
             full_generic_context,
             &parameters,
             return_ty,
+            definition,
         );
 
         Self {
@@ -933,10 +934,8 @@ impl<'db> Signature<'db> {
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type {
-            let self_mapping = TypeMapping::BindSelf {
-                self_type,
-                binding_context,
-            };
+            let self_mapping =
+                TypeMapping::BindSelf(SelfBinding::new(db, self_type, binding_context));
             parameters = parameters.apply_type_mapping_impl(
                 db,
                 &self_mapping,
@@ -956,10 +955,11 @@ impl<'db> Signature<'db> {
     }
 
     pub(crate) fn apply_self(&self, db: &'db dyn Db, self_type: Type<'db>) -> Self {
-        let self_mapping = TypeMapping::BindSelf {
+        let self_mapping = TypeMapping::BindSelf(SelfBinding::new(
+            db,
             self_type,
-            binding_context: self.definition.map(BindingContext::Definition),
-        };
+            self.definition.map(BindingContext::Definition),
+        ));
         let parameters = self.parameters.apply_type_mapping_impl(
             db,
             &self_mapping,
@@ -2710,7 +2710,7 @@ mod tests {
     use super::*;
     use crate::db::tests::{TestDb, setup_db};
     use crate::place::global_symbol;
-    use crate::types::{FunctionType, KnownClass};
+    use crate::types::{FunctionType, KnownClass, LiteralValueType};
     use ruff_db::system::DbWithWritableSystem as _;
 
     #[track_caller]
@@ -2770,21 +2770,21 @@ mod tests {
                 Parameter::positional_only(Some(Name::new_static("b")))
                     .with_annotated_type(KnownClass::Int.to_instance(&db)),
                 Parameter::positional_only(Some(Name::new_static("c")))
-                    .with_default_type(Type::IntLiteral(1)),
+                    .with_default_type(Type::int_literal(1)),
                 Parameter::positional_only(Some(Name::new_static("d")))
                     .with_annotated_type(KnownClass::Int.to_instance(&db))
-                    .with_default_type(Type::IntLiteral(2)),
+                    .with_default_type(Type::int_literal(2)),
                 Parameter::positional_or_keyword(Name::new_static("e"))
-                    .with_default_type(Type::IntLiteral(3)),
+                    .with_default_type(Type::int_literal(3)),
                 Parameter::positional_or_keyword(Name::new_static("f"))
-                    .with_annotated_type(Type::IntLiteral(4))
-                    .with_default_type(Type::IntLiteral(4)),
+                    .with_annotated_type(LiteralValueType::unpromotable(4).into())
+                    .with_default_type(LiteralValueType::unpromotable(4).into()),
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
                 Parameter::keyword_only(Name::new_static("g"))
-                    .with_default_type(Type::IntLiteral(5)),
+                    .with_default_type(Type::int_literal(5)),
                 Parameter::keyword_only(Name::new_static("h"))
-                    .with_annotated_type(Type::IntLiteral(6))
-                    .with_default_type(Type::IntLiteral(6)),
+                    .with_annotated_type(LiteralValueType::unpromotable(6).into())
+                    .with_default_type(LiteralValueType::unpromotable(6).into()),
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(KnownClass::Str.to_instance(&db)),
             ],

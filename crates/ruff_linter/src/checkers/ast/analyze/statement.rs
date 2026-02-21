@@ -345,6 +345,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::Airflow3Removal) {
                 airflow::rules::airflow_3_removal_function_def(checker, function_def);
             }
+            if checker.is_rule_enabled(Rule::Airflow3IncompatibleFunctionSignature) {
+                airflow::rules::airflow_3_incompatible_method_signature_def(checker, function_def);
+            }
             if checker.is_rule_enabled(Rule::NonPEP695GenericFunction) {
                 pyupgrade::rules::non_pep695_generic_function(checker, function_def);
             }

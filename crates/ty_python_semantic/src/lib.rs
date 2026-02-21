@@ -36,7 +36,6 @@ pub mod ast_node_ref;
 mod db;
 mod dunder_all;
 pub mod lint;
-pub(crate) mod list;
 mod node_key;
 pub(crate) mod place;
 mod program;
@@ -90,6 +89,8 @@ pub struct AnalysisSettings {
     pub respect_type_ignore_comments: bool,
 
     pub allowed_unresolved_imports: ModuleGlobSet,
+
+    pub replace_imports_with_any: ModuleGlobSet,
 }
 
 impl Default for AnalysisSettings {
@@ -97,6 +98,7 @@ impl Default for AnalysisSettings {
         Self {
             respect_type_ignore_comments: true,
             allowed_unresolved_imports: ModuleGlobSet::empty(),
+            replace_imports_with_any: ModuleGlobSet::empty(),
         }
     }
 }

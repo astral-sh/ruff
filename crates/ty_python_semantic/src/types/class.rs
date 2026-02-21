@@ -20,8 +20,7 @@ use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE,
-    SUPER_CALL_IN_NAMED_TUPLE_METHOD, report_conflicting_metaclass_from_bases,
+    INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
 };
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
@@ -31,11 +30,11 @@ use crate::types::function::{
     is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
-    GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
+    GenericContext, InferableTypeVars, Specialization, walk_specialization,
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
-use crate::types::mro::{DynamicMroError, DynamicMroErrorKind};
+use crate::types::mro::DynamicMroError;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
@@ -108,7 +107,7 @@ fn implicit_attribute_cycle_recover<'db>(
     Member { inner }
 }
 
-fn try_mro_cycle_initial<'db>(
+fn static_class_try_mro_cycle_initial<'db>(
     db: &'db dyn Db,
     _id: salsa::Id,
     self_: StaticClassLiteral<'db>,
@@ -129,6 +128,20 @@ fn try_metaclass_cycle_initial<'db>(
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
+}
+
+#[expect(clippy::unnecessary_wraps)]
+fn dynamic_class_try_mro_cycle_initial<'db>(
+    db: &'db dyn Db,
+    _id: salsa::Id,
+    self_: DynamicClassLiteral<'db>,
+) -> Result<Mro<'db>, DynamicMroError<'db>> {
+    // When there's a cycle, return a minimal MRO with just the class itself and object.
+    // This breaks the cycle and allows type checking to continue.
+    Ok(Mro::from([
+        ClassBase::Class(ClassType::NonGeneric(self_.into())),
+        ClassBase::object(db),
+    ]))
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -873,6 +886,23 @@ impl<'db> ClassType<'db> {
         }
     }
 
+    /// Returns the underlying class literal and specialization, if any.
+    ///
+    /// For a non-generic class, this returns the class literal directly.
+    /// For a generic alias, this returns the alias's origin.
+    pub(crate) fn class_literal_and_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> (ClassLiteral<'db>, Option<Specialization<'db>>) {
+        match self {
+            Self::NonGeneric(literal) => (literal, None),
+            Self::Generic(generic) => (
+                ClassLiteral::Static(generic.origin(db)),
+                Some(generic.specialization(db)),
+            ),
+        }
+    }
+
     /// Returns the statement-defined class literal and specialization for this class.
     /// For a non-generic class, this is the class itself. For a generic alias, this is the alias's origin.
     pub(crate) fn static_class_literal(
@@ -1058,6 +1088,7 @@ impl<'db> ClassType<'db> {
             let ClassBase::Class(class) = supercls else {
                 continue;
             };
+
             // Currently we do not recognize dynamic classes as being able to define abstract methods,
             // but we do recognise them as being able to override abstract methods defined in static classes.
             let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
@@ -1065,11 +1096,32 @@ impl<'db> ClassType<'db> {
                     .retain(|name, _| class.own_class_member(db, None, name).is_undefined());
                 continue;
             };
+
             let scope = class_literal.body_scope(db);
             let place_table = place_table(db, scope);
-            for (symbol_id, bindings_iterator) in
-                use_def_map(db, class_literal.body_scope(db)).all_end_of_scope_symbol_bindings()
-            {
+            let use_def_map = use_def_map(db, class_literal.body_scope(db));
+
+            // Treat abstract methods from superclasses as having been overridden
+            // if this class has a synthesized method by that name,
+            // or this class has a `ClassVar` declaration by that name
+            abstract_methods.retain(|name, _| {
+                if class_literal
+                    .own_synthesized_member(db, None, None, name)
+                    .is_some()
+                {
+                    return false;
+                }
+
+                place_table.symbol_id(name).is_none_or(|symbol_id| {
+                    let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+                    !place_from_declarations(db, declarations)
+                        .ignore_conflicting_declarations()
+                        .qualifiers
+                        .contains(TypeQualifiers::CLASS_VAR)
+                })
+            });
+
+            for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
                 let name = place_table.symbol(symbol_id).name();
                 let place_and_definition = place_from_bindings(db, bindings_iterator);
                 let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
@@ -1411,7 +1463,7 @@ impl<'db> ClassType<'db> {
                     .and_then(|spec| spec.tuple(db))
                     .and_then(|tuple| tuple.len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
-                    .map(Type::IntLiteral)
+                    .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
                 let parameters = Parameters::new(
@@ -1547,7 +1599,7 @@ impl<'db> ClassType<'db> {
 
                                 let index_annotation = UnionType::from_elements(
                                     db,
-                                    indices.into_iter().map(Type::IntLiteral),
+                                    indices.into_iter().map(Type::int_literal),
                                 );
 
                                 Some(synthesize_getitem_overload_signature(
@@ -1924,49 +1976,6 @@ impl<'db> ClassType<'db> {
     pub(super) fn definition_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).header_span(db)
     }
-
-    /// Returns `true` if calls to this class type should use constructor call handling
-    /// (via `try_call_constructor`) rather than the regular `try_call` path.
-    ///
-    /// Some known classes have manual signatures defined in `bindings()` and should use
-    /// the `try_call` path. For all other class types, we use `try_call_constructor`
-    /// to properly validate `__new__`/`__init__` signatures.
-    pub(super) fn should_use_constructor_call(self, db: &'db dyn Db) -> bool {
-        // For some known classes we have manual signatures defined and use the regular
-        // `try_call` path instead of constructor call handling.
-        let has_special_cased_constructor = matches!(
-            self.known(db),
-            Some(
-                KnownClass::Bool
-                    | KnownClass::Str
-                    | KnownClass::Type
-                    | KnownClass::Object
-                    | KnownClass::Property
-                    | KnownClass::Super
-                    | KnownClass::TypeAliasType
-                    | KnownClass::Deprecated
-            )
-        ) || (
-            // Constructor calls to `tuple` and subclasses of `tuple` are handled in
-            // `Type::bindings`, but constructor calls to `tuple[int]`, `tuple[int, ...]`,
-            // `tuple[int, *tuple[str, ...]]` (etc.) are handled by the default constructor-call
-            // logic (we synthesize a `__new__` method for them in `ClassType::own_class_member`).
-            self.is_known(db, KnownClass::Tuple) && !self.is_generic()
-        ) || self.static_class_literal(db).is_some_and(
-            |(class_literal, specialization)| {
-                CodeGeneratorKind::TypedDict.matches(db, class_literal.into(), specialization)
-            },
-        );
-
-        // Use regular `try_call` for all subclasses of `enum.Enum`. This is a temporary
-        // special-casing until we support the functional syntax for creating enum classes.
-        let is_enum_subclass = KnownClass::Enum
-            .to_class_literal(db)
-            .to_class_type(db)
-            .is_some_and(|enum_class| self.is_subclass_of(db, enum_class));
-
-        !has_special_cased_constructor && !is_enum_subclass
-    }
 }
 
 fn into_callable_cycle_initial<'db>(
@@ -2194,6 +2203,17 @@ impl<'db> StaticClassLiteral<'db> {
         })
     }
 
+    /// Returns `true` if this class is a dataclass-like class.
+    ///
+    /// This covers `@dataclass`-decorated classes, as well as classes created via
+    /// `dataclass_transform` (function-based, metaclass-based, and base-class-based).
+    pub(crate) fn is_dataclass_like(self, db: &'db dyn Db) -> bool {
+        matches!(
+            CodeGeneratorKind::from_class(db, ClassLiteral::Static(self), None),
+            Some(CodeGeneratorKind::DataclassLike(_))
+        )
+    }
+
     /// Returns a new [`StaticClassLiteral`] with the given dataclass params, preserving all other fields.
     pub(crate) fn with_dataclass_params(
         self,
@@ -2348,11 +2368,10 @@ impl<'db> StaticClassLiteral<'db> {
         )
     }
 
-    /// Returns all of the typevars that are referenced in this class's definition. This includes
-    /// any typevars bound in its generic context, as well as any typevars mentioned in its base
-    /// class list. (This is used to ensure that classes do not bind or reference typevars from
-    /// enclosing generic contexts.)
-    pub(crate) fn typevars_referenced_in_definition(
+    /// Returns all of the typevars that are referenced in this class's base class list.
+    /// (This is used to ensure that classes do not reference typevars from enclosing
+    /// generic contexts.)
+    pub(crate) fn typevars_referenced_in_bases(
         self,
         db: &'db dyn Db,
     ) -> FxIndexSet<BoundTypeVarInstance<'db>> {
@@ -2381,9 +2400,6 @@ impl<'db> StaticClassLiteral<'db> {
         }
 
         let visitor = CollectTypeVars::default();
-        if let Some(generic_context) = self.generic_context(db) {
-            walk_generic_context(db, generic_context, &visitor);
-        }
         for base in self.explicit_bases(db) {
             visitor.visit_type(db, *base);
         }
@@ -2672,7 +2688,7 @@ impl<'db> StaticClassLiteral<'db> {
     /// attribute on a class at runtime.
     ///
     /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-    #[salsa::tracked(returns(as_ref), cycle_initial=try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(as_ref), cycle_initial=static_class_try_mro_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn try_mro(
         self,
         db: &'db dyn Db,
@@ -3273,21 +3289,26 @@ impl<'db> StaticClassLiteral<'db> {
                         // descriptor attribute, data-classes will (implicitly) call the `__set__` method
                         // of the descriptor. This means that the synthesized `__init__` parameter for
                         // this attribute is determined by possible `value` parameter types with which
-                        // the `__set__` method can be called. We build a union of all possible options
-                        // to account for possible overloads.
-                        let mut value_types = UnionBuilder::new(db);
-                        for binding in &dunder_set.bindings(db) {
+                        // the `__set__` method can be called.
+                        //
+                        // We union parameter types across overloads of a single callable, intersect
+                        // callable bindings inside an intersection element, and union outer elements.
+                        field_ty = dunder_set.bindings(db).map_types(db, |binding| {
+                            let mut value_types = UnionBuilder::new(db);
+                            let mut has_value_type = false;
                             for overload in binding {
                                 if let Some(value_param) =
                                     overload.signature.parameters().get_positional(2)
                                 {
                                     value_types = value_types.add(value_param.annotated_type());
+                                    has_value_type = true;
                                 } else if overload.signature.parameters().is_gradual() {
                                     value_types = value_types.add(Type::unknown());
+                                    has_value_type = true;
                                 }
                             }
-                        }
-                        field_ty = value_types.build();
+                            has_value_type.then(|| value_types.build())
+                        });
 
                         // The default value of the attribute is *not* determined by the right hand side
                         // of the class-body assignment. Instead, the runtime invokes `__get__` on the
@@ -3296,7 +3317,7 @@ impl<'db> StaticClassLiteral<'db> {
 
                         if let Some(ref mut default_ty) = default_ty {
                             *default_ty = default_ty
-                                .try_call_dunder_get(db, Type::none(db), Type::from(self))
+                                .try_call_dunder_get(db, None, Type::from(self))
                                 .map(|(return_ty, _)| return_ty)
                                 .unwrap_or_else(Type::unknown);
                         }
@@ -5039,7 +5060,7 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 ///
 /// The type of `Foo` would be `<class 'Foo'>` where `Foo` is a `DynamicClassLiteral` with:
 /// - name: "Foo"
-/// - bases: [Base]
+/// - members: [("attr", int)]
 ///
 /// This is called "dynamic" because the class is created dynamically at runtime
 /// via a function call rather than a class statement.
@@ -5066,16 +5087,13 @@ pub struct DynamicClassLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    /// The base classes (from the second argument to `type()`).
-    #[returns(deref)]
-    pub bases: Box<[ClassBase<'db>]>,
-
     /// The anchor for this dynamic class, providing stable identity.
     ///
     /// - `Definition`: The `type()` call is assigned to a variable. The definition
     ///   uniquely identifies this class and can be used to find the `type()` call.
     /// - `ScopeOffset`: The `type()` call is "dangling" (not assigned). The offset
     ///   is relative to the enclosing scope's anchor node index.
+    #[returns(ref)]
     pub anchor: DynamicClassAnchor<'db>,
 
     /// The class members from the namespace dict (third argument to `type()`).
@@ -5098,9 +5116,7 @@ pub struct DynamicClassLiteral<'db> {
 /// This enum provides stable identity for `DynamicClassLiteral`:
 /// - For assigned calls, the `Definition` uniquely identifies the class.
 /// - For dangling calls, a relative offset provides stable identity.
-#[derive(
-    Copy, Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub enum DynamicClassAnchor<'db> {
     /// The `type()` call is assigned to a variable.
     ///
@@ -5112,7 +5128,14 @@ pub enum DynamicClassAnchor<'db> {
     ///
     /// The offset is relative to the enclosing scope's anchor node index.
     /// For module scope, this is equivalent to an absolute index (anchor is 0).
-    ScopeOffset { scope: ScopeId<'db>, offset: u32 },
+    ///
+    /// The `explicit_bases` are computed eagerly at creation time since dangling
+    /// calls cannot recursively reference the class being defined.
+    ScopeOffset {
+        scope: ScopeId<'db>,
+        offset: u32,
+        explicit_bases: Box<[Type<'db>]>,
+    },
 }
 
 impl get_size2::GetSize for DynamicClassLiteral<'_> {}
@@ -5122,7 +5145,7 @@ impl<'db> DynamicClassLiteral<'db> {
     /// Returns the definition where this class is created, if it was assigned to a variable.
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self.anchor(db) {
-            DynamicClassAnchor::Definition(definition) => Some(definition),
+            DynamicClassAnchor::Definition(definition) => Some(*definition),
             DynamicClassAnchor::ScopeOffset { .. } => None,
         }
     }
@@ -5131,7 +5154,63 @@ impl<'db> DynamicClassLiteral<'db> {
     pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         match self.anchor(db) {
             DynamicClassAnchor::Definition(definition) => definition.scope(db),
-            DynamicClassAnchor::ScopeOffset { scope, .. } => scope,
+            DynamicClassAnchor::ScopeOffset { scope, .. } => *scope,
+        }
+    }
+
+    /// Returns the explicit base classes of this dynamic class.
+    ///
+    /// For assigned `type()` calls, bases are computed lazily using deferred inference
+    /// to handle forward references (e.g., `X = type("X", (tuple["X | None"],), {})`).
+    ///
+    /// For dangling `type()` calls, bases are computed eagerly at creation time and
+    /// stored directly on the anchor, since dangling calls cannot recursively reference
+    /// the class being defined.
+    ///
+    /// Returns an empty slice if the bases cannot be computed (e.g., due to a cycle)
+    /// or if the bases argument is not a tuple.
+    ///
+    /// Returns `[Unknown]` if the bases tuple is variable-length (like `tuple[type, ...]`).
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> &'db [Type<'db>] {
+        /// Inner cached function for deferred inference of bases.
+        /// Only called for assigned `type()` calls where inference was deferred.
+        #[salsa::tracked(returns(deref), cycle_initial=|_, _, _| Box::default(), heap_size=ruff_memory_usage::heap_size)]
+        fn deferred_explicit_bases<'db>(
+            db: &'db dyn Db,
+            definition: Definition<'db>,
+        ) -> Box<[Type<'db>]> {
+            let module = parsed_module(db, definition.file(db)).load(db);
+
+            let value = definition
+                .kind(db)
+                .value(&module)
+                .expect("DynamicClassAnchor::Definition should only be used for assignments");
+            let call_expr = value
+                .as_call_expr()
+                .expect("Definition value should be a call expression");
+
+            // The `bases` argument is the second positional argument.
+            let Some(bases_arg) = call_expr.arguments.args.get(1) else {
+                return Box::default();
+            };
+
+            // Use `definition_expression_type` for deferred inference support.
+            let bases_type = definition_expression_type(db, definition, bases_arg);
+
+            // For variable-length tuples (like `tuple[type, ...]`), we can't statically
+            // determine the bases, so return Unknown.
+            bases_type
+                .fixed_tuple_elements(db)
+                .map(Cow::into_owned)
+                .map(Into::into)
+                .unwrap_or_else(|| Box::from([Type::unknown()]))
+        }
+
+        match self.anchor(db) {
+            // For dangling calls, bases are stored directly on the anchor.
+            DynamicClassAnchor::ScopeOffset { explicit_bases, .. } => explicit_bases.as_ref(),
+            // For assigned calls, use deferred inference.
+            DynamicClassAnchor::Definition(definition) => deferred_explicit_bases(db, *definition),
         }
     }
 
@@ -5164,7 +5243,7 @@ impl<'db> DynamicClassLiteral<'db> {
                 let anchor_u32 = scope_anchor
                     .as_u32()
                     .expect("anchor should not be NodeIndex::NONE");
-                let absolute_index = NodeIndex::from(anchor_u32 + offset);
+                let absolute_index = NodeIndex::from(anchor_u32 + *offset);
 
                 // Get the node and return its range.
                 let node: &ast::ExprCall = module
@@ -5197,18 +5276,31 @@ impl<'db> DynamicClassLiteral<'db> {
         self,
         db: &'db dyn Db,
     ) -> Result<Type<'db>, DynamicMetaclassConflict<'db>> {
-        let bases = self.bases(db);
+        let original_bases = self.explicit_bases(db);
 
         // If no bases, metaclass is `type`.
         // To dynamically create a class with no bases that has a custom metaclass,
         // you have to invoke that metaclass rather than `type()`.
-        if bases.is_empty() {
+        if original_bases.is_empty() {
             return Ok(KnownClass::Type.to_class_literal(db));
         }
 
         // If there's an MRO error, return unknown to avoid cascading errors.
         if self.try_mro(db).is_err() {
             return Ok(SubclassOfType::subclass_of_unknown());
+        }
+
+        // Convert Types to ClassBases for metaclass computation.
+        // All bases should convert successfully here: `try_mro()` above would have
+        // returned `Err(InvalidBases)` if any failed, causing us to return early.
+        let bases: Vec<ClassBase<'db>> = original_bases
+            .iter()
+            .filter_map(|base_type| ClassBase::try_from_type(db, *base_type, None))
+            .collect();
+
+        // If all bases failed to convert, return type as the metaclass.
+        if bases.is_empty() {
+            return Ok(KnownClass::Type.to_class_literal(db));
         }
 
         // Start with the first base's metaclass as the candidate.
@@ -5355,7 +5447,7 @@ impl<'db> DynamicClassLiteral<'db> {
     ///
     /// Returns `Ok(Mro)` if successful, or `Err(DynamicMroError)` if there's
     /// an error (duplicate bases or C3 linearization failure).
-    #[salsa::tracked(returns(ref), heap_size = ruff_memory_usage::heap_size)]
+    #[salsa::tracked(returns(ref), cycle_initial=dynamic_class_try_mro_cycle_initial, heap_size = ruff_memory_usage::heap_size)]
     pub(crate) fn try_mro(self, db: &'db dyn Db) -> Result<Mro<'db>, DynamicMroError<'db>> {
         Mro::of_dynamic_class(db, self)
     }
@@ -5378,7 +5470,7 @@ impl<'db> DynamicClassLiteral<'db> {
                         spec.len().into_fixed_length().is_some_and(|len| len > 0)
                     }),
                     // __slots__ = "abc"  # Same as ("abc",)
-                    Type::StringLiteral(_) => true,
+                    Type::LiteralValue(literal) if literal.is_string() => true,
                     // Other types are considered dynamic/unknown
                     _ => false,
                 };
@@ -5413,8 +5505,7 @@ impl<'db> DynamicClassLiteral<'db> {
         Self::new(
             db,
             self.name(db).clone(),
-            self.bases(db),
-            self.anchor(db),
+            self.anchor(db).clone(),
             self.members(db),
             self.has_dynamic_namespace(db),
             dataclass_params,
@@ -6141,9 +6232,10 @@ impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
                     // Skip over these very special class bases that aren't really classes.
                 }
                 ClassBase::Dynamic(_) => {
-                    return InstanceMemberResult::Done(PlaceAndQualifiers::todo(
-                        "instance attribute on class with dynamic base",
-                    ));
+                    // We already return the dynamic type for class member lookup, so we can
+                    // just return unbound here (to avoid having to build a union of the
+                    // dynamic type with itself).
+                    return InstanceMemberResult::Done(PlaceAndQualifiers::unbound());
                 }
                 ClassBase::Class(class) => {
                     if let member @ PlaceAndQualifiers {
@@ -8135,69 +8227,6 @@ impl KnownClass {
                 )));
             }
 
-            KnownClass::Type => {
-                // Check for MRO and metaclass errors in three-argument type() calls.
-                if let Type::ClassLiteral(ClassLiteral::Dynamic(dynamic_class)) =
-                    overload.return_type()
-                {
-                    // Check for MRO errors
-                    if let Err(error) = dynamic_class.try_mro(db) {
-                        match error.reason() {
-                            DynamicMroErrorKind::DuplicateBases(duplicates) => {
-                                if let Some(builder) =
-                                    context.report_lint(&DUPLICATE_BASE, call_expression)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Duplicate base class{maybe_s} {dupes} in class `{class}`",
-                                        maybe_s = if duplicates.len() == 1 { "" } else { "es" },
-                                        dupes = duplicates
-                                            .iter()
-                                            .map(|base: &ClassBase<'_>| base.display(db))
-                                            .join(", "),
-                                        class = dynamic_class.name(db),
-                                    ));
-                                }
-                            }
-                            DynamicMroErrorKind::UnresolvableMro => {
-                                if let Some(builder) =
-                                    context.report_lint(&INCONSISTENT_MRO, call_expression)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot create a consistent method resolution order (MRO) \
-                                            for class `{}` with bases `[{}]`",
-                                        dynamic_class.name(db),
-                                        dynamic_class
-                                            .bases(db)
-                                            .iter()
-                                            .map(|base| base.display(db))
-                                            .join(", ")
-                                    ));
-                                }
-                            }
-                        }
-                    }
-
-                    // Check for metaclass conflicts
-                    if let Err(DynamicMetaclassConflict {
-                        metaclass1,
-                        base1,
-                        metaclass2,
-                        base2,
-                    }) = dynamic_class.try_metaclass(db)
-                    {
-                        report_conflicting_metaclass_from_bases(
-                            context,
-                            call_expression.into(),
-                            dynamic_class.name(db),
-                            metaclass1,
-                            base1.display(db),
-                            metaclass2,
-                            base2.display(db),
-                        );
-                    }
-                }
-            }
-
             _ => {}
         }
     }
@@ -8343,7 +8372,7 @@ impl SlotsKind {
             },
 
             // __slots__ = "abc"  # Same as `("abc",)`
-            Type::StringLiteral(_) => Self::NotEmpty,
+            Type::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
 
             _ => Self::Dynamic,
         }

@@ -288,6 +288,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1706") => rules::pylint::rules::AndOrTernary,
         (Pylint, "R1708") => rules::pylint::rules::StopIterationReturn,
         (Pylint, "R1711") => rules::pylint::rules::UselessReturn,
+        (Pylint, "R1712") => rules::pylint::rules::SwapWithTemporaryVariable,
         (Pylint, "R1714") => rules::pylint::rules::RepeatedEqualityComparison,
         (Pylint, "R1722") => rules::pylint::rules::SysExitAlias,
         (Pylint, "R1730") => rules::pylint::rules::IfStmtMinMax,
@@ -1063,7 +1064,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "067") => rules::ruff::rules::NonEmptyInitModule,
         (Ruff, "068") => rules::ruff::rules::DuplicateEntryInDunderAll,
         (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
-        (Ruff, "070") => rules::ruff::rules::FallibleContextManager,
+        (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
+        (Ruff, "071") => rules::ruff::rules::FallibleContextManager,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,

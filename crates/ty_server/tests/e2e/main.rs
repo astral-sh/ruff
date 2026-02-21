@@ -31,6 +31,7 @@ mod code_actions;
 mod commands;
 mod completions;
 mod configuration;
+mod folding_range;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -67,14 +68,14 @@ use lsp_types::{
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidChangeWorkspaceFoldersParams, DidCloseTextDocumentParams,
     DidOpenTextDocumentParams, DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent,
-    Hover, HoverParams, InitializeParams, InitializeResult, InitializedParams, InlayHint,
-    InlayHintClientCapabilities, InlayHintParams, NumberOrString, PartialResultParams, Position,
-    PreviousResultId, PublishDiagnosticsClientCapabilities, Range, SemanticTokensResult,
-    SignatureHelp, SignatureHelpParams, SignatureHelpTriggerKind, TextDocumentClientCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
-    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent,
+    FoldingRange, FoldingRangeParams, Hover, HoverParams, InitializeParams, InitializeResult,
+    InitializedParams, InlayHint, InlayHintClientCapabilities, InlayHintParams, NumberOrString,
+    PartialResultParams, Position, PreviousResultId, PublishDiagnosticsClientCapabilities, Range,
+    SemanticTokensResult, SignatureHelp, SignatureHelpParams, SignatureHelpTriggerKind,
+    TextDocumentClientCapabilities, TextDocumentContentChangeEvent, TextDocumentIdentifier,
+    TextDocumentItem, TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier,
+    WorkDoneProgressParams, WorkspaceClientCapabilities, WorkspaceDiagnosticParams,
+    WorkspaceDiagnosticReportResult, WorkspaceEdit, WorkspaceFolder, WorkspaceFoldersChangeEvent,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -786,6 +787,21 @@ impl TestServer {
         self.test_context.root().join(path)
     }
 
+    #[expect(dead_code)]
+    pub(crate) fn write_file(
+        &self,
+        path: impl AsRef<SystemPath>,
+        content: impl AsRef<str>,
+    ) -> Result<()> {
+        let file_path = self.file_path(path);
+        // Ensure parent directories exists
+        if let Some(parent) = file_path.parent() {
+            fs::create_dir_all(parent.as_std_path())?;
+        }
+        fs::write(file_path.as_std_path(), content.as_ref())?;
+        Ok(())
+    }
+
     /// Send a `textDocument/didOpen` notification
     pub(crate) fn open_text_document(
         &mut self,
@@ -1030,6 +1046,14 @@ impl TestServer {
         )
     }
 
+    pub(crate) fn folding_range_request(&mut self, uri: &Url) -> Option<Vec<FoldingRange>> {
+        self.send_request_await::<lsp_types::request::FoldingRangeRequest>(FoldingRangeParams {
+            text_document: TextDocumentIdentifier { uri: uri.clone() },
+            work_done_progress_params: WorkDoneProgressParams::default(),
+            partial_result_params: PartialResultParams::default(),
+        })
+    }
+
     /// Adds a workspace folder configuration to this wrapper's state.
     ///
     /// This is meant to roughly model VS Code's "Add Folder to Workspace"
@@ -1173,7 +1197,11 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: vec![("VIRTUAL_ENV".to_string(), None)],
+            env_vars: vec![
+                ("HOME".into(), None),
+                ("PATH".into(), None),
+                ("VIRTUAL_ENV".into(), None),
+            ],
         })
     }
 

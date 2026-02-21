@@ -840,13 +840,13 @@ if sys.version_info >= (3, 10):
         to a callable accepting two positional-only arguments of types int
         and str:
 
-            type IntFuncDefault[**P = (int, str)] = Callable[P, int]
+            type IntFuncDefault[**P = [int, str]] = Callable[P, int]
 
         For compatibility with Python 3.11 and earlier, ParamSpec objects
         can also be created as follows::
 
             P = ParamSpec('P')
-            DefaultP = ParamSpec('DefaultP', default=(int, str))
+            DefaultP = ParamSpec('DefaultP', default=[int, str])
 
         Parameter specification variables exist primarily for the benefit of
         static type checkers.  They are used to forward the parameter types of
@@ -1176,31 +1176,31 @@ class _Alias:
     def __getitem__(self, typeargs: Any) -> Any: ...
 
 List = _Alias()
-"""A generic version of list."""
+"""Deprecated alias to list."""
 
 Dict = _Alias()
-"""A generic version of dict."""
+"""Deprecated alias to dict."""
 
 DefaultDict = _Alias()
-"""A generic version of collections.defaultdict."""
+"""Deprecated alias to collections.defaultdict."""
 
 Set = _Alias()
-"""A generic version of set."""
+"""Deprecated alias to set."""
 
 FrozenSet = _Alias()
-"""A generic version of frozenset."""
+"""Deprecated alias to frozenset."""
 
 Counter = _Alias()
-"""A generic version of collections.Counter."""
+"""Deprecated alias to collections.Counter."""
 
 Deque = _Alias()
-"""A generic version of collections.deque."""
+"""Deprecated alias to collections.deque."""
 
 ChainMap = _Alias()
-"""A generic version of collections.ChainMap."""
+"""Deprecated alias to collections.ChainMap."""
 
 OrderedDict = _Alias()
-"""A generic version of collections.OrderedDict."""
+"""Deprecated alias to collections.OrderedDict."""
 
 Annotated: _SpecialForm
 """Add context-specific metadata to a type.
@@ -1674,6 +1674,14 @@ class AbstractSet(Collection[_T_co]):
         by the built-in frozenset type.
         """
     # Mixin methods
+    @classmethod
+    def _from_iterable(cls, it: Iterable[_S]) -> AbstractSet[_S]:
+        """Construct an instance of the class from any iterable input.
+
+        Must override this method if the class constructor signature
+        does not accept an iterable for an input.
+        """
+
     def __le__(self, other: AbstractSet[Any]) -> bool: ...
     def __lt__(self, other: AbstractSet[Any]) -> bool: ...
     def __gt__(self, other: AbstractSet[Any]) -> bool: ...
@@ -1727,6 +1735,8 @@ class MappingView(Sized):
 
 class ItemsView(MappingView, AbstractSet[tuple[_KT_co, _VT_co]], Generic[_KT_co, _VT_co]):
     def __init__(self, mapping: SupportsGetItemViewable[_KT_co, _VT_co]) -> None: ...  # undocumented
+    @classmethod
+    def _from_iterable(cls, it: Iterable[_S]) -> set[_S]: ...
     def __and__(self, other: Iterable[Any]) -> set[tuple[_KT_co, _VT_co]]: ...
     def __rand__(self, other: Iterable[_T]) -> set[_T]: ...
     def __contains__(self, item: tuple[object, object]) -> bool: ...  # type: ignore[override]
@@ -1740,6 +1750,8 @@ class ItemsView(MappingView, AbstractSet[tuple[_KT_co, _VT_co]], Generic[_KT_co,
 
 class KeysView(MappingView, AbstractSet[_KT_co]):
     def __init__(self, mapping: Viewable[_KT_co]) -> None: ...  # undocumented
+    @classmethod
+    def _from_iterable(cls, it: Iterable[_S]) -> set[_S]: ...
     def __and__(self, other: Iterable[Any]) -> set[_KT_co]: ...
     def __rand__(self, other: Iterable[_T]) -> set[_T]: ...
     def __contains__(self, key: object) -> bool: ...

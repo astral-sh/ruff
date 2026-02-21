@@ -1,4 +1,3 @@
-use super::TypeVarVariance;
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::ConstraintSet;
@@ -10,7 +9,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicClassLiteral,
     DynamicType, FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
     NormalizedVisitor, SpecialFormType, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    TypedDictType, UnionType, todo_type,
+    TypeVarVariance, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -393,13 +392,8 @@ impl<'db> SubclassOfInner<'db> {
                         Self::try_from_instance(db, bound)
                             .and_then(|subclass_of| subclass_of.into_class(db))
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        match &**constraints.elements(db) {
-                            [bound] => Self::try_from_instance(db, *bound)
-                                .and_then(|subclass_of| subclass_of.into_class(db)),
-                            _ => Some(ClassType::object(db)),
-                        }
-                    }
+                    // TODO this is quite imprecise
+                    Some(TypeVarBoundOrConstraints::Constraints(_)) => Some(ClassType::object(db)),
                 }
             }
         }

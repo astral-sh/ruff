@@ -306,3 +306,425 @@ AIR301 `appbuilder` is removed in Airflow 3.0
     |               ^^^^^^
     |
 help: The constructor takes no parameter now
+
+AIR301 [*] `default_var` is removed in Airflow 3.0
+   --> AIR301_args.py:114:21
+    |
+112 | from airflow.sdk import Variable
+113 |
+114 | Variable.get("key", default_var="deprecated")
+    |                     ^^^^^^^^^^^
+115 | Variable.get(key="key", default_var="deprecated")
+    |
+help: Use `default` instead
+111 | # airflow.sdk.Variable
+112 | from airflow.sdk import Variable
+113 | 
+    - Variable.get("key", default_var="deprecated")
+114 + Variable.get("key", default="deprecated")
+115 | Variable.get(key="key", default_var="deprecated")
+116 | 
+117 | Variable.get("key", default="default")
+
+AIR301 [*] `default_var` is removed in Airflow 3.0
+   --> AIR301_args.py:115:25
+    |
+114 | Variable.get("key", default_var="deprecated")
+115 | Variable.get(key="key", default_var="deprecated")
+    |                         ^^^^^^^^^^^
+116 |
+117 | Variable.get("key", default="default")
+    |
+help: Use `default` instead
+112 | from airflow.sdk import Variable
+113 | 
+114 | Variable.get("key", default_var="deprecated")
+    - Variable.get(key="key", default_var="deprecated")
+115 + Variable.get(key="key", default="deprecated")
+116 | 
+117 | Variable.get("key", default="default")
+118 | Variable.get(key="key", default="default")
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:137:62
+    |
+135 | )
+136 |
+137 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                              ^^^^^^^^^^^^^^^
+138 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+139 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:138:68
+    |
+137 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+138 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                    ^^^^^^^^^^^^^^^
+139 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+140 | PythonVirtualenvOperator(
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:139:68
+    |
+137 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+138 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+139 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                    ^^^^^^^^^^^^^^^
+140 | PythonVirtualenvOperator(
+141 |     task_id="virtualenv_python",
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:145:5
+    |
+143 |     requirements=["colorama==0.4.0"],
+144 |     system_site_packages=False,
+145 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^
+146 | )
+147 | BranchPythonVirtualenvOperator(
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:153:5
+    |
+151 |     python_callable=virtualenv_callable,
+152 |     op_args=["some_args"],
+153 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^
+154 | )
+155 | ExternalPythonOperator(
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:159:5
+    |
+157 |     python_callable=virtualenv_callable,
+158 |     python="some_path",
+159 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^
+160 | )
+161 | BranchExternalPythonOperator(
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:166:5
+    |
+164 |     python_callable=virtualenv_callable,
+165 |     op_args=["some_args"],
+166 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^
+167 | )
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:208:62
+    |
+206 | )
+207 |
+208 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                              ^^^^^^^^^^^^^^^
+209 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+210 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:209:68
+    |
+208 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+209 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                    ^^^^^^^^^^^^^^^
+210 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+211 | PythonVirtualenvOperator(
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:210:68
+    |
+208 | PythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+209 | BranchPythonOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+210 | ShortCircuitOperator(task_id="task", python_callable=lambda: None, provide_context=True)
+    |                                                                    ^^^^^^^^^^^^^^^
+211 | PythonVirtualenvOperator(
+212 |     task_id="virtualenv_python",
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:216:5
+    |
+214 |     requirements=["colorama==0.4.0"],
+215 |     system_site_packages=False,
+216 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^
+217 | )
+218 | BranchPythonVirtualenvOperator(
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:224:5
+    |
+222 |     python_callable=virtualenv_callable,
+223 |     op_args=["some_args"],
+224 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^
+225 | )
+226 | ExternalPythonOperator(
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:230:5
+    |
+228 |     python_callable=virtualenv_callable,
+229 |     python="some_path",
+230 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^
+231 | )
+232 | BranchExternalPythonOperator(
+    |
+
+AIR301 `provide_context` is removed in Airflow 3.0
+   --> AIR301_args.py:237:5
+    |
+235 |     python_callable=virtualenv_callable,
+236 |     op_args=["some_args"],
+237 |     provide_context=True,
+    |     ^^^^^^^^^^^^^^^
+238 | )
+    |
+
+AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
+   --> AIR301_args.py:274:20
+    |
+272 | from airflow.utils.trigger_rule import TriggerRule
+273 |
+274 | @task(trigger_rule="none_failed_or_skipped")
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^
+275 | def invalid_trigger_rule_task():
+276 |     pass
+    |
+help: Use `none_failed_min_one_success` instead
+271 | from airflow.operators.python import PythonOperator
+272 | from airflow.utils.trigger_rule import TriggerRule
+273 | 
+    - @task(trigger_rule="none_failed_or_skipped")
+274 + @task(trigger_rule="none_failed_min_one_success")
+275 | def invalid_trigger_rule_task():
+276 |     pass
+277 | 
+
+AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   --> AIR301_args.py:278:20
+    |
+276 |     pass
+277 |
+278 | @task(trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+279 | def invalid_trigger_rule_task():
+280 |     pass
+    |
+help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
+275 | def invalid_trigger_rule_task():
+276 |     pass
+277 | 
+    - @task(trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+278 + @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
+279 | def invalid_trigger_rule_task():
+280 |     pass
+281 | 
+
+AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
+   --> AIR301_args.py:286:96
+    |
+284 |     pass
+285 |
+286 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+    |                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^
+287 |
+288 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+    |
+help: Use `none_failed_min_one_success` instead
+283 | def valid_trigger_rule_task():
+284 |     pass
+285 | 
+    - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+286 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_min_one_success")
+287 | 
+288 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+289 | 
+
+AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   --> AIR301_args.py:288:96
+    |
+286 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+287 |
+288 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+    |                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+289 |
+290 | PythonOperator(task_id="valid_trigger_rule_task", python_callable=lambda: None, trigger_rule="all_success")
+    |
+help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
+285 | 
+286 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+287 | 
+    - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+288 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
+289 | 
+290 | PythonOperator(task_id="valid_trigger_rule_task", python_callable=lambda: None, trigger_rule="all_success")
+291 | 
+
+AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
+   --> AIR301_args.py:295:20
+    |
+293 | from airflow.providers.standard.operators.python import PythonOperator
+294 |
+295 | @task(trigger_rule="none_failed_or_skipped")
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^
+296 | def invalid_trigger_rule_task():
+297 |     pass
+    |
+help: Use `none_failed_min_one_success` instead
+292 | from airflow.sdk import task
+293 | from airflow.providers.standard.operators.python import PythonOperator
+294 | 
+    - @task(trigger_rule="none_failed_or_skipped")
+295 + @task(trigger_rule="none_failed_min_one_success")
+296 | def invalid_trigger_rule_task():
+297 |     pass
+298 | 
+
+AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   --> AIR301_args.py:299:20
+    |
+297 |     pass
+298 |
+299 | @task(trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+300 | def invalid_trigger_rule_task():
+301 |     pass
+    |
+help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
+296 | def invalid_trigger_rule_task():
+297 |     pass
+298 | 
+    - @task(trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+299 + @task(trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
+300 | def invalid_trigger_rule_task():
+301 |     pass
+302 | 
+
+AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
+   --> AIR301_args.py:307:96
+    |
+305 |     pass
+306 |
+307 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+    |                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^
+308 |
+309 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+    |
+help: Use `none_failed_min_one_success` instead
+304 | def valid_trigger_rule_task():
+305 |     pass
+306 | 
+    - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+307 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_min_one_success")
+308 | 
+309 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+310 | 
+
+AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   --> AIR301_args.py:309:96
+    |
+307 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+308 |
+309 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+    |                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+310 |
+311 | PythonOperator(task_id="valid_trigger_rule_task", python_callable=lambda: None, trigger_rule="all_success")
+    |
+help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
+306 | 
+307 | PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule="none_failed_or_skipped")
+308 | 
+    - PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED)
+309 + PythonOperator(task_id="invalid_trigger_rule_task", python_callable=lambda: None, trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS)
+310 | 
+311 | PythonOperator(task_id="valid_trigger_rule_task", python_callable=lambda: None, trigger_rule="all_success")
+312 | 
+
+AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
+   --> AIR301_args.py:320:18
+    |
+318 |     split_statements=True,
+319 |     return_last=False,
+320 |     trigger_rule="none_failed_or_skipped",
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^
+321 | )
+    |
+help: Use `none_failed_min_one_success` instead
+317 |     sql="SELECT 1; SELECT * FROM AIRFLOW_DB_METADATA_TABLE LIMIT 1;",
+318 |     split_statements=True,
+319 |     return_last=False,
+    -     trigger_rule="none_failed_or_skipped",
+320 +     trigger_rule="none_failed_min_one_success",
+321 | )
+322 | 
+323 | execute_query = SQLExecuteQueryOperator(
+
+AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   --> AIR301_args.py:328:18
+    |
+326 |     split_statements=True,
+327 |     return_last=False,
+328 |     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+329 | )
+    |
+help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
+325 |     sql="SELECT 1; SELECT * FROM AIRFLOW_DB_METADATA_TABLE LIMIT 1;",
+326 |     split_statements=True,
+327 |     return_last=False,
+    -     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+328 +     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
+329 | )
+330 | 
+331 | from airflow.providers.amazon.aws.operators.s3 import S3FileTransformOperator
+
+AIR301 [*] `none_failed_or_skipped` is removed in Airflow 3.0
+   --> AIR301_args.py:339:18
+    |
+337 |     transform_script="cp",
+338 |     replace=True,
+339 |     trigger_rule="none_failed_or_skipped",
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^
+340 | )
+    |
+help: Use `none_failed_min_one_success` instead
+336 |     dest_s3_key="s3://bucket_2/key_2",
+337 |     transform_script="cp",
+338 |     replace=True,
+    -     trigger_rule="none_failed_or_skipped",
+339 +     trigger_rule="none_failed_min_one_success",
+340 | )
+341 | 
+342 | file_transform = S3FileTransformOperator(
+
+AIR301 [*] `airflow.utils.trigger_rule.TriggerRule.NONE_FAILED_OR_SKIPPED` is removed in Airflow 3.0
+   --> AIR301_args.py:348:18
+    |
+346 |     transform_script="cp",
+347 |     replace=True,
+348 |     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+    |                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+349 | )
+    |
+help: Use `NONE_FAILED_MIN_ONE_SUCCESS` instead
+345 |     dest_s3_key="s3://bucket_2/key_2",
+346 |     transform_script="cp",
+347 |     replace=True,
+    -     trigger_rule=TriggerRule.NONE_FAILED_OR_SKIPPED,
+348 +     trigger_rule=TriggerRule.NONE_FAILED_MIN_ONE_SUCCESS,
+349 | )

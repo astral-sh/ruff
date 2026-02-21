@@ -747,9 +747,13 @@ If a class variable is additionally qualified as `Final`, we do not union with `
 from typing import Final
 
 class D:
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final1: Final[ClassVar] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final2: ClassVar[Final] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final3: ClassVar[Final[int]] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final4: Final[ClassVar[int]] = 1
 
 reveal_type(D.final1)  # revealed: Literal[1]
@@ -1285,13 +1289,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
+    # error: [unresolved-attribute] "Attribute `x` is not defined on `<class 'C2'>` in union `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
+    # error: [unresolved-attribute] "Attribute `x` is not defined on `C2` in union `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1465,6 +1469,40 @@ def _(flag: bool):
     # handling in `validate_attribute_assignment` for this.
     # error: [invalid-assignment] "Object of type `Literal[1]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'>`"
     C.x = 1
+```
+
+## Unions with some paths unbound
+
+If the symbol is unbound in some elements of the union, that's also an error:
+
+```py
+def f(x: list[int], y: list[int] | None, z: None):
+    x.index
+    # error: [unresolved-attribute] "Attribute `index` is not defined on `None` in union `list[int] | None`"
+    y.index
+    # error: [unresolved-attribute] "Object of type `None` has no attribute `index`"
+    z.index
+```
+
+This is also true of type aliases of unions, and of special-case `NewType`s that have a union as a
+base type:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import NewType
+
+type MaybeList = list[int] | None
+FloatNT = NewType("FloatNT", float)
+
+def g(x: MaybeList, y: FloatNT):
+    # error: [unresolved-attribute] "Attribute `index` is not defined on `None` in union `MaybeList`"
+    x.index
+    # error: [unresolved-attribute] "Attribute `hex` is not defined on `int` in union `FloatNT`"
+    y.hex
 ```
 
 ## Inherited class attributes
@@ -2091,11 +2129,12 @@ of type `Never`):
 ```py
 from typing_extensions import Never, Any
 
-def _(n: Never):
-    reveal_type(n.__setattr__)  # revealed: Never
+def _(never: Never):
+    reveal_type(never.__setattr__)  # revealed: Never
 
+def _(never: Never):
     # No error:
-    n.non_existing = 1
+    never.non_existing = 1
 ```
 
 And similarly for `Any`:
@@ -2664,7 +2703,7 @@ class ManyCycles2:
 
     def f1(self: "ManyCycles2"):
         # TODO: should be Unknown | list[Unknown | int] | list[Divergent]
-        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Divergent] | list[Divergent]
+        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Unknown] | list[Divergent]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]

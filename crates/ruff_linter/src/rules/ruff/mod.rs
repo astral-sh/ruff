@@ -119,7 +119,7 @@ mod tests {
     #[test_case(Rule::PropertyWithoutReturn, Path::new("RUF066.py"))]
     #[test_case(Rule::DuplicateEntryInDunderAll, Path::new("RUF068.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
-    #[test_case(Rule::FallibleContextManager, Path::new("RUF070.py"))]
+    #[test_case(Rule::FallibleContextManager, Path::new("RUF071.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
@@ -132,6 +132,22 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn missing_fstring_syntax_backslash_py311() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/RUF027_0.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY311.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+        );
         Ok(())
     }
 
@@ -333,7 +349,7 @@ mod tests {
 
     #[test]
     fn range_suppressions() -> Result<()> {
-        assert_diagnostics_diff!(
+        let diagnostics = test_path(
             Path::new("ruff/suppressions.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
@@ -344,17 +360,8 @@ mod tests {
                 Rule::UnmatchedSuppressionComment,
             ])
             .with_external_rules(&["TK421"]),
-            &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedVariable,
-                Rule::AmbiguousVariableName,
-                Rule::UnusedNOQA,
-                Rule::InvalidRuleCode,
-                Rule::InvalidSuppressionComment,
-                Rule::UnmatchedSuppressionComment,
-            ])
-            .with_external_rules(&["TK421"])
-            .with_preview_mode(),
-        );
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -624,6 +631,7 @@ mod tests {
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
+    #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

@@ -123,10 +123,7 @@ pub(crate) fn format(
                     let path = resolved_file.path();
                     let settings = resolver.resolve(path);
 
-                    let source_type = match settings.formatter.extension.get(path) {
-                        None => SourceType::from(path),
-                        Some(language) => SourceType::Python(PySourceType::from(language)),
-                    };
+                    let source_type = settings.formatter.extension.get_source_type(path);
                     if source_type.is_toml() {
                         // Ignore TOML files.
                         return None;
@@ -627,7 +624,7 @@ impl<'a> FormatResults<'a> {
             .collect();
 
         let context = EmitterContext::new(&notebook_index);
-        let config = DisplayDiagnosticConfig::default()
+        let config = DisplayDiagnosticConfig::new("ruff")
             .hide_severity(true)
             .show_fix_diff(true)
             .color(!cfg!(test) && colored::control::SHOULD_COLORIZE.should_colorize());

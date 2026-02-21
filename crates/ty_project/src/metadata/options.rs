@@ -184,14 +184,13 @@ impl Options {
             }
         };
 
-        let self_site_packages = self_environment_search_paths(
+        let self_environment = self_environment_search_paths(
             python_environment
                 .as_ref()
                 .map(ty_python_semantic::PythonEnvironment::origin)
                 .cloned(),
             system,
-        )
-        .unwrap_or_default();
+        );
 
         let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
             let site_packages_paths = python_environment
@@ -210,10 +209,19 @@ impl Options {
                     }
                 }
             };
-            self_site_packages.concatenate(site_packages_paths)
+            match self_environment {
+                // When ty is installed in a virtual environment (e.g., `uvx --with ...`),
+                // the self-environment takes priority over the discovered environment.
+                Some((self_site_packages, true)) => {
+                    self_site_packages.concatenate(site_packages_paths)
+                }
+                // When ty is installed in a system Python, do not include the system
+                // Python's site-packages if there's a discovered project environment.
+                Some((_, false)) | None => site_packages_paths,
+            }
         } else {
             tracing::debug!("No virtual environment found");
-            self_site_packages
+            self_environment.map(|(paths, _)| paths).unwrap_or_default()
         };
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
@@ -518,10 +526,15 @@ impl Options {
 ///
 /// Since ty may be executed from an arbitrary non-Python location, errors during discovery of ty's
 /// environment are not raised, instead [`None`] is returned.
+///
+/// Returns a tuple of (`site_packages`, `is_virtual_env`). When the self-environment is a virtual
+/// environment (e.g., `uvx --with ...`), it takes priority over other environments.
+/// When it's a system Python and there's a project environment (like `.venv`), the system
+/// Python's site-packages are excluded entirely.
 fn self_environment_search_paths(
     existing_origin: Option<SysPrefixPathOrigin>,
     system: &dyn System,
-) -> Option<SitePackagesPaths> {
+) -> Option<(SitePackagesPaths, bool)> {
     if existing_origin.is_some_and(|origin| !origin.allows_concatenation_with_self_environment()) {
         return None;
     }
@@ -535,15 +548,17 @@ fn self_environment_search_paths(
         .inspect_err(|err| tracing::debug!("Failed to discover ty's environment: {err}"))
         .ok()?;
 
+    let is_virtual_env = environment.is_virtual();
+
     let search_paths = environment
         .site_packages_paths(system)
         .inspect_err(|err| {
             tracing::debug!("Failed to discover site-packages in ty's environment: {err}");
         })
-        .ok();
+        .ok()?;
 
     tracing::debug!("Using site-packages from ty's environment");
-    search_paths
+    Some((search_paths, is_virtual_env))
 }
 
 #[derive(
@@ -668,16 +683,20 @@ pub struct EnvironmentOptions {
     /// ty uses the `site-packages` directory of your project's Python environment
     /// to resolve third-party (and, in some cases, first-party) imports in your code.
     ///
-    /// If you're using a project management tool such as uv, you should not generally need
-    /// to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
-    /// environment variable to point to your project's virtual environment. ty can also infer
-    /// the location of your environment from an activated Conda environment, and will look for
-    /// a `.venv` directory in the project root if none of the above apply.
+    /// This can be a path to:
     ///
-    /// Passing a path to a Python executable is supported, but passing a path to a dynamic executable
-    /// (such as a shim) is not currently supported.
+    /// - A Python interpreter, e.g. `.venv/bin/python3`
+    /// - A virtual environment directory, e.g. `.venv`
+    /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
     ///
-    /// This option can be used to point to virtual or system Python environments.
+    /// If you're using a project management tool such as uv, you should not generally need to
+    /// specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV` environment
+    /// variable to point to your project's virtual environment. ty can also infer the location of
+    /// your environment from an activated Conda environment, and will look for a `.venv` directory
+    /// in the project root if none of the above apply. Failing that, ty will look for a `python3`
+    /// or `python` binary available in `PATH`.
+    ///
+    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
@@ -1172,6 +1191,9 @@ pub enum OutputFormat {
     ///
     /// [GitHub Actions]: https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands#setting-an-error-message
     Github,
+    /// Print diagnostics as a JUnit-style XML report.
+    #[cfg(feature = "junit")]
+    Junit,
 }
 
 impl OutputFormat {
@@ -1192,6 +1214,8 @@ impl From<OutputFormat> for DiagnosticFormat {
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
+            #[cfg(feature = "junit")]
+            OutputFormat::Junit => Self::Junit,
         }
     }
 }
@@ -1227,7 +1251,7 @@ pub struct TerminalOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"full"#,
-        value_type = "full | concise",
+        value_type = "full | concise | github | gitlab | junit",
         example = r#"
             output-format = "concise"
         "#
@@ -1305,6 +1329,31 @@ pub struct AnalysisOptions {
         "#
     )]
     pub allowed_unresolved_imports: Option<Vec<RangedValue<String>>>,
+
+    /// A list of module glob patterns whose imports should be replaced with `typing.Any`.
+    ///
+    /// Unlike `allowed-unresolved-imports`, this setting replaces the module's type information
+    /// with `typing.Any` even if the module can be resolved. Import diagnostics are
+    /// unconditionally suppressed for matching modules.
+    ///
+    /// - Prefix a pattern with `!` to exclude matching modules
+    ///
+    /// When multiple patterns match, later entries take precedence.
+    ///
+    /// Glob patterns can be used in combinations with each other. For example, to suppress errors for
+    /// any module where the first component contains the substring `test`, use `*test*.**`.
+    ///
+    /// When multiple patterns match, later entries take precedence.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Replace all pandas and numpy imports with Any
+            replace-imports-with-any = ["pandas.**", "numpy.**"]
+        "#
+    )]
+    pub replace_imports_with_any: Option<Vec<RangedValue<String>>>,
 }
 
 impl AnalysisOptions {
@@ -1316,11 +1365,13 @@ impl AnalysisOptions {
         let Self {
             respect_type_ignore_comments,
             allowed_unresolved_imports,
+            replace_imports_with_any,
         } = self;
 
         let AnalysisSettings {
             respect_type_ignore_comments: respect_type_ignore_default,
             allowed_unresolved_imports: allowed_unresolved_imports_default,
+            replace_imports_with_any: replace_imports_with_any_default,
         } = AnalysisSettings::default();
 
         let allowed_unresolved_imports =
@@ -1334,10 +1385,22 @@ impl AnalysisOptions {
                 allowed_unresolved_imports_default
             };
 
+        let replace_imports_with_any =
+            if let Some(replace_imports_with_any) = replace_imports_with_any {
+                build_module_glob_set(db, replace_imports_with_any, "replace_imports_with_any")
+                    .unwrap_or_else(|error| {
+                        diagnostics.push(*error);
+                        ModuleGlobSet::empty()
+                    })
+            } else {
+                replace_imports_with_any_default
+            };
+
         AnalysisSettings {
             respect_type_ignore_comments: respect_type_ignore_comments
                 .unwrap_or(respect_type_ignore_default),
             allowed_unresolved_imports,
+            replace_imports_with_any,
         }
     }
 }
@@ -1721,7 +1784,7 @@ impl ToSettingsError {
 
         impl fmt::Display for DisplayPretty<'_> {
             fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                let display_config = DisplayDiagnosticConfig::default()
+                let display_config = DisplayDiagnosticConfig::new("ty")
                     .format(self.error.output_format.into())
                     .color(self.error.color);
 

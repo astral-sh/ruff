@@ -214,6 +214,12 @@ impl PythonEnvironment {
                 .map(Some);
         }
 
+        if let Some(env) = environment_from_binary(system, "python3")
+            .or_else(|| environment_from_binary(system, "python"))
+        {
+            return Ok(Some(env));
+        }
+
         Ok(None)
     }
 
@@ -269,6 +275,11 @@ impl PythonEnvironment {
             Self::Virtual(env) => &env.root_path.origin,
             Self::System(env) => &env.root_path.origin,
         }
+    }
+
+    /// Returns `true` if this is a virtual environment (has a `pyvenv.cfg` file).
+    pub fn is_virtual(&self) -> bool {
+        matches!(self, Self::Virtual(_))
     }
 }
 
@@ -715,6 +726,33 @@ pub(crate) fn conda_environment_from_env(
     }
 
     Some(path)
+}
+
+#[cfg(target_family = "wasm")]
+pub(crate) fn environment_from_binary(
+    _system: &dyn System,
+    _binary: &str,
+) -> Option<PythonEnvironment> {
+    None
+}
+
+#[cfg(not(target_family = "wasm"))]
+pub(crate) fn environment_from_binary(
+    system: &dyn System,
+    binary: &str,
+) -> Option<PythonEnvironment> {
+    let binary = which::WhichConfig::new_with_sys(system)
+        .binary_name(binary.into())
+        .first_result()
+        .ok()?;
+    let binary = SystemPathBuf::from_path_buf(binary).ok()?;
+    let env = PythonEnvironment::new(binary, SysPrefixPathOrigin::PythonBinary, system).ok()?;
+
+    // TODO: replace this with better shim support, e.g. pyenv
+    // sanity check to filter out shims
+    env.site_packages_paths(system).ok()?;
+
+    Some(env)
 }
 
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.
@@ -1661,6 +1699,8 @@ pub enum SysPrefixPathOrigin {
     LocalVenv,
     /// The `sys.prefix` path came from the environment ty is installed in.
     SelfEnvironment,
+    /// The Python binary discovered in $PATH
+    PythonBinary,
 }
 
 impl SysPrefixPathOrigin {
@@ -1673,14 +1713,9 @@ impl SysPrefixPathOrigin {
             | Self::PythonCliFlag
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
-            | Self::CondaPrefixVar => false,
-            // It's not strictly true that the self environment must be virtual, e.g., ty could be
-            // installed in a system Python environment and users may expect us to respect
-            // dependencies installed alongside it. However, we're intentionally excluding support
-            // for this to start. Note a change here has downstream implications, i.e., we probably
-            // don't want the packages in a system environment to take precedence over those in a
-            // virtual environment and would need to reverse the ordering in that case.
-            Self::SelfEnvironment => true,
+            | Self::CondaPrefixVar
+            | Self::PythonBinary
+            | Self::SelfEnvironment => false,
         }
     }
 
@@ -1693,7 +1728,8 @@ impl SysPrefixPathOrigin {
             Self::PythonCliFlag
             | Self::ConfigFileSetting(..)
             | Self::Editor
-            | Self::SelfEnvironment => false,
+            | Self::SelfEnvironment
+            | Self::PythonBinary => false,
             Self::VirtualEnvVar
             | Self::CondaPrefixVar
             | Self::DerivedFromPyvenvCfg
@@ -1711,7 +1747,8 @@ impl SysPrefixPathOrigin {
             | Self::Editor
             | Self::DerivedFromPyvenvCfg
             | Self::ConfigFileSetting(..)
-            | Self::PythonCliFlag => false,
+            | Self::PythonCliFlag
+            | Self::PythonBinary => false,
             Self::LocalVenv => true,
         }
     }
@@ -1728,6 +1765,7 @@ impl std::fmt::Display for SysPrefixPathOrigin {
             Self::LocalVenv => f.write_str("local virtual environment"),
             Self::Editor => f.write_str("selected interpreter in your editor"),
             Self::SelfEnvironment => f.write_str("ty environment"),
+            Self::PythonBinary => f.write_str("Python binary discovered in $PATH"),
         }
     }
 }
@@ -2148,6 +2186,20 @@ mod tests {
             matches!(err, SitePackagesDiscoveryError::NoPyvenvCfgFile(..)),
             "Got {err:?}",
         );
+    }
+
+    #[test]
+    fn can_find_site_packages_directory_no_virtual_env_at_origin_self_environment() {
+        // Test that ty can discover dependencies in a system Python environment
+        // that it's installed into (issue #2068).
+        let test = PythonEnvironmentTestCase {
+            system: TestSystem::default(),
+            minor_version: 13,
+            free_threaded: false,
+            origin: SysPrefixPathOrigin::SelfEnvironment,
+            virtual_env: None,
+        };
+        test.run();
     }
 
     #[test]

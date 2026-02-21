@@ -2,7 +2,10 @@ use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::place::TypeOrigin;
-use crate::types::diagnostic::{INVALID_TYPE_FORM, report_invalid_arguments_to_annotated};
+use crate::types::diagnostic::{
+    INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR, report_invalid_arguments_to_annotated,
+};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
@@ -279,9 +282,42 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 PEP613Policy::Disallowed,
                             );
 
+                            // Emit a diagnostic if ClassVar and Final are combined in a class that is
+                            // not a dataclass, since Final already implies the semantics of ClassVar.
+                            let classvar_and_final = match type_qualifier {
+                                SpecialFormType::Final => type_and_qualifiers
+                                    .qualifiers
+                                    .contains(TypeQualifiers::CLASS_VAR),
+                                SpecialFormType::ClassVar => type_and_qualifiers
+                                    .qualifiers
+                                    .contains(TypeQualifiers::FINAL),
+                                _ => false,
+                            };
+                            if classvar_and_final
+                                && nearest_enclosing_class(self.db(), self.index, self.scope())
+                                    .is_none_or(|class| !class.is_dataclass_like(self.db()))
+                                && let Some(builder) = self
+                                    .context
+                                    .report_lint(&REDUNDANT_FINAL_CLASSVAR, subscript)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "`Combining `ClassVar` and `Final` is redundant"
+                                ));
+                            }
+
                             match type_qualifier {
                                 SpecialFormType::ClassVar => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
+                                    if type_and_qualifiers
+                                        .inner_type()
+                                        .has_non_self_typevar(self.db())
+                                        && let Some(builder) =
+                                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                    {
+                                        builder.into_diagnostic(
+                                            "`ClassVar` cannot contain type variables",
+                                        );
+                                    }
                                 }
                                 SpecialFormType::Final => {
                                     type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);
@@ -371,7 +407,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
 
         self.store_expression_type(annotation, annotation_ty.inner_type());
-
         annotation_ty
     }
 
