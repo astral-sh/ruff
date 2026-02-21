@@ -153,6 +153,10 @@ def f(a: Optional[Any]) -> None: ...
 def f(a: Annotated[Any, ...]) -> None: ...
 def f(a: "Union[str, bytes, Any]") -> None: ...
 
+# Regression test for stack overflow with nested quoted annotations containing
+# escape sequences (https://github.com/astral-sh/ruff/issues/14695)
+def f(x: "'in\x74'"): pass
+
 
 class Foo:
     @decorator()

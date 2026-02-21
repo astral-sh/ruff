@@ -281,42 +281,63 @@ ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
 153 | def f(a: Annotated[Any, ...]) -> None: ...
 154 | def f(a: "Union[str, bytes, Any]") -> None: ...
     |          ^^^^^^^^^^^^^^^^^^^^^^^^
+155 |
+156 | # Regression test for stack overflow with nested quoted annotations containing
     |
 
-ANN204 [*] Missing return type annotation for special method `__init__`
-   --> annotation_presence.py:159:9
+ANN201 [*] Missing return type annotation for public function `f`
+   --> annotation_presence.py:158:5
     |
-157 | class Foo:
-158 |     @decorator()
-159 |     def __init__(self: "Foo", foo: int):
-    |         ^^^^^^^^
-160 |        ...
+156 | # Regression test for stack overflow with nested quoted annotations containing
+157 | # escape sequences (https://github.com/astral-sh/ruff/issues/14695)
+158 | def f(x: "'in\x74'"): pass
+    |     ^
     |
 help: Add return type annotation: `None`
-156 | 
-157 | class Foo:
-158 |     @decorator()
-    -     def __init__(self: "Foo", foo: int):
-159 +     def __init__(self: "Foo", foo: int) -> None:
-160 |        ...
-161 | 
-162 | 
+155 | 
+156 | # Regression test for stack overflow with nested quoted annotations containing
+157 | # escape sequences (https://github.com/astral-sh/ruff/issues/14695)
+    - def f(x: "'in\x74'"): pass
+158 + def f(x: "'in\x74'") -> None: pass
+159 | 
+160 | 
+161 | class Foo:
 note: This is an unsafe fix and may change runtime behavior
 
 ANN204 [*] Missing return type annotation for special method `__init__`
-   --> annotation_presence.py:165:9
+   --> annotation_presence.py:163:9
     |
-163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
-164 | class Class:
-165 |     def __init__(self):
+161 | class Foo:
+162 |     @decorator()
+163 |     def __init__(self: "Foo", foo: int):
     |         ^^^^^^^^
-166 |         print(f"{self.attr=}")
+164 |        ...
     |
 help: Add return type annotation: `None`
-162 | 
-163 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
-164 | class Class:
+160 | 
+161 | class Foo:
+162 |     @decorator()
+    -     def __init__(self: "Foo", foo: int):
+163 +     def __init__(self: "Foo", foo: int) -> None:
+164 |        ...
+165 | 
+166 | 
+note: This is an unsafe fix and may change runtime behavior
+
+ANN204 [*] Missing return type annotation for special method `__init__`
+   --> annotation_presence.py:169:9
+    |
+167 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
+168 | class Class:
+169 |     def __init__(self):
+    |         ^^^^^^^^
+170 |         print(f"{self.attr=}")
+    |
+help: Add return type annotation: `None`
+166 | 
+167 | # Regression test for: https://github.com/astral-sh/ruff/issues/7711
+168 | class Class:
     -     def __init__(self):
-165 +     def __init__(self) -> None:
-166 |         print(f"{self.attr=}")
+169 +     def __init__(self) -> None:
+170 |         print(f"{self.attr=}")
 note: This is an unsafe fix and may change runtime behavior
