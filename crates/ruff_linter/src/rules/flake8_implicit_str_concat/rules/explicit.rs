@@ -38,7 +38,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Setting `lint.flake8-implicit-str-concat.allow-multiline = false` will disable this rule because
 /// it would leave no allowed way to write a multi-line string.
 ///
-/// - `lint.flake8-implicit-str-concat.allow-multiline`
+/// - [`lint.flake8-implicit-str-concat.allow-multiline`](https://docs.astral.sh/ruff/settings/)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.201")]
 pub(crate) struct ExplicitStringConcatenation;
