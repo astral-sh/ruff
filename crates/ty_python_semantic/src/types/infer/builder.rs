@@ -4798,14 +4798,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Name(_) => {
                 let ty = self.infer_type_expression(default_expr);
-                let is_paramspec = match ty {
-                    Type::TypeVar(typevar) => typevar.is_paramspec(self.db()),
-                    Type::KnownInstance(known_instance) => {
-                        known_instance.class(self.db()) == KnownClass::ParamSpec
+                let paramspec_kind = match ty {
+                    Type::TypeVar(typevar) if typevar.is_paramspec(self.db()) => {
+                        Some(typevar.kind(self.db()))
                     }
-                    _ => false,
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                        if typevar.is_paramspec(self.db()) =>
+                    {
+                        Some(typevar.kind(self.db()))
+                    }
+                    Type::KnownInstance(known_instance)
+                        if known_instance.class(self.db()) == KnownClass::ParamSpec =>
+                    {
+                        return;
+                    }
+                    _ => None,
                 };
-                if is_paramspec {
+                if let Some(kind) = paramspec_kind {
+                    if matches!(kind, TypeVarKind::ParamSpec) {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_PARAMSPEC, default_expr)
+                        {
+                            builder.into_diagnostic(
+                                "Cannot combine legacy `ParamSpec` defaults with PEP 695 type parameters",
+                            );
+                        }
+                    }
                     return;
                 }
             }
