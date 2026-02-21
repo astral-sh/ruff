@@ -1,0 +1,16 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F401 [*] `resources.F401_same_package` imported but unused; consider removing, adding to `__all__`, or using a redundant alias
+ --> __init__.py:1:8
+  |
+1 | import resources.F401_same_package
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 | __all__ = ['FOO']
+3 | FOO = 42
+  |
+help: Add `resources` to __all__
+1 | import resources.F401_same_package
+  - __all__ = ['FOO']
+2 + __all__ = ['FOO', 'resources']
+3 | FOO = 42

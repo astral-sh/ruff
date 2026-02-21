@@ -150,7 +150,7 @@ pub(crate) fn categorize<'a>(
     import_type
 }
 
-fn same_package(package: Option<PackageRoot<'_>>, module_base: &str) -> bool {
+pub fn same_package(package: Option<PackageRoot<'_>>, module_base: &str) -> bool {
     package
         .map(PackageRoot::path)
         .is_some_and(|package| package.ends_with(module_base))
