@@ -499,9 +499,22 @@ impl Printed {
         let source_range = TextRange::new(source_start, source_end);
         let formatted_range = TextRange::new(formatted_start, formatted_end);
 
-        // Extend both ranges to include the indentation
+        // Extend both ranges to include the indentation.
         let source_range = extend_range_to_include_indent(source_range, source);
-        let formatted_range = extend_range_to_include_indent(formatted_range, &self.code);
+
+        // Only extend the formatted range to include indentation if the source
+        // range is at a line boundary. When semicolon-separated statements are
+        // split onto their own lines by the formatter, the formatted output gains
+        // indentation that has no counterpart in the source. Including that
+        // indentation in the formatted slice would introduce spurious whitespace
+        // when the slice replaces the (mid-line) source range.
+        let source_at_line_start = source_range.start() == TextSize::from(0)
+            || source.as_bytes()[usize::from(source_range.start()) - 1] == b'\n';
+        let formatted_range = if source_at_line_start {
+            extend_range_to_include_indent(formatted_range, &self.code)
+        } else {
+            formatted_range
+        };
 
         PrintedRange {
             code: self.code[formatted_range].to_string(),
