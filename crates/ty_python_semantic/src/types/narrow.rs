@@ -576,12 +576,8 @@ impl<'db> NarrowingConstraintBuilder<'db> {
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(
-        &self,
-        db: &'db dyn Db,
-        check_redundancy: bool,
-    ) -> Type<'db> {
-        let mut union = UnionBuilder::new(db).check_redundancy(check_redundancy);
+    pub(crate) fn evaluate_constraint_type(&self, db: &'db dyn Db) -> Type<'db> {
+        let mut union = UnionBuilder::new(db);
         for conjunctions in self
             .replacement_disjuncts
             .iter()
@@ -593,6 +589,7 @@ impl<'db> NarrowingConstraintBuilder<'db> {
     }
 }
 
+#[salsa::tracked]
 impl<'db> NarrowingConstraint<'db> {
     pub(crate) fn intersection(db: &'db dyn Db, constraint: Type<'db>) -> Self {
         NarrowingConstraintBuilder::intersection(constraint).finish(db)
@@ -617,13 +614,15 @@ impl<'db> NarrowingConstraint<'db> {
             .finish(db)
     }
 
-    pub(crate) fn evaluate_constraint_type(
-        self,
-        db: &'db dyn Db,
-        check_redundancy: bool,
-    ) -> Type<'db> {
-        self.inner(db)
-            .evaluate_constraint_type(db, check_redundancy)
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _| {
+            result.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.inner(db).evaluate_constraint_type(db)
     }
 }
 
