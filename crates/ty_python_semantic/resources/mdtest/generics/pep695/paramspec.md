@@ -370,7 +370,7 @@ reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
 P2 = ParamSpec("P2")
 
-# TODO: error: paramspec is out of scope
+# error: [invalid-paramspec] "Cannot combine legacy `ParamSpec` defaults with PEP 695 type parameters"
 class ParamSpecWithDefault5[**P1 = P2]:
     attr: Callable[P1, None]
 ```

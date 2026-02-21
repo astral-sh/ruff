@@ -232,6 +232,29 @@ fn pep695_type_params() {
     check_typevar("Y", "TypeVar", None, None, None);
 }
 
+#[test]
+fn pep695_paramspec_default_rejects_legacy_paramspec() {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        r#"
+            from typing_extensions import ParamSpec
+
+            P1 = ParamSpec("P1")
+
+            class C[**P = P1]:
+                pass
+            "#,
+    )
+    .unwrap();
+
+    assert_file_diagnostics(
+        &db,
+        "src/a.py",
+        &["Cannot combine legacy `ParamSpec` defaults with PEP 695 type parameters"],
+    );
+}
+
 /// Test that a symbol known to be unbound in a scope does not still trigger cycle-causing
 /// reachability-constraint checks in that scope.
 #[test]

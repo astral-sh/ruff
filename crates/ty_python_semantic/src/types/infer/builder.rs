@@ -154,6 +154,12 @@ enum IntersectionOn {
     Right,
 }
 
+#[derive(Copy, Clone)]
+enum ParamSpecDefaultContext {
+    Pep695TypeParam,
+    LegacyConstructor,
+}
+
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 struct TypeAndRange<'db> {
     ty: Type<'db>,
@@ -4772,11 +4778,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let previous_deferred_state =
             std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
-        self.infer_paramspec_default(default);
+        self.infer_paramspec_default_for_pep695(default);
         self.deferred_state = previous_deferred_state;
     }
 
-    fn infer_paramspec_default(&mut self, default_expr: &ast::Expr) {
+    fn infer_paramspec_default_for_pep695(&mut self, default_expr: &ast::Expr) {
+        self.infer_paramspec_default_impl(default_expr, ParamSpecDefaultContext::Pep695TypeParam);
+    }
+
+    fn infer_paramspec_default_for_legacy(&mut self, default_expr: &ast::Expr) {
+        self.infer_paramspec_default_impl(default_expr, ParamSpecDefaultContext::LegacyConstructor);
+    }
+
+    fn infer_paramspec_default_impl(
+        &mut self,
+        default_expr: &ast::Expr,
+        context: ParamSpecDefaultContext,
+    ) {
         match default_expr {
             ast::Expr::EllipsisLiteral(ellipsis) => {
                 let ty = self.infer_ellipsis_literal_expression(ellipsis);
@@ -4798,14 +4816,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             ast::Expr::Name(_) => {
                 let ty = self.infer_type_expression(default_expr);
-                let is_paramspec = match ty {
-                    Type::TypeVar(typevar) => typevar.is_paramspec(self.db()),
-                    Type::KnownInstance(known_instance) => {
-                        known_instance.class(self.db()) == KnownClass::ParamSpec
+                let paramspec_kind = match ty {
+                    Type::TypeVar(typevar) if typevar.is_paramspec(self.db()) => {
+                        Some(typevar.kind(self.db()))
                     }
-                    _ => false,
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                        if typevar.is_paramspec(self.db()) =>
+                    {
+                        Some(typevar.kind(self.db()))
+                    }
+                    Type::KnownInstance(known_instance)
+                        if known_instance.class(self.db()) == KnownClass::ParamSpec =>
+                    {
+                        return;
+                    }
+                    _ => None,
                 };
-                if is_paramspec {
+                if let Some(kind) = paramspec_kind {
+                    if matches!(
+                        (context, kind),
+                        (
+                            ParamSpecDefaultContext::Pep695TypeParam,
+                            TypeVarKind::ParamSpec
+                        )
+                    ) {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_PARAMSPEC, default_expr)
+                        {
+                            builder.into_diagnostic(
+                                "Cannot combine legacy `ParamSpec` defaults with PEP 695 type parameters",
+                            );
+                        }
+                    }
                     return;
                 }
             }
@@ -7375,7 +7417,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 known_class,
                 Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
             ) {
-                self.infer_paramspec_default(&default.value);
+                self.infer_paramspec_default_for_legacy(&default.value);
             } else {
                 let default_ty = self.infer_type_expression(&default.value);
                 let bound_or_constraints_node = arguments
