@@ -100,7 +100,7 @@ reveal_type(union_bound(Multiply))  # revealed: Multiply
 from ty_extensions import Intersection, Unknown
 
 def _[T: int](x: type | type[T]):
-    reveal_type(x())  # revealed: Any
+    reveal_type(x())  # revealed: object
 
 def _[T: int](x: type[int] | type[T]):
     reveal_type(x())  # revealed: int
@@ -516,13 +516,13 @@ def f[T, T1: object, T2: int, T3: Foo | Bar, T4: (Foo, Bar)](
     type_t_union_bound: type[T3],
     type_t_constrained: type[T4],
 ):
-    # Because `type` is just a regular nominal-instance type,
-    # we just fall back here to looking up `type.__call__` in typeshed,
-    # which unfortunately is given a very permissive, dynamic signature.
-    reveal_type(bare_type())  # revealed: Any
-    reveal_type(bare_type(""))  # revealed: Any
-    reveal_type(type_object())  # revealed: Any
-    reveal_type(type_object(""))  # revealed: Any
+    reveal_type(bare_type())  # revealed: object
+    # TODO: should emit an error
+    reveal_type(bare_type(""))  # revealed: object
+
+    reveal_type(type_object())  # revealed: object
+    # TODO: shoudl emit an error
+    reveal_type(type_object(""))  # revealed: object
 
     reveal_type(type_t_unbound())  # revealed: T@f
     reveal_type(type_t_unbound(""))  # revealed: T@f

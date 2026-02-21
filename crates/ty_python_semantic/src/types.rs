@@ -4375,6 +4375,13 @@ impl<'db> Type<'db> {
                 .into()
             }
 
+            // Special case: for <instance of type>, return the constructor bindings for `object`,
+            // since `type` is the same as `type[object]`. This avoids us falling back to typeshed's
+            // signature for `type.__call__`, which is very dynamic and permissive.
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                self.constructor_bindings(db, ClassType::object(db))
+            }
+
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
                 // Note that for objects that have a (possibly not callable!) `__call__` attribute,
                 // we will get the signature of the `__call__` attribute, but will pass in the type
