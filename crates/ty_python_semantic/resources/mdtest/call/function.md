@@ -786,6 +786,53 @@ for tup in my_other_args:
     f4(*tup, e=None)
 ```
 
+Regression test for <https://github.com/astral-sh/ty/issues/2734>.
+
+```py
+def f5(x: int | None = None, y: str = "") -> None: ...
+def f6(flag: bool) -> None:
+    args = () if flag else (1,)
+    f5(*args)
+
+def f7(x: int | None = None, y: str = "") -> None: ...
+def f8(flag: bool) -> None:
+    args = () if flag else ("bad",)
+    f7(*args)  # error: [invalid-argument-type]
+
+def f11(*args: int) -> None: ...
+def f12(args: tuple[int] | int) -> None:
+    f11(*args)  # error: [not-iterable]
+
+def f13(a: int, b: int, c: str) -> None: ...
+def f14(a: int, b: int, c: str, d: list[float], e: list[float]) -> None: ...
+def f15(profile: bool, line: str) -> None:
+    matcher = f13
+    timings = []
+    if profile:
+        matcher = f14
+        timings = [[0.0], [1.0], [2.0], [3.0]]
+    matcher(1, 2, line, *timings[:2])
+
+def f9(x: int = 0, y: str = "") -> None: ...
+def f10(args: tuple[int, ...] | tuple[int, str]) -> None:
+    # The variable-length element `int` from `tuple[int, ...]` unions with `str`
+    # from `tuple[int, str]` at position 1, giving `int | str` for `y: str`.
+    f9(*args)  # error: [invalid-argument-type]
+
+def f18(x: int = 0, y: int = 0) -> None: ...
+def f19(args: tuple[int, ...] | tuple[int, int]) -> None:
+    f18(*args)
+
+# TODO: Union variadic unpacking should also work when the non-defaulted parameters
+# are covered by all union elements, even if not all remaining parameters are defaulted.
+# Currently we only apply per-element iteration when all remaining positional parameters
+# have defaults, so this falls back to `iterate()` which produces `tuple[int, ...]` and
+# greedily matches `c: str` with `int`.
+def f16(a: int, b: int = 0, c: str = "") -> None: ...
+def f17(x: tuple[int] | tuple[int, int]) -> None:
+    f16(*x)  # error: [invalid-argument-type]  # TODO: false positive
+```
+
 ### Mixed argument and parameter containing variadic
 
 ```toml
@@ -1511,4 +1558,18 @@ foo(*None)
 def _(arg: int):
     # error: [not-iterable] "Object of type `int` is not iterable"
     foo(*arg)
+```
+
+## Union variadic unpacking with explicit keyword arguments
+
+When a union type containing variable-length elements (like `Unknown`) is unpacked as `*args`, the
+variadic expansion should not greedily consume optional positional parameters that are also provided
+as explicit keyword arguments.
+
+```py
+from ty_extensions import Unknown
+
+def f(a: int = 0, b: int = 0, c: int = 0, fmt: str | None = None) -> None: ...
+def _(args: "Unknown | tuple[int, int, int]"):
+    f(*args, fmt="{key}")  # fine
 ```
