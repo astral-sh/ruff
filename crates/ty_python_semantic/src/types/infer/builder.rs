@@ -1060,24 +1060,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if let Some((base_class_literal, _)) = base_class.static_class_literal(self.db())
-                    && let (Some(base_params), Some(class_params)) = (
-                        base_class_literal.dataclass_params(self.db()),
-                        class.dataclass_params(self.db()),
+                    && let (Some(base_is_frozen), Some(class_is_frozen)) = (
+                        base_class_literal.is_frozen_dataclass(self.db()),
+                        class.is_frozen_dataclass(self.db()),
                     )
+                    && base_is_frozen != class_is_frozen
                 {
-                    let base_params = base_params.flags(self.db());
-                    let class_is_frozen = class_params.flags(self.db()).is_frozen();
-
-                    if base_params.is_frozen() != class_is_frozen {
-                        report_bad_frozen_dataclass_inheritance(
-                            &self.context,
-                            class,
-                            class_node,
-                            base_class_literal,
-                            &class_node.bases()[i],
-                            base_params,
-                        );
-                    }
+                    report_bad_frozen_dataclass_inheritance(
+                        &self.context,
+                        class,
+                        class_node,
+                        base_class_literal,
+                        &class_node.bases()[i],
+                        base_is_frozen,
+                    );
                 }
             }
 

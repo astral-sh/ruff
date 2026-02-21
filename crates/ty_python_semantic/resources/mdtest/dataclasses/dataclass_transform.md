@@ -421,9 +421,7 @@ class Mutable(DefaultFrozenModel, frozen=False, order=True):
     name: str
 
 m = Mutable(name="test")
-# TODO: This should not be an error. In order to support this, we need to implement the precise `frozen` semantics of
-# `dataclass_transform` described here: https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-semantics
-m.name = "new"  # error: [invalid-assignment]
+m.name = "new"  # No error
 
 reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
 ```
@@ -457,6 +455,116 @@ m = Mutable(name="test")
 m.name = "new"  # No error
 
 reveal_type(Mutable(name="A") < Mutable(name="B"))  # revealed: bool
+```
+
+### Frozen inheritance
+
+Just like regular `@dataclass`, mixing frozen and non-frozen `dataclass_transform` classes in an
+inheritance chain is not allowed. However, the root class of a `dataclass_transform` hierarchy (the
+class decorated with `@dataclass_transform()` or the class that directly specifies the transform
+metaclass) is "neither frozen nor non-frozen", so both frozen and non-frozen subclasses can inherit
+from it.
+
+#### Using function-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+def frozen_model(*, frozen: bool = True): ...
+
+@frozen_model()
+class FrozenParent:
+    x: int
+
+@frozen_model()
+class FrozenChild(FrozenParent):
+    y: int
+
+@frozen_model(frozen=False)
+# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `NonFrozenChild` cannot inherit from frozen dataclass `FrozenParent`"
+class NonFrozenChild(FrozenParent):
+    y: int
+
+@frozen_model(frozen=False)
+class NonFrozenParent:
+    x: int
+
+@frozen_model()
+# error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenFromNonFrozen` cannot inherit from non-frozen dataclass `NonFrozenParent`"
+class FrozenFromNonFrozen(NonFrozenParent):
+    y: int
+```
+
+#### Using metaclass-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class FrozenMeta(type):
+    def __new__(
+        cls,
+        name,
+        bases,
+        namespace,
+        *,
+        frozen: bool = True,
+    ): ...
+
+class FrozenModel(metaclass=FrozenMeta): ...
+
+# Both frozen and non-frozen classes can inherit from the root class,
+# because it is "neither frozen nor non-frozen".
+class FrozenChild(FrozenModel):
+    x: int
+
+class NonFrozenChild(FrozenModel, frozen=False):
+    x: int
+
+# But mixing frozen and non-frozen in a non-root inheritance chain is not allowed.
+
+# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `NonFrozenFromFrozen` cannot inherit from frozen dataclass `FrozenChild`"
+class NonFrozenFromFrozen(FrozenChild, frozen=False):
+    y: int
+
+class NonFrozenParent(FrozenModel, frozen=False):
+    x: int
+
+# error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenFromNonFrozen` cannot inherit from non-frozen dataclass `NonFrozenParent`"
+class FrozenFromNonFrozen(NonFrozenParent):
+    y: int
+```
+
+#### Using base-class-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(frozen_default=True)
+class FrozenBase:
+    def __init_subclass__(cls, *, frozen: bool = True): ...
+
+# Both frozen and non-frozen classes can inherit from the root class,
+# because it is "neither frozen nor non-frozen".
+class FrozenChild(FrozenBase):
+    x: int
+
+class NonFrozenChild(FrozenBase, frozen=False):
+    x: int
+
+# But mixing frozen and non-frozen in a non-root inheritance chain is not allowed.
+
+# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `NonFrozenFromFrozen` cannot inherit from frozen dataclass `FrozenChild`"
+class NonFrozenFromFrozen(FrozenChild, frozen=False):
+    y: int
+
+class NonFrozenParent(FrozenBase, frozen=False):
+    x: int
+
+# error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenFromNonFrozen` cannot inherit from non-frozen dataclass `NonFrozenParent`"
+class FrozenFromNonFrozen(NonFrozenParent):
+    y: int
 ```
 
 ### Override diagnostics on dataclass-like classes
@@ -1206,7 +1314,7 @@ sure that we recognize all fields in a hierarchy like this:
 from dataclasses import dataclass
 from typing import dataclass_transform
 
-@dataclass_transform()
+@dataclass_transform(frozen_default=True)
 class ModelMeta(type):
     pass
 

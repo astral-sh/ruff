@@ -2815,6 +2815,54 @@ impl<'db> StaticClassLiteral<'db> {
         (dataclass_params, transformer_params)
     }
 
+    /// Returns the effective frozen status of this class if it's a dataclass-like class.
+    ///
+    /// Returns `Some(true)` for a frozen dataclass-like class, `Some(false)` for a non-frozen one,
+    /// and `None` if the class is not a dataclass-like class. This checks both `dataclass_params`
+    /// (for regular `@dataclass` classes) and transformer params (for `dataclass_transform` classes),
+    /// including class keyword argument overrides.
+    pub(crate) fn is_frozen_dataclass(self, db: &'db dyn Db) -> Option<bool> {
+        let field_policy = CodeGeneratorKind::from_class(db, self.into(), None)?;
+        match field_policy {
+            CodeGeneratorKind::DataclassLike(None) => {
+                // Regular @dataclass or function-based transform — always has definite frozen status
+                Some(self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN))
+            }
+            CodeGeneratorKind::DataclassLike(Some(_)) => {
+                // Base-class-based root: this class IS the @dataclass_transform-decorated class.
+                // Per the spec, it is "neither frozen nor non-frozen".
+                if self.dataclass_transformer_params(db).is_some() {
+                    return None;
+                }
+
+                // Metaclass-based root: directly specifies the metaclass, with no
+                // dataclass-like explicit base. Per the spec, this class is "neither
+                // frozen nor non-frozen".
+                let has_dataclass_like_base = self.explicit_bases(db).iter().any(|base_ty| {
+                    base_ty.as_class_literal().is_some_and(|lit| {
+                        // Check if the base is itself DataclassLike (covers metaclass-based children
+                        // and grandchildren+ of base-class-based roots)
+                        CodeGeneratorKind::from_class(db, lit, None)
+                            .is_some_and(|k| matches!(k, CodeGeneratorKind::DataclassLike(_)))
+                            // Also check if the base is a @dataclass_transform-decorated class
+                            // (covers direct children of base-class-based roots, where the root
+                            // itself is not DataclassLike)
+                            || lit
+                                .as_static()
+                                .and_then(|s| s.dataclass_transformer_params(db))
+                                .is_some()
+                    })
+                });
+                if !has_dataclass_like_base {
+                    return None;
+                }
+
+                Some(self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN))
+            }
+            _ => None,
+        }
+    }
+
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
     fn has_dataclass_param(
@@ -3538,7 +3586,7 @@ impl<'db> StaticClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN) {
+                if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
                         Parameters::new(
                             db,
@@ -4033,7 +4081,7 @@ impl<'db> StaticClassLiteral<'db> {
             match name.as_str() {
                 "__setattr__" | "__delattr__" => {
                     if let CodeGeneratorKind::DataclassLike(_) = field_policy
-                        && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
+                        && self.is_frozen_dataclass(db) == Some(true)
                     {
                         if let Some(builder) = context.report_lint(
                             &INVALID_DATACLASS_OVERRIDE,
