@@ -226,4 +226,151 @@ help: Replace `.items()` with `.keys()`
     -     for(B,D)in A.items():
 106 +     for B in A.keys():
 107 |         if(C:=name_to_value.get(B.name)):A.run(B.set,C)
+108 | 
+109 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PERF102 [*] When using only the keys of a dict use the `keys()` method
+   --> PERF102.py:111:20
+    |
+110 | # Comprehensions and generators — errors (https://github.com/astral-sh/ruff/issues/6638)
+111 | _ = [k for k, _ in some_dict.items()]  # PERF102
+    |                    ^^^^^^^^^^^^^^^
+112 | _ = {k for k, _ in some_dict.items()}  # PERF102
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+    |
+help: Replace `.items()` with `.keys()`
+108 | 
+109 | 
+110 | # Comprehensions and generators — errors (https://github.com/astral-sh/ruff/issues/6638)
+    - _ = [k for k, _ in some_dict.items()]  # PERF102
+111 + _ = [k for k in some_dict.keys()]  # PERF102
+112 | _ = {k for k, _ in some_dict.items()}  # PERF102
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+note: This is an unsafe fix and may change runtime behavior
+
+PERF102 [*] When using only the keys of a dict use the `keys()` method
+   --> PERF102.py:112:20
+    |
+110 | # Comprehensions and generators — errors (https://github.com/astral-sh/ruff/issues/6638)
+111 | _ = [k for k, _ in some_dict.items()]  # PERF102
+112 | _ = {k for k, _ in some_dict.items()}  # PERF102
+    |                    ^^^^^^^^^^^^^^^
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+    |
+help: Replace `.items()` with `.keys()`
+109 | 
+110 | # Comprehensions and generators — errors (https://github.com/astral-sh/ruff/issues/6638)
+111 | _ = [k for k, _ in some_dict.items()]  # PERF102
+    - _ = {k for k, _ in some_dict.items()}  # PERF102
+112 + _ = {k for k in some_dict.keys()}  # PERF102
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+note: This is an unsafe fix and may change runtime behavior
+
+PERF102 [*] When using only the keys of a dict use the `keys()` method
+   --> PERF102.py:113:25
+    |
+111 | _ = [k for k, _ in some_dict.items()]  # PERF102
+112 | _ = {k for k, _ in some_dict.items()}  # PERF102
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+    |                         ^^^^^^^^^^^^^^^
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+    |
+help: Replace `.items()` with `.keys()`
+110 | # Comprehensions and generators — errors (https://github.com/astral-sh/ruff/issues/6638)
+111 | _ = [k for k, _ in some_dict.items()]  # PERF102
+112 | _ = {k for k, _ in some_dict.items()}  # PERF102
+    - _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+113 + _ = {k: "v" for k in some_dict.keys()}  # PERF102
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+note: This is an unsafe fix and may change runtime behavior
+
+PERF102 [*] When using only the keys of a dict use the `keys()` method
+   --> PERF102.py:114:20
+    |
+112 | _ = {k for k, _ in some_dict.items()}  # PERF102
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+    |                    ^^^^^^^^^^^^^^^
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+    |
+help: Replace `.items()` with `.keys()`
+111 | _ = [k for k, _ in some_dict.items()]  # PERF102
+112 | _ = {k for k, _ in some_dict.items()}  # PERF102
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+    - _ = (k for k, _ in some_dict.items())  # PERF102
+114 + _ = (k for k in some_dict.keys())  # PERF102
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+117 | _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+note: This is an unsafe fix and may change runtime behavior
+
+PERF102 [*] When using only the values of a dict use the `values()` method
+   --> PERF102.py:115:20
+    |
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+    |                    ^^^^^^^^^^^^^^^
+116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+117 | _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+    |
+help: Replace `.items()` with `.values()`
+112 | _ = {k for k, _ in some_dict.items()}  # PERF102
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+    - _ = [v for _, v in some_dict.items()]  # PERF102
+115 + _ = [v for v in some_dict.values()]  # PERF102
+116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+117 | _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+118 | 
+note: This is an unsafe fix and may change runtime behavior
+
+PERF102 [*] When using only the keys of a dict use the `keys()` method
+   --> PERF102.py:116:20
+    |
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+    |                    ^^^^^^^^^^^^^^^
+117 | _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+    |
+help: Replace `.items()` with `.keys()`
+113 | _ = {k: "v" for k, _ in some_dict.items()}  # PERF102
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+    - _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+116 + _ = [k for k in some_dict.keys()]  # PERF102 (v unused)
+117 | _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+118 | 
+119 | # Comprehensions — no errors
+note: This is an unsafe fix and may change runtime behavior
+
+PERF102 [*] When using only the values of a dict use the `values()` method
+   --> PERF102.py:117:38
+    |
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+117 | _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+    |                                      ^^^^^^^^^^^^^^^
+118 |
+119 | # Comprehensions — no errors
+    |
+help: Replace `.items()` with `.values()`
+114 | _ = (k for k, _ in some_dict.items())  # PERF102
+115 | _ = [v for _, v in some_dict.items()]  # PERF102
+116 | _ = [k for k, v in some_dict.items()]  # PERF102 (v unused)
+    - _ = [v for x in range(1) for _, v in some_dict.items()]  # PERF102
+117 + _ = [v for x in range(1) for v in some_dict.values()]  # PERF102
+118 | 
+119 | # Comprehensions — no errors
+120 | _ = [(k, v) for k, v in some_dict.items()]  # OK (both used)
 note: This is an unsafe fix and may change runtime behavior

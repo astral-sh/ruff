@@ -3,7 +3,7 @@ use std::fmt;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
 use ruff_python_ast::{Arguments, Expr};
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix::edits::pad;
@@ -62,9 +62,31 @@ impl AlwaysFixableViolation for IncorrectDictIterator {
     }
 }
 
-/// PERF102
+/// PERF102 for `for` loops.
 pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor) {
-    let Expr::Tuple(ast::ExprTuple { elts, .. }) = stmt_for.target.as_ref() else {
+    check_dict_items_usage(
+        checker,
+        stmt_for.target.as_ref(),
+        stmt_for.iter.as_ref(),
+        stmt_for.target.range(),
+    );
+}
+
+/// PERF102 for comprehensions and generators.
+pub(crate) fn incorrect_dict_iterator_comprehension(
+    checker: &Checker,
+    comprehension: &ast::Comprehension,
+) {
+    check_dict_items_usage(
+        checker,
+        &comprehension.target,
+        &comprehension.iter,
+        comprehension.target.range(),
+    );
+}
+
+fn check_dict_items_usage(checker: &Checker, target: &Expr, iter: &Expr, target_range: TextRange) {
+    let Expr::Tuple(ast::ExprTuple { elts, .. }) = target else {
         return;
     };
     let [key, value] = elts.as_slice() else {
@@ -74,7 +96,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
         func,
         arguments: Arguments { args, .. },
         ..
-    }) = stmt_for.iter.as_ref()
+    }) = iter
     else {
         return;
     };
@@ -92,12 +114,7 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
         checker.semantic().is_unused(key),
         checker.semantic().is_unused(value),
     ) {
-        (true, true) => {
-            // Both the key and the value are unused.
-        }
-        (false, false) => {
-            // Neither the key nor the value are unused.
-        }
+        (true, true) | (false, false) => {}
         (true, false) => {
             // The key is unused, so replace with `dict.values()`.
             let mut diagnostic = checker.report_diagnostic(
@@ -110,10 +127,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(value).to_string(),
-                    stmt_for.target.range(),
+                    target_range,
                     checker.locator(),
                 ),
-                stmt_for.target.range(),
+                target_range,
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
         }
@@ -129,10 +146,10 @@ pub(crate) fn incorrect_dict_iterator(checker: &Checker, stmt_for: &ast::StmtFor
             let replace_target = Edit::range_replacement(
                 pad(
                     checker.locator().slice(key).to_string(),
-                    stmt_for.target.range(),
+                    target_range,
                     checker.locator(),
                 ),
-                stmt_for.target.range(),
+                target_range,
             );
             diagnostic.set_fix(Fix::unsafe_edits(replace_attribute, [replace_target]));
         }

@@ -79,7 +79,7 @@ use crate::rules::pylint::rules::{
     AwaitOutsideAsync, LoadBeforeGlobalDeclaration, NonlocalWithoutBinding,
     YieldFromInAsyncFunction,
 };
-use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
+use crate::rules::{flake8_pyi, flake8_type_checking, perflint, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::{Edit, Violation};
@@ -2157,6 +2157,21 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_expr(target);
             }
             _ => visitor::walk_expr(self, expr),
+        }
+
+        // Unlike most comprehension checks (which run in `analyze::expression`, after scope pop),
+        // PERF102 needs `is_unused()` which requires the generator scope to still be active.
+        if self.is_rule_enabled(Rule::IncorrectDictIterator) {
+            let generators = match expr {
+                Expr::ListComp(comp) => comp.generators.as_slice(),
+                Expr::SetComp(comp) => comp.generators.as_slice(),
+                Expr::Generator(comp) => comp.generators.as_slice(),
+                Expr::DictComp(comp) => comp.generators.as_slice(),
+                _ => &[],
+            };
+            for generator in generators {
+                perflint::rules::incorrect_dict_iterator_comprehension(self, generator);
+            }
         }
 
         // Step 3: Clean-up
