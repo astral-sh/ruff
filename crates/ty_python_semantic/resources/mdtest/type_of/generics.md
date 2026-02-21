@@ -491,3 +491,45 @@ expects_type_c_default(C[int])
 expects_type_c_default_of_int(C[str])
 expects_type_c_default_of_int_str(C[str, int])
 ```
+
+## Upcasting a `type[]` type to a `Callable` type
+
+```py
+from ty_extensions import CallableTypeOf
+
+class Foo:
+    def __init__(self, x: str): ...
+
+class Bar: ...
+
+def f[T, T1: object, T2: int, T3: Foo | Bar, T4: (Foo, Bar)](
+    bare_type: type,
+    type_object: type[object],
+    type_t_unbound: type[T],
+    type_t_object_bound: type[T1],
+    type_int: type[int],
+    type_t_int_bound: type[T2],
+    type_t_union_bound: type[T3],
+    type_t_constrained: type[T4],
+):
+    def g(
+        bare_type_upcast: CallableTypeOf[bare_type],
+        type_object_upcast: CallableTypeOf[type_object],
+        type_t_unbound_upcast: CallableTypeOf[type_t_unbound],
+        type_t_object_bound_upcast: CallableTypeOf[type_t_object_bound],
+        type_int_upcast: CallableTypeOf[type_int],
+        type_t_int_bound_upcast: CallableTypeOf[type_t_int_bound],
+        type_t_union_bound_upcast: CallableTypeOf[type_t_union_bound],
+        type_t_constrained_upcast: CallableTypeOf[type_t_constrained],
+    ):
+        reveal_type(bare_type_upcast)  # revealed: () -> object
+        reveal_type(type_object_upcast)  # revealed: () -> object
+        reveal_type(type_t_unbound_upcast)  # revealed: () -> T@f
+        reveal_type(type_t_object_bound_upcast)  # revealed: () -> T1@f
+        # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> int, (x: str | bytes | bytearray, /, base: SupportsIndex) -> int]
+        reveal_type(type_int_upcast)
+        # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> T2@f, (x: str | bytes | bytearray, /, base: SupportsIndex) -> T2@f]
+        reveal_type(type_t_int_bound_upcast)
+        reveal_type(type_t_union_bound_upcast)  # revealed: ((x: str) -> T3@f) | (() -> T3@f)
+        reveal_type(type_t_constrained_upcast)  # revealed: ((x: str) -> T4@f) | (() -> T4@f)
+```

@@ -2062,6 +2062,12 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(bound_method.into_callable_type(db)))
             }
 
+            // Special case: if we're dealing with <instance of type>,
+            // treat it as <subclass of object>.
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                Some(ClassType::object(db).into_callable(db))
+            }
+
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
                     .member_lookup_with_policy(
@@ -2092,13 +2098,49 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-
-                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
-                    Some(CallableTypes::one(CallableType::single(
+                SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        let upcast_callables = bound.to_meta_type(db).try_upcast_to_callable(db)?;
+                        Some(upcast_callables.map(|callable| {
+                            let signatures = callable
+                                .signatures(db)
+                                .into_iter()
+                                .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
+                            CallableType::new(
+                                db,
+                                CallableSignature::from_overloads(signatures),
+                                callable.kind(db),
+                            )
+                        }))
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        let mut callables = SmallVec::new();
+                        for constraint in constraints.elements(db) {
+                            let element_upcast =
+                                constraint.to_meta_type(db).try_upcast_to_callable(db)?;
+                            for callable in element_upcast.into_inner() {
+                                let signatures = callable
+                                    .signatures(db)
+                                    .into_iter()
+                                    .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
+                                callables.push(CallableType::new(
+                                    db,
+                                    CallableSignature::from_overloads(signatures),
+                                    callable.kind(db),
+                                ));
+                            }
+                        }
+                        Some(CallableTypes(callables))
+                    }
+                    None => Some(CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
-                    )))
-                }
+                        Signature::new(Parameters::new(db, []), Type::TypeVar(tvar)),
+                    ))),
+                },
+                SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
+                ))),
             },
 
             Type::Union(union) => {
