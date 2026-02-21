@@ -40,6 +40,85 @@ where
     matches!(id, "list" | "tuple" | "set" | "dict" | "frozenset") && is_builtin(id)
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, is_macro::Is)]
+pub enum SideEffect {
+    No,
+    Maybe,
+    Yes,
+}
+
+impl SideEffect {
+    #[must_use]
+    pub const fn merge(self, other: SideEffect) -> SideEffect {
+        match (self, other) {
+            (SideEffect::Yes, _) | (_, SideEffect::Yes) => SideEffect::Yes,
+            (SideEffect::Maybe, _) | (_, SideEffect::Maybe) => SideEffect::Maybe,
+            _ => SideEffect::No,
+        }
+    }
+}
+
+fn is_definitely_side_effect_free_interpolation_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_) => true,
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
+            is_definitely_side_effect_free_interpolation_expr(operand)
+        }
+        Expr::Tuple(ast::ExprTuple { elts, .. })
+        | Expr::List(ast::ExprList { elts, .. })
+        | Expr::Set(ast::ExprSet { elts, .. }) => elts
+            .iter()
+            .all(is_definitely_side_effect_free_interpolation_expr),
+        Expr::Dict(ast::ExprDict { items, .. }) => items.iter().all(|DictItem { key, value }| {
+            key.as_ref()
+                .is_none_or(is_definitely_side_effect_free_interpolation_expr)
+                && is_definitely_side_effect_free_interpolation_expr(value)
+        }),
+        _ => false,
+    }
+}
+
+fn is_conservative_binop_operand(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::StringLiteral(_)
+            | Expr::BytesLiteral(_)
+            | Expr::NumberLiteral(_)
+            | Expr::BooleanLiteral(_)
+            | Expr::NoneLiteral(_)
+            | Expr::EllipsisLiteral(_)
+            | Expr::FString(_)
+            | Expr::List(_)
+            | Expr::Tuple(_)
+            | Expr::Set(_)
+            | Expr::Dict(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::DictComp(_)
+    )
+}
+
+fn is_definitely_side_effectful_expr(expr: &Expr) -> bool {
+    matches!(
+        expr,
+        Expr::Await(_)
+            | Expr::Call(_)
+            | Expr::DictComp(_)
+            | Expr::Generator(_)
+            | Expr::ListComp(_)
+            | Expr::SetComp(_)
+            | Expr::Subscript(_)
+            | Expr::Yield(_)
+            | Expr::YieldFrom(_)
+            | Expr::IpyEscapeCommand(_)
+    )
+}
+
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
 ///
@@ -70,62 +149,324 @@ where
 
         // Avoid false positive for overloaded operators.
         if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = expr {
-            if !matches!(
-                left.as_ref(),
-                Expr::StringLiteral(_)
-                    | Expr::BytesLiteral(_)
-                    | Expr::NumberLiteral(_)
-                    | Expr::BooleanLiteral(_)
-                    | Expr::NoneLiteral(_)
-                    | Expr::EllipsisLiteral(_)
-                    | Expr::FString(_)
-                    | Expr::List(_)
-                    | Expr::Tuple(_)
-                    | Expr::Set(_)
-                    | Expr::Dict(_)
-                    | Expr::ListComp(_)
-                    | Expr::SetComp(_)
-                    | Expr::DictComp(_)
-            ) {
-                return true;
-            }
-            if !matches!(
-                right.as_ref(),
-                Expr::StringLiteral(_)
-                    | Expr::BytesLiteral(_)
-                    | Expr::NumberLiteral(_)
-                    | Expr::BooleanLiteral(_)
-                    | Expr::NoneLiteral(_)
-                    | Expr::EllipsisLiteral(_)
-                    | Expr::FString(_)
-                    | Expr::List(_)
-                    | Expr::Tuple(_)
-                    | Expr::Set(_)
-                    | Expr::Dict(_)
-                    | Expr::ListComp(_)
-                    | Expr::SetComp(_)
-                    | Expr::DictComp(_)
-            ) {
-                return true;
-            }
-            return false;
+            return !(is_conservative_binop_operand(left.as_ref())
+                && is_conservative_binop_operand(right.as_ref()));
         }
 
         // Otherwise, avoid all complex expressions.
-        matches!(
-            expr,
-            Expr::Await(_)
-                | Expr::Call(_)
-                | Expr::DictComp(_)
-                | Expr::Generator(_)
-                | Expr::ListComp(_)
-                | Expr::SetComp(_)
-                | Expr::Subscript(_)
-                | Expr::Yield(_)
-                | Expr::YieldFrom(_)
-                | Expr::IpyEscapeCommand(_)
-        )
+        is_definitely_side_effectful_expr(expr)
     })
+}
+
+/// Return whether `expr` has no side effects, maybe has side effects, or definitely
+/// has side effects.
+///
+/// This keeps `contains_effect` as the strict "yes/no" API and exposes a small
+/// tri-state variant for rules that need a more conservative fix-safety decision.
+pub fn side_effect<F>(expr: &Expr, is_builtin: F) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    side_effect_over_expr(expr, &is_builtin)
+}
+
+fn side_effect_over_expr_iter<'a, I, F>(exprs: I, is_builtin: &F) -> SideEffect
+where
+    I: IntoIterator<Item = &'a Expr>,
+    F: Fn(&str) -> bool,
+{
+    exprs.into_iter().fold(SideEffect::No, |acc, expr| {
+        acc.merge(side_effect_over_expr(expr, is_builtin))
+    })
+}
+
+fn side_effect_over_optional_expr<F>(expr: Option<&Expr>, is_builtin: &F) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    expr.map_or(SideEffect::No, |expr| {
+        side_effect_over_expr(expr, is_builtin)
+    })
+}
+
+fn side_effect_over_comprehension<F>(generator: &ast::Comprehension, is_builtin: &F) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    side_effect_over_expr(&generator.target, is_builtin)
+        .merge(side_effect_over_expr(&generator.iter, is_builtin))
+        .merge(side_effect_over_expr_iter(generator.ifs.iter(), is_builtin))
+}
+
+fn side_effect_over_interpolated_string_elements<'a, I, F>(
+    elements: I,
+    is_builtin: &F,
+) -> SideEffect
+where
+    I: IntoIterator<Item = &'a InterpolatedStringElement>,
+    F: Fn(&str) -> bool,
+{
+    elements.into_iter().fold(SideEffect::No, |acc, element| {
+        acc.merge(side_effect_over_interpolated_string_element(
+            element, is_builtin,
+        ))
+    })
+}
+
+fn side_effect_of_node<F>(expr: &Expr, is_builtin: &F) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    // Accept empty iterable initializers.
+    if let Expr::Call(ast::ExprCall {
+        func,
+        arguments,
+        range: _,
+        node_index: _,
+    }) = expr
+    {
+        if arguments.is_empty()
+            && let Expr::Name(ast::ExprName { id, .. }) = func.as_ref()
+            && is_iterable_initializer(id.as_str(), |id| is_builtin(id))
+        {
+            return SideEffect::No;
+        }
+    }
+
+    // Same conservative logic as `contains_effect` for binary operators.
+    if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = expr {
+        return if is_conservative_binop_operand(left.as_ref())
+            && is_conservative_binop_operand(right.as_ref())
+        {
+            SideEffect::No
+        } else {
+            SideEffect::Yes
+        };
+    }
+
+    if let Expr::FString(ast::ExprFString { value, .. }) = expr {
+        return side_effect_over_interpolated_string_elements(value.elements(), is_builtin);
+    }
+
+    if let Expr::TString(ast::ExprTString { value, .. }) = expr {
+        return side_effect_over_interpolated_string_elements(value.elements(), is_builtin);
+    }
+
+    if is_definitely_side_effectful_expr(expr) {
+        return SideEffect::Yes;
+    }
+
+    SideEffect::No
+}
+
+fn side_effect_over_dict_items<'a, I, F>(items: I, is_builtin: &F) -> SideEffect
+where
+    I: IntoIterator<Item = &'a DictItem>,
+    F: Fn(&str) -> bool,
+{
+    items
+        .into_iter()
+        .fold(SideEffect::No, |acc, DictItem { key, value }| {
+            acc.merge(side_effect_over_expr(value, is_builtin))
+                .merge(side_effect_over_optional_expr(key.as_ref(), is_builtin))
+        })
+}
+
+fn side_effect_over_generators<'a, I, F>(generators: I, is_builtin: &F) -> SideEffect
+where
+    I: IntoIterator<Item = &'a ast::Comprehension>,
+    F: Fn(&str) -> bool,
+{
+    generators
+        .into_iter()
+        .fold(SideEffect::No, |acc, generator| {
+            acc.merge(side_effect_over_comprehension(generator, is_builtin))
+        })
+}
+
+fn side_effect_over_comprehension_expr<'a, I, F>(
+    elt: &Expr,
+    generators: I,
+    is_builtin: &F,
+) -> SideEffect
+where
+    I: IntoIterator<Item = &'a ast::Comprehension>,
+    F: Fn(&str) -> bool,
+{
+    side_effect_over_expr(elt, is_builtin)
+        .merge(side_effect_over_generators(generators, is_builtin))
+}
+
+fn side_effect_over_dict_comprehension_expr<'a, I, F>(
+    key: &Expr,
+    value: &Expr,
+    generators: I,
+    is_builtin: &F,
+) -> SideEffect
+where
+    I: IntoIterator<Item = &'a ast::Comprehension>,
+    F: Fn(&str) -> bool,
+{
+    side_effect_over_expr(key, is_builtin)
+        .merge(side_effect_over_expr(value, is_builtin))
+        .merge(side_effect_over_generators(generators, is_builtin))
+}
+
+fn side_effect_over_call_expr<F>(
+    call_func: &Expr,
+    arguments: &ast::Arguments,
+    is_builtin: &F,
+) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    side_effect_over_expr(call_func, is_builtin)
+        .merge(side_effect_over_expr_iter(
+            arguments.args.iter(),
+            is_builtin,
+        ))
+        .merge(side_effect_over_expr_iter(
+            arguments.keywords.iter().map(|keyword| &keyword.value),
+            is_builtin,
+        ))
+}
+
+fn side_effect_over_children<F>(expr: &Expr, is_builtin: &F) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    match expr {
+        Expr::BoolOp(ast::ExprBoolOp { values, .. }) => {
+            side_effect_over_expr_iter(values.iter(), is_builtin)
+        }
+        // FString/TString nodes are fully classified by `side_effect_of_node`.
+        Expr::FString(_) | Expr::TString(_) => SideEffect::No,
+        Expr::Named(ast::ExprNamed { target, value, .. }) => {
+            side_effect_over_expr(target, is_builtin)
+                .merge(side_effect_over_expr(value, is_builtin))
+        }
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            side_effect_over_expr(left, is_builtin).merge(side_effect_over_expr(right, is_builtin))
+        }
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => {
+            side_effect_over_expr(operand, is_builtin)
+        }
+        Expr::Lambda(ast::ExprLambda { body, .. }) => side_effect_over_expr(body, is_builtin),
+        Expr::If(ast::ExprIf {
+            test, body, orelse, ..
+        }) => side_effect_over_expr(test, is_builtin)
+            .merge(side_effect_over_expr(body, is_builtin))
+            .merge(side_effect_over_expr(orelse, is_builtin)),
+        Expr::Dict(ast::ExprDict { items, .. }) => {
+            side_effect_over_dict_items(items.iter(), is_builtin)
+        }
+        Expr::Set(ast::ExprSet { elts, .. })
+        | Expr::List(ast::ExprList { elts, .. })
+        | Expr::Tuple(ast::ExprTuple { elts, .. }) => {
+            side_effect_over_expr_iter(elts.iter(), is_builtin)
+        }
+        Expr::ListComp(ast::ExprListComp {
+            elt, generators, ..
+        })
+        | Expr::SetComp(ast::ExprSetComp {
+            elt, generators, ..
+        })
+        | Expr::Generator(ast::ExprGenerator {
+            elt, generators, ..
+        }) => side_effect_over_comprehension_expr(elt, generators.iter(), is_builtin),
+        Expr::DictComp(ast::ExprDictComp {
+            key,
+            value,
+            generators,
+            ..
+        }) => side_effect_over_dict_comprehension_expr(key, value, generators.iter(), is_builtin),
+        Expr::Await(ast::ExprAwait { value, .. })
+        | Expr::YieldFrom(ast::ExprYieldFrom { value, .. })
+        | Expr::Attribute(ast::ExprAttribute { value, .. })
+        | Expr::Starred(ast::ExprStarred { value, .. }) => side_effect_over_expr(value, is_builtin),
+        Expr::Yield(ast::ExprYield { value, .. }) => {
+            side_effect_over_optional_expr(value.as_deref(), is_builtin)
+        }
+        Expr::Compare(ast::ExprCompare {
+            left, comparators, ..
+        }) => side_effect_over_expr(left, is_builtin)
+            .merge(side_effect_over_expr_iter(comparators.iter(), is_builtin)),
+        Expr::Call(ast::ExprCall {
+            func: call_func,
+            arguments,
+            ..
+        }) => side_effect_over_call_expr(call_func, arguments, is_builtin),
+        Expr::Subscript(ast::ExprSubscript { value, slice, .. }) => {
+            side_effect_over_expr(value, is_builtin).merge(side_effect_over_expr(slice, is_builtin))
+        }
+        Expr::Slice(ast::ExprSlice {
+            lower, upper, step, ..
+        }) => side_effect_over_optional_expr(lower.as_deref(), is_builtin)
+            .merge(side_effect_over_optional_expr(upper.as_deref(), is_builtin))
+            .merge(side_effect_over_optional_expr(step.as_deref(), is_builtin)),
+        Expr::Name(_)
+        | Expr::StringLiteral(_)
+        | Expr::BytesLiteral(_)
+        | Expr::NumberLiteral(_)
+        | Expr::BooleanLiteral(_)
+        | Expr::NoneLiteral(_)
+        | Expr::EllipsisLiteral(_)
+        | Expr::IpyEscapeCommand(_) => SideEffect::No,
+    }
+}
+
+fn side_effect_over_expr<F>(expr: &Expr, is_builtin: &F) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    let node_effect = side_effect_of_node(expr, is_builtin);
+    if node_effect.is_yes() {
+        return SideEffect::Yes;
+    }
+
+    let children_effect = side_effect_over_children(expr, is_builtin);
+
+    node_effect.merge(children_effect)
+}
+
+fn side_effect_over_interpolated_string_element<F>(
+    element: &InterpolatedStringElement,
+    is_builtin: &F,
+) -> SideEffect
+where
+    F: Fn(&str) -> bool,
+{
+    match element {
+        InterpolatedStringElement::Literal(_) => SideEffect::No,
+        InterpolatedStringElement::Interpolation(ast::InterpolatedElement {
+            expression,
+            format_spec,
+            range: _,
+            node_index: _,
+            conversion: _,
+            debug_text: _,
+        }) => {
+            let expression_effect = side_effect_over_expr(expression, is_builtin);
+            let format_spec_effect = format_spec.as_ref().map_or(SideEffect::No, |spec| {
+                side_effect_over_interpolated_string_elements(spec.elements.iter(), is_builtin)
+            });
+
+            let combined_effect = expression_effect.merge(format_spec_effect);
+            if combined_effect.is_yes() {
+                return SideEffect::Yes;
+            }
+
+            if is_definitely_side_effect_free_interpolation_expr(expression)
+                && format_spec_effect.is_no()
+            {
+                return SideEffect::No;
+            }
+
+            // For non-literal interpolation (e.g., `f"{c}"`), formatting may invoke
+            // user-defined `__str__` / `__repr__`; keep fix safety conservative.
+            SideEffect::Maybe.merge(combined_effect)
+        }
+    }
 }
 
 /// Call `func` over every `Expr` in `expr`, returning `true` if any expression
@@ -1669,12 +2010,69 @@ mod tests {
 
     use ruff_text_size::TextRange;
 
-    use crate::helpers::{any_over_stmt, any_over_type_param, resolve_imported_module_path};
-    use crate::{
-        AtomicNodeIndex, Expr, ExprContext, ExprName, ExprNumberLiteral, Identifier, Int, Number,
-        Stmt, StmtTypeAlias, TypeParam, TypeParamParamSpec, TypeParamTypeVar,
-        TypeParamTypeVarTuple, TypeParams,
+    use crate::helpers::{
+        SideEffect, any_over_stmt, any_over_type_param, contains_effect,
+        resolve_imported_module_path, side_effect,
     };
+    use crate::{
+        self as ast, Arguments, AtomicNodeIndex, ConversionFlag, Expr, ExprContext, ExprName,
+        ExprNumberLiteral, Identifier, Int, Number, Stmt, StmtTypeAlias, TypeParam,
+        TypeParamParamSpec, TypeParamTypeVar, TypeParamTypeVarTuple, TypeParams,
+    };
+
+    fn name_expr(name: &str) -> Expr {
+        Expr::Name(ExprName {
+            id: name.into(),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+            ctx: ExprContext::Load,
+        })
+    }
+
+    fn number_expr(value: u8) -> Expr {
+        Expr::NumberLiteral(ExprNumberLiteral {
+            value: Number::Int(Int::from(value)),
+            range: TextRange::default(),
+            node_index: AtomicNodeIndex::NONE,
+        })
+    }
+
+    fn call_expr(function_name: &str) -> Expr {
+        Expr::Call(ast::ExprCall {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::default(),
+            func: Box::new(name_expr(function_name)),
+            arguments: Arguments {
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+                args: Box::new([]),
+                keywords: Box::new([]),
+            },
+        })
+    }
+
+    fn fstring_expr(interpolation_expr: Expr) -> Expr {
+        Expr::FString(ast::ExprFString {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::default(),
+            value: ast::FStringValue::single(ast::FString {
+                range: TextRange::default(),
+                node_index: AtomicNodeIndex::NONE,
+                elements: vec![ast::InterpolatedStringElement::Interpolation(
+                    ast::InterpolatedElement {
+                        range: TextRange::default(),
+                        node_index: AtomicNodeIndex::NONE,
+                        expression: Box::new(interpolation_expr),
+                        debug_text: None,
+                        conversion: ConversionFlag::None,
+                        format_spec: None,
+                    },
+                )]
+                .into(),
+                flags: ast::FStringFlags::empty(),
+            }),
+        })
+    }
 
     #[test]
     fn resolve_import() {
@@ -1895,5 +2293,54 @@ mod tests {
             }),
             "if true is returned from `func` it should be respected"
         );
+    }
+
+    #[test]
+    fn side_effect_empty_builtin_initializer_is_no() {
+        let expr = call_expr("list");
+        assert!(!contains_effect(&expr, |id| id == "list"));
+        assert_eq!(side_effect(&expr, |id| id == "list"), SideEffect::No);
+    }
+
+    #[test]
+    fn side_effect_empty_non_builtin_call_is_yes() {
+        let expr = call_expr("list");
+        assert!(contains_effect(&expr, |_id| false));
+        assert_eq!(side_effect(&expr, |_id| false), SideEffect::Yes);
+    }
+
+    #[test]
+    fn side_effect_binop_matches_contains_effect_conservative_logic() {
+        let safe = Expr::BinOp(ast::ExprBinOp {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::default(),
+            left: Box::new(number_expr(1)),
+            op: ast::Operator::Add,
+            right: Box::new(number_expr(2)),
+        });
+        assert!(!contains_effect(&safe, |_id| false));
+        assert_eq!(side_effect(&safe, |_id| false), SideEffect::No);
+
+        let maybe_overloaded = Expr::BinOp(ast::ExprBinOp {
+            node_index: AtomicNodeIndex::NONE,
+            range: TextRange::default(),
+            left: Box::new(name_expr("x")),
+            op: ast::Operator::Add,
+            right: Box::new(number_expr(2)),
+        });
+        assert!(contains_effect(&maybe_overloaded, |_id| false));
+        assert_eq!(side_effect(&maybe_overloaded, |_id| false), SideEffect::Yes);
+    }
+
+    #[test]
+    fn side_effect_fstring_yes_maybe_no_matrix() {
+        let no = fstring_expr(number_expr(1));
+        assert_eq!(side_effect(&no, |_id| false), SideEffect::No);
+
+        let maybe = fstring_expr(name_expr("value"));
+        assert_eq!(side_effect(&maybe, |_id| false), SideEffect::Maybe);
+
+        let yes = fstring_expr(call_expr("fn_name"));
+        assert_eq!(side_effect(&yes, |_id| false), SideEffect::Yes);
     }
 }
