@@ -1177,6 +1177,7 @@ fn place_from_bindings_impl<'db>(
         Some(BindingWithConstraints {
             binding,
             reachability_constraint,
+            reachability_constraint_before_transfer: _,
             narrowing_constraint: _,
         }) if binding.is_undefined_or(is_non_exported) => Some(*reachability_constraint),
         _ => None,
@@ -1200,6 +1201,7 @@ fn place_from_bindings_impl<'db>(
              binding,
              narrowing_constraint,
              reachability_constraint,
+             reachability_constraint_before_transfer: _,
          }| {
             let binding = match binding {
                 DefinitionState::Defined(binding) => binding,
@@ -1529,6 +1531,7 @@ fn place_from_declarations_impl<'db>(
         Some(DeclarationWithConstraint {
             declaration,
             reachability_constraint,
+            reachability_constraint_before_transfer: _,
         }) if declaration.is_undefined_or(is_non_exported) => {
             reachability_constraints.evaluate(db, predicates, *reachability_constraint)
         }
@@ -1541,6 +1544,7 @@ fn place_from_declarations_impl<'db>(
         |DeclarationWithConstraint {
              declaration,
              reachability_constraint,
+             reachability_constraint_before_transfer: _,
          }| {
             let DefinitionState::Defined(declaration) = declaration else {
                 return None;
