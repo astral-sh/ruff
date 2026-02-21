@@ -1,0 +1,263 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF071 `@abstractmethod` should be placed after `@property`
+  --> RUF071.py:14:5
+   |
+13 | class AbstractAboveProperty:
+14 |     @abstractmethod  # RUF071
+   |     ^^^^^^^^^^^^^^^
+15 |     @property
+16 |     def foo(self): ...
+   |
+
+RUF071 `@abstractmethod` should be placed after `@classmethod`
+  --> RUF071.py:19:5
+   |
+18 | class AbstractAboveClassmethod:
+19 |     @abstractmethod  # RUF071
+   |     ^^^^^^^^^^^^^^^
+20 |     @classmethod
+21 |     def foo(cls): ...
+   |
+
+RUF071 `@abstractmethod` should be placed after `@staticmethod`
+  --> RUF071.py:24:5
+   |
+23 | class AbstractAboveStaticmethod:
+24 |     @abstractmethod  # RUF071
+   |     ^^^^^^^^^^^^^^^
+25 |     @staticmethod
+26 |     def foo(): ...
+   |
+
+RUF071 `@contextmanager` should be placed after `@staticmethod`
+  --> RUF071.py:31:5
+   |
+30 | class ContextManagerAboveStaticmethod:
+31 |     @contextmanager  # RUF071
+   |     ^^^^^^^^^^^^^^^
+32 |     @staticmethod
+33 |     def foo(): ...
+   |
+
+RUF071 `@contextmanager` should be placed after `@classmethod`
+  --> RUF071.py:36:5
+   |
+35 | class ContextManagerAboveClassmethod:
+36 |     @contextmanager  # RUF071
+   |     ^^^^^^^^^^^^^^^
+37 |     @classmethod
+38 |     def foo(cls): ...
+   |
+
+RUF071 `@asynccontextmanager` should be placed after `@staticmethod`
+  --> RUF071.py:41:5
+   |
+40 | class AsyncContextManagerAboveStaticmethod:
+41 |     @asynccontextmanager  # RUF071
+   |     ^^^^^^^^^^^^^^^^^^^^
+42 |     @staticmethod
+43 |     def foo(): ...
+   |
+
+RUF071 `@asynccontextmanager` should be placed after `@classmethod`
+  --> RUF071.py:46:5
+   |
+45 | class AsyncContextManagerAboveClassmethod:
+46 |     @asynccontextmanager  # RUF071
+   |     ^^^^^^^^^^^^^^^^^^^^
+47 |     @classmethod
+48 |     def foo(cls): ...
+   |
+
+RUF071 `@functools.cache` should be placed after `@property`
+  --> RUF071.py:53:5
+   |
+52 | class CacheAboveProperty:
+53 |     @cache  # RUF071
+   |     ^^^^^^
+54 |     @property
+55 |     def foo(self): ...
+   |
+
+RUF071 `@functools.lru_cache` should be placed after `@property`
+  --> RUF071.py:58:5
+   |
+57 | class LruCacheAboveProperty:
+58 |     @lru_cache  # RUF071
+   |     ^^^^^^^^^^
+59 |     @property
+60 |     def foo(self): ...
+   |
+
+RUF071 `@functools.cache` should be placed after `@classmethod`
+  --> RUF071.py:63:5
+   |
+62 | class CacheAboveClassmethod:
+63 |     @cache  # RUF071
+   |     ^^^^^^
+64 |     @classmethod
+65 |     def foo(cls): ...
+   |
+
+RUF071 `@functools.lru_cache` should be placed after `@classmethod`
+  --> RUF071.py:68:5
+   |
+67 | class LruCacheAboveClassmethod:
+68 |     @lru_cache  # RUF071
+   |     ^^^^^^^^^^
+69 |     @classmethod
+70 |     def foo(cls): ...
+   |
+
+RUF071 `@functools.cache` should be placed after `@functools.cached_property`
+  --> RUF071.py:73:5
+   |
+72 | class CacheAboveCachedProperty:
+73 |     @cache  # RUF071
+   |     ^^^^^^
+74 |     @cached_property
+75 |     def foo(self): ...
+   |
+
+RUF071 `@functools.lru_cache` should be placed after `@functools.cached_property`
+  --> RUF071.py:78:5
+   |
+77 | class LruCacheAboveCachedProperty:
+78 |     @lru_cache  # RUF071
+   |     ^^^^^^^^^^
+79 |     @cached_property
+80 |     def foo(self): ...
+   |
+
+RUF071 `@classmethod` should be placed after `@functools.cached_property`
+  --> RUF071.py:83:5
+   |
+82 | class ClassmethodAboveCachedProperty:
+83 |     @classmethod  # RUF071
+   |     ^^^^^^^^^^^^
+84 |     @cached_property
+85 |     def foo(cls): ...
+   |
+
+RUF071 `@functools.cached_property` should be placed after `@abstractmethod`
+  --> RUF071.py:88:5
+   |
+87 | class CachedPropertyAboveAbstractmethod:
+88 |     @cached_property  # RUF071
+   |     ^^^^^^^^^^^^^^^^
+89 |     @abstractmethod
+90 |     def foo(self): ...
+   |
+
+RUF071 `@abstractmethod` should be placed after `@property`
+  --> RUF071.py:95:5
+   |
+94 | class QualifiedAbstractAboveProperty:
+95 |     @abc.abstractmethod  # RUF071
+   |     ^^^^^^^^^^^^^^^^^^^
+96 |     @property
+97 |     def foo(self): ...
+   |
+
+RUF071 `@functools.lru_cache` should be placed after `@property`
+   --> RUF071.py:100:5
+    |
+ 99 | class QualifiedLruCacheAboveProperty:
+100 |     @functools.lru_cache  # RUF071
+    |     ^^^^^^^^^^^^^^^^^^^^
+101 |     @property
+102 |     def foo(self): ...
+    |
+
+RUF071 `@abstractmethod` should be placed after `@property`
+   --> RUF071.py:107:5
+    |
+106 | class DeprecatedAbstractPropertyBelowAbstractmethod:
+107 |     @abstractmethod  # RUF071
+    |     ^^^^^^^^^^^^^^^
+108 |     @abstractproperty
+109 |     def foo(self): ...
+    |
+
+RUF071 `@abstractmethod` should be placed after `@classmethod`
+   --> RUF071.py:112:5
+    |
+111 | class DeprecatedAbstractClassmethodBelowAbstractmethod:
+112 |     @abstractmethod  # RUF071
+    |     ^^^^^^^^^^^^^^^
+113 |     @abstractclassmethod
+114 |     def foo(cls): ...
+    |
+
+RUF071 `@abstractmethod` should be placed after `@staticmethod`
+   --> RUF071.py:117:5
+    |
+116 | class DeprecatedAbstractStaticmethodBelowAbstractmethod:
+117 |     @abstractmethod  # RUF071
+    |     ^^^^^^^^^^^^^^^
+118 |     @abstractstaticmethod
+119 |     def foo(): ...
+    |
+
+RUF071 `@abstractmethod` should be placed after `@property`
+   --> RUF071.py:124:5
+    |
+123 | class InterleavedDecorator:
+124 |     @abstractmethod  # RUF071 (still wrong; unrelated decorator between them doesn't help)
+    |     ^^^^^^^^^^^^^^^
+125 |     @some_other_decorator
+126 |     @property
+    |
+
+RUF071 `@functools.lru_cache` should be placed after `@property`
+   --> RUF071.py:132:5
+    |
+131 | class LruCacheCallAboveProperty:
+132 |     @lru_cache()  # RUF071
+    |     ^^^^^^^^^^^^
+133 |     @property
+134 |     def foo(self): ...
+    |
+
+RUF071 `@functools.lru_cache` should be placed after `@property`
+   --> RUF071.py:137:5
+    |
+136 | class LruCacheCallWithArgsAboveProperty:
+137 |     @lru_cache(maxsize=128)  # RUF071
+    |     ^^^^^^^^^^^^^^^^^^^^^^^
+138 |     @property
+139 |     def foo(self): ...
+    |
+
+RUF071 `@abstractmethod` should be placed after `@property`
+   --> RUF071.py:144:5
+    |
+143 | class MultipleViolations:
+144 |     @abstractmethod  # RUF071 (x2: above both property and classmethod... though unusual)
+    |     ^^^^^^^^^^^^^^^
+145 |     @contextmanager  # RUF071 (above classmethod)
+146 |     @property
+    |
+
+RUF071 `@abstractmethod` should be placed after `@classmethod`
+   --> RUF071.py:144:5
+    |
+143 | class MultipleViolations:
+144 |     @abstractmethod  # RUF071 (x2: above both property and classmethod... though unusual)
+    |     ^^^^^^^^^^^^^^^
+145 |     @contextmanager  # RUF071 (above classmethod)
+146 |     @property
+    |
+
+RUF071 `@contextmanager` should be placed after `@classmethod`
+   --> RUF071.py:145:5
+    |
+143 | class MultipleViolations:
+144 |     @abstractmethod  # RUF071 (x2: above both property and classmethod... though unusual)
+145 |     @contextmanager  # RUF071 (above classmethod)
+    |     ^^^^^^^^^^^^^^^
+146 |     @property
+147 |     @classmethod
+    |

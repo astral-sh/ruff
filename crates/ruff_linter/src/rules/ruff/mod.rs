@@ -630,6 +630,7 @@ mod tests {
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
     #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
+    #[test_case(Rule::IncorrectDecoratorOrder, Path::new("RUF071.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
