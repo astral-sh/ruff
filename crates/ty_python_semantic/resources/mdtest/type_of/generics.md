@@ -494,6 +494,10 @@ expects_type_c_default_of_int_str(C[str, int])
 
 ## Upcasting a `type[]` type to a `Callable` type
 
+`type[T]` accepts the same parameters as `object.__init__` if `T` does not have an upper bound. If
+`T` is bound to a nominal-instance type, `type[T]` accepts the same parameters as the constructor of
+the class that the instance-type refers to.
+
 ```py
 from ty_extensions import CallableTypeOf
 
@@ -512,7 +516,34 @@ def f[T, T1: object, T2: int, T3: Foo | Bar, T4: (Foo, Bar)](
     type_t_union_bound: type[T3],
     type_t_constrained: type[T4],
 ):
+    # Because `type` is just a regular nominal-instance type,
+    # we just fall back here to looking up `type.__call__` in typeshed,
+    # which unfortunately is given a very permissive, dynamic signature.
+    reveal_type(bare_type())  # revealed: Any
+    reveal_type(bare_type(""))  # revealed: Any
+    reveal_type(type_object())  # revealed: Any
+    reveal_type(type_object(""))  # revealed: Any
+
+    reveal_type(type_t_unbound())  # revealed: T@f
+    reveal_type(type_t_unbound(""))  # revealed: T@f
+
+    reveal_type(type_int())  # revealed: int
+    reveal_type(type_int("1"))  # revealed: int
+    # error: [invalid-argument-type]
+    reveal_type(type_int([]))  # revealed: int
+
+    # error: [missing-argument]
+    reveal_type(type_t_union_bound())  # revealed: T3@f
+    # error: [too-many-positional-arguments]
+    reveal_type(type_t_union_bound(""))  # revealed: T3@f
+
+    # error: [missing-argument]
+    reveal_type(type_t_constrained())  # revealed: T4@f
+    # error: [too-many-positional-arguments]
+    reveal_type(type_t_constrained(""))  # revealed: T4@f
+
     def g(
+        object_class_upcast: CallableTypeOf[object],
         bare_type_upcast: CallableTypeOf[bare_type],
         type_object_upcast: CallableTypeOf[type_object],
         type_t_unbound_upcast: CallableTypeOf[type_t_unbound],
@@ -522,6 +553,7 @@ def f[T, T1: object, T2: int, T3: Foo | Bar, T4: (Foo, Bar)](
         type_t_union_bound_upcast: CallableTypeOf[type_t_union_bound],
         type_t_constrained_upcast: CallableTypeOf[type_t_constrained],
     ):
+        reveal_type(object_class_upcast)  # revealed: () -> object
         reveal_type(bare_type_upcast)  # revealed: () -> object
         reveal_type(type_object_upcast)  # revealed: () -> object
         reveal_type(type_t_unbound_upcast)  # revealed: () -> T@f

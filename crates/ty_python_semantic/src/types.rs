@@ -4329,25 +4329,23 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
                 SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
-                SubclassOfInner::TypeVar(bound_typevar) => {
-                    let Some(class) = (match bound_typevar.typevar(db).bound_or_constraints(db) {
-                        None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
-                            subclass_of_type.subclass_of().into_class(db)
+                SubclassOfInner::TypeVar(tvar) => {
+                    let bindings = match tvar.typevar(db).bound_or_constraints(db) {
+                        None => self.constructor_bindings(db, ClassType::object(db)),
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            bound.to_meta_type(db).bindings(db)
                         }
-                        // TODO: model calls to `type[T]` where `T` is constrained
-                        Some(TypeVarBoundOrConstraints::Constraints(_)) => None,
-                    }) else {
-                        return Binding::single(
-                            self,
-                            Signature::new(
-                                Parameters::gradual_form(),
-                                self.to_instance(db).unwrap_or(Type::unknown()),
-                            ),
-                        )
-                        .into();
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            Bindings::from_union(
+                                self,
+                                constraints
+                                    .elements(db)
+                                    .iter()
+                                    .map(|ty| ty.to_meta_type(db).bindings(db)),
+                            )
+                        }
                     };
-
-                    self.constructor_bindings(db, class)
+                    bindings.with_constructor_instance_type(Type::TypeVar(tvar))
                 }
             },
 
