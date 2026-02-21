@@ -19,7 +19,9 @@ use smallvec::{SmallVec, smallvec_inline};
 use super::{DynamicType, Type, TypeVarVariance, semantic_index};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
+use crate::types::generics::{
+    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, walk_generic_context,
+};
 use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
@@ -187,6 +189,34 @@ impl<'db> CallableSignature<'db> {
                 Type::Callable(callable)
                     if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
                 {
+                    // Notes:
+                    //
+                    // signature: this is the signature of the captured `ParamSpec` value from the
+                    // specialization, more specifically one of the overloads of the callable that
+                    // represents the `ParamSpec` value
+                    //
+                    // self_signature: this is the type in which we need to replace the type
+                    // variables representing the `ParamSpec`
+                    //
+                    // so, for a `decorator(foo)` call where decorator takes a `Callable[P, R]` and
+                    // returns the same, and `foo` is an overloaded function, then we'd have:
+                    //   P: Overloaded[(x: int) -> int, (x: str) -> str]
+                    //   R: int | str
+                    //
+                    // earlier, the return type would've been `unknown` but now we're preserving the
+                    // return types for each overload from the concrete signatures of `ParamSpec`
+                    // value in the specialization
+                    //
+                    // now, when applying the type mapping to the return type which itself is a
+                    // `Callable[P, R]`, the `P` is substituted with the signatures from the
+                    // `ParamSpec` specialization but `R` remains a union for _all_ signatures,
+                    // but that's incorrect
+                    //
+                    // what if we check whether there is a return type in the captured ParamSpec
+                    // value and use that to substitute the return type if it's a type variable.
+                    // but the return type could be something else like if the user is changing
+                    // the captured return type `R` to `tuple[int, R]` or something, we'd still
+                    // need to substitute the `R` inside the container
                     Some(CallableSignature::from_overloads(
                         callable.signatures(db).iter().map(|signature| Signature {
                             generic_context: GenericContext::merge_optional(
@@ -215,17 +245,96 @@ impl<'db> CallableSignature<'db> {
                                         .chain(signature.parameters().iter().cloned()),
                                 )
                             },
-                            return_ty: self_signature.return_ty.apply_type_mapping_impl(
-                                db,
-                                type_mapping,
-                                tcx,
-                                visitor,
-                            ),
+                            // Preserve per-overload return types for decorated overloaded
+                            // functions:
+                            // 1. If the outer return type is exactly a TypeVar (e.g., T),
+                            //    use the stored per-overload return type directly.
+                            // 2. If the outer return type contains a TypeVar (e.g., list[T]),
+                            //    create a modified type mapping that substitutes the TypeVar
+                            //    with the per-overload return type.
+                            return_ty: if !signature.return_ty.is_unknown()
+                                && matches!(self_signature.return_ty, Type::TypeVar(_))
+                            {
+                                signature.return_ty
+                            } else {
+                                // Splitting the union back to individual types won't work and isn't
+                                // generic. I need to find another solution.
+                                //
+                                // What if we look for the exact `Callable[P, R]` pattern and
+                                // perform the substitution directly for that specific case?
+                                let per_overload_mapping = create_per_overload_return_type_mapping(
+                                    db,
+                                    type_mapping,
+                                    signature.return_ty,
+                                );
+                                let effective_mapping =
+                                    per_overload_mapping.as_ref().unwrap_or(type_mapping);
+                                self_signature.return_ty.apply_type_mapping_impl(
+                                    db,
+                                    effective_mapping,
+                                    tcx,
+                                    visitor,
+                                )
+                            },
                         }),
                     ))
                 }
                 _ => None,
             }
+        }
+
+        fn create_per_overload_return_type_mapping<'a, 'db>(
+            db: &'db dyn Db,
+            type_mapping: &TypeMapping<'a, 'db>,
+            overload_return_ty: Type<'db>,
+        ) -> Option<TypeMapping<'a, 'db>> {
+            if overload_return_ty.is_unknown() {
+                return None;
+            }
+
+            let TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                specialization,
+            )) = type_mapping
+            else {
+                return None;
+            };
+
+            let generic_context = specialization.generic_context(db);
+            let types = specialization.types(db);
+            let variables = generic_context.variables(db);
+
+            let mut modified_types: Option<Box<[Type<'db>]>> = None;
+            for (index, (variable, mapped_type)) in variables.zip(types.iter()).enumerate() {
+                if variable.is_paramspec(db) {
+                    continue;
+                }
+
+                if let Type::Union(union) = mapped_type {
+                    let elements = union.elements(db);
+                    if elements.contains(&overload_return_ty) {
+                        let new_types: Box<[Type<'db>]> = types
+                            .iter()
+                            .enumerate()
+                            .map(|(i, ty)| if i == index { overload_return_ty } else { *ty })
+                            .collect();
+                        modified_types = Some(new_types);
+                        break;
+                    }
+                }
+            }
+
+            modified_types.map(|new_types| {
+                let new_specialization = Specialization::new(
+                    db,
+                    generic_context,
+                    new_types,
+                    specialization.materialization_kind(db),
+                    None,
+                );
+                TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(
+                    new_specialization,
+                ))
+            })
         }
 
         if let TypeMapping::ApplySpecialization(specialization) = type_mapping {
@@ -422,7 +531,7 @@ impl<'db> CallableSignature<'db> {
                                 Signature::new_generic(
                                     signature.generic_context,
                                     signature.parameters().clone(),
-                                    Type::unknown(),
+                                    signature.return_ty,
                                 )
                             },
                         )),
@@ -458,7 +567,7 @@ impl<'db> CallableSignature<'db> {
                                 Signature::new_generic(
                                     signature.generic_context,
                                     signature.parameters().clone(),
-                                    Type::unknown(),
+                                    signature.return_ty,
                                 )
                             },
                         )),
@@ -1122,7 +1231,7 @@ impl<'db> Signature<'db> {
                     Signature::new_generic(
                         signature.generic_context,
                         signature.parameters().clone(),
-                        Type::unknown(),
+                        signature.return_ty,
                     )
                 })),
                 CallableTypeKind::ParamSpecValue,
@@ -1382,7 +1491,7 @@ impl<'db> Signature<'db> {
                         CallableSignature::single(Signature::new_generic(
                             other.generic_context,
                             other.parameters.clone(),
-                            Type::unknown(),
+                            other.return_ty,
                         )),
                         CallableTypeKind::ParamSpecValue,
                     ));
@@ -1402,7 +1511,7 @@ impl<'db> Signature<'db> {
                         CallableSignature::single(Signature::new_generic(
                             self.generic_context,
                             self.parameters.clone(),
-                            Type::unknown(),
+                            self.return_ty,
                         )),
                         CallableTypeKind::ParamSpecValue,
                     ));

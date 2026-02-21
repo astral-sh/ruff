@@ -778,8 +778,7 @@ reveal_type(t1(y=1))  # revealed: Unknown
 t2 = Task(never_returns)
 # TODO: This should be `Task[(x: int), Never]`
 reveal_type(t2)  # revealed: Task[(x: int), Unknown]
-# TODO: This should be `Never`
-reveal_type(t2(1))  # revealed: Unknown
+reveal_type(t2(1))  # revealed: Never
 ```
 
 ## ParamSpec attribute assignability

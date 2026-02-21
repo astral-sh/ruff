@@ -864,11 +864,9 @@ class ClassWithNoReturnMetatype(metaclass=Meta):
 # we confuse with "R has no lower bound".
 # revealed: (...) -> Never
 reveal_type(into_callable(ClassWithNoReturnMetatype))
-# TODO: revealed: (...) -> Never
-# revealed: (...) -> Unknown
+# revealed: (...) -> Never
 reveal_type(accepts_callable(ClassWithNoReturnMetatype))
-# TODO: revealed: Never
-# revealed: Unknown
+# revealed: Never
 reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
 
 class Proxy: ...
@@ -904,13 +902,11 @@ class ClassWithOverloadedInit[T]:
 # revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(into_callable(ClassWithOverloadedInit))
 # TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
-# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], [T](x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
+# revealed: Overload[[T](x: int) -> ClassWithOverloadedInit[int], [T](x: str) -> ClassWithOverloadedInit[str]]
 reveal_type(accepts_callable(ClassWithOverloadedInit))
-# TODO: revealed: ClassWithOverloadedInit[int]
-# revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
+# revealed: ClassWithOverloadedInit[int]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
-# TODO: revealed: ClassWithOverloadedInit[str]
-# revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
+# revealed: ClassWithOverloadedInit[str]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
 
 class GenericClass[T]:
