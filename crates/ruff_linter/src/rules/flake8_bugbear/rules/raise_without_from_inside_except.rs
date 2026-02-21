@@ -18,9 +18,10 @@ use crate::checkers::ast::Checker;
 /// printing the stack trace, chained exceptions are displayed in such a way
 /// so as make it easier to trace the exception back to its root cause.
 ///
-/// When raising an exception from within an `except` clause, always include a
-/// `from` clause to facilitate exception chaining. If the exception is not
-/// chained, it will be difficult to trace the exception back to its root cause.
+/// When raising an exception from within an `except` clause, explicitly use a
+/// `from` clause to make the intended relationship clear: use `raise ... from exc`
+/// to set the direct cause, or `raise ... from None` to suppress the context.
+/// This helps distinguish errors raised intentionally from errors in exception handling.
 ///
 /// ## Example
 /// ```python
