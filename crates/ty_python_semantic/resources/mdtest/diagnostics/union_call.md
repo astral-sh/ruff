@@ -180,8 +180,6 @@ T = TypeVar("T", A, B)
 
 def _(x: T, y: int) -> T:
     # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
-    # error: [invalid-argument-type]
     return x.foo(y)
 ```
 
