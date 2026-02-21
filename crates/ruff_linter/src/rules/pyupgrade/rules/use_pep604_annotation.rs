@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::helpers::{pep_604_optional, pep_604_union};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_semantic::analyze::typing::{Pep604Operator, to_pep604_operator};
 use ruff_source_file::LineRanges;
 use ruff_text_size::Ranged;
@@ -190,17 +190,52 @@ pub(crate) fn non_pep604_annotation(
                             }
                         }
 
-                        diagnostic.set_fix(Fix::applicable_edit(
-                            Edit::range_replacement(
-                                pad(
-                                    checker.generator().expr(&pep_604_optional(inner)),
+                        // If the inner expression is a `BitOr` union that already
+                        // contains `None`, strip it out and re-add it only at the end.
+                        // This avoids generating `None | None` which is a runtime
+                        // `TypeError`. For example, `Optional[None | int]` should
+                        // become `int | None`, not `None | int | None`.
+                        let fix_expr = if let Expr::BinOp(ast::ExprBinOp {
+                            op: Operator::BitOr,
+                            ..
+                        }) = inner
+                        {
+                            let elements = collect_bitor_elements(inner);
+                            if elements
+                                .iter()
+                                .any(|element| matches!(element, Expr::NoneLiteral(_)))
+                            {
+                                let non_none: Vec<Expr> = elements
+                                    .into_iter()
+                                    .filter(|element| !matches!(element, Expr::NoneLiteral(_)))
+                                    .cloned()
+                                    .collect();
+                                if non_none.is_empty() {
+                                    // All elements were `None`; don't provide a fix.
+                                    None
+                                } else {
+                                    Some(pep_604_optional(&pep_604_union(&non_none)))
+                                }
+                            } else {
+                                Some(pep_604_optional(inner))
+                            }
+                        } else {
+                            Some(pep_604_optional(inner))
+                        };
+
+                        if let Some(fix_expr) = fix_expr {
+                            diagnostic.set_fix(Fix::applicable_edit(
+                                Edit::range_replacement(
+                                    pad(
+                                        checker.generator().expr(&fix_expr),
+                                        expr.range(),
+                                        checker.locator(),
+                                    ),
                                     expr.range(),
-                                    checker.locator(),
                                 ),
-                                expr.range(),
-                            ),
-                            applicability,
-                        ));
+                                applicability,
+                            ));
+                        }
                     }
                 }
             }
@@ -331,4 +366,28 @@ fn is_named_tuple(checker: &Checker, expr: &Expr) -> bool {
 /// Return `true` if this is an `Optional[None]` annotation.
 fn is_optional_none(operator: Pep604Operator, slice: &Expr) -> bool {
     matches!(operator, Pep604Operator::Optional) && matches!(slice, Expr::NoneLiteral(_))
+}
+
+/// Collect all leaf elements of a chain of `BitOr` binary operations.
+///
+/// For example, `a | b | c` is collected as `[a, b, c]`.
+fn collect_bitor_elements(expr: &Expr) -> Vec<&Expr> {
+    fn inner<'a>(expr: &'a Expr, elements: &mut Vec<&'a Expr>) {
+        if let Expr::BinOp(ast::ExprBinOp {
+            left,
+            op: Operator::BitOr,
+            right,
+            ..
+        }) = expr
+        {
+            inner(left, elements);
+            inner(right, elements);
+        } else {
+            elements.push(expr);
+        }
+    }
+
+    let mut elements = Vec::new();
+    inner(expr, &mut elements);
+    elements
 }
