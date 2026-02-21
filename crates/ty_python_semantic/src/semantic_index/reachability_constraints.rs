@@ -872,7 +872,7 @@ impl ReachabilityConstraints {
                 match accumulated {
                     Some(constraint) => NarrowingConstraint::intersection(db, base_ty)
                         .merge_constraint_and(db, constraint)
-                        .evaluate_constraint_type(db),
+                        .evaluate_constraint_type(db, false),
                     None => base_ty,
                 }
             }
