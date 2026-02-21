@@ -16,10 +16,12 @@ use itertools::{EitherOrBoth, Itertools};
 use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, semantic_index};
+use super::{DynamicType, Type, TypeVarVariance, UnionType, semantic_index};
 use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
+use crate::types::generics::{
+    ApplySpecialization, GenericContext, InferableTypeVars, Specialization, walk_generic_context,
+};
 use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
@@ -92,6 +94,15 @@ impl<'db> CallableSignature<'db> {
 
     pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
         self.overloads.iter()
+    }
+
+    /// Returns the union of all overload return types, or `Unknown` if there are no overloads.
+    pub(crate) fn overload_return_type_or_unknown(&self, db: &'db dyn Db) -> Type<'db> {
+        match self.overloads.as_slice() {
+            [] => Type::unknown(),
+            [signature] => signature.return_ty,
+            overloads => UnionType::from_elements(db, overloads.iter().map(|sig| sig.return_ty)),
+        }
     }
 
     pub(crate) fn with_inherited_generic_context(
@@ -977,6 +988,21 @@ impl<'db> Signature<'db> {
         }
     }
 
+    pub(crate) fn apply_specialization(
+        &self,
+        db: &'db dyn Db,
+        specialization: Specialization<'db>,
+    ) -> Self {
+        let type_mapping =
+            TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization));
+        self.apply_type_mapping_impl(
+            db,
+            &type_mapping,
+            TypeContext::default(),
+            &ApplyTypeMappingVisitor::default(),
+        )
+    }
+
     fn inferable_typevars(&self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
         match self.generic_context {
             Some(generic_context) => generic_context.inferable_typevars(db),
@@ -1714,6 +1740,14 @@ impl<'db> Signature<'db> {
     /// Create a new signature with the given definition.
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         Self { definition, ..self }
+    }
+
+    pub(crate) fn with_parameters(self, parameters: Parameters<'db>) -> Self {
+        Self { parameters, ..self }
+    }
+
+    pub(crate) fn with_return_type(self, return_ty: Type<'db>) -> Self {
+        Self { return_ty, ..self }
     }
 }
 

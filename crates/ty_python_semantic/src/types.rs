@@ -2155,6 +2155,10 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                Some(CallableTypes::one(callable))
+            }
+
             // TODO
             Type::DataclassDecorator(_)
             | Type::ModuleLiteral(_)
@@ -2379,6 +2383,9 @@ impl<'db> Type<'db> {
     /// Return true if this type is non-empty and all inhabitants of this type compare equal.
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
+            // Each `partial()` call creates a distinct object at runtime.
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(_)) => false,
+
             Type::FunctionLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -3496,6 +3503,19 @@ impl<'db> Type<'db> {
                     .into()
             }
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable))
+                if name_str == "__call__" =>
+            {
+                Place::bound(Type::Callable(callable)).into()
+            }
+
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                let known_instance = KnownInstanceType::FunctoolsPartial(callable);
+                known_instance
+                    .instance_fallback(db)
+                    .member_lookup_with_policy(db, name, policy)
+            }
+
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::NewTypeInstance(..)
@@ -4428,6 +4448,10 @@ impl<'db> Type<'db> {
             )
             .into(),
 
+            Type::KnownInstance(KnownInstanceType::FunctoolsPartial(callable)) => {
+                Type::Callable(callable).bindings(db)
+            }
+
             Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
             }
@@ -4752,6 +4776,47 @@ impl<'db> Type<'db> {
                 )
             }
 
+            KnownClass::FunctoolsPartial => {
+                // ```py
+                // class partial(Generic[_T]):
+                //     def __new__(cls, func: Callable[..., _T], /, *args: Any, **kwargs: Any) -> Self: ...
+                // ```
+                let return_ty = BoundTypeVarInstance::synthetic(
+                    db,
+                    Name::new_static("_T"),
+                    TypeVarVariance::Covariant,
+                );
+
+                Some(
+                    Binding::single(
+                        self,
+                        Signature::new_generic(
+                            Some(GenericContext::from_typevar_instances(db, [return_ty])),
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("func")))
+                                        .with_annotated_type(Type::single_callable(
+                                            db,
+                                            Signature::new(
+                                                Parameters::gradual_form(),
+                                                Type::TypeVar(return_ty),
+                                            ),
+                                        )),
+                                    Parameter::variadic(Name::new_static("args"))
+                                        .with_annotated_type(Type::any()),
+                                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                        .with_annotated_type(Type::any()),
+                                ],
+                            ),
+                            KnownClass::FunctoolsPartial
+                                .to_specialized_instance(db, &[Type::TypeVar(return_ty)]),
+                        ),
+                    )
+                    .into(),
+                )
+            }
+
             KnownClass::Tuple => {
                 let element_ty = BoundTypeVarInstance::synthetic(
                     db,
@@ -4869,6 +4934,7 @@ impl<'db> Type<'db> {
                     | KnownClass::Str
                     | KnownClass::Type
                     | KnownClass::Object
+                    | KnownClass::FunctoolsPartial
                     | KnownClass::Property
                     | KnownClass::Super
                     | KnownClass::TypeAliasType
@@ -5989,6 +6055,12 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                KnownInstanceType::FunctoolsPartial(_) => Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec_inline![InvalidTypeExpression::InvalidType(
+                        *self, scope_id
+                    )],
+                    fallback_type: Type::unknown(),
+                }),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -6402,7 +6474,8 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Literal(_) |
                 KnownInstanceType::LiteralStringAlias(_) |
                 KnownInstanceType::NamedTupleSpec(_) |
-                KnownInstanceType::NewType(_) => {
+                KnownInstanceType::NewType(_) |
+                KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to apply the type mapping to inner types.
                     self
                 },
@@ -6835,7 +6908,8 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
                 | KnownInstanceType::NamedTupleSpec(_)
-                | KnownInstanceType::NewType(_) => {
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::FunctoolsPartial(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
@@ -7562,6 +7636,10 @@ pub enum KnownInstanceType<'db> {
 
     /// The inferred spec for a functional `NamedTuple` class.
     NamedTupleSpec(NamedTupleSpec<'db>),
+
+    /// A `functools.partial(func, ...)` call result where we could determine
+    /// the remaining callable signature after binding some arguments.
+    FunctoolsPartial(CallableType<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -7613,6 +7691,9 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
                 visitor.visit_type(db, field.ty);
             }
         }
+        KnownInstanceType::FunctoolsPartial(callable) => {
+            visitor.visit_callable_type(db, callable);
+        }
     }
 }
 
@@ -7654,6 +7735,9 @@ impl<'db> KnownInstanceType<'db> {
                     .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
             ),
             Self::NamedTupleSpec(spec) => Self::NamedTupleSpec(spec.normalized_impl(db, visitor)),
+            Self::FunctoolsPartial(callable) => {
+                Self::FunctoolsPartial(callable.normalized_impl(db, visitor))
+            }
             Self::Deprecated(_)
             | Self::ConstraintSet(_)
             | Self::GenericContext(_)
@@ -7713,6 +7797,9 @@ impl<'db> KnownInstanceType<'db> {
             Self::NamedTupleSpec(spec) => spec
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::NamedTupleSpec),
+            Self::FunctoolsPartial(callable) => callable
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(Self::FunctoolsPartial),
         }
     }
 
@@ -7740,6 +7827,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
             Self::NamedTupleSpec(_) => KnownClass::Sequence,
+            Self::FunctoolsPartial(_) => KnownClass::FunctoolsPartial,
         }
     }
 
@@ -7752,8 +7840,14 @@ impl<'db> KnownInstanceType<'db> {
     /// For example, an alias created using the `type` statement is an instance of
     /// `typing.TypeAliasType`, so `KnownInstanceType::TypeAliasType(_).instance_fallback(db)`
     /// returns `Type::NominalInstance(NominalInstanceType { class: <typing.TypeAliasType> })`.
-    fn instance_fallback(self, db: &dyn Db) -> Type<'_> {
-        self.class(db).to_instance(db)
+    fn instance_fallback(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::FunctoolsPartial(callable) => {
+                let return_ty = callable.signatures(db).overload_return_type_or_unknown(db);
+                KnownClass::FunctoolsPartial.to_specialized_instance(db, &[return_ty])
+            }
+            _ => self.class(db).to_instance(db),
+        }
     }
 
     /// Return `true` if this symbol is an instance of `class`.
