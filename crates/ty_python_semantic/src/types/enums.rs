@@ -7,10 +7,10 @@ use crate::{
     place::{
         DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
     },
-    semantic_index::{place_table, use_def_map},
+    semantic_index::{place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
+        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, function::FunctionType,
     },
 };
 
@@ -18,15 +18,43 @@ use crate::{
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
+
+    /// The explicit `_value_` annotation type, if declared.
+    pub(crate) value_annotation: Option<Type<'db>>,
+
+    /// The custom `__init__` function, if defined on this enum.
+    ///
+    /// When present, member values are validated by synthesizing a call to
+    /// `__init__` rather than by simple type assignability.
+    pub(crate) init_function: Option<FunctionType<'db>>,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
 
-impl EnumMetadata<'_> {
+impl<'db> EnumMetadata<'db> {
     fn empty() -> Self {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
+            value_annotation: None,
+            init_function: None,
+        }
+    }
+
+    /// Returns the type of `.value`/`._value_` for a given enum member.
+    ///
+    /// Priority: explicit `_value_` annotation, then `__init__` → `Any`,
+    /// then the inferred member value type.
+    pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
+        if !self.members.contains_key(member_name) {
+            return None;
+        }
+        if let Some(annotation) = self.value_annotation {
+            Some(annotation)
+        } else if self.init_function.is_some() {
+            Some(Type::Dynamic(DynamicType::Any))
+        } else {
+            self.members.get(member_name).copied()
         }
     }
 
@@ -287,7 +315,40 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    Some(EnumMetadata { members, aliases })
+    // Look up an explicit `_value_` annotation, if present.
+    let value_annotation = place_table(db, scope_id)
+        .symbol_id("_value_")
+        .and_then(|symbol_id| {
+            let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+            place_from_declarations(db, declarations)
+                .ignore_conflicting_declarations()
+                .ignore_possibly_undefined()
+        });
+
+    let init_function = custom_init(db, scope_id);
+
+    Some(EnumMetadata {
+        members,
+        aliases,
+        value_annotation,
+        init_function,
+    })
+}
+
+/// Returns the custom `__init__` function type if one is defined on the enum.
+fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
+    let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
+    let init_type = place_from_declarations(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_declarations(init_symbol_id),
+    )
+    .ignore_conflicting_declarations()
+    .ignore_possibly_undefined()?;
+
+    match init_type {
+        Type::FunctionLiteral(f) => Some(f),
+        _ => None,
+    }
 }
 
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(
