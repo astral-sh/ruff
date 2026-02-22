@@ -2062,12 +2062,6 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(bound_method.into_callable_type(db)))
             }
 
-            // Special case: if we're dealing with <instance of type>,
-            // treat it as <subclass of object>.
-            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
-                Some(ClassType::object(db).into_callable(db))
-            }
-
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
                     .member_lookup_with_policy(
@@ -2134,7 +2128,7 @@ impl<'db> Type<'db> {
                     }
                     None => Some(CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::new(db, []), Type::TypeVar(tvar)),
+                        Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
                     ))),
                 },
                 SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
@@ -4331,7 +4325,7 @@ impl<'db> Type<'db> {
                 SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
                 SubclassOfInner::TypeVar(tvar) => {
                     let bindings = match tvar.typevar(db).bound_or_constraints(db) {
-                        None => self.constructor_bindings(db, ClassType::object(db)),
+                        None => KnownClass::Type.to_instance(db).bindings(db),
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             bound.to_meta_type(db).bindings(db)
                         }
@@ -4373,13 +4367,6 @@ impl<'db> Type<'db> {
                     ),
                 )
                 .into()
-            }
-
-            // Special case: for <instance of type>, return the constructor bindings for `object`,
-            // since `type` is the same as `type[object]`. This avoids us falling back to typeshed's
-            // signature for `type.__call__`, which is very dynamic and permissive.
-            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
-                self.constructor_bindings(db, ClassType::object(db))
             }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
