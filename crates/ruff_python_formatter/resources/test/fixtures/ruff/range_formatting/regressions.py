@@ -88,4 +88,4 @@ def new_function_inserted_after_test_start ():
 # Range formatting of semicolon-separated statements should not introduce
 # spurious indentation whitespace when the range starts mid-line.
 class Foo:
-    x = 1; <RANGE_START>x = 2<RANGE_END>
+    x=1;<RANGE_START>x=2<RANGE_END>
