@@ -17,6 +17,7 @@
   "dependencies": {
     "@monaco-editor/react": "^4.7.0",
     "classnames": "^2.5.1",
+    "fflate": "^0.8.2",
     "lz-string": "^1.5.0",
     "monaco-editor": "^0.55.0",
     "pyodide": "^0.29.0",
