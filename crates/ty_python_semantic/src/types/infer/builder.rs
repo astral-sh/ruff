@@ -15144,43 +15144,55 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (Type::Union(union), other) => {
                 let mut builder = UnionBuilder::new(self.db());
                 for element in union.elements(self.db()) {
-                    builder =
-                        builder.add(self.infer_binary_type_comparison(*element, op, other, range, visitor)?);
+                    builder = builder.add(
+                        self.infer_binary_type_comparison(*element, op, other, range, visitor)?,
+                    );
                 }
                 Some(Ok(builder.build()))
             }
             (other, Type::Union(union)) => {
                 let mut builder = UnionBuilder::new(self.db());
                 for element in union.elements(self.db()) {
-                    builder =
-                        builder.add(self.infer_binary_type_comparison(other, op, *element, range, visitor)?);
+                    builder = builder.add(
+                        self.infer_binary_type_comparison(other, op, *element, range, visitor)?,
+                    );
                 }
                 Some(Ok(builder.build()))
             }
 
-            (Type::Intersection(intersection), right) => {
-                Some(self.infer_binary_intersection_type_comparison(
+            (Type::Intersection(intersection), right) => Some(
+                self.infer_binary_intersection_type_comparison(
                     intersection,
                     op,
                     right,
                     IntersectionOn::Left,
                     range,
                     visitor,
-                ).map_err(|err|UnsupportedComparisonError { op, left_ty: left, right_ty: err.right_ty }))
-            }
-            (left, Type::Intersection(intersection)) => {
-                Some(self.infer_binary_intersection_type_comparison(
+                )
+                .map_err(|err| UnsupportedComparisonError {
+                    op,
+                    left_ty: left,
+                    right_ty: err.right_ty,
+                }),
+            ),
+            (left, Type::Intersection(intersection)) => Some(
+                self.infer_binary_intersection_type_comparison(
                     intersection,
                     op,
                     left,
                     IntersectionOn::Right,
                     range,
                     visitor,
-                ).map_err(|err|UnsupportedComparisonError { op, left_ty: err.left_ty, right_ty: right }))
-            }
+                )
+                .map_err(|err| UnsupportedComparisonError {
+                    op,
+                    left_ty: err.left_ty,
+                    right_ty: right,
+                }),
+            ),
 
-            (Type::TypeAlias(alias), right) => Some(
-                visitor.visit((left, op, right), || { self.infer_binary_type_comparison(
+            (Type::TypeAlias(alias), right) => Some(visitor.visit((left, op, right), || {
+                self.infer_binary_type_comparison(
                     alias.value_type(self.db()),
                     op,
                     right,
@@ -15189,8 +15201,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 )
             })),
 
-            (left, Type::TypeAlias(alias)) => Some(
-                visitor.visit((left, op, right), || { self.infer_binary_type_comparison(
+            (left, Type::TypeAlias(alias)) => Some(visitor.visit((left, op, right), || {
+                self.infer_binary_type_comparison(
                     left,
                     op,
                     alias.value_type(self.db()),
@@ -15253,11 +15265,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let mut builder = UnionBuilder::new(self.db());
                         for &constraint in constraints.elements(self.db()) {
                             builder = builder.add(self.infer_binary_type_comparison(
-                                constraint,
-                                op,
-                                constraint,
-                                range,
-                                visitor,
+                                constraint, op, constraint, range, visitor,
                             )?);
                         }
                         Some(Ok(builder.build()))
@@ -15291,7 +15299,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // When the right operand is a bounded TypeVar and the left is not a TypeVar,
             // delegate to the bound type.
             (left, Type::TypeVar(right_tvar)) if !left.is_type_var() => {
-                match right_tvar.typevar(self.db()).bound_or_constraints(self.db()) {
+                match right_tvar
+                    .typevar(self.db())
+                    .bound_or_constraints(self.db())
+                {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => Some(
                         try_dunder(self, MemberLookupPolicy::default()).or_else(|_| {
                             visitor.visit((left, op, right), || {
@@ -15312,148 +15323,175 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => match (left_literal.kind(), right_literal.kind()) {
-                (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => Some(match op {
-                    ast::CmpOp::Eq => Ok(Type::bool_literal(n == m)),
-                    ast::CmpOp::NotEq => Ok(Type::bool_literal(n != m)),
-                    ast::CmpOp::Lt => Ok(Type::bool_literal(n < m)),
-                    ast::CmpOp::LtE => Ok(Type::bool_literal(n <= m)),
-                    ast::CmpOp::Gt => Ok(Type::bool_literal(n > m)),
-                    ast::CmpOp::GtE => Ok(Type::bool_literal(n >= m)),
-                    // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
-                    // Even if they are the same value, they may not be the same object.
-                    ast::CmpOp::Is => {
-                        if n == m {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
-                        } else {
-                            Ok(Type::bool_literal(false))
-                        }
+            (Type::LiteralValue(left_literal), Type::LiteralValue(right_literal)) => {
+                match (left_literal.kind(), right_literal.kind()) {
+                    (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Int(m)) => {
+                        Some(match op {
+                            ast::CmpOp::Eq => Ok(Type::bool_literal(n == m)),
+                            ast::CmpOp::NotEq => Ok(Type::bool_literal(n != m)),
+                            ast::CmpOp::Lt => Ok(Type::bool_literal(n < m)),
+                            ast::CmpOp::LtE => Ok(Type::bool_literal(n <= m)),
+                            ast::CmpOp::Gt => Ok(Type::bool_literal(n > m)),
+                            ast::CmpOp::GtE => Ok(Type::bool_literal(n >= m)),
+                            // We cannot say that two equal int Literals will return True from an `is` or `is not` comparison.
+                            // Even if they are the same value, they may not be the same object.
+                            ast::CmpOp::Is => {
+                                if n == m {
+                                    Ok(KnownClass::Bool.to_instance(self.db()))
+                                } else {
+                                    Ok(Type::bool_literal(false))
+                                }
+                            }
+                            ast::CmpOp::IsNot => {
+                                if n == m {
+                                    Ok(KnownClass::Bool.to_instance(self.db()))
+                                } else {
+                                    Ok(Type::bool_literal(true))
+                                }
+                            }
+                            // Undefined for (int, int)
+                            ast::CmpOp::In | ast::CmpOp::NotIn => Err(UnsupportedComparisonError {
+                                op,
+                                left_ty: left,
+                                right_ty: right,
+                            }),
+                        })
                     }
-                    ast::CmpOp::IsNot => {
-                        if n == m {
-                            Ok(KnownClass::Bool.to_instance(self.db()))
-                        } else {
-                            Ok(Type::bool_literal(true))
-                        }
+                    // Booleans are coded as integers (False = 0, True = 1)
+                    (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Bool(b)) => Some(
+                        self.infer_binary_type_comparison(
+                            Type::int_literal(n.as_i64()),
+                            op,
+                            Type::int_literal(i64::from(b)),
+                            range,
+                            visitor,
+                        )
+                        .map_err(|_| UnsupportedComparisonError {
+                            op,
+                            left_ty: left,
+                            right_ty: right,
+                        }),
+                    ),
+                    (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(m)) => Some(
+                        self.infer_binary_type_comparison(
+                            Type::int_literal(i64::from(b)),
+                            op,
+                            Type::int_literal(m.as_i64()),
+                            range,
+                            visitor,
+                        )
+                        .map_err(|_| UnsupportedComparisonError {
+                            op,
+                            left_ty: left,
+                            right_ty: right,
+                        }),
+                    ),
+                    (LiteralValueTypeKind::Bool(a), LiteralValueTypeKind::Bool(b)) => Some(
+                        self.infer_binary_type_comparison(
+                            Type::int_literal(i64::from(a)),
+                            op,
+                            Type::int_literal(i64::from(b)),
+                            range,
+                            visitor,
+                        )
+                        .map_err(|_| UnsupportedComparisonError {
+                            op,
+                            left_ty: left,
+                            right_ty: right,
+                        }),
+                    ),
+
+                    (
+                        LiteralValueTypeKind::String(salsa_s1),
+                        LiteralValueTypeKind::String(salsa_s2),
+                    ) => {
+                        let s1 = salsa_s1.value(self.db());
+                        let s2 = salsa_s2.value(self.db());
+                        let result = match op {
+                            ast::CmpOp::Eq => Type::bool_literal(s1 == s2),
+                            ast::CmpOp::NotEq => Type::bool_literal(s1 != s2),
+                            ast::CmpOp::Lt => Type::bool_literal(s1 < s2),
+                            ast::CmpOp::LtE => Type::bool_literal(s1 <= s2),
+                            ast::CmpOp::Gt => Type::bool_literal(s1 > s2),
+                            ast::CmpOp::GtE => Type::bool_literal(s1 >= s2),
+                            ast::CmpOp::In => Type::bool_literal(s2.contains(s1)),
+                            ast::CmpOp::NotIn => Type::bool_literal(!s2.contains(s1)),
+                            ast::CmpOp::Is => {
+                                if s1 == s2 {
+                                    KnownClass::Bool.to_instance(self.db())
+                                } else {
+                                    Type::bool_literal(false)
+                                }
+                            }
+                            ast::CmpOp::IsNot => {
+                                if s1 == s2 {
+                                    KnownClass::Bool.to_instance(self.db())
+                                } else {
+                                    Type::bool_literal(true)
+                                }
+                            }
+                        };
+                        Some(Ok(result))
                     }
-                    // Undefined for (int, int)
-                    ast::CmpOp::In | ast::CmpOp::NotIn => Err(UnsupportedComparisonError {
-                        op,
-                        left_ty: left,
-                        right_ty: right,
-                    }),
-                }),
-                // Booleans are coded as integers (False = 0, True = 1)
-                (LiteralValueTypeKind::Int(n), LiteralValueTypeKind::Bool(b)) => {
-                    Some(self.infer_binary_type_comparison(
-                        Type::int_literal(n.as_i64()),
-                        op,
-                        Type::int_literal(i64::from(b)),
-                        range,
-                        visitor,
-                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-                }
-                (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(m)) => {
-                    Some(self.infer_binary_type_comparison(
-                        Type::int_literal(i64::from(b)),
-                        op,
-                        Type::int_literal(m.as_i64()),
-                        range,
-                        visitor,
-                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-                }
-                (LiteralValueTypeKind::Bool(a), LiteralValueTypeKind::Bool(b)) => {
-                    Some(self.infer_binary_type_comparison(
-                        Type::int_literal(i64::from(a)),
-                        op,
-                        Type::int_literal(i64::from(b)),
-                        range,
-                        visitor,
-                    ).map_err(|_|UnsupportedComparisonError {op, left_ty: left, right_ty: right}))
-                }
 
-                (LiteralValueTypeKind::String(salsa_s1), LiteralValueTypeKind::String(salsa_s2)) => {
-                    let s1 = salsa_s1.value(self.db());
-                    let s2 = salsa_s2.value(self.db());
-                    let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(s1 == s2),
-                        ast::CmpOp::NotEq => Type::bool_literal(s1 != s2),
-                        ast::CmpOp::Lt => Type::bool_literal(s1 < s2),
-                        ast::CmpOp::LtE => Type::bool_literal(s1 <= s2),
-                        ast::CmpOp::Gt => Type::bool_literal(s1 > s2),
-                        ast::CmpOp::GtE => Type::bool_literal(s1 >= s2),
-                        ast::CmpOp::In => Type::bool_literal(s2.contains(s1)),
-                        ast::CmpOp::NotIn => Type::bool_literal(!s2.contains(s1)),
-                        ast::CmpOp::Is => {
-                            if s1 == s2 {
-                                KnownClass::Bool.to_instance(self.db())
-                            } else {
-                                Type::bool_literal(false)
+                    (
+                        LiteralValueTypeKind::Bytes(salsa_b1),
+                        LiteralValueTypeKind::Bytes(salsa_b2),
+                    ) => {
+                        let b1 = salsa_b1.value(self.db());
+                        let b2 = salsa_b2.value(self.db());
+                        let result = match op {
+                            ast::CmpOp::Eq => Type::bool_literal(b1 == b2),
+                            ast::CmpOp::NotEq => Type::bool_literal(b1 != b2),
+                            ast::CmpOp::Lt => Type::bool_literal(b1 < b2),
+                            ast::CmpOp::LtE => Type::bool_literal(b1 <= b2),
+                            ast::CmpOp::Gt => Type::bool_literal(b1 > b2),
+                            ast::CmpOp::GtE => Type::bool_literal(b1 >= b2),
+                            ast::CmpOp::In => {
+                                Type::bool_literal(memchr::memmem::find(b2, b1).is_some())
                             }
-                        }
-                        ast::CmpOp::IsNot => {
-                            if s1 == s2 {
-                                KnownClass::Bool.to_instance(self.db())
-                            } else {
-                                Type::bool_literal(true)
+                            ast::CmpOp::NotIn => {
+                                Type::bool_literal(memchr::memmem::find(b2, b1).is_none())
                             }
-                        }
-                    };
-                    Some(Ok(result))
-                }
+                            ast::CmpOp::Is => {
+                                if b1 == b2 {
+                                    KnownClass::Bool.to_instance(self.db())
+                                } else {
+                                    Type::bool_literal(false)
+                                }
+                            }
+                            ast::CmpOp::IsNot => {
+                                if b1 == b2 {
+                                    KnownClass::Bool.to_instance(self.db())
+                                } else {
+                                    Type::bool_literal(true)
+                                }
+                            }
+                        };
+                        Some(Ok(result))
+                    }
 
-                (LiteralValueTypeKind::Bytes(salsa_b1), LiteralValueTypeKind::Bytes(salsa_b2)) => {
-                    let b1 = salsa_b1.value(self.db());
-                    let b2 = salsa_b2.value(self.db());
-                    let result = match op {
-                        ast::CmpOp::Eq => Type::bool_literal(b1 == b2),
-                        ast::CmpOp::NotEq => Type::bool_literal(b1 != b2),
-                        ast::CmpOp::Lt => Type::bool_literal(b1 < b2),
-                        ast::CmpOp::LtE => Type::bool_literal(b1 <= b2),
-                        ast::CmpOp::Gt => Type::bool_literal(b1 > b2),
-                        ast::CmpOp::GtE => Type::bool_literal(b1 >= b2),
-                        ast::CmpOp::In => {
-                            Type::bool_literal(memchr::memmem::find(b2, b1).is_some())
-                        }
-                        ast::CmpOp::NotIn => {
-                            Type::bool_literal(memchr::memmem::find(b2, b1).is_none())
-                        }
-                        ast::CmpOp::Is => {
-                            if b1 == b2 {
-                                KnownClass::Bool.to_instance(self.db())
-                            } else {
-                                Type::bool_literal(false)
-                            }
-                        }
-                        ast::CmpOp::IsNot => {
-                            if b1 == b2 {
-                                KnownClass::Bool.to_instance(self.db())
-                            } else {
-                                Type::bool_literal(true)
-                            }
-                        }
-                    };
-                    Some(Ok(result))
-                }
+                    (
+                        LiteralValueTypeKind::Enum(literal_1),
+                        LiteralValueTypeKind::Enum(literal_2),
+                    ) if op == ast::CmpOp::Eq => Some(Ok(
+                        match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                            Ok(ty) => ty,
+                            Err(_) => Type::bool_literal(literal_1 == literal_2),
+                        },
+                    )),
+                    (
+                        LiteralValueTypeKind::Enum(literal_1),
+                        LiteralValueTypeKind::Enum(literal_2),
+                    ) if op == ast::CmpOp::NotEq => Some(Ok(
+                        match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
+                            Ok(ty) => ty,
+                            Err(_) => Type::bool_literal(literal_1 != literal_2),
+                        },
+                    )),
 
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::Eq =>
-                {
-                    Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                        Ok(ty) => ty,
-                        Err(_) => Type::bool_literal(literal_1 == literal_2),
-                    }))
+                    _ => None,
                 }
-                (LiteralValueTypeKind::Enum(literal_1), LiteralValueTypeKind::Enum(literal_2))
-                    if op == ast::CmpOp::NotEq =>
-                {
-                    Some(Ok(match try_dunder(self, MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK) {
-                        Ok(ty) => ty,
-                        Err(_) => Type::bool_literal(literal_1 != literal_2),
-                    }))
-                }
-
-                _ => None
             }
 
             (
@@ -15461,24 +15499,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
             ) => match op {
                 ast::CmpOp::Eq => Some(Ok(Type::bool_literal(
-                    left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
+                    left.constraints(self.db())
+                        .iff(self.db(), right.constraints(self.db()))
+                        .is_always_satisfied(self.db()),
                 ))),
                 ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(
-                    !left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
+                    !left
+                        .constraints(self.db())
+                        .iff(self.db(), right.constraints(self.db()))
+                        .is_always_satisfied(self.db()),
                 ))),
                 _ => None,
-            }
+            },
 
-            (
-                Type::NominalInstance(nominal1),
-                Type::NominalInstance(nominal2),
-            ) => nominal1.tuple_spec(self.db())
+            (Type::NominalInstance(nominal1), Type::NominalInstance(nominal2)) => nominal1
+                .tuple_spec(self.db())
                 .and_then(|lhs_tuple| Some((lhs_tuple, nominal2.tuple_spec(self.db())?)))
                 .map(|(lhs_tuple, rhs_tuple)| {
-                    let mut tuple_rich_comparison =
-                        |rich_op| visitor.visit((left, op, right), || {
-                            self.infer_tuple_rich_comparison(&lhs_tuple, rich_op, &rhs_tuple, range, visitor)
-                        });
+                    let mut tuple_rich_comparison = |rich_op| {
+                        visitor.visit((left, op, right), || {
+                            self.infer_tuple_rich_comparison(
+                                &lhs_tuple, rich_op, &rhs_tuple, range, visitor,
+                            )
+                        })
+                    };
 
                     match op {
                         ast::CmpOp::Eq => tuple_rich_comparison(RichCompareOperator::Eq),
@@ -15492,13 +15536,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let mut any_ambiguous = false;
 
                             for ty in rhs_tuple.iter_all_elements() {
-                                let eq_result = self.infer_binary_type_comparison(
-                                left,
-                                ast::CmpOp::Eq,
-                                ty,
-                                range,
-                                visitor
-                            ).expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+                                let eq_result = self
+                                    .infer_binary_type_comparison(
+                                        left,
+                                        ast::CmpOp::Eq,
+                                        ty,
+                                        range,
+                                        visitor,
+                                    )
+                                    .expect("Eq comparison should always succeed");
 
                                 match eq_result {
                                     todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
@@ -15524,9 +15570,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ast::CmpOp::Is | ast::CmpOp::IsNot => {
                             // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
                             // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
-                            let eq_result = tuple_rich_comparison(RichCompareOperator::Eq).expect(
-                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
-                        );
+                            let eq_result = tuple_rich_comparison(RichCompareOperator::Eq)
+                                .expect("Eq comparison should always succeed");
 
                             Ok(match eq_result {
                                 todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
@@ -15540,8 +15585,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             })
                         }
                     }
-                }
-            ),
+                }),
 
             _ => None,
         };
@@ -15685,9 +15729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for (l_ty, r_ty) in left_iter.zip(right_iter) {
                     let pairwise_eq_result = self
                         .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range, visitor)
-                        .expect(
-                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
-                        );
+                        .expect("Eq comparison should always succeed");
 
                     match pairwise_eq_result
                         .try_bool(self.db())
