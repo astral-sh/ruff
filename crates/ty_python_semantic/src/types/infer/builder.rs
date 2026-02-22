@@ -14904,8 +14904,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
 
                         match op {
-                            // `in, not in, is, is not` always return bool instances
-                            ast::CmpOp::In
+                            // `in`/`not in`/`is`/`is not` always return `bool`.
+                            // `==`/`!=` can return arbitrary types in general, but
+                            // in the error case the runtime falls back to identity
+                            // comparison, which returns `bool`.
+                            ast::CmpOp::Eq
+                            | ast::CmpOp::NotEq
+                            | ast::CmpOp::In
                             | ast::CmpOp::NotIn
                             | ast::CmpOp::Is
                             | ast::CmpOp::IsNot => KnownClass::Bool.to_instance(builder.db()),
@@ -15544,7 +15549,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         range,
                                         visitor,
                                     )
-                                    .expect("Eq comparison should always succeed");
+                                    .unwrap_or_else(|_| KnownClass::Bool.to_instance(self.db()));
 
                                 match eq_result {
                                     todo @ Type::Dynamic(DynamicType::Todo(_)) => return Ok(todo),
@@ -15571,7 +15576,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             // - `[ast::CmpOp::Is]`: returns `false` if the elements are definitely unequal, otherwise `bool`
                             // - `[ast::CmpOp::IsNot]`: returns `true` if the elements are definitely unequal, otherwise `bool`
                             let eq_result = tuple_rich_comparison(RichCompareOperator::Eq)
-                                .expect("Eq comparison should always succeed");
+                                .unwrap_or_else(|_| KnownClass::Bool.to_instance(self.db()));
 
                             Ok(match eq_result {
                                 todo @ Type::Dynamic(DynamicType::Todo(_)) => todo,
@@ -15621,34 +15626,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 policy,
             )
             .map(|outcome| outcome.return_type(db))
-            .ok()
         };
 
         // The reflected dunder has priority if the right-hand side is a strict subclass of the left-hand side.
-        if left != right && right.is_subtype_of(db, left) {
-            call_dunder(op.reflect(), right, left).or_else(|| call_dunder(op, left, right))
-        } else {
-            call_dunder(op, left, right).or_else(|| call_dunder(op.reflect(), right, left))
-        }
-        .or_else(|| {
-            // When no appropriate method returns any value other than NotImplemented,
-            // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
-            // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
-            if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
-                // This branch implements specific behavior of the `__eq__` and `__ne__` methods
-                // on `object`, so it does not apply if we skip looking up attributes on `object`.
-                && !policy.mro_no_object_fallback()
-            {
-                Some(KnownClass::Bool.to_instance(db))
+        let reflected_has_priority = left != right && right.is_subtype_of(db, left);
+        let (first_op, first_left, first_right, second_op, second_left, second_right) =
+            if reflected_has_priority {
+                (op.reflect(), right, left, op, left, right)
             } else {
-                None
-            }
-        })
-        .ok_or_else(|| UnsupportedComparisonError {
-            op: op.into(),
-            left_ty: left,
-            right_ty: right,
-        })
+                (op, left, right, op.reflect(), right, left)
+            };
+
+        let first = call_dunder(first_op, first_left, first_right);
+        if let Ok(ty) = first {
+            return Ok(ty);
+        }
+
+        let second = call_dunder(second_op, second_left, second_right);
+        if let Ok(ty) = second {
+            return Ok(ty);
+        }
+
+        // Both failed. Emit error if either had a CallError (method exists but wrong signature).
+        let has_call_error = matches!(&first, Err(CallDunderError::CallError(..)))
+            || matches!(&second, Err(CallDunderError::CallError(..)));
+
+        // When no appropriate method returns any value other than NotImplemented,
+        // the `==` and `!=` operators will fall back to `is` and `is not`, respectively.
+        // refer to `<https://docs.python.org/3/reference/datamodel.html#object.__eq__>`
+        if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
+            // This branch implements specific behavior of the `__eq__` and `__ne__` methods
+            // on `object`, so it does not apply if we skip looking up attributes on `object`.
+            && !policy.mro_no_object_fallback()
+            && !has_call_error
+        {
+            Ok(KnownClass::Bool.to_instance(db))
+        } else {
+            Err(UnsupportedComparisonError {
+                op: op.into(),
+                left_ty: left,
+                right_ty: right,
+            })
+        }
     }
 
     /// Performs a membership test (`in` and `not in`) between two instances and returns the resulting type, or `None` if the test is unsupported.
@@ -15729,7 +15748,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for (l_ty, r_ty) in left_iter.zip(right_iter) {
                     let pairwise_eq_result = self
                         .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range, visitor)
-                        .expect("Eq comparison should always succeed");
+                        .unwrap_or_else(|_| KnownClass::Bool.to_instance(self.db()));
 
                     match pairwise_eq_result
                         .try_bool(self.db())
