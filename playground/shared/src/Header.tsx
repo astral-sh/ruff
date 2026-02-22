@@ -16,6 +16,7 @@ export default function Header({
   onShare,
   onCopyMarkdownLink,
   onCopyMarkdown,
+  onDownload,
 }: {
   theme: Theme;
   tool: "ruff" | "ty";
@@ -26,6 +27,7 @@ export default function Header({
   onShare: () => Promise<void>;
   onCopyMarkdownLink: () => Promise<void>;
   onCopyMarkdown: () => Promise<void>;
+  onDownload?(): void;
 }) {
   return (
     <div
@@ -63,6 +65,11 @@ export default function Header({
             onCopyMarkdown={onCopyMarkdown}
           />
         </div>
+        {onDownload != null && (
+          <div className="max-sm:hidden flex">
+            <DownloadButton onClicked={onDownload} />
+          </div>
+        )}
         <Divider />
 
         <ThemeButton theme={theme} onChange={onChangeTheme} />
@@ -146,6 +153,18 @@ function ResetButton({ onClicked }: { onClicked?: () => void }) {
       onClick={onClicked}
     >
       Reset
+    </AstralButton>
+  );
+}
+
+function DownloadButton({ onClicked }: { onClicked: () => void }) {
+  return (
+    <AstralButton
+      type="button"
+      className="relative flex-none leading-6 py-1.5 px-3 shadow-xs"
+      onClick={onClicked}
+    >
+      Download
     </AstralButton>
   );
 }

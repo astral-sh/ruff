@@ -18,6 +18,7 @@ import {
   persistLocal,
   restore,
 } from "./Editor/persist";
+import { downloadZip } from "./Editor/downloadZip";
 import { loader } from "@monaco-editor/react";
 import tySchema from "../../../ty.schema.json";
 import Chrome, { formatError } from "./Editor/Chrome";
@@ -80,6 +81,13 @@ export default function Playground() {
     }
   }, [files]);
 
+  const handleDownload = useCallback(async () => {
+    const serialized = serializeFiles(files);
+
+    if (serialized != null) {
+      await downloadZip(serialized.files);
+    }
+  }, [files]);
   const handleFileAdded = useCallback((workspace: Workspace, name: string) => {
     let handle = null;
 
@@ -205,6 +213,7 @@ export default function Playground() {
         onShare={handleShare}
         onCopyMarkdownLink={handleCopyMarkdownLink}
         onCopyMarkdown={handleCopyMarkdown}
+        onDownload={handleDownload}
         onReset={workspace == null ? undefined : handleReset}
       />
 
