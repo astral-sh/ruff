@@ -5998,8 +5998,8 @@ impl<'db> Type<'db> {
                 SpecialFormCategory::LegacyStdlibAlias(alias) => {
                     Ok(alias.aliased_class().to_instance(db))
                 }
-                SpecialFormCategory::Other(alias) => {
-                    alias.in_type_expression(db, scope_id, typevar_binding_context)
+                SpecialFormCategory::Other(form) => {
+                    form.in_type_expression(db, scope_id, typevar_binding_context)
                 }
                 SpecialFormCategory::TypeQualifier(qualifier) => {
                     let err = match qualifier {
@@ -7826,7 +7826,7 @@ impl TypeQualifiers {
 pub(crate) struct TypeAndQualifiers<'db> {
     inner: Type<'db>,
     origin: TypeOrigin,
-    pub(crate) qualifiers: TypeQualifiers,
+    qualifiers: TypeQualifiers,
 }
 
 impl<'db> TypeAndQualifiers<'db> {
@@ -7855,9 +7855,10 @@ impl<'db> TypeAndQualifiers<'db> {
         self.origin
     }
 
-    /// Insert/add an additional type qualifier in place.
-    pub(crate) fn add_qualifier(&mut self, qualifier: TypeQualifiers) {
+    /// Return `self` with an additional qualifier added to the set of qualifiers.
+    pub(crate) fn with_qualifier(mut self, qualifier: TypeQualifiers) -> Self {
         self.qualifiers |= qualifier;
+        self
     }
 
     /// Return the set of type qualifiers.

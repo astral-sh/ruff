@@ -4,12 +4,14 @@
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::{FileScopeId, definition::Definition, place_table, scope::ScopeId, semantic_index, use_def_map};
+use crate::semantic_index::{
+    FileScopeId, definition::Definition, place_table, scope::ScopeId, semantic_index, use_def_map,
+};
 use crate::types::TypeDefinition;
 use crate::types::TypeQualifiers;
 use crate::types::{
-    IntersectionBuilder, InvalidTypeExpression, InvalidTypeExpressionError,
-    generics::typing_self, infer::nearest_enclosing_class,
+    IntersectionBuilder, InvalidTypeExpression, InvalidTypeExpressionError, generics::typing_self,
+    infer::nearest_enclosing_class,
 };
 use ruff_db::files::File;
 use std::str::FromStr;
@@ -341,51 +343,16 @@ impl SpecialFormType {
     /// specification for more details:
     /// <https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions>
     pub(super) const fn is_valid_in_type_expression(self) -> bool {
-        match self {
-            Self::ClassVar
-            | Self::Final
-            | Self::Required
-            | Self::NotRequired
-            | SpecialFormType::ReadOnly
-            | SpecialFormType::Unpack
-            | SpecialFormType::TypeAlias => false,
-            Self::Annotated
-            | SpecialFormType::Any
-            | SpecialFormType::Literal
-            | SpecialFormType::LiteralString
-            | SpecialFormType::Optional
-            | SpecialFormType::Union
-            | SpecialFormType::NoReturn
-            | SpecialFormType::Never
-            | SpecialFormType::Tuple
-            | SpecialFormType::List
-            | SpecialFormType::Dict
-            | SpecialFormType::Set
-            | SpecialFormType::FrozenSet
-            | SpecialFormType::ChainMap
-            | SpecialFormType::Counter
-            | SpecialFormType::DefaultDict
-            | SpecialFormType::Deque
-            | SpecialFormType::OrderedDict
-            | SpecialFormType::Type
-            | SpecialFormType::Unknown
-            | SpecialFormType::AlwaysTruthy
-            | SpecialFormType::AlwaysFalsy
-            | SpecialFormType::Not
-            | SpecialFormType::Intersection
-            | SpecialFormType::TypeOf
-            | SpecialFormType::CallableTypeOf
-            | SpecialFormType::Top
-            | SpecialFormType::Bottom
-            | SpecialFormType::Callable
-            | SpecialFormType::TypingSelf
-            | SpecialFormType::Concatenate
-            | SpecialFormType::TypeGuard
-            | SpecialFormType::TypedDict
-            | SpecialFormType::TypeIs
-            | SpecialFormType::Protocol
-            | SpecialFormType::Generic
-            | SpecialFormType::NamedTuple => true,
+        match self.kind() {
+            SpecialFormCategory::TypeQualifier(_)
+            | SpecialFormCategory::Other(MiscSpecialForm::Unpack | MiscSpecialForm::TypeAlias) => {
+                false
+            }
+            SpecialFormCategory::Type
+            | SpecialFormCategory::Tuple
+            | SpecialFormCategory::Callable
+            | SpecialFormCategory::LegacyStdlibAlias(_)
+            | SpecialFormCategory::Other(_) => true,
         }
     }
 
@@ -450,14 +417,6 @@ impl SpecialFormType {
         }
     }
 
-    #[expect(dead_code)]
-    pub(super) const fn as_type_qualifier(self) -> Option<TypeQualifier> {
-        match self.kind() {
-            SpecialFormCategory::TypeQualifier(qualifier) => Some(qualifier),
-            _ => None,
-        }
-    }
-
     /// Return `Some(KnownClass)` if this special form is an alias
     /// to a standard library class.
     pub(super) const fn aliased_stdlib_class(self) -> Option<KnownClass> {
@@ -465,59 +424,25 @@ impl SpecialFormType {
             SpecialFormCategory::LegacyStdlibAlias(alias) => Some(alias.aliased_class()),
             SpecialFormCategory::Tuple => Some(KnownClass::Tuple),
             SpecialFormCategory::Type => Some(KnownClass::Type),
-            _ => None,
+            // From ty's perspective, `collections.abc.Callable` and `typing.Callable` are the same object
+            SpecialFormCategory::Callable
+            | SpecialFormCategory::Other(_)
+            | SpecialFormCategory::TypeQualifier(_) => None,
         }
     }
 
     /// Return `true` if this special form is valid as the second argument
     /// to `issubclass()` and `isinstance()` calls.
     pub(super) const fn is_valid_isinstance_target(self) -> bool {
-        match self {
-            Self::Callable
-            | Self::ChainMap
-            | Self::Counter
-            | Self::DefaultDict
-            | Self::Deque
-            | Self::FrozenSet
-            | Self::Dict
-            | Self::List
-            | Self::OrderedDict
-            | Self::Set
-            | Self::Tuple
-            | Self::Type
-            | Self::Protocol
-            | Self::Generic => true,
-
-            Self::AlwaysFalsy
-            | Self::AlwaysTruthy
-            | Self::Annotated
-            | Self::Bottom
-            | Self::CallableTypeOf
-            | Self::ClassVar
-            | Self::Concatenate
-            | Self::Final
-            | Self::Intersection
-            | Self::Literal
-            | Self::LiteralString
-            | Self::Never
-            | Self::NoReturn
-            | Self::Not
-            | Self::ReadOnly
-            | Self::Required
-            | Self::TypeAlias
-            | Self::TypeGuard
-            | Self::NamedTuple
-            | Self::NotRequired
-            | Self::Optional
-            | Self::Top
-            | Self::TypeIs
-            | Self::TypedDict
-            | Self::TypingSelf
-            | Self::Union
-            | Self::Unknown
-            | Self::TypeOf
-            | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
-            | Self::Unpack => false,
+        match self.kind() {
+            SpecialFormCategory::LegacyStdlibAlias(_)
+            | SpecialFormCategory::Callable
+            | SpecialFormCategory::Tuple
+            | SpecialFormCategory::Type
+            | SpecialFormCategory::Other(MiscSpecialForm::Protocol | MiscSpecialForm::Generic) => {
+                true
+            }
+            SpecialFormCategory::TypeQualifier(_) | SpecialFormCategory::Other(_) => false,
         }
     }
 

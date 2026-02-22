@@ -6,11 +6,13 @@ use crate::types::diagnostic::{
     INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR, report_invalid_arguments_to_annotated,
 };
 use crate::types::infer::nearest_enclosing_class;
+use crate::types::special_form::{MiscSpecialForm, SpecialFormCategory};
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
 use crate::types::{
-    KnownClass, SpecialFormType, Type, TypeAndQualifiers, TypeContext, TypeQualifiers, todo_type,
+    KnownClass, SpecialFormType, Type, TypeAndQualifiers, TypeContext, TypeQualifier,
+    TypeQualifiers, todo_type,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -90,36 +92,37 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             pep_613_policy: PEP613Policy,
         ) -> TypeAndQualifiers<'db> {
             match ty {
-                Type::SpecialForm(SpecialFormType::ClassVar) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::CLASS_VAR,
-                ),
-                Type::SpecialForm(SpecialFormType::Final) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::FINAL,
-                ),
-                Type::SpecialForm(SpecialFormType::Required) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::REQUIRED,
-                ),
-                Type::SpecialForm(SpecialFormType::NotRequired) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::NOT_REQUIRED,
-                ),
-                Type::SpecialForm(SpecialFormType::ReadOnly) => TypeAndQualifiers::new(
-                    Type::unknown(),
-                    TypeOrigin::Declared,
-                    TypeQualifiers::READ_ONLY,
-                ),
-                Type::SpecialForm(SpecialFormType::TypeAlias)
-                    if pep_613_policy == PEP613Policy::Allowed =>
-                {
-                    TypeAndQualifiers::declared(ty)
-                }
+                Type::SpecialForm(special_form) => match special_form.kind() {
+                    SpecialFormCategory::TypeQualifier(qualifier) => TypeAndQualifiers::new(
+                        Type::unknown(),
+                        TypeOrigin::Declared,
+                        TypeQualifiers::from(qualifier),
+                    ),
+                    SpecialFormCategory::Other(MiscSpecialForm::TypeAlias)
+                        if pep_613_policy == PEP613Policy::Allowed =>
+                    {
+                        TypeAndQualifiers::declared(ty)
+                    }
+                    SpecialFormCategory::Type
+                    | SpecialFormCategory::Tuple
+                    | SpecialFormCategory::Callable
+                    | SpecialFormCategory::LegacyStdlibAlias(_)
+                    | SpecialFormCategory::Other(_) => TypeAndQualifiers::declared(
+                        ty.default_specialize(builder.db())
+                            .in_type_expression(
+                                builder.db(),
+                                builder.scope(),
+                                builder.typevar_binding_context,
+                            )
+                            .unwrap_or_else(|error| {
+                                error.into_fallback_type(
+                                    &builder.context,
+                                    annotation,
+                                    builder.is_reachable(annotation),
+                                )
+                            }),
+                    ),
+                },
                 // Conditional import of `typing.TypeAlias` or `typing_extensions.TypeAlias` on a
                 // Python version where the former doesn't exist.
                 Type::Union(union)
@@ -228,135 +231,133 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let slice = &**slice;
 
                 match value_ty {
-                    Type::SpecialForm(SpecialFormType::Annotated) => {
-                        // This branch is similar to the corresponding branch in `infer_parameterized_special_form_type_expression`, but
-                        // `Annotated[…]` can appear both in annotation expressions and in type expressions, and needs to be handled slightly
-                        // differently in each case (calling either `infer_type_expression_*` or `infer_annotation_expression_*`).
-                        if let ast::Expr::Tuple(ast::ExprTuple {
-                            elts: arguments, ..
-                        }) = slice
-                        {
-                            if arguments.len() < 2 {
-                                report_invalid_arguments_to_annotated(&self.context, subscript);
-                            }
-
-                            if let [inner_annotation, metadata @ ..] = &arguments[..] {
-                                for element in metadata {
-                                    self.infer_expression(element, TypeContext::default());
+                    Type::SpecialForm(special_form) => match special_form.kind() {
+                        SpecialFormCategory::Other(MiscSpecialForm::Annotated) => {
+                            // This branch is similar to the corresponding branch in
+                            // `infer_parameterized_special_form_type_expression`, but
+                            // `Annotated[…]` can appear both in annotation expressions and in
+                            // type expressions, and needs to be handled slightly
+                            // differently in each case (calling either `infer_type_expression_*`
+                            // or `infer_annotation_expression_*`).
+                            if let ast::Expr::Tuple(ast::ExprTuple {
+                                elts: arguments, ..
+                            }) = slice
+                            {
+                                if arguments.len() < 2 {
+                                    report_invalid_arguments_to_annotated(&self.context, subscript);
                                 }
 
-                                let inner_annotation_ty = self.infer_annotation_expression_impl(
-                                    inner_annotation,
+                                if let [inner_annotation, metadata @ ..] = &arguments[..] {
+                                    for element in metadata {
+                                        self.infer_expression(element, TypeContext::default());
+                                    }
+
+                                    let inner_annotation_ty = self
+                                        .infer_annotation_expression_impl(
+                                            inner_annotation,
+                                            PEP613Policy::Disallowed,
+                                        );
+
+                                    self.store_expression_type(
+                                        slice,
+                                        inner_annotation_ty.inner_type(),
+                                    );
+                                    inner_annotation_ty
+                                } else {
+                                    for argument in arguments {
+                                        self.infer_expression(argument, TypeContext::default());
+                                    }
+                                    self.store_expression_type(slice, Type::unknown());
+                                    TypeAndQualifiers::declared(Type::unknown())
+                                }
+                            } else {
+                                report_invalid_arguments_to_annotated(&self.context, subscript);
+                                self.infer_annotation_expression_impl(
+                                    slice,
+                                    PEP613Policy::Disallowed,
+                                )
+                            }
+                        }
+                        SpecialFormCategory::TypeQualifier(qualifier) => {
+                            let arguments = if let ast::Expr::Tuple(tuple) = slice {
+                                &*tuple.elts
+                            } else {
+                                std::slice::from_ref(slice)
+                            };
+                            let type_and_qualifiers = if let [argument] = arguments {
+                                let type_and_qualifiers = self.infer_annotation_expression_impl(
+                                    argument,
                                     PEP613Policy::Disallowed,
                                 );
 
-                                self.store_expression_type(slice, inner_annotation_ty.inner_type());
-                                inner_annotation_ty
-                            } else {
-                                for argument in arguments {
-                                    self.infer_expression(argument, TypeContext::default());
+                                // Emit a diagnostic if ClassVar and Final are combined in a class that is
+                                // not a dataclass, since Final already implies the semantics of ClassVar.
+                                let classvar_and_final = match qualifier {
+                                    TypeQualifier::Final => type_and_qualifiers
+                                        .qualifiers
+                                        .contains(TypeQualifiers::CLASS_VAR),
+                                    TypeQualifier::ClassVar => type_and_qualifiers
+                                        .qualifiers
+                                        .contains(TypeQualifiers::FINAL),
+                                    _ => false,
+                                };
+                                if classvar_and_final
+                                    && nearest_enclosing_class(self.db(), self.index, self.scope())
+                                        .is_none_or(|class| !class.is_dataclass_like(self.db()))
+                                    && let Some(builder) = self
+                                        .context
+                                        .report_lint(&REDUNDANT_FINAL_CLASSVAR, subscript)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "`Combining `ClassVar` and `Final` is redundant"
+                                    ));
                                 }
-                                self.store_expression_type(slice, Type::unknown());
-                                TypeAndQualifiers::declared(Type::unknown())
-                            }
-                        } else {
-                            report_invalid_arguments_to_annotated(&self.context, subscript);
-                            self.infer_annotation_expression_impl(slice, PEP613Policy::Disallowed)
-                        }
-                    }
-                    Type::SpecialForm(
-                        type_qualifier @ (SpecialFormType::ClassVar
-                        | SpecialFormType::Final
-                        | SpecialFormType::Required
-                        | SpecialFormType::NotRequired
-                        | SpecialFormType::ReadOnly),
-                    ) => {
-                        let arguments = if let ast::Expr::Tuple(tuple) = slice {
-                            &*tuple.elts
-                        } else {
-                            std::slice::from_ref(slice)
-                        };
-                        let type_and_qualifiers = if let [argument] = arguments {
-                            let mut type_and_qualifiers = self.infer_annotation_expression_impl(
-                                argument,
-                                PEP613Policy::Disallowed,
-                            );
 
-                            // Emit a diagnostic if ClassVar and Final are combined in a class that is
-                            // not a dataclass, since Final already implies the semantics of ClassVar.
-                            let classvar_and_final = match type_qualifier {
-                                SpecialFormType::Final => type_and_qualifiers
-                                    .qualifiers
-                                    .contains(TypeQualifiers::CLASS_VAR),
-                                SpecialFormType::ClassVar => type_and_qualifiers
-                                    .qualifiers
-                                    .contains(TypeQualifiers::FINAL),
-                                _ => false,
-                            };
-                            if classvar_and_final
-                                && nearest_enclosing_class(self.db(), self.index, self.scope())
-                                    .is_none_or(|class| !class.is_dataclass_like(self.db()))
-                                && let Some(builder) = self
-                                    .context
-                                    .report_lint(&REDUNDANT_FINAL_CLASSVAR, subscript)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "`Combining `ClassVar` and `Final` is redundant"
-                                ));
-                            }
-
-                            match type_qualifier {
-                                SpecialFormType::ClassVar => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::CLASS_VAR);
-                                    if type_and_qualifiers
+                                if qualifier == TypeQualifier::ClassVar
+                                    && type_and_qualifiers
                                         .inner_type()
                                         .has_non_self_typevar(self.db())
-                                        && let Some(builder) =
-                                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                                    {
-                                        builder.into_diagnostic(
-                                            "`ClassVar` cannot contain type variables",
-                                        );
-                                    }
+                                    && let Some(builder) =
+                                        self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                {
+                                    builder.into_diagnostic(
+                                        "`ClassVar` cannot contain type variables",
+                                    );
                                 }
-                                SpecialFormType::Final => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::FINAL);
+                                type_and_qualifiers.with_qualifier(TypeQualifiers::from(qualifier))
+                            } else {
+                                for element in arguments {
+                                    self.infer_annotation_expression_impl(
+                                        element,
+                                        PEP613Policy::Disallowed,
+                                    );
                                 }
-                                SpecialFormType::Required => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::REQUIRED);
+                                if let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                                {
+                                    let num_arguments = arguments.len();
+                                    builder.into_diagnostic(format_args!(
+                                        "Type qualifier `{qualifier}` expected exactly 1 \
+                                        argument, got {num_arguments}",
+                                    ));
                                 }
-                                SpecialFormType::NotRequired => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::NOT_REQUIRED);
-                                }
-                                SpecialFormType::ReadOnly => {
-                                    type_and_qualifiers.add_qualifier(TypeQualifiers::READ_ONLY);
-                                }
-                                _ => unreachable!(),
+                                TypeAndQualifiers::declared(Type::unknown())
+                            };
+                            if slice.is_tuple_expr() {
+                                self.store_expression_type(slice, type_and_qualifiers.inner_type());
                             }
                             type_and_qualifiers
-                        } else {
-                            for element in arguments {
-                                self.infer_annotation_expression_impl(
-                                    element,
-                                    PEP613Policy::Disallowed,
-                                );
-                            }
-                            if let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                            {
-                                let num_arguments = arguments.len();
-                                builder.into_diagnostic(format_args!(
-                                    "Type qualifier `{type_qualifier}` expected exactly 1 argument, \
-                                    got {num_arguments}",
-                                ));
-                            }
-                            TypeAndQualifiers::declared(Type::unknown())
-                        };
-                        if slice.is_tuple_expr() {
-                            self.store_expression_type(slice, type_and_qualifiers.inner_type());
                         }
-                        type_and_qualifiers
-                    }
+                        SpecialFormCategory::Type
+                        | SpecialFormCategory::Tuple
+                        | SpecialFormCategory::Callable
+                        | SpecialFormCategory::LegacyStdlibAlias(_)
+                        | SpecialFormCategory::Other(_) => TypeAndQualifiers::declared(
+                            self.infer_subscript_type_expression_no_store(
+                                subscript, slice, value_ty,
+                            ),
+                        ),
+                    },
                     Type::ClassLiteral(class) if class.is_known(self.db(), KnownClass::InitVar) => {
                         let arguments = if let ast::Expr::Tuple(tuple) = slice {
                             &*tuple.elts
@@ -364,12 +365,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             std::slice::from_ref(slice)
                         };
                         let type_and_qualifiers = if let [argument] = arguments {
-                            let mut type_and_qualifiers = self.infer_annotation_expression_impl(
+                            self.infer_annotation_expression_impl(
                                 argument,
                                 PEP613Policy::Disallowed,
-                            );
-                            type_and_qualifiers.add_qualifier(TypeQualifiers::INIT_VAR);
-                            type_and_qualifiers
+                            )
+                            .with_qualifier(TypeQualifiers::INIT_VAR)
                         } else {
                             for element in arguments {
                                 self.infer_annotation_expression_impl(

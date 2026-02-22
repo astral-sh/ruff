@@ -1700,10 +1700,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         }
     }
 
-    fn infer_callable_type_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
-        self.infer_callable_type(subscript)
-    }
-
     fn infer_parameterized_special_form_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
@@ -1723,7 +1719,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 self.infer_subclass_of_type_expression(&subscript.slice)
             }
             special_form::SpecialFormCategory::Callable => {
-                self.infer_callable_type_expression(subscript)
+                self.infer_callable_type(subscript)
             }
             special_form::SpecialFormCategory::TypeQualifier(qualifier) => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {

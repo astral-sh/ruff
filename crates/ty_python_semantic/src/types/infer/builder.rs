@@ -119,6 +119,7 @@ use crate::types::generics::{
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
+use crate::types::special_form::{AliasSpec, MiscSpecialForm};
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
@@ -132,12 +133,13 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LintDiagnosticGuard, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
     MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
-    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+    Parameters, Signature, SpecialFormCategory, SpecialFormType, StaticClassLiteral,
+    SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
+    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
+    todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -15933,279 +15935,243 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            Type::SpecialForm(SpecialFormType::Tuple) => {
-                return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(subscript));
-            }
-            Type::SpecialForm(SpecialFormType::Literal) => {
-                match self.infer_literal_parameter_type(slice) {
-                    Ok(result) => {
-                        return Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(
-                            self.db(),
-                            result,
-                        )));
-                    }
-                    Err(nodes) => {
-                        for node in nodes {
-                            let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node)
-                            else {
-                                continue;
-                            };
-                            builder.into_diagnostic(
-                                "Type arguments for `Literal` must be `None`, \
-                            a literal value (int, bool, str, or bytes), or an enum member",
-                            );
-                        }
-                        return Type::unknown();
-                    }
+            Type::SpecialForm(special_form) => match special_form.kind() {
+                SpecialFormCategory::Tuple => {
+                    return tuple_generic_alias(
+                        self.db(),
+                        self.infer_tuple_type_expression(subscript),
+                    );
                 }
-            }
-            Type::SpecialForm(SpecialFormType::Annotated) => {
-                let ast::Expr::Tuple(ast::ExprTuple {
-                    elts: ref arguments,
-                    ..
-                }) = **slice
-                else {
-                    report_invalid_arguments_to_annotated(&self.context, subscript);
-
-                    return self.infer_expression(slice, TypeContext::default());
-                };
-
-                if arguments.len() < 2 {
-                    report_invalid_arguments_to_annotated(&self.context, subscript);
-                }
-
-                let [type_expr, metadata @ ..] = &arguments[..] else {
-                    for argument in arguments {
-                        self.infer_expression(argument, TypeContext::default());
-                    }
-                    self.store_expression_type(slice, Type::unknown());
-                    return Type::unknown();
-                };
-
-                for element in metadata {
-                    self.infer_expression(element, TypeContext::default());
-                }
-
-                let ty = self.infer_type_expression(type_expr);
-
-                return Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
-                    self.db(),
-                    ty,
-                )));
-            }
-            Type::SpecialForm(SpecialFormType::Optional) => {
-                let db = self.db();
-
-                if matches!(**slice, ast::Expr::Tuple(_))
-                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                {
-                    builder.into_diagnostic(format_args!(
-                        "`typing.Optional` requires exactly one argument"
-                    ));
-                }
-
-                let ty = self.infer_type_expression(slice);
-
-                // `Optional[None]` is equivalent to `None`:
-                if ty.is_none(db) {
-                    return ty;
-                }
-
-                return Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
-                    db,
-                    None,
-                    Ok(UnionType::from_elements(db, [ty, Type::none(db)])),
-                )));
-            }
-            Type::SpecialForm(SpecialFormType::Union) => {
-                let db = self.db();
-
-                match **slice {
-                    ast::Expr::Tuple(ref tuple) => {
-                        let mut elements = tuple
-                            .elts
-                            .iter()
-                            .map(|elt| self.infer_type_expression(elt))
-                            .peekable();
-
-                        let is_empty = elements.peek().is_none();
-                        let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
-                            UnionTypeInstance::new(
-                                db,
-                                None,
-                                Ok(UnionType::from_elements(db, elements)),
-                            ),
-                        ));
-
-                        if is_empty
-                            && let Some(builder) =
-                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                        {
-                            builder.into_diagnostic(
-                                "`typing.Union` requires at least one type argument",
-                            );
-                        }
-
-                        return union_type;
-                    }
-                    _ => {
-                        return self.infer_expression(slice, TypeContext::default());
-                    }
-                }
-            }
-            Type::SpecialForm(SpecialFormType::Type) => {
-                // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
-                let argument_ty = self.infer_type_expression(slice);
-                return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
-                    InternedType::new(self.db(), argument_ty),
-                ));
-            }
-            Type::SpecialForm(SpecialFormType::Callable) => {
-                let arguments = if let ast::Expr::Tuple(tuple) = &*subscript.slice {
-                    &*tuple.elts
-                } else {
-                    std::slice::from_ref(&*subscript.slice)
-                };
-
-                // TODO: Remove this once we support Concatenate properly. This is necessary
-                // to avoid a lot of false positives downstream, because we can't represent the typevar-
-                // specialized `Callable` types yet.
-                let num_arguments = arguments.len();
-                if num_arguments == 2 {
-                    let first_arg = &arguments[0];
-                    let second_arg = &arguments[1];
-
-                    if first_arg.is_subscript_expr() {
-                        let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
-                        if let Type::Dynamic(DynamicType::UnknownGeneric(generic_context)) =
-                            first_arg_ty
-                        {
-                            let mut variables = generic_context
-                                .variables(self.db())
-                                .collect::<FxOrderSet<_>>();
-
-                            let return_ty =
-                                self.infer_expression(second_arg, TypeContext::default());
-                            return_ty.bind_and_find_all_legacy_typevars(
-                                self.db(),
-                                self.typevar_binding_context,
-                                &mut variables,
-                            );
-
-                            let generic_context =
-                                GenericContext::from_typevar_instances(self.db(), variables);
-                            return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
-                        }
-
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "The first argument to `Callable` must be either a list of types, \
-                                     ParamSpec, Concatenate, or `...`",
+                SpecialFormCategory::Other(MiscSpecialForm::Literal) => {
+                    match self.infer_literal_parameter_type(slice) {
+                        Ok(result) => {
+                            return Type::KnownInstance(KnownInstanceType::Literal(
+                                InternedType::new(self.db(), result),
                             ));
                         }
-                        return Type::KnownInstance(KnownInstanceType::Callable(
-                            CallableType::unknown(self.db()),
-                        ));
+                        Err(nodes) => {
+                            for node in nodes {
+                                let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, node)
+                                else {
+                                    continue;
+                                };
+                                builder.into_diagnostic(
+                                    "Type arguments for `Literal` must be `None`, \
+                            a literal value (int, bool, str, or bytes), or an enum member",
+                                );
+                            }
+                            return Type::unknown();
+                        }
                     }
                 }
+                SpecialFormCategory::Other(MiscSpecialForm::Annotated) => {
+                    let ast::Expr::Tuple(ast::ExprTuple {
+                        elts: ref arguments,
+                        ..
+                    }) = **slice
+                    else {
+                        report_invalid_arguments_to_annotated(&self.context, subscript);
 
-                let callable = self
-                    .infer_callable_type(subscript)
-                    .as_callable()
-                    .expect("always returns Type::Callable");
+                        return self.infer_expression(slice, TypeContext::default());
+                    };
 
-                return Type::KnownInstance(KnownInstanceType::Callable(callable));
-            }
-            // `typing` special forms with a single generic argument
-            Type::SpecialForm(
-                special_form @ (SpecialFormType::List
-                | SpecialFormType::Set
-                | SpecialFormType::FrozenSet
-                | SpecialFormType::Counter
-                | SpecialFormType::Deque),
-            ) => {
-                let slice_ty = self.infer_type_expression(slice);
-
-                let element_ty = if matches!(**slice, ast::Expr::Tuple(_)) {
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "`typing.{}` requires exactly one argument",
-                            special_form.name()
-                        ));
+                    if arguments.len() < 2 {
+                        report_invalid_arguments_to_annotated(&self.context, subscript);
                     }
-                    Type::unknown()
-                } else {
-                    slice_ty
-                };
 
-                let class = special_form
-                    .aliased_stdlib_class()
-                    .expect("A known stdlib class is available");
+                    let [type_expr, metadata @ ..] = &arguments[..] else {
+                        for argument in arguments {
+                            self.infer_expression(argument, TypeContext::default());
+                        }
+                        self.store_expression_type(slice, Type::unknown());
+                        return Type::unknown();
+                    };
 
-                return class
-                    .to_specialized_class_type(self.db(), &[element_ty])
-                    .map(Type::from)
-                    .unwrap_or_else(Type::unknown);
-            }
-            // `typing` special forms with two generic arguments
-            Type::SpecialForm(
-                special_form @ (SpecialFormType::Dict
-                | SpecialFormType::ChainMap
-                | SpecialFormType::DefaultDict
-                | SpecialFormType::OrderedDict),
-            ) => {
-                let (first_ty, second_ty) = if let ast::Expr::Tuple(ast::ExprTuple {
-                    elts: ref arguments,
-                    ..
-                }) = **slice
-                {
-                    if arguments.len() != 2
+                    for element in metadata {
+                        self.infer_expression(element, TypeContext::default());
+                    }
+
+                    let ty = self.infer_type_expression(type_expr);
+
+                    return Type::KnownInstance(KnownInstanceType::Annotated(InternedType::new(
+                        self.db(),
+                        ty,
+                    )));
+                }
+                SpecialFormCategory::Other(MiscSpecialForm::Optional) => {
+                    let db = self.db();
+
+                    if matches!(**slice, ast::Expr::Tuple(_))
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_TYPE_FORM, subscript)
                     {
                         builder.into_diagnostic(format_args!(
-                            "`typing.{}` requires exactly two arguments, got {}",
-                            special_form.name(),
-                            arguments.len()
+                            "`typing.Optional` requires exactly one argument"
                         ));
                     }
 
-                    if let [first_expr, second_expr] = &arguments[..] {
-                        let first_ty = self.infer_type_expression(first_expr);
-                        let second_ty = self.infer_type_expression(second_expr);
+                    let ty = self.infer_type_expression(slice);
 
-                        (first_ty, second_ty)
-                    } else {
-                        for argument in arguments {
-                            self.infer_type_expression(argument);
+                    // `Optional[None]` is equivalent to `None`:
+                    if ty.is_none(db) {
+                        return ty;
+                    }
+
+                    return Type::KnownInstance(KnownInstanceType::UnionType(
+                        UnionTypeInstance::new(
+                            db,
+                            None,
+                            Ok(UnionType::from_elements(db, [ty, Type::none(db)])),
+                        ),
+                    ));
+                }
+                SpecialFormCategory::Other(MiscSpecialForm::Union) => {
+                    let db = self.db();
+
+                    match **slice {
+                        ast::Expr::Tuple(ref tuple) => {
+                            let mut elements = tuple
+                                .elts
+                                .iter()
+                                .map(|elt| self.infer_type_expression(elt))
+                                .peekable();
+
+                            let is_empty = elements.peek().is_none();
+                            let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
+                                UnionTypeInstance::new(
+                                    db,
+                                    None,
+                                    Ok(UnionType::from_elements(db, elements)),
+                                ),
+                            ));
+
+                            if is_empty
+                                && let Some(builder) =
+                                    self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                            {
+                                builder.into_diagnostic(
+                                    "`typing.Union` requires at least one type argument",
+                                );
+                            }
+
+                            return union_type;
                         }
-
-                        (Type::unknown(), Type::unknown())
+                        _ => {
+                            return self.infer_expression(slice, TypeContext::default());
+                        }
                     }
-                } else {
-                    let first_ty = self.infer_type_expression(slice);
+                }
+                SpecialFormCategory::Type => {
+                    // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
+                    let argument_ty = self.infer_type_expression(slice);
+                    return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
+                        InternedType::new(self.db(), argument_ty),
+                    ));
+                }
+                SpecialFormCategory::Callable => {
+                    let arguments = if let ast::Expr::Tuple(tuple) = &*subscript.slice {
+                        &*tuple.elts
+                    } else {
+                        std::slice::from_ref(&*subscript.slice)
+                    };
 
-                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
-                        builder.into_diagnostic(format_args!(
-                            "`typing.{}` requires exactly two arguments, got 1",
-                            special_form.name()
-                        ));
+                    // TODO: Remove this once we support Concatenate properly. This is necessary
+                    // to avoid a lot of false positives downstream, because we can't represent the typevar-
+                    // specialized `Callable` types yet.
+                    let num_arguments = arguments.len();
+                    if num_arguments == 2 {
+                        let first_arg = &arguments[0];
+                        let second_arg = &arguments[1];
+
+                        if first_arg.is_subscript_expr() {
+                            let first_arg_ty =
+                                self.infer_expression(first_arg, TypeContext::default());
+                            if let Type::Dynamic(DynamicType::UnknownGeneric(generic_context)) =
+                                first_arg_ty
+                            {
+                                let mut variables = generic_context
+                                    .variables(self.db())
+                                    .collect::<FxOrderSet<_>>();
+
+                                let return_ty =
+                                    self.infer_expression(second_arg, TypeContext::default());
+                                return_ty.bind_and_find_all_legacy_typevars(
+                                    self.db(),
+                                    self.typevar_binding_context,
+                                    &mut variables,
+                                );
+
+                                let generic_context =
+                                    GenericContext::from_typevar_instances(self.db(), variables);
+                                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
+                            }
+
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                "The first argument to `Callable` must be either a list of types, \
+                                     ParamSpec, Concatenate, or `...`",
+                            ));
+                            }
+                            return Type::KnownInstance(KnownInstanceType::Callable(
+                                CallableType::unknown(self.db()),
+                            ));
+                        }
                     }
 
-                    (first_ty, Type::unknown())
-                };
+                    let callable = self
+                        .infer_callable_type(subscript)
+                        .as_callable()
+                        .expect("always returns Type::Callable");
 
-                let class = special_form
-                    .aliased_stdlib_class()
-                    .expect("Stdlib class available");
+                    return Type::KnownInstance(KnownInstanceType::Callable(callable));
+                }
+                SpecialFormCategory::Other(_) => {}
+                SpecialFormCategory::LegacyStdlibAlias(alias) => {
+                    let AliasSpec {
+                        class,
+                        expected_argument_number,
+                    } = alias.alias_spec();
 
-                return class
-                    .to_specialized_class_type(self.db(), &[first_ty, second_ty])
-                    .map(Type::from)
-                    .unwrap_or_else(Type::unknown);
-            }
+                    let args = if let ast::Expr::Tuple(t) = &**slice {
+                        &*t.elts
+                    } else {
+                        std::slice::from_ref(&**slice)
+                    };
+
+                    if args.len() != expected_argument_number {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            let noun = if expected_argument_number == 1 {
+                                "argument"
+                            } else {
+                                "arguments"
+                            };
+                            builder.into_diagnostic(format_args!(
+                                "`typing.{name}` requires exactly \
+                                {expected_argument_number} {noun}, got {got}",
+                                name = special_form.name(),
+                                got = args.len()
+                            ));
+                        }
+                    }
+
+                    let arg_types: Vec<_> = args
+                        .iter()
+                        .map(|arg| self.infer_type_expression(arg))
+                        .collect();
+
+                    return class
+                        .to_specialized_class_type(self.db(), arg_types)
+                        .map(Type::from)
+                        .unwrap_or_else(Type::unknown);
+                }
+                SpecialFormCategory::TypeQualifier(_) => {}
+            },
+
             Type::KnownInstance(
                 KnownInstanceType::UnionType(_)
                 | KnownInstanceType::Annotated(_)

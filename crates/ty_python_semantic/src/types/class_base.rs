@@ -2,13 +2,13 @@ use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
 use crate::types::special_form::{self, SpecialFormCategory};
-use crate::{Db, DisplaySettings};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
     MaterializationKind, NormalizedVisitor, SpecialFormType, StaticMroError, Type, TypeContext,
     TypeMapping, todo_type,
 };
+use crate::{Db, DisplaySettings};
 
 /// Enumeration of the possible kinds of types we allow in class bases.
 ///
