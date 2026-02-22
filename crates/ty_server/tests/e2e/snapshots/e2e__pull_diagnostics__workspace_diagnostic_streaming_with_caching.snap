@@ -68,9 +68,7 @@ expression: all_items
                             "ty",
                         ),
                         message: "Name `true` used when not defined",
-                        related_information: Some(
-                            [],
-                        ),
+                        related_information: None,
                         tags: None,
                         data: None,
                     },
@@ -143,9 +141,7 @@ expression: all_items
                             "ty",
                         ),
                         message: "Name `true` used when not defined",
-                        related_information: Some(
-                            [],
-                        ),
+                        related_information: None,
                         tags: None,
                         data: None,
                     },
@@ -218,9 +214,7 @@ expression: all_items
                             "ty",
                         ),
                         message: "Name `true` used when not defined",
-                        related_information: Some(
-                            [],
-                        ),
+                        related_information: None,
                         tags: None,
                         data: None,
                     },

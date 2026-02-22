@@ -2,7 +2,7 @@ use memchr::memchr2_iter;
 use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
@@ -57,6 +57,10 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// This fix will always change the behavior of the program and, despite the precautions detailed
 /// above, this may be undesired. As such the fix is always marked as unsafe.
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 ///
 /// [logging]: https://docs.python.org/3/howto/logging-cookbook.html#using-particular-formatting-styles-throughout-your-application
 /// [gettext]: https://docs.python.org/3/library/gettext.html
@@ -116,7 +120,12 @@ pub(crate) fn missing_fstring_syntax(checker: &Checker, literal: &ast::StringLit
         return;
     }
 
-    if should_be_fstring(literal, checker.locator(), semantic) {
+    if should_be_fstring(
+        literal,
+        checker.locator(),
+        semantic,
+        checker.target_version(),
+    ) {
         checker
             .report_diagnostic(MissingFStringSyntax, literal.range())
             .set_fix(fix_fstring_syntax(literal.range()));
@@ -180,6 +189,7 @@ fn should_be_fstring(
     literal: &ast::StringLiteral,
     locator: &Locator,
     semantic: &SemanticModel,
+    target_version: PythonVersion,
 ) -> bool {
     if !has_brackets(&literal.value) {
         return false;
@@ -216,6 +226,13 @@ fn should_be_fstring(
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.interpolations() {
+            // Check if the interpolation expression contains backslashes
+            // F-strings with backslashes in interpolations are only valid in Python 3.12+
+            let interpolation_text = &fstring_expr[element.range()];
+            if target_version < PythonVersion::PY312 && interpolation_text.contains('\\') {
+                return false;
+            }
+
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
                 if arg_names.contains(id) {
                     return false;

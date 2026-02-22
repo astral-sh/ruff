@@ -20,17 +20,21 @@ type TypeVarAndParamSpec[T, **P] = ...
 type SingleTypeVarTuple[*Ts] = ...
 type TypeVarAndTypeVarTuple[T, *Ts] = ...
 
-# revealed: tuple[T@SingleTypevar]
+# revealed: ty_extensions.GenericContext[T@SingleTypevar]
 reveal_type(generic_context(SingleTypevar))
-# revealed: tuple[T@MultipleTypevars, S@MultipleTypevars]
+# revealed: ty_extensions.GenericContext[T@MultipleTypevars, S@MultipleTypevars]
 reveal_type(generic_context(MultipleTypevars))
 
-# TODO: support `ParamSpec`/`TypeVarTuple` properly
-# (these should include the `ParamSpec`s and `TypeVarTuple`s in their generic contexts)
-reveal_type(generic_context(SingleParamSpec))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndParamSpec))  # revealed: tuple[T@TypeVarAndParamSpec]
-reveal_type(generic_context(SingleTypeVarTuple))  # revealed: tuple[()]
-reveal_type(generic_context(TypeVarAndTypeVarTuple))  # revealed: tuple[T@TypeVarAndTypeVarTuple]
+# TODO: support `TypeVarTuple` properly
+# (these should include the `TypeVarTuple`s in their generic contexts)
+# revealed: ty_extensions.GenericContext[P@SingleParamSpec]
+reveal_type(generic_context(SingleParamSpec))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndParamSpec, P@TypeVarAndParamSpec]
+reveal_type(generic_context(TypeVarAndParamSpec))
+# revealed: ty_extensions.GenericContext[]
+reveal_type(generic_context(SingleTypeVarTuple))
+# revealed: ty_extensions.GenericContext[T@TypeVarAndTypeVarTuple]
+reveal_type(generic_context(TypeVarAndTypeVarTuple))
 ```
 
 You cannot use the same typevar more than once.
@@ -57,20 +61,98 @@ def _(a: C[int], b: C[Literal[5]]):
 The specialization must match the generic types:
 
 ```py
-# error: [too-many-positional-arguments] "Too many positional arguments: expected 1, got 2"
-reveal_type(C[int, int])  # revealed: Unknown
+# error: [invalid-type-arguments] "Too many type arguments: expected 1, got 2"
+reveal_type(C[int, int])  # revealed: <type alias 'C[Unknown]'>
 ```
 
 And non-generic types cannot be specialized:
 
 ```py
+from typing import TypeVar, Protocol, TypedDict
+
 type B = ...
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias"
 reveal_type(B[int])  # revealed: Unknown
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias"
-def _(b: B[int]): ...
+# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+def _(b: B[int]):
+    reveal_type(b)  # revealed: Unknown
+
+type IntOrStr = int | str
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+def _(c: IntOrStr[int]):
+    reveal_type(c)  # revealed: Unknown
+
+type ListOfInts = list[int]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+def _(l: ListOfInts[int]):
+    reveal_type(l)  # revealed: Unknown
+
+type List[T] = list[T]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
+def _(l: List[int][int]):
+    reveal_type(l)  # revealed: Unknown
+
+# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
+type DoubleSpecialization[T] = list[T][T]
+
+def _(d: DoubleSpecialization[int]):
+    reveal_type(d)  # revealed: Unknown
+
+type Tuple = tuple[int, str]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `tuple[int, str]` is already specialized"
+def _(doubly_specialized: Tuple[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+T = TypeVar("T")
+
+class LegacyProto(Protocol[T]):
+    pass
+
+type LegacyProtoInt = LegacyProto[int]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `LegacyProto[int]` is already specialized"
+def _(x: LegacyProtoInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+class Proto[T](Protocol):
+    pass
+
+type ProtoInt = Proto[int]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `Proto[int]` is already specialized"
+def _(x: ProtoInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+# TODO: TypedDict is just a function object at runtime, we should emit an error
+class LegacyDict(TypedDict[T]):
+    x: T
+
+type LegacyDictInt = LegacyDict[int]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias"
+def _(x: LegacyDictInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+class Dict[T](TypedDict):
+    x: T
+
+type DictInt = Dict[int]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `Dict[int]` is already specialized"
+def _(x: DictInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+type Union = list[str] | list[int]
+
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[str] | list[int]` is already specialized"
+def _(x: Union[int]):
+    reveal_type(x)  # revealed: Unknown
 ```
 
 If the type variable has an upper bound, the specialized type must satisfy that bound:
@@ -81,21 +163,28 @@ type BoundedByUnion[T: int | str] = ...
 
 class IntSubclass(int): ...
 
-reveal_type(Bounded[int])  # revealed: Bounded[int]
-reveal_type(Bounded[IntSubclass])  # revealed: Bounded[IntSubclass]
+reveal_type(Bounded[int])  # revealed: <type alias 'Bounded[int]'>
+reveal_type(Bounded[IntSubclass])  # revealed: <type alias 'Bounded[IntSubclass]'>
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `str`"
-reveal_type(Bounded[str])  # revealed: Unknown
+# error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `T@Bounded`"
+reveal_type(Bounded[str])  # revealed: <type alias 'Bounded[Unknown]'>
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `int | str`"
-reveal_type(Bounded[int | str])  # revealed: Unknown
+# error: [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `T@Bounded`"
+reveal_type(Bounded[int | str])  # revealed: <type alias 'Bounded[Unknown]'>
 
-reveal_type(BoundedByUnion[int])  # revealed: BoundedByUnion[int]
-reveal_type(BoundedByUnion[IntSubclass])  # revealed: BoundedByUnion[IntSubclass]
-reveal_type(BoundedByUnion[str])  # revealed: BoundedByUnion[str]
-reveal_type(BoundedByUnion[int | str])  # revealed: BoundedByUnion[int | str]
+reveal_type(BoundedByUnion[int])  # revealed: <type alias 'BoundedByUnion[int]'>
+reveal_type(BoundedByUnion[IntSubclass])  # revealed: <type alias 'BoundedByUnion[IntSubclass]'>
+reveal_type(BoundedByUnion[str])  # revealed: <type alias 'BoundedByUnion[str]'>
+reveal_type(BoundedByUnion[int | str])  # revealed: <type alias 'BoundedByUnion[int | str]'>
+
+type TupleOfIntAndStr[T: int, U: str] = tuple[T, U]
+
+def _(x: TupleOfIntAndStr[int, str]):
+    reveal_type(x)  # revealed: tuple[int, str]
+
+# error: [invalid-type-arguments] "Type `int` is not assignable to upper bound `str` of type variable `U@TupleOfIntAndStr`"
+def _(x: TupleOfIntAndStr[int, int]):
+    reveal_type(x)  # revealed: tuple[int, Unknown]
 ```
 
 If the type variable is constrained, the specialized type must satisfy those constraints:
@@ -103,21 +192,29 @@ If the type variable is constrained, the specialized type must satisfy those con
 ```py
 type Constrained[T: (int, str)] = ...
 
-reveal_type(Constrained[int])  # revealed: Constrained[int]
+reveal_type(Constrained[int])  # revealed: <type alias 'Constrained[int]'>
 
 # TODO: error: [invalid-argument-type]
 # TODO: revealed: Constrained[Unknown]
-reveal_type(Constrained[IntSubclass])  # revealed: Constrained[IntSubclass]
+reveal_type(Constrained[IntSubclass])  # revealed: <type alias 'Constrained[IntSubclass]'>
 
-reveal_type(Constrained[str])  # revealed: Constrained[str]
+reveal_type(Constrained[str])  # revealed: <type alias 'Constrained[str]'>
 
 # TODO: error: [invalid-argument-type]
 # TODO: revealed: Unknown
-reveal_type(Constrained[int | str])  # revealed: Constrained[int | str]
+reveal_type(Constrained[int | str])  # revealed: <type alias 'Constrained[int | str]'>
 
-# TODO: update this diagnostic to talk about type parameters and specializations
-# error: [invalid-argument-type] "Argument is incorrect: Expected `int | str`, found `object`"
-reveal_type(Constrained[object])  # revealed: Unknown
+# error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
+reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[Unknown]'>
+
+type TupleOfIntOrStr[T: (int, str), U: (int, str)] = tuple[T, U]
+
+def _(x: TupleOfIntOrStr[int, str]):
+    reveal_type(x)  # revealed: tuple[int, str]
+
+# error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `U@TupleOfIntOrStr`"
+def _(x: TupleOfIntOrStr[int, object]):
+    reveal_type(x)  # revealed: tuple[int, Unknown]
 ```
 
 If the type variable has a default, it can be omitted:
@@ -125,8 +222,8 @@ If the type variable has a default, it can be omitted:
 ```py
 type WithDefault[T, U = int] = ...
 
-reveal_type(WithDefault[str, str])  # revealed: WithDefault[str, str]
-reveal_type(WithDefault[str])  # revealed: WithDefault[str, int]
+reveal_type(WithDefault[str, str])  # revealed: <type alias 'WithDefault[str, str]'>
+reveal_type(WithDefault[str])  # revealed: <type alias 'WithDefault[str, int]'>
 ```
 
 If the type alias is not specialized explicitly, it is implicitly specialized to `Unknown`:
@@ -230,4 +327,207 @@ d4: DivergentList[int] = [[1]]
 def _(x: DivergentList[int]):
     d1: DivergentList[int] = [x]
     d2: DivergentList[int] = x[0]
+```
+
+## Solving generics with type alias parameters
+
+A generic function parameter annotated with a PEP 695 type alias that contains a type variable
+should properly infer the specialization from the argument:
+
+```py
+type MyList[T] = list[T]
+type MyDict[K, V] = dict[K, V]
+
+def head[T](my_list: MyList[T]) -> T:
+    return my_list[0]
+
+def get_value[K, V](my_dict: MyDict[K, V], key: K) -> V:
+    return my_dict[key]
+
+reveal_type(head([1, 2]))  # revealed: Unknown | int
+reveal_type(head(["a", "b"]))  # revealed: Unknown | str
+
+d: dict[str, int] = {"a": 1}
+reveal_type(get_value(d, "a"))  # revealed: int
+```
+
+It also works in the reverse direction, where the type alias is used as the argument type:
+
+```py
+type MyList[T] = list[T]
+
+def head[T](l: list[T]) -> T:
+    return l[0]
+
+def _(x: MyList[int]):
+    reveal_type(head(x))  # revealed: int
+```
+
+## Bidirectional type inference with union type aliases
+
+When a PEP 695 type alias expands to a union, bidirectional type inference should still work
+correctly. The type alias should be expanded to its value type when determining the expected type
+for specialization inference.
+
+```py
+type MaybeList[T] = list[T] | T
+
+def test[X: int](items: list[X]) -> list[X]:
+    # The annotation MaybeList[str | int] expands to `list[str | int] | str | int`.
+    # Bidirectional inference should infer list[str | int] from the list() call.
+    a: MaybeList[str | int] = list(items)
+    # The revealed type is list[str | int] because that's what list() returns.
+    reveal_type(a)  # revealed: list[str | int]
+    return items
+```
+
+This also works for more complex cases with multiple generic functions:
+
+```py
+type OptionalList[T] = list[T] | None
+
+def copy_list[T](items: list[T]) -> list[T]:
+    return list(items)
+
+def _(values: list[int]) -> OptionalList[int]:
+    result: OptionalList[int] = copy_list(values)
+    # The revealed type is list[int] because that's what copy_list returns.
+    reveal_type(result)  # revealed: list[int]
+    return result
+```
+
+Union type aliases also work correctly with TypedDict dict literal inference:
+
+```py
+from typing import TypedDict
+
+class Person(TypedDict):
+    name: str
+    age: int
+
+type MaybePerson = Person | None
+
+def _(p: MaybePerson):
+    # Dict literal should be inferred as Person, not dict[str, str | int]
+    x: MaybePerson = {"name": "Alice", "age": 30}
+    reveal_type(x)  # revealed: Person
+```
+
+And with `dict()` calls in TypedDict context:
+
+```py
+from typing import TypedDict
+
+class Dog(TypedDict):
+    name: str
+    breed: str
+
+type MaybeDog = Dog | None
+
+def _():
+    # dict() call with keyword args should be inferred as Dog
+    animal: MaybeDog = dict(name="Buddy", breed="Labrador")
+    reveal_type(animal)  # revealed: Dog
+```
+
+And with set literal inference:
+
+```py
+type MaybeSet[T] = set[T] | T
+
+def _():
+    # Set literal should be inferred as set[int]
+    x: MaybeSet[int] = {1, 2, 3}
+    reveal_type(x)  # revealed: set[int]
+```
+
+## Fully qualified type alias names in error messages
+
+When two type aliases have the same name but are in different scopes, they should be fully qualified
+in error messages to distinguish them:
+
+```py
+class A:
+    class B[T]:
+        pass
+
+    type D = list[int]
+
+class C:
+    class B[T]:
+        pass
+
+    type D = list[str]
+
+def f(b: C.B[C.D]) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.C.B[mdtest_snippet.C.D]` is not assignable to `mdtest_snippet.A.B[mdtest_snippet.A.D]`"
+    a: A.B[A.D] = b
+```
+
+## Fully qualified type alias names in nested classes
+
+Type aliases in nested classes should include the full class path:
+
+```py
+class Outer1:
+    class Inner:
+        type Alias = int
+
+class Outer2:
+    class Inner:
+        type Alias = str
+
+def g(x: Outer1.Inner.Alias, y: Outer2.Inner.Alias) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Outer2.Inner.Alias` is not assignable to `mdtest_snippet.Outer1.Inner.Alias`"
+    a: Outer1.Inner.Alias = y
+```
+
+## Fully qualified generic type aliases
+
+Ambiguous generic type aliases should also be fully qualified:
+
+```py
+class X:
+    type GenAlias[T] = list[T]
+
+class Y:
+    type GenAlias[T] = dict[str, T]
+
+def h(x: X.GenAlias[int], y: Y.GenAlias[int]) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Y.GenAlias[int]` is not assignable to `mdtest_snippet.X.GenAlias[int]`"
+    a: X.GenAlias[int] = y
+```
+
+## Non-ambiguous type aliases should not be qualified
+
+Type aliases with unique names should NOT be qualified:
+
+```py
+class P:
+    type UniqueAlias1 = int
+
+class Q:
+    type UniqueAlias2 = str
+
+def i(x: P.UniqueAlias1, y: Q.UniqueAlias2) -> None:
+    # error: [invalid-assignment] "Object of type `UniqueAlias2` is not assignable to `UniqueAlias1`"
+    a: P.UniqueAlias1 = y
+```
+
+## Class and type alias with same name
+
+When a class and a type alias have the same name in different scopes, both should be fully qualified
+to distinguish them in error messages:
+
+```py
+class Container1:
+    class Item:
+        pass
+
+class Container2:
+    type Item = str
+
+def j(x: Container1.Item, y: Container2.Item) -> None:
+    # error: [invalid-assignment] "Object of type `mdtest_snippet.Container2.Item` is not assignable to `mdtest_snippet.Container1.Item`"
+    a: Container1.Item = y
 ```

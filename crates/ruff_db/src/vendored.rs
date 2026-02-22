@@ -619,19 +619,19 @@ pub(crate) mod tests {
     fn read_directory_stdlib() {
         let mock_typeshed = mock_typeshed();
 
-        assert_snapshot!(readdir_snapshot(&mock_typeshed, "stdlib"), @r"
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "stdlib"), @"
         vendored://stdlib/asyncio/
         vendored://stdlib/functools.pyi
         ");
-        assert_snapshot!(readdir_snapshot(&mock_typeshed, "stdlib/"), @r"
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "stdlib/"), @"
         vendored://stdlib/asyncio/
         vendored://stdlib/functools.pyi
         ");
-        assert_snapshot!(readdir_snapshot(&mock_typeshed, "./stdlib"), @r"
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "./stdlib"), @"
         vendored://stdlib/asyncio/
         vendored://stdlib/functools.pyi
         ");
-        assert_snapshot!(readdir_snapshot(&mock_typeshed, "./stdlib/"), @r"
+        assert_snapshot!(readdir_snapshot(&mock_typeshed, "./stdlib/"), @"
         vendored://stdlib/asyncio/
         vendored://stdlib/functools.pyi
         ");

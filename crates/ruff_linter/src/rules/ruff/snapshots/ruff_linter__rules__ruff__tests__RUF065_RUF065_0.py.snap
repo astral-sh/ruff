@@ -1,0 +1,219 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+ --> RUF065_0.py:4:26
+  |
+3 | # %s + str()
+4 | logging.info("Hello %s", str("World!"))
+  |                          ^^^^^^^^^^^^^
+5 | logging.log(logging.INFO, "Hello %s", str("World!"))
+  |
+
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+ --> RUF065_0.py:5:39
+  |
+3 | # %s + str()
+4 | logging.info("Hello %s", str("World!"))
+5 | logging.log(logging.INFO, "Hello %s", str("World!"))
+  |                                       ^^^^^^^^^^^^^
+6 |
+7 | # %s + repr()
+  |
+
+RUF065 Unnecessary `repr()` conversion when formatting with `%s`. Use `%r` instead of `%s`
+ --> RUF065_0.py:8:26
+  |
+7 | # %s + repr()
+8 | logging.info("Hello %s", repr("World!"))
+  |                          ^^^^^^^^^^^^^^
+9 | logging.log(logging.INFO, "Hello %s", repr("World!"))
+  |
+
+RUF065 Unnecessary `repr()` conversion when formatting with `%s`. Use `%r` instead of `%s`
+  --> RUF065_0.py:9:39
+   |
+ 7 | # %s + repr()
+ 8 | logging.info("Hello %s", repr("World!"))
+ 9 | logging.log(logging.INFO, "Hello %s", repr("World!"))
+   |                                       ^^^^^^^^^^^^^^
+10 |
+11 | # %r + str()
+   |
+
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+  --> RUF065_0.py:22:18
+   |
+21 | # %s + str()
+22 | info("Hello %s", str("World!"))
+   |                  ^^^^^^^^^^^^^
+23 | log(logging.INFO, "Hello %s", str("World!"))
+   |
+
+RUF065 Unnecessary `str()` conversion when formatting with `%s`
+  --> RUF065_0.py:23:31
+   |
+21 | # %s + str()
+22 | info("Hello %s", str("World!"))
+23 | log(logging.INFO, "Hello %s", str("World!"))
+   |                               ^^^^^^^^^^^^^
+24 |
+25 | # %s + repr()
+   |
+
+RUF065 Unnecessary `repr()` conversion when formatting with `%s`. Use `%r` instead of `%s`
+  --> RUF065_0.py:26:18
+   |
+25 | # %s + repr()
+26 | info("Hello %s", repr("World!"))
+   |                  ^^^^^^^^^^^^^^
+27 | log(logging.INFO, "Hello %s", repr("World!"))
+   |
+
+RUF065 Unnecessary `repr()` conversion when formatting with `%s`. Use `%r` instead of `%s`
+  --> RUF065_0.py:27:31
+   |
+25 | # %s + repr()
+26 | info("Hello %s", repr("World!"))
+27 | log(logging.INFO, "Hello %s", repr("World!"))
+   |                               ^^^^^^^^^^^^^^
+28 |
+29 | # %r + str()
+   |
+
+RUF065 Unnecessary `repr()` conversion when formatting with `%s`. Use `%r` instead of `%s`
+  --> RUF065_0.py:44:32
+   |
+42 | logging.warning("Value: %r", repr(42))
+43 | logging.error("Error: %r", repr([1, 2, 3]))
+44 | logging.info("Debug info: %s", repr("test\nstring"))
+   |                                ^^^^^^^^^^^^^^^^^^^^
+45 | logging.warning("Value: %s", repr(42))
+   |
+
+RUF065 Unnecessary `repr()` conversion when formatting with `%s`. Use `%r` instead of `%s`
+  --> RUF065_0.py:45:30
+   |
+43 | logging.error("Error: %r", repr([1, 2, 3]))
+44 | logging.info("Debug info: %s", repr("test\nstring"))
+45 | logging.warning("Value: %s", repr(42))
+   |                              ^^^^^^^^
+46 |
+47 | # %s + ascii()
+   |
+
+RUF065 Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`
+  --> RUF065_0.py:48:27
+   |
+47 | # %s + ascii()
+48 | logging.info("ASCII: %s", ascii("Hello\nWorld"))
+   |                           ^^^^^^^^^^^^^^^^^^^^^
+49 | logging.warning("ASCII: %s", ascii("test"))
+   |
+
+RUF065 Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`
+  --> RUF065_0.py:49:30
+   |
+47 | # %s + ascii()
+48 | logging.info("ASCII: %s", ascii("Hello\nWorld"))
+49 | logging.warning("ASCII: %s", ascii("test"))
+   |                              ^^^^^^^^^^^^^
+50 |
+51 | # %s + oct()
+   |
+
+RUF065 Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`
+  --> RUF065_0.py:52:27
+   |
+51 | # %s + oct()
+52 | logging.info("Octal: %s", oct(42))
+   |                           ^^^^^^^
+53 | logging.warning("Octal: %s", oct(255))
+   |
+
+RUF065 Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`
+  --> RUF065_0.py:53:30
+   |
+51 | # %s + oct()
+52 | logging.info("Octal: %s", oct(42))
+53 | logging.warning("Octal: %s", oct(255))
+   |                              ^^^^^^^^
+54 |
+55 | # %s + hex()
+   |
+
+RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` instead of `%s`
+  --> RUF065_0.py:56:25
+   |
+55 | # %s + hex()
+56 | logging.info("Hex: %s", hex(42))
+   |                         ^^^^^^^
+57 | logging.warning("Hex: %s", hex(255))
+   |
+
+RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` instead of `%s`
+  --> RUF065_0.py:57:28
+   |
+55 | # %s + hex()
+56 | logging.info("Hex: %s", hex(42))
+57 | logging.warning("Hex: %s", hex(255))
+   |                            ^^^^^^^^
+   |
+
+RUF065 Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`
+  --> RUF065_0.py:63:19
+   |
+61 | from logging import info, log
+62 |
+63 | info("ASCII: %s", ascii("Hello\nWorld"))
+   |                   ^^^^^^^^^^^^^^^^^^^^^
+64 | log(logging.INFO, "ASCII: %s", ascii("test"))
+   |
+
+RUF065 Unnecessary `ascii()` conversion when formatting with `%s`. Use `%a` instead of `%s`
+  --> RUF065_0.py:64:32
+   |
+63 | info("ASCII: %s", ascii("Hello\nWorld"))
+64 | log(logging.INFO, "ASCII: %s", ascii("test"))
+   |                                ^^^^^^^^^^^^^
+65 |
+66 | info("Octal: %s", oct(42))
+   |
+
+RUF065 Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`
+  --> RUF065_0.py:66:19
+   |
+64 | log(logging.INFO, "ASCII: %s", ascii("test"))
+65 |
+66 | info("Octal: %s", oct(42))
+   |                   ^^^^^^^
+67 | log(logging.INFO, "Octal: %s", oct(255))
+   |
+
+RUF065 Unnecessary `oct()` conversion when formatting with `%s`. Use `%#o` instead of `%s`
+  --> RUF065_0.py:67:32
+   |
+66 | info("Octal: %s", oct(42))
+67 | log(logging.INFO, "Octal: %s", oct(255))
+   |                                ^^^^^^^^
+68 |
+69 | info("Hex: %s", hex(42))
+   |
+
+RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` instead of `%s`
+  --> RUF065_0.py:69:17
+   |
+67 | log(logging.INFO, "Octal: %s", oct(255))
+68 |
+69 | info("Hex: %s", hex(42))
+   |                 ^^^^^^^
+70 | log(logging.INFO, "Hex: %s", hex(255))
+   |
+
+RUF065 Unnecessary `hex()` conversion when formatting with `%s`. Use `%#x` instead of `%s`
+  --> RUF065_0.py:70:30
+   |
+69 | info("Hex: %s", hex(42))
+70 | log(logging.INFO, "Hex: %s", hex(255))
+   |                              ^^^^^^^^
+   |

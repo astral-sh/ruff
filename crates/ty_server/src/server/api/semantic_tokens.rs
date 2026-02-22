@@ -1,7 +1,8 @@
 use lsp_types::SemanticToken;
-use ruff_db::source::source_text;
+use ruff_db::source::{line_index, source_text};
+use ruff_source_file::OneIndexed;
 use ruff_text_size::{Ranged, TextRange};
-use ty_ide::semantic_tokens;
+use ty_ide::{SemanticTokenModifier, SemanticTokenType, semantic_tokens};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionEncoding, ToRangeExt};
@@ -16,12 +17,14 @@ pub(crate) fn generate_semantic_tokens(
     multiline_token_support: bool,
 ) -> Vec<SemanticToken> {
     let source = source_text(db, file);
+    let line_index = line_index(db, file);
     let semantic_token_data = semantic_tokens(db, file, range);
 
-    // Convert semantic tokens to LSP format
-    let mut lsp_tokens = Vec::new();
-    let mut prev_line = 0u32;
-    let mut prev_start = 0u32;
+    let mut encoder = Encoder {
+        tokens: Vec::with_capacity(semantic_token_data.len()),
+        prev_line: 0,
+        prev_start: 0,
+    };
 
     for token in &*semantic_token_data {
         let Some(lsp_range) = token
@@ -32,62 +35,92 @@ pub(crate) fn generate_semantic_tokens(
             continue;
         };
 
-        let line = lsp_range.start.line;
-        let character = lsp_range.start.character;
+        if lsp_range.start.line == lsp_range.end.line {
+            let len = lsp_range.end.character - lsp_range.start.character;
+            encoder.push_token_at(lsp_range.start, len, token.token_type, token.modifiers);
+        } else if multiline_token_support {
+            // If the client supports multiline-tokens,
+            // compute the length of the entire range.
+            let mut len = 0;
 
-        // Calculate length in the negotiated encoding
-        let length = if !multiline_token_support && lsp_range.start.line != lsp_range.end.line {
-            // Token spans multiple lines but client doesn't support it
-            // Clamp to the end of the current line
-            if let Some(line_text) = source.lines().nth(lsp_range.start.line as usize) {
-                let line_length_in_encoding = match encoding {
-                    PositionEncoding::UTF8 => line_text.len().try_into().unwrap_or(u32::MAX),
-                    PositionEncoding::UTF16 => line_text
-                        .encode_utf16()
-                        .count()
-                        .try_into()
-                        .unwrap_or(u32::MAX),
-                    PositionEncoding::UTF32 => {
-                        line_text.chars().count().try_into().unwrap_or(u32::MAX)
-                    }
+            for line in lsp_range.start.line..lsp_range.end.line {
+                let line_len = line_index.line_len(
+                    OneIndexed::from_zero_indexed(line as usize),
+                    &source,
+                    encoding.into(),
+                );
+
+                len += u32::try_from(line_len).unwrap();
+            }
+
+            // Subtract the first line because we added the length from the beginning.
+            len -= lsp_range.start.character;
+            // We didn't compute the length of the last line, add it now.
+            len += lsp_range.end.character;
+
+            encoder.push_token_at(lsp_range.start, len, token.token_type, token.modifiers);
+        } else {
+            // Multiline token but the client only supports single line tokens
+            // Push a token for each line.
+            for line in lsp_range.start.line..=lsp_range.end.line {
+                let start_character = if line == lsp_range.start.line {
+                    lsp_range.start.character
+                } else {
+                    0
                 };
-                line_length_in_encoding.saturating_sub(lsp_range.start.character)
-            } else {
-                0
-            }
-        } else {
-            // Either client supports multiline tokens or this is a single-line token
-            // Use the difference between start and end character positions
-            if lsp_range.start.line == lsp_range.end.line {
-                lsp_range.end.character - lsp_range.start.character
-            } else {
-                // Multiline token and client supports it - calculate full token length
-                let token_text = &source[token.range()];
-                match encoding {
-                    PositionEncoding::UTF8 => token_text.len().try_into().unwrap_or(u32::MAX),
-                    PositionEncoding::UTF16 => token_text
-                        .encode_utf16()
-                        .count()
-                        .try_into()
-                        .unwrap_or(u32::MAX),
-                    PositionEncoding::UTF32 => {
-                        token_text.chars().count().try_into().unwrap_or(u32::MAX)
-                    }
-                }
-            }
-        };
-        let token_type = token.token_type as u32;
-        let token_modifiers = token.modifiers.bits();
 
+                let start = lsp_types::Position {
+                    line,
+                    character: start_character,
+                };
+
+                let end = if line == lsp_range.end.line {
+                    lsp_range.end.character
+                } else {
+                    let line_len = line_index.line_len(
+                        OneIndexed::from_zero_indexed(line as usize),
+                        &source,
+                        encoding.into(),
+                    );
+                    u32::try_from(line_len).unwrap()
+                };
+
+                let len = end - start.character;
+
+                encoder.push_token_at(start, len, token.token_type, token.modifiers);
+            }
+        }
+    }
+
+    encoder.tokens
+}
+
+struct Encoder {
+    tokens: Vec<SemanticToken>,
+    prev_line: u32,
+    prev_start: u32,
+}
+
+impl Encoder {
+    fn push_token_at(
+        &mut self,
+        start: lsp_types::Position,
+        length: u32,
+        ty: SemanticTokenType,
+        modifiers: SemanticTokenModifier,
+    ) {
         // LSP semantic tokens are encoded as deltas
-        let delta_line = line - prev_line;
+        let delta_line = start.line - self.prev_line;
         let delta_start = if delta_line == 0 {
-            character - prev_start
+            start.character - self.prev_start
         } else {
-            character
+            start.character
         };
 
-        lsp_tokens.push(SemanticToken {
+        let token_type = ty as u32;
+        let token_modifiers = modifiers.bits();
+
+        self.tokens.push(SemanticToken {
             delta_line,
             delta_start,
             length,
@@ -95,9 +128,7 @@ pub(crate) fn generate_semantic_tokens(
             token_modifiers_bitset: token_modifiers,
         });
 
-        prev_line = line;
-        prev_start = character;
+        self.prev_line = start.line;
+        self.prev_start = start.character;
     }
-
-    lsp_tokens
 }

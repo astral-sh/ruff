@@ -1,0 +1,61 @@
+---
+source: crates/ty_ide/src/hover.rs
+expression: output
+---
+string case 0:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:5
+  |
+2 | def f(s: str):
+3 |     s[1:-1]
+  |     ^^-^^^^
+  |     | |
+  |     | Cursor offset
+  |     source
+  |
+
+
+
+string case 1:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:5
+  |
+2 | def f(s: str):
+3 |     s[1:-1]
+  |     ^^^^-^^
+  |     |   |
+  |     |   Cursor offset
+  |     source
+  |
+
+
+
+string case 2:
+str
+---------------------------------------------
+```python
+str
+```
+---------------------------------------------
+info[hover]: Hovered content is
+ --> main.py:3:5
+  |
+2 | def f(s: str):
+3 |     s[1:-1]
+  |     ^^^^^-^
+  |     |    |
+  |     |    Cursor offset
+  |     source
+  |

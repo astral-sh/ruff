@@ -22,10 +22,11 @@ import re
 import tempfile
 import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
+from collections.abc import Awaitable
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from signal import SIGINT, SIGTERM
-from typing import TYPE_CHECKING, NamedTuple, Self, TypeVar
+from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -46,7 +47,7 @@ class Repository(NamedTuple):
     show_fixes: bool = False
 
     @asynccontextmanager
-    async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
+    async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[str]:
         """Shallow clone this repository to a temporary directory."""
         if checkout_dir.exists():
             logger.debug(f"Reusing {self.org}:{self.repo}")
@@ -342,7 +343,7 @@ DIFF_LINE_RE = re.compile(
     r"^(?P<pre>[+-]) (?P<inner>(?P<path>[^:]+):(?P<lnum>\d+):\d+:) (?P<post>.*)$",
 )
 
-T = TypeVar("T")
+T = TypeVar("T", bound=Awaitable[Any])
 
 
 async def main(
@@ -476,7 +477,7 @@ async def main(
             print("| ---- | ------- | --------- | -------- |")
             for rule, (additions, removals) in sorted(
                 rule_changes.items(),
-                key=lambda x: (x[1][0] + x[1][1]),
+                key=lambda x: x[1][0] + x[1][1],
                 reverse=True,
             ):
                 print(f"| {rule} | {additions + removals} | {additions} | {removals} |")

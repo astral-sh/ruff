@@ -284,10 +284,17 @@ python-version = "3.12"
 ```py
 from typing import assert_never
 
-class A[T]: ...
+class A[T]:
+    value: T
+
 class ASub[T](A[T]): ...
-class B[T]: ...
-class C[T]: ...
+
+class B[T]:
+    value: T
+
+class C[T]:
+    value: T
+
 class D: ...
 class E: ...
 class F: ...
@@ -464,7 +471,6 @@ def i[T: (int, str)](x: T) -> T:
         case str():
             pass
         case _:
-            reveal_type(x)  # revealed: Never
             assert_never(x)
 
     return x

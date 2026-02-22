@@ -1,0 +1,202 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: diagnostics
+---
+{
+  "vscode-notebook-cell://test.ipynb#0": [],
+  "vscode-notebook-cell://test.ipynb#1": [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 49
+        },
+        "end": {
+          "line": 0,
+          "character": 52
+        }
+      },
+      "severity": 1,
+      "code": "invalid-return-type",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#invalid-return-type"
+      },
+      "source": "ty",
+      "message": "Function can implicitly return `None`, which is not assignable to return type `str`"
+    }
+  ],
+  "vscode-notebook-cell://test.ipynb#2": [
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 19
+        },
+        "end": {
+          "line": 0,
+          "character": 23
+        }
+      },
+      "severity": 1,
+      "code": "invalid-syntax",
+      "source": "ty",
+      "message": "Expected `,`, found name"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 19
+        },
+        "end": {
+          "line": 0,
+          "character": 23
+        }
+      },
+      "severity": 1,
+      "code": "unresolved-reference",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#unresolved-reference"
+      },
+      "source": "ty",
+      "message": "Name `word` used when not defined"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 23
+        },
+        "end": {
+          "line": 0,
+          "character": 27
+        }
+      },
+      "severity": 1,
+      "code": "invalid-syntax",
+      "source": "ty",
+      "message": "Expected `,`, found string"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 23
+        },
+        "end": {
+          "line": 0,
+          "character": 27
+        }
+      },
+      "severity": 1,
+      "code": "invalid-argument-type",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#invalid-argument-type"
+      },
+      "source": "ty",
+      "message": "Argument to function `with_style` is incorrect: Expected `Style`, found `Literal[/", /"]`"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 27
+        },
+        "end": {
+          "line": 0,
+          "character": 36
+        }
+      },
+      "severity": 1,
+      "code": "invalid-syntax",
+      "source": "ty",
+      "message": "Expected `,`, found name"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 27
+        },
+        "end": {
+          "line": 0,
+          "character": 36
+        }
+      },
+      "severity": 1,
+      "code": "unresolved-reference",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#unresolved-reference"
+      },
+      "source": "ty",
+      "message": "Name `underline` used when not defined"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 27
+        },
+        "end": {
+          "line": 0,
+          "character": 36
+        }
+      },
+      "severity": 1,
+      "code": "too-many-positional-arguments",
+      "codeDescription": {
+        "href": "https://ty.dev/rules#too-many-positional-arguments"
+      },
+      "source": "ty",
+      "message": "Too many positional arguments to function `with_style`: expected 3, got 6"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 0,
+          "character": 36
+        },
+        "end": {
+          "line": 0,
+          "character": 38
+        }
+      },
+      "severity": 1,
+      "code": "invalid-syntax",
+      "source": "ty",
+      "message": "missing closing quote in string literal"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 2,
+          "character": 0
+        },
+        "end": {
+          "line": 2,
+          "character": 7
+        }
+      },
+      "severity": 1,
+      "code": "invalid-syntax",
+      "source": "ty",
+      "message": "Expected `,`, found name"
+    },
+    {
+      "range": {
+        "start": {
+          "line": 3,
+          "character": 0
+        },
+        "end": {
+          "line": 3,
+          "character": 0
+        }
+      },
+      "severity": 1,
+      "code": "invalid-syntax",
+      "source": "ty",
+      "message": "unexpected EOF while parsing"
+    }
+  ]
+}

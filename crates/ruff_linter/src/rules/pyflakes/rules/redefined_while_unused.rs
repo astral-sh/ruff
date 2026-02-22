@@ -30,6 +30,12 @@ use rustc_hash::FxHashMap;
 /// import foo
 /// import bar
 /// ```
+///
+/// ## Options
+///
+/// This rule ignores dummy variables, as determined by:
+///
+/// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.171")]
 pub(crate) struct RedefinedWhileUnused {

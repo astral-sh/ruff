@@ -2,10 +2,12 @@
 
 ## `__getitem__` unbound
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class NotSubscriptable: ...
 
-a = NotSubscriptable()[0]  # error: "Cannot subscript object of type `NotSubscriptable` with no `__getitem__` method"
+a = NotSubscriptable()[0]  # error: [not-subscriptable]
 ```
 
 ## `__getitem__` not callable
@@ -40,6 +42,7 @@ def _(flag: bool):
         if flag:
             def __getitem__(self, index: int) -> int:
                 return index
+
         else:
             def __getitem__(self, index: int) -> str:
                 return str(index)
@@ -76,7 +79,7 @@ a[0] = 0
 class NoSetitem: ...
 
 a = NoSetitem()
-a[0] = 0  # error: "Cannot assign to object of type `NoSetitem` with no `__setitem__` method"
+a[0] = 0  # error: "Cannot assign to a subscript on an object of type `NoSetitem`"
 ```
 
 ## `__setitem__` not callable
@@ -108,6 +111,6 @@ class Identity:
         pass
 
 a = Identity()
-# error: [invalid-assignment] "Method `__setitem__` of type `bound method Identity.__setitem__(index: int, value: int) -> None` cannot be called with a key of type `Literal["a"]` and a value of type `Literal[0]` on object of type `Identity`"
+# error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal["a"]` and value of type `Literal[0]` on object of type `Identity`"
 a["a"] = 0
 ```

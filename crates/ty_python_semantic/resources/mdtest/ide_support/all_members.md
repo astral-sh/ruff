@@ -110,6 +110,11 @@ static_assert(not has_member(C(), "non_existent"))
 
 ### Class objects
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 Class-level attributes can also be accessed through the class itself:
 
 ```py
@@ -153,6 +158,18 @@ static_assert(has_member(D, "meta_base_attr"))
 static_assert(has_member(D, "meta_attr"))
 static_assert(has_member(D, "base_attr"))
 static_assert(has_member(D, "class_attr"))
+
+def _(x: type[D]):
+    static_assert(has_member(x, "meta_base_attr"))
+    static_assert(has_member(x, "meta_attr"))
+    static_assert(has_member(x, "base_attr"))
+    static_assert(has_member(x, "class_attr"))
+
+def _[T: D](x: type[T]):
+    static_assert(has_member(x, "meta_base_attr"))
+    static_assert(has_member(x, "meta_attr"))
+    static_assert(has_member(x, "base_attr"))
+    static_assert(has_member(x, "class_attr"))
 ```
 
 ### Generic classes
@@ -168,6 +185,40 @@ class C(Generic[T]):
 
 static_assert(has_member(C[int], "base_attr"))
 static_assert(has_member(C[int](), "base_attr"))
+```
+
+Generic classes can also have metaclasses:
+
+```py
+class Meta(type):
+    FOO = 42
+
+class E(Generic[T], metaclass=Meta): ...
+
+static_assert(has_member(E[int], "FOO"))
+
+def f(x: type[E[str]]):
+    static_assert(has_member(x, "FOO"))
+```
+
+### `type[Any]` and `Any`
+
+`type[Any]` has all members of `type`.
+
+```py
+from typing import Any
+from ty_extensions import has_member, static_assert
+
+def f(x: type[Any]):
+    static_assert(has_member(x, "__base__"))
+    static_assert(has_member(x, "__qualname__"))
+```
+
+`Any` has all members of `object`, since it is a subtype of `object`:
+
+```py
+def f(x: Any):
+    static_assert(has_member(x, "__repr__"))
 ```
 
 ### Other instance-like types
@@ -308,6 +359,52 @@ def f(union: A | B):
     static_assert(has_member(union, "on_both"))
     static_assert(not has_member(union, "only_on_a"))
     static_assert(not has_member(union, "only_on_b"))
+```
+
+Unless one of the elements of the union is `Any`, thus making it dynamic. In which case, we consider
+items on the intersection of the non-`Any` elements:
+
+```py
+from typing import Any
+from ty_extensions import has_member, static_assert
+
+class A:
+    on_both: int = 1
+    only_on_a: str = "a"
+
+class B:
+    on_both: int = 2
+    only_on_b: str = "b"
+
+def f(union: Any | A):
+    static_assert(has_member(union, "on_both"))
+    static_assert(has_member(union, "only_on_a"))
+
+def g(union: Any | A | B):
+    static_assert(has_member(union, "on_both"))
+    static_assert(not has_member(union, "only_on_a"))
+    static_assert(not has_member(union, "only_on_b"))
+```
+
+Similarly, unioning with an intersection involving `Any` is treated the same as if it was just
+unioned with `Any`:
+
+```py
+from typing import Any
+from ty_extensions import Intersection, has_member, static_assert
+
+class A:
+    on_both: int = 1
+    only_on_a: str = "a"
+
+class B:
+    on_both: int = 2
+    only_on_b: str = "b"
+
+def f(x: Intersection[Any, A] | B):
+    static_assert(has_member(x, "on_both"))
+    static_assert(not has_member(x, "only_on_a"))
+    static_assert(has_member(x, "only_on_b"))
 ```
 
 ### Intersections
@@ -548,13 +645,20 @@ static_assert(not has_member(c, "dynamic_attr"))
 
 ### Dataclasses
 
-So far, we do not include synthetic members of dataclasses.
+#### Basic
+
+For dataclasses, we make sure to include all synthesized members:
+
+```toml
+[environment]
+python-version = "3.9"
+```
 
 ```py
 from ty_extensions import has_member, static_assert
 from dataclasses import dataclass
 
-@dataclass(order=True)
+@dataclass
 class Person:
     age: int
     name: str
@@ -562,13 +666,304 @@ class Person:
 static_assert(has_member(Person, "name"))
 static_assert(has_member(Person, "age"))
 
+static_assert(has_member(Person, "__dataclass_fields__"))
+static_assert(has_member(Person, "__dataclass_params__"))
+
 # These are always available, since they are also defined on `object`:
 static_assert(has_member(Person, "__init__"))
 static_assert(has_member(Person, "__repr__"))
 static_assert(has_member(Person, "__eq__"))
+static_assert(has_member(Person, "__ne__"))
 
-# TODO: this should ideally be available:
-static_assert(has_member(Person, "__lt__"))  # error: [static-assert-error]
+# There are not available, unless `order=True` is set:
+static_assert(not has_member(Person, "__lt__"))
+static_assert(not has_member(Person, "__le__"))
+static_assert(not has_member(Person, "__gt__"))
+static_assert(not has_member(Person, "__ge__"))
+
+# These are not available, unless `slots=True`, `weakref_slot=True` are set:
+static_assert(not has_member(Person, "__slots__"))
+static_assert(not has_member(Person, "__weakref__"))
+
+# Not available before Python 3.13:
+static_assert(not has_member(Person, "__replace__"))
+```
+
+The same behavior applies to instances of dataclasses:
+
+```py
+def _(person: Person):
+    static_assert(has_member(person, "name"))
+    static_assert(has_member(person, "age"))
+
+    static_assert(has_member(person, "__dataclass_fields__"))
+    static_assert(has_member(person, "__dataclass_params__"))
+
+    static_assert(has_member(person, "__init__"))
+    static_assert(has_member(person, "__repr__"))
+    static_assert(has_member(person, "__eq__"))
+    static_assert(has_member(person, "__ne__"))
+
+    static_assert(not has_member(person, "__lt__"))
+    static_assert(not has_member(person, "__le__"))
+    static_assert(not has_member(person, "__gt__"))
+    static_assert(not has_member(person, "__ge__"))
+
+    static_assert(not has_member(person, "__slots__"))
+
+    static_assert(not has_member(person, "__replace__"))
+```
+
+#### `__init__`, `__repr__` and `__eq__`
+
+`__init__`, `__repr__` and `__eq__` are always available (via `object`), even when `init=False`,
+`repr=False` and `eq=False` are set:
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(init=False, repr=False, eq=False)
+class C:
+    x: int
+
+static_assert(has_member(C, "__init__"))
+static_assert(has_member(C, "__repr__"))
+static_assert(has_member(C, "__eq__"))
+static_assert(has_member(C, "__ne__"))
+static_assert(has_member(C(), "__init__"))
+static_assert(has_member(C(), "__repr__"))
+static_assert(has_member(C(), "__eq__"))
+static_assert(has_member(C(), "__ne__"))
+```
+
+#### `order=True`
+
+When `order=True` is set, comparison dunder methods become available:
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(order=True)
+class C:
+    x: int
+
+static_assert(has_member(C, "__lt__"))
+static_assert(has_member(C, "__le__"))
+static_assert(has_member(C, "__gt__"))
+static_assert(has_member(C, "__ge__"))
+
+def _(c: C):
+    static_assert(has_member(c, "__lt__"))
+    static_assert(has_member(c, "__le__"))
+    static_assert(has_member(c, "__gt__"))
+    static_assert(has_member(c, "__ge__"))
+```
+
+#### `slots=True`
+
+When `slots=True`, the corresponding dunder attribute becomes available:
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(slots=True)
+class C:
+    x: int
+
+static_assert(has_member(C, "__slots__"))
+static_assert(has_member(C(1), "__slots__"))
+```
+
+#### `weakref_slot=True`
+
+When `weakref_slot=True` on Python >=3.11, the corresponding dunder attribute becomes available:
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass(slots=True, weakref_slot=True)
+class C:
+    x: int
+
+static_assert(has_member(C, "__weakref__"))
+static_assert(has_member(C(1), "__weakref__"))
+```
+
+#### `__replace__` in Python 3.13+
+
+Since Python 3.13, dataclasses have a `__replace__` method:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    x: int
+
+static_assert(has_member(C, "__replace__"))
+
+def _(c: C):
+    static_assert(has_member(c, "__replace__"))
+```
+
+#### `__match_args__`
+
+Since Python 3.10, dataclasses have a `__match_args__` attribute:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from ty_extensions import has_member, static_assert
+from dataclasses import dataclass
+
+@dataclass
+class C:
+    x: int
+
+static_assert(has_member(C, "__match_args__"))
+
+def _(c: C):
+    static_assert(has_member(c, "__match_args__"))
+```
+
+### Attributes added on new Python versions are not synthesized on older Python versions
+
+```toml
+[environment]
+python-version = "3.9"
+```
+
+```py
+from dataclasses import dataclass
+from ty_extensions import static_assert, has_member
+
+# TODO: these parameters don't exist on Python 3.9;
+# we should emit a diagnostic (or two)
+@dataclass(slots=True, weakref_slot=True)
+class F: ...
+
+static_assert(not has_member(F, "__slots__"))
+static_assert(not has_member(F, "__match_args__"))
+
+# In actual fact, all non-slotted instances have this attribute
+# (and even slotted instances can, if `__weakref__` is included in `__slots__`);
+# we could possibly model that more fully?
+# It's not added by the dataclasses machinery, though
+static_assert(not has_member(F(), "__weakref__"))
+```
+
+### Dynamic classes (created via `type()`)
+
+Dynamic classes created using the three-argument form of `type()` support autocomplete for members
+inherited from their base classes on the class object:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class Base:
+    base_attr: int = 1
+
+    def base_method(self) -> str:
+        return "hello"
+
+class Mixin:
+    mixin_attr: str = "mixin"
+
+# Dynamic class with a single base
+DynamicSingle = type("DynamicSingle", (Base,), {})
+
+# The class object has access to base class attributes
+static_assert(has_member(DynamicSingle, "base_attr"))
+static_assert(has_member(DynamicSingle, "base_method"))
+
+# Dynamic class with multiple bases
+DynamicMulti = type("DynamicMulti", (Base, Mixin), {})
+
+static_assert(has_member(DynamicMulti, "base_attr"))
+static_assert(has_member(DynamicMulti, "mixin_attr"))
+```
+
+Members from `object` and the `type` metaclass are available on the class object:
+
+```py
+from ty_extensions import has_member, static_assert
+
+Dynamic = type("Dynamic", (), {})
+
+# object members are available on the class
+static_assert(has_member(Dynamic, "__doc__"))
+static_assert(has_member(Dynamic, "__init__"))
+
+# type metaclass members are available on the class
+static_assert(has_member(Dynamic, "__name__"))
+static_assert(has_member(Dynamic, "__bases__"))
+static_assert(has_member(Dynamic, "__mro__"))
+static_assert(has_member(Dynamic, "__subclasses__"))
+```
+
+Attributes from the namespace dict (third argument) are not tracked:
+
+```py
+from ty_extensions import has_member, static_assert
+
+DynamicWithDict = type("DynamicWithDict", (), {"custom_attr": 42})
+
+# TODO: these should pass -- namespace dict attributes are not yet available for autocomplete
+static_assert(has_member(DynamicWithDict, "custom_attr"))  # error: [static-assert-error]
+static_assert(has_member(DynamicWithDict(), "custom_attr"))  # error: [static-assert-error]
+```
+
+Dynamic classes inheriting from classes with custom metaclasses get metaclass members:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class MyMeta(type):
+    meta_attr: str = "meta"
+
+class Base(metaclass=MyMeta):
+    base_attr: int = 1
+
+Dynamic = type("Dynamic", (Base,), {})
+
+# Metaclass attributes are available on the class
+static_assert(has_member(Dynamic, "meta_attr"))
+static_assert(has_member(Dynamic, "base_attr"))
+```
+
+However, instances of dynamic classes currently do not expose members for autocomplete:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class Base:
+    base_attr: int = 1
+
+DynamicSingle = type("DynamicSingle", (Base,), {})
+instance = DynamicSingle()
+
+# TODO: these should pass; instance members should be available
+static_assert(has_member(instance, "base_attr"))  # error: [static-assert-error]
+static_assert(has_member(instance, "__repr__"))  # error: [static-assert-error]
+static_assert(has_member(instance, "__hash__"))  # error: [static-assert-error]
 ```
 
 ### Attributes not available at runtime
@@ -582,4 +977,40 @@ from ty_extensions import has_member, static_assert
 
 # TODO: this should ideally not be available:
 static_assert(not has_member(3, "__annotations__"))  # error: [static-assert-error]
+```
+
+### `ModuleType` attributes are available on modules
+
+`namespace_package/foo.py`:
+
+```py
+```
+
+`regular_module.py`:
+
+```py
+```
+
+`regular_package/__init__.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import namespace_package
+import regular_module
+import regular_package
+from ty_extensions import static_assert, has_member
+
+static_assert(has_member(namespace_package, "__file__"))
+static_assert(has_member(namespace_package, "__name__"))
+static_assert(has_member(namespace_package, "__eq__"))
+static_assert(has_member(regular_module, "__file__"))
+static_assert(has_member(regular_module, "__name__"))
+static_assert(has_member(regular_module, "__eq__"))
+static_assert(has_member(regular_package, "__file__"))
+static_assert(has_member(regular_package, "__name__"))
+static_assert(has_member(regular_package, "__eq__"))
 ```

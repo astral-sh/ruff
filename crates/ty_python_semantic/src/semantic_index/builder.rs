@@ -13,23 +13,25 @@ use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
 use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
+    YieldOutsideFunctionKind,
 };
 use ruff_text_size::TextRange;
+use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::module_name::ModuleName;
-use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::{
     AnnotatedAssignmentDefinitionNodeRef, AssignmentDefinitionNodeRef,
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
-    DefinitionNodeRef, Definitions, ExceptHandlerDefinitionNodeRef, ForStmtDefinitionNodeRef,
-    ImportDefinitionNodeRef, ImportFromDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
+    ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
+use crate::semantic_index::member::MemberExprBuilder;
 use crate::semantic_index::place::{PlaceExpr, PlaceTableBuilder, ScopedPlaceId};
 use crate::semantic_index::predicate::{
     CallableAndCallExpr, ClassPatternKind, PatternPredicate, PatternPredicateKind, Predicate,
@@ -45,26 +47,36 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedEnclosingSnapshotId,
+    UseDefMapBuilder,
 };
 use crate::semantic_index::{
-    ExpressionsScopeMap, MaybeModuleImport, SemanticIndex, VisibleAncestorsIter,
+    ExpressionsScopeMap, LoopHeader, LoopToken, SemanticIndex, VisibleAncestorsIter,
+    get_loop_header,
 };
 use crate::semantic_model::HasTrackedScope;
+use crate::types::PossiblyNarrowedPlaces;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
 mod except_handlers;
+mod loop_bindings_visitor;
 
 #[derive(Clone, Debug, Default)]
 struct Loop {
     /// Flow states at each `break` in the current loop.
     break_states: Vec<FlowSnapshot>,
+    /// Flow states at each `continue` in the current loop.
+    continue_states: Vec<FlowSnapshot>,
 }
 
 impl Loop {
     fn push_break(&mut self, state: FlowSnapshot) {
         self.break_states.push(state);
+    }
+
+    fn push_continue(&mut self, state: FlowSnapshot) {
+        self.continue_states.push(state);
     }
 }
 
@@ -113,7 +125,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     definitions_by_node: FxHashMap<DefinitionNodeKey, Definitions<'db>>,
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     imported_modules: FxHashSet<ModuleName>,
-    maybe_imported_modules: FxHashSet<MaybeModuleImport>,
+    seen_submodule_imports: FxHashSet<String>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -151,7 +163,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions_by_node: FxHashMap::default(),
             expressions_by_node: FxHashMap::default(),
 
-            maybe_imported_modules: FxHashSet::default(),
+            seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
             generator_functions: FxHashSet::default(),
 
@@ -188,35 +200,66 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_scope_info().file_scope_id
     }
 
-    /// Returns the scope ID of the surrounding class body scope if the current scope
-    /// is a method inside a class body. Returns `None` otherwise, e.g. if the current
-    /// scope is a function body outside of a class, or if the current scope is not a
+    /// Returns the scope ID of the current scope if the current scope
+    /// is a method inside a class body or an eagerly executed scope inside a method.
+    /// Returns `None` otherwise, e.g. if the current scope is a function body outside of a class, or if the current scope is not a
     /// function body.
-    fn is_method_of_class(&self) -> Option<FileScopeId> {
-        let mut scopes_rev = self.scope_stack.iter().rev();
+    fn is_method_or_eagerly_executed_in_method(&self) -> Option<FileScopeId> {
+        let mut scopes_rev = self
+            .scope_stack
+            .iter()
+            .rev()
+            .skip_while(|scope| self.scopes[scope.file_scope_id].is_eager());
         let current = scopes_rev.next()?;
 
         if self.scopes[current.file_scope_id].kind() != ScopeKind::Function {
             return None;
         }
 
+        let maybe_method = current.file_scope_id;
         let parent = scopes_rev.next()?;
 
         match self.scopes[parent.file_scope_id].kind() {
-            ScopeKind::Class => Some(parent.file_scope_id),
+            ScopeKind::Class => Some(maybe_method),
             ScopeKind::TypeParams => {
                 // If the function is generic, the parent scope is an annotation scope.
                 // In this case, we need to go up one level higher to find the class scope.
                 let grandparent = scopes_rev.next()?;
 
                 if self.scopes[grandparent.file_scope_id].kind() == ScopeKind::Class {
-                    Some(grandparent.file_scope_id)
+                    Some(maybe_method)
                 } else {
                     None
                 }
             }
             _ => None,
         }
+    }
+
+    /// Checks if a symbol name is bound in any intermediate eager scopes
+    /// between the current scope and the specified method scope.
+    ///
+    fn is_symbol_bound_in_intermediate_eager_scopes(
+        &self,
+        symbol_name: &str,
+        method_scope_id: FileScopeId,
+    ) -> bool {
+        for scope_info in self.scope_stack.iter().rev() {
+            let scope_id = scope_info.file_scope_id;
+
+            if scope_id == method_scope_id {
+                break;
+            }
+
+            if let Some(symbol_id) = self.place_tables[scope_id].symbol_id(symbol_name) {
+                let symbol = self.place_tables[scope_id].symbol(symbol_id);
+                if symbol.is_bound() {
+                    return true;
+                }
+            }
+        }
+
+        false
     }
 
     /// Push a new loop, returning the outer loop, if any.
@@ -285,6 +328,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Records snapshots of the place states visible from the current eager scope.
     fn record_eager_snapshots(&mut self, popped_scope_id: FileScopeId) {
+        let popped_scope = &self.scopes[popped_scope_id];
+        let popped_scope_is_annotation_scope = popped_scope.kind().is_annotation();
+
         // If the scope that we just popped off is an eager scope, we need to "lock" our view of
         // which bindings reach each of the uses in the scope. Loop through each enclosing scope,
         // looking for any that bind each place.
@@ -299,6 +345,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // ```
         for enclosing_scope_info in self.scope_stack.iter().rev() {
             let enclosing_scope_id = enclosing_scope_info.file_scope_id;
+            let is_immediately_enclosing_scope = popped_scope.parent() == Some(enclosing_scope_id);
             let enclosing_scope_kind = self.scopes[enclosing_scope_id].kind();
             let enclosing_place_table = &self.place_tables[enclosing_scope_id];
 
@@ -326,6 +373,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         enclosing_place_id,
                         enclosing_scope_kind,
                         enclosing_place,
+                        popped_scope_is_annotation_scope && is_immediately_enclosing_scope,
                     );
                 self.enclosing_snapshots.insert(key, eager_snapshot);
             }
@@ -400,6 +448,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     enclosed_symbol_id.into(),
                     enclosing_scope_kind,
                     enclosing_place.into(),
+                    false,
                 );
                 self.enclosing_snapshots.insert(key, lazy_snapshot);
             }
@@ -656,10 +705,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// and the second element is the number of definitions that are now associated with
     /// `definition_node`.
     ///
-    /// This method should only be used when adding a definition associated with a `*` import.
-    /// All other nodes can only ever be associated with exactly 1 or 0 [`Definition`]s.
-    /// For any node other than an [`ast::Alias`] representing a `*` import,
-    /// prefer to use `self.add_definition()`, which ensures that this invariant is maintained.
+    /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
+    /// `add_definition` above, which enforces that. This method should currently only be used with
+    /// `*` imports and loop headers.
     fn push_additional_definition(
         &mut self,
         place: ScopedPlaceId,
@@ -669,6 +717,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Note `definition_node` is guaranteed to be a child of `self.module`
         let kind = definition_node.into_owned(self.module);
+        let is_loop_header = kind.is_loop_header();
 
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
@@ -688,7 +737,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions.len()
         };
 
-        if category.is_binding() {
+        // We need to avoid marking places as bound as soon as we encounter a loop header
+        // definition for them, because that would lead to false-positive semantic syntax errors in
+        // cases like this:
+        // ```py
+        // while True:
+        //     global x  # [invalid-syntax] if `x` is already used or bound
+        //     x = 1
+        // ```
+        if category.is_binding() && !is_loop_header {
             self.mark_place_bound(place);
         }
         if category.is_declaration() {
@@ -703,8 +760,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
             DefinitionCategory::Binding => {
-                use_def.record_binding(place, definition);
-                self.delete_associated_bindings(place);
+                // Loop-header bindings don't shadow prior bindings.
+                let previous_definitions = if is_loop_header {
+                    PreviousDefinitions::AreKept
+                } else {
+                    PreviousDefinitions::AreShadowed
+                };
+                use_def.record_binding(place, definition, previous_definitions);
+                if !is_loop_header {
+                    self.delete_associated_bindings(place);
+                }
             }
         }
 
@@ -721,13 +786,125 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         (definition, num_definitions)
     }
 
+    // Creates a definition for each key-value assignment in the dictionary.
+    //
+    // If there are multiple targets, a given key-value definition will be created multiple
+    // times for each target.
+    fn add_dict_key_assignment_definitions(
+        &mut self,
+        targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for target in targets {
+            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+                self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
+            }
+        }
+    }
+
+    fn add_dict_key_assignment_definitions_impl(
+        &mut self,
+        target: &MemberExprBuilder,
+        dict: &'ast ast::ExprDict,
+        assignment: Definition<'db>,
+    ) {
+        for item in &dict.items {
+            let Some(key) = item.key.as_ref() else {
+                continue;
+            };
+
+            let Some(member_expr) = MemberExprBuilder::visit_subscript_expr(target.clone(), key)
+            else {
+                continue;
+            };
+
+            // Recurse into nested dictionaries.
+            if let ast::Expr::Dict(dict_value) = &item.value {
+                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
+            }
+
+            if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
+                let place_id = self.add_place(place_expr);
+
+                self.add_definition(
+                    place_id,
+                    DictKeyAssignmentNodeRef {
+                        key,
+                        assignment,
+                        value: &item.value,
+                    },
+                );
+            }
+        }
+    }
+
+    /// Create loop header definitions for all places that are bound within a loop. Return the
+    /// `LoopToken` referenced by those definitions, and the set of bound place IDs.
+    fn synthesize_loop_header_definitions(
+        &mut self,
+        loop_stmt: LoopStmtRef<'ast>,
+        bound_places: Vec<PlaceExpr>,
+    ) -> (LoopToken<'db>, FxHashSet<ScopedPlaceId>) {
+        let loop_token = LoopToken::new(self.db);
+        let mut bound_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
+        for place_expr in bound_places {
+            let place_id = self.add_place(place_expr);
+            if bound_place_ids.insert(place_id) {
+                let loop_header_ref = LoopHeaderDefinitionNodeRef {
+                    loop_stmt,
+                    place: place_id,
+                    loop_token,
+                };
+                // Note that `DefinitionKind::LoopHeader` doesn't shadow prior bindings.
+                self.push_additional_definition(place_id, loop_header_ref);
+            }
+        }
+        (loop_token, bound_place_ids)
+    }
+
+    /// Build a `LoopHeader` that tracks all the variables bound in a loop, which will be visible
+    /// to uses in the same loop via "loop header definitions". We call this after merging control
+    /// flow from all the loop-back edges, most importantly at the end of the loop body, and also
+    /// at any `continue` statements.
+    fn populate_loop_header(
+        &mut self,
+        loop_header_places: &FxHashSet<ScopedPlaceId>,
+        loop_token: LoopToken<'db>,
+    ) {
+        let mut loop_header = LoopHeader::new();
+        let use_def = self.current_use_def_map_mut();
+        // Collect bindings.
+        for place_id in loop_header_places {
+            for live_binding in use_def.loop_back_bindings(*place_id) {
+                loop_header.add_binding(*place_id, live_binding);
+            }
+        }
+        // Mark the reachability and narrowing constraints as used.
+        for place_id in loop_header_places {
+            for live_binding in loop_header.bindings_for_place(*place_id) {
+                use_def
+                    .reachability_constraints
+                    .mark_used(live_binding.reachability_constraint);
+                use_def
+                    .reachability_constraints
+                    .mark_used(live_binding.narrowing_constraint);
+            }
+        }
+        // The `LoopHeader` needs to be visible to uses within the loop body that we've already
+        // walked, but all our Salsa state is generally immutable. `specify` is how we work around
+        // that. See this section of the Salsa docs:
+        // <https://salsa-rs.github.io/salsa/overview.html#specify-the-result-of-tracked-functions-for-particular-structs>
+        get_loop_header::specify(self.db, loop_token, loop_header);
+    }
+
     fn record_expression_narrowing_constraint(
         &mut self,
-        precide_node: &ast::Expr,
-    ) -> PredicateOrLiteral<'db> {
-        let predicate = self.build_predicate(precide_node);
-        self.record_narrowing_constraint(predicate);
-        predicate
+        predicate_node: &ast::Expr,
+    ) -> (PredicateOrLiteral<'db>, ScopedPredicateId) {
+        let predicate = self.build_predicate(predicate_node);
+        let predicate_id = self.record_narrowing_constraint(predicate);
+        (predicate, predicate_id)
     }
 
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
@@ -767,7 +944,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     /// Adds a new predicate to the list of all predicates, but does not record it. Returns the
     /// predicate ID for later recording using
-    /// [`SemanticIndexBuilder::record_narrowing_constraint_id`].
+    /// [`SemanticIndexBuilder::record_narrowing_constraint_id_for_places`].
     fn add_predicate(&mut self, predicate: PredicateOrLiteral<'db>) -> ScopedPredicateId {
         self.current_use_def_map_mut().add_predicate(predicate)
     }
@@ -778,28 +955,82 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             .add_predicate(predicate.negated())
     }
 
-    /// Records a previously added narrowing constraint by adding it to all live bindings.
-    fn record_narrowing_constraint_id(&mut self, predicate: ScopedPredicateId) {
+    /// Records a previously added narrowing constraint by adding it to the live bindings
+    /// of the specified places.
+    fn record_narrowing_constraint_id_for_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+        places: &PossiblyNarrowedPlaces,
+    ) {
         self.current_use_def_map_mut()
-            .record_narrowing_constraint(predicate);
+            .record_narrowing_constraint_for_places(predicate, places);
     }
 
-    /// Adds and records a narrowing constraint, i.e. adds it to all live bindings.
-    fn record_narrowing_constraint(&mut self, predicate: PredicateOrLiteral<'db>) {
-        let use_def = self.current_use_def_map_mut();
-        let predicate_id = use_def.add_predicate(predicate);
-        use_def.record_narrowing_constraint(predicate_id);
-    }
-
-    /// Negates the given predicate and then adds it as a narrowing constraint to all live
-    /// bindings.
-    fn record_negated_narrowing_constraint(
+    /// Adds and records a narrowing constraint for only the places that could possibly be narrowed.
+    ///
+    /// Returns the `ScopedPredicateId` for the positive predicate, which can later be passed to
+    /// `record_negated_narrowing_constraint` for TDD-level negation.
+    fn record_narrowing_constraint(
         &mut self,
         predicate: PredicateOrLiteral<'db>,
     ) -> ScopedPredicateId {
-        let id = self.add_negated_predicate(predicate);
-        self.record_narrowing_constraint_id(id);
-        id
+        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+        let use_def = self.current_use_def_map_mut();
+        let predicate_id = use_def.add_predicate(predicate);
+        use_def.record_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
+        predicate_id
+    }
+
+    /// Computes the conservative set of places that could possibly be narrowed by a predicate.
+    ///
+    /// This uses the closure-based approach to avoid calling Salsa queries that depend on
+    /// the semantic index (which is still being built).
+    fn compute_possibly_narrowed_places(
+        &self,
+        predicate: &PredicateOrLiteral<'db>,
+    ) -> PossiblyNarrowedPlaces {
+        use crate::types::PossiblyNarrowedPlacesBuilder;
+
+        match predicate {
+            PredicateOrLiteral::Literal(_) => PossiblyNarrowedPlaces::default(),
+            PredicateOrLiteral::Predicate(pred) => {
+                let place_table = self.current_place_table();
+
+                match pred.node {
+                    PredicateNode::Expression(expression) => {
+                        let module = self.module;
+                        let expression_node = expression.node_ref(self.db, module);
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .expression(expression_node)
+                    }
+                    PredicateNode::Pattern(pattern) => {
+                        let module = self.module;
+                        PossiblyNarrowedPlacesBuilder::new(self.db, place_table)
+                            .pattern(pattern, module)
+                    }
+                    PredicateNode::ReturnsNever(_) | PredicateNode::StarImportPlaceholder(_) => {
+                        // These predicates don't narrow any places
+                        PossiblyNarrowedPlaces::default()
+                    }
+                }
+            }
+        }
+    }
+
+    /// Negates the given predicate and then adds it as a narrowing constraint to the places
+    /// that could possibly be narrowed.
+    ///
+    /// Takes the `ScopedPredicateId` from the positive recording so that TDD-level negation
+    /// (`add_not_constraint`) uses the same atom. This ensures `atom(P) OR NOT(atom(P))`
+    /// simplifies to `ALWAYS_TRUE`, correctly cancelling narrowing after complete if/else blocks.
+    fn record_negated_narrowing_constraint(
+        &mut self,
+        predicate: PredicateOrLiteral<'db>,
+        predicate_id: ScopedPredicateId,
+    ) {
+        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+        self.current_use_def_map_mut()
+            .record_negated_narrowing_constraint_for_places(predicate_id, &possibly_narrowed);
     }
 
     /// Records that all remaining statements in the current block are unreachable.
@@ -924,7 +1155,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         pattern: &ast::Pattern,
         guard: Option<&ast::Expr>,
         previous_pattern: Option<PatternPredicate<'db>>,
-    ) -> (PredicateOrLiteral<'db>, PatternPredicate<'db>) {
+        is_catchall: bool,
+    ) -> (
+        PredicateOrLiteral<'db>,
+        ScopedPredicateId,
+        PatternPredicate<'db>,
+    ) {
         // This is called for the top-level pattern of each match arm. We need to create a
         // standalone expression for each arm of a match statement, since they can introduce
         // constraints on the match subject. (Or more accurately, for the match arm's pattern,
@@ -948,12 +1184,24 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             guard,
             previous_pattern.map(Box::new),
         );
+
         let predicate = PredicateOrLiteral::Predicate(Predicate {
             node: PredicateNode::Pattern(pattern_predicate),
             is_positive: true,
         });
-        self.record_narrowing_constraint(predicate);
-        (predicate, pattern_predicate)
+
+        // For the last catchall case (irrefutable wildcard without guard), we skip
+        // recording the narrowing constraint from the pattern. The accumulated negated
+        // constraints from earlier cases (~P1, ~P2, ...) are sufficient. This ensures
+        // `P1 OR (~P1 AND P2) OR (~P1 AND ~P2)` simplifies to ALWAYS_TRUE, preserving
+        // the original type after an exhaustive match. The reachability and pattern
+        // predicates are still created normally for proper control flow tracking.
+        let predicate_id = if is_catchall {
+            ScopedPredicateId::ALWAYS_TRUE
+        } else {
+            self.record_narrowing_constraint(predicate)
+        };
+        (predicate, predicate_id, pattern_predicate)
     }
 
     /// Record an expression that needs to be a Salsa ingredient, because we need to infer its type
@@ -1029,6 +1277,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ..
                     }) => (name, &None, default),
                 };
+                self.scopes_by_expression
+                    .record_expression(name, self.current_scope());
                 let symbol = self.add_symbol(name.id.clone());
                 // TODO create Definition for PEP 695 typevars
                 // note that the "bound" on the typevar is a totally different thing than whether
@@ -1085,6 +1335,13 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         // nodes are evaluated in the inner scope.
         let value = self.add_standalone_expression(&generator.iter);
         self.visit_expr(&generator.iter);
+
+        // Clear the assignment stack before entering the comprehension scope.
+        // If the comprehension appears inside an assignment target (e.g., error-recovered
+        // `arr[::[x for *b in y for (b: _` is parsed as `StmtAnnAssign`), the outer
+        // assignment context must not leak into the inner scope.
+        let saved_assignments = std::mem::take(&mut self.current_assignments);
+
         self.push_scope(scope);
 
         self.add_unpackable_assignment(
@@ -1098,7 +1355,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         for if_expr in &generator.ifs {
             self.visit_expr(if_expr);
-            self.record_expression_narrowing_constraint(if_expr);
+            let _ = self.record_expression_narrowing_constraint(if_expr);
         }
 
         for generator in generators_iter {
@@ -1116,12 +1373,14 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
             for if_expr in &generator.ifs {
                 self.visit_expr(if_expr);
-                self.record_expression_narrowing_constraint(if_expr);
+                let _ = self.record_expression_narrowing_constraint(if_expr);
             }
         }
 
         visit_outer_elt(self);
         self.pop_scope();
+
+        self.current_assignments = saved_assignments;
     }
 
     fn declare_parameters(&mut self, parameters: &'ast ast::Parameters) {
@@ -1130,6 +1389,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         if let Some(vararg) = parameters.vararg.as_ref() {
             let symbol = self.add_symbol(vararg.name.id().clone());
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
             self.add_definition(
                 symbol.into(),
                 DefinitionNodeRef::VariadicPositionalParameter(vararg),
@@ -1137,6 +1399,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         }
         if let Some(kwarg) = parameters.kwarg.as_ref() {
             let symbol = self.add_symbol(kwarg.name.id().clone());
+            self.current_place_table_mut()
+                .symbol_mut(symbol)
+                .mark_parameter();
             self.add_definition(
                 symbol.into(),
                 DefinitionNodeRef::VariadicKeywordParameter(kwarg),
@@ -1148,6 +1413,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         let symbol = self.add_symbol(parameter.name().id().clone());
 
         let definition = self.add_definition(symbol.into(), parameter);
+
+        self.current_place_table_mut()
+            .symbol_mut(symbol)
+            .mark_parameter();
 
         // Insert a mapping from the inner Parameter node to the same definition. This
         // ensures that calling `HasType::inferred_type` on the inner parameter returns
@@ -1266,7 +1535,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.scopes_by_node.shrink_to_fit();
         self.generator_functions.shrink_to_fit();
         self.enclosing_snapshots.shrink_to_fit();
-        self.maybe_imported_modules.shrink_to_fit();
 
         SemanticIndex {
             place_tables,
@@ -1279,7 +1547,6 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             imported_modules: Arc::new(self.imported_modules),
-            maybe_imported_modules: self.maybe_imported_modules,
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
             semantic_syntax_errors: self.semantic_syntax_errors.into_inner(),
@@ -1433,6 +1700,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        self.scopes_by_expression
+                            .record_expression(asname, self.current_scope());
                         (asname.id.clone(), asname.id == alias.name.id)
                     } else {
                         (Name::new(alias.name.id.split('.').next().unwrap()), false)
@@ -1452,6 +1721,67 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::ImportFrom(node) => {
                 self.current_use_def_map_mut()
                     .record_node_reachability(NodeKey::from_node(node));
+
+                // If we see:
+                //
+                // * `from .x.y import z` (or `from whatever.thispackage.x.y`)
+                // * And we are in an `__init__.py(i)` (hereafter `thispackage`)
+                // * And this is the first time we've seen `from .x` in this module
+                // * And we're in the global scope
+                //
+                // We introduce a local definition `x = <module 'thispackage.x'>` that occurs
+                // before the `z = ...` declaration the import introduces. This models the fact
+                // that the *first* time that you import 'thispackage.x' the python runtime creates
+                // `x` as a variable in the global scope of `thispackage`.
+                //
+                // This is not a perfect simulation of actual runtime behaviour for *various*
+                // reasons but it works well for most practical purposes. In particular it's nice
+                // that `x` can be freely overwritten, and that we don't assume that an import
+                // in one function is visible in another function.
+                let mut is_self_import = false;
+                if self.file.is_package(self.db)
+                    && let Ok(module_name) = ModuleName::from_identifier_parts(
+                        self.db,
+                        self.file,
+                        node.module.as_deref(),
+                        node.level,
+                    )
+                    && let Ok(thispackage) = ModuleName::package_for_file(self.db, self.file)
+                {
+                    // Record whether this is equivalent to `from . import ...`
+                    is_self_import = module_name == thispackage;
+
+                    if let Some(module_node) = &node.module
+                        && let Some(relative_submodule) = module_name.relative_to(&thispackage)
+                        && let Some(direct_submodule) = relative_submodule.components().next()
+                        && !self.seen_submodule_imports.contains(direct_submodule)
+                        && self.current_scope().is_global()
+                    {
+                        self.seen_submodule_imports
+                            .insert(direct_submodule.to_owned());
+
+                        let direct_submodule_name = Name::new(direct_submodule);
+                        let symbol = self.add_symbol(direct_submodule_name);
+
+                        let module_index = if node.level == 0 {
+                            // "whatever.thispackage.x.y" we want `x`
+                            thispackage.components().count()
+                        } else {
+                            // ".x.y" we want `x` (level 1 => index 0)
+                            // "..x.y" we want `y` (level 2 => index 1)
+                            // (The Identifier doesn't include the prefix dots)
+                            node.level as usize - 1
+                        };
+                        self.add_definition(
+                            symbol.into(),
+                            ImportFromSubmoduleDefinitionNodeRef {
+                                node,
+                                module: module_node,
+                                module_index,
+                            },
+                        );
+                    }
+                }
 
                 let mut found_star = false;
                 for (alias_index, alias) in node.names.iter().enumerate() {
@@ -1488,7 +1818,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             continue;
                         };
 
-                        let Some(module) = resolve_module(self.db, &module_name) else {
+                        let Some(module) = resolve_module(self.db, self.file, &module_name) else {
                             continue;
                         };
 
@@ -1522,9 +1852,12 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                             let star_import_predicate = self.add_predicate(star_import.into());
 
+                            let associated_member_ids = self.place_tables[self.current_scope()]
+                                .associated_place_ids(ScopedPlaceId::Symbol(symbol_id));
                             let pre_definition = self
                                 .current_use_def_map()
-                                .single_symbol_place_snapshot(symbol_id);
+                                .single_symbol_snapshot(symbol_id, associated_member_ids);
+
                             let pre_definition_reachability =
                                 self.current_use_def_map().reachability;
 
@@ -1559,19 +1892,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     let (symbol_name, is_reexported) = if let Some(asname) = &alias.asname {
+                        self.scopes_by_expression
+                            .record_expression(asname, self.current_scope());
+                        // It's re-exported if it's `from ... import x as x`
                         (&asname.id, asname.id == alias.name.id)
                     } else {
-                        (&alias.name.id, false)
+                        // As a non-standard rule to handle stubs in the wild, we consider
+                        // `from . import x` and `from whatever.thispackage import x` in an
+                        // `__init__.pyi` to re-export `x` (as long as it wasn't renamed)
+                        (&alias.name.id, is_self_import)
                     };
-
-                    // If there's no alias or a redundant alias, record this as a potential import of a submodule
-                    if alias.asname.is_none() || is_reexported {
-                        self.maybe_imported_modules.insert(MaybeModuleImport {
-                            level: node.level,
-                            from_module: node.module.clone().map(Into::into),
-                            submodule: alias.name.clone().into(),
-                        });
-                    }
 
                     // Look for imports `from __future__ import annotations`, ignore `as ...`
                     // We intentionally don't enforce the rules about location of `__future__`
@@ -1662,7 +1992,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(&node.annotation);
                 if let Some(value) = &node.value {
                     self.visit_expr(value);
-                    if self.is_method_of_class().is_some() {
+                    if self.is_method_or_eagerly_executed_in_method().is_some() {
                         // Record the right-hand side of the assignment as a standalone expression
                         // if we're inside a method. This allows type inference to infer the type
                         // of the value for annotated assignments like `self.CONSTANT: Final = 1`,
@@ -1747,7 +2077,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Stmt::If(node) => {
                 self.visit_expr(&node.test);
                 let mut no_branch_taken = self.flow_snapshot();
-                let mut last_predicate = self.record_expression_narrowing_constraint(&node.test);
+                let (mut last_predicate, mut last_narrowing_id) =
+                    self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
                     self.record_reachability_constraint(last_predicate);
 
@@ -1788,7 +2119,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // taken
                     self.flow_restore(no_branch_taken.clone());
 
-                    self.record_negated_narrowing_constraint(last_predicate);
+                    self.record_negated_narrowing_constraint(last_predicate, last_narrowing_id);
                     self.record_negated_reachability_constraint(last_reachability_constraint);
 
                     if let Some(elif_test) = clause_test {
@@ -1796,7 +2127,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // A test expression is evaluated whether the branch is taken or not
                         no_branch_taken = self.flow_snapshot();
 
-                        last_predicate = self.record_expression_narrowing_constraint(elif_test);
+                        (last_predicate, last_narrowing_id) =
+                            self.record_expression_narrowing_constraint(elif_test);
 
                         last_reachability_constraint =
                             self.record_reachability_constraint(last_predicate);
@@ -1831,28 +2163,61 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
             }
-            ast::Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::While(
+                while_stmt @ ast::StmtWhile {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                    node_index: _,
+                },
+            ) => {
+                // Pre-walk the loop to collect all the bound places, then create a loop header
+                // definition for each bound place. See `struct LoopHeader` for more on this. Loop
+                // header definitions stash a token to look up the `LoopHeader` later, so that we
+                // can populate the header lazily.
+                let bound_places = loop_bindings_visitor::collect_while_loop_bindings(while_stmt);
+                let mut maybe_loop_header_info = None;
+                // Avoid allocating a `LoopToken` if there are no bound places in this loop.
+                if !bound_places.is_empty() {
+                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
+                        LoopStmtRef::While(while_stmt),
+                        bound_places,
+                    ));
+                }
+
+                // Visit the test expression after creating loop headers, so that loop-back values
+                // are visible.
                 self.visit_expr(test);
 
+                // Take the pre_loop snapshot after visiting the test expression, so that walrus
+                // bindings in the test (which are always evaluated at least once) remain visible
+                // after the loop.
                 let pre_loop = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
+                let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 
+                // Loop-back bindings include everything that's visible if/when control reaches the
+                // end of the loop body, and they also include everything that's visible to a
+                // `continue` statement. Merge the `continue` states before collecting bindings.
+                for continue_state in this_loop.continue_states {
+                    self.flow_merge(continue_state);
+                }
+
+                // Collect all the loop-back bindings (including the `continue` states we just
+                // merged) and populate the `LoopHeader`.
+                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
+                    self.populate_loop_header(&bound_place_ids, loop_token);
+                }
+
                 // We execute the `else` branch once the condition evaluates to false. This could
                 // happen without ever executing the body, if the condition is false the first time
                 // it's tested. Or it could happen if a _later_ evaluation of the condition yields
                 // false. So we merge in the pre-loop state here into the post-body state:
-
                 self.flow_merge(pre_loop);
 
                 // The `else` branch can only be reached if the loop condition *can* be false. To
@@ -1865,7 +2230,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     .add_atom(later_predicate_id);
                 self.record_negated_reachability_constraint(later_reachability_constraint);
 
-                self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_narrowing_constraint(predicate, predicate_id);
 
                 self.visit_body(orelse);
 
@@ -1924,11 +2289,38 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 let pre_loop = self.flow_snapshot();
 
+                // Pre-walk the loop to collect all the bound places, then create a loop header
+                // definition for each bound place. See `struct LoopHeader` for more on this. Loop
+                // header definitions stash a token to look up the `LoopHeader` later, so that we
+                // can populate the header lazily.
+                let bound_places = loop_bindings_visitor::collect_for_loop_bindings(for_stmt);
+                let mut maybe_loop_header_info = None;
+                // Avoid allocating a `LoopToken` if there are no bound places in this loop.
+                if !bound_places.is_empty() {
+                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
+                        LoopStmtRef::For(for_stmt),
+                        bound_places,
+                    ));
+                }
+
                 self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
+
+                // Loop-back bindings include everything that's visible if/when control reaches the
+                // end of the loop body, and they also include everything that's visible to a
+                // `continue` statement. Merge the `continue` states before collecting bindings.
+                for continue_state in this_loop.continue_states {
+                    self.flow_merge(continue_state);
+                }
+
+                // Collect all the loop-back bindings (including the `continue` states we just
+                // merged) and populate the `LoopHeader`.
+                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
+                    self.populate_loop_header(&bound_place_ids, loop_token);
+                }
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
@@ -1972,12 +2364,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // here because the effects of visiting a pattern is binding
                     // symbols, and this doesn't occur unless the pattern
                     // actually matches
-                    let (match_predicate, match_pattern_predicate) = self
+                    let is_catchall = has_catchall && i == cases.len() - 1;
+                    let (match_predicate, match_narrowing_id, match_pattern_predicate) = self
                         .add_pattern_narrowing_constraint(
                             subject_expr,
                             &case.pattern,
                             case.guard.as_deref(),
                             previous_pattern,
+                            is_catchall,
                         );
                     previous_pattern = Some(match_pattern_predicate);
                     let reachability_constraint =
@@ -1995,10 +2389,22 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             node: PredicateNode::Expression(guard_expr),
                             is_positive: true,
                         });
-                        self.record_negated_narrowing_constraint(predicate);
+                        // Add the predicate once, then use TDD-level negation for the failure
+                        // path. This ensures the positive and negative atoms share the same ID.
+                        let guard_predicate_id = self.add_predicate(predicate);
+                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
+                        self.current_use_def_map_mut()
+                            .record_negated_narrowing_constraint_for_places(
+                                guard_predicate_id,
+                                &possibly_narrowed,
+                            );
                         let match_success_guard_failure = self.flow_snapshot();
                         self.flow_restore(post_guard_eval);
-                        self.record_narrowing_constraint(predicate);
+                        self.current_use_def_map_mut()
+                            .record_narrowing_constraint_for_places(
+                                guard_predicate_id,
+                                &possibly_narrowed,
+                            );
                         match_success_guard_failure
                     });
 
@@ -2011,7 +2417,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // one. The last one will just become the state that we merge the other
                         // snapshots into.
                         self.flow_restore(no_case_matched.clone());
-                        self.record_negated_narrowing_constraint(match_predicate);
+                        self.record_negated_narrowing_constraint(
+                            match_predicate,
+                            match_narrowing_id,
+                        );
                         self.record_negated_reachability_constraint(reachability_constraint);
                         if let Some(match_success_guard_failure) = match_success_guard_failure {
                             self.flow_merge(match_success_guard_failure);
@@ -2150,8 +2559,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_body(finalbody);
             }
 
-            ast::Stmt::Raise(_) | ast::Stmt::Return(_) | ast::Stmt::Continue(_) => {
+            ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
                 walk_stmt(self, stmt);
+                // Everything in the current block after a terminal statement is unreachable.
+                self.mark_unreachable();
+            }
+
+            ast::Stmt::Continue(_) => {
+                let snapshot = self.flow_snapshot();
+                if let Some(current_loop) = self.current_loop_mut() {
+                    current_loop.push_continue(snapshot);
+                }
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
@@ -2170,10 +2588,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 names,
             }) => {
                 for name in names {
+                    self.scopes_by_expression
+                        .record_expression(name, self.current_scope());
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
-                    if symbol.is_bound() || symbol.is_declared() || symbol.is_used() {
+                    if (symbol.is_bound() || symbol.is_declared() || symbol.is_used())
+                        && !symbol.is_parameter()
+                    {
                         self.report_semantic_error(SemanticSyntaxError {
                             kind: SemanticSyntaxErrorKind::LoadBeforeGlobalDeclaration {
                                 name: name.to_string(),
@@ -2203,6 +2625,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 names,
             }) => {
                 for name in names {
+                    self.scopes_by_expression
+                        .record_expression(name, self.current_scope());
                     let symbol_id = self.add_symbol(name.id.clone());
                     let symbol = self.current_place_table().symbol(symbol_id);
                     // Check whether the variable has already been accessed in this scope.
@@ -2309,9 +2733,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             }),
                             is_positive: false,
                         };
-                        self.record_reachability_constraint(PredicateOrLiteral::Predicate(
-                            predicate,
-                        ));
+                        let constraint = self.record_reachability_constraint(
+                            PredicateOrLiteral::Predicate(predicate),
+                        );
+
+                        // Also gate narrowing by this constraint: if the call returns
+                        // `Never`, any narrowing in the current branch should be
+                        // invalidated (since this path is unreachable). This enables
+                        // narrowing to be preserved after if-statements where one branch
+                        // calls a `NoReturn` function like `sys.exit()`.
+                        self.current_use_def_map_mut()
+                            .record_narrowing_constraint_for_all_places(constraint);
                     }
                 }
             }
@@ -2334,14 +2766,21 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             | ast::Expr::Attribute(ast::ExprAttribute { ctx, .. })
             | ast::Expr::Subscript(ast::ExprSubscript { ctx, .. }) => {
                 if let Some(mut place_expr) = PlaceExpr::try_from_expr(expr) {
-                    if self.is_method_of_class().is_some() {
+                    if let Some(method_scope_id) = self.is_method_or_eagerly_executed_in_method() {
                         if let PlaceExpr::Member(member) = &mut place_expr {
                             if member.is_instance_attribute_candidate() {
                                 // We specifically mark attribute assignments to the first parameter of a method,
                                 // i.e. typically `self` or `cls`.
-                                let accessed_object_refers_to_first_parameter = self
-                                    .current_first_parameter_name
-                                    .is_some_and(|first| member.symbol_name() == first);
+                                // However, we must check that the symbol hasn't been shadowed by an intermediate
+                                // scope (e.g., a comprehension variable: `for self in [...]`).
+                                let accessed_object_refers_to_first_parameter =
+                                    self.current_first_parameter_name.is_some_and(|first| {
+                                        member.symbol_name() == first
+                                            && !self.is_symbol_bound_in_intermediate_eager_scopes(
+                                                first,
+                                                method_scope_id,
+                                            )
+                                    });
 
                                 if accessed_object_refers_to_first_parameter {
                                     member.mark_instance_attribute();
@@ -2374,7 +2813,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     if is_definition {
                         match self.current_assignment() {
                             Some(CurrentAssignment::Assign { node, unpack }) => {
-                                self.add_definition(
+                                let assignment = self.add_definition(
                                     place_id,
                                     AssignmentDefinitionNodeRef {
                                         unpack,
@@ -2382,10 +2821,18 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         target: expr,
                                     },
                                 );
+
+                                if let ast::Expr::Dict(dict) = &*node.value {
+                                    self.add_dict_key_assignment_definitions(
+                                        &node.targets,
+                                        dict,
+                                        assignment,
+                                    );
+                                }
                             }
                             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                                 self.add_standalone_type_expression(&ann_assign.annotation);
-                                self.add_definition(
+                                let assignment = self.add_definition(
                                     place_id,
                                     AnnotatedAssignmentDefinitionNodeRef {
                                         node: ann_assign,
@@ -2394,6 +2841,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                         target: expr,
                                     },
                                 );
+
+                                if let Some(ast::Expr::Dict(dict)) = ann_assign.value.as_deref() {
+                                    self.add_dict_key_assignment_definitions(
+                                        [&*ann_assign.target],
+                                        dict,
+                                        assignment,
+                                    );
+                                }
                             }
                             Some(CurrentAssignment::AugAssign(aug_assign)) => {
                                 self.add_definition(place_id, aug_assign);
@@ -2507,13 +2962,13 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }) => {
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
+                let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 let reachability_constraint = self.record_reachability_constraint(predicate);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
 
-                self.record_negated_narrowing_constraint(predicate);
+                self.record_negated_narrowing_constraint(predicate, predicate_id);
                 self.record_negated_reachability_constraint(reachability_constraint);
                 self.visit_expr(orelse);
                 self.flow_merge(post_body);
@@ -2589,6 +3044,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // anymore.
                     if index < values.len() - 1 {
                         let predicate = self.build_predicate(value);
+                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
                         let predicate_id = match op {
                             ast::BoolOp::And => self.add_predicate(predicate),
                             ast::BoolOp::Or => self.add_negated_predicate(predicate),
@@ -2611,7 +3067,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         // the application of the reachability constraint until after the expression
                         // has been evaluated, so we only push it onto the stack here.
                         self.flow_restore(after_expr);
-                        self.record_narrowing_constraint_id(predicate_id);
+                        self.record_narrowing_constraint_id_for_places(
+                            predicate_id,
+                            &possibly_narrowed,
+                        );
                         reachability_constraints.push(reachability_constraint);
                     }
                 }
@@ -2742,6 +3201,11 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
                 ScopeKind::Class => return false,
                 ScopeKind::Function | ScopeKind::Lambda => return true,
                 ScopeKind::Comprehension
+                    if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) =>
+                {
+                    return true;
+                }
+                ScopeKind::Comprehension
                 | ScopeKind::Module
                 | ScopeKind::TypeAlias
                 | ScopeKind::TypeParams => {}
@@ -2790,11 +3254,14 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
         matches!(kind, ScopeKind::Function | ScopeKind::Lambda)
     }
 
-    fn in_generator_scope(&self) -> bool {
-        matches!(
-            self.scopes[self.current_scope()].node(),
-            NodeWithScopeKind::GeneratorExpression(_)
-        )
+    fn in_generator_context(&self) -> bool {
+        for scope_info in &self.scope_stack {
+            let scope = &self.scopes[scope_info.file_scope_id];
+            if matches!(scope.node(), NodeWithScopeKind::GeneratorExpression(_)) {
+                return true;
+            }
+        }
+        false
     }
 
     fn in_notebook(&self) -> bool {
@@ -2802,6 +3269,17 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     }
 
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
+        // TODO(brent) The long-term fix for this is for `YieldOutsideFunction` not to apply to
+        // `await` at all and only to emit the more specific `AwaitOutsideAsyncFunction` instead.
+        // However, to preserve backwards compatibility with the corresponding Ruff rules, we
+        // temporarily filter out the diagnostic for ty instead.
+        if matches!(
+            error.kind,
+            SemanticSyntaxErrorKind::YieldOutsideFunction(YieldOutsideFunctionKind::Await)
+        ) {
+            return;
+        }
+
         if self.db.should_check_file(self.file) {
             self.semantic_syntax_errors.borrow_mut().push(error);
         }
@@ -2810,8 +3288,12 @@ impl SemanticSyntaxContext for SemanticIndexBuilder<'_, '_> {
     fn in_loop_context(&self) -> bool {
         self.current_scope_info().current_loop.is_some()
     }
-    fn is_bound_parameter(&self, _name: &str) -> bool {
-        false
+
+    fn is_bound_parameter(&self, name: &str) -> bool {
+        self.scopes[self.current_scope()]
+            .node()
+            .as_function()
+            .is_some_and(|func| func.node(self.module).parameters.includes(name))
     }
 }
 
@@ -3049,15 +3531,31 @@ impl ExpressionsScopeMapBuilder {
 
 /// Returns if the expression is a `TYPE_CHECKING` expression.
 fn is_if_type_checking(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING")
+    fn is_dotted_name(expr: &ast::Expr) -> bool {
+        match expr {
+            ast::Expr::Name(_) => true,
+            ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+            _ => false,
+        }
+    }
+
+    match expr {
+        ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
+        ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+            attr == "TYPE_CHECKING" && is_dotted_name(value)
+        }
+        _ => false,
+    }
 }
 
 /// Returns if the expression is a `not TYPE_CHECKING` expression.
 fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
-    matches!(expr, ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) if *op == ruff_python_ast::UnaryOp::Not
-        && matches!(
-            &**operand,
-            ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING"
-        )
+    matches!(
+        expr,
+        ast::Expr::UnaryOp(ast::ExprUnaryOp {
+            op: ast::UnaryOp::Not,
+            operand,
+            ..
+        }) if is_if_type_checking(operand)
     )
 }

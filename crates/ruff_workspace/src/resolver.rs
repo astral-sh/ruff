@@ -23,7 +23,7 @@ use ruff_linter::package::PackageRoot;
 use ruff_linter::packaging::is_package;
 
 use crate::configuration::Configuration;
-use crate::pyproject::{TargetVersionStrategy, settings_toml};
+use crate::pyproject::settings_toml;
 use crate::settings::Settings;
 use crate::{FileResolverSettings, pyproject};
 
@@ -102,8 +102,8 @@ impl Relativity {
 #[derive(Debug)]
 pub struct Resolver<'a> {
     pyproject_config: &'a PyprojectConfig,
-    /// All [`Settings`] that have been added to the resolver.
-    settings: Vec<Settings>,
+    /// All [`Settings`] that have been added to the resolver, along with their config file paths.
+    settings: Vec<(Settings, PathBuf)>,
     /// A router from path to index into the `settings` vector.
     router: Router<usize>,
 }
@@ -146,8 +146,8 @@ impl<'a> Resolver<'a> {
     }
 
     /// Add a resolved [`Settings`] under a given [`PathBuf`] scope.
-    fn add(&mut self, path: &Path, settings: Settings) {
-        self.settings.push(settings);
+    fn add(&mut self, path: &Path, settings: Settings, config_path: PathBuf) {
+        self.settings.push((settings, config_path));
 
         // Normalize the path to use `/` separators and escape the '{' and '}' characters,
         // which matchit uses for routing parameters.
@@ -172,13 +172,27 @@ impl<'a> Resolver<'a> {
 
     /// Return the appropriate [`Settings`] for a given [`Path`].
     pub fn resolve(&self, path: &Path) -> &Settings {
+        self.resolve_with_path(path).0
+    }
+
+    /// Return the appropriate [`Settings`] and config file path for a given [`Path`].
+    pub fn resolve_with_path(&self, path: &Path) -> (&Settings, Option<&Path>) {
         match self.pyproject_config.strategy {
-            PyprojectDiscoveryStrategy::Fixed => &self.pyproject_config.settings,
+            PyprojectDiscoveryStrategy::Fixed => (
+                &self.pyproject_config.settings,
+                self.pyproject_config.path.as_deref(),
+            ),
             PyprojectDiscoveryStrategy::Hierarchical => self
                 .router
                 .at(path.to_slash_lossy().as_ref())
-                .map(|Match { value, .. }| &self.settings[*value])
-                .unwrap_or(&self.pyproject_config.settings),
+                .map(|Match { value, .. }| {
+                    let (settings, config_path) = &self.settings[*value];
+                    (settings, Some(config_path.as_path()))
+                })
+                .unwrap_or((
+                    &self.pyproject_config.settings,
+                    self.pyproject_config.path.as_deref(),
+                )),
         }
     }
 
@@ -255,7 +269,8 @@ impl<'a> Resolver<'a> {
 
     /// Return an iterator over the resolved [`Settings`] in this [`Resolver`].
     pub fn settings(&self) -> impl Iterator<Item = &Settings> {
-        std::iter::once(&self.pyproject_config.settings).chain(&self.settings)
+        std::iter::once(&self.pyproject_config.settings)
+            .chain(self.settings.iter().map(|(settings, _)| settings))
     }
 }
 
@@ -300,13 +315,13 @@ pub trait ConfigurationTransformer {
 // file at least twice (possibly more than twice, since we'll also parse it when
 // resolving the "default" configuration).
 pub fn resolve_configuration(
-    pyproject: &Path,
+    initial_config_path: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
 ) -> Result<Configuration> {
     let relativity = Relativity::from(origin);
     let mut configurations = indexmap::IndexMap::new();
-    let mut next = Some(fs::normalize_path(pyproject));
+    let mut next = Some(fs::normalize_path(initial_config_path));
     while let Some(path) = next {
         if configurations.contains_key(&path) {
             bail!(format!(
@@ -319,20 +334,7 @@ pub fn resolve_configuration(
             ));
         }
 
-        // Resolve the current path.
-        let version_strategy =
-            if configurations.is_empty() && matches!(origin, ConfigurationOrigin::Ancestor) {
-                // For configurations that are discovered by
-                // walking back from a file, we will attempt to
-                // infer the `target-version` if it is missing
-                TargetVersionStrategy::RequiresPythonFallback
-            } else {
-                // In all other cases (e.g. for configurations
-                // inherited via `extend`, or user-level settings)
-                // we do not attempt to infer a missing `target-version`
-                TargetVersionStrategy::UseDefault
-            };
-        let options = pyproject::load_options(&path, &version_strategy).with_context(|| {
+        let options = pyproject::load_options(&path).with_context(|| {
             if configurations.is_empty() {
                 format!(
                     "Failed to load configuration `{path}`",
@@ -374,22 +376,25 @@ pub fn resolve_configuration(
     for extend in configurations {
         configuration = configuration.combine(extend);
     }
+
+    let configuration = configuration.apply_fallbacks(origin, initial_config_path);
+
     Ok(transformer.transform(configuration))
 }
 
 /// Extract the project root (scope) and [`Settings`] from a given
 /// `pyproject.toml`.
-fn resolve_scoped_settings<'a>(
-    pyproject: &'a Path,
+fn resolve_scoped_settings(
+    pyproject: &Path,
     transformer: &dyn ConfigurationTransformer,
     origin: ConfigurationOrigin,
-) -> Result<(&'a Path, Settings)> {
+) -> Result<(PathBuf, Settings)> {
     let relativity = Relativity::from(origin);
 
     let configuration = resolve_configuration(pyproject, transformer, origin)?;
     let project_root = relativity.resolve(pyproject);
     let settings = configuration.into_settings(project_root)?;
-    Ok((project_root, settings))
+    Ok((project_root.to_path_buf(), settings))
 }
 
 /// Extract the [`Settings`] from a given `pyproject.toml` and process the
@@ -455,7 +460,7 @@ pub fn python_files_in_path<'a>(
                             transformer,
                             ConfigurationOrigin::Ancestor,
                         )?;
-                        resolver.add(root, settings);
+                        resolver.add(&root, settings, pyproject);
                         // We found the closest configuration.
                         break;
                     }
@@ -647,7 +652,11 @@ impl ParallelVisitor for PythonFilesVisitor<'_, '_> {
                             ConfigurationOrigin::Ancestor,
                         ) {
                             Ok((root, settings)) => {
-                                self.global.resolver.write().unwrap().add(root, settings);
+                                self.global
+                                    .resolver
+                                    .write()
+                                    .unwrap()
+                                    .add(&root, settings, pyproject);
                             }
                             Err(err) => {
                                 self.local_error = Err(err);
@@ -767,7 +776,7 @@ pub fn python_file_at_path(
             if let Some(pyproject) = settings_toml(ancestor)? {
                 let (root, settings) =
                     resolve_scoped_settings(&pyproject, transformer, ConfigurationOrigin::Unknown)?;
-                resolver.add(root, settings);
+                resolver.add(&root, settings, pyproject);
                 break;
             }
         }
@@ -944,7 +953,10 @@ mod tests {
     use path_absolutize::Absolutize;
     use tempfile::TempDir;
 
-    use ruff_linter::settings::types::{FilePattern, GlobPath};
+    use ruff_linter::settings::{
+        TargetVersion,
+        types::{FilePattern, GlobPath, PythonVersion},
+    };
 
     use crate::configuration::Configuration;
     use crate::pyproject::find_settings_toml;
@@ -1130,5 +1142,48 @@ mod tests {
             file_basename,
             &make_exclusion(exclude),
         ));
+    }
+
+    #[test]
+    fn extend_respects_target_version() -> Result<()> {
+        let tmp_dir = TempDir::new()?;
+        let root = tmp_dir.path();
+
+        let ruff_toml = root.join("ruff.toml");
+        std::fs::write(&ruff_toml, "target-version = \"py310\"")?;
+
+        let dot_ruff_toml = root.join(".ruff.toml");
+        std::fs::write(&dot_ruff_toml, "extend = \"ruff.toml\"")?;
+
+        let pyproject_toml = root.join("pyproject.toml");
+        std::fs::write(
+            &pyproject_toml,
+            r#"[project]
+name = "repro-ruff"
+version = "0.1.0"
+requires-python = ">=3.13"
+"#,
+        )?;
+
+        let main_py = root.join("main.py");
+        std::fs::write(
+            &main_py,
+            r#"from typing import TypeAlias
+
+A: TypeAlias = str | int
+"#,
+        )?;
+
+        let settings = resolve_root_settings(
+            &dot_ruff_toml,
+            &NoOpTransformer,
+            ConfigurationOrigin::Ancestor,
+        )?;
+        assert_eq!(
+            settings.linter.unresolved_target_version,
+            TargetVersion(Some(PythonVersion::Py310.into()))
+        );
+
+        Ok(())
     }
 }

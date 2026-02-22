@@ -87,9 +87,9 @@ def update_schemastore(
         cwd=schemastore_path,
     )
 
-    # Run npm install
+    # Run npm ci
     src = schemastore_path / "src"
-    check_call(["npm", "install"], cwd=schemastore_path)
+    check_call(["npm", "ci", "--ignore-scripts"], cwd=schemastore_path)
 
     # Update the schema and format appropriately
     schema = json.loads(RUFF_SCHEMA.read_text())

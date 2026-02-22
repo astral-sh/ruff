@@ -4,8 +4,12 @@
 //!
 //! ```toml
 //! log = true # or log = "ty=WARN"
+//!
 //! [environment]
 //! python-version = "3.10"
+//!
+//! [project]
+//! dependencies = ["pydantic==2.12.2"]
 //! ```
 
 use anyhow::Context;
@@ -21,10 +25,19 @@ pub(crate) struct MarkdownTestConfig {
 
     pub(crate) log: Option<Log>,
 
+    pub(crate) analysis: Option<Analysis>,
+
     /// The [`ruff_db::system::System`] to use for tests.
     ///
     /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
     pub(crate) system: Option<SystemKind>,
+
+    /// Project configuration for installing external dependencies.
+    pub(crate) project: Option<Project>,
+
+    /// Simulate the use passing `-v` on the command line,
+    /// which can be used to show more information in test diagnostics.
+    pub(crate) verbose: Option<bool>,
 }
 
 impl MarkdownTestConfig {
@@ -50,6 +63,14 @@ impl MarkdownTestConfig {
 
     pub(crate) fn python(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.python.as_deref()
+    }
+
+    pub(crate) fn dependencies(&self) -> Option<&[String]> {
+        self.project.as_ref()?.dependencies.as_deref()
+    }
+
+    pub(crate) fn verbose(&self) -> bool {
+        self.verbose.unwrap_or_default()
     }
 }
 
@@ -92,6 +113,17 @@ pub(crate) struct Environment {
     pub python: Option<SystemPathBuf>,
 }
 
+#[derive(Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Analysis {
+    /// Whether ty should support `type: ignore` comments.
+    pub(crate) respect_type_ignore_comments: Option<bool>,
+
+    pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
+
+    pub(crate) replace_imports_with_any: Option<Vec<String>>,
+}
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub(crate) enum Log {
@@ -115,4 +147,17 @@ pub(crate) enum SystemKind {
     ///
     /// This system should only be used when testing system or OS specific behavior.
     Os,
+}
+
+/// Project configuration for tests that need external dependencies.
+#[derive(Deserialize, Debug, Default, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Project {
+    /// List of Python package dependencies in `pyproject.toml` format.
+    ///
+    /// These will be installed using `uv sync` into a temporary virtual environment.
+    /// The site-packages directory will then be copied into the test's filesystem.
+    ///
+    /// Example: `dependencies = ["pydantic==2.12.2"]`
+    pub(crate) dependencies: Option<Vec<String>>,
 }

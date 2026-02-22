@@ -1,0 +1,112 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ipython_help_escape_command_error_recovery_3.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..56,
+        body: [
+            With(
+                StmtWith {
+                    node_index: NodeIndex(None),
+                    range: 37..47,
+                    is_async: false,
+                    items: [
+                        WithItem {
+                            range: 42..43,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 42..43,
+                                    id: Name("a"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                        WithItem {
+                            range: 46..47,
+                            node_index: NodeIndex(None),
+                            context_expr: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 46..47,
+                                    id: Name("b"),
+                                    ctx: Load,
+                                },
+                            ),
+                            optional_vars: None,
+                        },
+                    ],
+                    body: [],
+                },
+            ),
+            IpyEscapeCommand(
+                StmtIpyEscapeCommand {
+                    node_index: NodeIndex(None),
+                    range: 48..49,
+                    kind: Help,
+                    value: "",
+                },
+            ),
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 50..55,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 50..51,
+                                id: Name("x"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: NumberLiteral(
+                        ExprNumberLiteral {
+                            node_index: NodeIndex(None),
+                            range: 54..55,
+                            value: Int(
+                                1,
+                            ),
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | with a, ?b
+  |         ^ Syntax Error: Expected `,`, found `?`
+3 | ?
+4 | x = 1
+  |
+
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | with a, ?b
+  |           ^ Syntax Error: Expected `:`, found newline
+3 | ?
+4 | x = 1
+  |
+
+
+  |
+1 | # parse_options: {"mode": "ipython"}
+2 | with a, ?b
+3 | ?
+  | ^ Syntax Error: Expected an indented block after `with` statement
+4 | x = 1
+  |

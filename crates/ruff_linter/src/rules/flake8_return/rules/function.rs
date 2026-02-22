@@ -4,10 +4,10 @@ use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::{is_const_false, is_const_true};
 use ruff_python_ast::stmt_if::elif_else_range;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{self as ast, Decorator, ElifElseClause, Expr, Stmt};
-use ruff_python_parser::TokenKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::visibility::is_property;
 use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer, is_python_whitespace};
@@ -55,6 +55,12 @@ use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe for cases in which comments would be
 /// dropped from the `return` statement.
+///
+/// ## Options
+///
+/// This rule ignores functions marked as properties.
+///
+/// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct UnnecessaryReturnNone;

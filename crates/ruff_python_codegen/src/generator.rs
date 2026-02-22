@@ -1247,6 +1247,7 @@ impl<'a> Generator<'a> {
                     self.p_bytes_repr(&bytes_literal.value, bytes_literal.flags);
                 }
             }
+            #[expect(clippy::eq_op)]
             Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
                 static INF_STR: &str = "1e309";
                 assert_eq!(f64::MAX_10_EXP, 308);

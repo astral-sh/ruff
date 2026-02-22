@@ -1,0 +1,98 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: protocols.md - Protocols - Match class patterns and protocols
+mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import Protocol, runtime_checkable
+ 2 | 
+ 3 | class HasX(Protocol):
+ 4 |     x: int
+ 5 | 
+ 6 | @runtime_checkable
+ 7 | class RuntimeCheckableHasX(Protocol):
+ 8 |     x: int
+ 9 | 
+10 | def match_non_runtime_checkable(arg: object):
+11 |     match arg:
+12 |         case HasX():  # error: [isinstance-against-protocol]
+13 |             reveal_type(arg)  # revealed: HasX
+14 |         case _:
+15 |             reveal_type(arg)  # revealed: ~HasX
+16 | 
+17 | def match_runtime_checkable(arg: object):
+18 |     match arg:
+19 |         case RuntimeCheckableHasX():  # no error!
+20 |             reveal_type(arg)  # revealed: RuntimeCheckableHasX
+21 |         case _:
+22 |             reveal_type(arg)  # revealed: ~RuntimeCheckableHasX
+23 | class Wrapper:
+24 |     inner: object
+25 | 
+26 | def match_nested_non_runtime_checkable(arg: Wrapper):
+27 |     match arg:
+28 |         case Wrapper(inner=HasX()):  # error: [isinstance-against-protocol]
+29 |             pass
+```
+
+# Diagnostics
+
+```
+error[isinstance-against-protocol]: Class `HasX` cannot be used in a class pattern
+  --> src/mdtest_snippet.py:12:14
+   |
+10 | def match_non_runtime_checkable(arg: object):
+11 |     match arg:
+12 |         case HasX():  # error: [isinstance-against-protocol]
+   |              ^^^^ This will raise `TypeError` at runtime
+13 |             reveal_type(arg)  # revealed: HasX
+14 |         case _:
+   |
+info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import Protocol, runtime_checkable
+2 |
+3 | class HasX(Protocol):
+  |       ^^^^^^^^^^^^^^ `HasX` declared here
+4 |     x: int
+  |
+info: A protocol class can only be used in a match class pattern if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
+info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+info: rule `isinstance-against-protocol` is enabled by default
+
+```
+
+```
+error[isinstance-against-protocol]: Class `HasX` cannot be used in a class pattern
+  --> src/mdtest_snippet.py:28:28
+   |
+26 | def match_nested_non_runtime_checkable(arg: Wrapper):
+27 |     match arg:
+28 |         case Wrapper(inner=HasX()):  # error: [isinstance-against-protocol]
+   |                            ^^^^ This will raise `TypeError` at runtime
+29 |             pass
+   |
+info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import Protocol, runtime_checkable
+2 |
+3 | class HasX(Protocol):
+  |       ^^^^^^^^^^^^^^ `HasX` declared here
+4 |     x: int
+  |
+info: A protocol class can only be used in a match class pattern if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
+info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+info: rule `isinstance-against-protocol` is enabled by default
+
+```

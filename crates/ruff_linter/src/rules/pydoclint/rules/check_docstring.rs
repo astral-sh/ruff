@@ -58,6 +58,11 @@ use crate::rules::pydocstyle::settings::Convention;
 ///     """
 ///     return distance / time
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.1")]
 pub(crate) struct DocstringExtraneousParameter {
@@ -113,6 +118,12 @@ impl Violation for DocstringExtraneousParameter {
 ///     """
 ///     return distance / time
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
+/// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.6")]
 pub(crate) struct DocstringMissingReturns;
@@ -165,6 +176,11 @@ impl Violation for DocstringMissingReturns {
 ///     for _ in range(n):
 ///         print("Hello!")
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.6")]
 pub(crate) struct DocstringExtraneousReturns;
@@ -218,6 +234,11 @@ impl Violation for DocstringExtraneousReturns {
 ///     for i in range(1, n + 1):
 ///         yield i
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct DocstringMissingYields;
@@ -270,6 +291,11 @@ impl Violation for DocstringMissingYields {
 ///     for _ in range(n):
 ///         print("Hello!")
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct DocstringExtraneousYields;
@@ -342,6 +368,11 @@ impl Violation for DocstringExtraneousYields {
 ///     except ZeroDivisionError as exc:
 ///         raise FasterThanLightError from exc
 /// ```
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.5")]
 pub(crate) struct DocstringMissingException {
@@ -410,6 +441,11 @@ impl Violation for DocstringMissingException {
 /// It may often be desirable to document *all* exceptions that a function
 /// could possibly raise, even those which are not explicitly raised using
 /// `raise` statements in the function body.
+///
+/// ## Options
+///
+/// - `lint.pydoclint.ignore-one-line-docstrings`
+/// - `lint.pydocstyle.convention`
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.5.5")]
 pub(crate) struct DocstringExtraneousException {
@@ -661,19 +697,31 @@ fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<Paramet
                 .is_some_and(|first_char| !first_char.is_whitespace())
             {
                 if let Some(before_colon) = entry.split(':').next() {
-                    let param = before_colon.trim_end();
-                    let param_name = param.trim_start_matches('*');
-                    if is_identifier(param_name) {
-                        let param_start = line_start + indentation.text_len();
-                        let param_end = param_start + param.text_len();
+                    let param_line = before_colon.trim_end();
 
-                        entries.push(ParameterEntry {
-                            name: param_name,
-                            range: TextRange::new(
-                                content_start + param_start,
-                                content_start + param_end,
-                            ),
-                        });
+                    // Split on commas to handle comma-separated parameters
+                    let mut current_offset = TextSize::from(0);
+                    for param_part in param_line.split(',') {
+                        let param_part_trimmed = param_part.trim();
+                        let param_name = param_part_trimmed.trim_start_matches('*');
+                        if is_identifier(param_name) {
+                            // Calculate the position of this specific parameter part within the line
+                            // Account for leading whitespace that gets trimmed
+                            let param_start_in_line = current_offset
+                                + (param_part.text_len() - param_part_trimmed.text_len());
+                            let param_start =
+                                line_start + indentation.text_len() + param_start_in_line;
+
+                            entries.push(ParameterEntry {
+                                name: param_name,
+                                range: TextRange::at(
+                                    content_start + param_start,
+                                    param_part_trimmed.text_len(),
+                                ),
+                            });
+                        }
+                        // Update offset for next iteration: add the part length plus comma length
+                        current_offset = current_offset + param_part.text_len() + ','.text_len();
                     }
                 }
             }
@@ -710,12 +758,30 @@ fn parse_raises(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName
 /// ```
 fn parse_raises_google(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
-    for potential in content.lines() {
-        let Some(colon_idx) = potential.find(':') else {
-            continue;
-        };
-        let entry = potential[..colon_idx].trim();
-        entries.push(QualifiedName::user_defined(entry));
+    let mut lines = content.lines().peekable();
+    let Some(first) = lines.peek() else {
+        return entries;
+    };
+    let indentation = &first[..first.len() - first.trim_start().len()];
+    for potential in lines {
+        if let Some(entry) = potential.strip_prefix(indentation) {
+            if let Some(first_char) = entry.chars().next() {
+                if !first_char.is_whitespace() {
+                    if let Some(colon_idx) = entry.find(':') {
+                        let entry = entry[..colon_idx].trim();
+                        if !entry.is_empty() {
+                            entries.push(QualifiedName::user_defined(entry));
+                        }
+                    }
+                }
+            }
+        } else {
+            // If we can't strip the expected indentation, check if this is a dedented line
+            // (not blank) - if so, break early as we've reached the end of this section
+            if !potential.trim().is_empty() {
+                break;
+            }
+        }
     }
     entries
 }
@@ -739,6 +805,12 @@ fn parse_raises_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
     for potential in lines {
         if let Some(entry) = potential.strip_prefix(indentation) {
+            // Check for Sphinx directives (lines starting with ..) - these indicate the end of the
+            // section. In numpy-style, exceptions are dedented to the same level as sphinx
+            // directives.
+            if entry.starts_with("..") {
+                break;
+            }
             if let Some(first_char) = entry.chars().next() {
                 if !first_char.is_whitespace() {
                     entries.push(QualifiedName::user_defined(entry.trim_end()));

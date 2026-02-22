@@ -82,7 +82,7 @@ def _(x: int | str | bytes | memoryview | range):
     if isinstance(x, int | str):
         reveal_type(x)  # revealed: int | str
     elif isinstance(x, bytes | memoryview):
-        reveal_type(x)  # revealed: bytes | memoryview[Unknown]
+        reveal_type(x)  # revealed: bytes | memoryview[int]
     else:
         reveal_type(x)  # revealed: range
 ```
@@ -145,6 +145,75 @@ def _(x: int | str | bytes):
         reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
     else:
         reveal_type(x)  # revealed: (int & Unknown) | (str & Unknown) | (bytes & Unknown)
+```
+
+## `classinfo` is a `types.UnionType`
+
+Python 3.10 added the ability to use `Union[int, str]` as the second argument to `isinstance()`:
+
+```py
+from typing import Union
+
+IntOrStr = Union[int, str]
+
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
+
+def _(x: int | str | bytes | memoryview | range):
+    if isinstance(x, IntOrStr):
+        reveal_type(x)  # revealed: int | str
+    elif isinstance(x, Union[bytes, memoryview]):
+        reveal_type(x)  # revealed: bytes | memoryview[int]
+    else:
+        reveal_type(x)  # revealed: range
+
+def _(x: int | str | None):
+    if isinstance(x, Union[int, None]):
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: str
+
+ListStrOrInt = Union[list[str], int]
+
+def _(x: dict[int, str] | ListStrOrInt):
+    # TODO: this should ideally be an error
+    if isinstance(x, ListStrOrInt):
+        # TODO: this should not be narrowed
+        reveal_type(x)  # revealed: list[str] | int
+
+    # TODO: this should ideally be an error
+    if isinstance(x, Union[list[str], int]):
+        # TODO: this should not be narrowed
+        reveal_type(x)  # revealed: list[str] | int
+```
+
+## `Optional` as `classinfo`
+
+```py
+from typing import Optional
+
+def _(x: int | str | None):
+    if isinstance(x, Optional[int]):
+        reveal_type(x)  # revealed: int | None
+    else:
+        reveal_type(x)  # revealed: str
+```
+
+## `classinfo` is a `typing.py` special form
+
+Certain special forms in `typing.py` are aliases to classes elsewhere in the standard library; these
+can be used in `isinstance()` and `issubclass()` checks. We support narrowing using them:
+
+```py
+import typing as t
+
+def f(x: dict[str, int] | list[str], y: object):
+    if isinstance(x, t.Dict):
+        reveal_type(x)  # revealed: dict[str, int]
+    else:
+        reveal_type(x)  # revealed: list[str]
+
+    if isinstance(y, t.Callable):
+        reveal_type(y)  # revealed: Top[(...) -> object]
 ```
 
 ## Class types
@@ -223,11 +292,11 @@ def _(flag: bool):
 def _(flag: bool):
     x = 1 if flag else "a"
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Unknown, ...]`, found `Literal["a"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["a"]"
     if isinstance(x, "a"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 
-    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Unknown, ...]`, found `Literal["int"]"
+    # error: [invalid-argument-type] "Argument to function `isinstance` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["int"]"
     if isinstance(x, "int"):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```
@@ -241,6 +310,23 @@ def _(flag: bool):
     # error: [unknown-argument]
     if isinstance(x, int, foo="bar"):
         reveal_type(x)  # revealed: Literal[1, "a"]
+```
+
+## Generic aliases are not supported as second argument
+
+The `classinfo` argument cannot be a generic alias:
+
+```py
+def _(x: list[str] | list[int] | list[bytes]):
+    # TODO: Ideally, this would be an error (requires https://github.com/astral-sh/ty/issues/116)
+    if isinstance(x, list[int]):
+        # No narrowing here:
+        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
+
+    # error: [invalid-argument-type] "Invalid second argument to `isinstance`"
+    if isinstance(x, list[int] | list[str]):
+        # No narrowing here:
+        reveal_type(x)  # revealed: list[str] | list[int] | list[bytes]
 ```
 
 ## `type[]` types are narrowed as well as class-literal types
@@ -469,4 +555,44 @@ def _(x: type[object], y: type[object], z: type[object]):
         reveal_type(y)  # revealed: type[Contravariant[Never]]
     if issubclass(z, Invariant):
         reveal_type(z)  # revealed: type[Top[Invariant[Unknown]]]
+```
+
+## Narrowing with TypedDict unions
+
+Narrowing unions of `int` and multiple TypedDicts using `isinstance(x, dict)` should not panic
+during type ordering of normalized intersection types. Regression test for
+<https://github.com/astral-sh/ty/issues/2451>.
+
+```py
+from typing import Any, TypedDict, cast
+
+class A(TypedDict):
+    x: str
+
+class B(TypedDict):
+    y: str
+
+T = int | A | B
+
+def test(a: Any, items: list[T]) -> None:
+    combined = a or items
+    v = combined[0]
+    if isinstance(v, dict):
+        cast(T, v)  # no panic
+```
+
+## Narrowing with named expressions (walrus operator)
+
+When `isinstance()` is used with a named expression, the target of the named expression should be
+narrowed.
+
+```py
+def get_value() -> int | str:
+    return 1
+
+def f():
+    if isinstance(x := get_value(), int):
+        reveal_type(x)  # revealed: int
+    else:
+        reveal_type(x)  # revealed: str
 ```

@@ -17,7 +17,7 @@ instances of `typing.TypeVar`, just like legacy type variables.
 ```py
 def f[T]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
@@ -33,7 +33,7 @@ python-version = "3.13"
 ```py
 def f[T = int]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__default__)  # revealed: int
     reveal_type(T.__bound__)  # revealed: None
     reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -61,12 +61,170 @@ reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 class Invalid[S = T]: ...
 ```
 
+### Invalid defaults
+
+A TypeVar default must be compatible with its bound or constraints.
+
+#### Concrete default with a bound
+
+The default must be assignable to the bound:
+
+```py
+# error: [invalid-type-variable-default] "TypeVar default is not assignable to the TypeVar's upper bound"
+def f[T: str = int](): ...
+def g[T: float = int](): ...
+```
+
+#### Concrete default with constraints
+
+The default must be one of the constrained types, even if it is a subtype of one of them:
+
+```py
+from typing import Any
+
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bytes` is not one of the constraints of `T`"
+def f[T: (int, str) = bytes](): ...
+def g[T: (int, str) = int](): ...
+
+# A subtype is not sufficient; the default must be exactly one of the constraints.
+# error: [invalid-type-variable-default] "TypeVar default is inconsistent with the TypeVar's constraints: `bool` is not one of the constraints of `T`"
+def h[T: (int, str) = bool](): ...
+
+# `Any` is always allowed as a default, even for constrained TypeVars.
+def i[T: (int, str) = Any](): ...
+```
+
+#### Default TypeVar's bound must be assignable to the outer bound
+
+When the default is a TypeVar, its upper bound must be assignable to the outer TypeVar's bound:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T3 = TypeVar("T3", bound=str)
+
+# OK: `float` in a type expression means `int | float`,
+# and the upper bound of `T1` (`int`) is assignable to `int | float`
+def f[S: float = T1](): ...
+
+# `T3` has bound `str`, which is not assignable to `int | float`
+# error: [invalid-type-variable-default] "Default `T3` of TypeVar `U` is not assignable to upper bound `int | float` of `U` because its upper bound `str` is not assignable to `int | float`"
+def g[U: float = T3](): ...
+```
+
+#### An unbounded default TypeVar has an implicit `object` bound
+
+An unbounded TypeVar has an implicit upper bound of `object`, which is not assignable to a more
+restrictive bound:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1")
+
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `S` is not assignable to upper bound `int` of `S` because its upper bound `object` is not assignable to `int`"
+def f[S: int = T1](): ...
+```
+
+#### A constrained default TypeVar's constraints must all be assignable to the outer bound
+
+When the default TypeVar has constraints, every constraint must be assignable to the outer bound:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", int, str)
+T2 = TypeVar("T2", int, bool)
+
+# OK: `T1`'s constraints are `int` and `str`,
+# which are both assignable to `object`
+def f[S: object = T1](): ...
+
+# `T1` has constraint `str`, which is not assignable to bound `int`
+# error: [invalid-type-variable-default] "Default `T1` of TypeVar `U` is not assignable to upper bound `int` of `U` because constraint `str` of `T1` is not assignable to `int`"
+def g[U: int = T1](): ...
+
+# OK: `T2`'s constraints are `int` and `bool`,
+# which are both assignable to `int`
+def h[V: int = T2](): ...
+```
+
+#### Local type-parameter defaults
+
+PEP 695 type parameters from the same scope can be used as defaults:
+
+```py
+# OK: `T` has bound `int`, which is assignable to `int`
+def f[T: int, U: int = T](): ...
+
+# `T` has bound `int`, which is not assignable to `str`
+# error: [invalid-type-variable-default] "Default `T` of TypeVar `U` is not assignable to upper bound `str` of `U` because its upper bound `int` is not assignable to `str`"
+def g[T: int, U: str = T](): ...
+
+# OK: `T`'s constraints ({int, str}) are a subset of `U`'s ({int, str, bool})
+def h[T: (int, str), U: (int, str, bool) = T](): ...
+
+# `T` has constraint `int` which is not one of `U`'s constraints ({bool, complex})
+# error: [invalid-type-variable-default]
+def i[T: (int, str), U: (bool, complex) = T](): ...
+```
+
+#### A constrained default TypeVar's constraints must be a subset of the outer constraints
+
+When the default TypeVar has constraints, they must all appear in the outer TypeVar's constraint
+list:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", int, str)
+
+# OK: `T1`'s constraints ({int, str}) are a subset
+# of `S`'s constraints ({int, str, bool})
+def f[S: (int, str, bool) = T1](): ...
+
+# `T1` has constraint `int` which is not one of `U`'s constraints ({bool, complex})
+# error: [invalid-type-variable-default]
+def g[U: (bool, complex) = T1](): ...
+```
+
+#### Invalid constraints with default (no cascading diagnostic)
+
+When a TypeVar has fewer than two constraints (already invalid), we should not also emit
+`invalid-type-variable-default`:
+
+```py
+# error: [invalid-type-variable-constraints]
+def f[T: (int,) = str](): ...
+```
+
+#### A non-constrained default TypeVar is incompatible with a constrained outer TypeVar
+
+A bounded or unbounded TypeVar (one without constraints) cannot be used as the default for a
+constrained TypeVar, because there is no guarantee it will satisfy any of the constraints:
+
+```py
+from typing import TypeVar
+
+T1 = TypeVar("T1", bound=int)
+T2 = TypeVar("T2")
+
+# `T1` has a bound but no constraints
+# error: [invalid-type-variable-default]
+def f[S: (float, str) = T1](): ...
+
+# `T2` has no bound or constraints
+# error: [invalid-type-variable-default]
+def g[U: (str, bytes) = T2](): ...
+```
+
 ### Type variables with an upper bound
 
 ```py
 def f[T: int]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__bound__)  # revealed: int
     reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -79,7 +237,7 @@ def g[S]():
 ```py
 def f[T: (int, str)]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__constraints__)  # revealed: tuple[int, str]
     reveal_type(T.__bound__)  # revealed: None
 
@@ -96,6 +254,26 @@ def g[S]():
 # error: [invalid-type-variable-constraints] "TypeVar must have at least two constrained types"
 def f[T: (int,)]():
     pass
+```
+
+### No explicit specialization
+
+A type variable itself cannot be explicitly specialized; the result of the specialization is
+`Unknown`. However, generic type aliases that point to type variables can be explicitly specialized.
+
+```py
+type Positive[T] = T
+
+def _[T](
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    a: T[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    b: T[T],
+    c: Positive[int],
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: int
 ```
 
 ## Invalid uses
@@ -137,84 +315,26 @@ class Sub(Base): ...
 class Unrelated: ...
 
 def unbounded_unconstrained[T, U](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, T))
     static_assert(is_assignable_to(T, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, object))
     static_assert(is_assignable_to(T, object))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Super))
     static_assert(not is_assignable_to(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Any))
     static_assert(is_assignable_to(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Any, T))
     static_assert(is_assignable_to(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(U, U))
     static_assert(is_assignable_to(U, U))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(U, object))
     static_assert(is_assignable_to(U, object))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(U, Super))
     static_assert(not is_assignable_to(U, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, U))
     static_assert(not is_assignable_to(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(U, T))
     static_assert(not is_assignable_to(U, T))
 
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(T, T))
     static_assert(is_subtype_of(T, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(T, object))
     static_assert(is_subtype_of(T, object))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Super))
     static_assert(not is_subtype_of(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Any))
     static_assert(not is_subtype_of(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Any, T))
     static_assert(not is_subtype_of(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(U, U))
     static_assert(is_subtype_of(U, U))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(U, object))
     static_assert(is_subtype_of(U, object))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(U, Super))
     static_assert(not is_subtype_of(U, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, U))
     static_assert(not is_subtype_of(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(U, T))
     static_assert(not is_subtype_of(U, T))
 ```
 
@@ -229,137 +349,47 @@ from typing import Any
 from typing_extensions import final
 
 def bounded[T: Super](t: T) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Any))
     static_assert(is_assignable_to(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Any, T))
     static_assert(is_assignable_to(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Super))
     static_assert(is_assignable_to(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Sub))
     static_assert(not is_assignable_to(T, Sub))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Super, T))
     static_assert(not is_assignable_to(Super, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Sub, T))
     static_assert(not is_assignable_to(Sub, T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Any))
     static_assert(not is_subtype_of(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Any, T))
     static_assert(not is_subtype_of(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(T, Super))
     static_assert(is_subtype_of(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(T, Sub))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Super, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Sub, T))
     static_assert(not is_subtype_of(Sub, T))
 
 def bounded_by_gradual[T: Any](t: T) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Any))
     static_assert(is_assignable_to(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Any, T))
     static_assert(is_assignable_to(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Super))
     static_assert(is_assignable_to(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Super, T))
     static_assert(not is_assignable_to(Super, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Sub))
     static_assert(is_assignable_to(T, Sub))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Sub, T))
     static_assert(not is_assignable_to(Sub, T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Any))
     static_assert(not is_subtype_of(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Any, T))
     static_assert(not is_subtype_of(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Super))
     static_assert(not is_subtype_of(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Super, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(T, Sub))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Sub, T))
     static_assert(not is_subtype_of(Sub, T))
 
 @final
 class FinalClass: ...
 
 def bounded_final[T: FinalClass](t: T) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Any))
     static_assert(is_assignable_to(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Any, T))
     static_assert(is_assignable_to(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, FinalClass))
     static_assert(is_assignable_to(T, FinalClass))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(FinalClass, T))
     static_assert(not is_assignable_to(FinalClass, T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Any))
     static_assert(not is_subtype_of(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Any, T))
     static_assert(not is_subtype_of(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(T, FinalClass))
     static_assert(is_subtype_of(T, FinalClass))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(FinalClass, T))
     static_assert(not is_subtype_of(FinalClass, T))
 ```
 
@@ -370,37 +400,17 @@ typevars to `Never` in addition to that final class.
 
 ```py
 def two_bounded[T: Super, U: Super](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, U))
     static_assert(not is_assignable_to(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(U, T))
     static_assert(not is_assignable_to(U, T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, U))
     static_assert(not is_subtype_of(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(U, T))
     static_assert(not is_subtype_of(U, T))
 
 def two_final_bounded[T: FinalClass, U: FinalClass](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, U))
     static_assert(not is_assignable_to(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(U, T))
     static_assert(not is_assignable_to(U, T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, U))
     static_assert(not is_subtype_of(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(U, T))
     static_assert(not is_subtype_of(U, T))
 ```
 
@@ -412,237 +422,67 @@ intersection of all of its constraints is a subtype of the typevar.
 from ty_extensions import Intersection
 
 def constrained[T: (Base, Unrelated)](t: T) -> None:
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Super))
     static_assert(not is_assignable_to(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Base))
     static_assert(not is_assignable_to(T, Base))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Sub))
     static_assert(not is_assignable_to(T, Sub))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Unrelated))
     static_assert(not is_assignable_to(T, Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Any))
     static_assert(is_assignable_to(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Super | Unrelated))
     static_assert(is_assignable_to(T, Super | Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Base | Unrelated))
     static_assert(is_assignable_to(T, Base | Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Sub | Unrelated))
     static_assert(not is_assignable_to(T, Sub | Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Any, T))
     static_assert(is_assignable_to(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Super, T))
     static_assert(not is_assignable_to(Super, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Unrelated, T))
     static_assert(not is_assignable_to(Unrelated, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Super | Unrelated, T))
     static_assert(not is_assignable_to(Super | Unrelated, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Intersection[Base, Unrelated], T))
     static_assert(is_assignable_to(Intersection[Base, Unrelated], T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Super))
     static_assert(not is_subtype_of(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Base))
     static_assert(not is_subtype_of(T, Base))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(T, Sub))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Unrelated))
     static_assert(not is_subtype_of(T, Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Any))
     static_assert(not is_subtype_of(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(T, Super | Unrelated))
     static_assert(is_subtype_of(T, Super | Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(T, Base | Unrelated))
     static_assert(is_subtype_of(T, Base | Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Sub | Unrelated))
     static_assert(not is_subtype_of(T, Sub | Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Any, T))
     static_assert(not is_subtype_of(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Super, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Unrelated, T))
     static_assert(not is_subtype_of(Unrelated, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Super | Unrelated, T))
     static_assert(not is_subtype_of(Super | Unrelated, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(Intersection[Base, Unrelated], T))
     static_assert(is_subtype_of(Intersection[Base, Unrelated], T))
 
 def constrained_by_gradual[T: (Base, Any)](t: T) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Super))
     static_assert(is_assignable_to(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Base))
     static_assert(is_assignable_to(T, Base))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Sub))
     static_assert(not is_assignable_to(T, Sub))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, Unrelated))
     static_assert(not is_assignable_to(T, Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Any))
     static_assert(is_assignable_to(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Super | Any))
     static_assert(is_assignable_to(T, Super | Any))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, Super | Unrelated))
     static_assert(is_assignable_to(T, Super | Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Super, T))
     static_assert(not is_assignable_to(Super, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Base, T))
     static_assert(is_assignable_to(Base, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Unrelated, T))
     static_assert(not is_assignable_to(Unrelated, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Any, T))
     static_assert(is_assignable_to(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Super | Any, T))
     static_assert(not is_assignable_to(Super | Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Base | Any, T))
     static_assert(is_assignable_to(Base | Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(Super | Unrelated, T))
     static_assert(not is_assignable_to(Super | Unrelated, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Intersection[Base, Unrelated], T))
     static_assert(is_assignable_to(Intersection[Base, Unrelated], T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Intersection[Base, Any], T))
     static_assert(is_assignable_to(Intersection[Base, Any], T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Super))
     static_assert(not is_subtype_of(T, Super))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Base))
     static_assert(not is_subtype_of(T, Base))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Sub))
     static_assert(not is_subtype_of(T, Sub))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Unrelated))
     static_assert(not is_subtype_of(T, Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Any))
     static_assert(not is_subtype_of(T, Any))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Super | Any))
     static_assert(not is_subtype_of(T, Super | Any))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, Super | Unrelated))
     static_assert(not is_subtype_of(T, Super | Unrelated))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Super, T))
     static_assert(not is_subtype_of(Super, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Base, T))
     static_assert(not is_subtype_of(Base, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Unrelated, T))
     static_assert(not is_subtype_of(Unrelated, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Any, T))
     static_assert(not is_subtype_of(Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Super | Any, T))
     static_assert(not is_subtype_of(Super | Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Base | Any, T))
     static_assert(not is_subtype_of(Base | Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Super | Unrelated, T))
     static_assert(not is_subtype_of(Super | Unrelated, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Intersection[Base, Unrelated], T))
     static_assert(not is_subtype_of(Intersection[Base, Unrelated], T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(Intersection[Base, Any], T))
     static_assert(not is_subtype_of(Intersection[Base, Any], T))
 ```
 
@@ -653,40 +493,20 @@ the same type.
 
 ```py
 def two_constrained[T: (int, str), U: (int, str)](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, U))
     static_assert(not is_assignable_to(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(U, T))
     static_assert(not is_assignable_to(U, T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, U))
     static_assert(not is_subtype_of(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(U, T))
     static_assert(not is_subtype_of(U, T))
 
 @final
 class AnotherFinalClass: ...
 
 def two_final_constrained[T: (FinalClass, AnotherFinalClass), U: (FinalClass, AnotherFinalClass)](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(T, U))
     static_assert(not is_assignable_to(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_assignable_to(U, T))
     static_assert(not is_assignable_to(U, T))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T, U))
     static_assert(not is_subtype_of(T, U))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(U, T))
     static_assert(not is_subtype_of(U, T))
 ```
 
@@ -694,20 +514,10 @@ A bound or constrained typevar is a subtype of itself in a union:
 
 ```py
 def union[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T, T | None))
     static_assert(is_assignable_to(T, T | None))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(U, U | None))
     static_assert(is_assignable_to(U, U | None))
 
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(T, T | None))
     static_assert(is_subtype_of(T, T | None))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(U, U | None))
     static_assert(is_subtype_of(U, U | None))
 ```
 
@@ -715,20 +525,10 @@ A bound or constrained typevar in a union with a dynamic type is assignable to t
 
 ```py
 def union_with_dynamic[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(T | Any, T))
     static_assert(is_assignable_to(T | Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(U | Any, U))
     static_assert(is_assignable_to(U | Any, U))
 
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(T | Any, T))
     static_assert(not is_subtype_of(T | Any, T))
-
-    # revealed: ty_extensions.ConstraintSet[never]
-    reveal_type(is_subtype_of(U | Any, U))
     static_assert(not is_subtype_of(U | Any, U))
 ```
 
@@ -740,20 +540,9 @@ from ty_extensions import Intersection, Not, is_disjoint_from
 class A: ...
 
 def inter[T: Base, U: (Base, Unrelated)](t: T, u: U) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Intersection[T, Unrelated], T))
     static_assert(is_assignable_to(Intersection[T, Unrelated], T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(Intersection[T, Unrelated], T))
     static_assert(is_subtype_of(Intersection[T, Unrelated], T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Intersection[U, A], U))
     static_assert(is_assignable_to(Intersection[U, A], U))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(Intersection[U, A], U))
     static_assert(is_subtype_of(Intersection[U, A], U))
 
     static_assert(is_disjoint_from(Not[T], T))
@@ -1054,20 +843,10 @@ of) itself.
 from ty_extensions import is_assignable_to, is_subtype_of, Not, static_assert
 
 def intersection_is_assignable[T](t: T) -> None:
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Intersection[T, None], T))
     static_assert(is_assignable_to(Intersection[T, None], T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_assignable_to(Intersection[T, Not[None]], T))
     static_assert(is_assignable_to(Intersection[T, Not[None]], T))
 
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(Intersection[T, None], T))
     static_assert(is_subtype_of(Intersection[T, None], T))
-
-    # revealed: ty_extensions.ConstraintSet[always]
-    reveal_type(is_subtype_of(Intersection[T, Not[None]], T))
     static_assert(is_subtype_of(Intersection[T, Not[None]], T))
 ```
 
@@ -1153,21 +932,20 @@ def constrained[T: (Callable[[], int], Callable[[], str])](f: T):
 
 ## Meta-type
 
-The meta-type of a typevar is the same as the meta-type of the upper bound, or the union of the
-meta-types of the constraints:
+The meta-type of a typevar is `type[T]`.
 
 ```py
 def normal[T](x: T):
-    reveal_type(type(x))  # revealed: type
+    reveal_type(type(x))  # revealed: type[T@normal]
 
 def bound_object[T: object](x: T):
-    reveal_type(type(x))  # revealed: type
+    reveal_type(type(x))  # revealed: type[T@bound_object]
 
 def bound_int[T: int](x: T):
-    reveal_type(type(x))  # revealed: type[int]
+    reveal_type(type(x))  # revealed: type[T@bound_int]
 
 def constrained[T: (int, str)](x: T):
-    reveal_type(type(x))  # revealed: type[int] | type[str]
+    reveal_type(type(x))  # revealed: type[T@constrained]
 ```
 
 ## Cycles
@@ -1179,11 +957,11 @@ A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 ```py
 from typing import Any
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 def f[S, T: list[S]](x: S, y: T) -> S | T:
     return x or y
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 class C[S, T: list[S]]:
     x: S
     y: T
@@ -1191,21 +969,21 @@ class C[S, T: list[S]]:
 reveal_type(C[int, list[Any]]().x)  # revealed: int
 reveal_type(C[int, list[Any]]().y)  # revealed: list[Any]
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 def g[T: list[T]](x: T) -> T:
     return x
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 class D[T: list[T]]:
     x: T
 
 reveal_type(D[list[Any]]().x)  # revealed: list[Any]
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
     return x or y
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 class E[S, T: (list[S], str)]:
     x: S
     y: T
@@ -1213,11 +991,11 @@ class E[S, T: (list[S], str)]:
 reveal_type(E[int, str]().x)  # revealed: int
 reveal_type(E[int, str]().y)  # revealed: str
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 def i[T: (list[T], str)](x: T) -> T:
     return x
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 class F[T: (list[T], str)]:
     x: T
 
@@ -1231,6 +1009,18 @@ class G[T: list[G]]:
     x: T
 
 reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+```
+
+An invalid specialization in a recursive bound doesn't cause a panic:
+
+```py
+# error: [invalid-type-arguments]
+class Node[T: "Node[int]"]:
+    pass
+
+# error: [invalid-type-arguments]
+def _(n: Node[str]):
+    reveal_type(n)  # revealed: Node[Unknown]
 ```
 
 ### Defaults
@@ -1251,7 +1041,7 @@ reveal_type(C[int]().y)  # revealed: int
 class D[T = T]:
     x: T
 
-reveal_type(D().x)  # revealed: T@D
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

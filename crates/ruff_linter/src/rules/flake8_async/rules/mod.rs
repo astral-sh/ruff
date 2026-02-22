@@ -18,7 +18,7 @@ mod async_zero_sleep;
 mod blocking_http_call;
 mod blocking_http_call_httpx;
 mod blocking_input;
-mod blocking_open_call;
+pub(crate) mod blocking_open_call;
 mod blocking_path_methods;
 mod blocking_process_invocation;
 mod blocking_sleep;

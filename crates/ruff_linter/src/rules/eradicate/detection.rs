@@ -22,6 +22,7 @@ static ALLOWLIST_REGEX: LazyLock<Regex> = LazyLock::new(|| {
             # Case-sensitive
             pyright
         |   pyrefly
+        |   ruff\s*:\s*(disable|enable)
         |   mypy:
         |   type:\s*ignore
         |   SPDX-License-Identifier:
@@ -148,6 +149,8 @@ mod tests {
         assert!(!comment_contains_code("# 123", &[]));
         assert!(!comment_contains_code("# 123.1", &[]));
         assert!(!comment_contains_code("# 1, 2, 3", &[]));
+        assert!(!comment_contains_code("# ruff: disable[E501]", &[]));
+        assert!(!comment_contains_code("#ruff:enable[E501, F84]", &[]));
         assert!(!comment_contains_code(
             "# pylint: disable=redefined-outer-name",
             &[]

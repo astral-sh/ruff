@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: overloads.md - Overloads - Argument type expansion - Optimization: Limit expansion size
 mdtest path: crates/ty_python_semantic/resources/mdtest/call/overloads.md
@@ -118,7 +119,7 @@ error[no-matching-overload]: No overload of function `f` matches arguments
    | |_________^
 41 |       )
    |
-info: Limit of argument type expansion reached at argument 10
+info: Limit of argument type expansion reached at argument 9
 info: First overload defined here
   --> src/overloaded.pyi:8:5
    |

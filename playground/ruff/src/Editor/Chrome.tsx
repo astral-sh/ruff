@@ -3,9 +3,9 @@ import { useCallback, useMemo, useRef, useState } from "react";
 import { Header, useTheme, setupMonaco } from "shared";
 import { persist, persistLocal, restore, stringify } from "./settings";
 import { default as Editor, Source } from "./Editor";
-import initRuff, { Workspace } from "ruff_wasm";
 import { loader } from "@monaco-editor/react";
 import { DEFAULT_PYTHON_SOURCE } from "../constants";
+import { default as initRuff, LogLevel, Workspace } from "ruff_wasm";
 
 export default function Chrome() {
   const initPromise = useRef<null | Promise<void>>(null);
@@ -16,15 +16,11 @@ export default function Chrome() {
 
   const [theme, setTheme] = useTheme();
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     if (settings == null || pythonSource == null) {
       return;
     }
-
-    persist(settings, pythonSource).catch((error) =>
-      // eslint-disable-next-line no-console
-      console.error(`Failed to share playground: ${error}`),
-    );
+    await persist(settings, pythonSource);
   }, [pythonSource, settings]);
 
   if (initPromise.current == null) {
@@ -114,7 +110,14 @@ async function startPlayground(): Promise<{
   settings: string;
   ruffVersion: string;
 }> {
-  await initRuff();
+  const ruff = await initRuff();
+
+  if (import.meta.env.DEV) {
+    ruff.initLogging(LogLevel.Debug);
+  } else {
+    ruff.initLogging(LogLevel.Info);
+  }
+
   const monaco = await loader.init();
 
   setupMonaco(monaco, {

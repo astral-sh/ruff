@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::parenthesize::parenthesized_range;
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
@@ -89,13 +89,9 @@ pub(crate) fn unnecessary_list_comprehension_set(checker: &Checker, call: &ast::
 
     // If the list comprehension is parenthesized, remove the parentheses in addition to
     // removing the brackets.
-    let replacement_range = parenthesized_range(
-        argument.into(),
-        (&call.arguments).into(),
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    )
-    .unwrap_or_else(|| argument.range());
+    let replacement_range =
+        parenthesized_range(argument.into(), (&call.arguments).into(), checker.tokens())
+            .unwrap_or_else(|| argument.range());
 
     let span = argument.range().add_start(one).sub_end(one);
     let replacement =

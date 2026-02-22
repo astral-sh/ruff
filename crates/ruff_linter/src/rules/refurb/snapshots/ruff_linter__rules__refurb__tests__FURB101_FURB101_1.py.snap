@@ -1,0 +1,39 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB101 [*] `Path.open()` followed by `read()` can be replaced by `Path("file.txt").read_text()`
+ --> FURB101_1.py:4:6
+  |
+2 | from pathlib import Path
+3 |
+4 | with Path("file.txt").open() as f:
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+5 |     contents = f.read()
+  |
+help: Replace with `Path("file.txt").read_text()`
+1 | 
+2 | from pathlib import Path
+3 | 
+  - with Path("file.txt").open() as f:
+  -     contents = f.read()
+4 + contents = Path("file.txt").read_text()
+5 | 
+6 | with Path("file.txt").open("r") as f:
+7 |     contents = f.read()
+
+FURB101 [*] `Path.open()` followed by `read()` can be replaced by `Path("file.txt").read_text()`
+ --> FURB101_1.py:7:6
+  |
+5 |     contents = f.read()
+6 |
+7 | with Path("file.txt").open("r") as f:
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+8 |     contents = f.read()
+  |
+help: Replace with `Path("file.txt").read_text()`
+4 | with Path("file.txt").open() as f:
+5 |     contents = f.read()
+6 | 
+  - with Path("file.txt").open("r") as f:
+  -     contents = f.read()
+7 + contents = Path("file.txt").read_text()

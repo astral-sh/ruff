@@ -17,7 +17,7 @@ Module(
                     test: Call(
                         ExprCall {
                             node_index: NodeIndex(None),
-                            range: 3..20,
+                            range: 3..18,
                             func: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
@@ -27,7 +27,7 @@ Module(
                                 },
                             ),
                             arguments: Arguments {
-                                range: 7..20,
+                                range: 7..18,
                                 node_index: NodeIndex(None),
                                 args: [
                                     Name(
@@ -113,7 +113,15 @@ Module(
 
   |
 1 | if call(foo, [a, b
-  |                   ^ Syntax Error: Expected `]`, found NonLogicalNewline
+2 |     def bar():
+  |     ^^^ Syntax Error: Expected `]`, found `def`
+3 |         pass
+  |
+
+
+  |
+1 | if call(foo, [a, b
+  |                   ^ Syntax Error: Expected `)`, found newline
 2 |     def bar():
 3 |         pass
   |

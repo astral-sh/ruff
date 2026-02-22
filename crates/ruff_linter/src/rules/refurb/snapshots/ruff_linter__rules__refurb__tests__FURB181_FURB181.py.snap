@@ -322,3 +322,28 @@ help: Replace with `.hexdigest()`
 39 | 
 40 | # not yet supported
 41 | h = sha256()
+
+FURB181 [*] Use of hashlib's `.digest().hex()`
+  --> FURB181.py:61:5
+   |
+60 |   hashed = (
+61 | /     sha512(b"some data")
+62 | |     .digest(
+63 | |         # text
+64 | |     )
+65 | |     .hex()
+   | |__________^
+66 |   )
+   |
+help: Replace with `.hexdigest()`
+58 | 
+59 | 
+60 | hashed = (
+   -     sha512(b"some data")
+   -     .digest(
+   -         # text
+   -     )
+   -     .hex()
+61 +     sha512(b"some data").hexdigest()
+62 | )
+note: This is an unsafe fix and may change runtime behavior

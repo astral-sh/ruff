@@ -288,6 +288,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1706") => rules::pylint::rules::AndOrTernary,
         (Pylint, "R1708") => rules::pylint::rules::StopIterationReturn,
         (Pylint, "R1711") => rules::pylint::rules::UselessReturn,
+        (Pylint, "R1712") => rules::pylint::rules::SwapWithTemporaryVariable,
         (Pylint, "R1714") => rules::pylint::rules::RepeatedEqualityComparison,
         (Pylint, "R1722") => rules::pylint::rules::SysExitAlias,
         (Pylint, "R1730") => rules::pylint::rules::IfStmtMinMax,
@@ -454,6 +455,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8ImplicitStrConcat, "001") => rules::flake8_implicit_str_concat::rules::SingleLineImplicitStringConcatenation,
         (Flake8ImplicitStrConcat, "002") => rules::flake8_implicit_str_concat::rules::MultiLineImplicitStringConcatenation,
         (Flake8ImplicitStrConcat, "003") => rules::flake8_implicit_str_concat::rules::ExplicitStringConcatenation,
+        (Flake8ImplicitStrConcat, "004") => rules::flake8_implicit_str_concat::rules::ImplicitStringConcatenationInCollectionLiteral,
 
         // flake8-print
         (Flake8Print, "1") => rules::flake8_print::rules::Print,
@@ -1058,10 +1060,17 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "063") => rules::ruff::rules::AccessAnnotationsFromClassDict,
         (Ruff, "064") => rules::ruff::rules::NonOctalPermissions,
         (Ruff, "065") => rules::ruff::rules::LoggingEagerConversion,
+        (Ruff, "066") => rules::ruff::rules::PropertyWithoutReturn,
+        (Ruff, "067") => rules::ruff::rules::NonEmptyInitModule,
+        (Ruff, "068") => rules::ruff::rules::DuplicateEntryInDunderAll,
+        (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
+        (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
         (Ruff, "102") => rules::ruff::rules::InvalidRuleCode,
+        (Ruff, "103") => rules::ruff::rules::InvalidSuppressionComment,
+        (Ruff, "104") => rules::ruff::rules::UnmatchedSuppressionComment,
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         #[cfg(any(feature = "test-rules", test))]
@@ -1119,8 +1128,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "002") => rules::airflow::rules::AirflowDagNoScheduleArgument,
         (Airflow, "301") => rules::airflow::rules::Airflow3Removal,
         (Airflow, "302") => rules::airflow::rules::Airflow3MovedToProvider,
+        (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,
         (Airflow, "311") => rules::airflow::rules::Airflow3SuggestedUpdate,
         (Airflow, "312") => rules::airflow::rules::Airflow3SuggestedToMoveToProvider,
+        (Airflow, "321") => rules::airflow::rules::Airflow31Moved,
 
         // perflint
         (Perflint, "101") => rules::perflint::rules::UnnecessaryListCast,
