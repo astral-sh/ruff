@@ -3394,6 +3394,60 @@ def g(x: B2[int]):
     pass
 ```
 
+## The `Generator` protocol's `_ReturnT_co` needs special casing prior to Python 3.13
+
+Prior to Python 3.13, the `_ReturnT_co` type parameter doesn't appear in any `Generator` methods in
+typeshed (except `__iter__`, which returns the self type recursively and gets normalized to `Any`).
+We need to special-case `Generator` so that specializations that differ in their return type don't
+appear equivalent.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
+from typing import Generator
+
+class A: ...
+class B: ...
+
+static_assert(not is_equivalent_to(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, B], Generator[None, None, A]))
+
+static_assert(is_equivalent_to(Generator[None, None, A], Generator[None, None, A]))
+static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+```
+
+## The `Generator` protocol's `_ReturnT_co` does not need special casing as of Python 3.13
+
+The same test cases as above, but for Python 3.13 instead of 3.12. In this version `_ReturnT_co`
+appears in `Generator`'s `close` method, and no special case is needed.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
+from typing import Generator
+
+class A: ...
+class B: ...
+
+static_assert(not is_equivalent_to(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, A], Generator[None, None, B]))
+static_assert(not is_subtype_of(Generator[None, None, B], Generator[None, None, A]))
+
+static_assert(is_equivalent_to(Generator[None, None, A], Generator[None, None, A]))
+static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+```
+
 ## TODO
 
 Add tests for:

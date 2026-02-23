@@ -265,6 +265,5 @@ class B: ...
 
 async def test(x: Intersection[Coroutine[object, object, A], Coroutine[object, object, B]]):
     y = await x
-    # TODO: should be `A & B`, but suffers from https://github.com/astral-sh/ty/issues/2426
-    reveal_type(y)  # revealed: A
+    reveal_type(y)  # revealed: A & B
 ```
