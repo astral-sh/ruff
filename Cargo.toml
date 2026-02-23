@@ -188,7 +188,7 @@ tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
 thiserror = { version = "2.0.0" }
 tikv-jemallocator = { version = "0.6.0" }
-toml = { version = "0.9.0" }
+toml = { version = "1.0.0" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.11" }
@@ -199,7 +199,7 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
     "ansi",
     "smallvec",
 ] }
-tryfn = { version = "0.2.1" }
+tryfn = { version = "1.0.0" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
 unicode-ident = { version = "1.0.12" }
