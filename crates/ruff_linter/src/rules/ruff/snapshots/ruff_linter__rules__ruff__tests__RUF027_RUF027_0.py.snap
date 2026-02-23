@@ -328,6 +328,8 @@ RUF027 [*] Possible f-string without an `f` prefix
 91 |     x = "test"
 92 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
    |           ^^^^^^^^^^^^^^^^^^
+93 |
+94 | # Test case for comment handling in f-string interpolations
    |
 help: Add `f` prefix
 89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
@@ -335,4 +337,26 @@ help: Add `f` prefix
 91 |     x = "test"
    -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
 92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+93 | 
+94 | # Test case for comment handling in f-string interpolations
+95 | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
+note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+   --> RUF027_0.py:99:11
+    |
+ 97 |   def comment_test():
+ 98 |       x = "!"
+ 99 |       print("""{x  # }
+    |  ___________^
+100 | | }""")
+    | |____^
+    |
+help: Add `f` prefix
+96  | # https://github.com/astral-sh/ruff/issues/23460
+97  | def comment_test():
+98  |     x = "!"
+    -     print("""{x  # }
+99  +     print(f"""{x  # }
+100 | }""")
 note: This is an unsafe fix and may change runtime behavior

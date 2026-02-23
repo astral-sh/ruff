@@ -226,10 +226,13 @@ fn should_be_fstring(
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.interpolations() {
-            // Check if the interpolation expression contains backslashes
-            // F-strings with backslashes in interpolations are only valid in Python 3.12+
+            // F-strings with backslashes or comments in interpolations are only
+            // valid in Python 3.12+ (PEP 701)
             let interpolation_text = &fstring_expr[element.range()];
-            if target_version < PythonVersion::PY312 && interpolation_text.contains('\\') {
+            if target_version < PythonVersion::PY312
+                && (interpolation_text.contains('\\')
+                    || interpolation_text.contains('#'))
+            {
                 return false;
             }
 
