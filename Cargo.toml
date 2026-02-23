@@ -61,7 +61,7 @@ anstream = { version = "0.6.18" }
 anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
 arc-swap = { version = "1.7.1" }
-argfile = { version = "0.2.0" }
+argfile = { version = "1.0.0" }
 assert_fs = { version = "1.1.0" }
 bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
