@@ -130,7 +130,11 @@ pub(crate) fn check(
                         SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                     Diagnostics::new(
-                        vec![IOError { message }.into_diagnostic(TextRange::default(), &dummy)],
+                        vec![IOError { message }.into_diagnostic(
+                            TextRange::default(),
+                            &dummy,
+                            settings.linter.rules.severity(Rule::IOError),
+                        )],
                         FxHashMap::default(),
                     )
                 } else {

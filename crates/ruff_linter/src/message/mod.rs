@@ -80,6 +80,7 @@ pub fn create_lint_diagnostic<B, S>(
     body: B,
     suggestion: Option<S>,
     range: TextRange,
+    severity: Severity,
     fix: Option<Fix>,
     parent: Option<TextSize>,
     file: SourceFile,
@@ -92,7 +93,7 @@ where
 {
     let mut diagnostic = Diagnostic::new(
         DiagnosticId::Lint(LintName::of(rule.into())),
-        Severity::Error,
+        severity,
         body,
     );
 
@@ -229,7 +230,7 @@ pub fn render_diagnostics(
 mod tests {
     use rustc_hash::FxHashMap;
 
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, Severity};
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
     use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{TextRange, TextSize};
@@ -277,6 +278,7 @@ def fibonacci(n):
             "`os` imported but unused",
             Some("Remove unused import: `os`"),
             TextRange::new(unused_import_start, TextSize::from(9)),
+            Severity::Error,
             Some(Fix::unsafe_edit(Edit::range_deletion(TextRange::new(
                 TextSize::from(0),
                 TextSize::from(10),
@@ -292,6 +294,7 @@ def fibonacci(n):
             "Local variable `x` is assigned to but never used",
             Some("Remove assignment to unused variable `x`"),
             TextRange::new(unused_variable_start, TextSize::from(95)),
+            Severity::Error,
             Some(Fix::unsafe_edit(Edit::deletion(
                 TextSize::from(94),
                 TextSize::from(99),
@@ -309,6 +312,7 @@ def fibonacci(n):
             "Undefined name `a`",
             Option::<&'static str>::None,
             TextRange::new(undefined_name_start, TextSize::from(4)),
+            Severity::Error,
             None,
             None,
             SourceFileBuilder::new("undef.py", file_2).finish(),
