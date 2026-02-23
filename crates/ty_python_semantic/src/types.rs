@@ -1022,23 +1022,25 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
-    /// Returns whether the definition of this type is generic
-    /// (this is different from whether this type *is* a generic type; a type that is already fully specialized is not a generic type).
-    pub(crate) fn is_definition_generic(self, db: &'db dyn Db) -> bool {
+    /// Returns whether this type represents a specialization of a generic type.
+    ///
+    /// For example, whereas `<class 'list'>` is a generic type, `<class 'list[int]'>`
+    /// is a specialization of that type.
+    pub(crate) fn is_specialized_generic(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .any(|ty| ty.is_definition_generic(db)),
+                .any(|ty| ty.is_specialized_generic(db)),
             Type::Intersection(intersection) => {
                 intersection
                     .positive(db)
                     .iter()
-                    .any(|ty| ty.is_definition_generic(db))
+                    .any(|ty| ty.is_specialized_generic(db))
                     || intersection
                         .negative(db)
                         .iter()
-                        .any(|ty| ty.is_definition_generic(db))
+                        .any(|ty| ty.is_specialized_generic(db))
             }
             Type::NominalInstance(instance_type) => instance_type.is_definition_generic(),
             Type::ProtocolInstance(protocol) => {
