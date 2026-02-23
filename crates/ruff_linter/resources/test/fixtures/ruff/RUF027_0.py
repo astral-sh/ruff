@@ -90,3 +90,10 @@ def fuzz_bug():
 def backslash_test():
     x = "test"
     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+
+# Test case for comment handling in f-string interpolations
+# Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
+def comment_test():
+    x = "!"
+    print("""{x  # }
+}""")
