@@ -1,7 +1,6 @@
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
 use crate::types::mro::MroIterator;
-use crate::types::special_form::{self, SpecialFormCategory};
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
@@ -212,72 +211,70 @@ impl<'db> ClassBase<'db> {
                 }
             },
 
-            Type::SpecialForm(special_form) => match special_form.kind() {
-                SpecialFormCategory::LegacyStdlibAlias(alias) => {
+            Type::SpecialForm(special_form) => match special_form {
+                SpecialFormType::TypeQualifier(_) => None,
+
+                SpecialFormType::Annotated
+                | SpecialFormType::Literal
+                | SpecialFormType::LiteralString
+                | SpecialFormType::Union
+                | SpecialFormType::NoReturn
+                | SpecialFormType::Never
+                | SpecialFormType::TypeGuard
+                | SpecialFormType::TypeIs
+                | SpecialFormType::TypingSelf
+                | SpecialFormType::Unpack
+                | SpecialFormType::Concatenate
+                | SpecialFormType::TypeAlias
+                | SpecialFormType::Optional
+                | SpecialFormType::Not
+                | SpecialFormType::Top
+                | SpecialFormType::Bottom
+                | SpecialFormType::Intersection
+                | SpecialFormType::TypeOf
+                | SpecialFormType::CallableTypeOf
+                | SpecialFormType::AlwaysTruthy
+                | SpecialFormType::AlwaysFalsy => None,
+
+                SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
+                SpecialFormType::Unknown => Some(Self::unknown()),
+                SpecialFormType::Protocol => Some(Self::Protocol),
+                SpecialFormType::Generic => Some(Self::Generic),
+                SpecialFormType::TypedDict => Some(Self::TypedDict),
+
+                SpecialFormType::NamedTuple => {
+                    let class = subclass?.as_static()?;
+                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                    Self::try_from_type(
+                        db,
+                        TupleType::heterogeneous(
+                            db,
+                            fields.values().map(|field| field.declared_ty),
+                        )?
+                        .to_class_type(db)
+                        .into(),
+                        subclass,
+                    )
+                }
+
+                // TODO: Classes inheriting from `typing.Type` also have `Generic` in their MRO
+                SpecialFormType::Type => {
+                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
+                }
+
+                SpecialFormType::Tuple => {
+                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db), subclass)
+                }
+
+                SpecialFormType::LegacyStdlibAlias(alias) => {
                     Self::try_from_type(db, alias.aliased_class().to_class_literal(db), subclass)
                 }
 
-                SpecialFormCategory::Callable => Self::try_from_type(
+                SpecialFormType::Callable => Self::try_from_type(
                     db,
                     todo_type!("Support for Callable as a base class"),
                     subclass,
                 ),
-
-                SpecialFormCategory::Tuple => {
-                    Self::try_from_type(db, KnownClass::Tuple.to_class_literal(db), subclass)
-                }
-
-                // TODO: Classes inheriting from `typing.Type` also have `Generic` in their MRO
-                SpecialFormCategory::Type => {
-                    Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
-                }
-
-                SpecialFormCategory::TypeQualifier(_) => None,
-
-                SpecialFormCategory::Other(form) => match form {
-                    special_form::MiscSpecialForm::Any => Some(Self::Dynamic(DynamicType::Any)),
-                    special_form::MiscSpecialForm::Unknown => Some(Self::unknown()),
-                    special_form::MiscSpecialForm::Protocol => Some(Self::Protocol),
-                    special_form::MiscSpecialForm::Generic => Some(Self::Generic),
-                    special_form::MiscSpecialForm::TypedDict => Some(Self::TypedDict),
-
-                    special_form::MiscSpecialForm::NamedTuple => {
-                        let class = subclass?.as_static()?;
-                        let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
-                        Self::try_from_type(
-                            db,
-                            TupleType::heterogeneous(
-                                db,
-                                fields.values().map(|field| field.declared_ty),
-                            )?
-                            .to_class_type(db)
-                            .into(),
-                            subclass,
-                        )
-                    }
-
-                    special_form::MiscSpecialForm::AlwaysFalsy
-                    | special_form::MiscSpecialForm::AlwaysTruthy
-                    | special_form::MiscSpecialForm::TypeOf
-                    | special_form::MiscSpecialForm::CallableTypeOf
-                    | special_form::MiscSpecialForm::TypeIs
-                    | special_form::MiscSpecialForm::TypingSelf
-                    | special_form::MiscSpecialForm::Not
-                    | special_form::MiscSpecialForm::Top
-                    | special_form::MiscSpecialForm::Bottom
-                    | special_form::MiscSpecialForm::Intersection
-                    | special_form::MiscSpecialForm::Literal
-                    | special_form::MiscSpecialForm::LiteralString
-                    | special_form::MiscSpecialForm::Annotated
-                    | special_form::MiscSpecialForm::TypeAlias
-                    | special_form::MiscSpecialForm::Optional
-                    | special_form::MiscSpecialForm::Unpack
-                    | special_form::MiscSpecialForm::Concatenate
-                    | special_form::MiscSpecialForm::Never
-                    | special_form::MiscSpecialForm::NoReturn
-                    | special_form::MiscSpecialForm::Union
-                    | special_form::MiscSpecialForm::TypeGuard => None,
-                },
             },
         }
     }

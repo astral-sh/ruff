@@ -16,7 +16,7 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, SpecialFormCategory, SubclassOfInner, SubclassOfType,
+    KnownInstanceType, LiteralValueTypeKind, SpecialFormType, SubclassOfInner, SubclassOfType,
     Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
@@ -228,23 +228,23 @@ impl ClassInfoConstraintFunction {
                 )
             }
 
-            Type::SpecialForm(form) => match form.kind() {
-                SpecialFormCategory::LegacyStdlibAlias(alias) => {
+            Type::SpecialForm(form) => match form {
+                SpecialFormType::LegacyStdlibAlias(alias) => {
                     self.generate_constraint(db, alias.aliased_class().to_class_literal(db))
                 }
-                SpecialFormCategory::Tuple => {
+                SpecialFormType::Tuple => {
                     self.generate_constraint(db, KnownClass::Tuple.to_class_literal(db))
                 }
-                SpecialFormCategory::Type => {
+                SpecialFormType::Type => {
                     self.generate_constraint(db, KnownClass::Type.to_class_literal(db))
                 }
 
                 // We don't have a good meta-type for `Callable`s right now,
                 // so only apply `isinstance()` narrowing, not `issubclass()`
-                SpecialFormCategory::Callable => (self == ClassInfoConstraintFunction::IsInstance)
+                SpecialFormType::Callable => (self == ClassInfoConstraintFunction::IsInstance)
                     .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
 
-                SpecialFormCategory::TypeQualifier(_) | SpecialFormCategory::Other(_) => None,
+                _ => None,
             },
 
             Type::AlwaysFalsy

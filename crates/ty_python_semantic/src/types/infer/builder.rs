@@ -119,7 +119,7 @@ use crate::types::generics::{
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::mro::{DynamicMroErrorKind, StaticMroErrorKind};
 use crate::types::newtype::NewType;
-use crate::types::special_form::{AliasSpec, MiscSpecialForm};
+use crate::types::special_form::AliasSpec;
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::subscript::{LegacyGenericOrigin, SubscriptError, SubscriptErrorKind};
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleSpecBuilder, TupleType};
@@ -133,13 +133,12 @@ use crate::types::{
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
     LintDiagnosticGuard, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
     MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
-    Parameters, Signature, SpecialFormCategory, SpecialFormType, StaticClassLiteral,
-    SubclassOfType, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarConstraints, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind,
-    TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type,
-    binding_type, definition_expression_type, infer_complete_scope_types, infer_scope_types,
-    todo_type,
+    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
+    infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -15935,37 +15934,35 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            Type::SpecialForm(special_form) => match special_form.kind() {
-                SpecialFormCategory::Tuple => {
+            Type::SpecialForm(special_form) => match special_form {
+                SpecialFormType::Tuple => {
                     return tuple_generic_alias(
                         self.db(),
                         self.infer_tuple_type_expression(subscript),
                     );
                 }
-                SpecialFormCategory::Other(MiscSpecialForm::Literal) => {
-                    match self.infer_literal_parameter_type(slice) {
-                        Ok(result) => {
-                            return Type::KnownInstance(KnownInstanceType::Literal(
-                                InternedType::new(self.db(), result),
-                            ));
-                        }
-                        Err(nodes) => {
-                            for node in nodes {
-                                let Some(builder) =
-                                    self.context.report_lint(&INVALID_TYPE_FORM, node)
-                                else {
-                                    continue;
-                                };
-                                builder.into_diagnostic(
-                                    "Type arguments for `Literal` must be `None`, \
-                            a literal value (int, bool, str, or bytes), or an enum member",
-                                );
-                            }
-                            return Type::unknown();
-                        }
+                SpecialFormType::Literal => match self.infer_literal_parameter_type(slice) {
+                    Ok(result) => {
+                        return Type::KnownInstance(KnownInstanceType::Literal(InternedType::new(
+                            self.db(),
+                            result,
+                        )));
                     }
-                }
-                SpecialFormCategory::Other(MiscSpecialForm::Annotated) => {
+                    Err(nodes) => {
+                        for node in nodes {
+                            let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node)
+                            else {
+                                continue;
+                            };
+                            builder.into_diagnostic(
+                                "Type arguments for `Literal` must be `None`, \
+                            a literal value (int, bool, str, or bytes), or an enum member",
+                            );
+                        }
+                        return Type::unknown();
+                    }
+                },
+                SpecialFormType::Annotated => {
                     let ast::Expr::Tuple(ast::ExprTuple {
                         elts: ref arguments,
                         ..
@@ -15999,7 +15996,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ty,
                     )));
                 }
-                SpecialFormCategory::Other(MiscSpecialForm::Optional) => {
+                SpecialFormType::Optional => {
                     let db = self.db();
 
                     if matches!(**slice, ast::Expr::Tuple(_))
@@ -16026,7 +16023,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ),
                     ));
                 }
-                SpecialFormCategory::Other(MiscSpecialForm::Union) => {
+                SpecialFormType::Union => {
                     let db = self.db();
 
                     match **slice {
@@ -16062,14 +16059,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 }
-                SpecialFormCategory::Type => {
+                SpecialFormType::Type => {
                     // Similar to the branch above that handles `type[…]`, handle `typing.Type[…]`
                     let argument_ty = self.infer_type_expression(slice);
                     return Type::KnownInstance(KnownInstanceType::TypeGenericAlias(
                         InternedType::new(self.db(), argument_ty),
                     ));
                 }
-                SpecialFormCategory::Callable => {
+                SpecialFormType::Callable => {
                     let arguments = if let ast::Expr::Tuple(tuple) = &*subscript.slice {
                         &*tuple.elts
                     } else {
@@ -16128,8 +16125,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     return Type::KnownInstance(KnownInstanceType::Callable(callable));
                 }
-                SpecialFormCategory::Other(_) => {}
-                SpecialFormCategory::LegacyStdlibAlias(alias) => {
+                SpecialFormType::LegacyStdlibAlias(alias) => {
                     let AliasSpec {
                         class,
                         expected_argument_number,
@@ -16169,7 +16165,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .map(Type::from)
                         .unwrap_or_else(Type::unknown);
                 }
-                SpecialFormCategory::TypeQualifier(_) => {}
+                _ => {}
             },
 
             Type::KnownInstance(

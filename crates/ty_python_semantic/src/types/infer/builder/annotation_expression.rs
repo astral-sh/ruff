@@ -6,7 +6,6 @@ use crate::types::diagnostic::{
     INVALID_TYPE_FORM, REDUNDANT_FINAL_CLASSVAR, report_invalid_arguments_to_annotated,
 };
 use crate::types::infer::nearest_enclosing_class;
-use crate::types::special_form::{MiscSpecialForm, SpecialFormCategory};
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, FSTRING_TYPE_ANNOTATION, parse_string_annotation,
 };
@@ -91,37 +90,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             builder: &TypeInferenceBuilder<'db, '_>,
             pep_613_policy: PEP613Policy,
         ) -> TypeAndQualifiers<'db> {
-            match ty {
-                Type::SpecialForm(special_form) => match special_form.kind() {
-                    SpecialFormCategory::TypeQualifier(qualifier) => TypeAndQualifiers::new(
+            let special_case = match ty {
+                Type::SpecialForm(special_form) => match special_form {
+                    SpecialFormType::TypeQualifier(qualifier) => Some(TypeAndQualifiers::new(
                         Type::unknown(),
                         TypeOrigin::Declared,
                         TypeQualifiers::from(qualifier),
-                    ),
-                    SpecialFormCategory::Other(MiscSpecialForm::TypeAlias)
-                        if pep_613_policy == PEP613Policy::Allowed =>
-                    {
-                        TypeAndQualifiers::declared(ty)
+                    )),
+                    SpecialFormType::TypeAlias if pep_613_policy == PEP613Policy::Allowed => {
+                        Some(TypeAndQualifiers::declared(ty))
                     }
-                    SpecialFormCategory::Type
-                    | SpecialFormCategory::Tuple
-                    | SpecialFormCategory::Callable
-                    | SpecialFormCategory::LegacyStdlibAlias(_)
-                    | SpecialFormCategory::Other(_) => TypeAndQualifiers::declared(
-                        ty.default_specialize(builder.db())
-                            .in_type_expression(
-                                builder.db(),
-                                builder.scope(),
-                                builder.typevar_binding_context,
-                            )
-                            .unwrap_or_else(|error| {
-                                error.into_fallback_type(
-                                    &builder.context,
-                                    annotation,
-                                    builder.is_reachable(annotation),
-                                )
-                            }),
-                    ),
+                    _ => None,
                 },
                 // Conditional import of `typing.TypeAlias` or `typing_extensions.TypeAlias` on a
                 // Python version where the former doesn't exist.
@@ -134,7 +113,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                         }) =>
                 {
-                    TypeAndQualifiers::declared(Type::SpecialForm(SpecialFormType::TypeAlias))
+                    Some(TypeAndQualifiers::declared(Type::SpecialForm(
+                        SpecialFormType::TypeAlias,
+                    )))
                 }
                 Type::ClassLiteral(class) if class.is_known(builder.db(), KnownClass::InitVar) => {
                     if let Some(builder) =
@@ -143,13 +124,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         builder
                             .into_diagnostic("`InitVar` may not be used without a type argument");
                     }
-                    TypeAndQualifiers::new(
+                    Some(TypeAndQualifiers::new(
                         Type::unknown(),
                         TypeOrigin::Declared,
                         TypeQualifiers::INIT_VAR,
-                    )
+                    ))
                 }
-                _ => TypeAndQualifiers::declared(
+                _ => None,
+            };
+
+            special_case.unwrap_or_else(|| {
+                TypeAndQualifiers::declared(
                     ty.default_specialize(builder.db())
                         .in_type_expression(
                             builder.db(),
@@ -163,8 +148,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 builder.is_reachable(annotation),
                             )
                         }),
-                ),
-            }
+                )
+            })
         }
 
         // https://typing.python.org/en/latest/spec/annotations.html#grammar-token-expression-grammar-annotation_expression
@@ -231,8 +216,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let slice = &**slice;
 
                 match value_ty {
-                    Type::SpecialForm(special_form) => match special_form.kind() {
-                        SpecialFormCategory::Other(MiscSpecialForm::Annotated) => {
+                    Type::SpecialForm(special_form) => match special_form {
+                        SpecialFormType::Annotated => {
                             // This branch is similar to the corresponding branch in
                             // `infer_parameterized_special_form_type_expression`, but
                             // `Annotated[…]` can appear both in annotation expressions and in
@@ -278,7 +263,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 )
                             }
                         }
-                        SpecialFormCategory::TypeQualifier(qualifier) => {
+                        SpecialFormType::TypeQualifier(qualifier) => {
                             let arguments = if let ast::Expr::Tuple(tuple) = slice {
                                 &*tuple.elts
                             } else {
@@ -348,11 +333,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             }
                             type_and_qualifiers
                         }
-                        SpecialFormCategory::Type
-                        | SpecialFormCategory::Tuple
-                        | SpecialFormCategory::Callable
-                        | SpecialFormCategory::LegacyStdlibAlias(_)
-                        | SpecialFormCategory::Other(_) => TypeAndQualifiers::declared(
+                        _ => TypeAndQualifiers::declared(
                             self.infer_subscript_type_expression_no_store(
                                 subscript, slice, value_ty,
                             ),

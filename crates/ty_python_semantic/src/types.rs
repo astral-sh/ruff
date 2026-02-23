@@ -73,7 +73,7 @@ pub(crate) use crate::types::narrow::{
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
-use crate::types::special_form::{SpecialFormCategory, TypeQualifier};
+use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
 use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
@@ -5990,34 +5990,9 @@ impl<'db> Type<'db> {
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
             },
 
-            Type::SpecialForm(special_form) => match special_form.kind() {
-                // We treat `typing.Type` exactly the same as `builtins.type`:
-                SpecialFormCategory::Type => Ok(KnownClass::Type.to_instance(db)),
-                SpecialFormCategory::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
-                SpecialFormCategory::Callable => Ok(Type::Callable(CallableType::unknown(db))),
-                SpecialFormCategory::LegacyStdlibAlias(alias) => {
-                    Ok(alias.aliased_class().to_instance(db))
-                }
-                SpecialFormCategory::Other(form) => {
-                    form.in_type_expression(db, scope_id, typevar_binding_context)
-                }
-                SpecialFormCategory::TypeQualifier(qualifier) => {
-                    let err = match qualifier {
-                        TypeQualifier::Final | TypeQualifier::ClassVar => {
-                            InvalidTypeExpression::TypeQualifier(qualifier)
-                        }
-                        TypeQualifier::ReadOnly
-                        | TypeQualifier::NotRequired
-                        | TypeQualifier::Required => {
-                            InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier)
-                        }
-                    };
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec_inline![err],
-                        fallback_type: Type::unknown(),
-                    })
-                }
-            },
+            Type::SpecialForm(special_form) => {
+                special_form.in_type_expression(db, scope_id, typevar_binding_context)
+            }
 
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
