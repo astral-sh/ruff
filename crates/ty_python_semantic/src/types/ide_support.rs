@@ -1018,16 +1018,21 @@ fn find_parameter_range(parameters: &ast::Parameters, parameter_name: &str) -> O
 /// Used by external tools that embed ty as a library.
 /// Not referenced by production code in this repository.
 /// No backwards compatibility guarantees are made for this API.
-pub fn explicit_bases_for_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
+pub fn explicit_bases_for_class<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<impl IntoIterator<Item = Type<'db>> + 'db> {
     let Type::ClassLiteral(class_literal) = ty else {
         return None;
     };
 
-    match class_literal {
-        ClassLiteral::Static(static_class) => Some(static_class.explicit_bases(db).to_vec()),
-        ClassLiteral::Dynamic(dynamic_class) => Some(dynamic_class.explicit_bases(db).to_vec()),
-        ClassLiteral::DynamicNamedTuple(_) => None,
-    }
+    let bases = match class_literal {
+        ClassLiteral::Static(static_class) => static_class.explicit_bases(db),
+        ClassLiteral::Dynamic(dynamic_class) => dynamic_class.explicit_bases(db),
+        ClassLiteral::DynamicNamedTuple(_) => return None,
+    };
+
+    Some(bases.iter().copied())
 }
 
 mod resolve_definition {
