@@ -141,6 +141,26 @@ When `__init__` is defined, member values are validated by synthesizing a call t
 from enum import Enum
 
 class Planet(Enum):
+    _value_: int
+
+    def __init__(self, value: int, mass: float, radius: float):
+        self._value_ = value
+
+    MERCURY = (1, 3.303e23, 2.4397e6)
+    SATURN = "saturn"  # error: [invalid-assignment]
+
+reveal_type(Planet.MERCURY.value)  # revealed: int
+reveal_type(Planet.MERCURY._value_)  # revealed: int
+```
+
+### `_value_` annotation incompatible with `__init__`
+
+When `_value_` and `__init__` disagree, the assignment inside `__init__` is flagged:
+
+```py
+from enum import Enum
+
+class Planet(Enum):
     _value_: str
 
     def __init__(self, value: int, mass: float, radius: float):
@@ -176,8 +196,8 @@ reveal_type(Planet2.MERCURY._value_)  # revealed: Any
 
 ### Inherited `_value_` annotation
 
-A `_value_` annotation on a parent enum is not inherited by subclasses for the purpose of member
-value validation:
+A `_value_` annotation on a parent enum is inherited by subclasses. Member values are validated
+against the inherited annotation, and `.value` uses the declared type:
 
 ```py
 from enum import Enum
@@ -187,9 +207,66 @@ class Base(Enum):
 
 class Child(Base):
     A = 1
-    B = "not checked against int"
+    B = "not an int"  # error: [invalid-assignment]
 
-reveal_type(Child.A.value)  # revealed: Literal[1]
+reveal_type(Child.A.value)  # revealed: int
+```
+
+This also works through multiple levels of inheritance, where `_value_` is declared on an
+intermediate class:
+
+```py
+from enum import Enum
+
+class Grandparent(Enum):
+    pass
+
+class Parent(Grandparent):
+    _value_: int
+
+class Child(Parent):
+    A = 1
+    B = "not an int"  # error: [invalid-assignment]
+
+reveal_type(Child.A.value)  # revealed: int
+```
+
+### Inherited `__init__`
+
+A custom `__init__` on a parent enum is inherited by subclasses. Member values are validated against
+the inherited `__init__` signature:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __init__(self, a: int, b: str):
+        self._value_ = a
+
+class Child(Base):
+    A = (1, "foo")
+    B = "should be checked against __init__"  # error: [invalid-assignment]
+
+reveal_type(Child.A.value)  # revealed: Any
+```
+
+This also works through multiple levels of inheritance:
+
+```py
+from enum import Enum
+
+class Grandparent(Enum):
+    def __init__(self, a: int, b: str):
+        self._value_ = a
+
+class Parent(Grandparent):
+    pass
+
+class Child(Parent):
+    A = (1, "foo")
+    B = "bad"  # error: [invalid-assignment]
+
+reveal_type(Child.A.value)  # revealed: Any
 ```
 
 ### Non-member attributes with disallowed type
@@ -450,7 +527,8 @@ class SingleMember(StrEnum):
 reveal_type(SingleMember.SINGLE.value)  # revealed: Literal["single"]
 ```
 
-Using `auto()` with `IntEnum` also works as expected:
+Using `auto()` with `IntEnum` also works as expected. `IntEnum` declares `_value_: int` in typeshed,
+so `.value` is typed as `int` rather than a precise literal:
 
 ```py
 from enum import IntEnum, auto
@@ -459,8 +537,8 @@ class Answer(IntEnum):
     YES = auto()
     NO = auto()
 
-reveal_type(Answer.YES.value)  # revealed: Literal[1]
-reveal_type(Answer.NO.value)  # revealed: Literal[2]
+reveal_type(Answer.YES.value)  # revealed: int
+reveal_type(Answer.NO.value)  # revealed: int
 ```
 
 As does using `auto()` for other enums that use `int` as a mixin:

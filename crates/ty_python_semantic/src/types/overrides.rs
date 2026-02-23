@@ -205,7 +205,14 @@ fn check_class_declaration<'db>(
                     Type::NominalInstance(nominal_instance)
                         if nominal_instance.has_known_class(db, KnownClass::EllipsisType)
                 );
-                let skip_type_check = context.in_stub() && is_ellipsis;
+                // `auto()` values are computed at runtime by the enum metaclass,
+                // so we can't validate them against _value_ or __init__ at the type level.
+                let is_auto = matches!(
+                    member_value_type,
+                    Type::NominalInstance(nominal_instance)
+                        if nominal_instance.has_known_class(db, KnownClass::Auto)
+                );
+                let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
 
                 if !skip_type_check {
                     if let Some(init_function) = enum_info.init_function {
