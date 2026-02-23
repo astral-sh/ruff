@@ -516,9 +516,9 @@ def f[
 ](
     bare_type: type,
     type_object: type[object],
+    type_int: type[int],
     type_t_unbound: type[T],
     type_t_object_bound: type[T1],
-    type_int: type[int],
     type_t_int_bound: type[T2],
     type_t_union_bound: type[T3],
     type_t_constrained: type[T4],
@@ -534,12 +534,22 @@ def f[
     reveal_type(type_object(""))  # revealed: Any
 
     reveal_type(type_t_unbound())  # revealed: T@f
+    # TODO: we could consider emitting an error here as well
     reveal_type(type_t_unbound(""))  # revealed: T@f
+
+    reveal_type(type_t_object_bound())  # revealed: T1@f
+    # TODO: we could consider emitting an error here as well
+    reveal_type(type_t_object_bound(""))  # revealed: T1@f
 
     reveal_type(type_int())  # revealed: int
     reveal_type(type_int("1"))  # revealed: int
     # error: [invalid-argument-type]
     reveal_type(type_int([]))  # revealed: int
+
+    reveal_type(type_t_int_bound())  # revealed: T2@f
+    reveal_type(type_t_int_bound("1"))  # revealed: T2@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_int_bound([]))  # revealed: T2@f
 
     reveal_type(type_t_union_bound(42))  # revealed: T3@f
     # error: [invalid-argument-type]
