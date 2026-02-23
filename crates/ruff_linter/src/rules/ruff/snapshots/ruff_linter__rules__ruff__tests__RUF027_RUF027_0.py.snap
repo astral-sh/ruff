@@ -336,3 +336,22 @@ help: Add `f` prefix
    -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
 92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
 note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_0.py:98:11
+   |
+96 |   def comment_test():
+97 |       x = "!"
+98 |       print("""{x  # }
+   |  ___________^
+99 | | }""")
+   | |____^
+   |
+help: Add `f` prefix
+95 | # Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
+96 | def comment_test():
+97 |     x = "!"
+   -     print("""{x  # }
+98 +     print(f"""{x  # }
+99 | }""")
+note: This is an unsafe fix and may change runtime behavior
