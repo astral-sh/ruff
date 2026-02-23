@@ -57,7 +57,7 @@ ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
 
 aho-corasick = { version = "1.1.3" }
-anstream = { version = "0.6.18" }
+anstream = { version = "1.0.0" }
 anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
 arc-swap = { version = "1.7.1" }
