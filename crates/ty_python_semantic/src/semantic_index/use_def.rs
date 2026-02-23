@@ -259,8 +259,8 @@ use crate::semantic_index::reachability_constraints::{
 use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::place_state::{
-    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, PlaceState,
+    Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclarationsIterator,
+    PlaceState,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{PossiblyNarrowedPlaces, Truthiness, Type};
@@ -268,7 +268,7 @@ use crate::types::{PossiblyNarrowedPlaces, Truthiness, Type};
 mod place_state;
 
 pub(super) use place_state::PreviousDefinitions;
-pub(crate) use place_state::{LiveBinding, ScopedDefinitionId};
+pub(crate) use place_state::{LiveBinding, LiveDeclaration, ScopedDefinitionId};
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -1210,7 +1210,7 @@ impl<'db> UseDefMapBuilder<'db> {
 
         self.bindings_by_definition
             .insert(declaration, place_state.bindings().clone());
-        place_state.record_declaration(def_id, self.reachability);
+        place_state.record_declaration(def_id, self.reachability, PreviousDefinitions::AreShadowed);
 
         let definitions = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
@@ -1238,7 +1238,7 @@ impl<'db> UseDefMapBuilder<'db> {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
         };
-        place_state.record_declaration(def_id, self.reachability);
+        place_state.record_declaration(def_id, self.reachability, PreviousDefinitions::AreShadowed);
         place_state.record_binding(
             def_id,
             self.reachability,
@@ -1375,6 +1375,93 @@ impl<'db> UseDefMapBuilder<'db> {
         };
 
         bindings.iter().copied()
+    }
+
+    /// Get a snapshot of the current declarations for a place. Like `loop_back_bindings` but for
+    /// declarations in the loop body that are visible via loop-back.
+    pub(super) fn loop_back_declarations(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = LiveDeclaration> + '_ {
+        let declarations = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].declarations(),
+            ScopedPlaceId::Member(member) => self.member_states[member].declarations(),
+        };
+
+        declarations.iter().copied()
+    }
+
+    /// Record a loop header declaration. Doesn't shadow prior declarations.
+    pub(super) fn record_loop_header_declaration(
+        &mut self,
+        place: ScopedPlaceId,
+        declaration: Definition<'db>,
+    ) {
+        let def_id = self
+            .all_definitions
+            .push(DefinitionState::Defined(declaration));
+
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+
+        self.bindings_by_definition
+            .insert(declaration, place_state.bindings().clone());
+        place_state.record_declaration(def_id, self.reachability, PreviousDefinitions::AreKept);
+
+        let definitions = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
+            ScopedPlaceId::Member(member) => &mut self.reachable_member_definitions[member],
+        };
+
+        definitions.declarations.record_declaration(
+            def_id,
+            self.reachability,
+            PreviousDefinitions::AreKept,
+        );
+    }
+
+    /// Record a loop header that is both a declaration and binding.
+    /// Doesn't shadow prior definitions.
+    pub(super) fn record_loop_header_declaration_and_binding(
+        &mut self,
+        place: ScopedPlaceId,
+        definition: Definition<'db>,
+    ) {
+        let def_id = self
+            .all_definitions
+            .push(DefinitionState::Defined(definition));
+        let place_state = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+        place_state.record_declaration(def_id, self.reachability, PreviousDefinitions::AreKept);
+        place_state.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            place.is_symbol(),
+            PreviousDefinitions::AreKept,
+        );
+
+        let reachable_definitions = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.reachable_symbol_definitions[symbol],
+            ScopedPlaceId::Member(member) => &mut self.reachable_member_definitions[member],
+        };
+
+        reachable_definitions.declarations.record_declaration(
+            def_id,
+            self.reachability,
+            PreviousDefinitions::AreKept,
+        );
+        reachable_definitions.bindings.record_binding(
+            def_id,
+            self.reachability,
+            self.is_class_scope,
+            place.is_symbol(),
+            PreviousDefinitions::AreKept,
+        );
     }
 
     /// Restore the current builder places state to the given snapshot.

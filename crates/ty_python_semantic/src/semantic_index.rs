@@ -47,7 +47,7 @@ mod use_def;
 
 pub(crate) use self::use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator, LiveBinding,
+    DeclarationWithConstraint, DeclarationsIterator, LiveBinding, LiveDeclaration,
 };
 
 /// Returns the semantic index for `file`.
@@ -135,17 +135,26 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
 #[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
 pub(crate) struct LoopHeader {
     bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
+    declarations: FxHashMap<ScopedPlaceId, SmallVec<[LiveDeclaration; 1]>>,
 }
 
 impl LoopHeader {
     pub(crate) fn new() -> Self {
         Self {
             bindings: FxHashMap::default(),
+            declarations: FxHashMap::default(),
         }
     }
 
     pub(crate) fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
         self.bindings.entry(place).or_default().push(binding);
+    }
+
+    pub(crate) fn add_declaration(&mut self, place: ScopedPlaceId, declaration: LiveDeclaration) {
+        self.declarations
+            .entry(place)
+            .or_default()
+            .push(declaration);
     }
 
     pub(crate) fn bindings_for_place(
@@ -155,6 +164,17 @@ impl LoopHeader {
         self.bindings
             .get(&place)
             .map(|v: &SmallVec<[LiveBinding; 1]>| v.iter().copied())
+            .into_iter()
+            .flatten()
+    }
+
+    pub(crate) fn declarations_for_place(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = LiveDeclaration> + '_ {
+        self.declarations
+            .get(&place)
+            .map(|v: &SmallVec<[LiveDeclaration; 1]>| v.iter().copied())
             .into_iter()
             .flatten()
     }
