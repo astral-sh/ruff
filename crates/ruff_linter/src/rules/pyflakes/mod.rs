@@ -711,7 +711,7 @@ mod tests {
     #[test]
     fn f811_typing_modules_overload() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("pyflakes/F811_34.py"),
+            Path::new("pyflakes/F811_33.py"),
             &LinterSettings {
                 typing_modules: vec!["std".to_string()],
                 ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
