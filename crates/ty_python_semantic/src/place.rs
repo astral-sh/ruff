@@ -19,7 +19,7 @@ use crate::types::{
     Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
     declaration_type,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -1157,6 +1157,7 @@ fn place_impl<'db>(
 /// Pre-computed reachability analysis for loop-back bindings in a loop header.
 #[salsa::tracked(
     cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
+    cycle_fn=loop_header_reachability_cycle_recover,
     heap_size = ruff_memory_usage::heap_size,
 )]
 pub(crate) fn loop_header_reachability<'db>(
@@ -1164,6 +1165,16 @@ pub(crate) fn loop_header_reachability<'db>(
     definition: Definition<'db>,
 ) -> LoopHeaderReachability<'db> {
     loop_header_reachability_impl(db, definition, false)
+}
+
+fn loop_header_reachability_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    previous: &LoopHeaderReachability<'db>,
+    result: LoopHeaderReachability<'db>,
+    _definition: Definition<'db>,
+) -> LoopHeaderReachability<'db> {
+    result.cycle_normalized(previous)
 }
 
 fn loop_header_reachability_impl<'db>(
@@ -1182,7 +1193,7 @@ fn loop_header_reachability_impl<'db>(
 
     let mut has_defined_bindings = false;
     let mut deleted_reachability = Truthiness::AlwaysFalse;
-    let mut reachable_bindings = Vec::new();
+    let mut reachable_bindings = FxIndexSet::default();
 
     for live_binding in loop_header.bindings_for_place(place) {
         let reachability = if initial {
@@ -1198,7 +1209,7 @@ fn loop_header_reachability_impl<'db>(
             DefinitionState::Defined(def) => {
                 has_defined_bindings = true;
                 if def != definition {
-                    reachable_bindings.push(ReachableLoopBinding {
+                    reachable_bindings.insert(ReachableLoopBinding {
                         definition: def,
                         narrowing_constraint: live_binding.narrowing_constraint,
                     });
@@ -1225,11 +1236,28 @@ pub(crate) struct LoopHeaderReachability<'db> {
     pub(crate) has_defined_bindings: bool,
     pub(crate) deleted_reachability: Truthiness,
     /// Reachable, defined loop-back bindings (excluding the loop header definition itself).
-    pub(crate) reachable_bindings: Vec<ReachableLoopBinding<'db>>,
+    pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
+}
+
+impl<'db> LoopHeaderReachability<'db> {
+    fn cycle_normalized(
+        self,
+        previous: &LoopHeaderReachability<'db>,
+    ) -> LoopHeaderReachability<'db> {
+        let mut reachable_bindings = FxIndexSet::default();
+        reachable_bindings.extend(previous.reachable_bindings.iter().copied());
+        reachable_bindings.extend(self.reachable_bindings);
+
+        LoopHeaderReachability {
+            has_defined_bindings: self.has_defined_bindings,
+            deleted_reachability: self.deleted_reachability,
+            reachable_bindings,
+        }
+    }
 }
 
 /// A single reachable loop-back binding with its narrowing constraint.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ReachableLoopBinding<'db> {
     pub(crate) definition: Definition<'db>,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
