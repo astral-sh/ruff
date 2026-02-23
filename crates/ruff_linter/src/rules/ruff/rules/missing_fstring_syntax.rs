@@ -254,8 +254,16 @@ fn should_be_fstring(
                 has_name = true;
             }
             if let Some(spec) = &element.format_spec {
-                let spec = &fstring_expr[spec.range()];
-                if FormatSpec::parse(spec).is_err() {
+                let spec_text;
+                let spec_str = if spec.elements.interpolations().next().is_none() {
+                    // Use decoded literal values so escape sequences like `\x64`
+                    // are resolved before parsing.
+                    spec_text = spec.elements.literals().map(|lit| &*lit.value).collect::<String>();
+                    &spec_text
+                } else {
+                    &fstring_expr[spec.range()]
+                };
+                if FormatSpec::parse(spec_str).is_err() {
                     return false;
                 }
             }
