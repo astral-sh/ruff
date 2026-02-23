@@ -3410,7 +3410,7 @@ supposed to see that incompatible `_ReturnT_co` types imply incompatible `Genera
 As of Python 3.13, the `Generator` protocol's `close` method was changed from returning `None` to
 returning `_ReturnT_co | None`. This was motivated by an edge case (you tried to cancel a generator,
 but it caught the related exception and returned something anyway), but coincidentally it tells `ty`
-what it needs to know: `_ReturnT_co` is something that some method in this protocol returns return.
+what it needs to know: `_ReturnT_co` is something that some method in this protocol returns.
 Something with a method that returns `float` isn't assignable to something where the same method
 returns `str`. Problem solved.
 
