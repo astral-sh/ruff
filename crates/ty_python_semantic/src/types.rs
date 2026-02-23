@@ -2092,13 +2092,49 @@ impl<'db> Type<'db> {
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
                 SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-
-                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
-                    Some(CallableTypes::one(CallableType::single(
+                SubclassOfInner::TypeVar(tvar) => match tvar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        let upcast_callables = bound.to_meta_type(db).try_upcast_to_callable(db)?;
+                        Some(upcast_callables.map(|callable| {
+                            let signatures = callable
+                                .signatures(db)
+                                .into_iter()
+                                .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
+                            CallableType::new(
+                                db,
+                                CallableSignature::from_overloads(signatures),
+                                callable.kind(db),
+                            )
+                        }))
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        let mut callables = SmallVec::new();
+                        for constraint in constraints.elements(db) {
+                            let element_upcast =
+                                constraint.to_meta_type(db).try_upcast_to_callable(db)?;
+                            for callable in element_upcast.into_inner() {
+                                let signatures = callable
+                                    .signatures(db)
+                                    .into_iter()
+                                    .map(|sig| sig.clone().with_return_type(Type::TypeVar(tvar)));
+                                callables.push(CallableType::new(
+                                    db,
+                                    CallableSignature::from_overloads(signatures),
+                                    callable.kind(db),
+                                ));
+                            }
+                        }
+                        Some(CallableTypes(callables))
+                    }
+                    None => Some(CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
-                    )))
-                }
+                        Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
+                    ))),
+                },
+                SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new(Parameters::unknown(), Type::from(subclass_of_ty)),
+                ))),
             },
 
             Type::Union(union) => {
@@ -4287,25 +4323,23 @@ impl<'db> Type<'db> {
                     Binding::single(self, Signature::dynamic(Type::Dynamic(dynamic_type))).into()
                 }
                 SubclassOfInner::Class(class) => self.constructor_bindings(db, class),
-                SubclassOfInner::TypeVar(bound_typevar) => {
-                    let Some(class) = (match bound_typevar.typevar(db).bound_or_constraints(db) {
-                        None | Some(TypeVarBoundOrConstraints::UpperBound(_)) => {
-                            subclass_of_type.subclass_of().into_class(db)
+                SubclassOfInner::TypeVar(tvar) => {
+                    let bindings = match tvar.typevar(db).bound_or_constraints(db) {
+                        None => KnownClass::Type.to_instance(db).bindings(db),
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            bound.to_meta_type(db).bindings(db)
                         }
-                        // TODO: model calls to `type[T]` where `T` is constrained
-                        Some(TypeVarBoundOrConstraints::Constraints(_)) => None,
-                    }) else {
-                        return Binding::single(
-                            self,
-                            Signature::new(
-                                Parameters::gradual_form(),
-                                self.to_instance(db).unwrap_or(Type::unknown()),
-                            ),
-                        )
-                        .into();
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            Bindings::from_union(
+                                self,
+                                constraints
+                                    .elements(db)
+                                    .iter()
+                                    .map(|ty| ty.to_meta_type(db).bindings(db)),
+                            )
+                        }
                     };
-
-                    self.constructor_bindings(db, class)
+                    bindings.with_constructor_instance_type(Type::TypeVar(tvar))
                 }
             },
 
