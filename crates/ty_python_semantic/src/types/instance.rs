@@ -184,8 +184,8 @@ impl<'db> Type<'db> {
         }
 
         // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
-        // methods (except `__iter__`, but that returns the self type recursively, which gets
-        // normalized to `Any`). We don't want generators with different return types to be
+        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
+        // out assignability). We don't want generators with different return types to be
         // assignable to each other. In this case we use the result of the nominal check above.
         if let Some(self_protocol) = self.as_protocol_instance()
             && let Protocol::FromClass(self_class) = self_protocol.inner
@@ -826,9 +826,9 @@ impl<'db> ProtocolInstanceType<'db> {
         }
 
         // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
-        // methods (except `__iter__`, but that returns the self type recursively, which gets
-        // normalized to `Any`). We don't want generators with different return types to be
-        // equivalent to each other. In this case we compare the `ClassType`s nominally.
+        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
+        // out equivalence). We don't want generators with different return types to be equivalent
+        // to each other. In this case we compare the `ClassType`s nominally.
         if let Protocol::FromClass(self_class) = self.inner
             && let Protocol::FromClass(other_class) = other.inner
             && self_class.known(db) == Some(KnownClass::Generator)
