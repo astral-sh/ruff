@@ -1,6 +1,7 @@
 use std::fmt::{Debug, Display, Formatter};
 
 use crate::display_settings;
+use ruff_db::diagnostic::Severity;
 use ruff_macros::CacheKey;
 
 use crate::registry::{Rule, RuleSet, RuleSetIterator};
@@ -10,6 +11,7 @@ use crate::registry::{Rule, RuleSet, RuleSetIterator};
 pub struct RuleTable {
     /// Maps rule codes to a boolean indicating if the rule should be fixed.
     enabled: RuleSet,
+    warn: RuleSet,
     should_fix: RuleSet,
 }
 
@@ -18,6 +20,7 @@ impl RuleTable {
     pub const fn empty() -> Self {
         Self {
             enabled: RuleSet::empty(),
+            warn: RuleSet::empty(),
             should_fix: RuleSet::empty(),
         }
     }
@@ -55,6 +58,17 @@ impl RuleTable {
         }
     }
 
+    /// Enables the given rule and sets its severity to `warning`.
+    #[inline]
+    pub fn warn(&mut self, rule: Rule, should_fix: bool) {
+        self.enabled.insert(rule);
+        self.warn.insert(rule);
+
+        if should_fix {
+            self.should_fix.insert(rule);
+        }
+    }
+
     /// Disables the given rule.
     #[inline]
     pub fn disable(&mut self, rule: Rule) {
@@ -82,7 +96,31 @@ impl FromIterator<Rule> for RuleTable {
         let rules = RuleSet::from_iter(iter);
         Self {
             enabled: rules.clone(),
+            warn: RuleSet::empty(),
             should_fix: rules,
+        }
+    }
+}
+
+impl FromIterator<(Rule, Severity)> for RuleTable {
+    fn from_iter<T: IntoIterator<Item = (Rule, Severity)>>(iter: T) -> Self {
+        let mut enabled = RuleSet::empty();
+        let mut warn = RuleSet::empty();
+        let mut should_fix = RuleSet::empty();
+
+        for (rule, severity) in iter {
+            enabled.insert(rule);
+            should_fix.insert(rule);
+            match severity {
+                Severity::Warning => warn.insert(rule),
+                Severity::Error => {}
+                _ => unreachable!("expect only rule severities of warning or error in rule table"),
+            }
+        }
+        Self {
+            enabled,
+            warn,
+            should_fix,
         }
     }
 }
