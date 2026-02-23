@@ -2064,6 +2064,15 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(bound_method.into_callable_type(db)))
             }
 
+            // Special case: if we're dealing with <instance of type>,
+            // treat it as <subclass of object>.
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                Some(CallableTypes::one(CallableType::single(
+                    db,
+                    Signature::new(Parameters::empty(), Type::object()),
+                )))
+            }
+
             Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
                     .member_lookup_with_policy(
@@ -2130,7 +2139,7 @@ impl<'db> Type<'db> {
                     }
                     None => Some(CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::gradual_form(), Type::TypeVar(tvar)),
+                        Signature::new(Parameters::empty(), Type::TypeVar(tvar)),
                     ))),
                 },
                 SubclassOfInner::Dynamic(_) => Some(CallableTypes::one(CallableType::single(
@@ -4369,6 +4378,12 @@ impl<'db> Type<'db> {
                     ),
                 )
                 .into()
+            }
+
+            // Special case: if we're dealing with <instance of type>,
+            // treat it as <subclass of object>.
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Type) => {
+                Binding::single(self, Signature::new(Parameters::empty(), Type::object())).into()
             }
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
