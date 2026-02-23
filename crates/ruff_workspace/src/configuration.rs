@@ -97,6 +97,12 @@ impl RuleSelection {
                     .map(|selector| (RuleSelectorKind::Modify, selector)),
             )
             .chain(
+                self.warn
+                    .iter()
+                    .flatten()
+                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+            .chain(
                 self.ignore
                     .iter()
                     .map(|selector| (RuleSelectorKind::Disable, selector)),
@@ -113,6 +119,11 @@ impl RuleSelection {
             )
             .chain(
                 self.extend_fixable
+                    .iter()
+                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+            )
+            .chain(
+                self.extend_warn
                     .iter()
                     .map(|selector| (RuleSelectorKind::Modify, selector)),
             )
@@ -861,6 +872,9 @@ impl LintConfiguration {
         // The fixable set keeps track of which rules are fixable.
         let mut fixable_set: RuleSet = RuleSelector::All.all_rules().collect();
 
+        // The warn set keeps track of which rules have severity `Warning`.
+        let mut warn_set: RuleSet = RuleSet::empty();
+
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
         // would be effectless. Instead we carry over the ignores to the next
@@ -891,6 +905,7 @@ impl LintConfiguration {
             // whether to enable or disable the given rule.
             let mut select_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
             let mut fixable_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
+            let mut warn_map_updates: FxHashMap<Rule, bool> = FxHashMap::default();
 
             let mut docstring_override_updates: FxHashSet<Rule> = FxHashSet::default();
 
@@ -912,6 +927,18 @@ impl LintConfiguration {
                         if spec == Specificity::Rule {
                             docstring_override_updates.insert(rule);
                         }
+                    }
+                }
+                // Iterate over rule selectors in order of specificity.
+                for selector in selection
+                    .warn
+                    .iter()
+                    .flatten()
+                    .chain(&selection.extend_select)
+                    .filter(|s| s.specificity() == spec)
+                {
+                    for rule in selector.rules(&preview) {
+                        warn_map_updates.insert(rule, true);
                     }
                 }
                 for selector in selection
@@ -973,6 +1000,27 @@ impl LintConfiguration {
 
                 for rule in docstring_override_updates {
                     docstring_overrides.insert(rule);
+                }
+            }
+
+            if let Some(warn) = &selection.warn {
+                // If the `select` option is given we reassign the whole select_set
+                // (overriding everything that has been defined previously).
+                warn_set = warn_map_updates
+                    .into_iter()
+                    .filter_map(|(rule, enabled)| enabled.then_some(rule))
+                    .collect();
+
+                if warn.is_empty()
+                    && selection.extend_warn.is_empty()
+                    && !selection.ignore.is_empty()
+                {
+                    carryover_ignores = Some(&selection.ignore);
+                }
+            } else {
+                // Otherwise we apply the updates on top of the existing select_set.
+                for (rule, enabled) in warn_map_updates {
+                    warn_set.set(rule, enabled);
                 }
             }
 
@@ -1139,6 +1187,11 @@ impl LintConfiguration {
         for rule in select_set {
             let fix = fixable_set.contains(rule);
             rules.enable(rule, fix);
+        }
+
+        for rule in warn_set {
+            let fix = fixable_set.contains(rule);
+            rules.warn(rule, fix);
         }
 
         // If a docstring convention is specified, disable any incompatible error
