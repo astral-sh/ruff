@@ -357,7 +357,7 @@ i = 1
 The full line-level suppression comment specification is as follows:
 
 - An own-line or trailing comment starting with case sensitive `#ruff:`, with
-  optional whitespace after the `#` symbol and `:` symbol, followed `ignore[`,
+  optional whitespace after the `#` symbol and `:` symbol, followed by `ignore[`,
   any codes to be suppressed, and ending with `]`.
 - Codes to be suppressed must be separated by commas, with optional whitespace
   before or after each code, and may be followed by an optional trailing comma
