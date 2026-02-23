@@ -1833,8 +1833,7 @@ fn missing_argfile_reports_error() {
         ----- stderr -----
         ruff failed
           Cause: Failed to read CLI arguments from files
-          Cause: failed to open file `!.txt`
-          Cause: No such file or directory (os error 2)
+          Cause: failed to open file `!.txt`: No such file or directory (os error 2)
         ");
     });
 }
