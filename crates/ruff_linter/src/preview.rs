@@ -293,7 +293,7 @@ pub(crate) const fn is_resolve_string_annotation_pyi041_enabled(settings: &Linte
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/issues/13604
+// https://github.com/astral-sh/ruff/pull/23510
 pub(crate) const fn is_baseloader_safe_in_yaml_load_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
