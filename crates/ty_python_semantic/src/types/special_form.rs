@@ -288,6 +288,7 @@ impl SpecialFormType {
         match self {
             // TypedDict can be called as a constructor to create TypedDict types
             Self::TypedDict
+
             // Collection constructors are callable
             // TODO actually implement support for calling them
             | Self::ChainMap
@@ -297,7 +298,16 @@ impl SpecialFormType {
             | Self::NamedTuple
             | Self::OrderedDict => true,
 
-            // All other special forms are not callable
+            // Unlike the aliases to `collections` classes,
+            // the aliases to builtin classes are *not* callable...
+            Self::List
+            | Self::Dict
+            | Self::Set
+            | Self::Tuple
+            | Self::Type
+            | Self::FrozenSet => false,
+
+            // All other special forms are also not callable
             Self::Annotated
             | Self::Literal
             | Self::LiteralString
@@ -305,12 +315,6 @@ impl SpecialFormType {
             | Self::Union
             | Self::NoReturn
             | Self::Never
-            | Self::Tuple
-            | Self::List
-            | Self::Dict
-            | Self::Set
-            | Self::FrozenSet
-            | Self::Type
             | Self::Unknown
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
@@ -344,15 +348,44 @@ impl SpecialFormType {
     /// <https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions>
     pub(super) const fn is_valid_in_type_expression(self) -> bool {
         match self.kind() {
-            SpecialFormCategory::TypeQualifier(_)
-            | SpecialFormCategory::Other(MiscSpecialForm::Unpack | MiscSpecialForm::TypeAlias) => {
-                false
-            }
             SpecialFormCategory::Type
             | SpecialFormCategory::Tuple
             | SpecialFormCategory::Callable
-            | SpecialFormCategory::LegacyStdlibAlias(_)
-            | SpecialFormCategory::Other(_) => true,
+            | SpecialFormCategory::LegacyStdlibAlias(_) => true,
+            SpecialFormCategory::TypeQualifier(_) => false,
+
+            SpecialFormCategory::Other(form) => match form {
+                MiscSpecialForm::Any
+                | MiscSpecialForm::Annotated
+                | MiscSpecialForm::Literal
+                | MiscSpecialForm::LiteralString
+                | MiscSpecialForm::Optional
+                | MiscSpecialForm::Union
+                | MiscSpecialForm::NoReturn
+                | MiscSpecialForm::Never
+                | MiscSpecialForm::Unknown
+                | MiscSpecialForm::AlwaysTruthy
+                | MiscSpecialForm::AlwaysFalsy
+                | MiscSpecialForm::Not
+                | MiscSpecialForm::Intersection
+                | MiscSpecialForm::TypeOf
+                | MiscSpecialForm::CallableTypeOf
+                | MiscSpecialForm::Top
+                | MiscSpecialForm::Bottom
+                | MiscSpecialForm::Concatenate
+                | MiscSpecialForm::TypeGuard
+                | MiscSpecialForm::TypedDict
+                | MiscSpecialForm::TypeIs
+                | MiscSpecialForm::NamedTuple
+                | MiscSpecialForm::TypingSelf => true,
+
+                MiscSpecialForm::Generic
+                | MiscSpecialForm::Protocol
+                | MiscSpecialForm::TypeAlias => false,
+
+                // TODO: seems incorrect?
+                MiscSpecialForm::Unpack => false,
+            },
         }
     }
 
@@ -414,20 +447,6 @@ impl SpecialFormType {
             Self::TypingSelf => SpecialFormCategory::Other(MiscSpecialForm::TypingSelf),
             Self::LiteralString => SpecialFormCategory::Other(MiscSpecialForm::LiteralString),
             Self::CallableTypeOf => SpecialFormCategory::Other(MiscSpecialForm::CallableTypeOf),
-        }
-    }
-
-    /// Return `Some(KnownClass)` if this special form is an alias
-    /// to a standard library class.
-    pub(super) const fn aliased_stdlib_class(self) -> Option<KnownClass> {
-        match self.kind() {
-            SpecialFormCategory::LegacyStdlibAlias(alias) => Some(alias.aliased_class()),
-            SpecialFormCategory::Tuple => Some(KnownClass::Tuple),
-            SpecialFormCategory::Type => Some(KnownClass::Type),
-            // From ty's perspective, `collections.abc.Callable` and `typing.Callable` are the same object
-            SpecialFormCategory::Callable
-            | SpecialFormCategory::Other(_)
-            | SpecialFormCategory::TypeQualifier(_) => None,
         }
     }
 

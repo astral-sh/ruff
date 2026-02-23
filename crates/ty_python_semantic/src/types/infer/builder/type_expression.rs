@@ -1718,9 +1718,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             special_form::SpecialFormCategory::Type => {
                 self.infer_subclass_of_type_expression(&subscript.slice)
             }
-            special_form::SpecialFormCategory::Callable => {
-                self.infer_callable_type(subscript)
-            }
+            special_form::SpecialFormCategory::Callable => self.infer_callable_type(subscript),
             special_form::SpecialFormCategory::TypeQualifier(qualifier) => {
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
                     let diag = builder.into_diagnostic(format_args!(

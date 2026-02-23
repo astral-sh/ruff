@@ -16,7 +16,7 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, SpecialFormType, SubclassOfInner, SubclassOfType,
+    KnownInstanceType, LiteralValueTypeKind, SpecialFormCategory, SubclassOfInner, SubclassOfType,
     Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
@@ -228,17 +228,24 @@ impl ClassInfoConstraintFunction {
                 )
             }
 
-            // We don't have a good meta-type for `Callable`s right now,
-            // so only apply `isinstance()` narrowing, not `issubclass()`
-            Type::SpecialForm(SpecialFormType::Callable)
-                if self == ClassInfoConstraintFunction::IsInstance =>
-            {
-                Some(Type::Callable(CallableType::unknown(db)).top_materialization(db))
-            }
+            Type::SpecialForm(form) => match form.kind() {
+                SpecialFormCategory::LegacyStdlibAlias(alias) => {
+                    self.generate_constraint(db, alias.aliased_class().to_class_literal(db))
+                }
+                SpecialFormCategory::Tuple => {
+                    self.generate_constraint(db, KnownClass::Tuple.to_class_literal(db))
+                }
+                SpecialFormCategory::Type => {
+                    self.generate_constraint(db, KnownClass::Type.to_class_literal(db))
+                }
 
-            Type::SpecialForm(special_form) => special_form
-                .aliased_stdlib_class()
-                .and_then(|class| self.generate_constraint(db, class.to_class_literal(db))),
+                // We don't have a good meta-type for `Callable`s right now,
+                // so only apply `isinstance()` narrowing, not `issubclass()`
+                SpecialFormCategory::Callable => (self == ClassInfoConstraintFunction::IsInstance)
+                    .then(|| Type::Callable(CallableType::unknown(db)).top_materialization(db)),
+
+                SpecialFormCategory::TypeQualifier(_) | SpecialFormCategory::Other(_) => None,
+            },
 
             Type::AlwaysFalsy
             | Type::AlwaysTruthy
