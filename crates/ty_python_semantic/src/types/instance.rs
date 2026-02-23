@@ -187,12 +187,12 @@ impl<'db> Type<'db> {
         // methods (except `__iter__`, but that returns the self type recursively, which gets
         // normalized to `Any`). We don't want generators with different return types to be
         // assignable to each other. In this case we use the result of the nominal check above.
-        if Program::get(db).python_version(db) < PythonVersion::PY313
-            && let Some(self_protocol) = self.as_protocol_instance()
+        if let Some(self_protocol) = self.as_protocol_instance()
             && let Protocol::FromClass(self_class) = self_protocol.inner
             && let Protocol::FromClass(proto_class) = protocol.inner
             && self_class.known(db) == Some(KnownClass::Generator)
             && proto_class.known(db) == Some(KnownClass::Generator)
+            && Program::get(db).python_version(db) < PythonVersion::PY313
         {
             return result;
         }
@@ -829,11 +829,11 @@ impl<'db> ProtocolInstanceType<'db> {
         // methods (except `__iter__`, but that returns the self type recursively, which gets
         // normalized to `Any`). We don't want generators with different return types to be
         // equivalent to each other. In this case we compare the `ClassType`s nominally.
-        if Program::get(db).python_version(db) < PythonVersion::PY313
-            && let Protocol::FromClass(self_class) = self.inner
+        if let Protocol::FromClass(self_class) = self.inner
             && let Protocol::FromClass(other_class) = other.inner
             && self_class.known(db) == Some(KnownClass::Generator)
             && other_class.known(db) == Some(KnownClass::Generator)
+            && Program::get(db).python_version(db) < PythonVersion::PY313
         {
             return (*self_class).is_equivalent_to_impl(db, *other_class, inferable, visitor);
         }
