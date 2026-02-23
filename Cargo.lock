@@ -3060,7 +3060,7 @@ dependencies = [
  "memchr",
  "ruff_annotate_snippets",
  "serde",
- "snapbox 0.6.24",
+ "snapbox",
  "toml",
  "tryfn",
  "unicode-width",
@@ -4004,9 +4004,9 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "snapbox"
-version = "0.6.24"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6c1abc378119f77310836665f8523018532cf7e3faeb3b10b01da5a7321bf8e1"
+checksum = "71d70a71b68054cbe88708f77abfc4bd2daf75028f8f55f4f1cff63565df89ea"
 dependencies = [
  "anstream",
  "anstyle",
@@ -4017,31 +4017,9 @@ dependencies = [
  "os_pipe",
  "serde_json",
  "similar",
- "snapbox-macros 0.4.0",
+ "snapbox-macros",
  "wait-timeout",
  "windows-sys 0.60.2",
-]
-
-[[package]]
-name = "snapbox"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "71d70a71b68054cbe88708f77abfc4bd2daf75028f8f55f4f1cff63565df89ea"
-dependencies = [
- "anstream",
- "anstyle",
- "normalize-line-endings",
- "similar",
- "snapbox-macros 1.0.0",
-]
-
-[[package]]
-name = "snapbox-macros"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b750c344002d7cc69afb9da00ebd9b5c0f8ac2eb7d115d9d45d5b5f47718d74"
-dependencies = [
- "anstream",
 ]
 
 [[package]]
@@ -4492,7 +4470,7 @@ checksum = "f68b00518dd6c69ee2289900b140e55dad068cb925678603bfa8d539f61ef6c1"
 dependencies = [
  "ignore",
  "libtest-mimic 0.7.3",
- "snapbox 1.0.0",
+ "snapbox",
 ]
 
 [[package]]
