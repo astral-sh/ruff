@@ -1201,6 +1201,7 @@ fn loop_header_reachability_impl<'db>(
         } else {
             use_def.evaluate_reachability(db, live_binding.reachability_constraint)
         };
+        // Skip unreachable bindings.
         if reachability.is_always_false() {
             continue;
         }
@@ -1215,9 +1216,15 @@ fn loop_header_reachability_impl<'db>(
                     });
                 }
             }
+            // `del` in the loop body is always visible to code after the loop via the
+            // normal control flow merge. Updating `deleted_reachability` here is
+            // necessary for prior uses in the loop to see it.
             DefinitionState::Deleted => {
                 deleted_reachability = deleted_reachability.or(reachability);
             }
+            // If UNBOUND is visible at loop-back, then it was visible before the loop.
+            // Loop header definitions don't shadow preexisting bindings, so we don't
+            // need to do anything with this.
             DefinitionState::Undefined => {}
         }
     }
@@ -1390,6 +1397,10 @@ fn place_from_bindings_impl<'db>(
             if binding.kind(db).is_loop_header() {
                 let loop_header = loop_header_reachability(db, binding);
                 deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
+                // If all the bindings in the loop are in statically false branches, it might be
+                // that none of them loop-back. In that case short-circuit, so that we don't
+                // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
+                // possibility below.
                 if !loop_header.has_defined_bindings {
                     return None;
                 }
