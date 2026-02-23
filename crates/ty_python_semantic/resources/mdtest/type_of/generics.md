@@ -501,12 +501,19 @@ the class that the instance-type refers to.
 ```py
 from ty_extensions import CallableTypeOf
 
-class Foo:
-    def __init__(self, x: str): ...
+class TakesStrInConstructor:
+    def __init__(self, x: int, y: str | None = None): ...
 
-class Bar: ...
+class TakesIntInConstructor:
+    def __init__(self, x: int, y: int | None = None): ...
 
-def f[T, T1: object, T2: int, T3: Foo | Bar, T4: (Foo, Bar)](
+def f[
+    T,
+    T1: object,
+    T2: int,
+    T3: TakesStrInConstructor | TakesIntInConstructor,
+    T4: (TakesStrInConstructor, TakesIntInConstructor),
+](
     bare_type: type,
     type_object: type[object],
     type_t_unbound: type[T],
@@ -534,15 +541,17 @@ def f[T, T1: object, T2: int, T3: Foo | Bar, T4: (Foo, Bar)](
     # error: [invalid-argument-type]
     reveal_type(type_int([]))  # revealed: int
 
-    # error: [missing-argument]
-    reveal_type(type_t_union_bound())  # revealed: T3@f
-    # error: [too-many-positional-arguments]
-    reveal_type(type_t_union_bound(""))  # revealed: T3@f
+    reveal_type(type_t_union_bound(42))  # revealed: T3@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_union_bound(42, ""))  # revealed: T3@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_union_bound(42, 42))  # revealed: T3@f
 
-    # error: [missing-argument]
-    reveal_type(type_t_constrained())  # revealed: T4@f
-    # error: [too-many-positional-arguments]
-    reveal_type(type_t_constrained(""))  # revealed: T4@f
+    reveal_type(type_t_constrained(42))  # revealed: T4@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_constrained(42, ""))  # revealed: T4@f
+    # error: [invalid-argument-type]
+    reveal_type(type_t_constrained(42, 42))  # revealed: T4@f
 
     def g(
         object_class_upcast: CallableTypeOf[object],
@@ -572,6 +581,8 @@ def f[T, T1: object, T2: int, T3: Foo | Bar, T4: (Foo, Bar)](
         reveal_type(type_int_upcast)
         # revealed: Overload[(x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> T2@f, (x: str | bytes | bytearray, /, base: SupportsIndex) -> T2@f]
         reveal_type(type_t_int_bound_upcast)
-        reveal_type(type_t_union_bound_upcast)  # revealed: ((x: str) -> T3@f) | (() -> T3@f)
-        reveal_type(type_t_constrained_upcast)  # revealed: ((x: str) -> T4@f) | (() -> T4@f)
+        # revealed: ((x: int, y: str | None = None) -> T3@f) | ((x: int, y: int | None = None) -> T3@f)
+        reveal_type(type_t_union_bound_upcast)
+        # revealed: ((x: int, y: str | None = None) -> T4@f) | ((x: int, y: int | None = None) -> T4@f)
+        reveal_type(type_t_constrained_upcast)
 ```
