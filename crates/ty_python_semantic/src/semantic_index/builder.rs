@@ -2708,8 +2708,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.visit_expr(value);
 
-                // If the statement is a call, it could possibly be a call to a function
-                // marked with `NoReturn` (for example, `sys.exit()`). In this case, we use a special
+                // If the statement is a call (or an `await` wrapping a call), it could
+                // possibly be a call to a function marked with `NoReturn` (for example,
+                // `sys.exit()` or `await async_exit()`). In this case, we use a special
                 // kind of constraint to mark the following code as unreachable.
                 //
                 // Ideally, these constraints should be added for every call expression, even those in
@@ -2721,15 +2722,29 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We also only add these inside function scopes, since considering module-level
                 // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
-                if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                let call_info = match value.as_ref() {
+                    ast::Expr::Call(ast::ExprCall { func, .. }) => {
+                        Some((func.as_ref(), value.as_ref(), false))
+                    }
+                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => match inner.as_ref() {
+                        ast::Expr::Call(ast::ExprCall { func, .. }) => {
+                            Some((func.as_ref(), value.as_ref(), true))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
+
+                if let Some((func, expr, is_await)) = call_info {
                     if !self.source_type.is_stub() && self.in_function_scope() {
                         let callable = self.add_standalone_expression(func);
-                        let call_expr = self.add_standalone_expression(value.as_ref());
+                        let call_expr = self.add_standalone_expression(expr);
 
                         let predicate = Predicate {
                             node: PredicateNode::ReturnsNever(CallableAndCallExpr {
                                 callable,
                                 call_expr,
+                                is_await,
                             }),
                             is_positive: false,
                         };

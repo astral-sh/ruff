@@ -242,3 +242,39 @@ def bar():
     # v was reassigned, so any narrowing shouldn't apply
     reveal_type(v)  # revealed: int | None
 ```
+
+## Narrowing after awaiting a `NoReturn` async function
+
+When an async function is annotated as returning `NoReturn`, awaiting it should be treated as
+terminal, just like calling a synchronous `NoReturn` function.
+
+```py
+from typing import NoReturn
+
+async def stop() -> NoReturn:
+    raise NotImplementedError
+
+async def main(flag: bool):
+    if flag:
+        x = 1
+        await stop()
+    else:
+        x = 2
+        pass
+
+    reveal_type(x)  # revealed: Literal[2]
+```
+
+## Narrowing preserved when `await`ing a `NoReturn` function in one branch
+
+```py
+from typing import NoReturn
+
+async def stop() -> NoReturn:
+    raise NotImplementedError
+
+async def main(val: int | None):
+    if val is None:
+        await stop()
+    reveal_type(val)  # revealed: int
+```
