@@ -183,6 +183,55 @@ fn is_method_call_on_literal(call_expr: &ast::ExprCall, literal: &ast::StringLit
     value.as_slice().contains(literal)
 }
 
+/// Returns `true` if `text` contains a `#` character that would start a comment,
+/// i.e., a `#` that appears outside of any nested string literal.
+///
+/// In Python < 3.12, f-string interpolations cannot contain comments, but a `#`
+/// inside a nested string (e.g., `f"{'#'}"`) is not a comment and is valid.
+fn has_comment_hash(text: &str) -> bool {
+    let mut chars = text.chars().peekable();
+    while let Some(ch) = chars.next() {
+        match ch {
+            // Entering a string literal — skip until the matching closing quote.
+            '\'' | '"' => {
+                let quote = ch;
+                // Check for triple-quote.
+                let triple = chars.as_str().starts_with([quote, quote].as_slice())
+                    && {
+                        // consume the two extra quotes
+                        chars.next();
+                        chars.next();
+                        true
+                    };
+                loop {
+                    match chars.next() {
+                        None => break,
+                        Some('\\') => {
+                            chars.next(); // skip escaped char
+                        }
+                        Some(c) if c == quote => {
+                            if triple {
+                                // need two more matching quotes
+                                if chars.as_str().starts_with([quote, quote].as_slice()) {
+                                    chars.next();
+                                    chars.next();
+                                    break;
+                                }
+                            } else {
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+            }
+            '#' => return true,
+            _ => {}
+        }
+    }
+    false
+}
+
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
 /// See [`MissingFStringSyntax`] for the validation criteria.
 fn should_be_fstring(
@@ -226,11 +275,12 @@ fn should_be_fstring(
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.interpolations() {
-            // Check if the interpolation expression contains backslashes or comments
-            // F-strings with backslashes or comments in interpolations are only valid in Python 3.12+
+            // Check if the interpolation expression contains backslashes or comments.
+            // F-strings with backslashes or comments in interpolations are only valid in Python 3.12+.
+            // Note: a `#` inside a nested string literal (e.g., `{'#'}`) is NOT a comment.
             let interpolation_text = &fstring_expr[element.range()];
             if target_version < PythonVersion::PY312
-                && (interpolation_text.contains('\\') || interpolation_text.contains('#'))
+                && (interpolation_text.contains('\\') || has_comment_hash(interpolation_text))
             {
                 return false;
             }

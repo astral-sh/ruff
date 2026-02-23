@@ -355,3 +355,36 @@ help: Add `f` prefix
 98 +     print(f"""{x  # }
 99 | }""")
 note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+   --> RUF027_0.py:105:11
+    |
+103 | def hash_in_string_test():
+104 |     x = "world"
+105 |     print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+    |           ^^^^^^^^^^^^^^^^
+    |
+help: Add `f` prefix
+102 | # `#` inside a string is NOT a comment — should trigger RUF027 even on Python < 3.12
+103 | def hash_in_string_test():
+104 |     x = "world"
+    -     print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+105 +     print(f"Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+106 |     print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
+note: This is an unsafe fix and may change runtime behavior
+
+RUF027 [*] Possible f-string without an `f` prefix
+   --> RUF027_0.py:106:11
+    |
+104 |     x = "world"
+105 |     print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+106 |     print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
+    |           ^^^^^^^^^^^^^^^^^^
+    |
+help: Add `f` prefix
+103 | def hash_in_string_test():
+104 |     x = "world"
+105 |     print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+    -     print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
+106 +     print(f"Hello {\"#\"}{x}") # RUF027: same, double-quoted
+note: This is an unsafe fix and may change runtime behavior

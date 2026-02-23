@@ -97,3 +97,10 @@ def comment_test():
     x = "!"
     print("""{x  # }
 }""")
+
+# Test case for `#` inside a nested string literal in interpolation
+# `#` inside a string is NOT a comment — should trigger RUF027 even on Python < 3.12
+def hash_in_string_test():
+    x = "world"
+    print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+    print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
