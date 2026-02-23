@@ -299,16 +299,16 @@ class RecursiveAttr2:
         self.i = 0
 
     def update(self):
-        self.i = (self.i + 1) % 9
+        self.i = (self.i + 1) % 4
 
-reveal_type(RecursiveAttr2().i)  # revealed: Unknown | Literal[0, 1, 2, 3, 4, 5, 6, 7, 8]
+reveal_type(RecursiveAttr2().i)  # revealed: Unknown | Literal[0, 1, 2, 3]
 
 class RecursiveAttr3:
     def __init__(self):
         self.i = 0
 
     def update(self):
-        self.i = (self.i + 1) % 10
+        self.i = (self.i + 1) % 5
 
 # Going beyond the MAX_RECURSIVE_UNION_LITERALS limit:
 reveal_type(RecursiveAttr3().i)  # revealed: Unknown | int
