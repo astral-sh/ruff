@@ -43,6 +43,16 @@ impl RuleTable {
         self.should_fix.contains(rule)
     }
 
+    /// Returns whether violations of the given rule should be fixed.
+    #[inline]
+    pub const fn severity(&self, rule: Rule) -> Severity {
+        if self.warn.contains(rule) {
+            Severity::Warning
+        } else {
+            Severity::Error
+        }
+    }
+
     /// Returns an iterator over all enabled rules.
     pub fn iter_enabled(&self) -> RuleSetIterator {
         self.enabled.iter()
