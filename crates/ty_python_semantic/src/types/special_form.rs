@@ -438,11 +438,36 @@ impl SpecialFormType {
             SpecialFormCategory::LegacyStdlibAlias(_)
             | SpecialFormCategory::Callable
             | SpecialFormCategory::Tuple
-            | SpecialFormCategory::Type
-            | SpecialFormCategory::Other(MiscSpecialForm::Protocol | MiscSpecialForm::Generic) => {
-                true
-            }
-            SpecialFormCategory::TypeQualifier(_) | SpecialFormCategory::Other(_) => false,
+            | SpecialFormCategory::Type => true,
+            SpecialFormCategory::TypeQualifier(_) => false,
+            SpecialFormCategory::Other(form) => match form {
+                MiscSpecialForm::Protocol | MiscSpecialForm::Generic => true,
+                MiscSpecialForm::Any
+                | MiscSpecialForm::Annotated
+                | MiscSpecialForm::Literal
+                | MiscSpecialForm::LiteralString
+                | MiscSpecialForm::Optional
+                | MiscSpecialForm::Union
+                | MiscSpecialForm::NoReturn
+                | MiscSpecialForm::Never
+                | MiscSpecialForm::Unknown
+                | MiscSpecialForm::AlwaysTruthy
+                | MiscSpecialForm::AlwaysFalsy
+                | MiscSpecialForm::Not
+                | MiscSpecialForm::Intersection
+                | MiscSpecialForm::TypeOf
+                | MiscSpecialForm::CallableTypeOf
+                | MiscSpecialForm::Top
+                | MiscSpecialForm::Bottom
+                | MiscSpecialForm::TypingSelf
+                | MiscSpecialForm::Concatenate
+                | MiscSpecialForm::Unpack
+                | MiscSpecialForm::TypeAlias
+                | MiscSpecialForm::TypeGuard
+                | MiscSpecialForm::TypedDict
+                | MiscSpecialForm::TypeIs
+                | MiscSpecialForm::NamedTuple => false,
+            },
         }
     }
 

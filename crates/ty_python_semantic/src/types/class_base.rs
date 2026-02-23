@@ -234,7 +234,7 @@ impl<'db> ClassBase<'db> {
 
                 SpecialFormCategory::TypeQualifier(_) => None,
 
-                SpecialFormCategory::Other(alias) => match alias {
+                SpecialFormCategory::Other(form) => match form {
                     special_form::MiscSpecialForm::Any => Some(Self::Dynamic(DynamicType::Any)),
                     special_form::MiscSpecialForm::Unknown => Some(Self::unknown()),
                     special_form::MiscSpecialForm::Protocol => Some(Self::Protocol),
