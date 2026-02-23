@@ -3396,10 +3396,36 @@ def g(x: B2[int]):
 
 ## The `Generator` protocol's `_ReturnT_co` needs special casing prior to Python 3.13
 
-Prior to Python 3.13, the `_ReturnT_co` type parameter doesn't appear in any `Generator` methods in
-typeshed (except `__iter__`, which returns the self type recursively and gets normalized to `Any`).
-We need to special-case `Generator` so that specializations that differ in their return type don't
-appear equivalent.
+The `_ReturnT_co` type parameter in the `Generator` protocol is the value of a `yield from` over
+that generator, and it's also in the pathway for the return values from `async` functions. (In the
+`Awaitable` protocol, `__await__` returns a `Generator`.) So of course if we're asking whether one
+type of `Generator` is e.g. assignable to another, and we see that one of them has a `_ReturnT_co`
+type of `float` while the other has `str`, we should decide that they're not assignable.
+
+However, zooming in to the implementation details, `_ReturnT_co` is actually the type of the `value`
+attribute on the `StopIteration` exception that the `Generator` raises when it's finished. This is
+awkward, because protocols don't describe the exceptions that their methods raise. How is `ty`
+supposed to see that incompatible `_ReturnT_co` types imply incompatible `Generator`s?
+
+As of Python 3.13, the `Generator` protocol's `close` method was changed from returning `None` to
+returning `_ReturnT_co | None`. This was motivated by an edge case (you tried to cancel a generator,
+but it caught the related exception and returned something anyway), but coincidentally it tells `ty`
+what it needs to know: `_ReturnT_co` is something that some method in this protocol returns return.
+Something with a method that returns `float` isn't assignable to something where the same method
+returns `str`. Problem solved.
+
+However, prior to 3.13, the `_ReturnT_co` type only appeared in the `__iter__` method.
+Unfortunately, the `__iter__` method on a `Generator` just returns `self`; its return type is the
+same `Generator`. That isn't helpful for the assignability question, because all we can say by
+looking at `__iter__` is that "`Generator` `A` is assignable to `Generator` `B` if...`Generator` `A`
+is assignable to `Generator` `B`." In practice we break this recursive cycle by inserting `Any`, and
+we end up ignoring `_ReturnT_co` entirely and saying that things are assignable when they shouldn't
+be. But how we break the cycle isn't really the problem; the problem is that the `Generator`
+protocol (prior to 3.13) genuinely tells us nothing about how `_ReturnT_co` interacts with
+assignability.
+
+As a special case workaround for this, we compare `Generator` implementations *nominally* when the
+target Python version is 3.12 or earlier, in both `has_relation_to` and `is_equivalent_to`.
 
 ```toml
 [environment]
