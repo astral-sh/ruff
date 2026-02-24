@@ -1,5 +1,4 @@
 use compact_str::ToCompactString;
-use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
 use rustc_hash::FxHashMap;
@@ -61,8 +60,7 @@ use crate::types::function::{
     FunctionType, KnownFunction,
 };
 use crate::types::generics::{
-    ApplySpecialization, InferableTypeVars, Specialization, bind_typevar, typing_self,
-    walk_generic_context,
+    ApplySpecialization, InferableTypeVars, Specialization, bind_typevar, walk_generic_context,
 };
 pub(crate) use crate::types::generics::{GenericContext, SpecializationBuilder};
 use crate::types::mro::{Mro, MroIterator, StaticMroError};
@@ -73,6 +71,7 @@ pub(crate) use crate::types::narrow::{
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
+use crate::types::special_form::TypeQualifier;
 use crate::types::tuple::{Tuple, TupleSpec, TupleSpecBuilder};
 use crate::types::typed_dict::TypedDictField;
 pub(crate) use crate::types::typed_dict::{TypedDictParams, TypedDictType, walk_typed_dict_type};
@@ -959,23 +958,25 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
-    /// Returns whether the definition of this type is generic
-    /// (this is different from whether this type *is* a generic type; a type that is already fully specialized is not a generic type).
-    pub(crate) fn is_definition_generic(self, db: &'db dyn Db) -> bool {
+    /// Returns whether this type represents a specialization of a generic type.
+    ///
+    /// For example, whereas `<class 'list'>` is a generic type, `<class 'list[int]'>`
+    /// is a specialization of that type.
+    pub(crate) fn is_specialized_generic(self, db: &'db dyn Db) -> bool {
         match self {
             Type::Union(union) => union
                 .elements(db)
                 .iter()
-                .any(|ty| ty.is_definition_generic(db)),
+                .any(|ty| ty.is_specialized_generic(db)),
             Type::Intersection(intersection) => {
                 intersection
                     .positive(db)
                     .iter()
-                    .any(|ty| ty.is_definition_generic(db))
+                    .any(|ty| ty.is_specialized_generic(db))
                     || intersection
                         .negative(db)
                         .iter()
-                        .any(|ty| ty.is_definition_generic(db))
+                        .any(|ty| ty.is_specialized_generic(db))
             }
             Type::NominalInstance(instance_type) => instance_type.is_definition_generic(),
             Type::ProtocolInstance(protocol) => {
@@ -5863,134 +5864,9 @@ impl<'db> Type<'db> {
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
             },
 
-            Type::SpecialForm(special_form) => match special_form {
-                SpecialFormType::Never | SpecialFormType::NoReturn => Ok(Type::Never),
-                SpecialFormType::LiteralString => Ok(Type::literal_string()),
-                SpecialFormType::Any => Ok(Type::any()),
-                SpecialFormType::Unknown => Ok(Type::unknown()),
-                SpecialFormType::AlwaysTruthy => Ok(Type::AlwaysTruthy),
-                SpecialFormType::AlwaysFalsy => Ok(Type::AlwaysFalsy),
-
-                // We treat `typing.Type` exactly the same as `builtins.type`:
-                SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
-                SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
-
-                // Legacy `typing` aliases
-                SpecialFormType::List => Ok(KnownClass::List.to_instance(db)),
-                SpecialFormType::Dict => Ok(KnownClass::Dict.to_instance(db)),
-                SpecialFormType::Set => Ok(KnownClass::Set.to_instance(db)),
-                SpecialFormType::FrozenSet => Ok(KnownClass::FrozenSet.to_instance(db)),
-                SpecialFormType::ChainMap => Ok(KnownClass::ChainMap.to_instance(db)),
-                SpecialFormType::Counter => Ok(KnownClass::Counter.to_instance(db)),
-                SpecialFormType::DefaultDict => Ok(KnownClass::DefaultDict.to_instance(db)),
-                SpecialFormType::Deque => Ok(KnownClass::Deque.to_instance(db)),
-                SpecialFormType::OrderedDict => Ok(KnownClass::OrderedDict.to_instance(db)),
-
-                // TODO: Use an opt-in rule for a bare `Callable`
-                SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
-
-                // Special case: `NamedTuple` in a type expression is understood to describe the type
-                // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
-                // This isn't very principled (since at runtime, `NamedTuple` is just a function),
-                // but it appears to be what users often expect, and it improves compatibility with
-                // other type checkers such as mypy.
-                // See conversation in https://github.com/astral-sh/ruff/pull/19915.
-                SpecialFormType::NamedTuple => Ok(IntersectionType::from_elements(
-                    db,
-                    [
-                        Type::homogeneous_tuple(db, Type::object()),
-                        KnownClass::NamedTupleLike.to_instance(db),
-                    ],
-                )),
-                SpecialFormType::TypingSelf => {
-                    let index = semantic_index(db, scope_id.file(db));
-                    let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
-                        return Err(InvalidTypeExpressionError {
-                            fallback_type: Type::unknown(),
-                            invalid_expressions: smallvec_inline![
-                                InvalidTypeExpression::InvalidType(*self, scope_id)
-                            ],
-                        });
-                    };
-
-                    Ok(
-                        typing_self(db, scope_id, typevar_binding_context, class.into())
-                            .map(Type::TypeVar)
-                            .unwrap_or(*self),
-                    )
-                }
-                // We ensure that `typing.TypeAlias` used in the expected position (annotating an
-                // annotated assignment statement) doesn't reach here. Using it in any other type
-                // expression is an error.
-                SpecialFormType::TypeAlias => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::TypeAlias],
-                    fallback_type: Type::unknown(),
-                }),
-                SpecialFormType::TypedDict => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::TypedDict],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Literal
-                | SpecialFormType::Union
-                | SpecialFormType::Intersection => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![
-                        InvalidTypeExpression::RequiresArguments(*special_form)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Protocol => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::Protocol],
-                    fallback_type: Type::unknown(),
-                }),
-                SpecialFormType::Generic => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![InvalidTypeExpression::Generic],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Optional
-                | SpecialFormType::Not
-                | SpecialFormType::Top
-                | SpecialFormType::Bottom
-                | SpecialFormType::TypeOf
-                | SpecialFormType::TypeIs
-                | SpecialFormType::TypeGuard
-                | SpecialFormType::Unpack
-                | SpecialFormType::CallableTypeOf => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![
-                        InvalidTypeExpression::RequiresOneArgument(*special_form)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-
-                SpecialFormType::Annotated | SpecialFormType::Concatenate => {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec_inline![
-                            InvalidTypeExpression::RequiresTwoArguments(*special_form)
-                        ],
-                        fallback_type: Type::unknown(),
-                    })
-                }
-
-                SpecialFormType::ClassVar | SpecialFormType::Final => {
-                    Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec_inline![
-                            InvalidTypeExpression::TypeQualifier(*special_form)
-                        ],
-                        fallback_type: Type::unknown(),
-                    })
-                }
-
-                SpecialFormType::ReadOnly
-                | SpecialFormType::NotRequired
-                | SpecialFormType::Required => Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec_inline![
-                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(*special_form)
-                    ],
-                    fallback_type: Type::unknown(),
-                }),
-            },
+            Type::SpecialForm(special_form) => {
+                special_form.in_type_expression(db, scope_id, typevar_binding_context)
+            }
 
             Type::Union(union) => {
                 let mut builder = UnionBuilder::new(db);
@@ -7784,9 +7660,10 @@ impl<'db> TypeAndQualifiers<'db> {
         self.origin
     }
 
-    /// Insert/add an additional type qualifier.
-    pub(crate) fn add_qualifier(&mut self, qualifier: TypeQualifiers) {
+    /// Return `self` with an additional qualifier added to the set of qualifiers.
+    pub(crate) fn with_qualifier(mut self, qualifier: TypeQualifiers) -> Self {
         self.qualifiers |= qualifier;
+        self
     }
 
     /// Return the set of type qualifiers.
@@ -7871,10 +7748,10 @@ enum InvalidTypeExpression<'db> {
     TypeAlias,
     /// Type qualifiers are always invalid in *type expressions*,
     /// but these ones are okay with 0 arguments in *annotation expressions*
-    TypeQualifier(SpecialFormType),
+    TypeQualifier(TypeQualifier),
     /// Type qualifiers that are invalid in type expressions,
     /// and which would require exactly one argument even if they appeared in an annotation expression
-    TypeQualifierRequiresOneArgument(SpecialFormType),
+    TypeQualifierRequiresOneArgument(TypeQualifier),
     /// Some types are always invalid in type expressions
     InvalidType(Type<'db>, ScopeId<'db>),
 }

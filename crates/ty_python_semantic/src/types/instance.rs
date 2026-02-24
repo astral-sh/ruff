@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
@@ -20,7 +21,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
@@ -174,6 +175,20 @@ impl<'db> Type<'db> {
             {
                 return result;
             }
+        }
+
+        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
+        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
+        // out assignability). We don't want generators with different return types to be
+        // assignable to each other. In this case we use the result of the nominal check above.
+        if let Some(self_protocol) = self.as_protocol_instance()
+            && let Protocol::FromClass(self_class) = self_protocol.inner
+            && let Protocol::FromClass(proto_class) = protocol.inner
+            && self_class.known(db) == Some(KnownClass::Generator)
+            && proto_class.known(db) == Some(KnownClass::Generator)
+            && Program::get(db).python_version(db) < PythonVersion::PY313
+        {
+            return result;
         }
 
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {

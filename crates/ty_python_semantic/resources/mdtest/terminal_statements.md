@@ -808,6 +808,28 @@ def _() -> NoReturn:
     C().die()
 ```
 
+### Awaiting async `NoReturn` functions
+
+Awaiting an async function annotated as returning `NoReturn` should be treated as terminal, just
+like calling a synchronous `NoReturn` function.
+
+```py
+from typing import NoReturn
+
+async def stop() -> NoReturn:
+    raise NotImplementedError
+
+async def main(flag: bool):
+    if flag:
+        x = "terminal"
+        await stop()
+    else:
+        x = "test"
+        pass
+
+    reveal_type(x)  # revealed: Literal["test"]
+```
+
 ## Nested functions
 
 Free references inside of a function body refer to variables defined in the containing scope.

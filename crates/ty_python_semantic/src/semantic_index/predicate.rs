@@ -102,6 +102,10 @@ impl PredicateOrLiteral<'_> {
 pub(crate) struct CallableAndCallExpr<'db> {
     pub(crate) callable: Expression<'db>,
     pub(crate) call_expr: Expression<'db>,
+    /// Whether the call is wrapped in an `await` expression. If `true`, `call_expr` refers to the
+    /// `await` expression rather than the call itself. This is used to detect terminal `await`s of
+    /// async functions that return `Never`.
+    pub(crate) is_await: bool,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]

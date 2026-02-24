@@ -286,6 +286,10 @@ pub struct Options {
     /// by the `--extension` command-line flag).
     ///
     /// Supported file types include `python`, `pyi`, `ipynb`, and `markdown`.
+    ///
+    /// Any file extensions listed here will be automatically added to the
+    /// default `include` list as a `*.{ext}` glob, so that they are linted
+    /// and formatted without needing any additional configuration settings.
     #[option(
         default = "{}",
         value_type = "dict[str, Language]",

@@ -478,9 +478,14 @@ bad4: TypeAlias = Final  # error: [invalid-type-form]
 bad5: TypeAlias = Required[int]  # error: [invalid-type-form]
 bad6: TypeAlias = NotRequired[int]  # error: [invalid-type-form]
 bad7: TypeAlias = ReadOnly[int]  # error: [invalid-type-form]
-bad8: TypeAlias = Unpack[tuple[int, ...]]  # error: [invalid-type-form]
 bad9: TypeAlias = InitVar[int]  # error: [invalid-type-form]
 bad10: TypeAlias = InitVar  # error: [invalid-type-form]
+
+# TODO: this should cause us to emit an error (`Unpack` is not valid at the
+# top level in this context), but for different reasons to the above cases:
+# `Unpack` is not a type qualifier, and so the error message in our diagnostic
+# shouldn't say that it is.
+differently_bad: TypeAlias = Unpack[tuple[int, ...]]
 ```
 
 [type expression]: https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions

@@ -1070,6 +1070,7 @@ impl ReachabilityConstraints {
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,
                 call_expr,
+                is_await,
             }) => {
                 // We first infer just the type of the callable. In the most likely case that the
                 // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
@@ -1111,7 +1112,7 @@ impl ReachabilityConstraints {
                     any_overload_is_generic |= overload.return_ty.has_typevar(db);
                 }
 
-                if no_overloads_return_never && !any_overload_is_generic {
+                if no_overloads_return_never && !any_overload_is_generic && !is_await {
                     Truthiness::AlwaysFalse
                 } else if all_overloads_return_never {
                     Truthiness::AlwaysTrue
