@@ -2129,6 +2129,16 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.visit_expr(&node.value);
 
+                // Unannotated collection literals must be standalone expressions to participate
+                // in full-scope bidirectional inference.
+                if node.targets.len() == 1
+                    && (node.value.is_list_expr()
+                        || node.value.is_set_expr()
+                        || node.value.is_dict_expr())
+                {
+                    self.add_standalone_assigned_expression(&node.value, node);
+                }
+
                 // Optimization for the common case: if there's just one target, and it's not an
                 // unpacking, and the target is a simple name, we don't need the RHS to be a
                 // standalone expression at all.

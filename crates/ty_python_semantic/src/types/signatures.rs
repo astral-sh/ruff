@@ -99,14 +99,21 @@ impl<'db> CallableSignature<'db> {
 
     pub(crate) fn with_inherited_generic_context(
         &self,
-        db: &'db dyn Db,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
         Self::from_overloads(self.overloads.iter().map(|signature| {
             signature
                 .clone()
-                .with_inherited_generic_context(db, inherited_generic_context)
+                .with_inherited_generic_context(inherited_generic_context)
         }))
+    }
+
+    pub(crate) fn merge_inherited_generic_context(&self, db: &'db dyn Db) -> Self {
+        Self::from_overloads(
+            self.overloads
+                .iter()
+                .map(|signature| signature.clone().merge_inherited_generic_context(db)),
+        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -146,6 +153,9 @@ impl<'db> CallableSignature<'db> {
                         generic_context: self_signature.generic_context.map(|context| {
                             type_mapping.update_signature_generic_context(db, context)
                         }),
+                        inherited_generic_context: self_signature.inherited_generic_context.map(
+                            |context| type_mapping.update_signature_generic_context(db, context),
+                        ),
                         definition: self_signature.definition,
                         parameters: Parameters::new(
                             db,
@@ -184,6 +194,13 @@ impl<'db> CallableSignature<'db> {
                                 db,
                                 signature.generic_context,
                                 self_signature.generic_context.map(|context| {
+                                    type_mapping.update_signature_generic_context(db, context)
+                                }),
+                            ),
+                            inherited_generic_context: GenericContext::merge_optional(
+                                db,
+                                signature.inherited_generic_context,
+                                self_signature.inherited_generic_context.map(|context| {
                                     type_mapping.update_signature_generic_context(db, context)
                                 }),
                             ),
@@ -356,6 +373,9 @@ pub struct Signature<'db> {
     /// The generic context for this overload, if it is generic.
     pub(crate) generic_context: Option<GenericContext<'db>>,
 
+    /// The inherited generic context for this overload, if it is generic.
+    pub(crate) inherited_generic_context: Option<GenericContext<'db>>,
+
     /// The original definition associated with this function, if available.
     /// This is useful for locating and extracting docstring information for the signature.
     pub(crate) definition: Option<Definition<'db>>,
@@ -394,6 +414,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn new(parameters: Parameters<'db>, return_ty: Type<'db>) -> Self {
         Self {
             generic_context: None,
+            inherited_generic_context: None,
             definition: None,
             parameters,
             return_ty,
@@ -407,6 +428,7 @@ impl<'db> Signature<'db> {
     ) -> Self {
         Self {
             generic_context,
+            inherited_generic_context: None,
             definition: None,
             parameters,
             return_ty,
@@ -417,6 +439,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn dynamic(signature_type: Type<'db>) -> Self {
         Signature {
             generic_context: None,
+            inherited_generic_context: None,
             definition: None,
             parameters: Parameters::gradual_form(),
             return_ty: signature_type,
@@ -429,6 +452,7 @@ impl<'db> Signature<'db> {
         let signature_type = todo_type!(reason);
         Signature {
             generic_context: None,
+            inherited_generic_context: None,
             definition: None,
             parameters: Parameters::todo(),
             return_ty: signature_type,
@@ -475,6 +499,7 @@ impl<'db> Signature<'db> {
 
         Self {
             generic_context,
+            inherited_generic_context: None,
             definition: Some(definition),
             parameters,
             return_ty,
@@ -512,9 +537,17 @@ impl<'db> Signature<'db> {
 
     pub(crate) fn with_inherited_generic_context(
         mut self,
-        db: &'db dyn Db,
         inherited_generic_context: GenericContext<'db>,
     ) -> Self {
+        self.inherited_generic_context = Some(inherited_generic_context);
+        self
+    }
+
+    pub(crate) fn merge_inherited_generic_context(mut self, db: &'db dyn Db) -> Self {
+        let Some(inherited_generic_context) = self.inherited_generic_context else {
+            return self;
+        };
+
         match self.generic_context.as_mut() {
             Some(generic_context) => {
                 *generic_context = generic_context.merge(db, inherited_generic_context);
@@ -549,6 +582,7 @@ impl<'db> Signature<'db> {
         };
         Some(Self {
             generic_context: self.generic_context,
+            inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             parameters,
             return_ty,
@@ -565,6 +599,9 @@ impl<'db> Signature<'db> {
         Self {
             generic_context: self
                 .generic_context
+                .map(|context| type_mapping.update_signature_generic_context(db, context)),
+            inherited_generic_context: self
+                .inherited_generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
             parameters: self
@@ -686,6 +723,9 @@ impl<'db> Signature<'db> {
             generic_context: self
                 .generic_context
                 .map(|generic_context| generic_context.remove_self(db, binding_context)),
+            inherited_generic_context: self
+                .inherited_generic_context
+                .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             parameters,
             return_ty,
@@ -709,6 +749,7 @@ impl<'db> Signature<'db> {
                 .apply_type_mapping(db, &self_mapping, TypeContext::default());
         Self {
             generic_context: self.generic_context,
+            inherited_generic_context: self.inherited_generic_context,
             definition: self.definition,
             parameters,
             return_ty,

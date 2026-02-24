@@ -1221,7 +1221,7 @@ impl ImportFromSubmoduleDefinitionKind {
 pub struct AssignmentDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
-    target: AstNodeRef<ast::Expr>,
+    pub(crate) target: AstNodeRef<ast::Expr>,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -1242,7 +1242,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
 pub struct AnnotatedAssignmentDefinitionKind {
     annotation: AstNodeRef<ast::Expr>,
     value: Option<AstNodeRef<ast::Expr>>,
-    target: AstNodeRef<ast::Expr>,
+    pub(crate) target: AstNodeRef<ast::Expr>,
 }
 
 impl AnnotatedAssignmentDefinitionKind {
@@ -1388,7 +1388,7 @@ impl<'db> LoopHeaderDefinitionKind<'db> {
 }
 
 #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
-pub(crate) struct DefinitionNodeKey(NodeKey);
+pub(crate) struct DefinitionNodeKey(pub(super) NodeKey);
 
 impl From<&ast::Alias> for DefinitionNodeKey {
     fn from(node: &ast::Alias) -> Self {
@@ -1440,6 +1440,12 @@ impl From<&ast::ExprSubscript> for DefinitionNodeKey {
 
 impl From<&ast::ExprNamed> for DefinitionNodeKey {
     fn from(node: &ast::ExprNamed) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtAssign> for DefinitionNodeKey {
+    fn from(node: &ast::StmtAssign) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

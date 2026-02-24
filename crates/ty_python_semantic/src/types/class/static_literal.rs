@@ -328,7 +328,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Returns the generic context that should be inherited by any constructor methods of this class.
-    pub(super) fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
+    pub(crate) fn inherited_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.generic_context(db)
     }
 
@@ -1111,7 +1111,9 @@ impl<'db> StaticClassLiteral<'db> {
                     Some(_),
                     "__new__" | "__init__",
                 ) => Type::FunctionLiteral(
-                    function.with_inherited_generic_context(db, generic_context),
+                    function
+                        .with_inherited_generic_context(db, generic_context)
+                        .merge_inherited_generic_context(db),
                 ),
                 _ => ty,
             }

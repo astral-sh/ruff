@@ -1027,6 +1027,16 @@ impl<'db> Type<'db> {
         }
     }
 
+    /// If this type is a class instance, returns its class.
+    pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
+        match self {
+            Type::NominalInstance(instance) => Some(instance.class(db)),
+            Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
+            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
+            _ => None,
+        }
+    }
+
     /// If the type is a specialized instance of the given `KnownClass`, returns the specialization.
     pub(crate) fn known_specialization(
         &self,
@@ -1043,29 +1053,23 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         expected_class: StaticClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, Some(expected_class))
+        self.class_specialization_impl(db, Some(expected_class))
+            .map(|(_, specialization)| specialization)
     }
 
-    /// If this type is a class instance, returns its specialization.
-    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, None)
+    /// If this type is a class instance, returns the class and its specialization.
+    pub(crate) fn class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
+        self.class_specialization_impl(db, None)
     }
 
-    /// If this type is a class instance, returns its class.
-    pub(crate) fn nominal_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
-        match self {
-            Type::NominalInstance(instance) => Some(instance.class(db)),
-            Type::ProtocolInstance(instance) => instance.to_nominal_instance().map(|i| i.class(db)),
-            Type::TypeAlias(alias) => alias.value_type(db).nominal_class(db),
-            _ => None,
-        }
-    }
-
-    fn specialization_of_optional(
+    fn class_specialization_impl(
         self,
         db: &'db dyn Db,
         expected_class: Option<StaticClassLiteral<'_>>,
-    ) -> Option<Specialization<'db>> {
+    ) -> Option<(StaticClassLiteral<'db>, Specialization<'db>)> {
         let class_type = self.nominal_class(db)?;
 
         let (class_literal, specialization) = class_type.static_class_literal(db)?;
@@ -1073,7 +1077,7 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        specialization
+        Some((class_literal, specialization?))
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
@@ -3505,7 +3509,15 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
+                let mut signature = bound_method.function(db).signature(db).clone();
+
+                if let Type::NominalInstance(instance) = bound_method.self_instance(db)
+                    && let Some(class_literal) = instance.class_literal(db).as_static()
+                    && let Some(generic_context) = class_literal.inherited_generic_context(db)
+                {
+                    signature = signature.with_inherited_generic_context(generic_context);
+                }
+
                 CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                     .with_bound_type(bound_method.self_instance(db))
                     .into()

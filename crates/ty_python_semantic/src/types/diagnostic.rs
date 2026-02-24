@@ -3474,7 +3474,7 @@ pub(super) fn note_numbers_module_not_supported<'db>(
 }
 
 fn covariant_supertype_hint<'db>(
-    class: ClassType<'db>,
+    class: StaticClassLiteral<'db>,
     db: &'db dyn Db,
     mismatched_invariant_parameters: &[usize],
 ) -> Option<&'static str> {
@@ -3508,20 +3508,16 @@ pub(super) fn add_invariant_generic_hints<'db>(
     expected_ty: Type<'db>,
     provided_ty: Type<'db>,
 ) {
-    let Some(expected_class) = expected_ty.nominal_class(db) else {
+    let Some((expected_class, expected_specialization)) = expected_ty.class_specialization(db)
+    else {
         return;
     };
-    let Some(provided_class) = provided_ty.nominal_class(db) else {
-        return;
-    };
-    let Some(expected_specialization) = expected_ty.class_specialization(db) else {
-        return;
-    };
-    let Some(provided_specialization) = provided_ty.class_specialization(db) else {
+    let Some((provided_class, provided_specialization)) = provided_ty.class_specialization(db)
+    else {
         return;
     };
 
-    if expected_class.class_literal(db) != provided_class.class_literal(db) {
+    if expected_class != provided_class {
         return;
     }
 
