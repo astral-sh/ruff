@@ -1000,6 +1000,10 @@ impl<'db> UseDefMapBuilder<'db> {
         def_id
     }
 
+    pub(super) fn definition(&self, def_id: ScopedDefinitionId) -> DefinitionState<'db> {
+        self.all_definitions[def_id]
+    }
+
     pub(super) fn mark_unreachable(&mut self) {
         self.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 
@@ -1099,6 +1103,13 @@ impl<'db> UseDefMapBuilder<'db> {
             place.is_symbol(),
             PreviousDefinitions::AreKept,
         );
+    }
+
+    pub(crate) fn bindings_at_use(
+        &self,
+        use_id: ScopedUseId,
+    ) -> impl Iterator<Item = &LiveBinding> {
+        self.bindings_by_use[use_id].iter()
     }
 
     pub(super) fn add_predicate(

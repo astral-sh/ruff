@@ -66,3 +66,9 @@ impl From<&ast::Stmt> for StatementNodeKey {
         Self(NodeKey::from_node(node))
     }
 }
+
+impl From<&ast::Expr> for StatementNodeKey {
+    fn from(node: &ast::Expr) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}

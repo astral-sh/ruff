@@ -917,6 +917,15 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::LoopHeader(_))
     }
 
+    pub fn is_unannotated_collection_literal(&self, module: &ParsedModuleRef) -> bool {
+        let value = match self {
+            DefinitionKind::Assignment(assignment) => assignment.value(module),
+            _ => return false,
+        };
+
+        value.is_dict_expr() || value.is_set_expr() || value.is_list_expr()
+    }
+
     /// Returns `true` if this definition is user-visible (i.e., not an internal
     /// control-flow construct like a loop header definition).
     pub const fn is_user_visible(&self) -> bool {
@@ -1494,6 +1503,12 @@ pub struct DefinitionNodeKey(NodeKey);
 impl DefinitionNodeKey {
     pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
         Self(NodeKey::from_node(node))
+    }
+
+    pub fn from_assignment(node: &ast::StmtAssign) -> impl Iterator<Item = DefinitionNodeKey> {
+        node.targets
+            .iter()
+            .map(|target| Self(NodeKey::from_node(target)))
     }
 }
 
