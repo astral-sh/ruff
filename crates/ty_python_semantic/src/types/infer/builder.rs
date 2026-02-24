@@ -6703,6 +6703,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let value = assignment.value(self.module());
         let target = assignment.target(self.module());
+        let tcx = tcx.with_target(assignment.target);
 
         let mut target_ty = match assignment.target_kind() {
             TargetKind::Sequence(unpack_position, unpack) => {
@@ -9138,7 +9139,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let inferred_ty = self.infer_maybe_standalone_expression(
                 value,
-                TypeContext::new(Some(declared.inner_type())),
+                TypeContext::new(Some(declared.inner_type()))
+                    .with_target(assignment.target.clone()),
             );
 
             self.typevar_binding_context = previous_typevar_binding_context;
@@ -11568,6 +11570,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let collection_ty = collection_class.to_instance(self.db());
             annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
         });
+
+        if let Some(target) = tcx.target
+            && let Some(place_expr) = PlaceExpr::try_from_expr(target.node(self.module()))
+            && let Some(place_id) = place_table(self.db(), self.scope()).place_id(&place_expr)
+        {
+            let use_def = self
+                .index
+                .use_def_map(self.scope().file_scope_id(self.db()));
+
+            let uses = use_def.uses_of_place(place_id);
+            for key in uses {
+                let expr = self.module().get_by_index(key.into_inner());
+                dbg!(expr);
+            }
+        }
 
         // Collect type constraints from the declared element types.
         let (elt_tcx_constraints, elt_tcx_variance) = {

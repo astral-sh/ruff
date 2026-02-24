@@ -17,4 +17,8 @@ impl NodeKey {
     pub(super) fn from_node_ref<T>(node_ref: &AstNodeRef<T>) -> Self {
         NodeKey(node_ref.index())
     }
+
+    pub(super) fn into_inner(self) -> NodeIndex {
+        self.0
+    }
 }

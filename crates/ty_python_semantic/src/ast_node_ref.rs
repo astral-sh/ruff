@@ -32,7 +32,6 @@ use ruff_text_size::Ranged;
 /// This means that changes to expressions in other scopes don't invalidate the expression's id, giving
 /// us some form of scope-stable identity for expressions. Only queries accessing the node field
 /// run on every AST change. All other queries only run when the expression's identity changes.
-#[derive(Clone)]
 pub struct AstNodeRef<T> {
     /// The index of the node in the AST.
     index: NodeIndex,
@@ -42,13 +41,44 @@ pub struct AstNodeRef<T> {
     kind: ruff_python_ast::NodeKind,
     #[cfg(debug_assertions)]
     range: ruff_text_size::TextRange,
-    // Note that because the module address is not stored in release builds, `AstNodeRef`
-    // cannot implement `Eq`, as indices are only unique within a given instance of the
-    // AST.
-    #[cfg(debug_assertions)]
+    // // Note that because the module address is not stored in release builds, `AstNodeRef`
+    // // cannot implement `Eq`, as indices are only unique within a given instance of the
+    // // AST.
+    // #[cfg(debug_assertions)]
     file: File,
 
     _node: PhantomData<T>,
+}
+
+impl<T> Copy for AstNodeRef<T> {}
+
+impl<T> Clone for AstNodeRef<T> {
+    fn clone(&self) -> Self {
+        Self {
+            index: self.index.clone(),
+            #[cfg(debug_assertions)]
+            kind: self.kind.clone(),
+            #[cfg(debug_assertions)]
+            range: self.range.clone(),
+            file: self.file.clone(),
+            _node: PhantomData,
+        }
+    }
+}
+
+impl<T> PartialEq for AstNodeRef<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.index == other.index && self.file == other.file
+    }
+}
+
+impl<T> Eq for AstNodeRef<T> {}
+
+impl<T> std::hash::Hash for AstNodeRef<T> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.index.hash(state);
+        self.file.hash(state);
+    }
 }
 
 impl<T> AstNodeRef<T> {

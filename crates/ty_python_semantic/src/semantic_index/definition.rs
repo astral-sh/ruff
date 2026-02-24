@@ -1226,7 +1226,7 @@ impl ImportFromSubmoduleDefinitionKind {
 pub struct AssignmentDefinitionKind<'db> {
     target_kind: TargetKind<'db>,
     value: AstNodeRef<ast::Expr>,
-    target: AstNodeRef<ast::Expr>,
+    pub(crate) target: AstNodeRef<ast::Expr>,
 }
 
 impl<'db> AssignmentDefinitionKind<'db> {
@@ -1247,7 +1247,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
 pub struct AnnotatedAssignmentDefinitionKind {
     annotation: AstNodeRef<ast::Expr>,
     value: Option<AstNodeRef<ast::Expr>>,
-    target: AstNodeRef<ast::Expr>,
+    pub(crate) target: AstNodeRef<ast::Expr>,
 }
 
 impl AnnotatedAssignmentDefinitionKind {

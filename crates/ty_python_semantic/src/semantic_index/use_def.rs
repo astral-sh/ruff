@@ -286,6 +286,9 @@ pub(crate) struct UseDefMap<'db> {
     /// [`Bindings`] reaching a [`ScopedUseId`].
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
+    /// Uses for each place.
+    uses_by_place: FxHashMap<ScopedPlaceId, Vec<NodeKey>>,
+
     /// Tracks whether or not a given AST node is reachable from the start of the scope.
     node_reachability: FxHashMap<NodeKey, ScopedReachabilityConstraintId>,
 
@@ -359,6 +362,13 @@ impl<'db> UseDefMap<'db> {
             &self.bindings_by_use[use_id],
             BoundnessAnalysis::BasedOnUnboundVisibility,
         )
+    }
+
+    pub(crate) fn uses_of_place(&self, place: ScopedPlaceId) -> &[NodeKey] {
+        match self.uses_by_place.get(&place) {
+            Some(uses) => uses.as_slice(),
+            None => &[],
+        }
     }
 
     pub(crate) fn applicable_constraints(
@@ -837,6 +847,9 @@ pub(super) struct UseDefMapBuilder<'db> {
     /// Live bindings at each so-far-recorded use.
     bindings_by_use: IndexVec<ScopedUseId, Bindings>,
 
+    /// Uses for each so-far-recorded place.
+    uses_by_place: FxHashMap<ScopedPlaceId, Vec<NodeKey>>,
+
     /// Tracks whether or not the current point in control flow is reachable from the
     /// start of the scope.
     pub(super) reachability: ScopedReachabilityConstraintId,
@@ -875,6 +888,7 @@ impl<'db> UseDefMapBuilder<'db> {
             predicates: PredicatesBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
+            uses_by_place: FxHashMap::default(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
             node_reachability: FxHashMap::default(),
             declarations_by_binding: FxHashMap::default(),
@@ -1297,6 +1311,9 @@ impl<'db> UseDefMapBuilder<'db> {
         let new_use = self.bindings_by_use.push(bindings.clone());
         debug_assert_eq!(use_id, new_use);
 
+        // Record a use of the place.
+        self.uses_by_place.entry(place).or_default().push(node_key);
+
         // Track reachability of all uses of places to silence `unresolved-reference`
         // diagnostics in unreachable code.
         self.record_node_reachability(node_key);
@@ -1509,6 +1526,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.reachable_symbol_definitions.shrink_to_fit();
         self.reachable_member_definitions.shrink_to_fit();
         self.bindings_by_use.shrink_to_fit();
+        self.uses_by_place.shrink_to_fit();
         self.node_reachability.shrink_to_fit();
         self.declarations_by_binding.shrink_to_fit();
         self.bindings_by_definition.shrink_to_fit();
@@ -1519,6 +1537,7 @@ impl<'db> UseDefMapBuilder<'db> {
             predicates: self.predicates.build(),
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
+            uses_by_place: self.uses_by_place,
             node_reachability: self.node_reachability,
             end_of_scope_symbols: self.symbol_states,
             end_of_scope_members: self.member_states,

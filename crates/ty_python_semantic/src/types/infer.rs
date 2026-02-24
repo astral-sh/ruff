@@ -43,6 +43,8 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::Db;
+use crate::ast_node_ref::AstNodeRef;
+
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
@@ -58,6 +60,7 @@ use crate::types::{
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
 pub(super) use builder::UnsupportedComparisonError;
+use ruff_python_ast as ast;
 
 mod builder;
 #[cfg(test)]
@@ -397,11 +400,22 @@ impl<'db> InferScope<'db> {
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub(crate) struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
+    pub(crate) target: Option<AstNodeRef<ast::Expr>>,
 }
 
 impl<'db> TypeContext<'db> {
     pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
-        Self { annotation }
+        Self {
+            annotation,
+            target: None,
+        }
+    }
+
+    pub(crate) fn with_target(self, target: AstNodeRef<ast::Expr>) -> Self {
+        Self {
+            annotation: self.annotation,
+            target: Some(target),
+        }
     }
 
     // If the type annotation is a specialized instance of the given `KnownClass`, returns the
@@ -418,6 +432,7 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             annotation: self.annotation.map(f),
+            target: self.target,
         }
     }
 
