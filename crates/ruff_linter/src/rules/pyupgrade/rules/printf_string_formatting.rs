@@ -3,12 +3,12 @@ use std::fmt::Write;
 use std::str::FromStr;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyStringFlags, Expr, StringFlags, whitespace::indentation};
 use ruff_python_codegen::Stylist;
 use ruff_python_literal::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use ruff_python_parser::TokenKind;
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};

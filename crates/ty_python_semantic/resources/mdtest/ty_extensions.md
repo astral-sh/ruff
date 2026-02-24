@@ -237,7 +237,7 @@ class InvalidBoolDunder:
     def __bool__(self) -> int:
         return 1
 
-# error: [unsupported-bool-conversion]  "Boolean conversion is unsupported for type `InvalidBoolDunder`"
+# error: [unsupported-bool-conversion]  "Boolean conversion is not supported for type `InvalidBoolDunder`"
 static_assert(InvalidBoolDunder())
 ```
 
@@ -398,7 +398,7 @@ the expression `str`:
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
-# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
+# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet` is statically known to be falsy"
 static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
@@ -425,6 +425,18 @@ t: TypeOf[int, str, bytes]
 # error: [invalid-type-form] "`ty_extensions.TypeOf` requires exactly one argument when used in a type expression"
 def f(x: TypeOf) -> None:
     reveal_type(x)  # revealed: Unknown
+```
+
+## Self-referential `TypeOf` in annotations
+
+A function can reference itself via `TypeOf` in a deferred annotation. This should not cause a stack
+overflow:
+
+```py
+from ty_extensions import TypeOf
+
+def foo(x: "TypeOf[foo]"):
+    reveal_type(x)  # revealed: def foo(x: def foo(...)) -> Unknown
 ```
 
 ## `CallableTypeOf`

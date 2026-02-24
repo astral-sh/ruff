@@ -7,7 +7,7 @@ use ruff_db::system::{OsSystem, SystemPathBuf};
 use crate::db::Db;
 pub use crate::logging::{LogLevel, init_logging};
 pub use crate::server::{PartialWorkspaceProgress, PartialWorkspaceProgressParams, Server};
-pub use crate::session::{ClientOptions, DiagnosticMode};
+pub use crate::session::{ClientOptions, DiagnosticMode, GlobalOptions, WorkspaceOptions};
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use session::Session;
 
@@ -27,6 +27,7 @@ pub(crate) const DIAGNOSTIC_NAME: &str = "ty";
 pub(crate) type Result<T> = anyhow::Result<T>;
 
 pub fn run_server() -> anyhow::Result<()> {
+    let _ = print_interactive_warning();
     let four = NonZeroUsize::new(4).unwrap();
 
     // by default, we set the number of worker threads to `num_cpus`, with a maximum of 4.
@@ -70,4 +71,21 @@ pub fn run_server() -> anyhow::Result<()> {
     }
 
     result
+}
+
+fn print_interactive_warning() -> std::io::Result<()> {
+    use std::io::{IsTerminal, Write};
+
+    if std::io::stdin().is_terminal() {
+        let mut stderr = std::io::stderr().lock();
+        writeln!(
+            stderr,
+            "WARNING: the ty LSP server should not be run interactively"
+        )?;
+        writeln!(
+            stderr,
+            "See https://docs.astral.sh/ty/editors/ for how to configure your editor"
+        )?;
+    }
+    Ok(())
 }

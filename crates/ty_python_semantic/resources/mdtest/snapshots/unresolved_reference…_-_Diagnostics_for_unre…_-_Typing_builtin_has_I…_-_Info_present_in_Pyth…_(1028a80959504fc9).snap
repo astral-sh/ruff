@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: unresolved_reference.md - Diagnostics for unresolved references - Typing builtin has Info help - Info present in Python 3.9+
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unresolved_reference.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | foo: List[int]  # error: [unresolved-reference]
+2 | bar: Type  # error: [unresolved-reference]
+```
+
+# Diagnostics
+
+```
+error[unresolved-reference]: Name `List` used when not defined
+ --> src/mdtest_snippet.py:1:6
+  |
+1 | foo: List[int]  # error: [unresolved-reference]
+  |      ^^^^ Did you mean `list`?
+2 | bar: Type  # error: [unresolved-reference]
+  |
+info: rule `unresolved-reference` is enabled by default
+
+```
+
+```
+error[unresolved-reference]: Name `Type` used when not defined
+ --> src/mdtest_snippet.py:2:6
+  |
+1 | foo: List[int]  # error: [unresolved-reference]
+2 | bar: Type  # error: [unresolved-reference]
+  |      ^^^^ Did you mean `type`?
+  |
+info: rule `unresolved-reference` is enabled by default
+
+```

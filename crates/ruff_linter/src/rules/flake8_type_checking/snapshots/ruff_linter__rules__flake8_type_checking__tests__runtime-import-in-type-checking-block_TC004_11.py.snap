@@ -9,6 +9,7 @@ TC004 [*] Move import `typing.List` out of type-checking block. Import is used f
   |                        ^^^^
 5 |
 6 | __all__ = ("List",)
+  |            ------ Used at runtime here
   |
 help: Move out of type-checking block
 1 | from typing import TYPE_CHECKING

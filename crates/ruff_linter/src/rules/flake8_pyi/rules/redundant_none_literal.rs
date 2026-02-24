@@ -5,7 +5,7 @@ use ruff_python_ast::{
     helpers::{pep_604_union, typing_optional},
     name::Name,
     operator_precedence::OperatorPrecedence,
-    parenthesize::parenthesized_range,
+    token::{Tokens, parenthesized_range},
 };
 use ruff_python_semantic::analyze::typing::{traverse_literal, traverse_union};
 use ruff_text_size::{Ranged, TextRange};
@@ -243,16 +243,12 @@ fn create_fix(
             let union_expr = pep_604_union(&[new_literal_expr, none_expr]);
 
             // Check if we need parentheses to preserve operator precedence
-            let content = if needs_parentheses_for_precedence(
-                semantic,
-                literal_expr,
-                checker.comment_ranges(),
-                checker.source(),
-            ) {
-                format!("({})", checker.generator().expr(&union_expr))
-            } else {
-                checker.generator().expr(&union_expr)
-            };
+            let content =
+                if needs_parentheses_for_precedence(semantic, literal_expr, checker.tokens()) {
+                    format!("({})", checker.generator().expr(&union_expr))
+                } else {
+                    checker.generator().expr(&union_expr)
+                };
 
             let union_edit = Edit::range_replacement(content, literal_expr.range());
             Fix::applicable_edit(union_edit, applicability)
@@ -278,8 +274,7 @@ enum UnionKind {
 fn needs_parentheses_for_precedence(
     semantic: &ruff_python_semantic::SemanticModel,
     literal_expr: &Expr,
-    comment_ranges: &ruff_python_trivia::CommentRanges,
-    source: &str,
+    tokens: &Tokens,
 ) -> bool {
     // Get the parent expression to check if we're in a context that needs parentheses
     let Some(parent_expr) = semantic.current_expression_parent() else {
@@ -287,14 +282,7 @@ fn needs_parentheses_for_precedence(
     };
 
     // Check if the literal expression is already parenthesized
-    if parenthesized_range(
-        literal_expr.into(),
-        parent_expr.into(),
-        comment_ranges,
-        source,
-    )
-    .is_some()
-    {
+    if parenthesized_range(literal_expr.into(), parent_expr.into(), tokens).is_some() {
         return false; // Already parenthesized, don't add more
     }
 

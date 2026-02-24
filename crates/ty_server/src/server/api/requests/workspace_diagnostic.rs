@@ -1,15 +1,7 @@
-use crate::PositionEncoding;
-use crate::document::DocumentKey;
-use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
-use crate::server::api::traits::{
-    BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
-};
-use crate::server::lazy_work_done_progress::LazyWorkDoneProgress;
-use crate::server::{Action, Result};
-use crate::session::client::Client;
-use crate::session::index::Index;
-use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
-use crate::system::file_to_url;
+use std::collections::BTreeMap;
+use std::sync::Mutex;
+use std::time::{Duration, Instant};
+
 use lsp_server::RequestId;
 use lsp_types::request::WorkspaceDiagnosticRequest;
 use lsp_types::{
@@ -21,12 +13,24 @@ use lsp_types::{
 };
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
+use ruff_db::source::source_text;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use std::sync::Mutex;
-use std::time::{Duration, Instant};
 use ty_project::{ProgressReporter, ProjectDatabase};
+
+use crate::PositionEncoding;
+use crate::capabilities::ResolvedClientCapabilities;
+use crate::document::DocumentKey;
+use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
+use crate::server::api::traits::{
+    BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
+};
+use crate::server::lazy_work_done_progress::LazyWorkDoneProgress;
+use crate::server::{Action, Result};
+use crate::session::client::Client;
+use crate::session::index::Index;
+use crate::session::{GlobalSettings, SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
+use crate::system::file_to_url;
 
 /// Handler for [Workspace diagnostics](workspace-diagnostics)
 ///
@@ -315,10 +319,12 @@ struct ResponseWriter<'a> {
     mode: ReportingMode,
     index: &'a Index,
     position_encoding: PositionEncoding,
+    client_capabilities: ResolvedClientCapabilities,
     // It's important that we use `AnySystemPath` over `Url` here because
     // `file_to_url` isn't guaranteed to return the exact same URL as the one provided
     // by the client.
     previous_result_ids: FxHashMap<DocumentKey, (Url, String)>,
+    global_settings: &'a GlobalSettings,
 }
 
 impl<'a> ResponseWriter<'a> {
@@ -354,7 +360,9 @@ impl<'a> ResponseWriter<'a> {
             mode,
             index,
             position_encoding,
+            client_capabilities: snapshot.resolved_client_capabilities(),
             previous_result_ids,
+            global_settings: snapshot.global_settings(),
         }
     }
 
@@ -368,6 +376,15 @@ impl<'a> ResponseWriter<'a> {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
             return;
         };
+
+        if source_text(db, file).is_notebook() {
+            // Notebooks only support publish diagnostics.
+            // and we can't convert text ranges to notebook ranges unless
+            // the document is open in the editor, in which case
+            // we publish the diagnostics already.
+            return;
+        }
+
         let key = DocumentKey::from_url(&url);
         let version = self
             .index
@@ -394,7 +411,18 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding))
+                    .filter_map(|diagnostic| {
+                        Some(
+                            to_lsp_diagnostic(
+                                db,
+                                diagnostic,
+                                self.position_encoding,
+                                self.client_capabilities,
+                                self.global_settings,
+                            )?
+                            .1,
+                        )
+                    })
                     .collect::<Vec<_>>();
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {

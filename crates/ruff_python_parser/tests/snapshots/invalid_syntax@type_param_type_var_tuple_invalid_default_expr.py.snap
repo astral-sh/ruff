@@ -384,3 +384,11 @@ Module(
   |              ^^^^^^^^^^^^ Syntax Error: yield expression cannot be used within a TypeVarTuple default
 5 | type X[*Ts = x := int] = int
   |
+
+
+  |
+3 | type X[*Ts = yield x] = int
+4 | type X[*Ts = yield from x] = int
+5 | type X[*Ts = x := int] = int
+  |                   ^^^ Syntax Error: non default type parameter `int` follows default type parameter
+  |

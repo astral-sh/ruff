@@ -28,6 +28,7 @@ mod tests {
     use crate::settings::types::PreviewMode;
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
+    use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
     use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
 
@@ -261,9 +262,21 @@ mod tests {
         FOO = 42",
         "f401_preview_first_party_submodule_dunder_all"
     )]
+    // Regression test for https://github.com/astral-sh/ruff/issues/22221
+    #[test_case(
+        r"
+        import submodule.bar
+        import submodule.baz
+        __all__ = ['submodule']
+        FOO = 42",
+        "f401_preview_dunder_all_multiple_bindings"
+    )]
     fn f401_preview_first_party_submodule(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
+            &SourceKind::Python {
+                code: dedent(contents).to_string(),
+                is_stub: false,
+            },
             Path::new("f401_preview_first_party_submodule/__init__.py"),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
@@ -562,7 +575,10 @@ mod tests {
     )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
-            &SourceKind::Python(dedent(contents).to_string()),
+            &SourceKind::Python {
+                code: dedent(contents).to_string(),
+                is_stub: false,
+            },
             Path::new("f401_preview_submodule.py"),
             &LinterSettings {
                 preview: PreviewMode::Enabled,
@@ -686,6 +702,19 @@ mod tests {
             &LinterSettings {
                 typing_modules: vec!["foo.typical".to_string()],
                 ..LinterSettings::for_rule(Rule::UndefinedName)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn f811_typing_modules_overload() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F811_33.py"),
+            &LinterSettings {
+                typing_modules: vec!["std".to_string()],
+                ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
             },
         )?;
         assert_diagnostics!(diagnostics);
@@ -938,7 +967,10 @@ mod tests {
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let source_type = PySourceType::default();
-        let source_kind = SourceKind::Python(contents.to_string());
+        let source_kind = SourceKind::Python {
+            code: contents.to_string(),
+            is_stub: source_type.is_stub(),
+        };
         let settings = LinterSettings::for_rules(Linter::Pyflakes.rules());
         let target_version = settings.unresolved_target_version;
         let options =
@@ -955,6 +987,7 @@ mod tests {
             &locator,
             &indexer,
         );
+        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
         let mut messages = check_path(
             Path::new("<filename>"),
             None,
@@ -968,6 +1001,7 @@ mod tests {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
         messages.sort_by(Diagnostic::ruff_start_ordering);
         let actual = messages

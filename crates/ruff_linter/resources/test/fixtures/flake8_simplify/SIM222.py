@@ -216,3 +216,15 @@ def get_items_list():
 
 def get_items_set():
     return tuple({item for item in items}) or None  # OK
+
+
+# https://github.com/astral-sh/ruff/issues/21473
+tuple("") or True  # SIM222
+tuple(t"") or True  # OK
+tuple(0) or True  # OK
+tuple(1) or True  # OK
+tuple(False) or True  # OK
+tuple(None) or True  # OK
+tuple(...) or True  # OK
+tuple(lambda x: x) or True  # OK
+tuple(x for x in range(0)) or True  # OK

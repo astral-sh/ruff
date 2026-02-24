@@ -1,7 +1,5 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
-input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/fmtonoff.py
-snapshot_kind: text
 ---
 ## Input
 
@@ -99,20 +97,22 @@ def example(session):
         .all()
     # fmt: on
 def off_and_on_without_data():
-    """All comments here are technically on the same prefix.
-
-    The comments between will be formatted. This is a known limitation.
-    """
+    """Test that comment-only fmt:off/on blocks preserve formatting."""
+    # fmt: off
+            #should not be formatted
+    # fmt: on
     # fmt: off
 
-
-        #hey, that won't work
-
+        #should not be formatted
 
     # fmt: on
+    # fmt: off
+            #should not be formatted
+        #should not be formatted #also should not be formatted
+    # fmt: on
     pass
-def on_and_off_broken():
-    """Another known limitation."""
+def on_and_off_with_comment_only_blocks():
+    """Test that fmt:off/on works with multiple directives and comment-only blocks."""
     # fmt: on
     # fmt: off
     this=should.not_be.formatted()
@@ -121,7 +121,16 @@ def on_and_off_broken():
     now . considers . multiple . fmt . directives . within . one . prefix
     # fmt: on
     # fmt: off
-        # ...but comments still get reformatted even though they should not be
+            #should not be formatted
+    # fmt: on
+    # fmt: off
+
+        #should not be formatted
+
+    # fmt: on
+    # fmt: off
+            #should not be formatted
+        #should not be formatted #also should not be formatted
     # fmt: on
 def long_lines():
     if True:
@@ -186,6 +195,50 @@ cfg.rule(
     # fmt: on
     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5
 )
+
+# Test comment-only blocks at file level with various spacing patterns
+# fmt: off
+ #nospace
+ # twospaces
+# fmt: on
+
+
+# fmt: off
+#nospaceatall
+  #extraspaces
+   #evenmorespaces
+# fmt: on
+
+
+# fmt: off
+# fmt: on
+
+
+# fmt: off
+#SBATCH --job-name=test
+#SBATCH --output=test.out
+# fmt: on
+
+
+# fmt: off
+ #first
+
+ #second
+# fmt: on
+
+
+# fmt: off
+  #!@#$%^&*()
+   #<=>+-*/
+# fmt: on
+
+
+# fmt: off
+ #x=1+2
+  #y  =  3
+   #z    =    4
+# fmt: on
+
 # fmt: off
 yield  'hello'
 # No formatting to the end of the file
@@ -226,28 +279,16 @@ d={'a':1,
          # fmt: on
          goes + here,
          andhere,
-@@ -118,8 +119,10 @@
-     """
-     # fmt: off
- 
--    # hey, that won't work
- 
-+        #hey, that won't work
-+
-+
-     # fmt: on
-     pass
- 
-@@ -134,7 +137,7 @@
+@@ -136,7 +137,7 @@
+     and_=indeed . it  is  not  formatted
+     because . the . handling . inside . generate_ignored_nodes()
      now . considers . multiple . fmt . directives . within . one . prefix
-     # fmt: on
+-
++    # fmt: on
      # fmt: off
--    # ...but comments still get reformatted even though they should not be
-+        # ...but comments still get reformatted even though they should not be
+             #should not be formatted
      # fmt: on
- 
- 
-@@ -174,14 +177,18 @@
+@@ -187,14 +188,18 @@
          $
          """,
          # fmt: off
@@ -388,22 +429,24 @@ def example(session):
 
 
 def off_and_on_without_data():
-    """All comments here are technically on the same prefix.
-
-    The comments between will be formatted. This is a known limitation.
-    """
+    """Test that comment-only fmt:off/on blocks preserve formatting."""
+    # fmt: off
+            #should not be formatted
+    # fmt: on
     # fmt: off
 
+        #should not be formatted
 
-        #hey, that won't work
-
-
+    # fmt: on
+    # fmt: off
+            #should not be formatted
+        #should not be formatted #also should not be formatted
     # fmt: on
     pass
 
 
-def on_and_off_broken():
-    """Another known limitation."""
+def on_and_off_with_comment_only_blocks():
+    """Test that fmt:off/on works with multiple directives and comment-only blocks."""
     # fmt: on
     # fmt: off
     this=should.not_be.formatted()
@@ -412,7 +455,16 @@ def on_and_off_broken():
     now . considers . multiple . fmt . directives . within . one . prefix
     # fmt: on
     # fmt: off
-        # ...but comments still get reformatted even though they should not be
+            #should not be formatted
+    # fmt: on
+    # fmt: off
+
+        #should not be formatted
+
+    # fmt: on
+    # fmt: off
+            #should not be formatted
+        #should not be formatted #also should not be formatted
     # fmt: on
 
 
@@ -493,6 +545,50 @@ cfg.rule(
     # fmt: on
     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 )
+
+# Test comment-only blocks at file level with various spacing patterns
+# fmt: off
+ #nospace
+ # twospaces
+# fmt: on
+
+
+# fmt: off
+#nospaceatall
+  #extraspaces
+   #evenmorespaces
+# fmt: on
+
+
+# fmt: off
+# fmt: on
+
+
+# fmt: off
+#SBATCH --job-name=test
+#SBATCH --output=test.out
+# fmt: on
+
+
+# fmt: off
+ #first
+
+ #second
+# fmt: on
+
+
+# fmt: off
+  #!@#$%^&*()
+   #<=>+-*/
+# fmt: on
+
+
+# fmt: off
+ #x=1+2
+  #y  =  3
+   #z    =    4
+# fmt: on
+
 # fmt: off
 yield  'hello'
 # No formatting to the end of the file
@@ -618,29 +714,42 @@ def example(session):
 
 
 def off_and_on_without_data():
-    """All comments here are technically on the same prefix.
-
-    The comments between will be formatted. This is a known limitation.
-    """
+    """Test that comment-only fmt:off/on blocks preserve formatting."""
+    # fmt: off
+            #should not be formatted
+    # fmt: on
     # fmt: off
 
-    # hey, that won't work
+        #should not be formatted
 
+    # fmt: on
+    # fmt: off
+            #should not be formatted
+        #should not be formatted #also should not be formatted
     # fmt: on
     pass
 
 
-def on_and_off_broken():
-    """Another known limitation."""
+def on_and_off_with_comment_only_blocks():
+    """Test that fmt:off/on works with multiple directives and comment-only blocks."""
     # fmt: on
     # fmt: off
     this=should.not_be.formatted()
     and_=indeed . it  is  not  formatted
     because . the . handling . inside . generate_ignored_nodes()
     now . considers . multiple . fmt . directives . within . one . prefix
+
+    # fmt: off
+            #should not be formatted
     # fmt: on
     # fmt: off
-    # ...but comments still get reformatted even though they should not be
+
+        #should not be formatted
+
+    # fmt: on
+    # fmt: off
+            #should not be formatted
+        #should not be formatted #also should not be formatted
     # fmt: on
 
 
@@ -717,6 +826,50 @@ cfg.rule(
     # fmt: on
     xxxxxxxxxx_xxxxxxxxxxx_xxxxxxx_xxxxxxxxx=5,
 )
+
+# Test comment-only blocks at file level with various spacing patterns
+# fmt: off
+ #nospace
+ # twospaces
+# fmt: on
+
+
+# fmt: off
+#nospaceatall
+  #extraspaces
+   #evenmorespaces
+# fmt: on
+
+
+# fmt: off
+# fmt: on
+
+
+# fmt: off
+#SBATCH --job-name=test
+#SBATCH --output=test.out
+# fmt: on
+
+
+# fmt: off
+ #first
+
+ #second
+# fmt: on
+
+
+# fmt: off
+  #!@#$%^&*()
+   #<=>+-*/
+# fmt: on
+
+
+# fmt: off
+ #x=1+2
+  #y  =  3
+   #z    =    4
+# fmt: on
+
 # fmt: off
 yield  'hello'
 # No formatting to the end of the file

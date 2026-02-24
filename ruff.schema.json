@@ -177,6 +177,16 @@
         "$ref": "#/definitions/RuleSelector"
       }
     },
+    "extension": {
+      "description": "A mapping of custom file extensions to known file types (overridden\nby the `--extension` command-line flag).\n\nSupported file types include `python`, `pyi`, `ipynb`, and `markdown`.\n\nAny file extensions listed here will be automatically added to the\ndefault `include` list as a `*.{ext}` glob, so that they are linted\nand formatted without needing any additional configuration settings.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "$ref": "#/definitions/Language"
+      }
+    },
     "external": {
       "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be\npreserved when (e.g.) validating `# noqa` directives. Useful for\nretaining `# noqa` directives that cover plugins not yet implemented\nby Ruff.",
       "type": [
@@ -818,6 +828,13 @@
           ],
           "format": "uint",
           "minimum": 0
+        },
+        "type-checking-imports": {
+          "description": "Whether to include imports that are only used for type checking (i.e., imports within `if TYPE_CHECKING:` blocks).\nWhen enabled (default), type-checking-only imports are included in the import graph.\nWhen disabled, they are excluded.",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -1481,7 +1498,7 @@
           }
         },
         "runtime-evaluated-decorators": {
-          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nimport fastapi\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
+          "description": "Exempt classes and functions decorated with any of the enumerated\ndecorators from being moved into type-checking blocks.\n\nCommon examples include Pydantic's `@pydantic.validate_call` decorator\n(for functions) and attrs' `@attrs.define` decorator (for classes).\n\nThis also supports framework decorators like FastAPI's `fastapi.FastAPI.get`\nwhich will work across assignments in the same module.\n\nFor example:\n```python\nfrom fastapi import FastAPI\n\napp = FastAPI(\"app\")\n\n@app.get(\"/home\")\ndef home() -> str: ...\n```\n\nHere `app.get` will correctly be identified as `fastapi.FastAPI.get`.",
           "type": [
             "array",
             "null"
@@ -1751,6 +1768,33 @@
             "null"
           ]
         },
+        "import-heading": {
+          "description": "A mapping from import section names to their heading comments.\n\nWhen set, a comment with the specified text will be added above imports\nin the corresponding section. If a heading comment already exists, it\nwill be replaced.\n\nCompatible with isort's `import_heading_{section_name}` settings.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "properties": {
+            "first-party": {
+              "type": "string"
+            },
+            "future": {
+              "type": "string"
+            },
+            "local-folder": {
+              "type": "string"
+            },
+            "standard-library": {
+              "type": "string"
+            },
+            "third-party": {
+              "type": "string"
+            }
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
         "known-first-party": {
           "description": "A list of modules to consider first-party, regardless of whether they\ncan be identified as such via introspection of the local filesystem.\n\nSupports glob patterns. For more information on the glob syntax, refer\nto the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
           "type": [
@@ -1873,6 +1917,38 @@
             "object",
             "null"
           ],
+          "properties": {
+            "first-party": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "future": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "local-folder": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "standard-library": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "third-party": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
           "additionalProperties": {
             "type": "array",
             "items": {
@@ -1909,6 +1985,15 @@
         }
       },
       "additionalProperties": false
+    },
+    "Language": {
+      "type": "string",
+      "enum": [
+        "python",
+        "pyi",
+        "ipynb",
+        "markdown"
+      ]
     },
     "LineEnding": {
       "oneOf": [
@@ -2845,7 +2930,8 @@
         "py311",
         "py312",
         "py313",
-        "py314"
+        "py314",
+        "py315"
       ]
     },
     "Quote": {
@@ -2919,6 +3005,13 @@
             "boolean",
             "null"
           ]
+        },
+        "strictly-empty-init-modules": {
+          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\ndocstrings (see `RUF067`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -2944,9 +3037,12 @@
         "AIR30",
         "AIR301",
         "AIR302",
+        "AIR303",
         "AIR31",
         "AIR311",
         "AIR312",
+        "AIR32",
+        "AIR321",
         "ALL",
         "ANN",
         "ANN0",
@@ -3475,6 +3571,7 @@
         "ISC001",
         "ISC002",
         "ISC003",
+        "ISC004",
         "LOG",
         "LOG0",
         "LOG00",
@@ -3718,6 +3815,7 @@
         "PLR1708",
         "PLR171",
         "PLR1711",
+        "PLR1712",
         "PLR1714",
         "PLR1716",
         "PLR172",
@@ -4037,11 +4135,19 @@
         "RUF063",
         "RUF064",
         "RUF065",
+        "RUF066",
+        "RUF067",
+        "RUF068",
+        "RUF069",
+        "RUF07",
+        "RUF070",
         "RUF1",
         "RUF10",
         "RUF100",
         "RUF101",
         "RUF102",
+        "RUF103",
+        "RUF104",
         "RUF2",
         "RUF20",
         "RUF200",

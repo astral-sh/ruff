@@ -1,12 +1,16 @@
-use crate::diagnostic::{Diagnostic, FileResolver, Severity};
+use ruff_text_size::TextRange;
 
-pub struct GithubRenderer<'a> {
+use crate::diagnostic::{
+    Annotation, Diagnostic, FileResolver, Severity, SubDiagnosticSeverity, UnifiedFile,
+};
+
+pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
     program: &'a str,
 }
 
 impl<'a> GithubRenderer<'a> {
-    pub fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
+    pub(super) fn new(resolver: &'a dyn FileResolver, program: &'a str) -> Self {
         Self { resolver, program }
     }
 
@@ -49,14 +53,26 @@ impl<'a> GithubRenderer<'a> {
                 }
                 .unwrap_or_default();
 
-                write!(
-                    f,
-                    ",line={row},col={column},endLine={end_row},endColumn={end_column}::",
-                    row = start_location.line,
-                    column = start_location.column,
-                    end_row = end_location.line,
-                    end_column = end_location.column,
-                )?;
+                // GitHub Actions workflow commands have constraints on error annotations:
+                // - `col` and `endColumn` cannot be set if `line` and `endLine` are different
+                // See: https://github.com/astral-sh/ruff/issues/22074
+                if start_location.line == end_location.line {
+                    write!(
+                        f,
+                        ",line={row},col={column},endLine={end_row},endColumn={end_column}::",
+                        row = start_location.line,
+                        column = start_location.column,
+                        end_row = end_location.line,
+                        end_column = end_location.column,
+                    )?;
+                } else {
+                    write!(
+                        f,
+                        ",line={row},endLine={end_row}::",
+                        row = start_location.line,
+                        end_row = end_location.line,
+                    )?;
+                }
 
                 write!(
                     f,
@@ -75,30 +91,94 @@ impl<'a> GithubRenderer<'a> {
                 write!(f, "{id}:", id = diagnostic.id())?;
             }
 
-            writeln!(f, " {}", diagnostic.body())?;
+            write!(f, " {}", diagnostic.concise_message())?;
+
+            // After rendering the main diagnostic, render its secondary annotations and
+            // sub-diagnostics. Note that lines within a single diagnostic must be separated by
+            // URL-encoded newlines (`%0A`) to render properly in GitHub annotations.
+            for annotation in diagnostic.secondary_annotations().filter_map(|annotation| {
+                GithubAnnotation::from_annotation(annotation, self.resolver)
+            }) {
+                write!(f, "%0A{annotation}")?;
+            }
+
+            for subdiagnostic in diagnostic.sub_diagnostics() {
+                let severity = match subdiagnostic.severity() {
+                    SubDiagnosticSeverity::Help => "help",
+                    SubDiagnosticSeverity::Info => "info",
+                    SubDiagnosticSeverity::Warning => "warning",
+                    SubDiagnosticSeverity::Error | SubDiagnosticSeverity::Fatal => "error",
+                };
+                if let Some(annotation) = subdiagnostic.primary_annotation()
+                    && let span = annotation.get_span()
+                    && let file = span.file()
+                    && let Some(range) = span.range()
+                {
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
+                    let message = subdiagnostic.concise_message();
+                    let start_location = source_code.line_column(range.start());
+                    write!(
+                        f,
+                        "%0A  {path}:{row}:{column}: {severity}: {message}",
+                        path = file.relative_path(self.resolver).display(),
+                        row = start_location.line,
+                        column = start_location.column,
+                    )?;
+                } else {
+                    write!(f, "%0A  {severity}: {}", subdiagnostic.concise_message())?;
+                }
+
+                for annotation in subdiagnostic
+                    .secondary_annotations()
+                    .filter_map(|annotation| {
+                        GithubAnnotation::from_annotation(annotation, self.resolver)
+                    })
+                {
+                    write!(f, "%0A  {annotation}")?;
+                }
+            }
+
+            writeln!(f)?;
         }
 
         Ok(())
     }
 }
 
-pub struct DisplayGithubDiagnostics<'a> {
-    renderer: &'a GithubRenderer<'a>,
-    diagnostics: &'a [Diagnostic],
+struct GithubAnnotation<'a> {
+    message: &'a str,
+    range: TextRange,
+    file: &'a UnifiedFile,
+    resolver: &'a dyn FileResolver,
 }
 
-impl<'a> DisplayGithubDiagnostics<'a> {
-    pub fn new(renderer: &'a GithubRenderer<'a>, diagnostics: &'a [Diagnostic]) -> Self {
-        Self {
-            renderer,
-            diagnostics,
-        }
+impl<'a> GithubAnnotation<'a> {
+    fn from_annotation(annotation: &'a Annotation, resolver: &'a dyn FileResolver) -> Option<Self> {
+        let span = annotation.get_span();
+        Some(Self {
+            message: annotation.get_message()?,
+            range: span.range()?,
+            file: span.file(),
+            resolver,
+        })
     }
 }
 
-impl std::fmt::Display for DisplayGithubDiagnostics<'_> {
+impl std::fmt::Display for GithubAnnotation<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.renderer.render(f, self.diagnostics)
+        let diagnostic_source = self.file.diagnostic_source(self.resolver);
+        let source_code = diagnostic_source.as_source_code();
+        let start_location = source_code.line_column(self.range.start());
+        write!(
+            f,
+            "  {path}:{row}:{column}:",
+            path = self.file.relative_path(self.resolver).display(),
+            row = start_location.line,
+            column = start_location.column,
+        )?;
+
+        write!(f, " {message}", message = self.message)
     }
 }
 

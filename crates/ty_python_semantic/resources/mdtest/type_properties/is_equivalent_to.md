@@ -415,7 +415,6 @@ class Child(Parent): ...
 def pg(a: Parent) -> None: ...
 @overload
 def pg(a: Grandparent) -> None: ...
-
 @overload
 def cpg(a: Child) -> None: ...
 @overload
@@ -628,7 +627,7 @@ import imported
 from module2 import imported as other_imported
 from ty_extensions import TypeOf, static_assert, is_equivalent_to
 
-# error: [unresolved-attribute] "Module `imported` has no member `abc`"
+# error: [possibly-missing-attribute]
 reveal_type(imported.abc)  # revealed: Unknown
 
 reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>

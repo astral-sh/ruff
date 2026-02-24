@@ -37,3 +37,35 @@ help: Replace with builtin `open`
    - with open("f.txt") as f:
 9  + with builtins.open("f.txt") as f:
 10 |     print(f.read())
+11 | 
+12 | 
+
+UP020 [*] Use builtin `open`
+  --> UP020.py:13:5
+   |
+12 |   with (
+13 | /     io  # text
+14 | |     # text
+15 | |     .open("file.txt") as f
+   | |_____________________^
+16 |   ):
+17 |       ...
+   |
+help: Replace with builtin `open`
+4  |     print(f.read())
+5  | 
+6  | from io import open
+7  + import builtins
+8  | 
+9  | with open("f.txt") as f:
+10 |     print(f.read())
+11 | 
+12 | 
+13 | with (
+   -     io  # text
+   -     # text
+   -     .open("file.txt") as f
+14 +     builtins.open("file.txt") as f
+15 | ):
+16 |     ...
+note: This is an unsafe fix and may change runtime behavior

@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/unary.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -200,6 +199,61 @@ def foo():
         not (aaaaaaaaaaaaaaaaaaaaa[bbbbbbbb, ccccccc]) and dddddddddd < eeeeeeeeeeeeeee
     ):
         pass
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/19226
+if '' and (not #
+0):
+    pass
+
+if '' and (not #
+(0)
+):
+    pass
+
+if '' and (not
+	(  #
+	0
+)):
+    pass
+
+if (
+  not
+  # comment
+  (a)):
+    pass
+
+if not ( # comment
+      a):
+    pass
+
+if not (
+  # comment
+  (a)):
+    pass
+
+if not (
+  # comment
+  a):
+    pass
+
+not (# comment
+  (a))
+
+(-#comment
+ (a))
+
+if ( # a
+        # b
+  not # c
+  # d
+  ( # e
+      # f
+      a # g
+      # h
+  ) # i
+  # j
+):
+    pass
 ```
 
 ## Output
@@ -250,31 +304,35 @@ if +(
     pass
 
 if (
+    not
     # comment
-    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
+    ~
     # comment
-    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
+    -
     # comment
-    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
+    +
     # comment
-    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
@@ -283,8 +341,9 @@ if (
 
 if (
     # unary comment
+    not
     # operand comment
-    not (
+    (
         # comment
         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
         + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
@@ -318,31 +377,28 @@ if (
 
 ## Trailing operator comments
 
-if (  # comment
-    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+if (
+    not aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    # comment
-    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    ~aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 if (
-    # comment
-    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    -aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
 
 
 if (
-    # comment
-    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+    +aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  # comment
     + bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 ):
     pass
@@ -362,14 +418,13 @@ if (
     pass
 
 if (
+    not
     # comment
-    not a
+    a
 ):
     pass
 
-if (  # comment
-    not a
-):
+if not a:  # comment
     pass
 
 # Regression test for: https://github.com/astral-sh/ruff/issues/7423
@@ -385,9 +440,9 @@ if True:
 # Regression test for: https://github.com/astral-sh/ruff/issues/7448
 x = (
     # a
-    # b
+    not  # b
     # c
-    not (  # d
+    (  # d
         # e
         True
     )
@@ -415,4 +470,68 @@ def foo():
         not (aaaaaaaaaaaaaaaaaaaaa[bbbbbbbb, ccccccc]) and dddddddddd < eeeeeeeeeeeeeee
     ):
         pass
+
+
+# Regression tests for https://github.com/astral-sh/ruff/issues/19226
+if "" and (
+    not 0  #
+):
+    pass
+
+if "" and (
+    not (0)  #
+):
+    pass
+
+if "" and (
+    not (  #
+        0
+    )
+):
+    pass
+
+if (
+    not
+    # comment
+    (a)
+):
+    pass
+
+if not (  # comment
+    a
+):
+    pass
+
+if not (
+    # comment
+    a
+):
+    pass
+
+if not (
+    # comment
+    a
+):
+    pass
+
+not (  # comment
+    a
+)
+
+(
+    -(a)  # comment
+)
+
+if (  # a
+    # b
+    not  # c
+    # d
+    (  # e
+        # f
+        a  # g
+        # h
+    )  # i
+    # j
+):
+    pass
 ```

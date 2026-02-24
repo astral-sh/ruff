@@ -167,10 +167,9 @@ class C:
 c = C()
 c.attr = 1
 
-# TODO: An error should be emitted here, and the type should be `Unknown`
-# or `Never`. See https://github.com/astral-sh/ruff/issues/16298 for more
-# details.
-reveal_type(c.attr)  # revealed: Unknown | property
+# TODO: An error should be emitted here.
+# See https://github.com/astral-sh/ruff/issues/16298 for more details.
+reveal_type(c.attr)  # revealed: Unknown
 ```
 
 ### Wrong setter signature
@@ -272,8 +271,8 @@ method, which means that it is a *data* descriptor (if there is no setter, `__se
 available but yields an `AttributeError` at runtime).
 
 ```py
-reveal_type(type(attr_property).__get__)  # revealed: <wrapper-descriptor `__get__` of `property` objects>
-reveal_type(type(attr_property).__set__)  # revealed: <wrapper-descriptor `__set__` of `property` objects>
+reveal_type(type(attr_property).__get__)  # revealed: <wrapper-descriptor '__get__' of 'property' objects>
+reveal_type(type(attr_property).__set__)  # revealed: <wrapper-descriptor '__set__' of 'property' objects>
 ```
 
 When we access `c.attr`, the `__get__` method of the `property` class is called, passing the

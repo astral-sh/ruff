@@ -8,11 +8,15 @@ use ruff_db::system::{
 };
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_notebook::{Notebook, NotebookError};
+use salsa::Setter as _;
 use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
+use ty_module_resolver::{ModuleGlobSetBuilder, SearchPaths};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{Db as SemanticDb, Program, default_lint_registry};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program, default_lint_registry};
+
+use crate::config::Analysis;
 
 #[salsa::db]
 #[derive(Clone)]
@@ -22,13 +26,14 @@ pub(crate) struct Db {
     system: MdtestSystem,
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
+    settings: Option<Settings>,
 }
 
 impl Db {
     pub(crate) fn setup() -> Self {
         let rule_selection = RuleSelection::all(default_lint_registry(), Severity::Info);
 
-        Self {
+        let mut db = Self {
             system: MdtestSystem::in_memory(),
             storage: salsa::Storage::new(Some(Box::new({
                 move |event| {
@@ -38,6 +43,71 @@ impl Db {
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             rule_selection: Arc::new(rule_selection),
+            settings: None,
+        };
+
+        db.settings = Some(Settings::new(&db));
+        db
+    }
+
+    fn settings(&self) -> Settings {
+        self.settings.unwrap()
+    }
+
+    pub(crate) fn set_verbosity(&mut self, verbose: bool) {
+        self.settings().set_verbose(self).to(verbose);
+    }
+
+    pub(crate) fn update_analysis_options(&mut self, options: Option<&Analysis>) {
+        let analysis = if let Some(options) = options {
+            let AnalysisSettings {
+                respect_type_ignore_comments: respect_type_ignore_comments_default,
+                allowed_unresolved_imports: allowed_unresolved_imports_default,
+                replace_imports_with_any: replace_imports_with_any_default,
+            } = AnalysisSettings::default();
+
+            let allowed_unresolved_imports = if let Some(allowed_unresolved_imports) =
+                options.allowed_unresolved_imports.as_deref()
+            {
+                let mut builder = ModuleGlobSetBuilder::new();
+                for pattern in allowed_unresolved_imports {
+                    builder
+                        .add(pattern)
+                        .expect("Invalid `allowed-unresolved-imports` pattern `{pattern}");
+                }
+                builder.build().unwrap()
+            } else {
+                allowed_unresolved_imports_default
+            };
+
+            let replace_imports_with_any = if let Some(replace_imports_with_any) =
+                options.replace_imports_with_any.as_deref()
+            {
+                let mut builder = ModuleGlobSetBuilder::new();
+                for pattern in replace_imports_with_any {
+                    builder
+                        .add(pattern)
+                        .expect("Invalid `replace-imports-with-any` pattern `{pattern}");
+                }
+                builder.build().unwrap()
+            } else {
+                replace_imports_with_any_default
+            };
+
+            AnalysisSettings {
+                respect_type_ignore_comments: options
+                    .respect_type_ignore_comments
+                    .unwrap_or(respect_type_ignore_comments_default),
+                allowed_unresolved_imports,
+                replace_imports_with_any,
+            }
+        } else {
+            AnalysisSettings::default()
+        };
+
+        let settings = self.settings();
+        if settings.analysis(self) != &analysis {
+            settings.set_analysis(self).to(analysis);
         }
     }
 
@@ -76,6 +146,13 @@ impl SourceDb for Db {
 }
 
 #[salsa::db]
+impl ty_module_resolver::Db for Db {
+    fn search_paths(&self) -> &SearchPaths {
+        Program::get(self).search_paths(self)
+    }
+}
+
+#[salsa::db]
 impl SemanticDb for Db {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()
@@ -90,7 +167,11 @@ impl SemanticDb for Db {
     }
 
     fn verbose(&self) -> bool {
-        false
+        self.settings().verbose(self)
+    }
+
+    fn analysis_settings(&self, _file: File) -> &AnalysisSettings {
+        self.settings().analysis(self)
     }
 }
 
@@ -102,6 +183,15 @@ impl DbWithWritableSystem for Db {
     fn writable_system(&self) -> &Self::System {
         &self.system
     }
+}
+
+#[salsa::input(debug)]
+struct Settings {
+    #[default]
+    #[returns(ref)]
+    analysis: AnalysisSettings,
+    #[default]
+    verbose: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -222,6 +312,10 @@ impl System for MdtestSystem {
         self.as_system().case_sensitivity()
     }
 
+    fn is_executable(&self, path: &SystemPath) -> bool {
+        self.as_system().is_executable(path)
+    }
+
     fn current_directory(&self) -> &SystemPath {
         self.as_system().current_directory()
     }
@@ -283,13 +377,17 @@ impl WritableSystem for MdtestSystem {
         self.as_system().create_new_file(&self.normalize_path(path))
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> ruff_db::system::Result<()> {
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> ruff_db::system::Result<()> {
         self.as_system()
-            .write_file(&self.normalize_path(path), content)
+            .write_file_bytes(&self.normalize_path(path), content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> ruff_db::system::Result<()> {
         self.as_system()
             .create_directory_all(&self.normalize_path(path))
+    }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
     }
 }

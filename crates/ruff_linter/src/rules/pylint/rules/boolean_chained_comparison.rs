@@ -2,7 +2,7 @@ use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     BoolOp, CmpOp, Expr, ExprBoolOp, ExprCompare,
-    parenthesize::{parentheses_iterator, parenthesized_range},
+    token::{parentheses_iterator, parenthesized_range},
 };
 use ruff_text_size::{Ranged, TextRange};
 
@@ -62,7 +62,7 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
     }
 
     let locator = checker.locator();
-    let comment_ranges = checker.comment_ranges();
+    let tokens = checker.tokens();
 
     // retrieve all compare expressions from boolean expression
     let compare_expressions = expr_bool_op
@@ -89,40 +89,22 @@ pub(crate) fn boolean_chained_comparison(checker: &Checker, expr_bool_op: &ExprB
             continue;
         }
 
-        let left_paren_count = parentheses_iterator(
-            left_compare.into(),
-            Some(expr_bool_op.into()),
-            comment_ranges,
-            locator.contents(),
-        )
-        .count();
+        let left_paren_count =
+            parentheses_iterator(left_compare.into(), Some(expr_bool_op.into()), tokens).count();
 
-        let right_paren_count = parentheses_iterator(
-            right_compare.into(),
-            Some(expr_bool_op.into()),
-            comment_ranges,
-            locator.contents(),
-        )
-        .count();
+        let right_paren_count =
+            parentheses_iterator(right_compare.into(), Some(expr_bool_op.into()), tokens).count();
 
         // Create the edit that removes the comparison operator
 
         // In `a<(b) and ((b))<c`, we need to handle the
         // parentheses when specifying the fix range.
-        let left_compare_right_range = parenthesized_range(
-            left_compare_right.into(),
-            left_compare.into(),
-            comment_ranges,
-            locator.contents(),
-        )
-        .unwrap_or(left_compare_right.range());
-        let right_compare_left_range = parenthesized_range(
-            right_compare_left.into(),
-            right_compare.into(),
-            comment_ranges,
-            locator.contents(),
-        )
-        .unwrap_or(right_compare_left.range());
+        let left_compare_right_range =
+            parenthesized_range(left_compare_right.into(), left_compare.into(), tokens)
+                .unwrap_or(left_compare_right.range());
+        let right_compare_left_range =
+            parenthesized_range(right_compare_left.into(), right_compare.into(), tokens)
+                .unwrap_or(right_compare_left.range());
         let edit = Edit::range_replacement(
             locator.slice(left_compare_right_range).to_string(),
             TextRange::new(

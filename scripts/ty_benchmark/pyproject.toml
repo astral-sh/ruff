@@ -2,8 +2,19 @@
 name = "ty_benchmark"
 version = "0.0.1"
 description = "Package for running end-to-end ty benchmarks"
-requires-python = ">=3.12"
-dependencies = ["mypy", "pyright"]
+requires-python = ">=3.14"
+dependencies = [
+    # mypy is missing here because we need to install it into the project's virtual environment
+    # for plugins to work. See `Venv.install`.
+    # Pyright is missing because we install it with `npm` to avoid measuring the overhead
+    # of the Python wrapper script (that lazily installs Pyright).
+    "mslex>=1.3.0",
+    "pyrefly>=0.43.1",
+    "pytest-benchmark>=4.0.0",
+    "pytest>=8.0.0",
+    "pygls>=2.0.0",
+    "lsprotocol>=2025.0.0",
+]
 
 [project.scripts]
 benchmark = "benchmark.run:main"
@@ -19,3 +30,8 @@ packages = ["src/benchmark"]
 ignore = [
     "E501", # We use ruff format
 ]
+
+[tool.ty.rules]
+possibly-unresolved-reference = "error"
+division-by-zero = "error"
+unused-ignore-comment = "error"

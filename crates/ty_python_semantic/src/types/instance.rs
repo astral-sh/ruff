@@ -3,6 +3,10 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use ruff_python_ast::PythonVersion;
+use ruff_python_ast::name::Name;
+use ty_module_resolver::{ModuleName, file_to_module};
+
 use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
@@ -10,15 +14,16 @@ use crate::semantic_index::definition::Definition;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
-use crate::types::protocol_class::walk_protocol_interface;
-use crate::types::tuple::{TupleSpec, TupleType};
+use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
+use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    LiteralValueTypeKind, NormalizedVisitor, TypeContext, TypeMapping, VarianceInferable,
 };
-use crate::{Db, FxOrderSet};
-
+use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
@@ -34,23 +39,42 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        let (class_literal, specialization) = class.class_literal(db);
-        match class_literal.known(db) {
-            Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
-                db,
-                specialization
-                    .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
-                    .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
-                    .as_ref(),
-            )),
-            Some(KnownClass::Object) => Type::object(),
-            _ if class_literal.is_protocol(db) => {
-                Self::ProtocolInstance(ProtocolInstanceType::from_class(class))
+        match class.class_literal(db) {
+            // Dynamic classes created via `type()` don't have special instance types.
+            // TODO: When we add functional TypedDict support, this branch should check
+            // for TypedDict and return `Type::typed_dict(class)` for that case.
+            ClassLiteral::Dynamic(_) => {
+                Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
-            _ if class_literal.is_typed_dict(db) => Type::typed_dict(class),
-            // We don't call non_tuple_instance here because we've already checked that the class
-            // is not `object`
-            _ => Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class))),
+            ClassLiteral::DynamicNamedTuple(_) => {
+                Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
+            }
+            ClassLiteral::Static(class_literal) => {
+                let specialization = class.into_generic_alias().map(|g| g.specialization(db));
+                match class_literal.known(db) {
+                    Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
+                        db,
+                        specialization
+                            .and_then(|spec| Some(Cow::Borrowed(spec.tuple(db)?)))
+                            .unwrap_or_else(|| Cow::Owned(TupleSpec::homogeneous(Type::unknown())))
+                            .as_ref(),
+                    )),
+                    Some(KnownClass::Object) => Type::object(),
+                    _ => class_literal
+                        .is_typed_dict(db)
+                        .then(|| Type::typed_dict(class))
+                        .or_else(|| {
+                            class.into_protocol_class(db).map(|protocol_class| {
+                                Self::ProtocolInstance(ProtocolInstanceType::from_class(
+                                    protocol_class,
+                                ))
+                            })
+                        })
+                        .unwrap_or(Type::NominalInstance(NominalInstanceType(
+                            NominalInstanceInner::NonTuple(class),
+                        ))),
+                }
+            }
         }
     }
 
@@ -61,7 +85,7 @@ impl<'db> Type<'db> {
         Type::tuple_instance(tuple)
     }
 
-    pub(crate) fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
+    pub fn homogeneous_tuple(db: &'db dyn Db, element: Type<'db>) -> Self {
         Type::tuple_instance(TupleType::homogeneous(db, element))
     }
 
@@ -72,10 +96,7 @@ impl<'db> Type<'db> {
     {
         Type::tuple(TupleType::heterogeneous(
             db,
-            elements
-                .into_iter()
-                .map(Into::into)
-                .map(|element| element.fallback_to_divergent(db)),
+            elements.into_iter().map(Into::into),
         ))
     }
 
@@ -86,6 +107,10 @@ impl<'db> Type<'db> {
     /// **Private** helper function to create a `Type::NominalInstance` from a tuple.
     fn tuple_instance(tuple: TupleType<'db>) -> Self {
         Type::NominalInstance(NominalInstanceType(NominalInstanceInner::ExactTuple(tuple)))
+    }
+
+    pub(crate) const fn is_nominal_instance(self) -> bool {
+        matches!(self, Type::NominalInstance(_))
     }
 
     pub(crate) const fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
@@ -123,10 +148,55 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
+        // `self` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
+        // `self` has the protocol class in its MRO. This is a much cheaper check than the
+        // structural check we perform below, so we do it first to avoid the structural check when
+        // we can.
+        let mut result = ConstraintSet::from(false);
+        if let Some(nominal_instance) = protocol.to_nominal_instance() {
+            // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
+            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
+            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
+            // `Q`'s members in a Liskov-incompatible way.
+            let type_to_test = self
+                .as_protocol_instance()
+                .and_then(ProtocolInstanceType::to_nominal_instance)
+                .map(Type::NominalInstance)
+                .unwrap_or(self);
+            let nominally_satisfied = type_to_test.has_relation_to_impl(
+                db,
+                Type::NominalInstance(nominal_instance),
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            );
+            if result
+                .union(db, nominally_satisfied)
+                .is_always_satisfied(db)
+            {
+                return result;
+            }
+        }
+
+        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
+        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
+        // out assignability). We don't want generators with different return types to be
+        // assignable to each other. In this case we use the result of the nominal check above.
+        if let Some(self_protocol) = self.as_protocol_instance()
+            && let Protocol::FromClass(self_class) = self_protocol.inner
+            && let Protocol::FromClass(proto_class) = protocol.inner
+            && self_class.known(db) == Some(KnownClass::Generator)
+            && proto_class.known(db) == Some(KnownClass::Generator)
+            && Program::get(db).python_version(db) < PythonVersion::PY313
+        {
+            return result;
+        }
+
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
             self_protocol.interface(db).has_relation_to_impl(
                 db,
@@ -152,37 +222,7 @@ impl<'db> Type<'db> {
                     )
                 })
         };
-
-        // Even if `self` does not satisfy the protocol from a structural perspective,
-        // we may still need to consider it as satisfying the protocol if `protocol` is
-        // a class-based protocol and `self` has the protocol class in its MRO.
-        //
-        // This matches the behaviour of other type checkers, and is required for us to
-        // recognise `str` as a subtype of `Container[str]`.
-        structurally_satisfied.or(db, || {
-            let Some(nominal_instance) = protocol.as_nominal_type() else {
-                return ConstraintSet::from(false);
-            };
-
-            // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
-            // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
-            // from a protocol `Q` to be a subtype of `Q` to be a subtype of `Q` if it overrides
-            // `Q`'s members in a Liskov-incompatible way.
-            let type_to_test = self
-                .as_protocol_instance()
-                .and_then(ProtocolInstanceType::as_nominal_type)
-                .map(Type::NominalInstance)
-                .unwrap_or(self);
-
-            type_to_test.has_relation_to_impl(
-                db,
-                Type::NominalInstance(nominal_instance),
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            )
-        })
+        result.or(db, || structurally_satisfied)
     }
 }
 
@@ -199,33 +239,55 @@ pub(super) fn walk_nominal_instance_type<'db, V: super::visitor::TypeVisitor<'db
     nominal: NominalInstanceType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, nominal.class(db).into());
+    match nominal.0 {
+        NominalInstanceInner::ExactTuple(tuple) => {
+            walk_tuple_type(db, tuple, visitor);
+        }
+        NominalInstanceInner::Object => {}
+        NominalInstanceInner::NonTuple(class) => {
+            visitor.visit_type(db, class.into());
+        }
+    }
 }
 
 impl<'db> NominalInstanceType<'db> {
+    /// Returns the name of the class this is an instance of.
+    ///
+    /// For example, for an instance of `builtins.str`, this returns `"str"`.
+    ///
+    /// As of 2026-02-16, this method is not used in any crates in the Ruff
+    /// repo, but is exposed as a public API for external users of
+    /// `ty_python_semantic`.
+    pub fn class_name(&self, db: &'db dyn Db) -> &'db Name {
+        self.class(db).name(db)
+    }
+
+    /// Returns the fully qualified module name of the module in which the class
+    /// is defined, if it can be resolved.
+    ///
+    /// For example, for an instance of `pathlib.Path`, this returns
+    /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
+    /// to a known module (e.g. for classes defined in scripts or notebooks).
+    ///
+    /// As of 2026-02-16, this method is not used in any crates in the Ruff
+    /// repo, but is exposed as a public API for external users of
+    /// `ty_python_semantic`.
+    pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
+        let file = self.class(db).class_literal(db).file(db);
+        file_to_module(db, file).map(|module| module.name(db))
+    }
+
     pub(super) fn class(&self, db: &'db dyn Db) -> ClassType<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class,
-            NominalInstanceInner::Object => KnownClass::Object
-                .try_to_class_literal(db)
-                .expect("Typeshed should always have a `object` class in `builtins.pyi`")
-                .default_specialization(db),
+            NominalInstanceInner::Object => ClassType::object(db),
         }
     }
 
+    /// Returns the class literal for this instance.
     pub(super) fn class_literal(&self, db: &'db dyn Db) -> ClassLiteral<'db> {
-        let class = match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
-            NominalInstanceInner::NonTuple(class) => class,
-            NominalInstanceInner::Object => {
-                return KnownClass::Object
-                    .try_to_class_literal(db)
-                    .expect("Typeshed should always have a `object` class in `builtins.pyi`");
-            }
-        };
-        let (class_literal, _) = class.class_literal(db);
-        class_literal
+        self.class(db).class_literal(db)
     }
 
     /// Returns the [`KnownClass`] that this is a nominal instance of, or `None` if it is not an
@@ -264,7 +326,7 @@ impl<'db> NominalInstanceType<'db> {
                     .find_map(|class| match class.known(db)? {
                         // N.B. this is a pure optimisation: iterating through the MRO would give us
                         // the correct tuple spec for `sys._version_info`, since we special-case the class
-                        // in `ClassLiteral::explicit_bases()` so that it is inferred as inheriting from
+                        // in `StmtClassLiteral::explicit_bases()` so that it is inferred as inheriting from
                         // a tuple type with the correct spec for the user's configured Python version and platform.
                         KnownClass::VersionInfo => {
                             Some(Cow::Owned(TupleSpec::version_info_spec(db)))
@@ -289,6 +351,14 @@ impl<'db> NominalInstanceType<'db> {
     /// Return `true` if this type represents instances of the class `builtins.object`.
     pub(super) const fn is_object(self) -> bool {
         matches!(self.0, NominalInstanceInner::Object)
+    }
+
+    pub(super) fn is_definition_generic(self) -> bool {
+        match self.0 {
+            NominalInstanceInner::NonTuple(class) => class.is_generic(),
+            NominalInstanceInner::ExactTuple(_) => true,
+            NominalInstanceInner::Object => false,
+        }
     }
 
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
@@ -318,10 +388,9 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(_) | NominalInstanceInner::Object => return None,
             NominalInstanceInner::NonTuple(class) => class,
         };
-        let (class, Some(specialization)) = class.class_literal(db) else {
-            return None;
-        };
-        if !class.is_known(db, KnownClass::Slice) {
+        let (class_literal, specialization) = class.static_class_literal(db)?;
+        let specialization = specialization?;
+        if !class_literal.is_known(db, KnownClass::Slice) {
             return None;
         }
         let [start, stop, step] = specialization.types(db) else {
@@ -329,8 +398,11 @@ impl<'db> NominalInstanceType<'db> {
         };
 
         let to_u32 = |ty: &Type<'db>| match ty {
-            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
-            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(n) => i32::try_from(n.as_i64()).map(Some).ok(),
+                LiteralValueTypeKind::Bool(b) => Some(Some(i32::from(b))),
+                _ => None,
+            },
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) =>
             {
@@ -361,12 +433,31 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self.0 {
+            NominalInstanceInner::ExactTuple(tuple) => {
+                Some(Self(NominalInstanceInner::ExactTuple(
+                    tuple.recursive_type_normalized_impl(db, div, nested)?,
+                )))
+            }
+            NominalInstanceInner::NonTuple(class) => Some(Self(NominalInstanceInner::NonTuple(
+                class.recursive_type_normalized_impl(db, div, nested)?,
+            ))),
+            NominalInstanceInner::Object => Some(Self(NominalInstanceInner::Object)),
+        }
+    }
+
     pub(super) fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation,
+        relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -442,8 +533,13 @@ impl<'db> NominalInstanceType<'db> {
                 }
             }
         }
+
         result.or(db, || {
-            ConstraintSet::from(!(self.class(db)).could_coexist_in_mro_with(db, other.class(db)))
+            ConstraintSet::from(
+                !self
+                    .class(db)
+                    .could_coexist_in_mro_with(db, other.class(db)),
+            )
         })
     }
 
@@ -458,7 +554,7 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
                 .map(KnownClass::is_singleton)
-                .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db).0)),
+                .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db))),
         }
     }
 
@@ -470,7 +566,7 @@ impl<'db> NominalInstanceType<'db> {
                 .known(db)
                 .and_then(KnownClass::is_single_valued)
                 .or_else(|| Some(self.tuple_spec(db)?.is_single_valued(db)))
-                .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db).0)),
+                .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db))),
         }
     }
 
@@ -583,7 +679,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     } else {
         match protocol.inner {
             Protocol::FromClass(class) => {
-                if let Some(specialization) = class.class_literal(db).1 {
+                if let Some((_, Some(specialization))) = class.static_class_literal(db) {
                     walk_specialization(db, specialization, visitor);
                 }
             }
@@ -597,7 +693,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
 impl<'db> ProtocolInstanceType<'db> {
     // Keep this method private, so that the only way of constructing `ProtocolInstanceType`
     // instances is through the `Type::instance` constructor function.
-    fn from_class(class: ClassType<'db>) -> Self {
+    fn from_class(class: ProtocolClass<'db>) -> Self {
         Self {
             inner: Protocol::FromClass(class),
             _phantom: PhantomData,
@@ -618,10 +714,10 @@ impl<'db> ProtocolInstanceType<'db> {
     /// If this is a synthesized protocol that does not correspond to a class definition
     /// in source code, return `None`. These are "pure" abstract types, that cannot be
     /// treated in a nominal way.
-    pub(super) fn as_nominal_type(self) -> Option<NominalInstanceType<'db>> {
+    pub(super) fn to_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self.inner {
             Protocol::FromClass(class) => {
-                Some(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
+                Some(NominalInstanceType(NominalInstanceInner::NonTuple(*class)))
             }
             Protocol::Synthesized(_) => None,
         }
@@ -656,7 +752,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
-        #[salsa::tracked(cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
+        #[salsa::tracked(cycle_initial=|_, _, _, ()| true, heap_size=ruff_memory_usage::heap_size)]
         fn is_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
@@ -672,15 +768,6 @@ impl<'db> ProtocolInstanceType<'db> {
                     &IsDisjointVisitor::default(),
                 )
                 .is_always_satisfied(db)
-        }
-
-        fn initial<'db>(
-            _db: &'db dyn Db,
-            _id: salsa::Id,
-            _value: ProtocolInstanceType<'db>,
-            _: (),
-        ) -> bool {
-            true
         }
 
         is_equivalent_to_object_inner(db, self, ())
@@ -712,6 +799,18 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    pub(super) fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        Some(Self {
+            inner: self.inner.recursive_type_normalized_impl(db, div, nested)?,
+            _phantom: PhantomData,
+        })
+    }
+
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
     ///
     /// TODO: consider the types of the members as well as their existence
@@ -719,12 +818,26 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsEquivalentVisitor<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
         }
+
+        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
+        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
+        // out equivalence). We don't want generators with different return types to be equivalent
+        // to each other. In this case we compare the `ClassType`s nominally.
+        if let Protocol::FromClass(self_class) = self.inner
+            && let Protocol::FromClass(other_class) = other.inner
+            && self_class.known(db) == Some(KnownClass::Generator)
+            && other_class.known(db) == Some(KnownClass::Generator)
+            && Program::get(db).python_version(db) < PythonVersion::PY313
+        {
+            return (*self_class).is_equivalent_to_impl(db, *other_class, inferable, visitor);
+        }
+
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
             return ConstraintSet::from(true);
@@ -801,11 +914,17 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
+///
+/// # Ordering
+///
+/// Ordering between variants is stable and should be the same between runs.
+/// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
+/// The id may change between runs, or when e.g. a `Protocol` was garbage-collected and recreated.
 #[derive(
     Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
 )]
 pub(super) enum Protocol<'db> {
-    FromClass(ClassType<'db>),
+    FromClass(ProtocolClass<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
 }
 
@@ -813,11 +932,24 @@ impl<'db> Protocol<'db> {
     /// Return the members of this protocol type
     fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         match self {
-            Self::FromClass(class) => class
-                .into_protocol_class(db)
-                .expect("Class wrapped by `Protocol` should be a protocol class")
-                .interface(db),
+            Self::FromClass(class) => class.interface(db),
             Self::Synthesized(synthesized) => synthesized.interface(),
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            Self::FromClass(class) => Some(Self::FromClass(
+                class.recursive_type_normalized_impl(db, div, nested)?,
+            )),
+            Self::Synthesized(synthesized) => Some(Self::Synthesized(
+                synthesized.recursive_type_normalized_impl(db, div, nested)?,
+            )),
         }
     }
 }
@@ -838,7 +970,7 @@ mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-        NormalizedVisitor, TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        NormalizedVisitor, Type, TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
 
@@ -888,6 +1020,17 @@ mod synthesized_protocol {
 
         pub(in crate::types) fn interface(self) -> ProtocolInterface<'db> {
             self.0
+        }
+
+        pub(in crate::types) fn recursive_type_normalized_impl(
+            self,
+            db: &'db dyn Db,
+            div: Type<'db>,
+            nested: bool,
+        ) -> Option<Self> {
+            Some(Self(
+                self.0.recursive_type_normalized_impl(db, div, nested)?,
+            ))
         }
     }
 

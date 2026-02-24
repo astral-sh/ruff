@@ -14,7 +14,6 @@ use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
 use bitflags::bitflags;
-use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -773,10 +772,14 @@ pub trait StringFlags: Copy {
     }
 
     /// The total length of the string's closer.
-    /// This is always equal to `self.quote_len()`,
-    /// but is provided here for symmetry with the `opener_len()` method.
+    /// This is always equal to `self.quote_len()`, except when the string is unclosed,
+    /// in which case the length is zero.
     fn closer_len(self) -> TextSize {
-        self.quote_len()
+        if self.is_unclosed() {
+            TextSize::default()
+        } else {
+            self.quote_len()
+        }
     }
 
     fn as_any_string_flags(self) -> AnyStringFlags {
@@ -2874,6 +2877,57 @@ pub struct PatternKeyword {
     pub pattern: Pattern,
 }
 
+impl PatternArguments {
+    /// Returns an iterator over the patterns and keywords in source order.
+    pub fn patterns_source_order(&self) -> PatternArgumentsSourceOrder<'_> {
+        PatternArgumentsSourceOrder {
+            patterns: &self.patterns,
+            keywords: &self.keywords,
+            next_pattern: 0,
+            next_keyword: 0,
+        }
+    }
+}
+
+/// The iterator returned by [`PatternArguments::patterns_source_order`].
+#[derive(Clone)]
+pub struct PatternArgumentsSourceOrder<'a> {
+    patterns: &'a [Pattern],
+    keywords: &'a [PatternKeyword],
+    next_pattern: usize,
+    next_keyword: usize,
+}
+
+/// An entry in the argument list of a class pattern.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum PatternOrKeyword<'a> {
+    Pattern(&'a Pattern),
+    Keyword(&'a PatternKeyword),
+}
+
+impl<'a> Iterator for PatternArgumentsSourceOrder<'a> {
+    type Item = PatternOrKeyword<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let pattern = self.patterns.get(self.next_pattern);
+        let keyword = self.keywords.get(self.next_keyword);
+
+        if let Some(pattern) = pattern
+            && keyword.is_none_or(|keyword| pattern.start() <= keyword.start())
+        {
+            self.next_pattern += 1;
+            Some(PatternOrKeyword::Pattern(pattern))
+        } else if let Some(keyword) = keyword {
+            self.next_keyword += 1;
+            Some(PatternOrKeyword::Keyword(keyword))
+        } else {
+            None
+        }
+    }
+}
+
+impl FusedIterator for PatternArgumentsSourceOrder<'_> {}
+
 impl TypeParam {
     pub const fn name(&self) -> &Identifier {
         match self {
@@ -3048,6 +3102,27 @@ impl Parameters {
             && self.vararg.is_none()
             && self.kwarg.is_none()
     }
+
+    /// Returns an iterator over all parameters in source order.
+    ///
+    /// This differs from [`Parameters::iter`] which returns parameters
+    /// in type-based order (positional-only, regular, variadic, keyword-only,
+    /// keyword). For well-formed Python the two orderings are identical, but
+    /// error recovery can produce ASTs where variadic parameters appear before
+    /// non-variadic ones (e.g. `def foo(**kwargs, a):`).
+    pub fn iter_source_order(&self) -> ParametersSourceOrderIterator<'_> {
+        let mut variadics = [self.vararg.as_deref(), self.kwarg.as_deref()];
+        variadics.sort_by_key(|param| param.map_or(TextSize::new(u32::MAX), Ranged::start));
+
+        ParametersSourceOrderIterator {
+            next_non_variadic_peeked: None,
+            posonlyargs: self.posonlyargs.iter(),
+            args: self.args.iter(),
+            kwonlyargs: self.kwonlyargs.iter(),
+            variadics,
+            next_variadic: 0,
+        }
+    }
 }
 
 pub struct ParametersIterator<'a> {
@@ -3188,6 +3263,69 @@ impl<'a> IntoIterator for &'a Box<Parameters> {
         (&**self).into_iter()
     }
 }
+
+/// The iterator returned by [`Parameters::iter_source_order`].
+pub struct ParametersSourceOrderIterator<'a> {
+    next_non_variadic_peeked: Option<&'a ParameterWithDefault>,
+    posonlyargs: Iter<'a, ParameterWithDefault>,
+    args: Iter<'a, ParameterWithDefault>,
+    kwonlyargs: Iter<'a, ParameterWithDefault>,
+    variadics: [Option<&'a Parameter>; 2],
+    next_variadic: usize,
+}
+
+impl<'a> ParametersSourceOrderIterator<'a> {
+    /// Returns the next variadic parameter that appears before `before`, if any.
+    fn next_variadic_before(&mut self, before: TextSize) -> Option<&'a Parameter> {
+        let param = self.variadics.get(self.next_variadic).copied().flatten()?;
+        if param.start() < before {
+            self.next_variadic += 1;
+            Some(param)
+        } else {
+            None
+        }
+    }
+
+    fn next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault> {
+        self.next_non_variadic_peeked
+            .take()
+            .or_else(|| self.posonlyargs.next())
+            .or_else(|| self.args.next())
+            .or_else(|| self.kwonlyargs.next())
+    }
+
+    fn peek_next_non_variadic(&mut self) -> Option<&'a ParameterWithDefault> {
+        let next = self.next_non_variadic()?;
+        self.next_non_variadic_peeked = Some(next);
+        Some(next)
+    }
+}
+
+impl<'a> Iterator for ParametersSourceOrderIterator<'a> {
+    type Item = AnyParameterRef<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        // If there's a variadic parameter that comes before the next
+        // non-variadic parameter, emit it first.
+        let next_non_variadic_start = self
+            .peek_next_non_variadic()
+            .map_or(TextSize::new(u32::MAX), Ranged::start);
+
+        if let Some(variadic) = self.next_variadic_before(next_non_variadic_start) {
+            return Some(AnyParameterRef::Variadic(variadic));
+        }
+
+        if let Some(non_variadic) = self.next_non_variadic() {
+            return Some(AnyParameterRef::NonVariadic(non_variadic));
+        }
+
+        // Drain remaining variadics.
+        self.next_variadic_before(TextSize::new(u32::MAX))
+            .map(AnyParameterRef::Variadic)
+    }
+}
+
+impl FusedIterator for ParametersSourceOrderIterator<'_> {}
 
 /// An alternative type of AST `arg`. This is used for each function argument that might have a default value.
 /// Used by `Arguments` original type.
@@ -3376,10 +3514,13 @@ impl Arguments {
     /// 2
     /// {'4': 5}
     /// ```
-    pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> {
-        let args = self.args.iter().map(ArgOrKeyword::Arg);
-        let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
-        args.merge_by(keywords, |left, right| left.start() <= right.start())
+    pub fn arguments_source_order(&self) -> ArgumentsSourceOrder<'_> {
+        ArgumentsSourceOrder {
+            args: &self.args,
+            keywords: &self.keywords,
+            next_arg: 0,
+            next_keyword: 0,
+        }
     }
 
     pub fn inner_range(&self) -> TextRange {
@@ -3394,6 +3535,38 @@ impl Arguments {
         TextRange::new(self.end() - ')'.text_len(), self.end())
     }
 }
+
+/// The iterator returned by [`Arguments::arguments_source_order`].
+#[derive(Clone)]
+pub struct ArgumentsSourceOrder<'a> {
+    args: &'a [Expr],
+    keywords: &'a [Keyword],
+    next_arg: usize,
+    next_keyword: usize,
+}
+
+impl<'a> Iterator for ArgumentsSourceOrder<'a> {
+    type Item = ArgOrKeyword<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let arg = self.args.get(self.next_arg);
+        let keyword = self.keywords.get(self.next_keyword);
+
+        if let Some(arg) = arg
+            && keyword.is_none_or(|keyword| arg.start() <= keyword.start())
+        {
+            self.next_arg += 1;
+            Some(ArgOrKeyword::Arg(arg))
+        } else if let Some(keyword) = keyword {
+            self.next_keyword += 1;
+            Some(ArgOrKeyword::Keyword(keyword))
+        } else {
+            None
+        }
+    }
+}
+
+impl FusedIterator for ArgumentsSourceOrder<'_> {}
 
 /// An AST node used to represent a sequence of type parameters.
 ///

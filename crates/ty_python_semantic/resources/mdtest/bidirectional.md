@@ -16,28 +16,19 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import Literal
+
 def list1[T](x: T) -> list[T]:
     return [x]
 
-l1 = list1(1)
+l1: list[Literal[1]] = list1(1)
 reveal_type(l1)  # revealed: list[Literal[1]]
-l2: list[int] = list1(1)
+
+l2 = list1(1)
 reveal_type(l2)  # revealed: list[int]
 
-# `list[Literal[1]]` and `list[int]` are incompatible, since `list[T]` is invariant in `T`.
-# error: [invalid-assignment] "Object of type `list[Literal[1]]` is not assignable to `list[int]`"
-l2 = l1
-
-intermediate = list1(1)
-# TODO: the error will not occur if we can infer the type of `intermediate` to be `list[int]`
-# error: [invalid-assignment] "Object of type `list[Literal[1]]` is not assignable to `list[int]`"
-l3: list[int] = intermediate
-# TODO: it would be nice if this were `list[int]`
-reveal_type(intermediate)  # revealed: list[Literal[1]]
-reveal_type(l3)  # revealed: list[int]
-
-l4: list[int | str] | None = list1(1)
-reveal_type(l4)  # revealed: list[int | str]
+l3: list[int | str] | None = list1(1)
+reveal_type(l3)  # revealed: list[int | str]
 
 def _(l: list[int] | None = None):
     l1 = l or list()
@@ -50,9 +41,13 @@ def _(l: list[int] | None = None):
 def f[T](x: T, cond: bool) -> T | list[T]:
     return x if cond else [x]
 
-# TODO: Better constraint solver.
-# error: [invalid-assignment]
 l5: int | list[int] = f(1, True)
+
+a: list[int] = [1, 2, *(3, 4, 5)]
+reveal_type(a)  # revealed: list[int]
+
+b: list[list[int]] = [[1], [2], *([3], [4])]
+reveal_type(b)  # revealed: list[list[int]]
 ```
 
 `typed_dict.py`:
@@ -66,10 +61,13 @@ class TD(TypedDict):
 d1 = {"x": 1}
 d2: TD = {"x": 1}
 d3: dict[str, int] = {"x": 1}
+d4: TD = dict(x=1)
+d5: TD = dict(x="1")  # error: [invalid-argument-type]
 
 reveal_type(d1)  # revealed: dict[Unknown | str, Unknown | int]
 reveal_type(d2)  # revealed: TD
 reveal_type(d3)  # revealed: dict[str, int]
+reveal_type(d4)  # revealed: TD
 
 def _() -> TD:
     return {"x": 1}
@@ -233,6 +231,9 @@ def _(flag: bool):
 
     def _(c: C):
         c.x = lst(1)
+
+        # TODO: Use the parameter type of `__set__` as type context to avoid this error.
+        # error: [invalid-assignment]
         C.x = lst(1)
 ```
 
@@ -270,7 +271,7 @@ def f[T](x: T) -> list[T]:
 
 class A:
     def __new__(cls, value: list[int | str]):
-        return super().__new__(cls, value)
+        return super().__new__(cls)
 
     def __init__(self, value: list[int | None]): ...
 
@@ -279,6 +280,86 @@ A(f(1))
 # error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
 # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[list[Unknown]]`"
 A(f([]))
+```
+
+## Conditional expressions
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The type context is propagated through both branches of conditional expressions:
+
+```py
+def f[T](x: T) -> list[T]:
+    raise NotImplementedError
+
+def _(flag: bool):
+    x1 = f(1) if flag else f(2)
+    reveal_type(x1)  # revealed: list[int]
+
+    x2: list[int | None] = f(1) if flag else f(2)
+    reveal_type(x2)  # revealed: list[int | None]
+```
+
+## Dunder Calls
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The key and value parameters types are used as type context for `__setitem__` dunder calls:
+
+```py
+from typing import TypedDict
+
+class Bar(TypedDict):
+    baz: float
+
+def _(x: dict[str, Bar]):
+    x["foo"] = reveal_type({"baz": 2})  # revealed: Bar
+
+class X:
+    def __setitem__(self, key: Bar, value: Bar): ...
+
+def _(x: X):
+    # revealed: Bar
+    x[reveal_type({"baz": 1})] = reveal_type({"baz": 2})  # revealed: Bar
+
+# TODO: Support type context with union subscripting.
+def _(x: X | dict[Bar, Bar]):
+    # error: [invalid-assignment]
+    # error: [invalid-assignment]
+    x[{"baz": 1}] = {"baz": 2}
+```
+
+Similarly, the value type for augmented assignment dunder calls is inferred with type context:
+
+```py
+from typing import TypedDict
+
+def lst[T](x: T) -> list[T]:
+    return [x]
+
+class Bar(TypedDict, closed=False):
+    bar: list[int]
+
+def _(bar: Bar):
+    bar |= reveal_type({"bar": lst(1)})  # revealed: Bar
+
+class Bar2(TypedDict):
+    bar: list[int | None]
+
+class X:
+    def __ior__(self, other: Bar2): ...
+
+def _(x: X):
+    x |= reveal_type({"bar": lst(1)})  # revealed: Bar2
+
+def _(x: X | Bar):
+    x |= {"bar": lst(1)}
 ```
 
 ## Multi-inference diagnostics
@@ -293,6 +374,8 @@ Diagnostics unrelated to the type-context are only reported once:
 `call.py`:
 
 ```py
+from typing import TypedDict
+
 def f[T](x: T) -> list[T]:
     return [x]
 
@@ -314,6 +397,22 @@ def _(x: int):
 
     # error: [possibly-unresolved-reference] "Name `z` used when possibly not defined"
     y(f(True), [z])
+
+class Bar(TypedDict):
+    bar: int
+
+class Bar2(TypedDict):
+    bar: int
+
+class Bar3(TypedDict):
+    bar: int
+
+def _(flag: bool, bar: Bar | Bar2 | Bar3):
+    if flag:
+        y = 1
+
+    # error: [possibly-unresolved-reference]
+    bar |= {"bar": y}
 ```
 
 `call_standalone_expression.py`:
@@ -327,7 +426,7 @@ def _(a: object, b: object, flag: bool):
     else:
         x = g
 
-    # error: [unsupported-operator] "Operator `>` is not supported for types `object` and `object`"
+    # error: [unsupported-operator] "Operator `>` is not supported between two objects of type `object`"
     x(f"{'a' if a > b else 'b'}")
 ```
 

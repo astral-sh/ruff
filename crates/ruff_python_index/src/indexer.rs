@@ -2,7 +2,7 @@
 //! are omitted from the AST (e.g., commented lines).
 
 use ruff_python_ast::Stmt;
-use ruff_python_parser::{TokenKind, Tokens};
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_trivia::{
     CommentRanges, has_leading_content, has_trailing_content, is_python_whitespace,
 };

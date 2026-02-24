@@ -1,11 +1,13 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
 
+use std::borrow::Cow;
+use std::{fmt::Write, path::PathBuf};
+
 use anyhow::bail;
 use itertools::Itertools;
 use pretty_assertions::StrComparison;
-use std::{fmt::Write, path::PathBuf};
-
 use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
+use ruff_python_trivia::textwrap;
 use ty_project::metadata::Options;
 
 use crate::{
@@ -144,8 +146,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push('\n');
 
     if let Some(deprecated) = &field.deprecated {
-        output.push_str("> [!WARN] \"Deprecated\"\n");
-        output.push_str("> This option has been deprecated");
+        output.push_str("!!! warning \"Deprecated\"\n");
+        output.push_str("    This option has been deprecated");
 
         if let Some(since) = deprecated.since {
             write!(output, " in {since}").unwrap();
@@ -165,61 +167,69 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     let _ = writeln!(output, "**Default value**: `{}`", field.default);
     output.push('\n');
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
-    output.push('\n');
-    output.push_str("**Example usage** (`pyproject.toml`):\n\n");
-    output.push_str(&format_example(
-        &format_header(
-            field.scope,
-            field.example,
-            parents,
-            ConfigurationFile::PyprojectToml,
-        ),
-        field.example,
-    ));
-    output.push('\n');
-}
 
-fn format_example(header: &str, content: &str) -> String {
-    if header.is_empty() {
-        format!("```toml\n{content}\n```\n",)
-    } else {
-        format!("```toml\n{header}\n{content}\n```\n",)
+    output.push('\n');
+    output.push_str("**Example usage**:\n\n");
+
+    for configuration_file in [ConfigurationFile::PyprojectToml, ConfigurationFile::TyToml] {
+        let (header, example) =
+            format_snippet(field.scope, field.example, parents, configuration_file);
+        output.push_str(&format_tab(configuration_file.name(), &header, &example));
+
+        output.push('\n');
     }
 }
 
+fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
+    let header = if header.is_empty() {
+        String::new()
+    } else {
+        format!("\n    {header}")
+    };
+    format!(
+        "=== \"{}\"\n\n    ```toml{}\n{}\n    ```\n",
+        tab_name,
+        header,
+        textwrap::indent(content, "    ")
+    )
+}
 /// Format the TOML header for the example usage for a given option.
 ///
-/// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
-fn format_header(
+/// For example: `[tool.ty.rules]`.
+fn format_snippet<'a>(
     scope: Option<&str>,
-    example: &str,
+    example: &'a str,
     parents: &[Set],
     configuration: ConfigurationFile,
-) -> String {
-    let tool_parent = match configuration {
-        ConfigurationFile::PyprojectToml => Some("tool.ty"),
-        ConfigurationFile::TyToml => None,
-    };
+) -> (String, Cow<'a, str>) {
+    let mut example = Cow::Borrowed(example);
 
-    let header = tool_parent
+    let header = configuration
+        .parent_table()
         .into_iter()
         .chain(parents.iter().filter_map(|parent| parent.name()))
         .chain(scope)
         .join(".");
 
+    // Rewrite examples starting with `[tool.ty]` or `[[tool.ty]]` to their `ty.toml` equivalent.
+    if matches!(configuration, ConfigurationFile::TyToml) {
+        example = example.replace("[tool.ty.", "[").into();
+    }
+
     // Ex) `[[tool.ty.xx]]`
     if example.starts_with(&format!("[[{header}")) {
-        return String::new();
+        return (String::new(), example);
     }
+
     // Ex) `[tool.ty.rules]`
     if example.starts_with(&format!("[{header}")) {
-        return String::new();
+        return (String::new(), example);
     }
 
     if header.is_empty() {
-        String::new()
+        (String::new(), example)
     } else {
-        format!("[{header}]")
+        (format!("[{header}]"), example)
     }
 }
 
@@ -242,8 +252,23 @@ impl Visit for CollectOptionsVisitor {
 #[derive(Debug, Copy, Clone)]
 enum ConfigurationFile {
     PyprojectToml,
-    #[expect(dead_code)]
     TyToml,
+}
+
+impl ConfigurationFile {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::PyprojectToml => "pyproject.toml",
+            Self::TyToml => "ty.toml",
+        }
+    }
+
+    const fn parent_table(self) -> Option<&'static str> {
+        match self {
+            Self::PyprojectToml => Some("tool.ty"),
+            Self::TyToml => None,
+        }
+    }
 }
 
 #[cfg(test)]

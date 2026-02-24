@@ -3,12 +3,13 @@ use std::path::Path;
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
+use crate::analyze::visibility;
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
     SubmoduleImport,
@@ -208,7 +209,7 @@ impl<'a> SemanticModel<'a> {
         }
 
         if self.typing_modules.iter().any(|module| {
-            let module = QualifiedName::from_dotted_name(module);
+            let module = QualifiedName::user_defined(module);
             qualified_name == &module.append_member(target)
         }) {
             return true;
@@ -1594,8 +1595,13 @@ impl<'a> SemanticModel<'a> {
     /// Return `true` if the model is in an async context.
     pub fn in_async_context(&self) -> bool {
         for scope in self.current_scopes() {
-            if let ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) = scope.kind {
-                return *is_async;
+            match scope.kind {
+                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
+                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Generator { .. }
+                | ScopeKind::Module
+                | ScopeKind::Type
+                | ScopeKind::DunderClassCell => {}
             }
         }
         false
@@ -2151,6 +2157,21 @@ impl<'a> SemanticModel<'a> {
                 return false;
             };
             function.range() == function_def.range()
+        })
+    }
+
+    /// Return `true` if the model is in a `typing.Protocol` subclass or an abstract
+    /// method.
+    pub fn in_protocol_or_abstract_method(&self) -> bool {
+        self.current_scopes().any(|scope| match scope.kind {
+            ScopeKind::Class(class_def) => class_def
+                .bases()
+                .iter()
+                .any(|base| self.match_typing_expr(map_subscript(base), "Protocol")),
+            ScopeKind::Function(function_def) => {
+                visibility::is_abstract(&function_def.decorator_list, self)
+            }
+            _ => false,
         })
     }
 }

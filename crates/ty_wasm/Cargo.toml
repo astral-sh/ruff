@@ -11,12 +11,13 @@ repository = { workspace = true }
 license = { workspace = true }
 description = "WebAssembly bindings for ty"
 
+[package.metadata.cargo-shear]
+# Depended on only to enable `log` feature as of 2025-10-03.
+ignored = ["tracing"]
+
 [lib]
 crate-type = ["cdylib", "rlib"]
 doctest = false
-
-[features]
-default = ["console_error_panic_hook"]
 
 [dependencies]
 ty_ide = { workspace = true }
@@ -27,6 +28,7 @@ ty_project = { workspace = true, default-features = false, features = [
 ty_python_semantic = { workspace = true }
 
 ruff_db = { workspace = true, default-features = false, features = [] }
+ruff_diagnostics = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_formatter = { workspace = true }
 ruff_source_file = { workspace = true }
@@ -34,11 +36,11 @@ ruff_text_size = { workspace = true }
 
 console_error_panic_hook = { workspace = true, optional = true }
 console_log = { workspace = true }
-js-sys = { workspace = true }
-log = { workspace = true }
 # Not a direct dependency but required to enable the `wasm_js` feature.
 # See https://docs.rs/getrandom/latest/getrandom/#webassembly-support
 getrandom = { workspace = true, features = ["wasm_js"] }
+js-sys = { workspace = true }
+log = { workspace = true }
 serde-wasm-bindgen = { workspace = true }
 tracing = { workspace = true, features = ["log"] }
 # Not a direct dependency but required to compile for Wasm.
@@ -49,9 +51,8 @@ wasm-bindgen = { workspace = true }
 [dev-dependencies]
 wasm-bindgen-test = { workspace = true }
 
+[features]
+default = ["console_error_panic_hook"]
+
 [lints]
 workspace = true
-
-[package.metadata.cargo-shear]
-# Depended on only to enable `log` feature as of 2025-10-03.
-ignored = ["tracing"]

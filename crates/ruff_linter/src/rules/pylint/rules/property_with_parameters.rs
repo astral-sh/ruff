@@ -32,6 +32,10 @@ use crate::checkers::ast::Checker;
 ///     def purr_volume(self, volume): ...
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.property-decorators`
+///
 /// ## References
 /// - [Python documentation: `property`](https://docs.python.org/3/library/functions.html#property)
 #[derive(ViolationMetadata)]

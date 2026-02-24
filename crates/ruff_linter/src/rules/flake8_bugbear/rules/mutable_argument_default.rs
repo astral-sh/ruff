@@ -3,7 +3,7 @@ use std::fmt::Write;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, ParameterWithDefault};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::function_type::is_stub;
@@ -166,12 +166,7 @@ fn move_initialization(
         return None;
     }
 
-    let range = match parenthesized_range(
-        default.into(),
-        parameter.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    ) {
+    let range = match parenthesized_range(default.into(), parameter.into(), checker.tokens()) {
         Some(range) => range,
         None => default.range(),
     };
@@ -194,13 +189,8 @@ fn move_initialization(
             "{} = {}",
             parameter.parameter.name(),
             locator.slice(
-                parenthesized_range(
-                    default.into(),
-                    parameter.into(),
-                    checker.comment_ranges(),
-                    checker.source()
-                )
-                .unwrap_or(default.range())
+                parenthesized_range(default.into(), parameter.into(), checker.tokens())
+                    .unwrap_or(default.range())
             )
         );
     } else {

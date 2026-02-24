@@ -222,6 +222,17 @@ where
     visitor.leave_node(node);
 }
 
+pub fn walk_node<'a, V>(visitor: &mut V, node: AnyNodeRef<'a>)
+where
+    V: SourceOrderVisitor<'a> + ?Sized,
+{
+    if visitor.enter_node(node).is_traverse() {
+        node.visit_source_order(visitor);
+    }
+
+    visitor.leave_node(node);
+}
+
 #[derive(Copy, Clone, Eq, PartialEq, Debug)]
 pub enum TraversalSignal {
     Traverse,
@@ -480,12 +491,7 @@ where
 {
     let node = AnyNodeRef::from(pattern_arguments);
     if visitor.enter_node(node).is_traverse() {
-        for pattern in &pattern_arguments.patterns {
-            visitor.visit_pattern(pattern);
-        }
-        for keyword in &pattern_arguments.keywords {
-            visitor.visit_pattern_keyword(keyword);
-        }
+        pattern_arguments.visit_source_order(visitor);
     }
     visitor.leave_node(node);
 }

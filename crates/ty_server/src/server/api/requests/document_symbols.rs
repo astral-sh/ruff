@@ -39,7 +39,7 @@ impl BackgroundDocumentRequestHandler for DocumentSymbolRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.to_file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 

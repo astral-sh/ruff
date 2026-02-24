@@ -48,6 +48,7 @@ def print_config(**context):
     tomorrow_ds = context["tomorrow_ds"]
     yesterday_ds = context["yesterday_ds"]
     yesterday_ds_nodash = context["yesterday_ds_nodash"]
+    events = context["triggering_dataset_events"]
 
 
 @task
@@ -64,6 +65,7 @@ def print_config_with_get_current_context():
     tomorrow_ds = context["tomorrow_ds"]
     yesterday_ds = context["yesterday_ds"]
     yesterday_ds_nodash = context["yesterday_ds_nodash"]
+    events = context["triggering_dataset_events"]
 
 
 @task(task_id="print_the_context")
@@ -144,9 +146,62 @@ class CustomOperator(BaseOperator):
         tomorrow_ds = context["tomorrow_ds"]
         yesterday_ds = context["yesterday_ds"]
         yesterday_ds_nodash = context["yesterday_ds_nodash"]
+        events = context["triggering_dataset_events"]
 
 
 class CustomOperatorNew(BaseOperator):
     def execute(self, context):
         execution_date = context.get("execution_date")
         next_ds = context.get("next_ds")
+
+
+# dagrun.external_trigger is removed
+@task
+def test_dag_run_external_trigger_via_variable(**context):
+    dag_run = context["dag_run"]
+    print(dag_run.external_trigger)
+    print(dag_run.run_type)
+    print(dag_run.dag_id)
+
+@task
+def test_dag_run_external_trigger_via_get(**context):
+    dag_run = context.get("dag_run")
+    print(dag_run.external_trigger)
+
+@task
+def test_dag_run_external_trigger_direct_subscript(**context):
+    print(context["dag_run"].external_trigger)
+
+@task
+def test_dag_run_external_trigger_direct_get(**context):
+    print(context.get("dag_run").external_trigger)
+
+@task
+def test_dag_run_external_trigger_get_current_context():
+    context = get_current_context()
+    dag_run = context["dag_run"]
+    print(dag_run.external_trigger)
+
+# inlet_events should be accessed through Asset/Dataset object
+@task
+def test_inlet_events_string_subscript(**context):
+    print(context["inlet_events"]["this://is-url"])
+    print(context.get("inlet_events")["this://is-url"])
+    print(context["inlet_events"].get("this://is-url"))
+    print(context.get("inlet_events").get("this://is-url"))
+
+
+@task
+def test_inlet_events_string_subscript_via_variable(**context):
+    inlet_events = context["inlet_events"]
+    print(inlet_events["this://is-url"])
+    print(inlet_events.get("this://is-url"))
+
+
+@task
+def test_inlet_events_dataset_subscript_ok(**context):
+    from airflow.datasets import Dataset
+    from airflow.sdk import Asset
+
+    print(context["inlet_events"][Dataset("this://is-url")])
+    print(context["inlet_events"][Asset("this://is-url")])

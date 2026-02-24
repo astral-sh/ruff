@@ -129,7 +129,7 @@ linter.flake8_copyright.notice_rgx = (?i)Copyright\s+((?:\(C\)|©)\s+)?\d{4}((-|
 linter.flake8_copyright.author = none
 linter.flake8_copyright.min_file_size = 0
 linter.flake8_errmsg.max_string_length = 0
-linter.flake8_gettext.functions_names = [
+linter.flake8_gettext.function_names = [
 	_,
 	gettext,
 	ngettext,
@@ -216,6 +216,7 @@ linter.isort.classes = []
 linter.isort.constants = []
 linter.isort.variables = []
 linter.isort.no_lines_before = []
+linter.isort.import_headings = {}
 linter.isort.lines_after_imports = -1
 linter.isort.lines_between_types = 0
 linter.isort.forced_separate = []
@@ -269,6 +270,7 @@ linter.pylint.max_locals = 15
 linter.pylint.max_nested_blocks = 5
 linter.pyupgrade.keep_runtime_typing = false
 linter.ruff.parenthesize_tuple_in_subscript = false
+linter.ruff.strictly_empty_init_modules = false
 
 # Formatter Settings
 formatter.exclude = []
@@ -291,5 +293,6 @@ analyze.target_version = 3.11
 analyze.string_imports = disabled
 analyze.extension = ExtensionMapping({})
 analyze.include_dependencies = {}
+analyze.type_checking_imports = true
 
 ----- stderr -----

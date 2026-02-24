@@ -12,7 +12,7 @@ python-version = "3.12"
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
+reveal_type(IntOrStr)  # revealed: TypeAliasType
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
 x: IntOrStr = 1
@@ -28,7 +28,7 @@ def f() -> None:
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr.__value__)  # revealed: @Todo(Support for `typing.TypeAlias`)
+reveal_type(IntOrStr.__value__)  # revealed: Any
 ```
 
 ## Invalid assignment
@@ -106,6 +106,29 @@ def _(flag: bool):
 ```py
 type ListOrSet[T] = list[T] | set[T]
 reveal_type(ListOrSet.__type_params__)  # revealed: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
+type Tuple1[T] = tuple[T]
+
+def _(cond: bool):
+    Generic = ListOrSet if cond else Tuple1
+
+    def _(x: Generic[int]):
+        reveal_type(x)  # revealed: list[int] | set[int] | tuple[int]
+
+try:
+    class Foo[T]:
+        x: T
+        def foo(self) -> T:
+            return self.x
+
+    ...
+except Exception:
+    class Foo[T]:
+        x: T
+        def foo(self) -> T:
+            return self.x
+
+def f(x: Foo[int]):
+    reveal_type(x.foo())  # revealed: int
 ```
 
 ## In unions and intersections
@@ -182,7 +205,7 @@ from typing_extensions import TypeAliasType, Union
 
 IntOrStr = TypeAliasType("IntOrStr", Union[int, str])
 
-reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
+reveal_type(IntOrStr)  # revealed: TypeAliasType
 
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
@@ -200,7 +223,8 @@ T = TypeVar("T")
 IntAndT = TypeAliasType("IntAndT", tuple[int, T], type_params=(T,))
 
 def f(x: IntAndT[str]) -> None:
-    reveal_type(x)  # revealed: @Todo(Generic manual PEP-695 type alias)
+    # TODO: This should be `tuple[int, str]`
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ### Error cases
@@ -244,6 +268,47 @@ def f(x: IntOr, y: OrInt):
         reveal_type(x)  # revealed: Never
     if not isinstance(y, int):
         reveal_type(y)  # revealed: Never
+
+# error: [cyclic-type-alias-definition] "Cyclic definition of `Itself`"
+type Itself = Itself
+
+def foo(
+    # this is a very strange thing to do, but this is a regression test to ensure it doesn't panic
+    Itself: Itself,
+):
+    x: Itself
+    reveal_type(Itself)  # revealed: Divergent
+
+# A type alias defined with invalid recursion behaves as a dynamic type.
+foo(42)
+foo("hello")
+
+# error: [cyclic-type-alias-definition] "Cyclic definition of `A`"
+type A = B
+# error: [cyclic-type-alias-definition] "Cyclic definition of `B`"
+type B = A
+
+def bar(B: B):
+    x: B
+    reveal_type(B)  # revealed: Divergent
+
+# error: [cyclic-type-alias-definition] "Cyclic definition of `G`"
+type G[T] = G[T]
+# error: [cyclic-type-alias-definition] "Cyclic definition of `H`"
+type H[T] = I[T]
+# error: [cyclic-type-alias-definition] "Cyclic definition of `I`"
+type I[T] = H[T]
+
+# It's not possible to create an element of this type, but it's not an error for now
+type DirectRecursiveList[T] = list[DirectRecursiveList[T]]
+
+# TODO: this should probably be a cyclic-type-alias-definition error
+type Foo[T] = list[T] | Bar[T]
+type Bar[T] = int | Foo[T]
+
+def _(x: Bar[int]):
+    # TODO: should be `int | list[int]`
+    reveal_type(x)  # revealed: int | list[int] | Any
 ```
 
 ### With legacy generic
@@ -327,7 +392,7 @@ class C(P[T]):
     pass
 
 reveal_type(C[int]())  # revealed: C[int]
-reveal_type(C())  # revealed: C[Divergent]
+reveal_type(C())  # revealed: C[C[Divergent]]
 ```
 
 ### Union inside generic
@@ -387,4 +452,18 @@ type Y = X | str | dict[str, Y]
 def _(y: Y):
     if isinstance(y, dict):
         reveal_type(y)  # revealed: dict[str, X] | dict[str, Y]
+```
+
+### Recursive alias with tuple - stack overflow test (issue 2470)
+
+This test case used to cause a stack overflow. The returned type `list[int]` is not assignable to
+`RecursiveT = int | tuple[RecursiveT, ...]`, so we get an error.
+
+```py
+type RecursiveT = int | tuple[RecursiveT, ...]
+
+def foo(a: int, b: int) -> RecursiveT:
+    some_intermediate_var = (a, b)
+    # error: [invalid-return-type] "Return type does not match returned value: expected `RecursiveT`, found `list[int]`"
+    return list(some_intermediate_var)
 ```

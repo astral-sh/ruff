@@ -248,13 +248,10 @@ use crate::place::BoundnessAnalysis;
 use crate::semantic_index::ast_ids::ScopedUseId;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::member::ScopedMemberId;
-use crate::semantic_index::narrowing_constraints::{
-    ConstraintKey, NarrowingConstraints, NarrowingConstraintsBuilder, NarrowingConstraintsIterator,
-    ScopedNarrowingConstraint,
-};
+use crate::semantic_index::narrowing_constraints::{ConstraintKey, ScopedNarrowingConstraint};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::predicate::{
-    Predicate, PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId,
+    PredicateOrLiteral, Predicates, PredicatesBuilder, ScopedPredicateId,
 };
 use crate::semantic_index::reachability_constraints::{
     ReachabilityConstraints, ReachabilityConstraintsBuilder, ScopedReachabilityConstraintId,
@@ -263,12 +260,15 @@ use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::place_state::{
     Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
+    LiveDeclarationsIterator, PlaceState,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
-use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
+use crate::types::{PossiblyNarrowedPlaces, Truthiness, Type};
 
 mod place_state;
+
+pub(super) use place_state::PreviousDefinitions;
+pub(crate) use place_state::{LiveBinding, ScopedDefinitionId};
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -279,9 +279,6 @@ pub(crate) struct UseDefMap<'db> {
 
     /// Array of predicates in this scope.
     predicates: Predicates<'db>,
-
-    /// Array of narrowing constraints in this scope.
-    narrowing_constraints: NarrowingConstraints,
 
     /// Array of reachability constraints in this scope.
     reachability_constraints: ReachabilityConstraints,
@@ -349,7 +346,7 @@ pub(crate) struct UseDefMap<'db> {
 }
 
 pub(crate) enum ApplicableConstraints<'map, 'db> {
-    UnboundBinding(ConstraintsIterator<'map, 'db>),
+    UnboundBinding(NarrowingEvaluator<'map, 'db>),
     ConstrainedBindings(BindingWithConstraintsIterator<'map, 'db>),
 }
 
@@ -373,9 +370,10 @@ impl<'db> UseDefMap<'db> {
     ) -> ApplicableConstraints<'_, 'db> {
         match constraint_key {
             ConstraintKey::NarrowingConstraint(constraint) => {
-                ApplicableConstraints::UnboundBinding(ConstraintsIterator {
+                ApplicableConstraints::UnboundBinding(NarrowingEvaluator {
+                    constraint,
                     predicates: &self.predicates,
-                    constraint_ids: self.narrowing_constraints.iter_predicates(constraint),
+                    reachability_constraints: &self.reachability_constraints,
                 })
             }
             ConstraintKey::NestedScope(nested_scope) => {
@@ -394,14 +392,36 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
-    pub(super) fn is_reachable(
+    pub(crate) fn is_reachable(
         &self,
         db: &dyn crate::Db,
         reachability: ScopedReachabilityConstraintId,
     ) -> bool {
+        self.evaluate_reachability(db, reachability).may_be_true()
+    }
+
+    pub(crate) fn evaluate_reachability(
+        &self,
+        db: &dyn crate::Db,
+        reachability: ScopedReachabilityConstraintId,
+    ) -> crate::types::Truthiness {
         self.reachability_constraints
             .evaluate(db, &self.predicates, reachability)
-            .may_be_true()
+    }
+
+    pub(crate) fn definition(&self, id: ScopedDefinitionId) -> DefinitionState<'db> {
+        self.all_definitions[id]
+    }
+
+    pub(crate) fn narrowing_evaluator(
+        &self,
+        constraint: ScopedNarrowingConstraint,
+    ) -> NarrowingEvaluator<'_, 'db> {
+        NarrowingEvaluator {
+            constraint,
+            predicates: &self.predicates,
+            reachability_constraints: &self.reachability_constraints,
+        }
     }
 
     /// Check whether or not a given expression is reachable from the start of the scope. This
@@ -453,17 +473,17 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
-    pub(crate) fn all_reachable_bindings(
+    pub(crate) fn reachable_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         match place {
-            ScopedPlaceId::Symbol(symbol) => self.all_reachable_symbol_bindings(symbol),
-            ScopedPlaceId::Member(member) => self.all_reachable_member_bindings(member),
+            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_bindings(symbol),
+            ScopedPlaceId::Member(member) => self.reachable_member_bindings(member),
         }
     }
 
-    pub(crate) fn all_reachable_symbol_bindings(
+    pub(crate) fn reachable_symbol_bindings(
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -471,7 +491,7 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_member_bindings(
+    pub(crate) fn reachable_member_bindings(
         &self,
         symbol: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -547,7 +567,7 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
-    pub(crate) fn all_reachable_symbol_declarations(
+    pub(crate) fn reachable_symbol_declarations(
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
@@ -555,7 +575,7 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_member_declarations(
+    pub(crate) fn reachable_member_declarations(
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
@@ -563,13 +583,13 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_declarations(
+    pub(crate) fn reachable_declarations(
         &self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'_, 'db> {
         match place {
-            ScopedPlaceId::Symbol(symbol) => self.all_reachable_symbol_declarations(symbol),
-            ScopedPlaceId::Member(member) => self.all_reachable_member_declarations(member),
+            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_declarations(symbol),
+            ScopedPlaceId::Member(member) => self.reachable_member_declarations(member),
         }
     }
 
@@ -588,6 +608,30 @@ impl<'db> UseDefMap<'db> {
         self.end_of_scope_symbols
             .indices()
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_bindings(symbol_id)))
+    }
+
+    pub(crate) fn all_reachable_symbols<'map>(
+        &'map self,
+    ) -> impl Iterator<
+        Item = (
+            ScopedSymbolId,
+            DeclarationsIterator<'map, 'db>,
+            BindingWithConstraintsIterator<'map, 'db>,
+        ),
+    > + 'map {
+        self.reachable_definitions_by_symbol.iter_enumerated().map(
+            |(symbol_id, reachable_definitions)| {
+                let declarations = self.declarations_iterator(
+                    &reachable_definitions.declarations,
+                    BoundnessAnalysis::AssumeBound,
+                );
+                let bindings = self.bindings_iterator(
+                    &reachable_definitions.bindings,
+                    BoundnessAnalysis::AssumeBound,
+                );
+                (symbol_id, declarations, bindings)
+            },
+        )
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
@@ -618,7 +662,6 @@ impl<'db> UseDefMap<'db> {
         BindingWithConstraintsIterator {
             all_definitions: &self.all_definitions,
             predicates: &self.predicates,
-            narrowing_constraints: &self.narrowing_constraints,
             reachability_constraints: &self.reachability_constraints,
             boundness_analysis,
             inner: bindings.iter(),
@@ -672,9 +715,8 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 
 #[derive(Clone, Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
-    all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
+    pub(crate) all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
-    pub(crate) narrowing_constraints: &'map NarrowingConstraints,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
     pub(crate) boundness_analysis: BoundnessAnalysis,
     inner: LiveBindingsIterator<'map>,
@@ -685,16 +727,16 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let predicates = self.predicates;
-        let narrowing_constraints = self.narrowing_constraints;
+        let reachability_constraints = self.reachability_constraints;
 
         self.inner
             .next()
             .map(|live_binding| BindingWithConstraints {
                 binding: self.all_definitions[live_binding.binding],
-                narrowing_constraint: ConstraintsIterator {
+                narrowing_constraint: NarrowingEvaluator {
+                    constraint: live_binding.narrowing_constraint,
                     predicates,
-                    constraint_ids: narrowing_constraints
-                        .iter_predicates(live_binding.narrowing_constraint),
+                    reachability_constraints,
                 },
                 reachability_constraint: live_binding.reachability_constraint,
             })
@@ -705,50 +747,30 @@ impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: DefinitionState<'db>,
-    pub(crate) narrowing_constraint: ConstraintsIterator<'map, 'db>,
+    pub(crate) narrowing_constraint: NarrowingEvaluator<'map, 'db>,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
 }
 
-pub(crate) struct ConstraintsIterator<'map, 'db> {
+pub(crate) struct NarrowingEvaluator<'map, 'db> {
+    pub(crate) constraint: ScopedNarrowingConstraint,
     predicates: &'map Predicates<'db>,
-    constraint_ids: NarrowingConstraintsIterator<'map>,
+    reachability_constraints: &'map ReachabilityConstraints,
 }
 
-impl<'db> Iterator for ConstraintsIterator<'_, 'db> {
-    type Item = Predicate<'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.constraint_ids
-            .next()
-            .map(|narrowing_constraint| self.predicates[narrowing_constraint.predicate()])
-    }
-}
-
-impl std::iter::FusedIterator for ConstraintsIterator<'_, '_> {}
-
-impl<'db> ConstraintsIterator<'_, 'db> {
+impl<'db> NarrowingEvaluator<'_, 'db> {
     pub(crate) fn narrow(
         self,
         db: &'db dyn crate::Db,
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        let constraint_tys: Vec<_> = self
-            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
-            .collect();
-
-        if constraint_tys.is_empty() {
-            base_ty
-        } else {
-            constraint_tys
-                .into_iter()
-                .rev()
-                .fold(
-                    IntersectionBuilder::new(db).add_positive(base_ty),
-                    IntersectionBuilder::add_positive,
-                )
-                .build()
-        }
+        self.reachability_constraints.narrow_by_constraint(
+            db,
+            self.predicates,
+            self.constraint,
+            base_ty,
+            place,
+        )
     }
 }
 
@@ -761,6 +783,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
     inner: LiveDeclarationsIterator<'map>,
 }
 
+#[derive(Debug)]
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: DefinitionState<'db>,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
@@ -800,6 +823,13 @@ pub(super) struct FlowSnapshot {
     reachability: ScopedReachabilityConstraintId,
 }
 
+/// A snapshot of the state of a single symbol (e.g. `obj`) and all of its associated members
+/// (e.g. `obj.attr`, `obj["key"]`).
+pub(super) struct SingleSymbolSnapshot {
+    symbol_state: PlaceState,
+    associated_member_states: FxHashMap<ScopedMemberId, PlaceState>,
+}
+
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`DefinitionState`].
@@ -807,9 +837,6 @@ pub(super) struct UseDefMapBuilder<'db> {
 
     /// Builder of predicates.
     pub(super) predicates: PredicatesBuilder<'db>,
-
-    /// Builder of narrowing constraints.
-    pub(super) narrowing_constraints: NarrowingConstraintsBuilder,
 
     /// Builder of reachability constraints.
     pub(super) reachability_constraints: ReachabilityConstraintsBuilder,
@@ -853,7 +880,6 @@ impl<'db> UseDefMapBuilder<'db> {
         Self {
             all_definitions: IndexVec::from_iter([DefinitionState::Undefined]),
             predicates: PredicatesBuilder::default(),
-            narrowing_constraints: NarrowingConstraintsBuilder::default(),
             reachability_constraints: ReachabilityConstraintsBuilder::default(),
             bindings_by_use: IndexVec::new(),
             reachability: ScopedReachabilityConstraintId::ALWAYS_TRUE,
@@ -918,7 +944,12 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn record_binding(&mut self, place: ScopedPlaceId, binding: Definition<'db>) {
+    pub(super) fn record_binding(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+        previous_definitions: PreviousDefinitions,
+    ) {
         let bindings = match place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
             ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
@@ -934,11 +965,13 @@ impl<'db> UseDefMapBuilder<'db> {
         };
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
+
         place_state.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
+            previous_definitions,
         );
 
         let bindings = match place {
@@ -970,7 +1003,12 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn record_narrowing_constraint(&mut self, predicate: ScopedPredicateId) {
+    /// Records a narrowing constraint for only the specified places.
+    pub(super) fn record_narrowing_constraint_for_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+        places: &PossiblyNarrowedPlaces,
+    ) {
         if predicate == ScopedPredicateId::ALWAYS_TRUE
             || predicate == ScopedPredicateId::ALWAYS_FALSE
         {
@@ -978,25 +1016,80 @@ impl<'db> UseDefMapBuilder<'db> {
             return;
         }
 
-        let narrowing_constraint = predicate.into();
-        for state in &mut self.symbol_states {
-            state
-                .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
+        let atom = self.reachability_constraints.add_atom(predicate);
+        self.record_narrowing_constraint_node_for_places(atom, places);
+    }
+
+    /// Records a negated narrowing constraint for only the specified places.
+    ///
+    /// Uses TDD-level negation (`add_not_constraint`) rather than creating a new predicate atom
+    /// for the negated predicate. This ensures that `atom(P) OR NOT(atom(P))` simplifies to
+    /// `ALWAYS_TRUE` in the TDD, so narrowing is correctly cancelled out after complete
+    /// if/else blocks.
+    pub(super) fn record_negated_narrowing_constraint_for_places(
+        &mut self,
+        predicate: ScopedPredicateId,
+        places: &PossiblyNarrowedPlaces,
+    ) {
+        if predicate == ScopedPredicateId::ALWAYS_TRUE
+            || predicate == ScopedPredicateId::ALWAYS_FALSE
+        {
+            return;
         }
 
-        for state in &mut self.member_states {
-            state
-                .record_narrowing_constraint(&mut self.narrowing_constraints, narrowing_constraint);
+        let atom = self.reachability_constraints.add_atom(predicate);
+        let negated = self.reachability_constraints.add_not_constraint(atom);
+        self.record_narrowing_constraint_node_for_places(negated, places);
+    }
+
+    /// Records a TDD narrowing constraint node for the specified places.
+    fn record_narrowing_constraint_node_for_places(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+        places: &PossiblyNarrowedPlaces,
+    ) {
+        for place in places {
+            match place {
+                ScopedPlaceId::Symbol(symbol_id) => {
+                    if let Some(state) = self.symbol_states.get_mut(*symbol_id) {
+                        state.record_narrowing_constraint(
+                            &mut self.reachability_constraints,
+                            constraint,
+                        );
+                    }
+                }
+                ScopedPlaceId::Member(member_id) => {
+                    if let Some(state) = self.member_states.get_mut(*member_id) {
+                        state.record_narrowing_constraint(
+                            &mut self.reachability_constraints,
+                            constraint,
+                        );
+                    }
+                }
+            }
         }
     }
 
-    /// Snapshot the state of a single place at the current point in control flow.
+    /// Snapshot the state of a single symbol and all of its associated members, at the current
+    /// point in control flow.
     ///
     /// This is only used for `*`-import reachability constraints, which are handled differently
     /// to most other reachability constraints. See the doc-comment for
     /// [`Self::record_and_negate_star_import_reachability_constraint`] for more details.
-    pub(super) fn single_symbol_place_snapshot(&self, symbol: ScopedSymbolId) -> PlaceState {
-        self.symbol_states[symbol].clone()
+    pub(super) fn single_symbol_snapshot(
+        &self,
+        symbol: ScopedSymbolId,
+        associated_member_ids: &[ScopedMemberId],
+    ) -> SingleSymbolSnapshot {
+        let symbol_state = self.symbol_states[symbol].clone();
+        let mut associated_member_states = FxHashMap::default();
+        for &member_id in associated_member_ids {
+            associated_member_states.insert(member_id, self.member_states[member_id].clone());
+        }
+        SingleSymbolSnapshot {
+            symbol_state,
+            associated_member_states,
+        }
     }
 
     /// This method exists solely for handling `*`-import reachability constraints.
@@ -1032,14 +1125,14 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         reachability_id: ScopedReachabilityConstraintId,
         symbol: ScopedSymbolId,
-        pre_definition_state: PlaceState,
+        pre_definition: SingleSymbolSnapshot,
     ) {
         let negated_reachability_id = self
             .reachability_constraints
             .add_not_constraint(reachability_id);
 
         let mut post_definition_state =
-            std::mem::replace(&mut self.symbol_states[symbol], pre_definition_state);
+            std::mem::replace(&mut self.symbol_states[symbol], pre_definition.symbol_state);
 
         post_definition_state
             .record_reachability_constraint(&mut self.reachability_constraints, reachability_id);
@@ -1049,11 +1142,46 @@ impl<'db> UseDefMapBuilder<'db> {
             negated_reachability_id,
         );
 
-        self.symbol_states[symbol].merge(
-            post_definition_state,
-            &mut self.narrowing_constraints,
-            &mut self.reachability_constraints,
-        );
+        self.symbol_states[symbol].merge(post_definition_state, &mut self.reachability_constraints);
+
+        // And similarly for all associated members:
+        for (member_id, pre_definition_member_state) in pre_definition.associated_member_states {
+            let mut post_definition_state = std::mem::replace(
+                &mut self.member_states[member_id],
+                pre_definition_member_state,
+            );
+
+            post_definition_state.record_reachability_constraint(
+                &mut self.reachability_constraints,
+                reachability_id,
+            );
+
+            self.member_states[member_id].record_reachability_constraint(
+                &mut self.reachability_constraints,
+                negated_reachability_id,
+            );
+
+            self.member_states[member_id]
+                .merge(post_definition_state, &mut self.reachability_constraints);
+        }
+    }
+
+    /// Records a narrowing constraint for all places in the current scope.
+    ///
+    /// This is used to gate narrowing by `ReturnsNever` constraints: when a branch contains
+    /// a call to a `NoReturn` function, all narrowing in that branch should be conditional
+    /// on the call actually returning `Never`.
+    pub(super) fn record_narrowing_constraint_for_all_places(
+        &mut self,
+        constraint: ScopedNarrowingConstraint,
+    ) {
+        for state in &mut self.symbol_states {
+            state.record_narrowing_constraint(&mut self.reachability_constraints, constraint);
+        }
+
+        for state in &mut self.member_states {
+            state.record_narrowing_constraint(&mut self.reachability_constraints, constraint);
+        }
     }
 
     pub(super) fn record_reachability_constraint(
@@ -1123,6 +1251,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
+            PreviousDefinitions::AreShadowed,
         );
 
         let reachable_definitions = match place {
@@ -1156,6 +1285,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
+            PreviousDefinitions::AreShadowed,
         );
     }
 
@@ -1186,17 +1316,21 @@ impl<'db> UseDefMapBuilder<'db> {
     pub(super) fn snapshot_enclosing_state(
         &mut self,
         enclosing_place: ScopedPlaceId,
-        scope: ScopeKind,
+        enclosing_scope: ScopeKind,
         enclosing_place_expr: PlaceExprRef,
+        is_parent_of_annotation_scope: bool,
     ) -> ScopedEnclosingSnapshotId {
         let bindings = match enclosing_place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
             ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
         };
 
-        // Names bound in class scopes are never visible to nested scopes (but attributes/subscripts are visible),
-        // so we never need to save eager scope bindings in a class scope.
-        if (scope.is_class() && enclosing_place.is_symbol()) || !enclosing_place_expr.is_bound() {
+        let is_class_symbol = enclosing_scope.is_class() && enclosing_place.is_symbol();
+        // Names bound in class scopes are never visible to nested scopes (but
+        // attributes/subscripts are visible), so we never need to save eager scope bindings in a
+        // class scope. There is one exception to this rule: annotation scopes can see names
+        // defined in an immediately-enclosing class scope.
+        if (is_class_symbol && !is_parent_of_annotation_scope) || !enclosing_place_expr.is_bound() {
             self.enclosing_snapshots.push(EnclosingSnapshot::Constraint(
                 bindings.unbound_narrowing_constraint(),
             ))
@@ -1216,12 +1350,11 @@ impl<'db> UseDefMapBuilder<'db> {
                 let new_symbol_state = &self.symbol_states[enclosing_symbol];
                 bindings.merge(
                     new_symbol_state.bindings().clone(),
-                    &mut self.narrowing_constraints,
                     &mut self.reachability_constraints,
                 );
             }
             Some(EnclosingSnapshot::Constraint(constraint)) => {
-                *constraint = ScopedNarrowingConstraint::empty();
+                *constraint = ScopedNarrowingConstraint::ALWAYS_TRUE;
             }
             None => {}
         }
@@ -1234,6 +1367,21 @@ impl<'db> UseDefMapBuilder<'db> {
             member_states: self.member_states.clone(),
             reachability: self.reachability,
         }
+    }
+
+    /// Get a snapshot of the current bindings for a place. We use this at the end of loop bodies
+    /// to populate the loop header definitions (bindings in the loop body that are visible via
+    /// loop-back to prior uses in the loop body and also to the loop condition).
+    pub(super) fn loop_back_bindings(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = LiveBinding> + '_ {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        bindings.iter().copied()
     }
 
     /// Restore the current builder places state to the given snapshot.
@@ -1288,15 +1436,10 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.symbol_states.into_iter();
         for current in &mut self.symbol_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.merge(
-                    snapshot,
-                    &mut self.narrowing_constraints,
-                    &mut self.reachability_constraints,
-                );
+                current.merge(snapshot, &mut self.reachability_constraints);
             } else {
                 current.merge(
                     PlaceState::undefined(snapshot.reachability),
-                    &mut self.narrowing_constraints,
                     &mut self.reachability_constraints,
                 );
                 // Place not present in snapshot, so it's unbound/undeclared from that path.
@@ -1306,15 +1449,10 @@ impl<'db> UseDefMapBuilder<'db> {
         let mut snapshot_definitions_iter = snapshot.member_states.into_iter();
         for current in &mut self.member_states {
             if let Some(snapshot) = snapshot_definitions_iter.next() {
-                current.merge(
-                    snapshot,
-                    &mut self.narrowing_constraints,
-                    &mut self.reachability_constraints,
-                );
+                current.merge(snapshot, &mut self.reachability_constraints);
             } else {
                 current.merge(
                     PlaceState::undefined(snapshot.reachability),
-                    &mut self.narrowing_constraints,
                     &mut self.reachability_constraints,
                 );
                 // Place not present in snapshot, so it's unbound/undeclared from that path.
@@ -1386,7 +1524,6 @@ impl<'db> UseDefMapBuilder<'db> {
         UseDefMap {
             all_definitions: self.all_definitions,
             predicates: self.predicates.build(),
-            narrowing_constraints: self.narrowing_constraints.build(),
             reachability_constraints: self.reachability_constraints.build(),
             bindings_by_use: self.bindings_by_use,
             node_reachability: self.node_reachability,

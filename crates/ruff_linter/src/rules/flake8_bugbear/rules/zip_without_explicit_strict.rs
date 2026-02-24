@@ -70,12 +70,7 @@ pub(crate) fn zip_without_explicit_strict(checker: &Checker, call: &ast::ExprCal
         checker
             .report_diagnostic(ZipWithoutExplicitStrict, call.range())
             .set_fix(Fix::applicable_edit(
-                add_argument(
-                    "strict=False",
-                    &call.arguments,
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                ),
+                add_argument("strict=False", &call.arguments, checker.tokens()),
                 Applicability::Unsafe,
             ));
     }

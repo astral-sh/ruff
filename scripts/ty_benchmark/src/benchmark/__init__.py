@@ -3,11 +3,17 @@ from __future__ import annotations
 import logging
 import shlex
 import subprocess
-import typing
+import sys
 from pathlib import Path
+from typing import Mapping, NamedTuple
+
+if sys.platform == "win32":
+    import mslex as shlex
+else:
+    import shlex
 
 
-class Command(typing.NamedTuple):
+class Command(NamedTuple):
     name: str
     """The name of the command to benchmark."""
 
@@ -18,7 +24,7 @@ class Command(typing.NamedTuple):
     """The command to run before each benchmark run."""
 
 
-class Hyperfine(typing.NamedTuple):
+class Hyperfine(NamedTuple):
     name: str
     """The benchmark to run."""
 
@@ -37,13 +43,16 @@ class Hyperfine(typing.NamedTuple):
     json: bool
     """Whether to export results to JSON."""
 
-    def run(self, *, cwd: Path | None = None) -> None:
+    def run(self, *, cwd: Path | None = None, env: Mapping[str, str]) -> None:
         """Run the benchmark using `hyperfine`."""
         args = [
             "hyperfine",
-            # Most repositories have some typing errors.
-            # This is annoying because it prevents us from capturing "real" errors.
-            "-i",
+            # Ignore any warning/error diagnostics but fail if there are any fatal errors, incorrect configuration, etc.
+            # mypy exit codes: https://github.com/python/mypy/issues/14615#issuecomment-1420163253
+            # pyright exit codes: https://docs.basedpyright.com/v1.31.6/configuration/command-line/#pyright-exit-codes
+            # pyrefly exit codes: Not documented
+            # ty: https://docs.astral.sh/ty/reference/exit-codes/
+            "--ignore-failure=1",
         ]
 
         # Export to JSON.
@@ -70,7 +79,4 @@ class Hyperfine(typing.NamedTuple):
 
         logging.info(f"Running {args}")
 
-        subprocess.run(
-            args,
-            cwd=cwd,
-        )
+        subprocess.run(args, cwd=cwd, env=env)

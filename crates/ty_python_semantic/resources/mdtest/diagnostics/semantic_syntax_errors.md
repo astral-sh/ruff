@@ -98,7 +98,7 @@ python-version = "3.10"
 match 2:
     # error: [invalid-syntax] "mapping pattern checks duplicate key `"x"`"
     case {"x": 1, "x": 2}:
-        ...
+        pass
 ```
 
 ## Duplicate `match` class attribute
@@ -136,13 +136,16 @@ yield
 # error: [invalid-syntax] "`yield from` statement outside of a function"
 yield from []
 
-# error: [invalid-syntax] "`await` statement outside of a function"
 # error: [invalid-syntax] "`await` outside of an asynchronous function"
 await C()
 
 def f():
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
     await C()
+
+(await cor async for cor in f())  # ok
+(await cor for cor in f())  # ok
+([await c for c in cor] async for cor in f())  # ok
 ```
 
 Generators are evaluated lazily, so `await` is allowed, even outside of a function.
@@ -221,7 +224,7 @@ def func():
 
 def gen():
     # error: [invalid-syntax] "Starred expression cannot be used here"
-    yield * [1, 2, 3]
+    yield *[1, 2, 3]
 
 # error: [invalid-syntax] "Starred expression cannot be used here"
 for *x in range(10):
@@ -337,10 +340,10 @@ def _():
 
     # error: [invalid-syntax] "`async for` outside of an asynchronous function"
     async for _ in elements(1):
-        ...
+        pass
     # error: [invalid-syntax] "`async with` outside of an asynchronous function"
     async with elements(1) as x:
-        ...
+        pass
     # error: [invalid-syntax] "asynchronous comprehension outside of an asynchronous function"
     [x async for x in elements(1)]
 ```
@@ -375,4 +378,42 @@ for x in range(42):
         # this is invalid syntax despite it being in an eager-nested scope!
         break  # error: [invalid-syntax]
         continue  # error: [invalid-syntax]
+```
+
+## name is parameter and global
+
+<!-- snapshot-diagnostics -->
+
+```py
+a = None
+
+def f(a):
+    global a  # error: [invalid-syntax]
+
+def g(a):
+    if True:
+        global a  # error: [invalid-syntax]
+
+def h(a):
+    def inner():
+        global a
+
+def i(a):
+    try:
+        global a  # error: [invalid-syntax]
+    except Exception:
+        pass
+
+def f(a):
+    a = 1
+    global a  # error: [invalid-syntax]
+
+def f(a):
+    a = 1
+    a = 2
+    global a  # error: [invalid-syntax]
+
+def f(a):
+    class Inner:
+        global a  # ok
 ```

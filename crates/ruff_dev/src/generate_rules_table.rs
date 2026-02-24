@@ -171,12 +171,14 @@ pub(crate) fn generate() -> String {
             table_out.push('\n');
         }
 
-        if Options::metadata().has(&format!("lint.{}", linter.name())) {
+        // The linter names for Ruff and NumPy are suffixed with "-specific rules."
+        let linter_name = linter.name().trim_end_matches("-specific rules");
+        // Several linter names are capitalized, but their settings are not.
+        let linter_name_lower = linter_name.to_lowercase();
+        if Options::metadata().has(&format!("lint.{linter_name_lower}")) {
             let _ = write!(
                 table_out,
-                "For related settings, see [{}](settings.md#lint{}).",
-                linter.name(),
-                linter.name(),
+                "For related settings, see [{linter_name}](settings.md#lint{linter_name_lower}).",
             );
             table_out.push('\n');
             table_out.push('\n');

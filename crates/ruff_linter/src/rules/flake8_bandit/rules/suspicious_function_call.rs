@@ -4,11 +4,16 @@
 use itertools::Either;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, Arguments, Decorator, Expr, ExprCall, Operator};
+use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::analyze::typing::find_binding_value;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::is_suspicious_function_reference_enabled;
+use crate::preview::{
+    is_s310_resolve_string_literal_bindings_enabled, is_suspicious_function_reference_enabled,
+};
+use crate::settings::LinterSettings;
 
 /// ## What it does
 /// Checks for calls to `pickle` functions or modules that wrap them.
@@ -1016,6 +1021,25 @@ fn suspicious_function(
             || has_prefix(chars.skip_while(|c| c.is_whitespace()), "https://")
     }
 
+    /// Resolves `expr` to its binding and checks if the resolved expression starts with an HTTP or HTTPS prefix.
+    fn expression_starts_with_http_prefix(
+        expr: &Expr,
+        semantic: &SemanticModel,
+        settings: &LinterSettings,
+    ) -> bool {
+        let resolved_expression = if is_s310_resolve_string_literal_bindings_enabled(settings)
+            && let Some(name_expr) = expr.as_name_expr()
+            && let Some(binding_id) = semantic.only_binding(name_expr)
+            && let Some(value) = find_binding_value(semantic.binding(binding_id), semantic)
+        {
+            value
+        } else {
+            expr
+        };
+
+        leading_chars(resolved_expression).is_some_and(has_http_prefix)
+    }
+
     /// Return the leading characters for an expression, if it's a string literal, f-string, or
     /// string concatenation.
     fn leading_chars(expr: &Expr) -> Option<impl Iterator<Item = char> + Clone + '_> {
@@ -1139,17 +1163,19 @@ fn suspicious_function(
         // URLOpen (`Request`)
         ["urllib", "request", "Request"] | ["six", "moves", "urllib", "request", "Request"] => {
             if let Some(arguments) = arguments {
-                // If the `url` argument is a string literal or an f-string, allow `http` and `https` schemes.
+                // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                 if arguments.args.iter().all(|arg| !arg.is_starred_expr())
                     && arguments
                         .keywords
                         .iter()
                         .all(|keyword| keyword.arg.is_some())
                 {
-                    if arguments
-                        .find_argument_value("url", 0)
-                        .and_then(leading_chars)
-                        .is_some_and(has_http_prefix)
+                    if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                        && expression_starts_with_http_prefix(
+                            url_expr,
+                            checker.semantic(),
+                            checker.settings(),
+                        )
                     {
                         return;
                     }
@@ -1186,19 +1212,25 @@ fn suspicious_function(
                                     name.segments() == ["urllib", "request", "Request"]
                                 })
                             {
-                                if arguments
-                                    .find_argument_value("url", 0)
-                                    .and_then(leading_chars)
-                                    .is_some_and(has_http_prefix)
+                                if let Some(url_expr) = arguments.find_argument_value("url", 0)
+                                    && expression_starts_with_http_prefix(
+                                        url_expr,
+                                        checker.semantic(),
+                                        checker.settings(),
+                                    )
                                 {
                                     return;
                                 }
                             }
                         }
 
-                        // If the `url` argument is a string literal, allow `http` and `https` schemes.
+                        // If the `url` argument is a string literal (including resolved bindings), allow `http` and `https` schemes.
                         Some(expr) => {
-                            if leading_chars(expr).is_some_and(has_http_prefix) {
+                            if expression_starts_with_http_prefix(
+                                expr,
+                                checker.semantic(),
+                                checker.settings(),
+                            ) {
                                 return;
                             }
                         }

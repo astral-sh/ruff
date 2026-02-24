@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Many parameters
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md

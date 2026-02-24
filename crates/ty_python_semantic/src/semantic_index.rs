@@ -1,18 +1,20 @@
-use std::iter::FusedIterator;
+use std::iter::{FusedIterator, once};
 use std::sync::Arc;
 
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
-
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
+use smallvec::SmallVec;
+use ty_module_resolver::ModuleName;
+
+use crate::semantic_index::place::ScopedPlaceId;
 
 use crate::Db;
-use crate::module_name::ModuleName;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -45,7 +47,7 @@ mod use_def;
 
 pub(crate) use self::use_def::{
     ApplicableConstraints, BindingWithConstraints, BindingWithConstraintsIterator,
-    DeclarationWithConstraint, DeclarationsIterator,
+    DeclarationWithConstraint, DeclarationsIterator, LiveBinding,
 };
 
 /// Returns the semantic index for `file`.
@@ -96,6 +98,95 @@ pub(crate) fn use_def_map<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Arc<UseD
     Arc::clone(&index.use_def_maps[scope.file_scope_id(db)])
 }
 
+/// All the bindings made in a loop, which are visible to the entire loop via "loop header
+/// definitions" (a.k.a. loop-back bindings)
+///
+/// Loop control flow analysis needs a way for uses early in the loop to see bindings that come
+/// later, reflecting the fact that a previous iteration of the loop might've already executed
+/// those bindings. For example:
+///
+/// ```py
+/// x = "A"
+/// while some_condition():
+///     # The loop entry value (in the first iteration) and the following binding (in other
+///     # iterations) are both visible at this use.
+///     reveal_type(x)  # revealed: Literal["A", "B"]
+///     x = "B"
+/// ```
+///
+/// As an important special case, these loop header definitions also combine with fixpoint
+/// iteration to let us infer `int` for loop variables. For example:
+///
+/// ```py
+/// i = 0  # revealed: Literal[0]
+/// while i < 1_000_000:
+///     i += 1  # revealed: int
+/// ```
+///
+/// The add-assign statement `i += 1` is both a use and a binding. The use sees the `i = 0` binding
+/// at the top, and it also sees *itself* via the loop header definition of `i`. When we infer the
+/// type of `i` in or after the loop, fixpoint iteration produces an ever-expanding union of
+/// literals (`Literal[0, 1, 2, ...]`) until we eventually reach the threshold for widening to
+/// `int` and stop iterating. (See `should_widen` and `widen_literal_types`.)
+///
+/// There's a chicken-and-egg problem with synthesizing the `DefinitionKind::LoopHeader`
+/// definitions at the top of the loop, and assembling all the bindings in the `LoopHeader` struct
+/// that they refer to. See `LoopToken` below for how we work around that.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Update, get_size2::GetSize)]
+pub(crate) struct LoopHeader {
+    bindings: FxHashMap<ScopedPlaceId, SmallVec<[LiveBinding; 1]>>,
+}
+
+impl LoopHeader {
+    pub(crate) fn new() -> Self {
+        Self {
+            bindings: FxHashMap::default(),
+        }
+    }
+
+    pub(crate) fn add_binding(&mut self, place: ScopedPlaceId, binding: LiveBinding) {
+        self.bindings.entry(place).or_default().push(binding);
+    }
+
+    pub(crate) fn bindings_for_place(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = LiveBinding> + '_ {
+        self.bindings
+            .get(&place)
+            .map(|v: &SmallVec<[LiveBinding; 1]>| v.iter().copied())
+            .into_iter()
+            .flatten()
+    }
+}
+
+/// A Salsa token for retrieving a `LoopHeader`. See `get_loop_header` below.
+#[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+pub struct LoopToken<'db> {}
+
+impl get_size2::GetSize for LoopToken<'_> {}
+
+/// Look up a `LoopHeader` given a `LoopToken`.
+///
+/// Loop header definitions are the very first things we encounter (synthesize) when we walk a
+/// loop, and they need to refer to the corresponding the `LoopHeader` struct that records their
+/// bindings, but that struct isn't available until we've finished walking the loop. To make this
+/// work in the largely immutable world of Salsa, we add a layer of indirection using a Salsa
+/// feature called "specify":
+/// <https://salsa-rs.github.io/salsa/overview.html#specify-the-result-of-tracked-functions-for-particular-structs>
+///
+/// When we first encounter a loop, we generate a `LoopToken` that uniquely identifies the loop but
+/// doesn't contain any data. We do a lightweight pre-walk to collect bound places (see
+/// `LoopBindingsVisitor`), and for each bound place we create a loop header definition that stores
+/// the `LoopToken`. Then after we've finished visiting the loop, we call
+/// `get_loop_header::specify` to associate the token with the completed `LoopHeader`. All of this
+/// happens while we're building the semantic index, and nothing needs to call `get_loop_header`
+/// until we get to type inference later, so the order of operations always works out.
+#[salsa::tracked(specify, heap_size=ruff_memory_usage::heap_size)]
+pub(crate) fn get_loop_header<'db>(_db: &'db dyn Db, _loop_token: LoopToken<'db>) -> LoopHeader {
+    panic!("should always be set by specify()");
+}
+
 /// Returns all attribute assignments (and their method scope IDs) with a symbol name matching
 /// the one given for a specific class body scope.
 ///
@@ -113,10 +204,7 @@ pub(crate) fn attribute_assignments<'db, 's>(
         let place_table = index.place_table(function_scope_id);
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
-        Some((
-            use_def.all_reachable_member_bindings(member),
-            function_scope_id,
-        ))
+        Some((use_def.reachable_member_bindings(member), function_scope_id))
     })
 }
 
@@ -138,7 +226,7 @@ pub(crate) fn attribute_declarations<'db, 's>(
         let member = place_table.member_id_by_instance_attribute_name(name)?;
         let use_def = &index.use_def_maps[function_scope_id];
         Some((
-            use_def.all_reachable_member_declarations(member),
+            use_def.reachable_member_declarations(member),
             function_scope_id,
         ))
     })
@@ -148,29 +236,56 @@ pub(crate) fn attribute_declarations<'db, 's>(
 ///
 /// Only call this when doing type inference on the same file as `class_body_scope`, otherwise it
 /// introduces a direct dependency on that file's AST.
-pub(crate) fn attribute_scopes<'db, 's>(
+pub(crate) fn attribute_scopes<'db>(
     db: &'db dyn Db,
     class_body_scope: ScopeId<'db>,
-) -> impl Iterator<Item = FileScopeId> + use<'s, 'db> {
+) -> impl Iterator<Item = FileScopeId> + 'db {
     let file = class_body_scope.file(db);
     let index = semantic_index(db, file);
     let class_scope_id = class_body_scope.file_scope_id(db);
+    ChildrenIter::new(&index.scopes, class_scope_id)
+        .filter_map(move |(child_scope_id, scope)| {
+            let (function_scope_id, function_scope) =
+                if scope.node().scope_kind() == ScopeKind::TypeParams {
+                    // This could be a generic method with a type-params scope.
+                    // Go one level deeper to find the function scope. The first
+                    // descendant is the (potential) function scope.
+                    let function_scope_id = scope.descendants().start;
+                    (function_scope_id, index.scope(function_scope_id))
+                } else {
+                    (child_scope_id, scope)
+                };
+            function_scope.node().as_function()?;
+            Some(function_scope_id)
+        })
+        .flat_map(move |func_id| {
+            // Add any descendent scope that is eager and have eager scopes between the scope
+            // and the method scope. Since attributes can be defined in this scope.
+            let nested = index.descendent_scopes(func_id).filter_map(move |(id, s)| {
+                let is_eager = s.kind().is_eager();
+                let parents_are_eager = {
+                    let mut all_parents_eager = true;
+                    let mut current = Some(id);
 
-    ChildrenIter::new(&index.scopes, class_scope_id).filter_map(move |(child_scope_id, scope)| {
-        let (function_scope_id, function_scope) =
-            if scope.node().scope_kind() == ScopeKind::TypeParams {
-                // This could be a generic method with a type-params scope.
-                // Go one level deeper to find the function scope. The first
-                // descendant is the (potential) function scope.
-                let function_scope_id = scope.descendants().start;
-                (function_scope_id, index.scope(function_scope_id))
-            } else {
-                (child_scope_id, scope)
-            };
+                    while let Some(scope_id) = current {
+                        if scope_id == func_id {
+                            break;
+                        }
+                        let scope = index.scope(scope_id);
+                        if !scope.is_eager() {
+                            all_parents_eager = false;
+                            break;
+                        }
+                        current = scope.parent();
+                    }
 
-        function_scope.node().as_function()?;
-        Some(function_scope_id)
-    })
+                    all_parents_eager
+                };
+
+                (parents_are_eager && is_eager).then_some(id)
+            });
+            once(func_id).chain(nested)
+        })
 }
 
 /// Returns the module global scope of `file`.
@@ -446,6 +561,11 @@ impl<'db> SemanticIndex<'db> {
     ///
     /// If the number of definitions associated with the key is not exactly 1 and
     /// the `debug_assertions` feature is enabled, this method will panic.
+    ///
+    /// It is generally safe to use this method for any AST node that does not
+    /// correspond to a `*` (wildcard) import, since `*` imports are the only
+    /// situations that can result in multiple definitions being associated with a
+    /// single AST node.
     #[track_caller]
     pub(crate) fn expect_single_definition(
         &self,
@@ -496,6 +616,20 @@ impl<'db> SemanticIndex<'db> {
     #[track_caller]
     pub(crate) fn node_scope(&self, node: NodeWithScopeRef) -> FileScopeId {
         self.scopes_by_node[&node.node_key()]
+    }
+
+    /// Returns the id of the scope that `node` creates, if it exists.
+    pub(crate) fn try_node_scope(&self, node: NodeWithScopeRef) -> Option<FileScopeId> {
+        self.scopes_by_node.get(&node.node_key()).copied()
+    }
+
+    /// Returns the id of the scope that the node identified by `key` creates.
+    ///
+    /// This is useful when you have a [`NodeWithScopeKey`] constructed from an
+    /// [`AstNodeRef`](crate::ast_node_ref::AstNodeRef) and want to avoid loading
+    /// the parsed module just to look up the scope.
+    pub(crate) fn node_scope_by_key(&self, key: NodeWithScopeKey) -> FileScopeId {
+        self.scopes_by_node[&key]
     }
 
     /// Checks if there is an import of `__future__.annotations` in the global scope, which affects
@@ -753,6 +887,13 @@ mod tests {
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
         }
 
+        fn first_public_declaration(&self, symbol: ScopedSymbolId) -> Option<Definition<'_>> {
+            self.end_of_scope_symbol_declarations(symbol)
+                .find_map(|declaration_with_constraint| {
+                    declaration_with_constraint.declaration.definition()
+                })
+        }
+
         fn first_binding_at_use(&self, use_id: ScopedUseId) -> Option<Definition<'_>> {
             self.bindings_at_use(use_id)
                 .find_map(|constrained_binding| constrained_binding.binding.definition())
@@ -805,10 +946,19 @@ mod tests {
     #[test]
     fn annotation_only() {
         let TestCase { db, file } = test_case("x: int");
-        let global_table = place_table(&db, global_scope(&db, file));
+        let scope = global_scope(&db, file);
+        let global_table = place_table(&db, scope);
 
         assert_eq!(names(global_table), vec!["int", "x"]);
-        // TODO record definition
+
+        let use_def = use_def_map(&db, scope);
+        let declaration = use_def
+            .first_public_declaration(global_table.symbol_id("x").expect("symbol to exist"))
+            .unwrap();
+        assert!(matches!(
+            declaration.kind(&db),
+            DefinitionKind::AnnotatedAssignment(_)
+        ));
     }
 
     #[test]
