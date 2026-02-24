@@ -480,50 +480,6 @@ impl SpecialFormType {
         }
     }
 
-    /// Return `true` if this special form type is valid in a type-expression context (and not
-    /// just in an *annotation* expression context). See the following section of the typing
-    /// specification for more details:
-    /// <https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions>
-    pub(super) const fn is_valid_in_type_expression(self) -> bool {
-        match self {
-            SpecialFormType::Annotated
-            | SpecialFormType::Any
-            | SpecialFormType::Literal
-            | SpecialFormType::LiteralString
-            | SpecialFormType::Optional
-            | SpecialFormType::Union
-            | SpecialFormType::NoReturn
-            | SpecialFormType::Never
-            | SpecialFormType::Tuple
-            | SpecialFormType::LegacyStdlibAlias(_)
-            | SpecialFormType::Type
-            | SpecialFormType::Unknown
-            | SpecialFormType::AlwaysTruthy
-            | SpecialFormType::AlwaysFalsy
-            | SpecialFormType::Not
-            | SpecialFormType::Intersection
-            | SpecialFormType::TypeOf
-            | SpecialFormType::CallableTypeOf
-            | SpecialFormType::Top
-            | SpecialFormType::Bottom
-            | SpecialFormType::Callable
-            | SpecialFormType::TypingSelf
-            | SpecialFormType::Concatenate
-            | SpecialFormType::TypeGuard
-            | SpecialFormType::TypedDict
-            | SpecialFormType::TypeIs
-            | SpecialFormType::NamedTuple => true,
-
-            SpecialFormType::TypeQualifier(_)
-            | SpecialFormType::TypeAlias
-            | SpecialFormType::Protocol
-            | SpecialFormType::Generic => false,
-
-            // TODO -- seems incorrect?
-            SpecialFormType::Unpack => false,
-        }
-    }
-
     /// Return `true` if this special form is valid as the second argument
     /// to `issubclass()` and `isinstance()` calls.
     pub(super) const fn is_valid_isinstance_target(self) -> bool {

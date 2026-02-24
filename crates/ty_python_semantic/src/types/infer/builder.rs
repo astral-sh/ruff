@@ -9161,11 +9161,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if is_pep_613_type_alias {
                 let is_valid_special_form = |ty: Type<'db>| match ty {
-                    Type::SpecialForm(special_form) => special_form.is_valid_in_type_expression(),
-                    Type::ClassLiteral(literal)
-                        if literal.is_known(self.db(), KnownClass::InitVar) =>
-                    {
-                        false
+                    Type::SpecialForm(SpecialFormType::TypeQualifier(_)) => false,
+                    Type::ClassLiteral(literal) => {
+                        !literal.is_known(self.db(), KnownClass::InitVar)
                     }
                     _ => true,
                 };
