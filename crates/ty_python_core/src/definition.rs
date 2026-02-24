@@ -867,7 +867,7 @@ pub enum DefinitionKind<'db> {
     LoopHeader(LoopHeaderDefinitionKind<'db>),
 }
 
-impl DefinitionKind<'_> {
+impl<'db> DefinitionKind<'db> {
     pub fn is_reexported(&self) -> bool {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
@@ -903,6 +903,13 @@ impl DefinitionKind<'_> {
 
     pub const fn is_unannotated_assignment(&self) -> bool {
         matches!(self, DefinitionKind::Assignment(_))
+    }
+
+    pub fn as_unannotated_assignment(&self) -> Option<AssignmentDefinitionKind<'db>> {
+        match self {
+            DefinitionKind::Assignment(assignment) => Some(assignment.clone()),
+            _ => None,
+        }
     }
 
     pub const fn is_function_def(&self) -> bool {
@@ -1494,6 +1501,12 @@ pub struct DefinitionNodeKey(NodeKey);
 impl DefinitionNodeKey {
     pub(crate) fn from_node_ref(node: ast::AnyNodeRef<'_>) -> Self {
         Self(NodeKey::from_node(node))
+    }
+
+    pub fn from_assignment(node: &ast::StmtAssign) -> impl Iterator<Item = DefinitionNodeKey> {
+        node.targets
+            .iter()
+            .map(|target| Self(NodeKey::from_node(target)))
     }
 }
 

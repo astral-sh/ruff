@@ -761,6 +761,162 @@ async def _():
     reveal_type(x3)  # revealed: list[int | None]
 ```
 
+## Container inference
+
+Empty, unannotated container literals are inferred based on future uses that extend throughout the
+entire scope:
+
+```py
+x1 = []
+x1.append(1)
+x1.append("2")
+reveal_type(x1)  # revealed: list[int | str]
+```
+
+```py
+class X:
+    def __init__(self):
+        self.x = []
+        self.x.append(1)
+        self.x.append("2")
+        reveal_type(self.x)  # revealed: list[int | str]
+```
+
+```py
+def _(flag: bool):
+    if flag:
+        x2 = []
+        x2.append(1)
+        reveal_type(x2)  # revealed: list[int]
+    else:
+        x2 = []
+        x2.append("2")
+        reveal_type(x2)  # revealed: list[str]
+```
+
+```py
+def takes_list_int(x: list[int]): ...
+
+x3 = []
+takes_list_int(x3)
+# TODO: This should reveal `list[int]`, but we do not currently record
+# argument constraints for arbitrary function calls.
+reveal_type(x3)  # revealed: list[Unknown]
+```
+
+```py
+def append[T](x: list[T], y: T):
+    x.append(y)
+
+x4 = []
+append(x4, 1)
+append(x4, "2")
+# TODO: This should reveal `list[int | str]`, but we do not currently record
+# argument constraints for arbitrary function calls.
+reveal_type(x4)  # revealed: list[Unknown]
+```
+
+```py
+x5 = []
+_: list[int] = reveal_type(x5)  # revealed: list[int]
+```
+
+```py
+def _() -> list[int | None]:
+    x6 = []
+    return reveal_type(x6)  # revealed: list[int | None]
+
+def _() -> int:
+    invalid_x6 = []
+    return invalid_x6  # error: [invalid-return-type]
+```
+
+```py
+x7 = []
+x7[:] = [1, "2", 3.0]
+reveal_type(x7)  # revealed: list[int | str | float]
+```
+
+```py
+from typing import Literal
+
+x8 = []
+one: Literal[1] = 1
+x8.append(one)
+reveal_type(x8)  # revealed: list[Literal[1]]
+```
+
+```py
+x9 = []
+x10 = []
+x9.append(1)
+x9.append("2")
+x10.append(3)
+
+reveal_type(x9)  # revealed: list[int | str]
+reveal_type(x10)  # revealed: list[int]
+```
+
+```py
+x11 = []
+x12 = []
+x11.append(1)
+x12.append(x11)
+
+reveal_type(x11)  # revealed: list[int]
+reveal_type(x12)  # revealed: list[list[int]]
+```
+
+```py
+x13 = []
+x13.append(x13)
+reveal_type(x13)  # revealed: list[Divergent]
+```
+
+```py
+x14 = []
+x15 = []
+
+x14.append(x15)
+x15.append(x14)
+
+reveal_type(x14)  # revealed: list[Divergent]
+reveal_type(x15)  # revealed: list[Divergent]
+```
+
+```py
+def _(i):
+    x16 = []
+    x16.append(x16)
+    reveal_type(x16)  # revealed: list[Divergent]
+```
+
+```py
+x17 = {}
+x17.update(a=1)
+reveal_type(x17)  # revealed: dict[str, int]
+```
+
+```py
+x18 = {}
+x18.update({"a": 1})
+reveal_type(x18)  # revealed: dict[str, int]
+```
+
+```py
+x19 = {}
+x19["a"] = 1
+x19["b"] = "2"
+reveal_type(x19)  # revealed: dict[str, int | str]
+```
+
+```py
+x20 = {}
+x20["a"] = len(x20)
+x20.setdefault("b", str(len(x20)))
+reveal_type(x20)  # revealed: dict[str, int | str]
+```
+
 ## Multi-inference diagnostics
 
 Diagnostics unrelated to the type-context are only reported once:

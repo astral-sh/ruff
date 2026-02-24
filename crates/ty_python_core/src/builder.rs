@@ -151,7 +151,7 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     current_assignments: Vec<CurrentAssignment<'ast, 'db>>,
     /// The statements we're currently visiting, with
     /// the most recent visit at the end of the Vec.
-    current_statements: Vec<CurrentStatement<'ast>>,
+    current_statements: Vec<CurrentStatement<'ast, 'db>>,
     /// The match case we're currently visiting.
     current_match_case: Option<CurrentMatchCase<'ast>>,
     /// The name of the first function parameter of the innermost function that we're currently visiting.
@@ -183,9 +183,14 @@ pub(super) struct SemanticIndexBuilder<'db, 'ast> {
     expressions_by_node: FxHashMap<ExpressionNodeKey, Expression<'db>>,
     condition_flow_snapshots_by_node: FxHashMap<ExpressionNodeKey, ConditionFlowSnapshots>,
     statements_by_node: FxHashMap<StatementNodeKey, Statement<'db>>,
-    enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
     imported_modules: FxHashSet<ModuleName>,
     seen_submodule_imports: FxHashSet<String>,
+    // A map from a lambda expression to its enclosing statement.
+    enclosing_lambda_statements: FxHashMap<ExpressionNodeKey, Statement<'db>>,
+    // A map from a constraining use of a collection literal to its definition.
+    collections_by_use: FxHashMap<ExpressionNodeKey, Definition<'db>>,
+    // A map from a collection literal definition to a statement containing a constraining use.
+    uses_by_collection: FxHashMap<Definition<'db>, Vec<(Statement<'db>, ExpressionNodeKey)>>,
     /// Hashset of all [`FileScopeId`]s that correspond to [generator functions].
     ///
     /// [generator functions]: https://docs.python.org/3/glossary.html#term-generator
@@ -233,6 +238,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             condition_flow_snapshots_by_node: FxHashMap::default(),
             statements_by_node: FxHashMap::default(),
             enclosing_lambda_statements: FxHashMap::default(),
+            collections_by_use: FxHashMap::default(),
+            uses_by_collection: FxHashMap::default(),
 
             seen_submodule_imports: FxHashSet::default(),
             imported_modules: FxHashSet::default(),
@@ -765,9 +772,38 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         &mut self.use_def_maps[scope_id].reachability_constraints
     }
 
-    fn current_ast_ids(&mut self) -> &mut AstIdsBuilder {
+    fn current_ast_ids(&self) -> &AstIdsBuilder {
+        let scope_id = self.current_scope();
+        &self.ast_ids[scope_id]
+    }
+
+    fn current_ast_ids_mut(&mut self) -> &mut AstIdsBuilder {
         let scope_id = self.current_scope();
         &mut self.ast_ids[scope_id]
+    }
+
+    /// If the given expression is a use of an unconstrained collection literal, returns
+    /// the definition of the collection literal.
+    fn unconstrained_collection_literal_binding(
+        &self,
+        collection_use: &ast::Expr,
+    ) -> Option<Definition<'db>> {
+        let use_def = self.current_use_def_map();
+        let use_id = self.current_ast_ids().try_use_id(collection_use)?;
+
+        use_def
+            .bindings_at_use(use_id)
+            .filter_map(|binding| use_def.definition(binding.binding()).definition())
+            .filter(|definition| {
+                definition
+                    .kind(self.db)
+                    .as_unannotated_assignment()
+                    .is_some_and(|assignment| {
+                        is_unconstrained_collection_literal(assignment.value(self.module))
+                    })
+            })
+            .exactly_one()
+            .ok()
     }
 
     /// Try to register a narrowing alias for a simple name assignment.
@@ -1006,7 +1042,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if let ScopedPlaceId::Symbol(symbol_id) = place_id {
             self.mark_symbol_used(symbol_id);
         }
-        let use_id = self.current_ast_ids().record_use(expr);
+        let use_id = self.current_ast_ids_mut().record_use(expr);
         self.current_use_def_map_mut().record_use(place_id, use_id);
     }
 
@@ -1599,15 +1635,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.current_assignments.last_mut()
     }
 
-    fn push_statement(&mut self, statement: CurrentStatement<'ast>) {
+    fn push_statement(&mut self, statement: CurrentStatement<'ast, 'db>) {
         self.current_statements.push(statement);
     }
 
-    fn pop_statement(&mut self) -> CurrentStatement<'ast> {
+    fn pop_statement(&mut self) -> CurrentStatement<'ast, 'db> {
         self.current_statements.pop().unwrap()
     }
 
-    fn current_statement_mut(&mut self) -> Option<&mut CurrentStatement<'ast>> {
+    fn current_statement_mut(&mut self) -> Option<&mut CurrentStatement<'ast, 'db>> {
         self.current_statements.last_mut()
     }
 
@@ -1792,11 +1828,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             ast::Stmt::ClassDef(class) => {
                 Some(Statement::Definition(self.expect_single_definition(class)))
             }
-            ast::Stmt::Expr(expr) => self
-                .expressions_by_node
-                .get(&(&expr.value).into())
-                .copied()
-                .map(Statement::Expression),
+            ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                Some(Statement::Expression(self.add_standalone_expression(value)))
+            }
             ast::Stmt::Assign(assign) => {
                 if let [ast::Expr::Name(name)] = &assign.targets[..] {
                     Some(Statement::Definition(self.expect_single_definition(name)))
@@ -1829,6 +1863,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         self.statements_by_node
             .insert(statement_node.into(), statement);
+
         statement
     }
 
@@ -2196,6 +2231,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         self.definitions_by_node.shrink_to_fit();
         self.statements_by_node.shrink_to_fit();
         self.enclosing_lambda_statements.shrink_to_fit();
+        self.collections_by_use.shrink_to_fit();
+        self.uses_by_collection.shrink_to_fit();
 
         self.scope_ids_by_scope.shrink_to_fit();
         self.scopes_by_node.shrink_to_fit();
@@ -2214,6 +2251,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             scopes_by_node: self.scopes_by_node,
             use_def_maps,
             enclosing_lambda_statements: self.enclosing_lambda_statements,
+            collections_by_use: self.collections_by_use,
+            uses_by_collection: self.uses_by_collection,
             imported_modules: Arc::new(self.imported_modules),
             has_future_annotations: self.has_future_annotations,
             enclosing_snapshots: self.enclosing_snapshots,
@@ -2304,7 +2343,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                let use_id = self.current_ast_ids().record_use(name);
+                let use_id = self.current_ast_ids_mut().record_use(name);
                 self.current_use_def_map_mut()
                     .record_use(symbol.into(), use_id);
 
@@ -2634,6 +2673,12 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
                 self.visit_expr(&node.value);
 
+                // Unconstrained collection literals must be standalone expressions to participate
+                // in full-scope bidirectional inference.
+                if node.targets.len() == 1 && is_unconstrained_collection_literal(&node.value) {
+                    self.add_standalone_assigned_expression(&node.value, node);
+                }
+
                 // Optimization for the common case: if there's just one target, and it's not an
                 // unpacking, and the target is a simple name, we don't need the RHS to be a
                 // standalone expression at all.
@@ -2930,6 +2975,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 } in items
                 {
                     self.visit_expr(context_expr);
+
                     if let Some(optional_vars) = optional_vars.as_deref() {
                         let context_manager = self.add_standalone_expression(context_expr);
                         self.add_unpackable_assignment(
@@ -3445,7 +3491,21 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 };
 
                 if let Some((func, expr, is_await)) = call_info {
-                    if !self.source_type.is_stub() {
+                    // Avoid creating reachability nodes for calls on unconstrained collection
+                    // literals. Without this short-circuit, performing reachability analysis
+                    // can lead to quadratic blowup of cycle dependencies during full-scope
+                    // collection inference, as Salsa flattens the dependencies of all cycle
+                    // participants, and the reachability analysis of a given use of the
+                    // collection may create dependencies on all previous uses, leading to
+                    // significant performance regressions.
+                    if !self.source_type.is_stub()
+                        && func
+                            .as_attribute_expr()
+                            .and_then(|attribute| {
+                                self.unconstrained_collection_literal_binding(&attribute.value)
+                            })
+                            .is_none()
+                    {
                         let callable = self.add_standalone_expression(func);
                         let call_expr = self.add_standalone_expression(expr);
 
@@ -3495,23 +3555,88 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
 impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
     fn visit_stmt(&mut self, stmt: &'ast ast::Stmt) {
-        self.push_statement(CurrentStatement {
-            lambda_exprs: Vec::new(),
-        });
-
+        self.push_statement(CurrentStatement::default());
         self.visit_stmt_impl(stmt);
+        let mut current_statement = self.pop_statement();
 
-        let current_statement = self.pop_statement();
-        if !current_statement.lambda_exprs.is_empty() {
-            // The body of a lambda expression needs access to the `Callable` type
-            // context the lambda is being inferred with, and so any statement
-            // containing a lambda must be inferable as a standalone statement
-            // to avoid large scope-level cycles.
-            let standalone_stmt = self.add_standalone_statement(stmt);
-            for lambda in current_statement.lambda_exprs {
-                self.enclosing_lambda_statements
-                    .insert(lambda.into(), standalone_stmt);
+        // We currently only consider certain types of statements to introduce constraints
+        // on collection literals. This restriction is mostly for performance reasons, as we
+        // want to avoid "reads" of a collection contributing to the complexity of the cycles
+        // created by full-scope collection inference.
+        current_statement
+            .collection_uses
+            .retain(|(_, use_expression)| {
+                match stmt {
+                    // A return involving the collection object.
+                    ruff_python_ast::Stmt::Return(_) => true,
+
+                    // A subscript assignment on the collection object.
+                    ruff_python_ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+                        match targets.as_slice() {
+                            [ast::Expr::Subscript(ast::ExprSubscript { value, .. })] => {
+                                ExpressionNodeKey::from(value) == *use_expression
+                            }
+                            _ => false,
+                        }
+                    }
+
+                    // An annotated assignment involving the collection object to a new binding.
+                    ruff_python_ast::Stmt::AnnAssign(_) => true,
+
+                    // A bound-method call on the collection object.
+                    ruff_python_ast::Stmt::Expr(ast::StmtExpr { value, .. }) => {
+                        match value.as_ref() {
+                            ast::Expr::Call(ast::ExprCall { func, .. }) => match func.as_ref() {
+                                ruff_python_ast::Expr::Attribute(ast::ExprAttribute {
+                                    value,
+                                    ..
+                                }) => ExpressionNodeKey::from(value) == *use_expression,
+                                _ => false,
+                            },
+                            _ => false,
+                        }
+                    }
+
+                    _ => false,
+                }
+            });
+
+        if current_statement.lambda_expressions.is_empty()
+            && current_statement.collection_uses.is_empty()
+        {
+            return;
+        }
+
+        let standalone_statement = self.add_standalone_statement(stmt);
+
+        // The body of a lambda expression needs access to the `Callable` type
+        // context the lambda is being inferred with, and so any statement
+        // containing a lambda must be inferable as a standalone statement
+        // to avoid large scope-level cycles.
+        for lambda in current_statement.lambda_expressions {
+            self.enclosing_lambda_statements
+                .insert(lambda.into(), standalone_statement);
+        }
+
+        // The inferred element type of collection literal depends on uses of
+        // the collection in its containing scope, and so each use must be part
+        // of an standalone inferable statement to avoid large scope-level cycles.
+        let mut collection_defs = FxHashSet::default();
+        for (collection_def, use_expression) in current_statement.collection_uses {
+            // If the same collection is referenced multiple times in this statement,
+            // we only consider the first occurrence, as collection use constraints are
+            // tracked at the statement level.
+            if !collection_defs.insert(collection_def) {
+                continue;
             }
+
+            self.uses_by_collection
+                .entry(collection_def)
+                .or_default()
+                .push((standalone_statement, use_expression));
+
+            self.collections_by_use
+                .insert(use_expression, collection_def);
         }
     }
 
@@ -3617,12 +3742,25 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 if let Some((place_expr, is_use, is_definition)) = deferred_effects {
                     let place_id = self.add_place(place_expr);
+
                     if is_use {
                         self.record_place_use(place_id, expr);
+
+                        // Keep track of any uses of collection literals.
+                        if let Some(collection_def) =
+                            self.unconstrained_collection_literal_binding(expr)
+                            && let Some(current_statement) = self.current_statements.last_mut()
+                        {
+                            current_statement
+                                .collection_uses
+                                .push((collection_def, expr.into()));
+                        }
                     }
+
                     if is_definition {
                         self.record_place_definition(place_id, expr);
                     }
+
                     if let Some(unpack_position) = self
                         .current_assignment_mut()
                         .and_then(CurrentAssignment::unpack_position_mut)
@@ -3647,7 +3785,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             ast::Expr::Lambda(lambda) => {
                 self.current_statement_mut()
                     .expect("every lambda expression is part of a statement")
-                    .lambda_exprs
+                    .lambda_expressions
                     .push(lambda);
 
                 if let Some(parameters) = &lambda.parameters {
@@ -4108,9 +4246,12 @@ impl<'ast> From<&'ast ast::ExprNamed> for CurrentAssignment<'ast, '_> {
     }
 }
 
-struct CurrentStatement<'ast> {
-    /// The lambda expressions part of this statement.
-    lambda_exprs: Vec<&'ast ast::ExprLambda>,
+#[derive(Default)]
+struct CurrentStatement<'ast, 'db> {
+    /// A list of lambda expressions contained in this statement.
+    lambda_expressions: Vec<&'ast ast::ExprLambda>,
+    /// A list of collection definitions whose uses are contained in this statement.
+    collection_uses: Vec<(Definition<'db>, ExpressionNodeKey)>,
 }
 
 #[derive(Debug, PartialEq)]
@@ -4311,4 +4452,13 @@ fn is_if_not_type_checking(expr: &ast::Expr) -> bool {
             ..
         }) if is_if_type_checking(operand)
     )
+}
+
+pub(crate) fn is_unconstrained_collection_literal(expr: &ast::Expr) -> bool {
+    match expr {
+        ast::Expr::List(list) => list.elts.is_empty(),
+        ast::Expr::Set(set) => set.elts.is_empty(),
+        ast::Expr::Dict(dict) => dict.items.is_empty(),
+        _ => false,
+    }
 }

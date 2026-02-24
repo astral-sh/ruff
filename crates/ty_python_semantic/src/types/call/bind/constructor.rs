@@ -236,7 +236,7 @@ impl<'db> ConstructorBinding<'db> {
         // non-specialized generic class (`C(...)`), it'll be the identity specialization. If we're
         // constructing an already-specialized generic alias (`C[str](...)`), it'll be the
         // specialization of that alias.
-        let class_specialization = constructed_instance_type.class_specialization(db)?;
+        let (_, class_specialization) = constructed_instance_type.class_specialization(db)?;
         let static_class_literal = self
             .constructed_class_literal(db)
             .and_then(ClassLiteral::as_static);
@@ -467,7 +467,7 @@ impl<'db> ConstructorBinding<'db> {
         let Some(class_context) = self
             .constructed_instance_type()
             .class_specialization(db)
-            .map(|specialization| specialization.generic_context(db))
+            .map(|(_, specialization)| specialization.generic_context(db))
         else {
             return specialization;
         };
