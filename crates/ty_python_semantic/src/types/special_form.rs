@@ -4,32 +4,55 @@
 use super::{ClassType, Type, class::KnownClass};
 use crate::db::Db;
 use crate::semantic_index::place::ScopedPlaceId;
-use crate::semantic_index::{FileScopeId, place_table, use_def_map};
-use crate::types::TypeDefinition;
+use crate::semantic_index::{
+    FileScopeId, definition::Definition, place_table, scope::ScopeId, semantic_index, use_def_map,
+};
+use crate::types::{
+    CallableType, IntersectionBuilder, InvalidTypeExpression, InvalidTypeExpressionError,
+    TypeDefinition, TypeQualifiers, generics::typing_self, infer::nearest_enclosing_class,
+};
 use ruff_db::files::File;
-use std::str::FromStr;
+use strum_macros::EnumString;
 use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 
 /// Enumeration of specific runtime symbols that are special enough
 /// that they can each be considered to inhabit a unique type.
 ///
+/// The enum uses a nested structure: variants that fall into well-defined subcategories
+/// (legacy stdlib aliases and type qualifiers) are represented as nested enums,
+/// while other special forms that each require unique handling remain as direct variants.
+///
 /// # Ordering
 ///
 /// Ordering is stable and should be the same between runs.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    PartialEq,
-    Eq,
-    Hash,
-    salsa::Update,
-    PartialOrd,
-    Ord,
-    strum_macros::EnumString,
-    get_size2::GetSize,
-)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub enum SpecialFormType {
+    /// Special forms that are simple aliases to classes elsewhere in the standard library.
+    LegacyStdlibAlias(LegacyStdlibAlias),
+
+    /// Special forms that are type qualifiers
+    TypeQualifier(TypeQualifier),
+
+    /// The special form `typing.Tuple`.
+    ///
+    /// While this is technically an alias to `builtins.tuple`, it requires special handling
+    /// for type-expression parsing.
+    Tuple,
+
+    /// The special form `typing.Type`.
+    ///
+    /// While this is technically an alias to `builtins.type`, it requires special handling
+    /// for type-expression parsing.
+    Type,
+
+    /// The special form `Callable`.
+    ///
+    /// While `typing.Callable` aliases `collections.abc.Callable`, we view both objects
+    /// as inhabiting the same special form type internally. Moreover, `Callable` requires
+    /// special handling for both type-expression parsing and `isinstance`/`issubclass`
+    /// narrowing.
+    Callable,
+
     Any,
     /// The symbol `typing.Annotated` (which can also be found as `typing_extensions.Annotated`)
     Annotated,
@@ -45,28 +68,6 @@ pub enum SpecialFormType {
     NoReturn,
     /// The symbol `typing.Never` available since 3.11 (which can also be found as `typing_extensions.Never`)
     Never,
-    /// The symbol `typing.Tuple` (which can also be found as `typing_extensions.Tuple`)
-    Tuple,
-    /// The symbol `typing.List` (which can also be found as `typing_extensions.List`)
-    List,
-    /// The symbol `typing.Dict` (which can also be found as `typing_extensions.Dict`)
-    Dict,
-    /// The symbol `typing.Set` (which can also be found as `typing_extensions.Set`)
-    Set,
-    /// The symbol `typing.FrozenSet` (which can also be found as `typing_extensions.FrozenSet`)
-    FrozenSet,
-    /// The symbol `typing.ChainMap` (which can also be found as `typing_extensions.ChainMap`)
-    ChainMap,
-    /// The symbol `typing.Counter` (which can also be found as `typing_extensions.Counter`)
-    Counter,
-    /// The symbol `typing.DefaultDict` (which can also be found as `typing_extensions.DefaultDict`)
-    DefaultDict,
-    /// The symbol `typing.Deque` (which can also be found as `typing_extensions.Deque`)
-    Deque,
-    /// The symbol `typing.OrderedDict` (which can also be found as `typing_extensions.OrderedDict`)
-    OrderedDict,
-    /// The symbol `typing.Type` (which can also be found as `typing_extensions.Type`)
-    Type,
     /// The symbol `ty_extensions.Unknown`
     Unknown,
     /// The symbol `ty_extensions.AlwaysTruthy`
@@ -85,24 +86,12 @@ pub enum SpecialFormType {
     Top,
     /// The symbol `ty_extensions.Bottom`
     Bottom,
-    /// The symbol `typing.Callable`
-    /// (which can also be found as `typing_extensions.Callable` or as `collections.abc.Callable`)
-    Callable,
     /// The symbol `typing.Self` (which can also be found as `typing_extensions.Self`)
-    #[strum(serialize = "Self")]
     TypingSelf,
-    /// The symbol `typing.Final` (which can also be found as `typing_extensions.Final`)
-    Final,
-    /// The symbol `typing.ClassVar` (which can also be found as `typing_extensions.ClassVar`)
-    ClassVar,
     /// The symbol `typing.Concatenate` (which can also be found as `typing_extensions.Concatenate`)
     Concatenate,
     /// The symbol `typing.Unpack` (which can also be found as `typing_extensions.Unpack`)
     Unpack,
-    /// The symbol `typing.Required` (which can also be found as `typing_extensions.Required`)
-    Required,
-    /// The symbol `typing.NotRequired` (which can also be found as `typing_extensions.NotRequired`)
-    NotRequired,
     /// The symbol `typing.TypeAlias` (which can also be found as `typing_extensions.TypeAlias`)
     TypeAlias,
     /// The symbol `typing.TypeGuard` (which can also be found as `typing_extensions.TypeGuard`)
@@ -111,8 +100,6 @@ pub enum SpecialFormType {
     TypedDict,
     /// The symbol `typing.TypeIs` (which can also be found as `typing_extensions.TypeIs`)
     TypeIs,
-    /// The symbol `typing.ReadOnly` (which can also be found as `typing_extensions.ReadOnly`)
-    ReadOnly,
 
     /// The symbol `typing.Protocol` (which can also be found as `typing_extensions.Protocol`)
     ///
@@ -146,13 +133,9 @@ impl SpecialFormType {
             | Self::Tuple
             | Self::Type
             | Self::TypingSelf
-            | Self::Final
-            | Self::ClassVar
             | Self::Callable
             | Self::Concatenate
             | Self::Unpack
-            | Self::Required
-            | Self::NotRequired
             | Self::TypeAlias
             | Self::TypeGuard
             | Self::TypedDict
@@ -163,7 +146,7 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::CallableTypeOf
-            | Self::ReadOnly => KnownClass::SpecialForm,
+            | Self::TypeQualifier(_) => KnownClass::SpecialForm,
 
             // Typeshed says it's an instance of `_SpecialForm`,
             // but then we wouldn't recognise things like `issubclass(`X, Protocol)`
@@ -172,15 +155,7 @@ impl SpecialFormType {
 
             Self::Generic | Self::Any => KnownClass::Type,
 
-            Self::List
-            | Self::Dict
-            | Self::DefaultDict
-            | Self::Set
-            | Self::FrozenSet
-            | Self::Counter
-            | Self::Deque
-            | Self::ChainMap
-            | Self::OrderedDict => KnownClass::StdlibAlias,
+            Self::LegacyStdlibAlias(_) => KnownClass::StdlibAlias,
 
             Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
 
@@ -207,10 +182,186 @@ impl SpecialFormType {
         file: File,
         symbol_name: &str,
     ) -> Option<Self> {
-        let candidate = Self::from_str(symbol_name).ok()?;
+        let candidate = Self::from_name(symbol_name)?;
         candidate
             .check_module(file_to_module(db, file)?.known(db)?)
             .then_some(candidate)
+    }
+
+    /// Parse a `SpecialFormType` from its runtime symbol name.
+    fn from_name(name: &str) -> Option<Self> {
+        /// An enum that maps 1:1 with `SpecialFormType`, but which holds no associated data
+        /// (and therefore can have `EnumString` derived on it).
+        /// This is much more robust than having a manual `from_string` method that matches
+        /// on string literals, because experience has shown it's very easy to forget to
+        /// update such a method when adding new variants.
+        #[derive(EnumString)]
+        enum SpecialFormTypeBuilder {
+            Tuple,
+            Type,
+            Callable,
+            Any,
+            Annotated,
+            Literal,
+            LiteralString,
+            Optional,
+            Union,
+            NoReturn,
+            Never,
+            Unknown,
+            AlwaysTruthy,
+            AlwaysFalsy,
+            Not,
+            Intersection,
+            TypeOf,
+            CallableTypeOf,
+            Top,
+            Bottom,
+            #[strum(serialize = "Self")]
+            TypingSelf,
+            Concatenate,
+            Unpack,
+            TypeAlias,
+            TypeGuard,
+            TypedDict,
+            TypeIs,
+            Protocol,
+            Generic,
+            NamedTuple,
+            List,
+            Dict,
+            FrozenSet,
+            Set,
+            ChainMap,
+            Counter,
+            DefaultDict,
+            Deque,
+            OrderedDict,
+            Final,
+            ClassVar,
+            ReadOnly,
+            Required,
+            NotRequired,
+        }
+
+        // This implementation exists purely to enforce that every variant of `SpecialFormType`
+        // is included in the `SpecialFormTypeBuilder` enum
+        #[cfg(test)]
+        impl From<SpecialFormType> for SpecialFormTypeBuilder {
+            fn from(value: SpecialFormType) -> Self {
+                match value {
+                    SpecialFormType::AlwaysFalsy => Self::AlwaysFalsy,
+                    SpecialFormType::AlwaysTruthy => Self::AlwaysTruthy,
+                    SpecialFormType::Annotated => Self::Annotated,
+                    SpecialFormType::Callable => Self::Callable,
+                    SpecialFormType::CallableTypeOf => Self::CallableTypeOf,
+                    SpecialFormType::Concatenate => Self::Concatenate,
+                    SpecialFormType::Intersection => Self::Intersection,
+                    SpecialFormType::Literal => Self::Literal,
+                    SpecialFormType::LiteralString => Self::LiteralString,
+                    SpecialFormType::Never => Self::Never,
+                    SpecialFormType::NoReturn => Self::NoReturn,
+                    SpecialFormType::Not => Self::Not,
+                    SpecialFormType::Optional => Self::Optional,
+                    SpecialFormType::Protocol => Self::Protocol,
+                    SpecialFormType::Type => Self::Type,
+                    SpecialFormType::TypeAlias => Self::TypeAlias,
+                    SpecialFormType::TypeGuard => Self::TypeGuard,
+                    SpecialFormType::TypeIs => Self::TypeIs,
+                    SpecialFormType::TypingSelf => Self::TypingSelf,
+                    SpecialFormType::Union => Self::Union,
+                    SpecialFormType::Unknown => Self::Unknown,
+                    SpecialFormType::Generic => Self::Generic,
+                    SpecialFormType::NamedTuple => Self::NamedTuple,
+                    SpecialFormType::Any => Self::Any,
+                    SpecialFormType::Bottom => Self::Bottom,
+                    SpecialFormType::Top => Self::Top,
+                    SpecialFormType::Unpack => Self::Unpack,
+                    SpecialFormType::Tuple => Self::Tuple,
+                    SpecialFormType::TypedDict => Self::TypedDict,
+                    SpecialFormType::TypeOf => Self::TypeOf,
+                    SpecialFormType::LegacyStdlibAlias(alias) => match alias {
+                        LegacyStdlibAlias::List => Self::List,
+                        LegacyStdlibAlias::Dict => Self::Dict,
+                        LegacyStdlibAlias::Set => Self::Set,
+                        LegacyStdlibAlias::FrozenSet => Self::FrozenSet,
+                        LegacyStdlibAlias::ChainMap => Self::ChainMap,
+                        LegacyStdlibAlias::Counter => Self::Counter,
+                        LegacyStdlibAlias::DefaultDict => Self::DefaultDict,
+                        LegacyStdlibAlias::Deque => Self::Deque,
+                        LegacyStdlibAlias::OrderedDict => Self::OrderedDict,
+                    },
+                    SpecialFormType::TypeQualifier(qualifier) => match qualifier {
+                        TypeQualifier::Final => Self::Final,
+                        TypeQualifier::ClassVar => Self::ClassVar,
+                        TypeQualifier::ReadOnly => Self::ReadOnly,
+                        TypeQualifier::Required => Self::Required,
+                        TypeQualifier::NotRequired => Self::NotRequired,
+                    },
+                }
+            }
+        }
+
+        SpecialFormTypeBuilder::try_from(name)
+            .ok()
+            .map(|form| match form {
+                SpecialFormTypeBuilder::AlwaysFalsy => Self::AlwaysFalsy,
+                SpecialFormTypeBuilder::AlwaysTruthy => Self::AlwaysTruthy,
+                SpecialFormTypeBuilder::Annotated => Self::Annotated,
+                SpecialFormTypeBuilder::Callable => Self::Callable,
+                SpecialFormTypeBuilder::CallableTypeOf => Self::CallableTypeOf,
+                SpecialFormTypeBuilder::Concatenate => Self::Concatenate,
+                SpecialFormTypeBuilder::Intersection => Self::Intersection,
+                SpecialFormTypeBuilder::Literal => Self::Literal,
+                SpecialFormTypeBuilder::LiteralString => Self::LiteralString,
+                SpecialFormTypeBuilder::Never => Self::Never,
+                SpecialFormTypeBuilder::NoReturn => Self::NoReturn,
+                SpecialFormTypeBuilder::Not => Self::Not,
+                SpecialFormTypeBuilder::Optional => Self::Optional,
+                SpecialFormTypeBuilder::Protocol => Self::Protocol,
+                SpecialFormTypeBuilder::Type => Self::Type,
+                SpecialFormTypeBuilder::TypeAlias => Self::TypeAlias,
+                SpecialFormTypeBuilder::TypeGuard => Self::TypeGuard,
+                SpecialFormTypeBuilder::TypeIs => Self::TypeIs,
+                SpecialFormTypeBuilder::TypingSelf => Self::TypingSelf,
+                SpecialFormTypeBuilder::Union => Self::Union,
+                SpecialFormTypeBuilder::Unknown => Self::Unknown,
+                SpecialFormTypeBuilder::Generic => Self::Generic,
+                SpecialFormTypeBuilder::NamedTuple => Self::NamedTuple,
+                SpecialFormTypeBuilder::Any => Self::Any,
+                SpecialFormTypeBuilder::Bottom => Self::Bottom,
+                SpecialFormTypeBuilder::Top => Self::Top,
+                SpecialFormTypeBuilder::Unpack => Self::Unpack,
+                SpecialFormTypeBuilder::Tuple => Self::Tuple,
+                SpecialFormTypeBuilder::TypedDict => Self::TypedDict,
+                SpecialFormTypeBuilder::TypeOf => Self::TypeOf,
+                SpecialFormTypeBuilder::List => Self::LegacyStdlibAlias(LegacyStdlibAlias::List),
+                SpecialFormTypeBuilder::Dict => Self::LegacyStdlibAlias(LegacyStdlibAlias::Dict),
+                SpecialFormTypeBuilder::Set => Self::LegacyStdlibAlias(LegacyStdlibAlias::Set),
+                SpecialFormTypeBuilder::FrozenSet => {
+                    Self::LegacyStdlibAlias(LegacyStdlibAlias::FrozenSet)
+                }
+                SpecialFormTypeBuilder::ChainMap => {
+                    Self::LegacyStdlibAlias(LegacyStdlibAlias::ChainMap)
+                }
+                SpecialFormTypeBuilder::Counter => {
+                    Self::LegacyStdlibAlias(LegacyStdlibAlias::Counter)
+                }
+                SpecialFormTypeBuilder::DefaultDict => {
+                    Self::LegacyStdlibAlias(LegacyStdlibAlias::DefaultDict)
+                }
+                SpecialFormTypeBuilder::Deque => Self::LegacyStdlibAlias(LegacyStdlibAlias::Deque),
+                SpecialFormTypeBuilder::OrderedDict => {
+                    Self::LegacyStdlibAlias(LegacyStdlibAlias::OrderedDict)
+                }
+                SpecialFormTypeBuilder::Final => Self::TypeQualifier(TypeQualifier::Final),
+                SpecialFormTypeBuilder::ClassVar => Self::TypeQualifier(TypeQualifier::ClassVar),
+                SpecialFormTypeBuilder::ReadOnly => Self::TypeQualifier(TypeQualifier::ReadOnly),
+                SpecialFormTypeBuilder::Required => Self::TypeQualifier(TypeQualifier::Required),
+                SpecialFormTypeBuilder::NotRequired => {
+                    Self::TypeQualifier(TypeQualifier::NotRequired)
+                }
+            })
     }
 
     /// Return `true` if `module` is a module from which this `SpecialFormType` variant can validly originate.
@@ -219,16 +370,8 @@ impl SpecialFormType {
     /// Some variants could validly be defined in either `typing` or `typing_extensions`, however.
     pub(super) fn check_module(self, module: KnownModule) -> bool {
         match self {
-            Self::ClassVar
-            | Self::Deque
-            | Self::List
-            | Self::Dict
-            | Self::DefaultDict
-            | Self::Set
-            | Self::FrozenSet
-            | Self::Counter
-            | Self::ChainMap
-            | Self::OrderedDict
+            Self::TypeQualifier(TypeQualifier::ClassVar)
+            | Self::LegacyStdlibAlias(_)
             | Self::Optional
             | Self::Union
             | Self::NoReturn
@@ -241,11 +384,14 @@ impl SpecialFormType {
             | Self::Literal
             | Self::LiteralString
             | Self::Never
-            | Self::Final
+            | Self::TypeQualifier(
+                TypeQualifier::Final
+                | TypeQualifier::Required
+                | TypeQualifier::NotRequired
+                | TypeQualifier::ReadOnly,
+            )
             | Self::Concatenate
             | Self::Unpack
-            | Self::Required
-            | Self::NotRequired
             | Self::TypeAlias
             | Self::TypeGuard
             | Self::TypedDict
@@ -253,8 +399,7 @@ impl SpecialFormType {
             | Self::TypingSelf
             | Self::Protocol
             | Self::NamedTuple
-            | Self::Any
-            | Self::ReadOnly => {
+            | Self::Any => {
                 matches!(module, KnownModule::Typing | KnownModule::TypingExtensions)
             }
 
@@ -281,16 +426,30 @@ impl SpecialFormType {
         match self {
             // TypedDict can be called as a constructor to create TypedDict types
             Self::TypedDict
+
             // Collection constructors are callable
             // TODO actually implement support for calling them
-            | Self::ChainMap
-            | Self::Counter
-            | Self::DefaultDict
-            | Self::Deque
-            | Self::NamedTuple
-            | Self::OrderedDict => true,
+            | Self::LegacyStdlibAlias(
+                LegacyStdlibAlias::ChainMap
+                | LegacyStdlibAlias::Counter
+                | LegacyStdlibAlias::DefaultDict
+                | LegacyStdlibAlias::Deque
+                | LegacyStdlibAlias::OrderedDict
+            )
+            | Self::NamedTuple => true,
 
-            // All other special forms are not callable
+            // Unlike the aliases to `collections` classes,
+            // the aliases to builtin classes are *not* callable...
+            Self::LegacyStdlibAlias(
+                LegacyStdlibAlias::List
+                | LegacyStdlibAlias::Dict
+                | LegacyStdlibAlias::Set
+                | LegacyStdlibAlias::FrozenSet
+            )
+            | Self::Tuple
+            | Self::Type => false,
+
+            // All other special forms are also not callable
             Self::Annotated
             | Self::Literal
             | Self::LiteralString
@@ -298,12 +457,6 @@ impl SpecialFormType {
             | Self::Union
             | Self::NoReturn
             | Self::Never
-            | Self::Tuple
-            | Self::List
-            | Self::Dict
-            | Self::Set
-            | Self::FrozenSet
-            | Self::Type
             | Self::Unknown
             | Self::AlwaysTruthy
             | Self::AlwaysFalsy
@@ -315,127 +468,15 @@ impl SpecialFormType {
             | Self::CallableTypeOf
             | Self::Callable
             | Self::TypingSelf
-            | Self::Final
-            | Self::ClassVar
+            | Self::TypeQualifier(_)
             | Self::Concatenate
             | Self::Unpack
-            | Self::Required
-            | Self::NotRequired
             | Self::TypeAlias
             | Self::TypeGuard
             | Self::TypeIs
-            | Self::ReadOnly
             | Self::Protocol
             | Self::Any
             | Self::Generic => false,
-        }
-    }
-
-    /// Return `true` if this special form type is valid in a type-expression context (and not
-    /// just in an *annotation* expression context). See the following section of the typing
-    /// specification for more details:
-    /// <https://typing.python.org/en/latest/spec/annotations.html#type-and-annotation-expressions>
-    pub(super) const fn is_valid_in_type_expression(self) -> bool {
-        match self {
-            Self::ClassVar
-            | Self::Final
-            | Self::Required
-            | Self::NotRequired
-            | SpecialFormType::ReadOnly
-            | SpecialFormType::Unpack
-            | SpecialFormType::TypeAlias => false,
-            Self::Annotated
-            | SpecialFormType::Any
-            | SpecialFormType::Literal
-            | SpecialFormType::LiteralString
-            | SpecialFormType::Optional
-            | SpecialFormType::Union
-            | SpecialFormType::NoReturn
-            | SpecialFormType::Never
-            | SpecialFormType::Tuple
-            | SpecialFormType::List
-            | SpecialFormType::Dict
-            | SpecialFormType::Set
-            | SpecialFormType::FrozenSet
-            | SpecialFormType::ChainMap
-            | SpecialFormType::Counter
-            | SpecialFormType::DefaultDict
-            | SpecialFormType::Deque
-            | SpecialFormType::OrderedDict
-            | SpecialFormType::Type
-            | SpecialFormType::Unknown
-            | SpecialFormType::AlwaysTruthy
-            | SpecialFormType::AlwaysFalsy
-            | SpecialFormType::Not
-            | SpecialFormType::Intersection
-            | SpecialFormType::TypeOf
-            | SpecialFormType::CallableTypeOf
-            | SpecialFormType::Top
-            | SpecialFormType::Bottom
-            | SpecialFormType::Callable
-            | SpecialFormType::TypingSelf
-            | SpecialFormType::Concatenate
-            | SpecialFormType::TypeGuard
-            | SpecialFormType::TypedDict
-            | SpecialFormType::TypeIs
-            | SpecialFormType::Protocol
-            | SpecialFormType::Generic
-            | SpecialFormType::NamedTuple => true,
-        }
-    }
-
-    /// Return `Some(KnownClass)` if this special form is an alias
-    /// to a standard library class.
-    pub(super) const fn aliased_stdlib_class(self) -> Option<KnownClass> {
-        match self {
-            Self::List => Some(KnownClass::List),
-            Self::Dict => Some(KnownClass::Dict),
-            Self::Set => Some(KnownClass::Set),
-            Self::FrozenSet => Some(KnownClass::FrozenSet),
-            Self::ChainMap => Some(KnownClass::ChainMap),
-            Self::Counter => Some(KnownClass::Counter),
-            Self::DefaultDict => Some(KnownClass::DefaultDict),
-            Self::Deque => Some(KnownClass::Deque),
-            Self::OrderedDict => Some(KnownClass::OrderedDict),
-            Self::Tuple => Some(KnownClass::Tuple),
-            Self::Type => Some(KnownClass::Type),
-
-            Self::AlwaysFalsy
-            | Self::AlwaysTruthy
-            | Self::Annotated
-            | Self::Bottom
-            | Self::CallableTypeOf
-            | Self::ClassVar
-            | Self::Concatenate
-            | Self::Final
-            | Self::Intersection
-            | Self::Literal
-            | Self::LiteralString
-            | Self::Never
-            | Self::NoReturn
-            | Self::Not
-            | Self::ReadOnly
-            | Self::Required
-            | Self::TypeAlias
-            | Self::TypeGuard
-            | Self::NamedTuple
-            | Self::NotRequired
-            | Self::Optional
-            | Self::Top
-            | Self::TypeIs
-            | Self::TypedDict
-            | Self::TypingSelf
-            | Self::Union
-            | Self::Unknown
-            | Self::TypeOf
-            | Self::Any
-            // `typing.Callable` is an alias to `collections.abc.Callable`,
-            // but they're both the same `SpecialFormType` in our model,
-            // and neither is a class in typeshed (even though the `collections.abc` one is at runtime)
-            | Self::Callable
-            | Self::Protocol
-            | Self::Generic
-            | Self::Unpack => None,
         }
     }
 
@@ -444,15 +485,7 @@ impl SpecialFormType {
     pub(super) const fn is_valid_isinstance_target(self) -> bool {
         match self {
             Self::Callable
-            | Self::ChainMap
-            | Self::Counter
-            | Self::DefaultDict
-            | Self::Deque
-            | Self::FrozenSet
-            | Self::Dict
-            | Self::List
-            | Self::OrderedDict
-            | Self::Set
+            | Self::LegacyStdlibAlias(_)
             | Self::Tuple
             | Self::Type
             | Self::Protocol
@@ -463,21 +496,17 @@ impl SpecialFormType {
             | Self::Annotated
             | Self::Bottom
             | Self::CallableTypeOf
-            | Self::ClassVar
+            | Self::TypeQualifier(_)
             | Self::Concatenate
-            | Self::Final
             | Self::Intersection
             | Self::Literal
             | Self::LiteralString
             | Self::Never
             | Self::NoReturn
             | Self::Not
-            | Self::ReadOnly
-            | Self::Required
             | Self::TypeAlias
             | Self::TypeGuard
             | Self::NamedTuple
-            | Self::NotRequired
             | Self::Optional
             | Self::Top
             | Self::TypeIs
@@ -505,27 +534,27 @@ impl SpecialFormType {
             SpecialFormType::Tuple => "Tuple",
             SpecialFormType::Type => "Type",
             SpecialFormType::TypingSelf => "Self",
-            SpecialFormType::Final => "Final",
-            SpecialFormType::ClassVar => "ClassVar",
+            SpecialFormType::TypeQualifier(TypeQualifier::Final) => "Final",
+            SpecialFormType::TypeQualifier(TypeQualifier::ClassVar) => "ClassVar",
             SpecialFormType::Callable => "Callable",
             SpecialFormType::Concatenate => "Concatenate",
             SpecialFormType::Unpack => "Unpack",
-            SpecialFormType::Required => "Required",
-            SpecialFormType::NotRequired => "NotRequired",
+            SpecialFormType::TypeQualifier(TypeQualifier::Required) => "Required",
+            SpecialFormType::TypeQualifier(TypeQualifier::NotRequired) => "NotRequired",
             SpecialFormType::TypeAlias => "TypeAlias",
             SpecialFormType::TypeGuard => "TypeGuard",
             SpecialFormType::TypedDict => "TypedDict",
             SpecialFormType::TypeIs => "TypeIs",
-            SpecialFormType::List => "List",
-            SpecialFormType::Dict => "Dict",
-            SpecialFormType::DefaultDict => "DefaultDict",
-            SpecialFormType::Set => "Set",
-            SpecialFormType::FrozenSet => "FrozenSet",
-            SpecialFormType::Counter => "Counter",
-            SpecialFormType::Deque => "Deque",
-            SpecialFormType::ChainMap => "ChainMap",
-            SpecialFormType::OrderedDict => "OrderedDict",
-            SpecialFormType::ReadOnly => "ReadOnly",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::List) => "List",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::Dict) => "Dict",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::DefaultDict) => "DefaultDict",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::Set) => "Set",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::FrozenSet) => "FrozenSet",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::Counter) => "Counter",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::Deque) => "Deque",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::ChainMap) => "ChainMap",
+            SpecialFormType::LegacyStdlibAlias(LegacyStdlibAlias::OrderedDict) => "OrderedDict",
+            SpecialFormType::TypeQualifier(TypeQualifier::ReadOnly) => "ReadOnly",
             SpecialFormType::Unknown => "Unknown",
             SpecialFormType::AlwaysTruthy => "AlwaysTruthy",
             SpecialFormType::AlwaysFalsy => "AlwaysFalsy",
@@ -555,30 +584,20 @@ impl SpecialFormType {
             | SpecialFormType::Tuple
             | SpecialFormType::Type
             | SpecialFormType::TypingSelf
-            | SpecialFormType::Final
-            | SpecialFormType::ClassVar
+            | SpecialFormType::TypeQualifier(_)
             | SpecialFormType::Callable
             | SpecialFormType::Concatenate
             | SpecialFormType::Unpack
-            | SpecialFormType::Required
-            | SpecialFormType::NotRequired
             | SpecialFormType::TypeAlias
             | SpecialFormType::TypeGuard
             | SpecialFormType::TypedDict
             | SpecialFormType::TypeIs
-            | SpecialFormType::ReadOnly
             | SpecialFormType::Protocol
             | SpecialFormType::Generic
             | SpecialFormType::NamedTuple
-            | SpecialFormType::List
-            | SpecialFormType::Dict
-            | SpecialFormType::DefaultDict
-            | SpecialFormType::Set
-            | SpecialFormType::FrozenSet
-            | SpecialFormType::Counter
-            | SpecialFormType::Deque
-            | SpecialFormType::ChainMap
-            | SpecialFormType::OrderedDict => &[KnownModule::Typing, KnownModule::TypingExtensions],
+            | SpecialFormType::LegacyStdlibAlias(_) => {
+                &[KnownModule::Typing, KnownModule::TypingExtensions]
+            }
 
             SpecialFormType::Unknown
             | SpecialFormType::AlwaysTruthy
@@ -608,6 +627,128 @@ impl SpecialFormType {
             })
             .map(TypeDefinition::SpecialForm)
     }
+
+    /// Interpret this special form as an unparameterized type in a type-expression context.
+    ///
+    /// This is called for the "misc" special forms that are not aliases, type qualifiers,
+    /// `Tuple`, `Type`, or `Callable` (those are handled by their respective call sites).
+    pub(super) fn in_type_expression<'db>(
+        self,
+        db: &'db dyn Db,
+        scope_id: ScopeId<'db>,
+        typevar_binding_context: Option<Definition<'db>>,
+    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+        match self {
+            Self::Never | Self::NoReturn => Ok(Type::Never),
+            Self::LiteralString => Ok(Type::literal_string()),
+            Self::Any => Ok(Type::any()),
+            Self::Unknown => Ok(Type::unknown()),
+            Self::AlwaysTruthy => Ok(Type::AlwaysTruthy),
+            Self::AlwaysFalsy => Ok(Type::AlwaysFalsy),
+
+            // Special case: `NamedTuple` in a type expression is understood to describe the type
+            // `tuple[object, ...] & <a protocol that any `NamedTuple` class would satisfy>`.
+            // This isn't very principled (since at runtime, `NamedTuple` is just a function),
+            // but it appears to be what users often expect, and it improves compatibility with
+            // other type checkers such as mypy.
+            // See conversation in https://github.com/astral-sh/ruff/pull/19915.
+            Self::NamedTuple => Ok(IntersectionBuilder::new(db)
+                .positive_elements([
+                    Type::homogeneous_tuple(db, Type::object()),
+                    KnownClass::NamedTupleLike.to_instance(db),
+                ])
+                .build()),
+
+            Self::TypingSelf => {
+                let index = semantic_index(db, scope_id.file(db));
+                let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
+                    return Err(InvalidTypeExpressionError {
+                        fallback_type: Type::unknown(),
+                        invalid_expressions: smallvec::smallvec_inline![
+                            InvalidTypeExpression::InvalidType(Type::SpecialForm(self), scope_id)
+                        ],
+                    });
+                };
+
+                Ok(
+                    typing_self(db, scope_id, typevar_binding_context, class.into())
+                        .map(Type::TypeVar)
+                        .unwrap_or(Type::SpecialForm(self)),
+                )
+            }
+            // We ensure that `typing.TypeAlias` used in the expected position (annotating an
+            // annotated assignment statement) doesn't reach here. Using it in any other type
+            // expression is an error.
+            Self::TypeAlias => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypeAlias],
+                fallback_type: Type::unknown(),
+            }),
+            Self::TypedDict => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::TypedDict],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Literal | Self::Union | Self::Intersection => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::RequiresArguments(self)
+                ],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Protocol => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Protocol],
+                fallback_type: Type::unknown(),
+            }),
+            Self::Generic => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Optional
+            | Self::Not
+            | Self::Top
+            | Self::Bottom
+            | Self::TypeOf
+            | Self::TypeIs
+            | Self::TypeGuard
+            | Self::Unpack
+            | Self::CallableTypeOf => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::RequiresOneArgument(self)
+                ],
+                fallback_type: Type::unknown(),
+            }),
+
+            Self::Annotated | Self::Concatenate => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::RequiresTwoArguments(self)
+                ],
+                fallback_type: Type::unknown(),
+            }),
+
+            // We treat `typing.Type` exactly the same as `builtins.type`:
+            SpecialFormType::Type => Ok(KnownClass::Type.to_instance(db)),
+            SpecialFormType::Tuple => Ok(Type::homogeneous_tuple(db, Type::unknown())),
+            SpecialFormType::Callable => Ok(Type::Callable(CallableType::unknown(db))),
+            SpecialFormType::LegacyStdlibAlias(alias) => Ok(alias.aliased_class().to_instance(db)),
+            SpecialFormType::TypeQualifier(qualifier) => {
+                let err = match qualifier {
+                    TypeQualifier::Final | TypeQualifier::ClassVar => {
+                        InvalidTypeExpression::TypeQualifier(qualifier)
+                    }
+                    TypeQualifier::ReadOnly
+                    | TypeQualifier::NotRequired
+                    | TypeQualifier::Required => {
+                        InvalidTypeExpression::TypeQualifierRequiresOneArgument(qualifier)
+                    }
+                };
+                Err(InvalidTypeExpressionError {
+                    invalid_expressions: smallvec::smallvec_inline![err],
+                    fallback_type: Type::unknown(),
+                })
+            }
+        }
+    }
 }
 
 impl std::fmt::Display for SpecialFormType {
@@ -619,4 +760,94 @@ impl std::fmt::Display for SpecialFormType {
             self.name()
         )
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+pub enum LegacyStdlibAlias {
+    List,
+    Dict,
+    Set,
+    FrozenSet,
+    ChainMap,
+    Counter,
+    DefaultDict,
+    Deque,
+    OrderedDict,
+}
+
+impl LegacyStdlibAlias {
+    pub(super) const fn alias_spec(self) -> AliasSpec {
+        let (class, expected_argument_number) = match self {
+            LegacyStdlibAlias::List => (KnownClass::List, 1),
+            LegacyStdlibAlias::Dict => (KnownClass::Dict, 2),
+            LegacyStdlibAlias::Set => (KnownClass::Set, 1),
+            LegacyStdlibAlias::FrozenSet => (KnownClass::FrozenSet, 1),
+            LegacyStdlibAlias::ChainMap => (KnownClass::ChainMap, 2),
+            LegacyStdlibAlias::Counter => (KnownClass::Counter, 1),
+            LegacyStdlibAlias::DefaultDict => (KnownClass::DefaultDict, 2),
+            LegacyStdlibAlias::Deque => (KnownClass::Deque, 1),
+            LegacyStdlibAlias::OrderedDict => (KnownClass::OrderedDict, 2),
+        };
+
+        AliasSpec {
+            class,
+            expected_argument_number,
+        }
+    }
+
+    pub(super) const fn aliased_class(self) -> KnownClass {
+        self.alias_spec().class
+    }
+}
+
+impl From<LegacyStdlibAlias> for SpecialFormType {
+    fn from(value: LegacyStdlibAlias) -> Self {
+        SpecialFormType::LegacyStdlibAlias(value)
+    }
+}
+
+impl std::fmt::Display for LegacyStdlibAlias {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        SpecialFormType::from(*self).fmt(f)
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+pub enum TypeQualifier {
+    ReadOnly,
+    Final,
+    ClassVar,
+    Required,
+    NotRequired,
+}
+
+impl From<TypeQualifier> for SpecialFormType {
+    fn from(value: TypeQualifier) -> Self {
+        SpecialFormType::TypeQualifier(value)
+    }
+}
+
+impl From<TypeQualifier> for TypeQualifiers {
+    fn from(value: TypeQualifier) -> Self {
+        match value {
+            TypeQualifier::ReadOnly => TypeQualifiers::READ_ONLY,
+            TypeQualifier::Final => TypeQualifiers::FINAL,
+            TypeQualifier::ClassVar => TypeQualifiers::CLASS_VAR,
+            TypeQualifier::Required => TypeQualifiers::REQUIRED,
+            TypeQualifier::NotRequired => TypeQualifiers::NOT_REQUIRED,
+        }
+    }
+}
+
+impl std::fmt::Display for TypeQualifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        SpecialFormType::from(*self).fmt(f)
+    }
+}
+
+/// Information regarding the [`KnownClass`] a [`LegacyStdlibAlias`] refers to.
+#[derive(Debug)]
+pub(super) struct AliasSpec {
+    pub(super) class: KnownClass,
+    pub(super) expected_argument_number: usize,
 }
