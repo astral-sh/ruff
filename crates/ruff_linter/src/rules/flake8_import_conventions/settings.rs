@@ -90,7 +90,7 @@ pub fn default_aliases(preview: PreviewMode) -> FxHashMap<String, String> {
 }
 
 pub fn default_banned_aliases(preview: PreviewMode) -> FxHashMap<String, BannedAliases> {
-    if preview.is_enabled() {
+    if is_expanded_import_conventions_enabled(preview) {
         FxHashMap::from_iter([(
             "geopandas".to_string(),
             BannedAliases::from_iter(["gpd".to_string()]),
