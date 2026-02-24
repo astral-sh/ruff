@@ -1,8 +1,8 @@
 use std::borrow::Cow;
 
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
 use ruff_python_ast::visitor::{self, Visitor};
+use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -426,9 +426,9 @@ pub(super) fn following_statements_after_with<'a>(
                 })
                 .or_else(|| find_following_in_body(orelse, with_range))
                 .or_else(|| find_following_in_body(finalbody, with_range)),
-            ast::Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().find_map(|case| {
-                find_following_in_body(&case.body, with_range)
-            }),
+            ast::Stmt::Match(ast::StmtMatch { cases, .. }) => cases
+                .iter()
+                .find_map(|case| find_following_in_body(&case.body, with_range)),
             _ => None,
         },
         None => find_following_in_body(module_body, with_range),
@@ -436,10 +436,12 @@ pub(super) fn following_statements_after_with<'a>(
 }
 
 fn find_following_in_body(body: &[ast::Stmt], with_range: TextRange) -> Option<&[ast::Stmt]> {
-    body.iter().position(|stmt| stmt.range() == with_range).map(|index| {
-        let next = index + 1;
-        &body[next..]
-    })
+    body.iter()
+        .position(|stmt| stmt.range() == with_range)
+        .map(|index| {
+            let next = index + 1;
+            &body[next..]
+        })
 }
 
 fn use_after_with_before_unconditional_rebind(
@@ -478,9 +480,9 @@ fn statement_rebinds_name_before_uses(stmt: &ast::Stmt, name: &str) -> bool {
 
 fn statement_unconditionally_rebinds_name(stmt: &ast::Stmt, name: &str) -> bool {
     match stmt {
-        ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-            targets.iter().any(|target| target_contains_name(target, name))
-        }
+        ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => targets
+            .iter()
+            .any(|target| target_contains_name(target, name)),
         ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
         | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
             target_contains_name(target, name)
@@ -490,19 +492,23 @@ fn statement_unconditionally_rebinds_name(stmt: &ast::Stmt, name: &str) -> bool 
                 .as_deref()
                 .is_some_and(|target| target_contains_name(target, name))
         }),
-        ast::Stmt::FunctionDef(ast::StmtFunctionDef { name: stmt_name, .. })
-        | ast::Stmt::ClassDef(ast::StmtClassDef { name: stmt_name, .. }) => stmt_name.as_str() == name,
+        ast::Stmt::FunctionDef(ast::StmtFunctionDef {
+            name: stmt_name, ..
+        })
+        | ast::Stmt::ClassDef(ast::StmtClassDef {
+            name: stmt_name, ..
+        }) => stmt_name.as_str() == name,
         ast::Stmt::Import(ast::StmtImport { names, .. }) => names.iter().any(|alias| {
-            alias
-                .asname
-                .as_ref()
-                .map_or_else(|| alias.name.id.as_str() == name, |asname| asname.as_str() == name)
+            alias.asname.as_ref().map_or_else(
+                || alias.name.id.as_str() == name,
+                |asname| asname.as_str() == name,
+            )
         }),
         ast::Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names.iter().any(|alias| {
-            alias
-                .asname
-                .as_ref()
-                .map_or_else(|| alias.name.id.as_str() == name, |asname| asname.as_str() == name)
+            alias.asname.as_ref().map_or_else(
+                || alias.name.id.as_str() == name,
+                |asname| asname.as_str() == name,
+            )
         }),
         _ => false,
     }
@@ -520,10 +526,7 @@ fn target_contains_name(target: &Expr, name: &str) -> bool {
 }
 
 fn statement_uses_name(stmt: &ast::Stmt, name: &str) -> bool {
-    let mut visitor = NameUseVisitor {
-        name,
-        found: false,
-    };
+    let mut visitor = NameUseVisitor { name, found: false };
     visitor.visit_stmt(stmt);
     visitor.found
 }
