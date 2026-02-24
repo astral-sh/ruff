@@ -121,6 +121,7 @@ mod tests {
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
+    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102_1.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -501,6 +502,19 @@ mod tests {
     fn invalid_rule_code_external_rules() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF102.py"),
+            &settings::LinterSettings {
+                external: vec!["V".to_string()],
+                ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn invalid_rule_code_external_rules_file_level() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF102_1.py"),
             &settings::LinterSettings {
                 external: vec!["V".to_string()],
                 ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
