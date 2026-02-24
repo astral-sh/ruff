@@ -45,6 +45,16 @@ pub fn all_symbols<'db>(
                     continue;
                 };
 
+                // Note that this will always consider namespace
+                // packages to be "not firsty party." This isn't
+                // necessarily correct, and we can probably improve
+                // on this in response to user feedback. (At time
+                // of writing, 2026-02-13, we don't really handle
+                // namespace packages in auto-import anyway.)
+                let is_non_first_party = module
+                    .search_path(&*db)
+                    .is_none_or(|sp| !sp.is_first_party());
+
                 // By convention, modules starting with an underscore
                 // are generally considered unexported. However, we
                 // should consider first party modules fair game.
@@ -52,11 +62,21 @@ pub fn all_symbols<'db>(
                 // Note that we apply this recursively. e.g.,
                 // `numpy._core.multiarray` is considered private
                 // because it's a child of `_core`.
-                if module.name(&*db).components().any(|c| c.starts_with('_'))
-                    && module
-                        .search_path(&*db)
-                        .is_none_or(|sp| !sp.is_first_party())
+                if is_non_first_party && module.name(&*db).components().any(|c| c.starts_with('_'))
                 {
+                    continue;
+                }
+
+                // Test modules in third-party packages are almost never
+                // useful to import. We filter out:
+                // - Modules where a non-root component is "test" or "tests"
+                //   (e.g., `numpy.tests.test_core`)
+                // - Modules named "conftest" (pytest configuration)
+                //
+                // Note: We intentionally keep top-level "testing" modules
+                // like `pandas.testing` since those provide utilities meant
+                // for external use.
+                if is_non_first_party && is_test_module(module.name(&*db)) {
                     continue;
                 }
                 // TODO: also make it available in `TYPE_CHECKING` blocks
@@ -77,6 +97,11 @@ pub fn all_symbols<'db>(
                         symbols.push(AllSymbolInfo::from_module(&*db, module, file));
                     }
                     for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
+                        // Test functions (starting with `test_`) in third-party
+                        // packages are almost never useful to import.
+                        if is_non_first_party && symbol.name.starts_with("test_") {
+                            continue;
+                        }
                         symbols.push(AllSymbolInfo::from_non_module_symbol(
                             &*db,
                             symbol.to_owned(),
@@ -551,6 +576,30 @@ mod merge {
     }
 }
 
+/// Returns `true` if the module appears to be a test module.
+///
+/// A module is considered a test module if:
+/// - Any non-root component is "test" or "tests" (e.g., `numpy.tests.test_core`)
+/// - The final component is "conftest" (pytest configuration)
+///
+/// Note: Top-level "testing" modules like `pandas.testing` are intentionally
+/// not filtered, as they provide utilities meant for external use.
+fn is_test_module(module_name: &ModuleName) -> bool {
+    // Check if the final component is "conftest" (pytest configuration)
+    if module_name.components().next_back() == Some("conftest") {
+        return true;
+    }
+
+    // Check if any non-root component is "test" or "tests" We skip the
+    // first component since that's usually the name of a PyPI package.
+    // We generally only want to exclude test modules from *inside* a
+    // package.
+    module_name
+        .components()
+        .skip(1)
+        .any(|c| c == "test" || c == "tests")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -603,7 +652,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:27
           |
@@ -649,7 +698,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:37
           |
@@ -694,7 +743,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -745,7 +794,7 @@ def zqzqzq():
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/io/api.py:2:31
           |
@@ -808,7 +857,7 @@ __all__ = ['zqzqzq']
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -840,7 +889,7 @@ def zqzqzq():
             .source("sub1/sub2/sub3.py", "from pandas import zqzqzq as zqzqzq")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -883,7 +932,7 @@ def zqzqzq():
             .source("sub1/sub2/sub3.py", "from pandas import zqzqzq as zqzqzq")
             .build();
 
-        assert_snapshot!(test.all_symbols("zqzqzq"), @r"
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
         info[all-symbols]: AllSymbolInfo
          --> pandas/__init__.py:2:5
           |
@@ -973,6 +1022,157 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
         ");
     }
 
+    /// Tests that first-party test modules are NOT filtered out.
+    /// This ensures developers can still auto-import from their own test code.
+    #[test]
+    fn first_party_test_modules_not_filtered() {
+        let test = CursorTest::builder()
+            .source("main.py", "<CURSOR>")
+            .source("mypackage/__init__.py", "")
+            .source("mypackage/tests/__init__.py", "")
+            .source(
+                "mypackage/tests/test_utils.py",
+                "
+def test_helper_xyzxyzxyz():
+    '''A test helper function'''
+    pass
+",
+            )
+            .build();
+
+        // First-party test symbols should still be available
+        // (both test_ prefixed and non-test_ prefixed)
+        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/tests/test_utils.py:2:5
+          |
+        2 | def test_helper_xyzxyzxyz():
+          |     ^^^^^^^^^^^^^^^^^^^^^
+        3 |     '''A test helper function'''
+        4 |     pass
+          |
+        info: Function test_helper_xyzxyzxyz
+        ");
+    }
+
+    /// Tests that test modules and test functions are filtered out from
+    /// third-party (site-packages) code.
+    #[test]
+    fn third_party_test_modules_filtered() {
+        let test = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "<CURSOR>")
+            // Regular third-party module (should be included)
+            .site_packages("thirdparty/__init__.py", "def useful_xyzxyzxyz(): pass")
+            // A test module (should be filtered)
+            .site_packages("thirdparty/tests/__init__.py", "")
+            // Another test module (should also be filtered).
+            .site_packages(
+                "thirdparty/tests/test_core.py",
+                "def check_xyzxyzxyz(): pass",
+            )
+            // A conftest module (should be filtered)
+            .site_packages("thirdparty/conftest.py", "def fixture_xyzxyzxyz(): pass")
+            // A module with test_ functions (test_ functions should be filtered)
+            .site_packages(
+                "thirdparty/utils.py",
+                "def helper_xyzxyzxyz(): pass\ndef test_something_xyzxyzxyz(): pass",
+            )
+            .build();
+
+        assert_snapshot!(test.all_symbols("xyzxyzxyz"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/utils.py:1:5
+          |
+        1 | def helper_xyzxyzxyz(): pass
+          |     ^^^^^^^^^^^^^^^^
+        2 | def test_something_xyzxyzxyz(): pass
+          |
+        info: Function helper_xyzxyzxyz
+
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/__init__.py:1:5
+          |
+        1 | def useful_xyzxyzxyz(): pass
+          |     ^^^^^^^^^^^^^^^^
+          |
+        info: Function useful_xyzxyzxyz
+        ");
+    }
+
+    /// Tests that first-party "private" modules are NOT filtered out.
+    /// This ensures developers can still auto-import from their unexported
+    /// modules.
+    #[test]
+    fn first_party_underscore_modules_not_filtered() {
+        let test = CursorTest::builder()
+            .source("main.py", "<CURSOR>")
+            .source("mypackage/__init__.py", "")
+            .source("mypackage/_test/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_tests/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_testing/__init__.py", "ZQZQZQ = 1")
+            .source("mypackage/_foo/__init__.py", "ZQZQZQ = 1")
+            .build();
+
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_foo/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_test/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_testing/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+
+        info[all-symbols]: AllSymbolInfo
+         --> mypackage/_tests/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+        ");
+    }
+
+    /// Tests that non-first-party "private" modules ARE filtered out.
+    #[test]
+    fn third_party_underscore_modules_are_filtered() {
+        let test = CursorTest::builder()
+            .with_site_packages()
+            .source("main.py", "<CURSOR>")
+            .site_packages("thirdparty/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_test/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_tests/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_testing/__init__.py", "ZQZQZQ = 1")
+            .site_packages("thirdparty/_foo/__init__.py", "ZQZQZQ = 1")
+            .build();
+
+        assert_snapshot!(test.all_symbols("zqzqzq"), @"
+        info[all-symbols]: AllSymbolInfo
+         --> site-packages/thirdparty/__init__.py:1:1
+          |
+        1 | ZQZQZQ = 1
+          | ^^^^^^
+          |
+        info: Constant ZQZQZQ
+        ");
+    }
+
     impl CursorTest {
         fn all_symbols(&self, query: &str) -> String {
             let symbols = all_symbols(&self.db, self.cursor.file, &QueryPattern::fuzzy(query));
@@ -1024,5 +1224,39 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
 
             main
         }
+    }
+
+    #[test]
+    fn is_test_module_detects_test_directories() {
+        // Test modules (should be filtered for non-first-party)
+        assert!(is_test_module(
+            &ModuleName::new_static("numpy.tests.test_core").unwrap()
+        ));
+        assert!(is_test_module(
+            &ModuleName::new_static("pandas.tests.arithmetic.test_numeric").unwrap()
+        ));
+        assert!(is_test_module(
+            &ModuleName::new_static("requests.test.utils").unwrap()
+        ));
+
+        // Conftest modules (should be filtered)
+        assert!(is_test_module(
+            &ModuleName::new_static("mypackage.conftest").unwrap()
+        ));
+        assert!(is_test_module(&ModuleName::new_static("conftest").unwrap()));
+
+        // Non-test modules (should NOT be filtered)
+        assert!(!is_test_module(&ModuleName::new_static("numpy").unwrap()));
+        assert!(!is_test_module(
+            &ModuleName::new_static("pandas.testing").unwrap()
+        ));
+        assert!(!is_test_module(&ModuleName::new_static("pytest").unwrap()));
+        assert!(!is_test_module(
+            &ModuleName::new_static("unittest").unwrap()
+        ));
+        // Root-level test packages should not be filtered
+        // (the filter only applies to non-root components)
+        assert!(!is_test_module(&ModuleName::new_static("test").unwrap()));
+        assert!(!is_test_module(&ModuleName::new_static("tests").unwrap()));
     }
 }

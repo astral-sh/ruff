@@ -30,6 +30,7 @@ DIRS_TO_WATCH: Final = (
     CRATE_ROOT.parent / "ty_test/src",
 )
 MDTEST_DIR: Final = CRATE_ROOT / "resources" / "mdtest"
+SNAPSHOTS_DIR: Final = MDTEST_DIR / "snapshots"
 MDTEST_README: Final = CRATE_ROOT / "resources" / "README.md"
 
 
@@ -137,6 +138,31 @@ class MDTestRunner:
             check=False,
         )
 
+    @staticmethod
+    def _md_file_for_snapshot(snapshot_path: Path) -> Path | None:
+        """Given a deleted .snap.new path, find the source .md file it belongs to.
+
+        Snapshot filenames follow the pattern:
+            <md_filename>_-_<Section_title>_-_…_(<hash>).snap.new
+        where <md_filename> may be truncated to 20 characters with a trailing
+        Unicode ellipsis (U+2026).
+        """
+        snapshot_name = snapshot_path.name.removesuffix(".new").removesuffix(".snap")
+
+        md_filename = snapshot_name.split("_-_", 1)[0]
+
+        is_truncated = md_filename.endswith("\u2026")
+        if is_truncated:
+            md_filename = md_filename[:-1]
+
+        for md_file in MDTEST_DIR.rglob("*.md"):
+            if is_truncated:
+                if md_file.name.startswith(md_filename):
+                    return md_file.relative_to(MDTEST_DIR)
+            elif md_file.name == md_filename:
+                return md_file.relative_to(MDTEST_DIR)
+        return None
+
     def _run_mdtests_for_file(self, markdown_file: Path) -> None:
         test_name = f"mdtest::{markdown_file}"
 
@@ -195,8 +221,9 @@ class MDTestRunner:
         self.console.print("[dim]Ready to watch for changes...[/dim]")
 
         for changes in watch(*DIRS_TO_WATCH):
-            new_md_files = set()
-            changed_md_files = set()
+            new_md_files: set[Path] = set()
+            changed_md_files: set[Path] = set()
+            rejected_snapshot_md_files: set[Path] = set()
             rust_code_has_changed = False
             vendored_typeshed_has_changed = False
 
@@ -206,6 +233,22 @@ class MDTestRunner:
                 # See above: `README.md` changes trigger a full re-run of all tests
                 if path == MDTEST_README:
                     self._run_mdtest(self.filters)
+                    continue
+
+                # When a pending snapshot (.snap.new) is rejected in a separate
+                # process (e.g. `cargo insta review`), the file is deleted.
+                # A common reason for rejecting a snapshot is that it was stale
+                # (produced by an earlier test run and now outdated). Re-run the
+                # relevant tests so the snapshot is regenerated from the current
+                # state of the code.
+                if (
+                    change == Change.deleted
+                    and path.name.endswith(".snap.new")
+                    and path.is_relative_to(SNAPSHOTS_DIR)
+                ):
+                    md_file = self._md_file_for_snapshot(path)
+                    if md_file is not None:
+                        rejected_snapshot_md_files.add(md_file)
                     continue
 
                 match path.suffix:
@@ -249,7 +292,7 @@ class MDTestRunner:
             ):
                 self._run_mdtest(self.filters)
 
-            for path in new_md_files | changed_md_files:
+            for path in new_md_files | changed_md_files | rejected_snapshot_md_files:
                 self._run_mdtests_for_file(path)
 
 

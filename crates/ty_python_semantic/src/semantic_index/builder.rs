@@ -27,8 +27,8 @@ use crate::semantic_index::definition::{
     ComprehensionDefinitionNodeRef, Definition, DefinitionCategory, DefinitionNodeKey,
     DefinitionNodeRef, Definitions, DictKeyAssignmentNodeRef, ExceptHandlerDefinitionNodeRef,
     ForStmtDefinitionNodeRef, ImportDefinitionNodeRef, ImportFromDefinitionNodeRef,
-    ImportFromSubmoduleDefinitionNodeRef, MatchPatternDefinitionNodeRef,
-    StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
+    ImportFromSubmoduleDefinitionNodeRef, LoopHeaderDefinitionNodeRef, LoopStmtRef,
+    MatchPatternDefinitionNodeRef, StarImportDefinitionNodeRef, WithItemDefinitionNodeRef,
 };
 use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::member::MemberExprBuilder;
@@ -47,25 +47,36 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::scope::{Scope, ScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::use_def::{
-    EnclosingSnapshotKey, FlowSnapshot, ScopedEnclosingSnapshotId, UseDefMapBuilder,
+    EnclosingSnapshotKey, FlowSnapshot, PreviousDefinitions, ScopedEnclosingSnapshotId,
+    UseDefMapBuilder,
 };
-use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
+use crate::semantic_index::{
+    ExpressionsScopeMap, LoopHeader, LoopToken, SemanticIndex, VisibleAncestorsIter,
+    get_loop_header,
+};
 use crate::semantic_model::HasTrackedScope;
 use crate::types::PossiblyNarrowedPlaces;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
 
 mod except_handlers;
+mod loop_bindings_visitor;
 
 #[derive(Clone, Debug, Default)]
 struct Loop {
     /// Flow states at each `break` in the current loop.
     break_states: Vec<FlowSnapshot>,
+    /// Flow states at each `continue` in the current loop.
+    continue_states: Vec<FlowSnapshot>,
 }
 
 impl Loop {
     fn push_break(&mut self, state: FlowSnapshot) {
         self.break_states.push(state);
+    }
+
+    fn push_continue(&mut self, state: FlowSnapshot) {
+        self.continue_states.push(state);
     }
 }
 
@@ -694,10 +705,9 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     /// and the second element is the number of definitions that are now associated with
     /// `definition_node`.
     ///
-    /// This method should only be used when adding a definition associated with a `*` import.
-    /// All other nodes can only ever be associated with exactly 1 or 0 [`Definition`]s.
-    /// For any node other than an [`ast::Alias`] representing a `*` import,
-    /// prefer to use `self.add_definition()`, which ensures that this invariant is maintained.
+    /// Most AST nodes can only be associated with at most one [`Definition`]. Generally prefer
+    /// `add_definition` above, which enforces that. This method should currently only be used with
+    /// `*` imports and loop headers.
     fn push_additional_definition(
         &mut self,
         place: ScopedPlaceId,
@@ -707,6 +717,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Note `definition_node` is guaranteed to be a child of `self.module`
         let kind = definition_node.into_owned(self.module);
+        let is_loop_header = kind.is_loop_header();
 
         let category = kind.category(self.source_type.is_stub(), self.module);
         let is_reexported = kind.is_reexported();
@@ -726,7 +737,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             definitions.len()
         };
 
-        if category.is_binding() {
+        // We need to avoid marking places as bound as soon as we encounter a loop header
+        // definition for them, because that would lead to false-positive semantic syntax errors in
+        // cases like this:
+        // ```py
+        // while True:
+        //     global x  # [invalid-syntax] if `x` is already used or bound
+        //     x = 1
+        // ```
+        if category.is_binding() && !is_loop_header {
             self.mark_place_bound(place);
         }
         if category.is_declaration() {
@@ -741,8 +760,16 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             }
             DefinitionCategory::Declaration => use_def.record_declaration(place, definition),
             DefinitionCategory::Binding => {
-                use_def.record_binding(place, definition);
-                self.delete_associated_bindings(place);
+                // Loop-header bindings don't shadow prior bindings.
+                let previous_definitions = if is_loop_header {
+                    PreviousDefinitions::AreKept
+                } else {
+                    PreviousDefinitions::AreShadowed
+                };
+                use_def.record_binding(place, definition, previous_definitions);
+                if !is_loop_header {
+                    self.delete_associated_bindings(place);
+                }
             }
         }
 
@@ -810,6 +837,65 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 );
             }
         }
+    }
+
+    /// Create loop header definitions for all places that are bound within a loop. Return the
+    /// `LoopToken` referenced by those definitions, and the set of bound place IDs.
+    fn synthesize_loop_header_definitions(
+        &mut self,
+        loop_stmt: LoopStmtRef<'ast>,
+        bound_places: Vec<PlaceExpr>,
+    ) -> (LoopToken<'db>, FxHashSet<ScopedPlaceId>) {
+        let loop_token = LoopToken::new(self.db);
+        let mut bound_place_ids: FxHashSet<ScopedPlaceId> = FxHashSet::default();
+        for place_expr in bound_places {
+            let place_id = self.add_place(place_expr);
+            if bound_place_ids.insert(place_id) {
+                let loop_header_ref = LoopHeaderDefinitionNodeRef {
+                    loop_stmt,
+                    place: place_id,
+                    loop_token,
+                };
+                // Note that `DefinitionKind::LoopHeader` doesn't shadow prior bindings.
+                self.push_additional_definition(place_id, loop_header_ref);
+            }
+        }
+        (loop_token, bound_place_ids)
+    }
+
+    /// Build a `LoopHeader` that tracks all the variables bound in a loop, which will be visible
+    /// to uses in the same loop via "loop header definitions". We call this after merging control
+    /// flow from all the loop-back edges, most importantly at the end of the loop body, and also
+    /// at any `continue` statements.
+    fn populate_loop_header(
+        &mut self,
+        loop_header_places: &FxHashSet<ScopedPlaceId>,
+        loop_token: LoopToken<'db>,
+    ) {
+        let mut loop_header = LoopHeader::new();
+        let use_def = self.current_use_def_map_mut();
+        // Collect bindings.
+        for place_id in loop_header_places {
+            for live_binding in use_def.loop_back_bindings(*place_id) {
+                loop_header.add_binding(*place_id, live_binding);
+            }
+        }
+        // Mark the reachability and narrowing constraints as used.
+        for place_id in loop_header_places {
+            for live_binding in loop_header.bindings_for_place(*place_id) {
+                use_def
+                    .reachability_constraints
+                    .mark_used(live_binding.reachability_constraint);
+                use_def
+                    .reachability_constraints
+                    .mark_used(live_binding.narrowing_constraint);
+            }
+        }
+        // The `LoopHeader` needs to be visible to uses within the loop body that we've already
+        // walked, but all our Salsa state is generally immutable. `specify` is how we work around
+        // that. See this section of the Salsa docs:
+        // <https://salsa-rs.github.io/salsa/overview.html#specify-the-result-of-tracked-functions-for-particular-structs>
+        get_loop_header::specify(self.db, loop_token, loop_header);
     }
 
     fn record_expression_narrowing_constraint(
@@ -1043,6 +1129,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ClassPatternKind::Refutable
                     },
                 )
+            }
+            ast::Pattern::MatchMapping(pattern) => {
+                // `case {}` and `case {**rest}` match every mapping, while keyed mapping
+                // patterns are refutable (`case {"x": _}` may fail for some mappings).
+                PatternPredicateKind::Mapping(if pattern.keys.is_empty() {
+                    ClassPatternKind::Irrefutable
+                } else {
+                    ClassPatternKind::Refutable
+                })
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
@@ -1385,9 +1480,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ));
                 Some(unpackable.as_current_assignment(unpack))
             }
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                Some(unpackable.as_current_assignment(None))
-            }
+            ast::Expr::Name(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_) => Some(unpackable.as_current_assignment(None)),
             _ => None,
         };
 
@@ -2077,15 +2173,36 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
             }
-            ast::Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::While(
+                while_stmt @ ast::StmtWhile {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                    node_index: _,
+                },
+            ) => {
+                // Pre-walk the loop to collect all the bound places, then create a loop header
+                // definition for each bound place. See `struct LoopHeader` for more on this. Loop
+                // header definitions stash a token to look up the `LoopHeader` later, so that we
+                // can populate the header lazily.
+                let bound_places = loop_bindings_visitor::collect_while_loop_bindings(while_stmt);
+                let mut maybe_loop_header_info = None;
+                // Avoid allocating a `LoopToken` if there are no bound places in this loop.
+                if !bound_places.is_empty() {
+                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
+                        LoopStmtRef::While(while_stmt),
+                        bound_places,
+                    ));
+                }
+
+                // Visit the test expression after creating loop headers, so that loop-back values
+                // are visible.
                 self.visit_expr(test);
 
+                // Take the pre_loop snapshot after visiting the test expression, so that walrus
+                // bindings in the test (which are always evaluated at least once) remain visible
+                // after the loop.
                 let pre_loop = self.flow_snapshot();
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
                 self.record_reachability_constraint(predicate);
@@ -2094,11 +2211,23 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
 
+                // Loop-back bindings include everything that's visible if/when control reaches the
+                // end of the loop body, and they also include everything that's visible to a
+                // `continue` statement. Merge the `continue` states before collecting bindings.
+                for continue_state in this_loop.continue_states {
+                    self.flow_merge(continue_state);
+                }
+
+                // Collect all the loop-back bindings (including the `continue` states we just
+                // merged) and populate the `LoopHeader`.
+                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
+                    self.populate_loop_header(&bound_place_ids, loop_token);
+                }
+
                 // We execute the `else` branch once the condition evaluates to false. This could
                 // happen without ever executing the body, if the condition is false the first time
                 // it's tested. Or it could happen if a _later_ evaluation of the condition yields
                 // false. So we merge in the pre-loop state here into the post-body state:
-
                 self.flow_merge(pre_loop);
 
                 // The `else` branch can only be reached if the loop condition *can* be false. To
@@ -2170,11 +2299,38 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 let pre_loop = self.flow_snapshot();
 
+                // Pre-walk the loop to collect all the bound places, then create a loop header
+                // definition for each bound place. See `struct LoopHeader` for more on this. Loop
+                // header definitions stash a token to look up the `LoopHeader` later, so that we
+                // can populate the header lazily.
+                let bound_places = loop_bindings_visitor::collect_for_loop_bindings(for_stmt);
+                let mut maybe_loop_header_info = None;
+                // Avoid allocating a `LoopToken` if there are no bound places in this loop.
+                if !bound_places.is_empty() {
+                    maybe_loop_header_info = Some(self.synthesize_loop_header_definitions(
+                        LoopStmtRef::For(for_stmt),
+                        bound_places,
+                    ));
+                }
+
                 self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
                 let this_loop = self.pop_loop(outer_loop);
+
+                // Loop-back bindings include everything that's visible if/when control reaches the
+                // end of the loop body, and they also include everything that's visible to a
+                // `continue` statement. Merge the `continue` states before collecting bindings.
+                for continue_state in this_loop.continue_states {
+                    self.flow_merge(continue_state);
+                }
+
+                // Collect all the loop-back bindings (including the `continue` states we just
+                // merged) and populate the `LoopHeader`.
+                if let Some((loop_token, bound_place_ids)) = maybe_loop_header_info {
+                    self.populate_loop_header(&bound_place_ids, loop_token);
+                }
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
@@ -2413,8 +2569,17 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_body(finalbody);
             }
 
-            ast::Stmt::Raise(_) | ast::Stmt::Return(_) | ast::Stmt::Continue(_) => {
+            ast::Stmt::Raise(_) | ast::Stmt::Return(_) => {
                 walk_stmt(self, stmt);
+                // Everything in the current block after a terminal statement is unreachable.
+                self.mark_unreachable();
+            }
+
+            ast::Stmt::Continue(_) => {
+                let snapshot = self.flow_snapshot();
+                if let Some(current_loop) = self.current_loop_mut() {
+                    current_loop.push_continue(snapshot);
+                }
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
@@ -2553,8 +2718,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.visit_expr(value);
 
-                // If the statement is a call, it could possibly be a call to a function
-                // marked with `NoReturn` (for example, `sys.exit()`). In this case, we use a special
+                // If the statement is a call (or an `await` wrapping a call), it could
+                // possibly be a call to a function marked with `NoReturn` (for example,
+                // `sys.exit()` or `await async_exit()`). In this case, we use a special
                 // kind of constraint to mark the following code as unreachable.
                 //
                 // Ideally, these constraints should be added for every call expression, even those in
@@ -2566,15 +2732,29 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We also only add these inside function scopes, since considering module-level
                 // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
-                if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                let call_info = match value.as_ref() {
+                    ast::Expr::Call(ast::ExprCall { func, .. }) => {
+                        Some((func.as_ref(), value.as_ref(), false))
+                    }
+                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => match inner.as_ref() {
+                        ast::Expr::Call(ast::ExprCall { func, .. }) => {
+                            Some((func.as_ref(), value.as_ref(), true))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
+
+                if let Some((func, expr, is_await)) = call_info {
                     if !self.source_type.is_stub() && self.in_function_scope() {
                         let callable = self.add_standalone_expression(func);
-                        let call_expr = self.add_standalone_expression(value.as_ref());
+                        let call_expr = self.add_standalone_expression(expr);
 
                         let predicate = Predicate {
                             node: PredicateNode::ReturnsNever(CallableAndCallExpr {
                                 callable,
                                 call_expr,
+                                is_await,
                             }),
                             is_positive: false,
                         };

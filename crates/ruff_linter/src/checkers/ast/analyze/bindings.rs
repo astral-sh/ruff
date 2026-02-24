@@ -26,6 +26,7 @@ pub(crate) fn bindings(checker: &Checker) {
         Rule::CustomTypeVarForSelf,
         Rule::PrivateTypeParameter,
         Rule::UnnecessaryAssign,
+        Rule::UnnecessaryAssignBeforeYield,
     ]) {
         return;
     }
@@ -34,6 +35,14 @@ pub(crate) fn bindings(checker: &Checker) {
         if checker.is_rule_enabled(Rule::UnnecessaryAssign) {
             if binding.kind.is_function_definition() {
                 flake8_return::rules::unnecessary_assign(
+                    checker,
+                    binding.statement(checker.semantic()).unwrap(),
+                );
+            }
+        }
+        if checker.is_rule_enabled(Rule::UnnecessaryAssignBeforeYield) {
+            if binding.kind.is_function_definition() {
+                ruff::rules::unnecessary_assign_before_yield(
                     checker,
                     binding.statement(checker.semantic()).unwrap(),
                 );

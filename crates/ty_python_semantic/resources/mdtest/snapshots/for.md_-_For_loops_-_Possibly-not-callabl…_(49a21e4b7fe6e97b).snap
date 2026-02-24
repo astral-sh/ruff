@@ -18,41 +18,43 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
  3 |         if flag:
  4 |             def __call__(self, *args, **kwargs) -> int:
  5 |                 return 42
- 6 |         else:
- 7 |             __call__: None = None
- 8 | 
- 9 |     class Iterable1:
-10 |         __getitem__: CustomCallable = CustomCallable()
-11 | 
-12 |     class Iterable2:
-13 |         if flag:
-14 |             def __getitem__(self, key: int) -> int:
-15 |                 return 42
-16 |         else:
-17 |             __getitem__: None = None
-18 | 
-19 |     # error: [not-iterable]
-20 |     for x in Iterable1():
-21 |         # TODO... `int` might be ideal here?
-22 |         reveal_type(x)  # revealed: int | Unknown
-23 | 
-24 |     # error: [not-iterable]
-25 |     for y in Iterable2():
-26 |         # TODO... `int` might be ideal here?
-27 |         reveal_type(y)  # revealed: int | Unknown
+ 6 | 
+ 7 |         else:
+ 8 |             __call__: None = None
+ 9 | 
+10 |     class Iterable1:
+11 |         __getitem__: CustomCallable = CustomCallable()
+12 | 
+13 |     class Iterable2:
+14 |         if flag:
+15 |             def __getitem__(self, key: int) -> int:
+16 |                 return 42
+17 | 
+18 |         else:
+19 |             __getitem__: None = None
+20 | 
+21 |     # error: [not-iterable]
+22 |     for x in Iterable1():
+23 |         # TODO... `int` might be ideal here?
+24 |         reveal_type(x)  # revealed: int | Unknown
+25 | 
+26 |     # error: [not-iterable]
+27 |     for y in Iterable2():
+28 |         # TODO... `int` might be ideal here?
+29 |         reveal_type(y)  # revealed: int | Unknown
 ```
 
 # Diagnostics
 
 ```
 error[not-iterable]: Object of type `Iterable1` may not be iterable
-  --> src/mdtest_snippet.py:20:14
+  --> src/mdtest_snippet.py:22:14
    |
-19 |     # error: [not-iterable]
-20 |     for x in Iterable1():
+21 |     # error: [not-iterable]
+22 |     for x in Iterable1():
    |              ^^^^^^^^^^^
-21 |         # TODO... `int` might be ideal here?
-22 |         reveal_type(x)  # revealed: int | Unknown
+23 |         # TODO... `int` might be ideal here?
+24 |         reveal_type(x)  # revealed: int | Unknown
    |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `CustomCallable`, which is not callable
@@ -62,13 +64,13 @@ info: rule `not-iterable` is enabled by default
 
 ```
 error[not-iterable]: Object of type `Iterable2` may not be iterable
-  --> src/mdtest_snippet.py:25:14
+  --> src/mdtest_snippet.py:27:14
    |
-24 |     # error: [not-iterable]
-25 |     for y in Iterable2():
+26 |     # error: [not-iterable]
+27 |     for y in Iterable2():
    |              ^^^^^^^^^^^
-26 |         # TODO... `int` might be ideal here?
-27 |         reveal_type(y)  # revealed: int | Unknown
+28 |         # TODO... `int` might be ideal here?
+29 |         reveal_type(y)  # revealed: int | Unknown
    |
 info: It has no `__iter__` method and its `__getitem__` attribute is invalid
 info: `__getitem__` has type `(bound method Iterable2.__getitem__(key: int) -> int) | None`, which is not callable

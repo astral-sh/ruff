@@ -15,8 +15,8 @@ on:
       - ".github/workflows/publish-ty-playground.yml"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref_name }}
-  cancel-in-progress: true
+  group: publish-ty-playground-${{ github.ref_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   CARGO_INCREMENTAL: 0

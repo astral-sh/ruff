@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
@@ -19,10 +20,10 @@ use crate::types::relation::{
 };
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor, NormalizedVisitor,
-    TypeContext, TypeMapping, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
+    LiteralValueTypeKind, NormalizedVisitor, TypeContext, TypeMapping, VarianceInferable,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
@@ -182,6 +183,20 @@ impl<'db> Type<'db> {
             }
         }
 
+        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
+        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
+        // out assignability). We don't want generators with different return types to be
+        // assignable to each other. In this case we use the result of the nominal check above.
+        if let Some(self_protocol) = self.as_protocol_instance()
+            && let Protocol::FromClass(self_class) = self_protocol.inner
+            && let Protocol::FromClass(proto_class) = protocol.inner
+            && self_class.known(db) == Some(KnownClass::Generator)
+            && proto_class.known(db) == Some(KnownClass::Generator)
+            && Program::get(db).python_version(db) < PythonVersion::PY313
+        {
+            return result;
+        }
+
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
             self_protocol.interface(db).has_relation_to_impl(
                 db,
@@ -239,6 +254,10 @@ impl<'db> NominalInstanceType<'db> {
     /// Returns the name of the class this is an instance of.
     ///
     /// For example, for an instance of `builtins.str`, this returns `"str"`.
+    ///
+    /// As of 2026-02-16, this method is not used in any crates in the Ruff
+    /// repo, but is exposed as a public API for external users of
+    /// `ty_python_semantic`.
     pub fn class_name(&self, db: &'db dyn Db) -> &'db Name {
         self.class(db).name(db)
     }
@@ -249,6 +268,10 @@ impl<'db> NominalInstanceType<'db> {
     /// For example, for an instance of `pathlib.Path`, this returns
     /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
     /// to a known module (e.g. for classes defined in scripts or notebooks).
+    ///
+    /// As of 2026-02-16, this method is not used in any crates in the Ruff
+    /// repo, but is exposed as a public API for external users of
+    /// `ty_python_semantic`.
     pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
         let file = self.class(db).class_literal(db).file(db);
         file_to_module(db, file).map(|module| module.name(db))
@@ -375,8 +398,11 @@ impl<'db> NominalInstanceType<'db> {
         };
 
         let to_u32 = |ty: &Type<'db>| match ty {
-            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
-            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(n) => i32::try_from(n.as_i64()).map(Some).ok(),
+                LiteralValueTypeKind::Bool(b) => Some(Some(i32::from(b))),
+                _ => None,
+            },
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) =>
             {
@@ -792,12 +818,26 @@ impl<'db> ProtocolInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsEquivalentVisitor<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
         }
+
+        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
+        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
+        // out equivalence). We don't want generators with different return types to be equivalent
+        // to each other. In this case we compare the `ClassType`s nominally.
+        if let Protocol::FromClass(self_class) = self.inner
+            && let Protocol::FromClass(other_class) = other.inner
+            && self_class.known(db) == Some(KnownClass::Generator)
+            && other_class.known(db) == Some(KnownClass::Generator)
+            && Program::get(db).python_version(db) < PythonVersion::PY313
+        {
+            return (*self_class).is_equivalent_to_impl(db, *other_class, inferable, visitor);
+        }
+
         let self_normalized = self.normalized(db);
         if self_normalized == Type::ProtocolInstance(other) {
             return ConstraintSet::from(true);

@@ -21,25 +21,26 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
  6 |         a: int
  7 |         b = 42
  8 |         def c(self) -> None: ...
- 9 |     else:
-10 |         d: int
-11 |         e = 56  # error: [ambiguous-protocol-member]
-12 |         def f(self) -> None: ...
-13 | 
-14 | reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["d", "e", "f"]]
+ 9 | 
+10 |     else:
+11 |         d: int
+12 |         e = 56  # error: [ambiguous-protocol-member]
+13 |         def f(self) -> None: ...
+14 | 
+15 | reveal_type(get_protocol_members(Foo))  # revealed: frozenset[Literal["d", "e", "f"]]
 ```
 
 # Diagnostics
 
 ```
 warning[ambiguous-protocol-member]: Cannot assign to undeclared variable in the body of a protocol class
-  --> src/mdtest_snippet.py:11:9
+  --> src/mdtest_snippet.py:12:9
    |
- 9 |     else:
-10 |         d: int
-11 |         e = 56  # error: [ambiguous-protocol-member]
+10 |     else:
+11 |         d: int
+12 |         e = 56  # error: [ambiguous-protocol-member]
    |         ^^^^^^ Consider adding an annotation, e.g. `e: int = ...`
-12 |         def f(self) -> None: ...
+13 |         def f(self) -> None: ...
    |
 info: Assigning to an undeclared variable in a protocol class leads to an ambiguous interface
  --> src/mdtest_snippet.py:4:7

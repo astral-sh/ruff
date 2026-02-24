@@ -260,12 +260,15 @@ use crate::semantic_index::scope::{FileScopeId, ScopeKind, ScopeLaziness};
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::place_state::{
     Bindings, Declarations, EnclosingSnapshot, LiveBindingsIterator, LiveDeclaration,
-    LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
+    LiveDeclarationsIterator, PlaceState,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
 use crate::types::{PossiblyNarrowedPlaces, Truthiness, Type};
 
 mod place_state;
+
+pub(super) use place_state::PreviousDefinitions;
+pub(crate) use place_state::{LiveBinding, ScopedDefinitionId};
 
 /// Applicable definitions and constraints for every use of a name.
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
@@ -389,14 +392,36 @@ impl<'db> UseDefMap<'db> {
         }
     }
 
-    pub(super) fn is_reachable(
+    pub(crate) fn is_reachable(
         &self,
         db: &dyn crate::Db,
         reachability: ScopedReachabilityConstraintId,
     ) -> bool {
+        self.evaluate_reachability(db, reachability).may_be_true()
+    }
+
+    pub(crate) fn evaluate_reachability(
+        &self,
+        db: &dyn crate::Db,
+        reachability: ScopedReachabilityConstraintId,
+    ) -> crate::types::Truthiness {
         self.reachability_constraints
             .evaluate(db, &self.predicates, reachability)
-            .may_be_true()
+    }
+
+    pub(crate) fn definition(&self, id: ScopedDefinitionId) -> DefinitionState<'db> {
+        self.all_definitions[id]
+    }
+
+    pub(crate) fn narrowing_evaluator(
+        &self,
+        constraint: ScopedNarrowingConstraint,
+    ) -> NarrowingEvaluator<'_, 'db> {
+        NarrowingEvaluator {
+            constraint,
+            predicates: &self.predicates,
+            reachability_constraints: &self.reachability_constraints,
+        }
     }
 
     /// Check whether or not a given expression is reachable from the start of the scope. This
@@ -690,7 +715,7 @@ type EnclosingSnapshots = IndexVec<ScopedEnclosingSnapshotId, EnclosingSnapshot>
 
 #[derive(Clone, Debug)]
 pub(crate) struct BindingWithConstraintsIterator<'map, 'db> {
-    all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
+    pub(crate) all_definitions: &'map IndexVec<ScopedDefinitionId, DefinitionState<'db>>,
     pub(crate) predicates: &'map Predicates<'db>,
     pub(crate) reachability_constraints: &'map ReachabilityConstraints,
     pub(crate) boundness_analysis: BoundnessAnalysis,
@@ -919,7 +944,12 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn record_binding(&mut self, place: ScopedPlaceId, binding: Definition<'db>) {
+    pub(super) fn record_binding(
+        &mut self,
+        place: ScopedPlaceId,
+        binding: Definition<'db>,
+        previous_definitions: PreviousDefinitions,
+    ) {
         let bindings = match place {
             ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
             ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
@@ -935,11 +965,13 @@ impl<'db> UseDefMapBuilder<'db> {
         };
         self.declarations_by_binding
             .insert(binding, place_state.declarations().clone());
+
         place_state.record_binding(
             def_id,
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
+            previous_definitions,
         );
 
         let bindings = match place {
@@ -1219,6 +1251,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
+            PreviousDefinitions::AreShadowed,
         );
 
         let reachable_definitions = match place {
@@ -1252,6 +1285,7 @@ impl<'db> UseDefMapBuilder<'db> {
             self.reachability,
             self.is_class_scope,
             place.is_symbol(),
+            PreviousDefinitions::AreShadowed,
         );
     }
 
@@ -1333,6 +1367,21 @@ impl<'db> UseDefMapBuilder<'db> {
             member_states: self.member_states.clone(),
             reachability: self.reachability,
         }
+    }
+
+    /// Get a snapshot of the current bindings for a place. We use this at the end of loop bodies
+    /// to populate the loop header definitions (bindings in the loop body that are visible via
+    /// loop-back to prior uses in the loop body and also to the loop condition).
+    pub(super) fn loop_back_bindings(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = LiveBinding> + '_ {
+        let bindings = match place {
+            ScopedPlaceId::Symbol(symbol) => self.symbol_states[symbol].bindings(),
+            ScopedPlaceId::Member(member) => self.member_states[member].bindings(),
+        };
+
+        bindings.iter().copied()
     }
 
     /// Restore the current builder places state to the given snapshot.

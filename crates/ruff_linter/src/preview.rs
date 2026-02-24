@@ -292,3 +292,13 @@ pub(crate) const fn is_plural_ngettext_check_enabled(settings: &LinterSettings) 
 pub(crate) const fn is_f811_shadowing_in_type_checking_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/19023
+pub(crate) const fn is_resolve_string_annotation_pyi041_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23510
+pub(crate) const fn is_baseloader_safe_in_yaml_load_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}

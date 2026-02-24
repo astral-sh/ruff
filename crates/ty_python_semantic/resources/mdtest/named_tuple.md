@@ -436,7 +436,6 @@ outer class is just a regular class inheriting from it. This is equivalent to:
 
 ```py
 class _Foo(NamedTuple): ...
-
 class Foo(_Foo):  # Regular class, not a namedtuple
     ...
 ```

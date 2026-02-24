@@ -1163,3 +1163,93 @@ help: Import from `typing`
 115 | 
 116 | # https://github.com/astral-sh/ruff/issues/15780
 117 | from typing_extensions import is_typeddict
+
+UP035 [*] Import from `typing` instead: `BinaryIO`
+   --> UP035.py:122:1
+    |
+121 | # UP035 on py37+ only
+122 | from typing.io import BinaryIO
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+123 |
+124 | # UP035 on py37+ only
+    |
+help: Import from `typing`
+119 | from typing_extensions import TypedDict
+120 | 
+121 | # UP035 on py37+ only
+    - from typing.io import BinaryIO
+122 + from typing import BinaryIO
+123 | 
+124 | # UP035 on py37+ only
+125 | from typing.io import IO
+
+UP035 [*] Import from `typing` instead: `IO`
+   --> UP035.py:125:1
+    |
+124 | # UP035 on py37+ only
+125 | from typing.io import IO
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+126 |
+127 | # UP035 on py37+ only
+    |
+help: Import from `typing`
+122 | from typing.io import BinaryIO
+123 | 
+124 | # UP035 on py37+ only
+    - from typing.io import IO
+125 + from typing import IO
+126 | 
+127 | # UP035 on py37+ only
+128 | from typing.io import TextIO
+
+UP035 [*] Import from `typing` instead: `TextIO`
+   --> UP035.py:128:1
+    |
+127 | # UP035 on py37+ only
+128 | from typing.io import TextIO
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+129 |
+130 | # UP035 on py37+ only
+    |
+help: Import from `typing`
+125 | from typing.io import IO
+126 | 
+127 | # UP035 on py37+ only
+    - from typing.io import TextIO
+128 + from typing import TextIO
+129 | 
+130 | # UP035 on py37+ only
+131 | from typing.re import Match
+
+UP035 [*] Import from `re` instead: `Match`
+   --> UP035.py:131:1
+    |
+130 | # UP035 on py37+ only
+131 | from typing.re import Match
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+132 |
+133 | # UP035 on py37+ only
+    |
+help: Import from `re`
+128 | from typing.io import TextIO
+129 | 
+130 | # UP035 on py37+ only
+    - from typing.re import Match
+131 + from re import Match
+132 | 
+133 | # UP035 on py37+ only
+134 | from typing.re import Pattern
+
+UP035 [*] Import from `re` instead: `Pattern`
+   --> UP035.py:134:1
+    |
+133 | # UP035 on py37+ only
+134 | from typing.re import Pattern
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Import from `re`
+131 | from typing.re import Match
+132 | 
+133 | # UP035 on py37+ only
+    - from typing.re import Pattern
+134 + from re import Pattern

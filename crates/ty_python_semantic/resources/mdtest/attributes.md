@@ -747,9 +747,13 @@ If a class variable is additionally qualified as `Final`, we do not union with `
 from typing import Final
 
 class D:
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final1: Final[ClassVar] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final2: ClassVar[Final] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final3: ClassVar[Final[int]] = 1
+    # error: [redundant-final-classvar] "Combining `ClassVar` and `Final` is redundant"
     final4: Final[ClassVar[int]] = 1
 
 reveal_type(D.final1)  # revealed: Literal[1]
@@ -2125,11 +2129,12 @@ of type `Never`):
 ```py
 from typing_extensions import Never, Any
 
-def _(n: Never):
-    reveal_type(n.__setattr__)  # revealed: Never
+def _(never: Never):
+    reveal_type(never.__setattr__)  # revealed: Never
 
+def _(never: Never):
     # No error:
-    n.non_existing = 1
+    never.non_existing = 1
 ```
 
 And similarly for `Any`:
@@ -2698,7 +2703,7 @@ class ManyCycles2:
 
     def f1(self: "ManyCycles2"):
         # TODO: should be Unknown | list[Unknown | int] | list[Divergent]
-        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Divergent] | list[Divergent]
+        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Unknown] | list[Divergent]
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]

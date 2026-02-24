@@ -51,6 +51,7 @@ expression: initialization_result
     "renameProvider": {
       "prepareProvider": true
     },
+    "foldingRangeProvider": true,
     "declarationProvider": true,
     "executeCommandProvider": {
       "commands": [

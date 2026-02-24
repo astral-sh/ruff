@@ -42,39 +42,30 @@ def lossy_decorator(fn: Callable) -> Callable: ...
 class Parent:
     @final
     def foo(self): ...
-
     @final
     @property
     def my_property1(self) -> int: ...
-
     @property
     @final
     def my_property2(self) -> int: ...
-
     @property
     @final
     def my_property3(self) -> int: ...
-
     @final
     @classmethod
     def class_method1(cls) -> int: ...
-
     @classmethod
     @final
     def class_method2(cls) -> int: ...
-
     @final
     @staticmethod
     def static_method1() -> int: ...
-
     @staticmethod
     @final
     def static_method2() -> int: ...
-
     @lossy_decorator
     @final
     def decorated_1(self): ...
-
     @final
     @lossy_decorator
     def decorated_2(self): ...
@@ -87,31 +78,23 @@ class Child(Parent):
     def foo(self): ...
     @property
     def my_property1(self) -> int: ...  # error: [override-of-final-method]
-
     @property
     def my_property2(self) -> int: ...  # error: [override-of-final-method]
     @my_property2.setter
     def my_property2(self, x: int) -> None: ...
-
     @property
     def my_property3(self) -> int: ...  # error: [override-of-final-method]
     @my_property3.deleter
     def my_proeprty3(self) -> None: ...
-
     @classmethod
     def class_method1(cls) -> int: ...  # error: [override-of-final-method]
-
     @staticmethod
     def static_method1() -> int: ...  # error: [override-of-final-method]
-
     @classmethod
     def class_method2(cls) -> int: ...  # error: [override-of-final-method]
-
     @staticmethod
     def static_method2() -> int: ...  # error: [override-of-final-method]
-
     def decorated_1(self): ...  # TODO: should emit [override-of-final-method]
-
     @lossy_decorator
     def decorated_2(self): ...  # TODO: should emit [override-of-final-method]
 
@@ -207,7 +190,6 @@ class Good:
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...
-
     @final
     @overload
     def baz(self, x: str) -> str: ...
@@ -219,7 +201,6 @@ class ChildOfGood(Good):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-
     @overload
     def baz(self, x: str) -> str: ...
     @overload
@@ -232,7 +213,6 @@ class Bad:
     @final
     # error: [invalid-overload]
     def bar(self, x: int) -> int: ...
-
     @overload
     def baz(self, x: str) -> str: ...
     @final
@@ -245,7 +225,6 @@ class ChildOfBad(Bad):
     def bar(self, x: str) -> str: ...
     @overload
     def bar(self, x: int) -> int: ...  # error: [override-of-final-method]
-
     @overload
     def baz(self, x: str) -> str: ...
     @overload
@@ -477,11 +456,13 @@ class A:
     if coinflip():
         @final
         def method1(self) -> None: ...
+
     else:
         def method1(self) -> None: ...
 
     if coinflip():
         def method2(self) -> None: ...
+
     else:
         @final
         def method2(self) -> None: ...
@@ -489,15 +470,18 @@ class A:
     if coinflip():
         @final
         def method3(self) -> None: ...
+
     else:
         @final
         def method3(self) -> None: ...
 
     if coinflip():
         def method4(self) -> None: ...
+
     elif coinflip():
         @final
         def method4(self) -> None: ...
+
     else:
         def method4(self) -> None: ...
 
@@ -518,11 +502,13 @@ class B(A):
 class C(A):
     if coinflip():
         def method1(self) -> None: ...  # error: [override-of-final-method]
+
     else:
         pass
 
     if coinflip():
         def method2(self) -> None: ...  # error: [override-of-final-method]
+
     else:
         def method2(self) -> None: ...
 
@@ -555,6 +541,7 @@ class Parent:
         def foooo(self) -> None: ...
         @final
         def baaaaar(self) -> None: ...
+
     else:
         @final
         def bar(self) -> None: ...
@@ -573,6 +560,7 @@ class Child(Parent):
     if sys.version_info >= (3, 10):
         def foooo(self) -> None: ...  # error: [override-of-final-method]
         def baz(self) -> None: ...
+
     else:
         # Fine because this doesn't override any reachable definitions
         def foooo(self) -> None: ...
@@ -601,6 +589,7 @@ class Foo:
         @overload
         @final
         def method(self, x: int) -> int: ...
+
     else:
         @overload
         def method(self, x: int) -> int: ...
@@ -610,6 +599,7 @@ class Foo:
     if sys.version_info >= (3, 10):
         @overload
         def method2(self, x: int) -> int: ...
+
     else:
         @overload
         @final
@@ -656,7 +646,7 @@ class Base(ABC):
         raise NotImplementedError
 
 @final
-class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` does not implement abstract method `foo`"
+class Derived(Base):  # error: [abstract-method-in-final-class] "Final class `Derived` has unimplemented abstract method `foo`"
     pass
 ```
 
@@ -1028,6 +1018,31 @@ class Final(DynamicMiddle):  # No error; `foo` is implemented by `DynamicMiddle`
     pass
 ```
 
+### Abstract method implemented via a synthesized method
+
+```py
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
+from functools import total_ordering
+from typing import final
+
+class AbstractOrdered(ABC):
+    @abstractmethod
+    def __lt__(self, other): ...
+
+@final
+@dataclass(order=True)
+class ConcreteOrdered(AbstractOrdered): ...  # fine
+
+# total_ordering does not override a comparison method
+# if it already exists in the MRO, even if the one that
+# exists in the MRO is abstract!
+@final
+@total_ordering
+class AlsoConreteOrdered(AbstractOrdered):  # error: [abstract-method-in-final-class]
+    def __gt__(self, other): ...
+```
+
 ### Non-final class with unimplemented abstract methods is fine
 
 Non-final classes are allowed to have unimplemented abstract methods, as they can be implemented by
@@ -1210,6 +1225,17 @@ class BadChild(Base):  # error: [abstract-method-in-final-class]
     f: int
 ```
 
+But we make an exception here for `ClassVar` annotations: we assume in this case that the user will
+dynamically patch the attribute onto the class (e.g., using a metaclass):
+
+```py
+from typing import ClassVar
+
+@final
+class GoodChild(Base):  # fine
+    f: ClassVar[int]
+```
+
 ### Abstract classmethod
 
 A `@final` class must also implement abstract classmethods.
@@ -1289,4 +1315,84 @@ class Base(ABC):
 # TODO: should emit [abstract-method-in-final-class] for `value`, `make`, and `create`
 class Bad(Base):
     pass
+```
+
+### Diagnostic when there are many abstract methods
+
+<!-- snapshot-diagnostics -->
+
+If the class has many unimplemented abstract methods, we do not list them all unless the user has
+specified `--verbose`:
+
+```toml
+verbose = false
+```
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+@final
+# error: [abstract-method-in-final-class] "Final class `Abstract` has 10 unimplemented abstract methods, including `aaaaaaaaaa`, `bbbbbbbb` and `cccccccc`"
+class Abstract(ABC):
+    @abstractmethod
+    def aaaaaaaaaa(self) -> int: ...
+    @abstractmethod
+    def bbbbbbbb(self) -> int: ...
+    @abstractmethod
+    def cccccccc(self) -> int: ...
+    @abstractmethod
+    def ddddddddd(self) -> int: ...
+    @abstractmethod
+    def eeeeeeeee(self) -> int: ...
+    @abstractmethod
+    def ffffffff(self) -> int: ...
+    @abstractmethod
+    def ggggggg(self) -> int: ...
+    @abstractmethod
+    def hhhhhhhh(self) -> int: ...
+    @abstractmethod
+    def iiiiiiiii(self) -> int: ...
+    @abstractmethod
+    def kkkkkkkkkk(self) -> int: ...
+```
+
+### Diagnostic when there are many abstract methods and `--verbose` has been specified
+
+<!-- snapshot-diagnostics -->
+
+If the class has many unimplemented abstract methods, we still list them all if the user has
+specified `--verbose`:
+
+```toml
+verbose = true
+```
+
+```py
+from abc import ABC, abstractmethod
+from typing import final
+
+@final
+# error: [abstract-method-in-final-class] "Final class `Abstract` has unimplemented abstract methods `aaaaaaaaaa`, `bbbbbbbb`, `cccccccc`, `ddddddddd`, `eeeeeeeee`, `ffffffff`, `ggggggg`, `hhhhhhhh`, `iiiiiiiii` and `kkkkkkkkkk`"
+class Abstract(ABC):
+    @abstractmethod
+    def aaaaaaaaaa(self) -> int: ...
+    @abstractmethod
+    def bbbbbbbb(self) -> int: ...
+    @abstractmethod
+    def cccccccc(self) -> int: ...
+    @abstractmethod
+    def ddddddddd(self) -> int: ...
+    @abstractmethod
+    def eeeeeeeee(self) -> int: ...
+    @abstractmethod
+    def ffffffff(self) -> int: ...
+    @abstractmethod
+    def ggggggg(self) -> int: ...
+    @abstractmethod
+    def hhhhhhhh(self) -> int: ...
+    @abstractmethod
+    def iiiiiiiii(self) -> int: ...
+    @abstractmethod
+    def kkkkkkkkkk(self) -> int: ...
 ```

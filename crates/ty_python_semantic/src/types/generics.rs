@@ -1868,6 +1868,7 @@ impl<'db> SpecializationBuilder<'db> {
                 if bound_typevar.is_paramspec(self.db) {
                     return;
                 }
+
                 *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
             }
             Entry::Vacant(entry) => {
@@ -2252,6 +2253,16 @@ impl<'db> SpecializationBuilder<'db> {
                         seen,
                     );
                 }
+            }
+
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::LiteralValue(literal),
+            ) => {
+                // Retry specialization with the literal's fallback instance so literals can
+                // contribute to generic inference for nominal and protocol formals.
+                let actual_instance = literal.fallback_instance(self.db);
+                return self.infer_map_impl(formal, actual_instance, polarity, f, seen);
             }
 
             (formal, Type::ProtocolInstance(actual_protocol)) => {

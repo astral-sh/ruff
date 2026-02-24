@@ -1,0 +1,24 @@
+---
+source: crates/ty_server/tests/e2e/folding_range.rs
+expression: ranges
+---
+[
+  {
+    "startLine": 0,
+    "startCharacter": 0,
+    "endLine": 5,
+    "endCharacter": 25
+  },
+  {
+    "startLine": 1,
+    "startCharacter": 4,
+    "endLine": 2,
+    "endCharacter": 22
+  },
+  {
+    "startLine": 4,
+    "startCharacter": 4,
+    "endLine": 5,
+    "endCharacter": 25
+  }
+]

@@ -797,17 +797,7 @@ impl SemanticSyntaxContext for Checker<'_> {
     }
 
     fn in_async_context(&self) -> bool {
-        for scope in self.semantic.current_scopes() {
-            match scope.kind {
-                ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
-                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
-                ScopeKind::Generator { .. }
-                | ScopeKind::Module
-                | ScopeKind::Type
-                | ScopeKind::DunderClassCell => {}
-            }
-        }
-        false
+        self.semantic.in_async_context()
     }
 
     fn in_await_allowed_context(&self) -> bool {
@@ -3440,6 +3430,20 @@ impl<'a> LintContext<'a> {
         }
 
         guard
+    }
+
+    /// Return a [`DiagnosticGuard`] for reporting a diagnostic, with its fix title deferred, if the
+    /// corresponding rule is enabled.
+    ///
+    /// Prefer [`LintContext::report_diagnostic_if_enabled`] unless you need to attach
+    /// sub-diagnostics before the fix title. See its documentation for more details.
+    pub(crate) fn report_custom_diagnostic_if_enabled<'chk, T: Violation>(
+        &'chk self,
+        kind: T,
+        range: TextRange,
+    ) -> Option<DiagnosticGuard<'chk, 'a>> {
+        self.is_rule_enabled(T::rule())
+            .then(|| self.report_custom_diagnostic(kind, range))
     }
 
     #[inline]

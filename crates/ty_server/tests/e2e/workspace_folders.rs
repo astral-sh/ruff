@@ -649,7 +649,9 @@ fn condensed_workspace_diagnostic_snapshot(report: WorkspaceDiagnosticReportResu
         .join("\n")
 }
 
-fn condensed_document_diagnostic_snapshot(report: DocumentDiagnosticReportResult) -> String {
+pub(crate) fn condensed_document_diagnostic_snapshot(
+    report: DocumentDiagnosticReportResult,
+) -> String {
     match report {
         DocumentDiagnosticReportResult::Report(DocumentDiagnosticReport::Full(full)) => {
             condensed_full_document_diagnostic_report(full.full_document_diagnostic_report)

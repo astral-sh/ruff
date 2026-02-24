@@ -34,6 +34,10 @@ pub(crate) struct MarkdownTestConfig {
 
     /// Project configuration for installing external dependencies.
     pub(crate) project: Option<Project>,
+
+    /// Simulate the use passing `-v` on the command line,
+    /// which can be used to show more information in test diagnostics.
+    pub(crate) verbose: Option<bool>,
 }
 
 impl MarkdownTestConfig {
@@ -63,6 +67,10 @@ impl MarkdownTestConfig {
 
     pub(crate) fn dependencies(&self) -> Option<&[String]> {
         self.project.as_ref()?.dependencies.as_deref()
+    }
+
+    pub(crate) fn verbose(&self) -> bool {
+        self.verbose.unwrap_or_default()
     }
 }
 
@@ -112,6 +120,8 @@ pub(crate) struct Analysis {
     pub(crate) respect_type_ignore_comments: Option<bool>,
 
     pub(crate) allowed_unresolved_imports: Option<Vec<String>>,
+
+    pub(crate) replace_imports_with_any: Option<Vec<String>>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

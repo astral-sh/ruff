@@ -1101,12 +1101,30 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     /// Updates the origin of `__all__` in the current module.
-    ///
-    /// This will clear existing names if the origin is changed to
-    /// mimic the behavior of overriding `__all__` in the current
-    /// module.
     fn update_all_origin(&mut self, origin: DunderAllOrigin) {
-        if self.all_origin.is_some() {
+        // N.B. This used to clear `all_names` whenever there
+        // was *any* previous origin set. Now we skip clearing
+        // it if the previous origin and the new origin are
+        // both "current module." This tends to arise in situation
+        // like this:
+        //
+        //     if sys.version > ...:
+        //         __all__ = ['SomeFancyNewSymbol']
+        //     else:
+        //         __all__ = []
+        //
+        // Clearing is arguably correct here, but auto-import
+        // (unlike ty's own __all__ handling) doesn't yet know
+        // how to evaluate conditionals. So instead of over-writing
+        // __all__, we union it. This will produce incorrect
+        // results in some cases, but the failure mode will be
+        // "suggests symbol that doesn't exist" instead of
+        // "doesn't suggest symbol that does exist." The former
+        // seems preferable (until we know how to evaluate at
+        // least some rudimentary conditionals).
+        if !(matches!(self.all_origin, Some(DunderAllOrigin::CurrentModule))
+            && matches!(origin, DunderAllOrigin::CurrentModule))
+        {
             self.all_names.clear();
         }
         self.all_origin = Some(origin);
@@ -1448,6 +1466,7 @@ mod tests {
     use ruff_db::Db;
     use ruff_db::files::{FileRootKind, system_path_to_file};
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
+    use ruff_python_ast::PythonVersion;
     use ruff_python_trivia::textwrap::dedent;
     use ty_project::{ProjectMetadata, TestDb};
 
@@ -1994,7 +2013,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         ZQZQZQ :: Constant :: Re-exported from `foo`
         __all__ :: Variable :: Re-exported from `foo`
         ",
@@ -2110,7 +2129,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable :: Re-exported from `foo`
         TRICKSY :: Constant
         ",
@@ -2164,7 +2183,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable :: Re-exported from `foo`
         defaultdict :: Variable :: Re-exported from `collections`
         ",
@@ -2259,7 +2278,7 @@ class X:
         // `from foo import *` will try to import it anyway.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable :: Re-exported from `foo`
         TRICKSY :: Constant
         ",
@@ -2378,7 +2397,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
@@ -2407,7 +2426,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
@@ -2436,7 +2455,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
@@ -2466,7 +2485,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2496,7 +2515,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2526,7 +2545,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2556,7 +2575,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2586,7 +2605,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant :: Re-exported from `parent.foo`
         _ZYZYZY :: Constant
         ",
@@ -2618,7 +2637,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("a.py"),
-            @r"
+            @"
         _ZBZBZB :: Constant :: Re-exported from `b`
         _ZAZAZA :: Constant :: Re-exported from `b`
         ",
@@ -2663,7 +2682,7 @@ class X:
         // `_ZBZBZB` instead of `_ZFZFZF`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZFZFZF :: Constant :: Re-exported from `foo`
         _ZYZYZY :: Constant
         ",
@@ -2704,11 +2723,84 @@ class X:
         // answer should just be `_ZFZFZF` and `_ZYZYZY`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZFZFZF :: Constant :: Re-exported from `parent.foo`
         foo :: Module :: Re-exported from `parent`
         _ZYZYZY :: Constant
         __all__ :: Variable
+        ",
+        );
+    }
+
+    /// Tests that a work-around which unions `__all__` values lets
+    /// us find conditionally exported symbols.
+    ///
+    /// However, this also means that we may suggest exported symbols
+    /// even when they aren't available. What we should ideally do is
+    /// evaluate the conditional like ty does, but this requires some
+    /// work. (And it's unlikely auto-import will ever get the full
+    /// evaluation capabilities as ty, so it's likely this sort of
+    /// union work-around will always be something we do in at least
+    /// some cases.)
+    #[test]
+    fn union_all_to_work_around_conditional_symbols_py311() {
+        let test = PublicTestBuilder::default()
+            .python_version(PythonVersion::PY311)
+            .source(
+                "test.py",
+                "
+                import sys
+                if sys.version_info >= (3, 11):
+                    ZQZQZQ = 1
+                else:
+                    ZYZYZY = 1
+
+                if sys.version_info >= (3, 11):
+                    __all__ = ['ZQZQZQ']
+                else:
+                    __all__ = ['ZYZYZY']
+                ",
+            )
+            .build();
+        // Ideally this would only have `ZQZQZQ`.
+        insta::assert_snapshot!(
+            test.exports(),
+            @"
+        ZQZQZQ :: Constant
+        ZYZYZY :: Constant
+        ",
+        );
+    }
+
+    /// Like `union_all_to_work_around_conditional_symbols_py311`, but
+    /// sets the environment Python version to 3.10 so that the conditional
+    /// should evaluate to false.
+    #[test]
+    fn union_all_to_work_around_conditional_symbols_py310() {
+        let test = PublicTestBuilder::default()
+            .python_version(PythonVersion::PY310)
+            .source(
+                "test.py",
+                "
+                import sys
+                if sys.version_info >= (3, 11):
+                    ZQZQZQ = 1
+                else:
+                    ZYZYZY = 1
+
+                if sys.version_info >= (3, 11):
+                    __all__ = ['ZQZQZQ']
+                else:
+                    __all__ = ['ZYZYZY']
+                ",
+            )
+            .build();
+        // Ideally this would only have `ZYZYZY`.
+        insta::assert_snapshot!(
+            test.exports(),
+            @"
+        ZQZQZQ :: Constant
+        ZYZYZY :: Constant
         ",
         );
     }
@@ -2848,16 +2940,17 @@ class C: ...
         /// A list of source files, corresponding to the
         /// file's path and its contents.
         sources: Vec<Source>,
+        /// The python version to use.
+        python_version: Option<PythonVersion>,
     }
 
     impl PublicTestBuilder {
         pub(super) fn build(&self) -> PublicTest {
-            let mut db = TestDb::new(ProjectMetadata::new(
-                "test".into(),
-                SystemPathBuf::from("/"),
-            ));
+            let metadata = ProjectMetadata::new("test".into(), SystemPathBuf::from("/"));
+            let mut db = TestDb::new(metadata);
 
-            db.init_program().unwrap();
+            db.init_program_with_python_version(self.python_version.unwrap_or_default())
+                .unwrap();
 
             for Source { path, contents } in &self.sources {
                 db.write_file(path, contents)
@@ -2895,6 +2988,11 @@ class C: ...
             let path = path.into();
             let contents = dedent(contents.as_ref()).into_owned();
             self.sources.push(Source { path, contents });
+            self
+        }
+
+        pub(super) fn python_version(&mut self, version: PythonVersion) -> &mut PublicTestBuilder {
+            self.python_version = Some(version);
             self
         }
     }

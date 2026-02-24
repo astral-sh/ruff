@@ -399,7 +399,7 @@ reveal_type(x)  # revealed: Foo
 
 ```pyi
 x: int = 1
-reveal_type(x) # revealed: Literal[1]
+reveal_type(x)  # revealed: Literal[1]
 ```
 
 ## Annotations influence generic call inference
@@ -927,7 +927,7 @@ def _(a: int | None):
 
 Regression test for [#1611](https://github.com/astral-sh/ty/issues/1611).
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
@@ -935,4 +935,4 @@ Regression test for [#1611](https://github.com/astral-sh/ty/issues/1611).
 a:'
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->

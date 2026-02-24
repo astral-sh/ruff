@@ -123,16 +123,16 @@ class TarFile:
     OPEN_METH: ClassVar[Mapping[str, str]]
     name: StrOrBytesPath | None
     mode: Literal["r", "a", "w", "x"]
-    fileobj: _Fileobj | None
-    format: _TarFormat | None
+    fileobj: _Fileobj
+    format: _TarFormat
     tarinfo: type[TarInfo]
-    dereference: bool | None
-    ignore_zeros: bool | None
-    encoding: str | None
+    dereference: bool
+    ignore_zeros: bool
+    encoding: str
     errors: str
     fileobject: type[ExFileObject]  # undocumented
     pax_headers: Mapping[str, str]
-    debug: int | None
+    debug: int
     errorlevel: int
     offset: int  # undocumented
     extraction_filter: _FilterFunction | None

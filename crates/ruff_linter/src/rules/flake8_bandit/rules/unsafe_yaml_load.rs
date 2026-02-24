@@ -4,6 +4,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::preview::is_baseloader_safe_in_yaml_load_enabled;
 
 /// ## What it does
 /// Checks for uses of the `yaml.load` function.
@@ -76,7 +77,13 @@ pub(crate) fn unsafe_yaml_load(checker: &Checker, call: &ast::ExprCall) {
                         ["yaml", "SafeLoader" | "CSafeLoader"]
                             | ["yaml", "loader", "SafeLoader" | "CSafeLoader"]
                             | ["yaml", "cyaml", "CSafeLoader"]
-                    )
+                    ) || (is_baseloader_safe_in_yaml_load_enabled(checker.settings())
+                        && matches!(
+                            qualified_name.segments(),
+                            ["yaml", "BaseLoader" | "CBaseLoader"]
+                                | ["yaml", "loader", "BaseLoader" | "CBaseLoader"]
+                                | ["yaml", "cyaml", "CBaseLoader"]
+                        ))
                 })
             {
                 let loader = match loader_arg {

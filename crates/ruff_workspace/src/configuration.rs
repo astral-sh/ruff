@@ -33,7 +33,8 @@ use ruff_linter::settings::types::{
     RequiredVersion, UnsafeFixes,
 };
 use ruff_linter::settings::{
-    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, TASK_TAGS, TargetVersion,
+    DEFAULT_SELECTORS, DUMMY_VARIABLE_RGX, LinterSettings, PREVIEW_DEFAULT_SELECTORS, TASK_TAGS,
+    TargetVersion,
 };
 use ruff_linter::{
     RuleSelector, fs, warn_user_once, warn_user_once_by_id, warn_user_once_by_message,
@@ -278,9 +279,19 @@ impl Configuration {
                     PreviewMode::Disabled => FilePatternSet::try_from_iter(
                         self.include.unwrap_or_else(|| INCLUDE.to_vec()),
                     )?,
-                    PreviewMode::Enabled => FilePatternSet::try_from_iter(
-                        self.include.unwrap_or_else(|| INCLUDE_PREVIEW.to_vec()),
-                    )?,
+                    PreviewMode::Enabled => {
+                        FilePatternSet::try_from_iter(self.include.unwrap_or_else(|| {
+                            let mut patterns = INCLUDE_PREVIEW.to_vec();
+                            if let Some(extension_map) = &self.extension {
+                                patterns.extend(
+                                    extension_map
+                                        .extensions()
+                                        .map(|ext| FilePattern::Config(format!("*.{ext}"))),
+                                );
+                            }
+                            patterns
+                        }))?
+                    }
                 },
                 respect_gitignore: self.respect_gitignore.unwrap_or(true),
                 project_root: project_root.to_path_buf(),
@@ -564,10 +575,7 @@ impl Configuration {
                     })
                     .collect()
             }),
-            // `--extension` is a hidden command-line argument that isn't supported in configuration
-            // files at present.
-            extension: None,
-
+            extension: options.extension.map(ExtensionMapping::from),
             lint: LintConfiguration::from_options(lint, project_root)?,
             format: FormatConfiguration::from_options(
                 options.format.unwrap_or_default(),
@@ -831,8 +839,14 @@ impl LintConfiguration {
             require_explicit: self.explicit_preview_rules.unwrap_or_default(),
         };
 
+        let selectors = if preview.mode.is_enabled() {
+            PREVIEW_DEFAULT_SELECTORS
+        } else {
+            DEFAULT_SELECTORS
+        };
+
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: RuleSet = DEFAULT_SELECTORS
+        let mut select_set: RuleSet = selectors
             .iter()
             .flat_map(|selector| selector.rules(&preview))
             .collect();

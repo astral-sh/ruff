@@ -7,6 +7,7 @@ def _(flag: bool):
     if flag:
         def f() -> int:
             return 1
+
     else:
         def f() -> str:
             return "foo"
@@ -859,6 +860,7 @@ def _(flag: bool):
     if flag:
         def f(x: T) -> int:
             return 1
+
     else:
         def f(x: dict[str, int]) -> int:
             return 1
@@ -867,4 +869,77 @@ def _(flag: bool):
 
     # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `T`, found `dict[str, int] & dict[Unknown | str, Unknown | int]`"
     f({"y": 1})
+```
+
+## Union of intersections with failing bindings
+
+<!-- snapshot-diagnostics -->
+
+When calling a union where one element is an intersection of callables, and all bindings in that
+intersection fail, we should report errors with both union and intersection context.
+
+```py
+from ty_extensions import Intersection
+from typing import Callable
+
+class IntCaller:
+    def __call__(self, x: int) -> int:
+        return x
+
+class StrCaller:
+    def __call__(self, x: str) -> str:
+        return x
+
+class BytesCaller:
+    def __call__(self, x: bytes) -> bytes:
+        return x
+
+def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
+    # Call with None - should fail for IntCaller, StrCaller, and BytesCaller
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    f(None)
+```
+
+## Union semantics with constrained callable typevars
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+Calling through a union that includes a constrained callable `TypeVar` must preserve union
+semantics: all possible callable variants of the constrained `TypeVar` still need to accept the
+argument list.
+
+```py
+from typing import Callable
+
+def test[T: (Callable[[int], int], Callable[[str], str])](
+    f: T | Callable[[int], int],
+) -> None:
+    # `f` may be `Callable[[str], str]`, so this call is not safe.
+    # error: [invalid-argument-type]
+    f(1)
+```
+
+## Union semantics with callable aliases in outer unions
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The same issue appears when the nested union comes from a callable type alias:
+
+```py
+from typing import Callable
+
+type Alias = Callable[[int], int] | Callable[[str], str]
+
+def test_alias(f: Alias | Callable[[int], int]) -> None:
+    # `f` may be `Callable[[str], str]`, so this call is not safe.
+    # error: [invalid-argument-type]
+    f(1)
 ```
