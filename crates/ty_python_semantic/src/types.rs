@@ -3707,7 +3707,7 @@ impl<'db> Type<'db> {
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
                 let constraints = ConstraintSetBuilder::new();
-                let tracked_set = constraints.load(tracked_set.constraints(db));
+                let tracked_set = constraints.load(db, tracked_set.constraints(db));
                 Truthiness::from(tracked_set.is_always_satisfied(db))
             }
 

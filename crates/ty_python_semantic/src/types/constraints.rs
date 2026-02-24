@@ -603,9 +603,11 @@ pub(crate) struct ConstraintSetBuilder<'db> {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
 struct ConstraintSetStorage<'db> {
+    typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
     nodes: IndexVec<NodeId, InteriorNodeData>,
 
+    typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
 
@@ -642,10 +644,14 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
     }
 
-    pub(crate) fn load<'c>(&'c self, other: &OwnedConstraintSet<'db>) -> ConstraintSet<'db, 'c> {
+    pub(crate) fn load<'c>(
+        &'c self,
+        db: &'db dyn Db,
+        other: &OwnedConstraintSet<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         let mut constraints = IndexVec::with_capacity(other.constraints.len());
         for constraint in other.constraints.iter().copied() {
-            constraints.push(self.intern_constraint(constraint));
+            constraints.push(self.intern_constraint(db, constraint));
         }
 
         let mut nodes = IndexVec::with_capacity(other.nodes.len());
@@ -666,7 +672,70 @@ impl<'db> ConstraintSetBuilder<'db> {
         ConstraintSet::from_node(self, remap(other.node, &nodes))
     }
 
-    fn intern_constraint(&self, data: Constraint<'db>) -> ConstraintId {
+    fn intern_typevar(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
+        let identity = typevar.identity(db);
+        let mut storage = self.storage.borrow_mut();
+        if let Some(id) = storage.typevar_cache.get(&identity) {
+            return *id;
+        }
+        let id = storage.typevars.push(identity);
+        storage.typevar_cache.insert(identity, id);
+        id
+    }
+
+    fn intern_mentioned_typevars_in_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+        struct InternMentionedTypevars<'a, 'db> {
+            builder: &'a ConstraintSetBuilder<'db>,
+            recursion_guard: TypeCollector<'db>,
+        }
+
+        impl<'db> TypeVisitor<'db> for InternMentionedTypevars<'_, 'db> {
+            fn should_visit_lazy_type_attributes(&self) -> bool {
+                false
+            }
+
+            fn visit_bound_type_var_type(
+                &self,
+                db: &'db dyn Db,
+                bound_typevar: BoundTypeVarInstance<'db>,
+            ) {
+                self.builder.intern_typevar(db, bound_typevar);
+                walk_bound_type_var_type(db, bound_typevar, self);
+            }
+
+            fn visit_generic_alias_type(&self, db: &'db dyn Db, alias: GenericAlias<'db>) {
+                for ty in alias.specialization(db).types(db) {
+                    self.visit_type(db, *ty);
+                }
+            }
+
+            fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+            }
+        }
+
+        InternMentionedTypevars {
+            builder: self,
+            recursion_guard: TypeCollector::default(),
+        }
+        .visit_type(db, ty);
+    }
+
+    fn intern_constraint_typevars(
+        &self,
+        db: &'db dyn Db,
+        typevar: BoundTypeVarInstance<'db>,
+        lower: Type<'db>,
+        upper: Type<'db>,
+    ) {
+        self.intern_typevar(db, typevar);
+        self.intern_mentioned_typevars_in_type(db, lower);
+        self.intern_mentioned_typevars_in_type(db, upper);
+    }
+
+    fn intern_constraint(&self, db: &'db dyn Db, data: Constraint<'db>) -> ConstraintId {
+        self.intern_constraint_typevars(db, data.typevar, data.lower, data.upper);
+
         let mut storage = self.storage.borrow_mut();
         if let Some(id) = storage.constraint_cache.get(&data) {
             return *id;
@@ -684,6 +753,16 @@ impl<'db> ConstraintSetBuilder<'db> {
         let id = storage.nodes.push(data);
         storage.node_cache.insert(data, id);
         id
+    }
+
+    fn typevar_id(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
+        let identity = typevar.identity(db);
+        self.storage
+            .borrow()
+            .typevar_cache
+            .get(&identity)
+            .copied()
+            .expect("typevar should be interned before ordering")
     }
 
     fn constraint_data(&self, constraint: ConstraintId) -> Constraint<'db> {
@@ -705,8 +784,13 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// any cycles. This particular ordering plays nicely with how we are ordering constraints
     /// within a BDD — it means that if a typevar has another typevar as a bound, all of the
     /// constraints that apply to the bound will appear lower in the BDD.
-    fn can_be_bound_for(self, db: &'db dyn Db, typevar: Self) -> bool {
-        self.identity(db) > typevar.identity(db)
+    fn can_be_bound_for(
+        self,
+        db: &'db dyn Db,
+        builder: &ConstraintSetBuilder<'db>,
+        typevar: Self,
+    ) -> bool {
+        builder.typevar_id(db, self) > builder.typevar_id(db, typevar)
     }
 }
 
@@ -722,6 +806,11 @@ impl IntersectionResult<'_> {
         matches!(self, IntersectionResult::Disjoint)
     }
 }
+
+/// The index of a bound typevar within a [`ConstraintSetStorage`].
+#[newtype_index]
+#[derive(Ord, PartialOrd, salsa::Update, get_size2::GetSize)]
+pub struct TypeVarId;
 
 /// The index of an individual constraint (i.e. a BDD variable) within a [`ConstraintSetStorage`].
 #[newtype_index]
@@ -740,16 +829,20 @@ pub(crate) struct Constraint<'db> {
 impl<'db> Constraint<'db> {
     #[expect(clippy::new_ret_no_self)]
     fn new(
+        db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
     ) -> ConstraintId {
-        builder.intern_constraint(Constraint {
-            typevar,
-            lower,
-            upper,
-        })
+        builder.intern_constraint(
+            db,
+            Constraint {
+                typevar,
+                lower,
+                upper,
+            },
+        )
     }
 
     /// Returns a new range constraint.
@@ -828,7 +921,7 @@ impl<'db> Constraint<'db> {
             {
                 return Node::new_constraint(
                     builder,
-                    Constraint::new(builder, typevar, Type::Never, Type::object()),
+                    Constraint::new(db, builder, typevar, Type::Never, Type::object()),
                     1,
                 )
                 .negate(builder);
@@ -859,6 +952,8 @@ impl<'db> Constraint<'db> {
             return ALWAYS_FALSE;
         }
 
+        builder.intern_constraint_typevars(db, typevar, lower, upper);
+
         // We have an (arbitrary) ordering for typevars. If the upper and/or lower bounds are
         // typevars, we have to ensure that the bounds are "later" according to that order than the
         // typevar being constrained.
@@ -868,40 +963,47 @@ impl<'db> Constraint<'db> {
         match (lower, upper) {
             // L ≤ T ≤ L == (T ≤ [L] ≤ T)
             (Type::TypeVar(lower), Type::TypeVar(upper)) if lower.is_same_typevar_as(db, upper) => {
-                let (bound, typevar) = if lower.can_be_bound_for(db, typevar) {
+                let (bound, typevar) = if lower.can_be_bound_for(db, builder, typevar) {
                     (lower, typevar)
                 } else {
                     (typevar, lower)
                 };
                 Node::new_constraint(
                     builder,
-                    Constraint::new(builder, typevar, Type::TypeVar(bound), Type::TypeVar(bound)),
+                    Constraint::new(
+                        db,
+                        builder,
+                        typevar,
+                        Type::TypeVar(bound),
+                        Type::TypeVar(bound),
+                    ),
                     1,
                 )
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && (T ≤ [U])
             (Type::TypeVar(lower), Type::TypeVar(upper))
-                if typevar.can_be_bound_for(db, lower) && typevar.can_be_bound_for(db, upper) =>
+                if typevar.can_be_bound_for(db, builder, lower)
+                    && typevar.can_be_bound_for(db, builder, upper) =>
             {
                 let lower = Node::new_constraint(
                     builder,
-                    Constraint::new(builder, lower, Type::Never, Type::TypeVar(typevar)),
+                    Constraint::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
                     1,
                 );
                 let upper = Node::new_constraint(
                     builder,
-                    Constraint::new(builder, upper, Type::TypeVar(typevar), Type::object()),
+                    Constraint::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
                     1,
                 );
                 lower.and(builder, upper)
             }
 
             // L ≤ T ≤ U == ([L] ≤ T) && ([T] ≤ U)
-            (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, lower) => {
+            (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, builder, lower) => {
                 let lower = Node::new_constraint(
                     builder,
-                    Constraint::new(builder, lower, Type::Never, Type::TypeVar(typevar)),
+                    Constraint::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
                     1,
                 );
                 let upper = if upper.is_object() {
@@ -913,7 +1015,7 @@ impl<'db> Constraint<'db> {
             }
 
             // L ≤ T ≤ U == (L ≤ [T]) && (T ≤ [U])
-            (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, upper) => {
+            (_, Type::TypeVar(upper)) if typevar.can_be_bound_for(db, builder, upper) => {
                 let lower = if lower.is_never() {
                     ALWAYS_TRUE
                 } else {
@@ -921,13 +1023,17 @@ impl<'db> Constraint<'db> {
                 };
                 let upper = Node::new_constraint(
                     builder,
-                    Constraint::new(builder, upper, Type::TypeVar(typevar), Type::object()),
+                    Constraint::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
                     1,
                 );
                 lower.and(builder, upper)
             }
 
-            _ => Node::new_constraint(builder, Constraint::new(builder, typevar, lower, upper), 1),
+            _ => Node::new_constraint(
+                builder,
+                Constraint::new(db, builder, typevar, lower, upper),
+                1,
+            ),
         }
     }
 }
@@ -3217,7 +3323,7 @@ impl InteriorNode {
                 // have to figure out which of the two typevars is constrained, and which one is
                 // the upper/lower bound.
                 let (bound_constraint, constrained_constraint) =
-                    if left_typevar.can_be_bound_for(db, right_typevar) {
+                    if left_typevar.can_be_bound_for(db, builder, right_typevar) {
                         (left_constraint, right_constraint)
                     } else {
                         (right_constraint, left_constraint)
@@ -3261,7 +3367,7 @@ impl InteriorNode {
                 };
 
                 let new_constraint =
-                    Constraint::new(builder, constrained_typevar, new_lower, new_upper);
+                    Constraint::new(db, builder, constrained_typevar, new_lower, new_upper);
                 if seen_constraints.contains(&new_constraint) {
                     continue;
                 }
@@ -3386,7 +3492,7 @@ impl InteriorNode {
             match left_constraint.intersect(db, builder, right_constraint) {
                 IntersectionResult::Simplified(intersection_constraint_data) => {
                     let intersection_constraint =
-                        builder.intern_constraint(intersection_constraint_data);
+                        builder.intern_constraint(db, intersection_constraint_data);
 
                     // If the intersection is non-empty, we need to create a new constraint to
                     // represent that intersection. We also need to add the new constraint to our
@@ -3976,7 +4082,7 @@ impl SequentMap {
             // Case 1
             (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
                 if !lower_typevar.is_same_typevar_as(db, upper_typevar) {
-                    Constraint::new(builder, lower_typevar, Type::Never, upper)
+                    Constraint::new(db, builder, lower_typevar, Type::Never, upper)
                 } else {
                     return;
                 }
@@ -3984,12 +4090,12 @@ impl SequentMap {
 
             // Case 2
             (Type::TypeVar(lower_typevar), _) => {
-                Constraint::new(builder, lower_typevar, Type::Never, upper)
+                Constraint::new(db, builder, lower_typevar, Type::Never, upper)
             }
 
             // Case 3
             (_, Type::TypeVar(upper_typevar)) => {
-                Constraint::new(builder, upper_typevar, lower, Type::object())
+                Constraint::new(db, builder, upper_typevar, lower, Type::object())
             }
 
             _ => return,
@@ -4070,7 +4176,7 @@ impl SequentMap {
         let right_constraint_data = builder.constraint_data(right_constraint);
         let right_typevar = right_constraint_data.typevar;
         let (bound_constraint, constrained_constraint) =
-            if left_typevar.can_be_bound_for(db, right_typevar) {
+            if left_typevar.can_be_bound_for(db, builder, right_typevar) {
                 (left_constraint, right_constraint)
             } else {
                 (right_constraint, left_constraint)
@@ -4142,7 +4248,8 @@ impl SequentMap {
             _ => return,
         };
 
-        let post_constraint = Constraint::new(builder, constrained_typevar, new_lower, new_upper);
+        let post_constraint =
+            Constraint::new(db, builder, constrained_typevar, new_lower, new_upper);
         self.add_pair_implication(
             db,
             builder,
@@ -4184,7 +4291,7 @@ impl SequentMap {
                     } else {
                         right_upper
                     };
-                    Constraint::new(builder, bound_typevar, right_lower, right_upper)
+                    Constraint::new(db, builder, bound_typevar, right_lower, right_upper)
                 };
                 let post_constraint = match (left_lower, left_upper) {
                     (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
@@ -4247,7 +4354,7 @@ impl SequentMap {
         match left_constraint.intersect(db, builder, right_constraint) {
             IntersectionResult::Simplified(intersection_constraint_data) => {
                 let intersection_constraint =
-                    builder.intern_constraint(intersection_constraint_data);
+                    builder.intern_constraint(db, intersection_constraint_data);
                 tracing::trace!(
                     target: "ty_python_semantic::types::constraints::SequentMap",
                     left = %left_constraint.display(db, builder),
