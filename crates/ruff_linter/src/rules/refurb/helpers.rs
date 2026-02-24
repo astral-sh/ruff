@@ -2,6 +2,7 @@ use std::borrow::Cow;
 
 use ruff_python_ast::PythonVersion;
 use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
+use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -182,12 +183,29 @@ pub(super) fn find_file_opens<'a>(
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     python_version: PythonVersion,
+    following_statements: Option<&'a [ast::Stmt]>,
 ) -> Vec<FileOpen<'a>> {
     with.items
         .iter()
         .filter_map(|item| {
-            find_file_open(item, with, semantic, read_mode, python_version)
-                .or_else(|| find_path_open(item, with, semantic, read_mode, python_version))
+            find_file_open(
+                item,
+                with,
+                semantic,
+                read_mode,
+                python_version,
+                following_statements,
+            )
+            .or_else(|| {
+                find_path_open(
+                    item,
+                    with,
+                    semantic,
+                    read_mode,
+                    python_version,
+                    following_statements,
+                )
+            })
         })
         .collect()
 }
@@ -200,6 +218,7 @@ fn resolve_file_open<'a>(
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
     argument: OpenArgument<'a>,
+    following_statements: Option<&'a [ast::Stmt]>,
 ) -> Option<FileOpen<'a>> {
     match mode {
         OpenMode::ReadText | OpenMode::ReadBytes => {
@@ -220,18 +239,48 @@ fn resolve_file_open<'a>(
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
     let scope = semantic.current_scope();
 
-    let binding = scope.get_all(var.id.as_str()).find_map(|id| {
-        let b = semantic.binding(id);
-        (b.range() == var.range()).then_some(b)
+    let binding_id = scope.get_all(var.id.as_str()).find(|id| {
+        let binding = semantic.binding(*id);
+        binding.range() == var.range()
     })?;
+
+    let binding = semantic.binding(binding_id);
+    let same_name_bindings: Vec<_> = scope.get_all(var.id.as_str()).collect();
+
     let references: Vec<&ResolvedReference> = binding
         .references
         .iter()
         .map(|id| semantic.reference(*id))
+        .collect();
+
+    let next_binding_after_with = same_name_bindings
+        .iter()
+        .copied()
+        .map(|id| semantic.binding(id).start())
+        .filter(|start| *start > with.end())
+        .min();
+
+    let has_use_after_with = same_name_bindings.iter().copied().any(|id| {
+        semantic.binding(id).references.iter().any(|reference_id| {
+            let reference = semantic.reference(*reference_id);
+            reference.start() > with.end()
+                && next_binding_after_with
+                    .is_none_or(|next_binding_start| reference.start() < next_binding_start)
+        })
+    });
+
+    if has_use_after_with
+        || use_after_with_before_unconditional_rebind(var.id.as_str(), following_statements)
+    {
+        return None;
+    }
+
+    let with_references: Vec<&ResolvedReference> = references
+        .into_iter()
         .filter(|reference| with.range().contains_range(reference.range()))
         .collect();
 
-    let [reference] = references.as_slice() else {
+    let [reference] = with_references.as_slice() else {
         return None;
     };
 
@@ -251,6 +300,7 @@ fn find_file_open<'a>(
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     python_version: PythonVersion,
+    following_statements: Option<&'a [ast::Stmt]>,
 ) -> Option<FileOpen<'a>> {
     // We want to match `open(...) as var`.
     let ast::ExprCall {
@@ -287,6 +337,7 @@ fn find_file_open<'a>(
         mode,
         keywords,
         OpenArgument::Builtin { filename },
+        following_statements,
     )
 }
 
@@ -296,6 +347,7 @@ fn find_path_open<'a>(
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
     python_version: PythonVersion,
+    following_statements: Option<&'a [ast::Stmt]>,
 ) -> Option<FileOpen<'a>> {
     let ast::ExprCall {
         func,
@@ -329,7 +381,184 @@ fn find_path_open<'a>(
         OpenArgument::Pathlib {
             path: attr.value.as_ref(),
         },
+        following_statements,
     )
+}
+
+pub(super) fn following_statements_after_with<'a>(
+    with: &ast::StmtWith,
+    with_parent: Option<&'a ast::Stmt>,
+    module_body: &'a [ast::Stmt],
+) -> Option<&'a [ast::Stmt]> {
+    let with_range = with.range();
+    match with_parent {
+        Some(parent) => match parent {
+            ast::Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
+            | ast::Stmt::ClassDef(ast::StmtClassDef { body, .. })
+            | ast::Stmt::With(ast::StmtWith { body, .. })
+            | ast::Stmt::For(ast::StmtFor { body, .. })
+            | ast::Stmt::While(ast::StmtWhile { body, .. }) => {
+                find_following_in_body(body, with_range)
+            }
+            ast::Stmt::If(ast::StmtIf {
+                body,
+                elif_else_clauses,
+                ..
+            }) => find_following_in_body(body, with_range).or_else(|| {
+                elif_else_clauses
+                    .iter()
+                    .find_map(|clause| find_following_in_body(&clause.body, with_range))
+            }),
+            ast::Stmt::Try(ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                ..
+            }) => find_following_in_body(body, with_range)
+                .or_else(|| {
+                    handlers.iter().find_map(|handler| match handler {
+                        ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
+                            body,
+                            ..
+                        }) => find_following_in_body(body, with_range),
+                    })
+                })
+                .or_else(|| find_following_in_body(orelse, with_range))
+                .or_else(|| find_following_in_body(finalbody, with_range)),
+            ast::Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().find_map(|case| {
+                find_following_in_body(&case.body, with_range)
+            }),
+            _ => None,
+        },
+        None => find_following_in_body(module_body, with_range),
+    }
+}
+
+fn find_following_in_body(body: &[ast::Stmt], with_range: TextRange) -> Option<&[ast::Stmt]> {
+    body.iter().position(|stmt| stmt.range() == with_range).map(|index| {
+        let next = index + 1;
+        &body[next..]
+    })
+}
+
+fn use_after_with_before_unconditional_rebind(
+    name: &str,
+    following_statements: Option<&[ast::Stmt]>,
+) -> bool {
+    let Some(following_statements) = following_statements else {
+        return false;
+    };
+
+    for stmt in following_statements {
+        if statement_rebinds_name_before_uses(stmt, name) {
+            return false;
+        }
+        if statement_uses_name(stmt, name) {
+            return true;
+        }
+        if statement_unconditionally_rebinds_name(stmt, name) {
+            return false;
+        }
+    }
+
+    false
+}
+
+fn statement_rebinds_name_before_uses(stmt: &ast::Stmt, name: &str) -> bool {
+    match stmt {
+        ast::Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
+            item.optional_vars
+                .as_deref()
+                .is_some_and(|target| target_contains_name(target, name))
+        }),
+        _ => false,
+    }
+}
+
+fn statement_unconditionally_rebinds_name(stmt: &ast::Stmt, name: &str) -> bool {
+    match stmt {
+        ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+            targets.iter().any(|target| target_contains_name(target, name))
+        }
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
+        | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            target_contains_name(target, name)
+        }
+        ast::Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
+            item.optional_vars
+                .as_deref()
+                .is_some_and(|target| target_contains_name(target, name))
+        }),
+        ast::Stmt::FunctionDef(ast::StmtFunctionDef { name: stmt_name, .. })
+        | ast::Stmt::ClassDef(ast::StmtClassDef { name: stmt_name, .. }) => stmt_name.as_str() == name,
+        ast::Stmt::Import(ast::StmtImport { names, .. }) => names.iter().any(|alias| {
+            alias
+                .asname
+                .as_ref()
+                .map_or_else(|| alias.name.id.as_str() == name, |asname| asname.as_str() == name)
+        }),
+        ast::Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names.iter().any(|alias| {
+            alias
+                .asname
+                .as_ref()
+                .map_or_else(|| alias.name.id.as_str() == name, |asname| asname.as_str() == name)
+        }),
+        _ => false,
+    }
+}
+
+fn target_contains_name(target: &Expr, name: &str) -> bool {
+    match target {
+        Expr::Name(ast::ExprName { id, .. }) => id.as_str() == name,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            elts.iter().any(|elt| target_contains_name(elt, name))
+        }
+        Expr::Starred(ast::ExprStarred { value, .. }) => target_contains_name(value, name),
+        _ => false,
+    }
+}
+
+fn statement_uses_name(stmt: &ast::Stmt, name: &str) -> bool {
+    let mut visitor = NameUseVisitor {
+        name,
+        found: false,
+    };
+    visitor.visit_stmt(stmt);
+    visitor.found
+}
+
+struct NameUseVisitor<'a> {
+    name: &'a str,
+    found: bool,
+}
+
+impl<'a> Visitor<'a> for NameUseVisitor<'_> {
+    fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
+        if self.found {
+            return;
+        }
+        if matches!(stmt, ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_)) {
+            return;
+        }
+        visitor::walk_stmt(self, stmt);
+    }
+
+    fn visit_expr(&mut self, expr: &'a Expr) {
+        if self.found {
+            return;
+        }
+        if matches!(expr, Expr::Lambda(_)) {
+            return;
+        }
+        if let Expr::Name(ast::ExprName { id, ctx, .. }) = expr {
+            if id.as_str() == self.name && matches!(ctx, ast::ExprContext::Load) {
+                self.found = true;
+                return;
+            }
+        }
+        visitor::walk_expr(self, expr);
+    }
 }
 
 /// Match positional arguments. Return expression for the file name and open mode.

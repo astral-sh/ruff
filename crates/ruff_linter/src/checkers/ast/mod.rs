@@ -472,6 +472,11 @@ impl<'a> Checker<'a> {
         self.locator.contents()
     }
 
+    /// The AST body for the current module.
+    pub(crate) fn python_ast(&self) -> &'a [Stmt] {
+        self.parsed.suite()
+    }
+
     /// The [`Stylist`] for the current file, which detects the current line ending, quote, and
     /// indentation style.
     pub(crate) const fn stylist(&self) -> &'a Stylist<'a> {
