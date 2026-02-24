@@ -212,7 +212,11 @@ impl Violation for PytestParametrizeValuesWrongType {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PytestParametrizeValuesWrongType { values, row, is_multi_named } = self;
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_multi_named,
+        } = self;
         if *is_multi_named {
             format!("Wrong values type in `pytest.mark.parametrize` expected `{values}` of `{row}`")
         } else {
@@ -221,7 +225,11 @@ impl Violation for PytestParametrizeValuesWrongType {
     }
 
     fn fix_title(&self) -> Option<String> {
-        let PytestParametrizeValuesWrongType { values, row, is_multi_named } = self;
+        let PytestParametrizeValuesWrongType {
+            values,
+            row,
+            is_multi_named,
+        } = self;
         Some(if *is_multi_named {
             format!("Use `{values}` of `{row}` for parameter values")
         } else {
