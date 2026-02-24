@@ -8,7 +8,6 @@ use crate::AlwaysFixableViolation;
 pub(crate) struct UnusedCodes {
     pub disabled: Vec<String>,
     pub duplicated: Vec<String>,
-    pub unknown: Vec<String>,
     pub unmatched: Vec<String>,
 }
 
@@ -119,16 +118,6 @@ impl AlwaysFixableViolation for UnusedNOQA {
                         "duplicated: {}",
                         codes
                             .duplicated
-                            .iter()
-                            .map(|code| format!("`{code}`"))
-                            .join(", ")
-                    ));
-                }
-                if !codes.unknown.is_empty() {
-                    codes_by_reason.push(format!(
-                        "unknown: {}",
-                        codes
-                            .unknown
                             .iter()
                             .map(|code| format!("`{code}`"))
                             .join(", ")
