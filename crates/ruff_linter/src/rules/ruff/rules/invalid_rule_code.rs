@@ -6,6 +6,7 @@ use crate::checkers::ast::LintContext;
 use crate::fix::edits::delete_comment;
 use crate::noqa::{Code, Directive, FileNoqaDirectives};
 use crate::noqa::{Codes, NoqaDirectives};
+use crate::preview::is_file_level_invalid_rule_code_enabled;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
@@ -110,9 +111,11 @@ pub(crate) fn invalid_noqa_code(
         }
     };
 
-    for line in file_noqa_directives.lines() {
-        if let Directive::Codes(codes) = &line.parsed_file_exemption {
-            check_codes(codes);
+    if is_file_level_invalid_rule_code_enabled(context.settings()) {
+        for line in file_noqa_directives.lines() {
+            if let Directive::Codes(codes) = &line.parsed_file_exemption {
+                check_codes(codes);
+            }
         }
     }
     for line in noqa_directives.lines() {

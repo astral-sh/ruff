@@ -498,29 +498,22 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn invalid_rule_code_external_rules() -> Result<()> {
+    #[test_case(Path::new("ruff/RUF102.py"))]
+    #[test_case(Path::new("ruff/RUF102_1.py"))]
+    fn invalid_rule_code_external_rules(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "invalid_rule_code_external_rules_{}",
+            path.to_string_lossy(),
+        );
         let diagnostics = test_path(
-            Path::new("ruff/RUF102.py"),
+            path,
             &settings::LinterSettings {
                 external: vec!["V".to_string()],
+                preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
             },
         )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn invalid_rule_code_external_rules_file_level() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("ruff/RUF102_1.py"),
-            &settings::LinterSettings {
-                external: vec!["V".to_string()],
-                ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
-            },
-        )?;
-        assert_diagnostics!(diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
