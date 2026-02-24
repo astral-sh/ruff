@@ -1158,6 +1158,43 @@ def _(list_int: list[int], list_any: list[Any]):
     reveal_type(f(*(list_any,)))  # revealed: int
 ```
 
+### Single list argument (complex generics)
+
+Here `Callable[P, R]` in the first overload is an equivalent type to `Callable[P, R]` in the second
+overload, despite the fact that `P` and `R` are scoped to different overload-literals. Evaluation of
+the result of the call is therefore unambiguous: it must evaluate to a `Callable` type rather
+`Unknown`/`Any`:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload, Callable
+
+class Foo: ...
+
+class Decorator:
+    @overload
+    def __call__[**P, R](self, task_runner: None) -> Callable[P, R]: ...
+    @overload
+    def __call__[**P, R](self, task_runner: Foo) -> Callable[P, R]: ...
+```
+
+`main.py`:
+
+```py
+from typing import Any
+from overloaded import Decorator
+
+def test(decorator: Decorator, argument: Any):
+    # revealed: [**P'return, R'return](**P'return) -> R'return
+    reveal_type(decorator(argument))
+```
+
 ### Single list argument (ambiguous)
 
 The overload definition is the same as above, but the return type of the second overload is changed
