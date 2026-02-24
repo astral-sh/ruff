@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf-8")`
+ --> FURB101_2.py:2:6
+  |
+1 | # FURB101
+2 | with open("file.txt", encoding="utf-8") as f:
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 |     _ = f.read()
+4 | f = object()
+  |
+help: Replace with `Path("file.txt").read_text(encoding="utf-8")`
+1 | # FURB101
+  - with open("file.txt", encoding="utf-8") as f:
+  -     _ = f.read()
+2 + import pathlib
+3 + _ = pathlib.Path("file.txt").read_text(encoding="utf-8")
+4 | f = object()
+5 | print(f)
+6 |

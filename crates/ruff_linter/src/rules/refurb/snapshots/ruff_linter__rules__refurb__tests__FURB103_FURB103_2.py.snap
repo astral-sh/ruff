@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/refurb/mod.rs
+---
+FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("\n", encoding="utf-8")`
+ --> FURB103_2.py:2:6
+  |
+1 | # FURB103
+2 | with open("file.txt", "w", encoding="utf-8") as f:
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 |     f.write("\n")
+4 | f = object()
+  |
+help: Replace with `Path("file.txt").write_text("\n", encoding="utf-8")`
+1 | # FURB103
+  - with open("file.txt", "w", encoding="utf-8") as f:
+  -     f.write("\n")
+2 + import pathlib
+3 + pathlib.Path("file.txt").write_text("\n", encoding="utf-8")
+4 | f = object()
+5 | print(f)
+6 |
