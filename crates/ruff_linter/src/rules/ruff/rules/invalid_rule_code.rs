@@ -4,7 +4,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use crate::Locator;
 use crate::checkers::ast::LintContext;
 use crate::fix::edits::delete_comment;
-use crate::noqa::{Code, Directive};
+use crate::noqa::{Code, Directive, FileNoqaDirectives};
 use crate::noqa::{Codes, NoqaDirectives};
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
@@ -83,33 +83,41 @@ impl AlwaysFixableViolation for InvalidRuleCode {
 /// RUF102 for invalid noqa codes
 pub(crate) fn invalid_noqa_code(
     context: &LintContext,
+    file_noqa_directives: &FileNoqaDirectives,
     noqa_directives: &NoqaDirectives,
     locator: &Locator,
     external: &[String],
 ) {
-    for line in noqa_directives.lines() {
-        let Directive::Codes(directive) = &line.directive else {
-            continue;
-        };
-
-        let all_valid = directive
+    let check_codes = |codes: &Codes<'_>| {
+        let all_valid = codes
             .iter()
             .all(|code| code_is_valid(code.as_str(), external));
 
         if all_valid {
-            continue;
+            return;
         }
 
-        let (valid_codes, invalid_codes): (Vec<_>, Vec<_>) = directive
+        let (valid_codes, invalid_codes): (Vec<_>, Vec<_>) = codes
             .iter()
             .partition(|&code| code_is_valid(code.as_str(), external));
 
         if valid_codes.is_empty() {
-            all_codes_invalid_diagnostic(directive, invalid_codes, locator, context);
+            all_codes_invalid_diagnostic(codes, invalid_codes, locator, context);
         } else {
             for invalid_code in invalid_codes {
-                some_codes_are_invalid_diagnostic(directive, invalid_code, locator, context);
+                some_codes_are_invalid_diagnostic(codes, invalid_code, locator, context);
             }
+        }
+    };
+
+    for line in file_noqa_directives.lines() {
+        if let Directive::Codes(codes) = &line.parsed_file_exemption {
+            check_codes(codes);
+        }
+    }
+    for line in noqa_directives.lines() {
+        if let Directive::Codes(codes) = &line.directive {
+            check_codes(codes);
         }
     }
 }
