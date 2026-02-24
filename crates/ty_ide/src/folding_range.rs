@@ -2,7 +2,8 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_body};
-use ruff_python_ast::{AnyNodeRef, Stmt};
+use ruff_python_ast::{AnyNodeRef, Decorator, Stmt, StmtClassDef, StmtFunctionDef};
+use ruff_python_trivia::{SimpleTokenKind, SimpleTokenizer};
 use ruff_source_file::{Line, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -223,6 +224,54 @@ impl<'a> FoldingRangeVisitor<'a> {
         }
         self.add_range(FoldingRange::from(first_stmt.range()).with_kind(FoldingRangeKind::Comment));
     }
+
+    /// Add a folding range for decorators applied to a class or function.
+    fn add_decorator_range(&mut self, decorator_list: &[Decorator]) {
+        if !decorator_list.is_empty() {
+            let range = TextRange::new(
+                decorator_list.first().unwrap().start(),
+                decorator_list.last().unwrap().end(),
+            );
+            self.add_range(range);
+        }
+    }
+
+    /// Add a folding range for the function or class definition.
+    ///
+    /// - target is `async` or `def` for functions, and `class` for classes
+    fn add_def_range(
+        &mut self,
+        range: TextRange,
+        decorator_list: &[Decorator],
+        target: SimpleTokenKind,
+    ) {
+        if decorator_list.is_empty() {
+            self.add_range(range);
+            return;
+        }
+
+        let tokenizer_start = decorator_list.last().unwrap().range().end();
+        let tokenizer = SimpleTokenizer::starts_at(tokenizer_start, &self.source);
+        if let Some(token) = tokenizer.skip_trivia().find(|token| token.kind == target) {
+            let range = TextRange::new(token.start(), range.end());
+            self.add_range(range);
+        }
+    }
+
+    /// Add a folding range for function definitions, excluding decorators.
+    fn add_function_def_range(&mut self, func: &StmtFunctionDef) {
+        let target = if func.is_async {
+            SimpleTokenKind::Async
+        } else {
+            SimpleTokenKind::Def
+        };
+        self.add_def_range(func.range(), &func.decorator_list, target);
+    }
+
+    /// Add a folding range for class definitions, excluding decorators.
+    fn add_class_def_range(&mut self, class: &StmtClassDef) {
+        self.add_def_range(class.range(), &class.decorator_list, SimpleTokenKind::Class);
+    }
 }
 
 impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
@@ -230,7 +279,8 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
         match node {
             // Compound statements that create folding regions
             AnyNodeRef::StmtFunctionDef(func) => {
-                self.add_range(func.range());
+                self.add_decorator_range(&func.decorator_list);
+                self.add_function_def_range(&func);
                 // Note that this may be duplicative with folding
                 // ranges added for string literals. But I don't think
                 // the LSP protocol specifies that this is a problem.
@@ -241,7 +291,8 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
                 self.add_docstring_range(&func.body);
             }
             AnyNodeRef::StmtClassDef(class) => {
-                self.add_range(class.range());
+                self.add_decorator_range(&class.decorator_list);
+                self.add_class_def_range(&class);
                 // See comment above for class docstrings about this
                 // being duplicative with adding folding ranges for
                 // string literals.
