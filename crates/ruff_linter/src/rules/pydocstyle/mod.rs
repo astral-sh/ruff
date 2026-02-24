@@ -203,6 +203,38 @@ mod tests {
     }
 
     #[test]
+    fn d420_numpy() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D420_numpy.py"),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    convention: Some(Convention::Numpy),
+                    ..Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::SectionOrderIncorrect)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d420_google() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D420_google.py"),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    convention: Some(Convention::Google),
+                    ..Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::SectionOrderIncorrect)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn d209_d400() -> Result<()> {
         let diagnostics = test_path(
             Path::new("pydocstyle/D209_D400.py"),
