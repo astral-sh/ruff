@@ -1,4 +1,11 @@
 ---
 source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
 ---
-
+UP046 Generic class `KeywordArguments` uses `Generic` subclass instead of type parameters
+  --> UP046_2.py:16:24
+   |
+16 | class KeywordArguments(Generic[T], metaclass=type):
+   |                        ^^^^^^^^^^
+17 |     var: T
+   |
+help: Use type parameters
