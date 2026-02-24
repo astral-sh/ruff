@@ -371,7 +371,9 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
     }
 
     // Imports inside `if TYPE_CHECKING:` are not executed at runtime.
-    let is_type_checking_block = checker.semantic().in_type_checking_block();
+    if checker.semantic().in_type_checking_block() {
+        return;
+    }
 
     match stmt {
         Stmt::Import(ast::StmtImport { names, .. }) => {
@@ -400,16 +402,10 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                         checker.report_diagnostic_if_enabled(SuspiciousXmlExpatImport, name.range);
                     }
                     "xml.dom.minidom" => {
-                        if is_type_checking_block {
-                            continue;
-                        }
                         checker
                             .report_diagnostic_if_enabled(SuspiciousXmlMinidomImport, name.range);
                     }
                     "xml.dom.pulldom" => {
-                        if is_type_checking_block {
-                            continue;
-                        }
                         checker
                             .report_diagnostic_if_enabled(SuspiciousXmlPulldomImport, name.range);
                     }
@@ -491,18 +487,12 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                                 );
                             }
                             "minidom" => {
-                                if is_type_checking_block {
-                                    continue;
-                                }
                                 checker.report_diagnostic_if_enabled(
                                     SuspiciousXmlMinidomImport,
                                     identifier.range(),
                                 );
                             }
                             "pulldom" => {
-                                if is_type_checking_block {
-                                    continue;
-                                }
                                 checker.report_diagnostic_if_enabled(
                                     SuspiciousXmlPulldomImport,
                                     identifier.range(),
@@ -517,18 +507,12 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                         .report_diagnostic_if_enabled(SuspiciousXmlExpatImport, identifier.range());
                 }
                 "xml.dom.minidom" => {
-                    if is_type_checking_block {
-                        return;
-                    }
                     checker.report_diagnostic_if_enabled(
                         SuspiciousXmlMinidomImport,
                         identifier.range(),
                     );
                 }
                 "xml.dom.pulldom" => {
-                    if is_type_checking_block {
-                        return;
-                    }
                     checker.report_diagnostic_if_enabled(
                         SuspiciousXmlPulldomImport,
                         identifier.range(),
