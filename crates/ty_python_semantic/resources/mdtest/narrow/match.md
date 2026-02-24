@@ -123,7 +123,7 @@ def f(x: Covariant[int]):
 ```py
 from collections.abc import Mapping
 
-def test_instance(x: dict | int) -> None:
+def test_isinstance(x: dict | int) -> None:
     if isinstance(x, Mapping):
         reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
     else:
@@ -136,10 +136,21 @@ def test_match(x: dict | int) -> None:
         case _:
             reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
 
+def test_match_double_star(x: dict | int) -> None:
+    match x:
+        case {**rest}:
+            reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+        case _:
+            reveal_type(x)  # revealed: int & ~Top[Mapping[Unknown, object]]
+
 def test_match_refutable(x: dict | int) -> None:
     match x:
         case {"k": _}:
             reveal_type(x)  # revealed: dict[Unknown, Unknown] | (int & Top[Mapping[Unknown, object]])
+
+            # TODO: no error here
+            # error: [invalid-argument-type]
+            reveal_type(x["k"])  # revealed: object
         case _:
             reveal_type(x)  # revealed: dict[Unknown, Unknown] | int
 ```
