@@ -6593,6 +6593,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 self.infer_definition(name);
             }
+            ast::Expr::Starred(ast::ExprStarred {
+                value: starred_value,
+                ..
+            }) => {
+                self.infer_target_impl(starred_value, value, infer_assigned_ty);
+            }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let assigned_ty = infer_assigned_ty.map(|f| f(self, TypeContext::default()));
