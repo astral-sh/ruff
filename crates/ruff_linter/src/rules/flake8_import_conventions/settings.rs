@@ -78,32 +78,26 @@ pub fn default_aliases(preview: PreviewMode) -> FxHashMap<String, String> {
         .collect::<FxHashMap<_, _>>();
 
     if is_expanded_import_conventions_enabled(preview) {
-        aliases.extend(preview_aliases());
+        aliases.extend(
+            PREVIEW_ALIASES
+                .iter()
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
+                .collect::<FxHashMap<_, _>>(),
+        );
     }
 
     aliases
 }
 
 pub fn default_banned_aliases(preview: PreviewMode) -> FxHashMap<String, BannedAliases> {
-    let mut banned_aliases = FxHashMap::default();
     if preview.is_enabled() {
-        banned_aliases.extend(preview_banned_aliases());
+        FxHashMap::from_iter([(
+            "geopandas".to_string(),
+            BannedAliases::from_iter(["gpd".to_string()]),
+        )])
+    } else {
+        FxHashMap::default()
     }
-    banned_aliases
-}
-
-pub fn preview_aliases() -> FxHashMap<String, String> {
-    PREVIEW_ALIASES
-        .iter()
-        .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-        .collect::<FxHashMap<_, _>>()
-}
-
-pub fn preview_banned_aliases() -> FxHashMap<String, BannedAliases> {
-    FxHashMap::from_iter([(
-        "geopandas".to_string(),
-        BannedAliases::from_iter(["gpd".to_string()]),
-    )])
 }
 
 impl Settings {
