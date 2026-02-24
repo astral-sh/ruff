@@ -2,6 +2,7 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -788,18 +789,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Creates a definition for each key-value assignment in the dictionary.
     //
-    // If there are multiple targets, a given key-value definition will be created multiple
-    // times for each target.
+    // If there are multiple targets, no definitions will be created.
     fn add_dict_key_assignment_definitions(
         &mut self,
         targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
         dict: &'ast ast::ExprDict,
         assignment: Definition<'db>,
     ) {
-        for target in targets {
-            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
-                self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
-            }
+        // TODO: Although we synthesize place expressions for each dictionary key, the definition
+        // is still uniquely associated with the AST node of the key expression, and so multiple target
+        // places cannot refer to the same key.
+        let Ok(target) = targets.into_iter().exactly_one() else {
+            return;
+        };
+
+        if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+            self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
         }
     }
 
