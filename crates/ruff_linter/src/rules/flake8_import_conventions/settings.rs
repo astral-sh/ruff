@@ -81,8 +81,7 @@ pub fn default_aliases(preview: PreviewMode) -> FxHashMap<String, String> {
         aliases.extend(
             PREVIEW_ALIASES
                 .iter()
-                .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
-                .collect::<FxHashMap<_, _>>(),
+                .map(|(k, v)| ((*k).to_string(), (*v).to_string())),
         );
     }
 
