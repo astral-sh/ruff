@@ -4891,8 +4891,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Ok(param_type);
                     }
 
-                    Type::KnownInstance(known_instance @ KnownInstanceType::TypeVar(typevar))
-                        if known_instance.class(self.db()) == KnownClass::ParamSpec =>
+                    Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                        if typevar.is_paramspec(db) =>
                     {
                         if let Some(diagnostic_builder) =
                             self.context.report_lint(&INVALID_TYPE_ARGUMENTS, expr)
@@ -16473,12 +16473,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // that's generic over a legacy TypeVarTuple
             } else if typevars_len == 0 {
                 // Type parameter list cannot be empty, so if we reach here, `value_ty` is not a generic type.
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&NOT_SUBSCRIPTABLE, &*subscript.value)
-                {
-                    let mut diagnostic =
-                        builder.into_diagnostic("Cannot subscript non-generic type");
+                if let Some(builder) = self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
+                    let mut diagnostic = builder.into_diagnostic(format_args!(
+                        "Cannot subscript non-generic type `{}`",
+                        value_ty.display(db)
+                    ));
                     if match value_ty {
                         Type::GenericAlias(_) => true,
                         Type::KnownInstance(KnownInstanceType::UnionType(union)) => union
@@ -16486,10 +16485,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .is_ok_and(|mut tys| tys.any(|ty| ty.is_generic_alias())),
                         _ => false,
                     } {
-                        diagnostic.set_primary_message(format_args!(
-                            "`{}` is already specialized",
-                            value_ty.display(db)
-                        ));
+                        diagnostic.annotate(
+                            self.context
+                                .secondary(&*subscript.value)
+                                .message("Type is already specialized"),
+                        );
                     }
                 }
                 error = Some(ExplicitSpecializationError::NonGeneric);

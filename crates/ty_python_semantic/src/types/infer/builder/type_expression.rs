@@ -1023,7 +1023,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                         {
                             let mut diagnostic =
-                                builder.into_diagnostic("Cannot subscript non-generic type alias");
+                                builder.into_diagnostic("Cannot specialize non-generic type alias");
                             diagnostic.set_primary_message("Double specialization is not allowed");
                         }
                         return Type::unknown();
@@ -1052,14 +1052,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if let Some(builder) =
                                 self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                             {
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Cannot specialize non-generic type alias `{}`",
+                                    type_alias.name(self.db())
+                                ));
+                                let secondary = self.context.secondary(&*subscript.value);
                                 let value_type = type_alias.raw_value_type(self.db());
-                                let mut diagnostic = builder
-                                    .into_diagnostic("Cannot subscript non-generic type alias");
-                                if value_type.is_definition_generic(self.db()) {
-                                    diagnostic.set_primary_message(format_args!(
-                                        "`{}` is already specialized",
-                                        value_type.display(self.db()),
-                                    ));
+                                if value_type.is_specialized_generic(self.db()) {
+                                    diagnostic.annotate(secondary.message(format_args!(
+                                        "Alias to `{}`, which is already specialized",
+                                        value_type.display(self.db())
+                                    )));
+                                } else {
+                                    diagnostic.annotate(secondary.message(format_args!(
+                                        "Alias to `{}`, which is not generic",
+                                        value_type.display(self.db())
+                                    )));
                                 }
                             }
 
