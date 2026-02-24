@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_pytest_style/mod.rs
 ---
-PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tuple`
+PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list`
  --> PT007.py:4:35
   |
 4 | @pytest.mark.parametrize("param", (1, 2))
@@ -9,7 +9,7 @@ PT007 [*] Wrong values type in `pytest.mark.parametrize` expected `list` of `tup
 5 | def test_tuple(param):
 6 |     ...
   |
-help: Use `list` of `tuple` for parameter values
+help: Use `list` for parameter values
 1 | import pytest
 2 | 
 3 | 
