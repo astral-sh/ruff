@@ -1,23 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF100 [*] Unused `noqa` directive (unknown: `INVALID123`)
- --> RUF102.py:2:12
-  |
-1 | # Invalid code
-2 | import os  # noqa: INVALID123
-  |            ^^^^^^^^^^^^^^^^^^
-3 | # External code
-4 | import re  # noqa: V123
-  |
-help: Remove unused `noqa` directive
-1 | # Invalid code
-  - import os  # noqa: INVALID123
-2 + import os
-3 | # External code
-4 | import re  # noqa: V123
-5 | # Valid noqa
-
 RUF102 [*] Invalid rule code in `# noqa`: INVALID123
  --> RUF102.py:2:12
   |
@@ -56,7 +39,7 @@ help: Remove unused `noqa` directive
 8 | from itertools import product  # Preceeding comment # noqa: INVALID789
 9 | # Succeeding comment
 
-RUF100 [*] Unused `noqa` directive (non-enabled: `F401`; unknown: `INVALID456`)
+RUF100 [*] Unused `noqa` directive (non-enabled: `F401`)
  --> RUF102.py:7:51
   |
 5 | # Valid noqa
@@ -97,26 +80,6 @@ help: Remove the rule code `INVALID456`
 9  | # Succeeding comment
 10 | import math # noqa: INVALID000 # Succeeding comment
 
-RUF100 [*] Unused `noqa` directive (unknown: `INVALID789`)
-  --> RUF102.py:8:53
-   |
- 6 | import sys  # noqa: E402
- 7 | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
- 8 | from itertools import product  # Preceeding comment # noqa: INVALID789
-   |                                                     ^^^^^^^^^^^^^^^^^^
- 9 | # Succeeding comment
-10 | import math # noqa: INVALID000 # Succeeding comment
-   |
-help: Remove unused `noqa` directive
-5  | # Valid noqa
-6  | import sys  # noqa: E402
-7  | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
-   - from itertools import product  # Preceeding comment # noqa: INVALID789
-8  + from itertools import product  # Preceeding comment
-9  | # Succeeding comment
-10 | import math # noqa: INVALID000 # Succeeding comment
-11 | # Mixed valid and invalid
-
 RUF102 [*] Invalid rule code in `# noqa`: INVALID789
   --> RUF102.py:8:53
    |
@@ -137,26 +100,6 @@ help: Remove the `# noqa` comment
 9  | # Succeeding comment
 10 | import math # noqa: INVALID000 # Succeeding comment
 11 | # Mixed valid and invalid
-
-RUF100 [*] Unused `noqa` directive (unknown: `INVALID000`)
-  --> RUF102.py:10:13
-   |
- 8 | from itertools import product  # Preceeding comment # noqa: INVALID789
- 9 | # Succeeding comment
-10 | import math # noqa: INVALID000 # Succeeding comment
-   |             ^^^^^^^^^^^^^^^^^^
-11 | # Mixed valid and invalid
-12 | from typing import List  # noqa: F401, INVALID123
-   |
-help: Remove unused `noqa` directive
-7  | from functools import cache  # Preceeding comment # noqa: F401, INVALID456
-8  | from itertools import product  # Preceeding comment # noqa: INVALID789
-9  | # Succeeding comment
-   - import math # noqa: INVALID000 # Succeeding comment
-10 + import math # Succeeding comment
-11 | # Mixed valid and invalid
-12 | from typing import List  # noqa: F401, INVALID123
-13 | # Test for multiple invalid
 
 RUF102 [*] Invalid rule code in `# noqa`: INVALID000
   --> RUF102.py:10:13
@@ -179,7 +122,7 @@ help: Remove the `# noqa` comment
 12 | from typing import List  # noqa: F401, INVALID123
 13 | # Test for multiple invalid
 
-RUF100 [*] Unused `noqa` directive (non-enabled: `F401`; unknown: `INVALID123`)
+RUF100 [*] Unused `noqa` directive (non-enabled: `F401`)
   --> RUF102.py:12:26
    |
 10 | import math # noqa: INVALID000 # Succeeding comment
@@ -220,7 +163,7 @@ help: Remove the rule code `INVALID123`
 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
 15 | # Test for preserving valid codes when fixing
 
-RUF100 [*] Unused `noqa` directive (non-enabled: `F401`; unknown: `INVALID100`, `INVALID200`)
+RUF100 [*] Unused `noqa` directive (non-enabled: `F401`)
   --> RUF102.py:14:38
    |
 12 | from typing import List  # noqa: F401, INVALID123
@@ -282,7 +225,7 @@ help: Remove the rule code `INVALID200`
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
 17 | # Test for mixed code types
 
-RUF100 [*] Unused `noqa` directive (non-enabled: `E402`, `F401`; unknown: `INVALID300`)
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`, `F401`)
   --> RUF102.py:16:30
    |
 14 | from collections import defaultdict  # noqa: INVALID100, INVALID200, F401
@@ -323,7 +266,7 @@ help: Remove the rule code `INVALID300`
 18 | import json  # noqa: E402, INVALID400, V100
 19 | # Test for rule redirects
 
-RUF100 [*] Unused `noqa` directive (non-enabled: `E402`; unknown: `INVALID400`)
+RUF100 [*] Unused `noqa` directive (non-enabled: `E402`)
   --> RUF102.py:18:14
    |
 16 | from itertools import chain  # noqa: E402, INVALID300, F401
@@ -382,21 +325,6 @@ help: Remove unused `noqa` directive
 20 + import pandas as pd
 21 | # Invalid code with trailing reason (single comment)
 22 | import pathlib  # noqa: INVALID123 some reason
-
-RUF100 [*] Unused `noqa` directive (unknown: `INVALID123`)
-  --> RUF102.py:22:17
-   |
-20 | import pandas as pd  # noqa: TCH002
-21 | # Invalid code with trailing reason (single comment)
-22 | import pathlib  # noqa: INVALID123 some reason
-   |                 ^^^^^^^^^^^^^^^^^^
-   |
-help: Remove unused `noqa` directive
-19 | # Test for rule redirects
-20 | import pandas as pd  # noqa: TCH002
-21 | # Invalid code with trailing reason (single comment)
-   - import pathlib  # noqa: INVALID123 some reason
-22 + import pathlib
 
 RUF102 [*] Invalid rule code in `# noqa`: INVALID123
   --> RUF102.py:22:17

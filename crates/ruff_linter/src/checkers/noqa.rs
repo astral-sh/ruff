@@ -187,7 +187,7 @@ pub(crate) fn check_noqa(
                                 } else {
                                     disabled_codes.push(original_code);
                                 }
-                            } else {
+                            } else if !context.is_rule_enabled(Rule::InvalidRuleCode) {
                                 unknown_codes.push(original_code);
                             }
                         } else {
