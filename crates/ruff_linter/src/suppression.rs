@@ -789,7 +789,7 @@ impl<'a> SuppressionsBuilder<'a> {
         if has_line_above && has_line_below {
             self.source.line_range(range.start())
         } else {
-            TextRange::new(min(start, range.start()), max(end, range.end()))
+            TextRange::new(start, max(end, range.end()))
         }
     }
 }
