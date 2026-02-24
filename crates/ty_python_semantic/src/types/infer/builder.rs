@@ -14904,17 +14904,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
 
                         match op {
+                            // For `==`/`!=`, if the dunder method exists but has
+                            // a wrong signature, use its return type: at runtime
+                            // Python doesn't enforce type annotations and still
+                            // calls the method.
+                            ast::CmpOp::Eq | ast::CmpOp::NotEq => error
+                                .return_type
+                                .unwrap_or_else(|| KnownClass::Bool.to_instance(builder.db())),
                             // `in`/`not in`/`is`/`is not` always return `bool`.
-                            // `==`/`!=` can return arbitrary types in general, but
-                            // in the error case the runtime falls back to identity
-                            // comparison, which returns `bool`.
-                            ast::CmpOp::Eq
-                            | ast::CmpOp::NotEq
-                            | ast::CmpOp::In
+                            ast::CmpOp::In
                             | ast::CmpOp::NotIn
                             | ast::CmpOp::Is
                             | ast::CmpOp::IsNot => KnownClass::Bool.to_instance(builder.db()),
-                            // Other operators can return arbitrary types
+                            // Other operators raise TypeError at runtime when
+                            // unsupported, so the result type is unknown.
                             _ => Type::unknown(),
                         }
                     });
@@ -15178,6 +15181,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                     left_ty: left,
                     right_ty: err.right_ty,
+                    return_type: err.return_type,
                 }),
             ),
             (left, Type::Intersection(intersection)) => Some(
@@ -15193,6 +15197,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     op,
                     left_ty: err.left_ty,
                     right_ty: right,
+                    return_type: err.return_type,
                 }),
             ),
 
@@ -15359,6 +15364,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 op,
                                 left_ty: left,
                                 right_ty: right,
+                                return_type: None,
                             }),
                         })
                     }
@@ -15371,10 +15377,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             range,
                             visitor,
                         )
-                        .map_err(|_| UnsupportedComparisonError {
+                        .map_err(|err| UnsupportedComparisonError {
                             op,
                             left_ty: left,
                             right_ty: right,
+                            return_type: err.return_type,
                         }),
                     ),
                     (LiteralValueTypeKind::Bool(b), LiteralValueTypeKind::Int(m)) => Some(
@@ -15385,10 +15392,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             range,
                             visitor,
                         )
-                        .map_err(|_| UnsupportedComparisonError {
+                        .map_err(|err| UnsupportedComparisonError {
                             op,
                             left_ty: left,
                             right_ty: right,
+                            return_type: err.return_type,
                         }),
                     ),
                     (LiteralValueTypeKind::Bool(a), LiteralValueTypeKind::Bool(b)) => Some(
@@ -15399,10 +15407,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             range,
                             visitor,
                         )
-                        .map_err(|_| UnsupportedComparisonError {
+                        .map_err(|err| UnsupportedComparisonError {
                             op,
                             left_ty: left,
                             right_ty: right,
+                            return_type: err.return_type,
                         }),
                     ),
 
@@ -15662,10 +15671,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         {
             Ok(KnownClass::Bool.to_instance(db))
         } else {
+            // When a dunder method exists but can't be called with the given
+            // arguments, build a union of all possible return types. At
+            // runtime, Python doesn't enforce type annotations: it tries the
+            // forward method, then the reflected method, and for `==`/`!=`
+            // falls back to identity comparison (`bool`) if both return
+            // `NotImplemented`.
+            let first_return_type = first.err().and_then(|e| e.return_type(db));
+            let second_return_type = second.err().and_then(|e| e.return_type(db));
+            let return_type = if first_return_type.is_some() || second_return_type.is_some() {
+                let mut builder = UnionBuilder::new(db);
+                if let Some(ty) = first_return_type {
+                    builder = builder.add(ty);
+                }
+                if let Some(ty) = second_return_type {
+                    builder = builder.add(ty);
+                }
+                // Identity comparison fallback for `==`/`!=`.
+                if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne)
+                    && !policy.mro_no_object_fallback()
+                {
+                    builder = builder.add(KnownClass::Bool.to_instance(db));
+                }
+                Some(builder.build())
+            } else {
+                None
+            };
+
             Err(UnsupportedComparisonError {
                 op: op.into(),
                 left_ty: left,
                 right_ty: right,
+                return_type,
             })
         }
     }
@@ -15721,6 +15758,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 op: op.into(),
                 left_ty: left,
                 right_ty: right,
+                return_type: None,
             })
     }
 
@@ -17296,6 +17334,11 @@ pub(crate) struct UnsupportedComparisonError<'db> {
     pub(crate) op: ast::CmpOp,
     pub(crate) left_ty: Type<'db>,
     pub(crate) right_ty: Type<'db>,
+    /// The return type of the dunder method, if it exists but can't be called
+    /// with the given arguments. At runtime, Python doesn't enforce type
+    /// annotations, so the method would still be called and this would be the
+    /// result type.
+    pub(crate) return_type: Option<Type<'db>>,
 }
 
 fn format_import_from_module(level: u32, module: Option<&str>) -> String {

@@ -280,9 +280,10 @@ reveal_type(X() < Y())  # revealed: int
 
 ## Equality and Inequality Fallback
 
-This test confirms that `==` and `!=` comparisons emit `unsupported-operator` diagnostics when
-argument types do not match the method signature. The inferred type is still `bool` because at
-runtime Python falls back to identity comparison (`is`, `is not`).
+When a custom `__eq__`/`__ne__` method exists but its signature doesn't match the argument types, ty
+emits an `unsupported-operator` diagnostic. The inferred type is a union of all possible runtime
+outcomes: the return types of the forward and reflected dunder methods, plus `bool` for the identity
+comparison fallback (when both methods return `NotImplemented`).
 
 Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#object.__eq__)
 
@@ -291,15 +292,19 @@ from __future__ import annotations
 
 class A:
     def __eq__(self, other: int) -> A:  # error: [invalid-method-override]
+        if not isinstance(other, int):
+            return NotImplemented
         return A()
 
     def __ne__(self, other: int) -> A:  # error: [invalid-method-override]
+        if not isinstance(other, int):
+            return NotImplemented
         return A()
 
 # error: [unsupported-operator]
-reveal_type(A() == A())  # revealed: bool
+reveal_type(A() == A())  # revealed: A | bool
 # error: [unsupported-operator]
-reveal_type(A() != A())  # revealed: bool
+reveal_type(A() != A())  # revealed: A | bool
 ```
 
 ## Equality Forward Fails but Reflected Succeeds
@@ -312,29 +317,37 @@ from __future__ import annotations
 
 class A:
     def __eq__(self, other: int) -> bool:  # error: [invalid-method-override]
-        return True
+        if not isinstance(other, int):
+            return NotImplemented
+        return False
 
     def __ne__(self, other: int) -> bool:  # error: [invalid-method-override]
-        return True
+        if not isinstance(other, int):
+            return NotImplemented
+        return False
 
 class B:
-    def __eq__(self, other: A) -> bool:  # error: [invalid-method-override]
-        return True
+    def __eq__(self, other: A) -> list[int]:  # error: [invalid-method-override]
+        if not isinstance(other, A):
+            return NotImplemented
+        return []
 
-    def __ne__(self, other: A) -> bool:  # error: [invalid-method-override]
-        return True
+    def __ne__(self, other: A) -> list[int]:  # error: [invalid-method-override]
+        if not isinstance(other, A):
+            return NotImplemented
+        return []
 
 # A.__eq__(B()) fails (wants int), but B.__eq__(A()) succeeds
-reveal_type(A() == B())  # revealed: bool
+reveal_type(A() == B())  # revealed: list[int]
 # A.__ne__(B()) fails (wants int), but B.__ne__(A()) succeeds
-reveal_type(A() != B())  # revealed: bool
+reveal_type(A() != B())  # revealed: list[int]
 ```
 
-## Equality Forward Missing but Reflected Has Wrong Signature
+## Equality Forward Inherited from object but Reflected Has Wrong Signature
 
-When the forward side has no custom `__eq__` (inherits `object.__eq__` which accepts `object`) and
-the reflected side has a custom `__eq__` with a mismatching signature, the forward side still
-succeeds (since `object.__eq__` accepts any `object`), so no error is emitted.
+When the forward side inherits `object.__eq__` (which accepts `object`) and the reflected side has a
+custom `__eq__` with a mismatching signature, the forward side still succeeds (since `object.__eq__`
+accepts any `object`), so no error is emitted.
 
 ```py
 from __future__ import annotations
@@ -342,10 +355,12 @@ from __future__ import annotations
 class A: ...
 
 class B:
-    def __eq__(self, other: int) -> bool:  # error: [invalid-method-override]
-        return True
+    def __eq__(self, other: int) -> list[int]:  # error: [invalid-method-override]
+        if not isinstance(other, int):
+            return NotImplemented
+        return []
 
-# A has no custom __eq__, so object.__eq__(B()) succeeds (object accepts object)
+# A inherits object.__eq__, so object.__eq__(B()) succeeds (object accepts object)
 reveal_type(A() == B())  # revealed: bool
 ```
 
