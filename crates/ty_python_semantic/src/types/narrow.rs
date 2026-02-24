@@ -588,6 +588,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Class(cls, kind) => {
                 self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive)
             }
+            PatternPredicateKind::Mapping(kind) => {
+                self.evaluate_match_pattern_mapping(subject, *kind, is_positive)
+            }
             PatternPredicateKind::Value(expr) => {
                 self.evaluate_match_pattern_value(subject, *expr, is_positive)
             }
@@ -1567,6 +1570,29 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         Some(NarrowingConstraints::from_iter([(
             place,
             NarrowingConstraint::intersection(narrowed_type),
+        )]))
+    }
+
+    fn evaluate_match_pattern_mapping(
+        &mut self,
+        subject: Expression<'db>,
+        kind: ClassPatternKind,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        if !kind.is_irrefutable() && !is_positive {
+            return None;
+        }
+
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
+        let place = self.expect_place(&subject);
+
+        let mapping_type = ClassInfoConstraintFunction::IsInstance
+            .generate_constraint(self.db, KnownClass::Mapping.to_class_literal(self.db))?
+            .negate_if(self.db, !is_positive);
+
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::intersection(mapping_type),
         )]))
     }
 
