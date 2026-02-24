@@ -731,7 +731,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
-        TextRange::new(range.start(), max(end, range.end()))
+        TextRange::new(range.start(), end)
     }
 
     fn trailing_comment_range(
