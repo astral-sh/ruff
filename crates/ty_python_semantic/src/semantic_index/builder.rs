@@ -1687,11 +1687,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
                 let use_id = self.current_ast_ids().record_use(name);
-                self.current_use_def_map_mut().record_use(
-                    symbol.into(),
-                    use_id,
-                    NodeKey::from_node(name),
-                );
+                self.current_use_def_map_mut()
+                    .record_use(symbol.into(), use_id, name.into());
 
                 self.add_definition(symbol.into(), function_def);
                 self.mark_symbol_used(symbol);
@@ -2879,7 +2876,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         }
                         let use_id = self.current_ast_ids().record_use(expr);
                         self.current_use_def_map_mut()
-                            .record_use(place_id, use_id, node_key);
+                            .record_use(place_id, use_id, expr.into());
                     }
 
                     if is_definition {

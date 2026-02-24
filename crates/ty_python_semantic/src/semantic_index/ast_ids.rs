@@ -40,6 +40,14 @@ fn ast_ids<'db>(db: &'db dyn Db, scope: ScopeId) -> &'db AstIds {
     semantic_index(db, scope.file(db)).ast_ids(scope.file_scope_id(db))
 }
 
+pub fn try_scoped_use_id(db: &dyn Db, scope: ScopeId, expr: &ast::Expr) -> Option<ScopedUseId> {
+    semantic_index(db, scope.file(db))
+        .ast_ids(scope.file_scope_id(db))
+        .uses_map
+        .get(&expr.into())
+        .copied()
+}
+
 /// Uniquely identifies a use of a name in a [`crate::semantic_index::FileScopeId`].
 #[newtype_index]
 #[derive(get_size2::GetSize)]
@@ -117,6 +125,12 @@ pub(crate) mod node_key {
 
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
     pub(crate) struct ExpressionNodeKey(NodeKey);
+
+    impl ExpressionNodeKey {
+        pub(crate) fn into_inner(self) -> NodeKey {
+            self.0
+        }
+    }
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
         fn from(value: ast::ExprRef<'_>) -> Self {

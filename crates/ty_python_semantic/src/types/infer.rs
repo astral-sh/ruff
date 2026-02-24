@@ -36,6 +36,9 @@
 //! of iterations, so if we fail to converge, Salsa will eventually panic. (This should of course
 //! be considered a bug.)
 
+use std::{iter, slice};
+
+use itertools::Either;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_text_size::Ranged;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -43,6 +46,7 @@ use salsa;
 use salsa::plumbing::AsId;
 
 use crate::Db;
+
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
@@ -337,7 +341,7 @@ impl<'db> InferExpression<'db> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> InferExpression<'db> {
-        if tcx.annotation.is_some() {
+        if tcx.annotation.is_some() || tcx.definition.is_some() {
             InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx))
         } else {
             InferExpression::Bare(expression)
@@ -399,11 +403,22 @@ impl<'db> InferScope<'db> {
 #[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub(crate) struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
+    pub(crate) definition: Option<Definition<'db>>,
 }
 
 impl<'db> TypeContext<'db> {
     pub(crate) fn new(annotation: Option<Type<'db>>) -> Self {
-        Self { annotation }
+        Self {
+            annotation,
+            definition: None,
+        }
+    }
+
+    pub(crate) fn with_definition(self, definition: Definition<'db>) -> Self {
+        Self {
+            annotation: self.annotation,
+            definition: Some(definition),
+        }
     }
 
     // If the type annotation is a specialized instance of the given `KnownClass`, returns the
@@ -420,6 +435,7 @@ impl<'db> TypeContext<'db> {
     pub(crate) fn map(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Self {
         Self {
             annotation: self.annotation.map(f),
+            definition: self.definition,
         }
     }
 
@@ -544,6 +560,9 @@ struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// The type contexts applicable to every definition in this region.
+    use_contexts: FxHashMap<Definition<'db>, Vec<Type<'db>>>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -573,6 +592,12 @@ impl<'db> ScopeInference<'db> {
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
 
+        if let Some(extra) = &mut self.extra {
+            for ty in extra.use_contexts.values_mut().flatten() {
+                *ty = ty.recursive_type_normalized(db, cycle);
+            }
+        }
+
         self
     }
 
@@ -583,6 +608,25 @@ impl<'db> ScopeInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn definition_use_contexts(
+        &self,
+        definition: Definition<'db>,
+    ) -> impl Iterator<Item = Type<'db>> {
+        let Some(extra) = &self.extra else {
+            return Either::Left(iter::empty());
+        };
+
+        match extra
+            .use_contexts
+            .get(&definition)
+            .map(Vec::as_slice)
+            .or_else(|| extra.cycle_recovery.as_ref().map(slice::from_ref))
+        {
+            None => Either::Left(iter::empty()),
+            Some(types) => Either::Right(types.iter().copied()),
+        }
     }
 
     pub(crate) fn try_expression_type(
@@ -644,6 +688,9 @@ struct DefinitionInferenceExtra<'db> {
 
     /// Functions called while inferring this definition.
     called_functions: Box<[FunctionType<'db>]>,
+
+    /// The type contexts applicable to every definition in this region.
+    use_contexts: FxHashMap<Definition<'db>, Vec<Type<'db>>>,
 
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
@@ -708,6 +755,11 @@ impl<'db> DefinitionInference<'db> {
             } else {
                 *declaration_ty =
                     declaration_ty.map_type(|decl_ty| decl_ty.recursive_type_normalized(db, cycle));
+            }
+        }
+        if let Some(extra) = &mut self.extra {
+            for ty in extra.use_contexts.values_mut().flatten() {
+                *ty = ty.recursive_type_normalized(db, cycle);
             }
         }
 
@@ -805,6 +857,9 @@ struct ExpressionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// The type contexts applicable to every definition in this region.
+    use_contexts: FxHashMap<Definition<'db>, Vec<Type<'db>>>,
+
     /// The types of every binding in this expression region.
     ///
     /// Only very few expression regions have bindings (around 0.1%).
@@ -853,6 +908,10 @@ impl<'db> ExpressionInference<'db> {
                 } else {
                     *binding_ty = binding_ty.recursive_type_normalized(db, cycle);
                 }
+            }
+
+            for ty in extra.use_contexts.values_mut().flatten() {
+                *ty = ty.recursive_type_normalized(db, cycle);
             }
         }
 
