@@ -1180,7 +1180,7 @@ fn loop_header_reachability_cycle_recover<'db>(
 fn loop_header_reachability_impl<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-    initial: bool,
+    is_cycle_initial: bool,
 ) -> LoopHeaderReachability<'db> {
     let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
         unreachable!("`loop_header_reachability` called with non-loop-header definition");
@@ -1196,7 +1196,7 @@ fn loop_header_reachability_impl<'db>(
     let mut reachable_bindings = FxIndexSet::default();
 
     for live_binding in loop_header.bindings_for_place(place) {
-        let reachability = if initial {
+        let reachability = if is_cycle_initial {
             Truthiness::Ambiguous
         } else {
             use_def.evaluate_reachability(db, live_binding.reachability_constraint)
