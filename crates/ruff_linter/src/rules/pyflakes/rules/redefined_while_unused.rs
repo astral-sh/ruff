@@ -44,7 +44,6 @@ use crate::{Fix, FixAvailability, Violation};
 pub(crate) struct RedefinedWhileUnused {
     pub name: String,
     pub row: SourceRow,
-    pub is_type_checking_duplicate: bool,
 }
 
 impl Violation for RedefinedWhileUnused {
@@ -52,29 +51,13 @@ impl Violation for RedefinedWhileUnused {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RedefinedWhileUnused {
-            name,
-            row,
-            is_type_checking_duplicate,
-        } = self;
-        if *is_type_checking_duplicate {
-            format!("Import `{name}` is duplicated in `typing.TYPE_CHECKING` block")
-        } else {
-            format!("Redefinition of unused `{name}` from {row}")
-        }
+        let RedefinedWhileUnused { name, row } = self;
+        format!("Redefinition of unused `{name}` from {row}")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let RedefinedWhileUnused {
-            name,
-            is_type_checking_duplicate,
-            ..
-        } = self;
-        if *is_type_checking_duplicate {
-            Some(format!("Remove runtime `{name}` import"))
-        } else {
-            Some(format!("Remove definition: `{name}`"))
-        }
+        let RedefinedWhileUnused { name, .. } = self;
+        Some(format!("Remove definition: `{name}`"))
     }
 }
 
@@ -107,12 +90,10 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             if !is_f811_shadowing_in_type_checking_enabled(checker.settings()) {
                 let shadowed_in_type_checking = shadowed
                     .source
-                    .map(|source| is_in_type_checking_block(checker, source))
-                    .unwrap_or(false);
+                    .is_some_and(|source| is_in_type_checking_block(checker, source));
                 let binding_in_type_checking = binding
                     .source
-                    .map(|source| is_in_type_checking_block(checker, source))
-                    .unwrap_or(false);
+                    .is_some_and(|source| is_in_type_checking_block(checker, source));
 
                 if (shadowed_in_type_checking || binding_in_type_checking)
                     && !(shadowed_in_type_checking && binding_in_type_checking)
@@ -177,33 +158,30 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             redefinitions
                 .entry(binding.source)
                 .or_default()
-                .push(EntryInfo::new(shadowed, binding, checker));
+                .push(EntryInfo::new(shadowed, binding));
         }
     }
 
     // Create a fix for each source statement.
     let mut fixes = FxHashMap::default();
-    for (source, entries) in &redefinitions {
-        let Some(_) = source else {
-            continue;
-        };
-
-        let has_type_checking_duplicate =
-            entries.iter().any(|info| info.is_type_checking_duplicate);
-
+    for entries in redefinitions.values() {
         let Some(runtime_source) = entries.iter().find_map(|info| info.runtime_import) else {
             continue;
         };
 
-        let member_names: Vec<_> = entries
+        let member_names = entries
             .iter()
             .filter_map(|info| {
-                let shadowed_import = info.shadowed.as_any_import()?;
-                let import = info.binding.as_any_import()?;
-                (shadowed_import.qualified_name() == import.qualified_name())
-                    .then_some(import.member_name())
+                if let Some(shadowed_import) = info.shadowed.as_any_import() {
+                    if let Some(import) = info.binding.as_any_import() {
+                        if shadowed_import.qualified_name() == import.qualified_name() {
+                            return Some(import.member_name());
+                        }
+                    }
+                }
+                None
             })
-            .collect();
+            .collect::<Vec<_>>();
 
         if !member_names.is_empty() {
             let statement = checker.semantic().statement(runtime_source);
@@ -219,13 +197,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 continue;
             };
 
-            let fix = if has_type_checking_duplicate {
-                // Mark fix always unsafe, because it can
-                // break behavior in projects like `mypy`
-                Fix::unsafe_edit(edit)
-            } else {
-                Fix::safe_edit(edit)
-            };
+            let fix = Fix::safe_edit(edit);
 
             fixes.insert(
                 runtime_source,
@@ -237,11 +209,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
     }
 
     // Create diagnostics for each statement.
-    for (source, entries) in &redefinitions {
-        let Some(_) = source else {
-            continue;
-        };
-
+    for entries in redefinitions.values() {
         for info in entries {
             let name = info.binding.name(checker.source());
 
@@ -249,23 +217,15 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 RedefinedWhileUnused {
                     name: name.to_string(),
                     row: checker.compute_source_row(info.shadowed.start()),
-                    is_type_checking_duplicate: info.is_type_checking_duplicate,
                 },
                 info.binding.range(),
             );
             diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 
-            if info.is_type_checking_duplicate {
-                diagnostic.secondary_annotation(
-                    format_args!("runtime import of `{name}` here"),
-                    info.shadowed,
-                );
-            } else {
-                diagnostic.secondary_annotation(
-                    format_args!("previous definition of `{name}` here"),
-                    info.shadowed,
-                );
-            }
+            diagnostic.secondary_annotation(
+                format_args!("previous definition of `{name}` here"),
+                info.shadowed,
+            );
 
             diagnostic.set_primary_message(format_args!("`{name}` redefined here"));
 
@@ -285,35 +245,16 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
 struct EntryInfo<'a> {
     shadowed: &'a Binding<'a>,
     binding: &'a Binding<'a>,
-    is_type_checking_duplicate: bool,
     runtime_import: Option<NodeId>,
 }
 
 impl<'a> EntryInfo<'a> {
-    fn new(shadowed: &'a Binding<'a>, binding: &'a Binding<'a>, checker: &Checker) -> Self {
-        let shadowed_in_type_checking = shadowed
-            .source
-            .map(|source| is_in_type_checking_block(checker, source))
-            .unwrap_or(false);
-
-        let binding_in_type_checking = binding
-            .source
-            .map(|source| is_in_type_checking_block(checker, source))
-            .unwrap_or(false);
-
-        let is_type_checking_duplicate = (shadowed_in_type_checking || binding_in_type_checking)
-            && !(shadowed_in_type_checking && binding_in_type_checking);
-
-        let runtime_import = match (shadowed_in_type_checking, binding_in_type_checking) {
-            (true, false) => binding.source,
-            (false, true) => shadowed.source,
-            _ => binding.source.or(shadowed.source),
-        };
+    fn new(shadowed: &'a Binding<'a>, binding: &'a Binding<'a>) -> Self {
+        let runtime_import = binding.source.or(shadowed.source);
 
         Self {
             shadowed,
             binding,
-            is_type_checking_duplicate,
             runtime_import,
         }
     }
@@ -328,14 +269,11 @@ fn bindings_in_different_forks(
     let left_ = is_in_type_checking_block(checker, left);
     let right_ = is_in_type_checking_block(checker, right);
 
-    if !is_f811_shadowing_in_type_checking_enabled(checker.settings())
-        && (left_ || right_)
-        && !(left_ && right_)
-    {
+    if !is_f811_shadowing_in_type_checking_enabled(checker.settings()) {
         return !checker.semantic().same_branch(left, right);
     }
 
-    if (left_ || right_) && !(left_ && right_) {
+    if left_ ^ right_ {
         let left_binding = &checker.semantic().bindings[shadow.shadowed_id()];
         let right_binding = &checker.semantic().bindings[shadow.binding_id()];
 
@@ -354,7 +292,6 @@ fn bindings_in_different_forks(
 fn is_in_type_checking_block(checker: &Checker, node_id: NodeId) -> bool {
     checker.semantic().statements(node_id).any(|stmt| {
         stmt.as_if_stmt()
-            .map(|if_stmt| is_type_checking_block(if_stmt, checker.semantic()))
-            .unwrap_or(false)
+            .is_some_and(|if_stmt| is_type_checking_block(if_stmt, checker.semantic()))
     })
 }

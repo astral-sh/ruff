@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+---
+F811 [*] Redefinition of unused `BrokerUsecase` from line 1
+ --> F811_34.py:1:41
+  |
+1 | from faststream._internal.broker import BrokerUsecase
+  |                                         ------------- previous definition of `BrokerUsecase` here
+2 |
+3 | if TYPE_CHECKING:
+4 |     from faststream._internal.broker import BrokerUsecase
+  |                                             ^^^^^^^^^^^^^ `BrokerUsecase` redefined here
+5 |     from faststream.specification.schema import Contact, License
+  |
+help: Remove definition: `BrokerUsecase`
+1 | from faststream._internal.broker import BrokerUsecase
+2 | 
+3 | if TYPE_CHECKING:
+  -     from faststream._internal.broker import BrokerUsecase
+4 |     from faststream.specification.schema import Contact, License
