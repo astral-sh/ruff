@@ -37,9 +37,9 @@ use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, DefinedPlace, Definedness, LookupError, Place, PlaceAndQualifiers,
     TypeOrigin, builtins_module_scope, builtins_symbol, class_body_implicit_symbol,
-    explicit_global_symbol, global_symbol, module_type_implicit_global_declaration,
-    module_type_implicit_global_symbol, place, place_from_bindings, place_from_declarations,
-    typing_extensions_symbol,
+    explicit_global_symbol, global_symbol, loop_header_reachability,
+    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
+    place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
@@ -57,7 +57,7 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
     ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, attribute_assignments,
-    get_loop_header, place_table,
+    place_table,
 };
 use crate::types::builder::RecursivelyDefined;
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
@@ -5020,37 +5020,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         let db = self.db();
-        let loop_token = loop_header_kind.loop_token();
         let place = loop_header_kind.place();
-        let loop_header = get_loop_header(db, loop_token);
         let use_def = self
             .index
             .use_def_map(self.scope().file_scope_id(self.db()));
+        let loop_header = loop_header_reachability(db, definition);
 
         let mut union = UnionBuilder::new(db).recursively_defined(RecursivelyDefined::Yes);
 
-        for live_binding in loop_header.bindings_for_place(place) {
-            // Skip unreachable bindings.
-            if !use_def.is_reachable(db, live_binding.reachability_constraint) {
-                continue;
-            }
-
-            // Boundness analysis is handled by looking at these bindings again in
-            // `place_from_bindings_impl`. Here we're only concerned with the type.
-            let def_state = use_def.definition(live_binding.binding);
-            let def = match def_state {
-                DefinitionState::Defined(def) => def,
-                DefinitionState::Deleted | DefinitionState::Undefined => continue,
-            };
-
-            // This loop header is visible to itself. Filter it out to avoid a pointless cycle.
-            if def == definition {
-                continue;
-            }
-
-            let binding_ty = binding_type(db, def);
+        for reachable_binding in &loop_header.reachable_bindings {
+            let binding_ty = binding_type(db, reachable_binding.definition);
             let narrowed_ty = use_def
-                .narrowing_evaluator(live_binding.narrowing_constraint)
+                .narrowing_evaluator(reachable_binding.narrowing_constraint)
                 .narrow(db, binding_ty, place);
 
             union.add_in_place(narrowed_ty);
