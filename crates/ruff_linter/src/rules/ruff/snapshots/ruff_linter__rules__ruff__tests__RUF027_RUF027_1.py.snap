@@ -1,4 +1,23 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_1.py:23:12
+   |
+21 |     e = "incorrect syntax: {}"
+22 |     f = "uses a builtin: {max}"
+23 |     json = "{ positive: false }"
+   |            ^^^^^^^^^^^^^^^^^^^^^
+24 |     json2 = "{ 'positive': false }"
+25 |     json3 = "{ 'positive': 'false' }"
+   |
+help: Add `f` prefix
+20 |     d = "bad variable: {invalid}"
+21 |     e = "incorrect syntax: {}"
+22 |     f = "uses a builtin: {max}"
+   -     json = "{ positive: false }"
+23 +     json = f"{ positive: false }"
+24 |     json2 = "{ 'positive': false }"
+25 |     json3 = "{ 'positive': 'false' }"
+26 |     alternative_formatter("{a}", a=5)
+note: This is an unsafe fix and may change runtime behavior

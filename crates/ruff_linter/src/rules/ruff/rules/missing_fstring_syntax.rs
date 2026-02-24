@@ -3,7 +3,6 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
-use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::parse_expression;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel, TypingOnlyBindingsStatus};
@@ -33,8 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///    (for example: `"{value}".format(...)`)
 /// 4. The string has no `{...}` expression sections, or uses invalid f-string syntax.
 /// 5. The string references variables that are not in scope, or it doesn't capture variables at all.
-/// 6. Any format specifiers in the potential f-string are invalid.
-/// 7. The string is part of a function call that is known to expect a template string rather than an
+/// 6. The string is part of a function call that is known to expect a template string rather than an
 ///    evaluated f-string: for example, a [`logging`][logging] call, a [`gettext`][gettext] call,
 ///    or a [FastAPI path].
 ///
@@ -252,20 +250,6 @@ fn should_be_fstring(
                     return false;
                 }
                 has_name = true;
-            }
-            if let Some(spec) = &element.format_spec {
-                let spec_text;
-                let spec_str = if spec.elements.interpolations().next().is_none() {
-                    // Use decoded literal values so escape sequences like `\x64`
-                    // are resolved before parsing.
-                    spec_text = spec.elements.literals().map(|lit| &*lit.value).collect::<String>();
-                    &spec_text
-                } else {
-                    &fstring_expr[spec.range()]
-                };
-                if FormatSpec::parse(spec_str).is_err() {
-                    return false;
-                }
             }
         }
         if !has_name {

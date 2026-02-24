@@ -83,6 +83,7 @@ def in_type_def():
 def escaped_format_spec():
     a = 4
     b = "{a:\x64}"  # RUF027
+    c = "{a:\n}"  # RUF027 - newline in format spec is valid via custom __format__
 
 # Regression test for parser bug
 # https://github.com/astral-sh/ruff/issues/18860
