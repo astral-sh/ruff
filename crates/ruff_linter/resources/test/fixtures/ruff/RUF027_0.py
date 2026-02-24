@@ -104,3 +104,10 @@ def hash_in_string_test():
     x = "world"
     print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
     print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
+
+# Test case for `#` in format spec (e.g., `{1:#x}`)
+# `#` in a format spec is NOT a comment — should trigger RUF027 even on Python < 3.12
+def hash_in_format_spec_test():
+    n = 255
+    print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
+    print("Oct: {n:#o}")   # RUF027: same

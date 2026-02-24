@@ -277,12 +277,21 @@ fn should_be_fstring(
         for element in f_string.elements.interpolations() {
             // Check if the interpolation expression contains backslashes or comments.
             // F-strings with backslashes or comments in interpolations are only valid in Python 3.12+.
-            // Note: a `#` inside a nested string literal (e.g., `{'#'}`) is NOT a comment.
+            // Notes:
+            // - A `#` inside a nested string literal (e.g., `{'#'}`) is NOT a comment.
+            // - A `#` inside a format spec (e.g., `{1:#x}`) is NOT a comment; only check
+            //   the expression part (before the format spec) for comment hashes.
             let interpolation_text = &fstring_expr[element.range()];
-            if target_version < PythonVersion::PY312
-                && (interpolation_text.contains('\\') || has_comment_hash(interpolation_text))
-            {
+            if target_version < PythonVersion::PY312 && interpolation_text.contains('\\') {
                 return false;
+            }
+            if target_version < PythonVersion::PY312 {
+                // Only scan up to the end of the expression, not into the format spec.
+                let expr_end = usize::from(element.expression.end() - element.start());
+                let expr_text = &interpolation_text[..expr_end.min(interpolation_text.len())];
+                if has_comment_hash(expr_text) {
+                    return false;
+                }
             }
 
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
