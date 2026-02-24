@@ -1,5 +1,3 @@
-state_variable = "PR_ASSIGNEE_ROUND_ROBIN_STATE"
-
 [[pools]]
 name = "ty-semantic"
 paths = ["/crates/ty_python_semantic/**"]
