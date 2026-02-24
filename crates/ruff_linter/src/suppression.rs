@@ -8,7 +8,6 @@ use ruff_python_index::Indexer;
 use ruff_source_file::LineRanges;
 use rustc_hash::FxHashSet;
 use std::cell::Cell;
-use std::cmp::{max, min};
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -789,7 +788,7 @@ impl<'a> SuppressionsBuilder<'a> {
         if has_line_above && has_line_below {
             self.source.line_range(range.start())
         } else {
-            TextRange::new(start, max(end, range.end()))
+            TextRange::new(start, end)
         }
     }
 }
