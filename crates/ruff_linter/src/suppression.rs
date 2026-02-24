@@ -516,15 +516,14 @@ impl<'a> SuppressionsBuilder<'a> {
             // Standalone suppression comments
 
             if suppression.action == SuppressionAction::Ignore {
-                let range = if let Some(_indent) =
-                    indentation_at_offset(suppression.range.start(), self.source)
-                {
-                    // own-line ignore
-                    Self::standalone_comment_range(suppression.range, before, after)
-                } else {
-                    // trailing ignore
-                    self.trailing_comment_range(suppression.range, before, after)
-                };
+                let range =
+                    if indentation_at_offset(suppression.range.start(), self.source).is_some() {
+                        // own-line ignore
+                        Self::standalone_comment_range(suppression.range, before, after)
+                    } else {
+                        // trailing ignore
+                        self.trailing_comment_range(suppression.range, before, after)
+                    };
                 for code in suppression.codes_as_str(self.source) {
                     self.valid.push(Suppression {
                         code: code.into(),
@@ -691,10 +690,54 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
+    /// Find the relevant range to cover for own-line suppression comments
+    ///
+    /// When placed above a "logical line", either a single- or multi-line statement or
+    /// suite header, this should return the range from the start of the comment to the end
+    /// of the entire logical line:
+    ///
+    /// ```py
+    ///
+    /// # V--- from here
+    /// # ruff:ignore[code]
+    /// foo = [
+    ///     1,
+    ///     2,
+    /// ]
+    /// # ^--- to here
+    ///
+    /// # V--- from here
+    /// # ruff:ignore[code]
+    /// def foo(
+    ///     arg1,
+    ///     arg2,
+    /// ):
+    /// # ^--- to here
+    ///     pass
+    ///
+    /// ```
+    ///
+    /// When placed "inside" of a logical line, ie, above any line within a multi-line statement
+    /// or suite header, this should return only the range from the start of the comment to the
+    /// end of the next "physical" (non-comment) line:
+    ///
+    /// ```py
+    ///
+    /// foo = [
+    ///     # V--- from here
+    ///     # ruff:ignore[code]
+    ///     1,
+    ///     # ^--- to here
+    ///     2,
+    /// ]
+    ///
+    /// ```
     fn standalone_comment_range(range: TextRange, before: &[Token], after: &[Token]) -> TextRange {
         let mut end = range.end();
-        let mut has_intermediary = false;
+        let mut is_inner_comment = false;
 
+        // Look backwards. If the next non-trivia token is a Newline, then this is above the logical
+        // line, otherwise this is "inside" of a multi-line statement or header.
         for prev_token in before.iter().rev() {
             match prev_token.kind() {
                 TokenKind::Newline => {
@@ -702,13 +745,17 @@ impl<'a> SuppressionsBuilder<'a> {
                 }
                 TokenKind::NonLogicalNewline | TokenKind::Comment => {}
                 _ => {
-                    has_intermediary = true;
+                    is_inner_comment = true;
                     break;
                 }
             }
         }
 
-        let mut comment_only_line = true;
+        // Look forward. If this is an "inner" comment, then find the end of the next line that
+        // isn't a comment (nb: the tokens start with the suppression comment, which potentially
+        // gets its own NonLogicalNewline). Otherwise, find the end of the statement or header
+        // by stopping at the next Newline token.
+        let mut is_blank_or_comment_only = true;
         let mut seen_nonlogical_newline = false;
         for next_token in after {
             match next_token.kind() {
@@ -716,15 +763,15 @@ impl<'a> SuppressionsBuilder<'a> {
                     break;
                 }
                 TokenKind::Comment => {}
-                TokenKind::NonLogicalNewline if has_intermediary => {
-                    if seen_nonlogical_newline && !comment_only_line {
+                TokenKind::NonLogicalNewline if is_inner_comment => {
+                    if seen_nonlogical_newline && !is_blank_or_comment_only {
                         break;
                     }
                     seen_nonlogical_newline = true;
-                    comment_only_line = true;
+                    is_blank_or_comment_only = true;
                 }
                 _ => {
-                    comment_only_line = false;
+                    is_blank_or_comment_only = false;
                     end = next_token.end();
                 }
             }
@@ -733,6 +780,40 @@ impl<'a> SuppressionsBuilder<'a> {
         TextRange::new(range.start(), end)
     }
 
+    /// Find the relevant range to cover for trailing end-of-line suppression comments
+    ///
+    /// When placed at the end of the first or last line of a multi-line statement or suite header,
+    /// this should return the entire range of the logical line, including any trailing comments:
+    ///
+    /// ```py
+    ///
+    /// # V--- from here
+    /// foo = [  # ruff:ignore[code]
+    ///     1,
+    /// ]
+    /// # ^--- to here
+    ///
+    /// # V--- from here
+    /// value = """
+    ///     some text
+    /// """  # ruff:ignore[code]
+    /// # to here -------------^
+    ///
+    /// ```
+    ///
+    /// When placed "inside" of a logical line, ie, at the end of any line within a multi-line
+    /// statement or suite header, this should return only the range of that same line, including
+    /// any trailing comments:
+    ///
+    /// ```py
+    ///
+    /// foo = [
+    ///     # V--- from here
+    ///     1,  # ruff:ignore[code]
+    ///     # to here ------------^
+    /// ]
+    /// ```
+    ///
     fn trailing_comment_range(
         &self,
         range: TextRange,
@@ -745,7 +826,9 @@ impl<'a> SuppressionsBuilder<'a> {
         let mut has_line_above = false;
         let mut has_line_below = false;
 
-        // find previous newline
+        // Look backward to find the previous logical newline. If there is a non-logical newline,
+        // and any non-trivia tokens before it, then this comment is not on the first line of
+        // the statement or header.
         for prev_token in before.iter().rev() {
             match prev_token.kind() {
                 TokenKind::Comment => {}
@@ -765,6 +848,9 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
+        // Look forward for the next logical newline. If there is a non-logical newline with
+        // any non-trivia tokens after it, then this comment is not on the last line of the
+        // statement or header.
         seen_nonlogical_newline = false;
         for next_token in after {
             match next_token.kind() {
@@ -785,6 +871,9 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         }
 
+        // If the comment is not on the first line, and also not on the last line, then it is
+        // "inside" the logical line, and the range should only be the physical line the comment
+        // appears on. Otherwise, the range should be the entire logical statement or header.
         if has_line_above && has_line_below {
             self.source.line_range(range.start())
         } else {
