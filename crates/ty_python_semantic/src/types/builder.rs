@@ -256,7 +256,7 @@ impl RecursivelyDefined {
 
 /// If the value ​​is defined recursively, widening is performed from fewer literal elements,
 /// resulting in faster convergence of the fixed-point iteration.
-const MAX_RECURSIVE_UNION_LITERALS: usize = 10;
+const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
 /// so in principle we can have as many literal elements as we want,
 /// but to avoid unintended huge computational loads, we limit it to 256.

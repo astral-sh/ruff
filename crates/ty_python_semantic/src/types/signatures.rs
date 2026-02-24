@@ -1715,6 +1715,11 @@ impl<'db> Signature<'db> {
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         Self { definition, ..self }
     }
+
+    /// Create a new signature with the given return type.
+    pub(crate) fn with_return_type(self, return_ty: Type<'db>) -> Self {
+        Self { return_ty, ..self }
+    }
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {

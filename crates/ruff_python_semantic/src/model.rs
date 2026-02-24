@@ -209,7 +209,7 @@ impl<'a> SemanticModel<'a> {
         }
 
         if self.typing_modules.iter().any(|module| {
-            let module = QualifiedName::from_dotted_name(module);
+            let module = QualifiedName::user_defined(module);
             qualified_name == &module.append_member(target)
         }) {
             return true;

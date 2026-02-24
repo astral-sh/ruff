@@ -32,7 +32,7 @@ use ruff_linter::rules::{
     pycodestyle, pydoclint, pydocstyle, pyflakes, pylint, pyupgrade, ruff,
 };
 use ruff_linter::settings::types::{
-    IdentifierPattern, Language, OutputFormat, PythonVersion, RequiredVersion,
+    IdentifierPattern, Language, OutputFormat, PreviewMode, PythonVersion, RequiredVersion,
 };
 use ruff_linter::{RuleSelector, warn_user_once};
 use ruff_macros::{CombineOptions, OptionsMetadata};
@@ -286,6 +286,10 @@ pub struct Options {
     /// by the `--extension` command-line flag).
     ///
     /// Supported file types include `python`, `pyi`, `ipynb`, and `markdown`.
+    ///
+    /// Any file extensions listed here will be automatically added to the
+    /// default `include` list as a `*.{ext}` glob, so that they are linted
+    /// and formatted without needing any additional configuration settings.
     #[option(
         default = "{}",
         value_type = "dict[str, Language]",
@@ -1685,13 +1689,14 @@ impl<'de> Deserialize<'de> for Alias {
 impl Flake8ImportConventionsOptions {
     pub fn try_into_settings(
         self,
+        preview: PreviewMode,
     ) -> anyhow::Result<flake8_import_conventions::settings::Settings> {
         let mut aliases: FxHashMap<String, String> = match self.aliases {
             Some(options_aliases) => options_aliases
                 .into_iter()
                 .map(|(module, alias)| (module.into_string(), alias.into_string()))
                 .collect(),
-            None => flake8_import_conventions::settings::default_aliases(),
+            None => flake8_import_conventions::settings::default_aliases(preview),
         };
         if let Some(extend_aliases) = self.extend_aliases {
             aliases.extend(
@@ -1712,9 +1717,13 @@ impl Flake8ImportConventionsOptions {
             normalized_aliases.insert(module, normalized_alias);
         }
 
+        let banned_aliases = self.banned_aliases.unwrap_or_else(|| {
+            flake8_import_conventions::settings::default_banned_aliases(preview)
+        });
+
         Ok(flake8_import_conventions::settings::Settings {
             aliases: normalized_aliases,
-            banned_aliases: self.banned_aliases.unwrap_or_default(),
+            banned_aliases,
             banned_from: self.banned_from.unwrap_or_default(),
         })
     }

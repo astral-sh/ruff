@@ -3926,7 +3926,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
 pub(crate) fn report_invalid_argument_number_to_special_form(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
-    special_form: SpecialFormType,
+    special_form: impl Into<SpecialFormType>,
     received_arguments: usize,
     expected_arguments: u8,
 ) {
@@ -3939,6 +3939,7 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
         builder.into_diagnostic(format_args!(
             "Special form `{special_form}` expected exactly {expected_arguments} {noun}, \
             got {received_arguments}",
+            special_form = special_form.into(),
         ));
     }
 }

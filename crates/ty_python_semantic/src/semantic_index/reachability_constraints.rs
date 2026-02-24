@@ -209,8 +209,8 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, NarrowingConstraint, Truthiness, Type, TypeContext,
-    UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+    CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, Type,
+    TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -330,6 +330,10 @@ fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type
     ty
 }
 
+fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
+    KnownClass::Mapping.to_instance(db).top_materialization(db)
+}
+
 /// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
 /// match that pattern.
 fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
@@ -352,6 +356,13 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
                     .to_instance(db)
                     .unwrap_or(Type::Never)
                     .top_materialization(db)
+            } else {
+                Type::Never
+            }
+        }
+        PatternPredicateKind::Mapping(kind) => {
+            if kind.is_irrefutable() {
+                mapping_pattern_type(db)
             } else {
                 Type::Never
             }
@@ -1050,6 +1061,20 @@ impl ReachabilityConstraints {
                     }
                 })
             }
+            PatternPredicateKind::Mapping(kind) => {
+                let mapping_ty = mapping_pattern_type(db);
+                if subject_ty.is_subtype_of(db, mapping_ty) {
+                    if kind.is_irrefutable() {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::Ambiguous
+                    }
+                } else if subject_ty.is_disjoint_from(db, mapping_ty) {
+                    Truthiness::AlwaysFalse
+                } else {
+                    Truthiness::Ambiguous
+                }
+            }
             PatternPredicateKind::As(pattern, _) => pattern
                 .as_deref()
                 .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
@@ -1070,6 +1095,7 @@ impl ReachabilityConstraints {
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,
                 call_expr,
+                is_await,
             }) => {
                 // We first infer just the type of the callable. In the most likely case that the
                 // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
@@ -1111,7 +1137,7 @@ impl ReachabilityConstraints {
                     any_overload_is_generic |= overload.return_ty.has_typevar(db);
                 }
 
-                if no_overloads_return_never && !any_overload_is_generic {
+                if no_overloads_return_never && !any_overload_is_generic && !is_await {
                     Truthiness::AlwaysFalse
                 } else if all_overloads_return_never {
                     Truthiness::AlwaysTrue

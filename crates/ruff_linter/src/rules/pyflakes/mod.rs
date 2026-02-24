@@ -709,6 +709,19 @@ mod tests {
     }
 
     #[test]
+    fn f811_typing_modules_overload() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pyflakes/F811_33.py"),
+            &LinterSettings {
+                typing_modules: vec!["std".to_string()],
+                ..LinterSettings::for_rule(Rule::RedefinedWhileUnused)
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn extend_generics() -> Result<()> {
         let snapshot = "extend_immutable_calls".to_string();
         let diagnostics = test_path(

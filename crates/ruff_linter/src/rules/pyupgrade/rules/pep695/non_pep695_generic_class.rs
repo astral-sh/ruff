@@ -159,7 +159,7 @@ pub(crate) fn non_pep695_generic_class(checker: &Checker, class_def: &StmtClassD
     //
     // because `find_generic` also finds the *first* Generic argument, this has the additional
     // benefit of bailing out with a diagnostic if multiple Generic arguments are present
-    if generic_idx != arguments.len() - 1 {
+    if generic_idx != arguments.args.len() - 1 {
         return;
     }
 
