@@ -210,16 +210,25 @@ pub(super) fn find_file_opens<'a>(
         .collect()
 }
 
-fn resolve_file_open<'a>(
-    item: &'a ast::WithItem,
+struct OpenResolutionContext<'a> {
     with: &'a ast::StmtWith,
     semantic: &'a SemanticModel<'a>,
     read_mode: bool,
+    following_statements: Option<&'a [ast::Stmt]>,
+}
+
+fn resolve_file_open<'a>(
+    item: &'a ast::WithItem,
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
     argument: OpenArgument<'a>,
-    following_statements: Option<&'a [ast::Stmt]>,
+    context: &OpenResolutionContext<'a>,
 ) -> Option<FileOpen<'a>> {
+    let with = context.with;
+    let semantic = context.semantic;
+    let read_mode = context.read_mode;
+    let following_statements = context.following_statements;
+
     match mode {
         OpenMode::ReadText | OpenMode::ReadBytes => {
             if !read_mode {
@@ -329,15 +338,18 @@ fn find_file_open<'a>(
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
-    resolve_file_open(
-        item,
+    let context = OpenResolutionContext {
         with,
         semantic,
         read_mode,
+        following_statements,
+    };
+    resolve_file_open(
+        item,
         mode,
         keywords,
         OpenArgument::Builtin { filename },
-        following_statements,
+        &context,
     )
 }
 
@@ -371,17 +383,20 @@ fn find_path_open<'a>(
 
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
-    resolve_file_open(
-        item,
+    let context = OpenResolutionContext {
         with,
         semantic,
         read_mode,
+        following_statements,
+    };
+    resolve_file_open(
+        item,
         mode,
         keywords,
         OpenArgument::Pathlib {
             path: attr.value.as_ref(),
         },
-        following_statements,
+        &context,
     )
 }
 
