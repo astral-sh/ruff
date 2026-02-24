@@ -556,6 +556,23 @@ impl<'a> Visitor<'a> for NameUseVisitor<'_> {
         if self.found {
             return;
         }
+        if let ast::Stmt::With(ast::StmtWith { items, .. }) = stmt {
+            if items.iter().any(|item| {
+                item.optional_vars
+                    .as_deref()
+                    .is_some_and(|target| target_contains_name(target, self.name))
+            }) {
+                // `with ... as name` rebinds `name` before the body executes.
+                // The body should not count as a use of the previous binding.
+                for item in items {
+                    self.visit_expr(&item.context_expr);
+                    if self.found {
+                        return;
+                    }
+                }
+                return;
+            }
+        }
         if matches!(stmt, ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_)) {
             return;
         }

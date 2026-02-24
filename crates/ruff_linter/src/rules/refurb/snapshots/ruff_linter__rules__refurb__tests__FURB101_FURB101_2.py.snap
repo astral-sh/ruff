@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/refurb/mod.rs
+assertion_line: 65
 ---
 FURB101 [*] `open` and `read` should be replaced by `Path("file.txt").read_text(encoding="utf-8")`
  --> FURB101_2.py:2:6
@@ -18,4 +19,29 @@ help: Replace with `Path("file.txt").read_text(encoding="utf-8")`
 3 + _ = pathlib.Path("file.txt").read_text(encoding="utf-8")
 4 | f = object()
 5 | print(f)
-6 |
+6 | 
+
+FURB101 [*] `open` and `read` should be replaced by `Path("config.yaml").read_text(encoding="utf-8")`
+  --> FURB101_2.py:13:6
+   |
+12 | # Rebinding in a later `with ... as config_file` should not suppress this one.
+13 | with open("config.yaml", encoding="utf-8") as config_file:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |     config_raw = config_file.read()
+   |
+help: Replace with `Path("config.yaml").read_text(encoding="utf-8")`
+1  | # FURB101
+2  + import pathlib
+3  | with open("file.txt", encoding="utf-8") as f:
+4  |     _ = f.read()
+5  | f = object()
+--------------------------------------------------------------------------------
+11 | print(f.mode)
+12 | 
+13 | # Rebinding in a later `with ... as config_file` should not suppress this one.
+   - with open("config.yaml", encoding="utf-8") as config_file:
+   -     config_raw = config_file.read()
+14 + config_raw = pathlib.Path("config.yaml").read_text(encoding="utf-8")
+15 | 
+16 | if "tts:" in config_raw:
+17 |     try:
