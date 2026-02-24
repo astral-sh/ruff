@@ -336,9 +336,10 @@ impl<'db> NarrowingConstraint<'db> {
         };
 
         let new_intersection_disjunct = self.intersection_disjunct.map(|intersection_disjunct| {
-            IntersectionType::from_elements(
+            IntersectionType::from_two_elements(
                 db,
-                [intersection_disjunct, other_intersection_disjunct],
+                intersection_disjunct,
+                other_intersection_disjunct,
             )
         });
 
@@ -346,9 +347,10 @@ impl<'db> NarrowingConstraint<'db> {
             self.replacement_disjuncts
                 .iter()
                 .map(|replacement_disjunct| {
-                    IntersectionType::from_elements(
+                    IntersectionType::from_two_elements(
                         db,
-                        [*replacement_disjunct, other_intersection_disjunct],
+                        *replacement_disjunct,
+                        other_intersection_disjunct,
                     )
                 });
 
@@ -365,13 +367,20 @@ impl<'db> NarrowingConstraint<'db> {
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `replacement` disjunct or not
-    pub(crate) fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        UnionType::from_elements(
-            db,
-            self.replacement_disjuncts
-                .into_iter()
-                .chain(self.intersection_disjunct),
-        )
+    pub(crate) fn evaluate_constraint_type(
+        self,
+        db: &'db dyn Db,
+        check_redundancy: bool,
+    ) -> Type<'db> {
+        let elements = self
+            .replacement_disjuncts
+            .into_iter()
+            .chain(self.intersection_disjunct);
+        if check_redundancy {
+            UnionType::from_elements(db, elements)
+        } else {
+            UnionType::from_elements_no_redundancy_check(db, elements)
+        }
     }
 }
 
@@ -1360,7 +1369,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .or_insert(constraint);
 
                 // Use the narrowed type for subsequent comparisons in a chain.
-                last_rhs_ty = Some(IntersectionType::from_elements(self.db, [rhs_ty, ty]));
+                last_rhs_ty = Some(IntersectionType::from_two_elements(self.db, rhs_ty, ty));
             } else {
                 last_rhs_ty = Some(rhs_ty);
             }

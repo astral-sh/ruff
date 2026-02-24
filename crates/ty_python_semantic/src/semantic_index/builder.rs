@@ -1955,14 +1955,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if let Some(msg) = msg {
                     let post_test = self.flow_snapshot();
                     let negated_predicate = predicate.negated();
-                    self.record_narrowing_constraint(negated_predicate);
-                    self.record_reachability_constraint(negated_predicate);
+                    let predicate_id = self.record_narrowing_constraint(negated_predicate);
+                    self.record_reachability_constraint_id(predicate_id);
                     self.visit_expr(msg);
                     self.flow_restore(post_test);
                 }
 
-                self.record_narrowing_constraint(predicate);
-                self.record_reachability_constraint(predicate);
+                let predicate_id = self.record_narrowing_constraint(predicate);
+                self.record_reachability_constraint_id(predicate_id);
             }
 
             ast::Stmt::Assign(node) => {
@@ -2080,7 +2080,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
-                    self.record_reachability_constraint(last_predicate);
+                    self.record_reachability_constraint_id(last_narrowing_id);
 
                 let is_outer_block_in_type_checking = self.in_type_checking_block;
 
@@ -2131,7 +2131,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             self.record_expression_narrowing_constraint(elif_test);
 
                         last_reachability_constraint =
-                            self.record_reachability_constraint(last_predicate);
+                            self.record_reachability_constraint_id(last_narrowing_id);
                     }
 
                     // Determine if this clause is in type checking context
@@ -2195,7 +2195,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // after the loop.
                 let pre_loop = self.flow_snapshot();
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
-                self.record_reachability_constraint(predicate);
+                self.record_reachability_constraint_id(predicate_id);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
@@ -2375,36 +2375,25 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         );
                     previous_pattern = Some(match_pattern_predicate);
                     let reachability_constraint =
-                        self.record_reachability_constraint(match_predicate);
+                        self.record_reachability_constraint_id(match_narrowing_id);
 
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
-                        let guard_expr = self.add_standalone_expression(guard);
-                        // We could also add the guard expression as a reachability constraint, but
-                        // it seems unlikely that both the case predicate as well as the guard are
-                        // statically known conditions, so we currently don't model that.
-                        self.record_ambiguous_reachability();
                         self.visit_expr(guard);
                         let post_guard_eval = self.flow_snapshot();
-                        let predicate = PredicateOrLiteral::Predicate(Predicate {
-                            node: PredicateNode::Expression(guard_expr),
-                            is_positive: true,
-                        });
-                        // Add the predicate once, then use TDD-level negation for the failure
-                        // path. This ensures the positive and negative atoms share the same ID.
-                        let guard_predicate_id = self.add_predicate(predicate);
-                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
-                        self.current_use_def_map_mut()
-                            .record_negated_narrowing_constraint_for_places(
-                                guard_predicate_id,
-                                &possibly_narrowed,
-                            );
-                        let match_success_guard_failure = self.flow_snapshot();
+                        let (guard_predicate, guard_predicate_id) =
+                            self.record_expression_narrowing_constraint(guard);
+                        let guard_reachability_constraint =
+                            self.record_reachability_constraint_id(guard_predicate_id);
+
+                        let guard_success_state = self.flow_snapshot();
                         self.flow_restore(post_guard_eval);
-                        self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_places(
-                                guard_predicate_id,
-                                &possibly_narrowed,
-                            );
+                        self.record_negated_narrowing_constraint(
+                            guard_predicate,
+                            guard_predicate_id,
+                        );
+                        self.record_negated_reachability_constraint(guard_reachability_constraint);
+                        let match_success_guard_failure = self.flow_snapshot();
+                        self.flow_restore(guard_success_state);
                         match_success_guard_failure
                     });
 
@@ -2978,7 +2967,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
-                let reachability_constraint = self.record_reachability_constraint(predicate);
+                let reachability_constraint = self.record_reachability_constraint_id(predicate_id);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
