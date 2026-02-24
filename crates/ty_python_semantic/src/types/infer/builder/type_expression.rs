@@ -529,7 +529,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         } = starred;
 
         let starred_type = self.infer_type_expression(value);
-        if starred_type.exact_tuple_instance_spec(self.db()).is_some() {
+        if starred_type.exact_tuple_instance_spec(self.db()).is_some()
+            || starred_type.is_typevartuple(self.db())
+        {
             starred_type
         } else {
             Type::Dynamic(DynamicType::TodoStarredExpression)
@@ -690,12 +692,67 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if inner_tuple.is_variadic() {
                                 report_too_many_unpacked_tuples();
                             }
-                        } else if self.expression_type(starred_value)
-                            == Type::Dynamic(DynamicType::TodoTypeVarTuple)
-                        {
-                            report_too_many_unpacked_tuples();
                         } else {
-                            // TODO: emit a diagnostic
+                            let starred_value_ty = self.expression_type(starred_value);
+                            // A TypeVarTuple can appear in three different type representations:
+                            // 1. `TodoTypeVarTuple` — legacy placeholder for unresolved cases
+                            // 2. `NominalInstance(TypeVarTuple)` — error-recovery fallback when
+                            //    the TypeVarTuple constructor fails validation
+                            // 3. A proper TypeVarTuple via `is_typevartuple()`, which handles
+                            //    both `KnownInstance(TypeVar(...))` and bound `TypeVar` forms
+                            if starred_value_ty.is_typevartuple(self.db()) {
+                                report_too_many_unpacked_tuples();
+                                if let TupleSpecBuilder::Fixed(_) = &element_types {
+                                    element_types = element_types.set_variable(element_ty);
+                                }
+                            } else if starred_value_ty
+                                == Type::Dynamic(DynamicType::TodoTypeVarTuple)
+                                || matches!(
+                                    starred_value_ty,
+                                    Type::NominalInstance(instance)
+                                    if instance.has_known_class(
+                                        self.db(),
+                                        KnownClass::TypeVarTuple
+                                    )
+                                )
+                            {
+                                return_todo = true;
+                                report_too_many_unpacked_tuples();
+                            } else {
+                                self.report_invalid_type_expression(
+                                    element,
+                                    format_args!(
+                                        "Only `TypeVarTuple` and `tuple` types can be \
+                                            unpacked in a `tuple` type expression"
+                                    ),
+                                );
+                            }
+                        }
+                    } else if element_ty.is_typevartuple(self.db()) {
+                        // Handle `Unpack[Ts]` (subscript form) the same as `*Ts` (starred form):
+                        // the TypeVarTuple becomes the variable-length element.
+                        if let Some(first) = first_unpacked_variadic_tuple {
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, tuple)
+                            {
+                                let mut diagnostic = builder.into_diagnostic(
+                                    "Multiple unpacked variadic tuples \
+                                        are not allowed in a `tuple` specialization",
+                                );
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(first)
+                                        .message("First unpacked variadic tuple"),
+                                );
+                                diagnostic.annotate(
+                                    self.context
+                                        .secondary(element)
+                                        .message("Later unpacked variadic tuple"),
+                                );
+                            }
+                        } else {
+                            first_unpacked_variadic_tuple = Some(element);
+                            element_types = element_types.set_variable(element_ty);
                         }
                     } else {
                         element_types.push(element_ty);
@@ -735,6 +792,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         self.db(),
                         Type::Dynamic(DynamicType::TodoTypeVarTuple),
                     ))
+                } else if single_element_ty.is_typevartuple(self.db()) {
+                    Some(TupleType::homogeneous(self.db(), single_element_ty))
                 } else {
                     TupleType::heterogeneous(self.db(), std::iter::once(single_element_ty))
                 }
@@ -1673,7 +1732,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 inferred_type
             }
             SpecialFormType::Unpack => {
-                self.infer_type_expression(arguments_slice);
+                let inner_ty = self.infer_type_expression(arguments_slice);
+                if inner_ty.is_typevartuple(self.db()) {
+                    return inner_ty;
+                }
                 todo_type!("`Unpack[]` special form")
             }
             SpecialFormType::NoReturn
@@ -1902,8 +1964,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
                     // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                    return_todo |= param_type.is_todo()
-                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                    if matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_)) {
+                        return_todo |=
+                            param_type.is_todo() || param_type.is_typevartuple(self.db());
+                    }
                     parameter_types.push(param_type);
                 }
 

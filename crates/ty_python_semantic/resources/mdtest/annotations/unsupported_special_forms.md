@@ -13,8 +13,12 @@ Ts = TypeVarTuple("Ts")
 R_co = TypeVar("R_co", covariant=True)
 
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
-    reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
+    reveal_type(args)  # revealed: tuple[Ts@f]
     return args
+
+def inner(args: tuple[Unpack[Ts]]) -> None: ...
+def g(*args: Unpack[Ts]) -> None:
+    inner(args)
 
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
     reveal_type(args)  # revealed: P@i.args
