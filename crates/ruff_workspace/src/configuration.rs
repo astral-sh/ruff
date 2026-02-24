@@ -249,9 +249,11 @@ impl Configuration {
             .unwrap_or_default();
         let flake8_import_conventions = lint
             .flake8_import_conventions
-            .map(Flake8ImportConventionsOptions::try_into_settings)
+            .map(|options| options.try_into_settings(lint_preview))
             .transpose()?
-            .unwrap_or_default();
+            .unwrap_or_else(|| {
+                ruff_linter::rules::flake8_import_conventions::settings::Settings::new(lint_preview)
+            });
 
         conflicting_import_settings(&isort, &flake8_import_conventions)?;
         conflicting_required_import_pyi025(&isort, &rules)?;
