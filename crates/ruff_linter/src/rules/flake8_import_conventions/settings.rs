@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use ruff_macros::CacheKey;
 
 use crate::display_settings;
+use crate::preview::is_expanded_import_conventions_enabled;
 use crate::settings::types::PreviewMode;
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
@@ -76,9 +77,10 @@ pub fn default_aliases(preview: PreviewMode) -> FxHashMap<String, String> {
         .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
         .collect::<FxHashMap<_, _>>();
 
-    if preview.is_enabled() {
+    if is_expanded_import_conventions_enabled(preview) {
         aliases.extend(preview_aliases());
     }
+
     aliases
 }
 
