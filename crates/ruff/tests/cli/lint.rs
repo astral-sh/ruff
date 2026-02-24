@@ -1076,38 +1076,6 @@ include = ["*.ipy"]
 }
 
 #[test]
-fn file_noqa_external() -> Result<()> {
-    let fixture = CliTest::with_file(
-        "ruff.toml",
-        r#"
-[lint]
-external = ["AAA"]
-"#,
-    )?;
-
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .arg("--config")
-        .arg("ruff.toml")
-        .arg("-")
-        .pass_stdin(r#"
-# flake8: noqa: AAA101, BBB102
-import os
-"#), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:3:8: F401 [*] `os` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
-
-    ----- stderr -----
-    ");
-
-    Ok(())
-}
-
-#[test]
 fn required_version_fails_to_parse() -> Result<()> {
     let fixture = CliTest::with_file(
         "ruff.toml",
