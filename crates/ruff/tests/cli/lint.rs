@@ -1120,7 +1120,6 @@ import os
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
     ");
 
     Ok(())

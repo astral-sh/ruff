@@ -19,4 +19,3 @@ exit_code: 0
 All checks passed!
 
 ----- stderr -----
-warning: Invalid rule code provided to `# ruff: noqa` at -:2: AAA101
