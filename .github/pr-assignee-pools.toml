@@ -8,7 +8,7 @@ reviewers = ["carljm", "AlexWaygood", "sharkdp", "dcreager", "ibraheemdev", "oco
 [[pools]]
 name = "ty-module-resolver"
 paths = ["/crates/ty_module_resolver/**", "/crates/ty_site_packages/**"]
-reviewers = ["carljm", "AlexWaygood", "MichaReiser", "Gankra", "BurntSushi"]
+reviewers = ["carljm", "AlexWaygood", "MichaReiser", "BurntSushi"]
 
 [[pools]]
 name = "ty-infra"
