@@ -2258,9 +2258,9 @@ impl<'db> SpecializationBuilder<'db> {
             (
                 formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
                 Type::LiteralValue(literal),
-            ) if literal.is_string() || literal.is_literal_string() || literal.is_bytes() => {
-                // Retry specialization with the literal's fallback instance (`str` / `bytes`)
-                // so literal iterables can contribute to generic inference.
+            ) => {
+                // Retry specialization with the literal's fallback instance so literals can
+                // contribute to generic inference for nominal and protocol formals.
                 let actual_instance = literal.fallback_instance(self.db);
                 return self.infer_map_impl(formal, actual_instance, polarity, f, seen);
             }
