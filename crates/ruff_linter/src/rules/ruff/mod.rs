@@ -518,6 +518,19 @@ mod tests {
     }
 
     #[test]
+    fn invalid_rule_code_external_rules_with_unused() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF102.py"),
+            &settings::LinterSettings {
+                external: vec!["V".to_string()],
+                ..settings::LinterSettings::for_rules(vec![Rule::InvalidRuleCode, Rule::UnusedNOQA])
+            },
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn ruff_per_file_ignores() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/ruff_per_file_ignores.py"),
