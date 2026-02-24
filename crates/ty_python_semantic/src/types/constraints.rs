@@ -649,27 +649,41 @@ impl<'db> ConstraintSetBuilder<'db> {
         db: &'db dyn Db,
         other: &OwnedConstraintSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
-        let mut constraints = IndexVec::with_capacity(other.constraints.len());
-        for constraint in other.constraints.iter().copied() {
-            constraints.push(self.intern_constraint(db, constraint));
+        fn rebuild_node<'db>(
+            db: &'db dyn Db,
+            builder: &ConstraintSetBuilder<'db>,
+            other: &OwnedConstraintSet<'db>,
+            cache: &mut FxHashMap<NodeId, NodeId>,
+            old_node: NodeId,
+        ) -> NodeId {
+            if old_node.is_terminal() {
+                return old_node;
+            }
+            if let Some(remapped) = cache.get(&old_node) {
+                return *remapped;
+            }
+
+            let old_interior = other.nodes[old_node];
+            let old_constraint = other.constraints[old_interior.constraint];
+            let condition = Constraint::new_node(
+                db,
+                builder,
+                old_constraint.typevar,
+                old_constraint.lower,
+                old_constraint.upper,
+            );
+
+            let if_true = rebuild_node(db, builder, other, cache, old_interior.if_true);
+            let if_false = rebuild_node(db, builder, other, cache, old_interior.if_false);
+            let remapped = condition.ite(builder, if_true, if_false);
+
+            cache.insert(old_node, remapped);
+            remapped
         }
 
-        let mut nodes = IndexVec::with_capacity(other.nodes.len());
-        let remap = |old: NodeId, nodes: &IndexVec<NodeId, NodeId>| {
-            if old.is_terminal() { old } else { nodes[old] }
-        };
-        for node in other.nodes.iter().copied() {
-            let remapped = InteriorNodeData {
-                constraint: constraints[node.constraint],
-                if_true: remap(node.if_true, &nodes),
-                if_false: remap(node.if_false, &nodes),
-                source_order: node.source_order,
-                max_source_order: node.max_source_order,
-            };
-            nodes.push(self.intern_interior_node(remapped));
-        }
-
-        ConstraintSet::from_node(self, remap(other.node, &nodes))
+        let mut cache = FxHashMap::default();
+        let node = rebuild_node(db, self, other, &mut cache, other.node);
+        ConstraintSet::from_node(self, node)
     }
 
     fn intern_typevar(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
@@ -790,7 +804,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         builder: &ConstraintSetBuilder<'db>,
         typevar: Self,
     ) -> bool {
-        builder.typevar_id(db, self) > builder.typevar_id(db, typevar)
+        builder.typevar_id(db, self) < builder.typevar_id(db, typevar)
     }
 }
 
