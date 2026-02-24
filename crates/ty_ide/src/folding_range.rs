@@ -251,7 +251,7 @@ impl<'a> FoldingRangeVisitor<'a> {
         }
 
         let tokenizer_start = decorator_list.last().unwrap().range().end();
-        let tokenizer = SimpleTokenizer::starts_at(tokenizer_start, &self.source);
+        let tokenizer = SimpleTokenizer::starts_at(tokenizer_start, self.source);
         if let Some(token) = tokenizer.skip_trivia().find(|token| token.kind == target) {
             let range = TextRange::new(token.start(), range.end());
             self.add_range(range);
@@ -280,7 +280,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             // Compound statements that create folding regions
             AnyNodeRef::StmtFunctionDef(func) => {
                 self.add_decorator_range(&func.decorator_list);
-                self.add_function_def_range(&func);
+                self.add_function_def_range(func);
                 // Note that this may be duplicative with folding
                 // ranges added for string literals. But I don't think
                 // the LSP protocol specifies that this is a problem.
@@ -292,7 +292,7 @@ impl SourceOrderVisitor<'_> for FoldingRangeVisitor<'_> {
             }
             AnyNodeRef::StmtClassDef(class) => {
                 self.add_decorator_range(&class.decorator_list);
-                self.add_class_def_range(&class);
+                self.add_class_def_range(class);
                 // See comment above for class docstrings about this
                 // being duplicative with adding folding ranges for
                 // string literals.
