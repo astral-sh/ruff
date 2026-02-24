@@ -1081,8 +1081,5 @@ class Factory[**P](Protocol):
 def call_factory[**P](ctr: Factory[P], *args: P.args, **kwargs: P.kwargs) -> int:
     return ctr("", *args, **kwargs)
 
-# TODO: This should be OK - P should be inferred as [] since my_factory only has `arg: str`
-# which matches the prefix. Currently this is a false positive.
-# error: [invalid-argument-type]
 call_factory(my_factory)
 ```

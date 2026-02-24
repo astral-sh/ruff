@@ -1349,12 +1349,36 @@ impl<'db> Signature<'db> {
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
-            result.intersect(
-                db,
-                ConstraintSet::from(
-                    relation.is_assignability() || relation.is_constraint_set_assignability(),
-                ),
+            if !(relation.is_assignability() || relation.is_constraint_set_assignability()) {
+                return ConstraintSet::from(false);
+            }
+
+            // For Concatenate[T, ...] forms, check that the prefix params are compatible.
+            // The prefix params precede the *args/**kwargs gradual tail, so prefix_len = total_params - 2.
+            let self_is_concat_gradual = matches!(
+                self.parameters.kind(),
+                ParametersKind::Concatenate(ConcatenateTail::Gradual)
             );
+            let other_is_concat_gradual = matches!(
+                other.parameters.kind(),
+                ParametersKind::Concatenate(ConcatenateTail::Gradual)
+            );
+
+            if self_is_concat_gradual && other_is_concat_gradual {
+                let self_prefix_len = self.parameters.len() - 2;
+                let other_prefix_len = other.parameters.len() - 2;
+                let common = self_prefix_len.min(other_prefix_len);
+                for i in 0..common {
+                    // Parameters are contravariant
+                    if !check_types(
+                        other.parameters.as_slice()[i].annotated_type(),
+                        self.parameters.as_slice()[i].annotated_type(),
+                    ) {
+                        return result;
+                    }
+                }
+            }
+
             return result;
         }
 
@@ -1416,7 +1440,100 @@ impl<'db> Signature<'db> {
                     return result;
                 }
 
-                (None, None) => {}
+                (None, None) => {
+                    // Check for Concatenate-style signatures: prefix params followed by
+                    // *P.args, **P.kwargs. These are not detected by as_paramspec() because
+                    // the prefix params change the ParametersKind from ParamSpec to Standard.
+
+                    // Case: `other` has Concatenate pattern, `self` is concrete
+                    if let Some((other_prefix, other_paramspec)) =
+                        other.parameters.find_paramspec_from_args_kwargs(db)
+                        && !other_prefix.is_empty()
+                    {
+                        let self_params = self.parameters.as_slice();
+                        if self_params.len() >= other_prefix.len() {
+                            // Check prefix param types (contravariant)
+                            for (other_param, self_param) in
+                                other_prefix.iter().zip(self_params.iter())
+                            {
+                                result.intersect(
+                                    db,
+                                    other_param.annotated_type().has_relation_to_impl(
+                                        db,
+                                        self_param.annotated_type(),
+                                        inferable,
+                                        relation,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    ),
+                                );
+                            }
+
+                            // Bind the ParamSpec to the remaining self params
+                            let remaining_params = &self_params[other_prefix.len()..];
+                            let lower = Type::Callable(CallableType::new(
+                                db,
+                                CallableSignature::single(Signature::new(
+                                    Parameters::new(db, remaining_params.iter().cloned()),
+                                    Type::unknown(),
+                                )),
+                                CallableTypeKind::ParamSpecValue,
+                            ));
+                            let param_spec_matches = ConstraintSet::constrain_typevar(
+                                db,
+                                other_paramspec,
+                                lower,
+                                Type::object(),
+                            );
+                            result.intersect(db, param_spec_matches);
+                            return result;
+                        }
+                    }
+
+                    // Case: `self` has Concatenate pattern, `other` is concrete
+                    if let Some((self_prefix, self_paramspec)) =
+                        self.parameters.find_paramspec_from_args_kwargs(db)
+                        && !self_prefix.is_empty()
+                    {
+                        let other_params = other.parameters.as_slice();
+                        if other_params.len() >= self_prefix.len() {
+                            // Check prefix param types (contravariant)
+                            for (self_param, other_param) in
+                                self_prefix.iter().zip(other_params.iter())
+                            {
+                                result.intersect(
+                                    db,
+                                    self_param.annotated_type().has_relation_to_impl(
+                                        db,
+                                        other_param.annotated_type(),
+                                        inferable,
+                                        relation,
+                                        relation_visitor,
+                                        disjointness_visitor,
+                                    ),
+                                );
+                            }
+
+                            let remaining_params = &other_params[self_prefix.len()..];
+                            let upper = Type::Callable(CallableType::new(
+                                db,
+                                CallableSignature::single(Signature::new(
+                                    Parameters::new(db, remaining_params.iter().cloned()),
+                                    Type::unknown(),
+                                )),
+                                CallableTypeKind::ParamSpecValue,
+                            ));
+                            let param_spec_matches = ConstraintSet::constrain_typevar(
+                                db,
+                                self_paramspec,
+                                Type::Never,
+                                upper,
+                            );
+                            result.intersect(db, param_spec_matches);
+                            return result;
+                        }
+                    }
+                }
             }
         }
 
@@ -1746,9 +1863,14 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
-// TODO: the spec also allows signatures like `Concatenate[int, ...]` or `Concatenate[int, P]`,
-// which have some number of required positional-only parameters followed by a gradual form or a
-// `ParamSpec`. Our representation will need some adjustments to represent that.
+/// The tail of a `Concatenate[T, ..., tail]` form.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum ConcatenateTail<'db> {
+    /// `Concatenate[T, ...]` — prefix params followed by a gradual `*args: Any, **kwargs: Any`.
+    Gradual,
+    /// `Concatenate[T, P]` — prefix params followed by a `ParamSpec`.
+    ParamSpec(BoundTypeVarInstance<'db>),
+}
 
 /// The kind of parameter list represented.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -1782,6 +1904,10 @@ pub(crate) enum ParametersKind<'db> {
     // TODO: Maybe we should use `find_paramspec_from_args_kwargs` instead of storing the typevar
     // here?
     ParamSpec(BoundTypeVarInstance<'db>),
+
+    /// Represents a `Concatenate[T, ..., tail]` form: some number of required positional-only
+    /// prefix parameters followed by either a gradual form or a `ParamSpec`.
+    Concatenate(ConcatenateTail<'db>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -1851,7 +1977,19 @@ impl<'db> Parameters<'db> {
     }
 
     pub(crate) const fn is_gradual(&self) -> bool {
-        matches!(self.kind, ParametersKind::Gradual)
+        matches!(
+            self.kind,
+            ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
+        )
+    }
+
+    /// Set the kind to `Concatenate(tail)`, used for `Concatenate[T, ..., tail]` forms where
+    /// prefix parameters precede either a gradual or `ParamSpec` suffix.
+    pub(crate) fn into_concatenate(self, tail: ConcatenateTail<'db>) -> Self {
+        Self {
+            kind: ParametersKind::Concatenate(tail),
+            ..self
+        }
     }
 
     pub(crate) const fn is_top(&self) -> bool {
@@ -2121,7 +2259,10 @@ impl<'db> Parameters<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping
-            && self.kind == ParametersKind::Gradual
+            && matches!(
+                self.kind,
+                ParametersKind::Gradual | ParametersKind::Concatenate(ConcatenateTail::Gradual)
+            )
         {
             match materialization_kind {
                 MaterializationKind::Bottom => {
