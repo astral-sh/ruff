@@ -2042,6 +2042,31 @@ static_assert(is_assignable_to(str, SupportsLessThan))
 static_assert(is_assignable_to(int, Invertable))
 ```
 
+Literal values should satisfy protocols with method members via their instance fallback type:
+
+```py
+from typing import Literal, Protocol, TypeVar
+
+reveal_type(abs(5))  # revealed: int
+
+def f(x: Literal[5]) -> None:
+    reveal_type(abs(x))  # revealed: int
+
+InT = TypeVar("InT")
+OutT = TypeVar("OutT")
+
+class CanMul(Protocol[InT, OutT]):
+    def __mul__(self, x: InT, /) -> OutT: ...
+
+def x2(x: CanMul[int, OutT], /) -> OutT:
+    return x * 2
+
+def g(x: int) -> None:
+    reveal_type(x2(x))  # revealed: int
+
+reveal_type(x2(1))  # revealed: int
+```
+
 ## Subtyping of protocols with generic method members
 
 Protocol method members can be generic. They can have generic contexts scoped to the class:
