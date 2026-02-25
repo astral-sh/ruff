@@ -108,6 +108,22 @@ pub(super) fn request(req: server::Request) -> Task {
         >(
             req, BackgroundSchedule::Worker
         ),
+        requests::PrepareTypeHierarchyRequestHandler::METHOD => background_document_request_task::<
+            requests::PrepareTypeHierarchyRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
+        requests::TypeHierarchySupertypesRequestHandler::METHOD => {
+            background_request_task::<requests::TypeHierarchySupertypesRequestHandler>(
+                req,
+                BackgroundSchedule::Worker,
+            )
+        }
+        requests::TypeHierarchySubtypesRequestHandler::METHOD => background_request_task::<
+            requests::TypeHierarchySubtypesRequestHandler,
+        >(
+            req, BackgroundSchedule::Worker
+        ),
         lsp_types::request::Shutdown::METHOD => sync_request_task::<requests::ShutdownHandler>(req),
 
         method => {
