@@ -46,6 +46,81 @@ use crate::types::{
 use crate::{Db, FxOrderMap, FxOrderSet};
 use smallvec::SmallVec;
 
+/// Extract `(core, guard)` from truthiness-guarded intersections.
+///
+/// e.g.
+/// - `A & ~AlwaysTruthy` -> `Some((A, ~AlwaysTruthy))`
+/// - `A & ~AlwaysFalsy` -> `Some((A, ~AlwaysFalsy))`
+/// - `A` -> `None`
+/// - `A & ~AlwaysTruthy & ~AlwaysFalsy` -> `None` (not a single-guard shape)
+///
+/// This only recognizes the "single truthiness guard" forms used by truthiness narrowing.
+fn split_truthiness_guarded_intersection<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<(Type<'db>, Type<'db>)> {
+    let Type::Intersection(intersection) = ty else {
+        return None;
+    };
+
+    let has_not_truthy = intersection.negative(db).contains(&Type::AlwaysTruthy);
+    let has_not_falsy = intersection.negative(db).contains(&Type::AlwaysFalsy);
+    let guard = match (has_not_truthy, has_not_falsy) {
+        (true, false) => Type::AlwaysTruthy.negate(db),
+        (false, true) => Type::AlwaysFalsy.negate(db),
+        _ => return None,
+    };
+
+    let mut core = IntersectionBuilder::new(db);
+    for positive in intersection.positive(db) {
+        core = core.add_positive(*positive);
+    }
+    for negative in intersection.negative(db) {
+        if (guard == Type::AlwaysTruthy.negate(db) && *negative == Type::AlwaysTruthy)
+            || (guard == Type::AlwaysFalsy.negate(db) && *negative == Type::AlwaysFalsy)
+        {
+            continue;
+        }
+        core = core.add_negative(*negative);
+    }
+    Some((core.build(), guard))
+}
+
+/// Try to merge a complementary guarded pair into an unguarded core.
+///
+/// e.g.
+/// - `(A & ~AlwaysTruthy, A & ~AlwaysFalsy)` -> `Some(A)`
+/// - `(A & ~AlwaysTruthy, B & ~AlwaysFalsy)` -> `Some(A | B)` if reconstruction is exact
+/// - `(A & ~AlwaysTruthy, C)` -> `None`
+///
+/// Safety rule:
+/// The candidate merge is accepted only if adding each original guard back reconstructs
+/// exactly the original operands (`left` and `right`).
+fn merge_truthiness_guarded_pair<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let (left_core, left_guard) = split_truthiness_guarded_intersection(db, left)?;
+    let (right_core, right_guard) = split_truthiness_guarded_intersection(db, right)?;
+    if left_guard == right_guard {
+        return None;
+    }
+
+    if left_core.is_equivalent_to(db, right_core) {
+        return Some(left_core);
+    }
+
+    let candidate = UnionType::from_elements(db, [left_core, right_core]);
+    let left_reconstructed = IntersectionType::from_elements(db, [candidate, left_guard]);
+    let right_reconstructed = IntersectionType::from_elements(db, [candidate, right_guard]);
+    if left_reconstructed == left && right_reconstructed == right {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LiteralKind<'db> {
     Int,
@@ -658,10 +733,13 @@ impl<'db> UnionBuilder<'db> {
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        let bool_pair = if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
-            Some(LiteralValueTypeKind::Bool(!b))
-        } else {
-            None
+        let mut ty = ty;
+        let bool_pair = |ty: Type<'db>| {
+            if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(!b))
+            } else {
+                None
+            }
         };
 
         // If an alias gets here, it means we aren't unpacking aliases, and we also
@@ -694,9 +772,16 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
+            if let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type) {
+                to_remove.push(i);
+                ty = merged_type;
+                continue;
+            }
+
             if element_type
                 .as_literal_value_kind()
-                .zip(bool_pair)
+                .zip(bool_pair(ty))
                 .is_some_and(|(element, pair)| element == pair)
             {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
