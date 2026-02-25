@@ -37,7 +37,15 @@ pub(crate) enum Command {
     Server,
 
     /// Display ty's version
-    Version,
+    Version {
+        #[arg(
+            long,
+            value_enum,
+            default_value = "text",
+            help = "The format in which to display the version information"
+        )]
+        output_format: VersionFormat,
+    },
 
     /// Generate shell completion
     #[clap(hide = true)]
@@ -54,6 +62,10 @@ pub(crate) struct CheckCommand {
     )]
     pub paths: Vec<SystemPathBuf>,
 
+    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
+    #[arg(long)]
+    pub(crate) add_ignore: bool,
+
     /// Run the command within the given project directory.
     ///
     /// All `pyproject.toml` files will be discovered by walking up the directory tree from the given project directory,
@@ -67,10 +79,16 @@ pub(crate) struct CheckCommand {
     ///
     /// ty uses your Python environment to resolve third-party imports in your code.
     ///
+    /// This can be a path to:
+    ///
+    /// - A Python interpreter, e.g. `.venv/bin/python3`
+    /// - A virtual environment directory, e.g. `.venv`
+    /// - A system Python [`sys.prefix`] directory, e.g. `/usr`
+    ///
     /// If you're using a project management tool such as uv or you have an activated Conda or virtual
     /// environment, you should not generally need to specify this option.
     ///
-    /// This option can be used to point to virtual or system Python environments.
+    /// [`sys.prefix`]: https://docs.python.org/3/library/sys.html#sys.prefix
     #[arg(long, value_name = "PATH", alias = "venv")]
     pub(crate) python: Option<SystemPathBuf>,
 
@@ -126,7 +144,7 @@ pub(crate) struct CheckCommand {
     pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.
-    #[arg(long)]
+    #[arg(long, env = EnvVars::TY_OUTPUT_FORMAT)]
     pub(crate) output_format: Option<OutputFormat>,
 
     /// Use exit code 1 if there are any warning-level diagnostics.
@@ -142,7 +160,7 @@ pub(crate) struct CheckCommand {
     pub(crate) watch: bool,
 
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
-    /// Use `--no-respect-gitignore` to disable.
+    /// Use `--no-respect-ignore-files` to disable.
     #[arg(
         long,
         overrides_with("no_respect_ignore_files"),
@@ -311,7 +329,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("error")
                 .long("error")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'error'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'error'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -319,7 +337,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("warn")
                 .long("warn")
                 .action(ArgAction::Append)
-                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times.")
+                .help("Treat the given rule as having severity 'warn'. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -327,7 +345,7 @@ impl clap::Args for RulesArg {
             clap::Arg::new("ignore")
                 .long("ignore")
                 .action(ArgAction::Append)
-                .help("Disables the rule. Can be specified multiple times.")
+                .help("Disables the rule. Can be specified multiple times. Use 'all' to apply to all rules.")
                 .value_name("RULE")
                 .help_heading(HELP_HEADING),
         )
@@ -359,9 +377,12 @@ pub enum OutputFormat {
     /// Print diagnostics in the JSON format expected by GitLab Code Quality reports.
     #[value(name = "gitlab")]
     Gitlab,
-    #[value(name = "github")]
     /// Print diagnostics in the format used by GitHub Actions workflow error annotations.
+    #[value(name = "github")]
     Github,
+    /// Print diagnostics as a JUnit-style XML report.
+    #[value(name = "junit")]
+    Junit,
 }
 
 impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
@@ -371,6 +392,7 @@ impl From<OutputFormat> for ty_project::metadata::options::OutputFormat {
             OutputFormat::Concise => Self::Concise,
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
+            OutputFormat::Junit => Self::Junit,
         }
     }
 }
@@ -387,6 +409,12 @@ pub(crate) enum TerminalColor {
 
     /// Never display colors.
     Never,
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+pub(crate) enum VersionFormat {
+    Text,
+    Json,
 }
 
 /// A TOML `<KEY> = <VALUE>` pair

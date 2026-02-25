@@ -1,0 +1,98 @@
+---
+source: crates/ruff_python_formatter/tests/fixtures.rs
+---
+## Input
+
+```python
+# Multiple fmt: skip in multi-part if-clause
+class ClassWithALongName:
+    Constant1 = 1
+    Constant2 = 2
+    Constant3 = 3
+
+
+def test():
+    if (
+        "cond1" == "cond1"
+        and "cond2" == "cond2"
+        and 1 in (
+            ClassWithALongName.Constant1,
+            ClassWithALongName.Constant2,
+            ClassWithALongName.Constant3, # fmt: skip
+        ) # fmt: skip
+    ):
+        return True
+    return False
+```
+
+## Black Differences
+
+```diff
+--- Black
++++ Ruff
+@@ -9,11 +9,12 @@
+     if (
+         "cond1" == "cond1"
+         and "cond2" == "cond2"
+-        and 1 in (
++        and 1
++        in (
+             ClassWithALongName.Constant1,
+             ClassWithALongName.Constant2,
+-            ClassWithALongName.Constant3, # fmt: skip
+-        ) # fmt: skip
++            ClassWithALongName.Constant3,  # fmt: skip
++        )  # fmt: skip
+     ):
+         return True
+     return False
+```
+
+## Ruff Output
+
+```python
+# Multiple fmt: skip in multi-part if-clause
+class ClassWithALongName:
+    Constant1 = 1
+    Constant2 = 2
+    Constant3 = 3
+
+
+def test():
+    if (
+        "cond1" == "cond1"
+        and "cond2" == "cond2"
+        and 1
+        in (
+            ClassWithALongName.Constant1,
+            ClassWithALongName.Constant2,
+            ClassWithALongName.Constant3,  # fmt: skip
+        )  # fmt: skip
+    ):
+        return True
+    return False
+```
+
+## Black Output
+
+```python
+# Multiple fmt: skip in multi-part if-clause
+class ClassWithALongName:
+    Constant1 = 1
+    Constant2 = 2
+    Constant3 = 3
+
+
+def test():
+    if (
+        "cond1" == "cond1"
+        and "cond2" == "cond2"
+        and 1 in (
+            ClassWithALongName.Constant1,
+            ClassWithALongName.Constant2,
+            ClassWithALongName.Constant3, # fmt: skip
+        ) # fmt: skip
+    ):
+        return True
+    return False
+```

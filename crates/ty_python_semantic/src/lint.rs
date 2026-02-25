@@ -33,7 +33,7 @@ pub struct LintMetadata {
     pub line: u32,
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, get_size2::GetSize)]
 #[cfg_attr(
     feature = "serde",
     derive(serde::Serialize, serde::Deserialize),
@@ -389,11 +389,11 @@ impl LintRegistry {
                     }
                 }
 
-                let suggestion = did_you_mean(self.by_name.keys(), code);
+                let suggestion = did_you_mean(self.by_name.keys().copied(), code);
 
                 Err(GetLintError::Unknown {
                     code: code.to_string(),
-                    suggestion,
+                    suggestion: suggestion.map(str::to_string),
                 })
             }
         }

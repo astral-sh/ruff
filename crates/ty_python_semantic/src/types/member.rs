@@ -1,7 +1,7 @@
 use crate::Db;
 use crate::place::{
-    ConsideredDefinitions, Place, PlaceAndQualifiers, RequiresExplicitReExport, place_by_id,
-    place_from_bindings,
+    ConsideredDefinitions, DefinedPlace, Place, PlaceAndQualifiers, RequiresExplicitReExport,
+    place_by_id, place_from_bindings,
 };
 use crate::semantic_index::{place_table, scope::ScopeId, use_def_map};
 use crate::types::Type;
@@ -25,6 +25,11 @@ impl<'db> Member<'db> {
         Self {
             inner: Place::declared(ty).into(),
         }
+    }
+
+    /// Returns the type qualifiers of this member.
+    pub(super) fn qualifiers(&self) -> crate::types::TypeQualifiers {
+        self.inner.qualifiers
     }
 
     /// Returns `true` if the inner place is undefined (i.e. there is no such member).
@@ -68,7 +73,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             }
 
             if let PlaceAndQualifiers {
-                place: Place::Defined(ty, _, _, _),
+                place: Place::Defined(DefinedPlace { ty, .. }),
                 qualifiers,
             } = place_and_quals
             {
@@ -82,9 +87,8 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 Member {
                     inner: match inferred {
                         Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined(_, origin, boundness, widening) => {
-                            Place::Defined(ty, origin, boundness, widening)
-                                .with_qualifiers(qualifiers)
+                        Place::Defined(place) => {
+                            Place::Defined(DefinedPlace { ty, ..place }).with_qualifiers(qualifiers)
                         }
                     },
                 }

@@ -8,8 +8,6 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 
 pub use self::render::{
     DisplayDiagnostic, DisplayDiagnostics, DummyFileResolver, FileResolver, Input,
-    ceil_char_boundary,
-    github::{DisplayGithubDiagnostics, GithubRenderer},
 };
 use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
@@ -96,6 +94,44 @@ impl Diagnostic {
         let span = span.into().with_range(range.range());
         diag.annotate(Annotation::primary(span));
         diag
+    }
+
+    /// Adds sub diagnostics that tell the user that this is a bug in ty
+    /// and asks them to open an issue on GitHub.
+    pub fn add_bug_sub_diagnostics(&mut self, url_encoded_title: &str) {
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            "This indicates a bug in ty.",
+        ));
+
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!(
+                "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title={url_encoded_title}, we'd be very appreciative!"
+            ),
+        ));
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format!(
+                "Platform: {os} {arch}",
+                os = std::env::consts::OS,
+                arch = std::env::consts::ARCH
+            ),
+        ));
+        if let Some(version) = crate::program_version() {
+            self.sub(SubDiagnostic::new(
+                SubDiagnosticSeverity::Info,
+                format!("Version: {version}"),
+            ));
+        }
+
+        self.sub(SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format!(
+                "Args: {args:?}",
+                args = std::env::args().collect::<Vec<_>>()
+            ),
+        ));
     }
 
     /// Add an annotation to this diagnostic.
@@ -281,17 +317,7 @@ impl Diagnostic {
 
     /// Returns all annotations, skipping the first primary annotation.
     pub fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
-        let mut seen_primary = false;
-        self.inner.annotations.iter().filter(move |ann| {
-            if seen_primary {
-                true
-            } else if ann.is_primary {
-                seen_primary = true;
-                false
-            } else {
-                true
-            }
-        })
+        secondary_annotations(self.inner.annotations.iter())
     }
 
     pub fn sub_diagnostics(&self) -> &[SubDiagnostic] {
@@ -633,6 +659,11 @@ impl SubDiagnostic {
         &self.inner.annotations
     }
 
+    /// Returns all annotations, skipping the first primary annotation.
+    pub fn secondary_annotations(&self) -> impl Iterator<Item = &Annotation> {
+        secondary_annotations(self.inner.annotations.iter())
+    }
+
     /// Returns a mutable borrow of the annotations of this sub-diagnostic.
     pub fn annotations_mut(&mut self) -> impl Iterator<Item = &mut Annotation> {
         self.inner.annotations.iter_mut()
@@ -671,6 +702,10 @@ impl SubDiagnostic {
             ConciseMessage::Both { main, annotation }
         }
     }
+
+    pub(crate) fn severity(&self) -> SubDiagnosticSeverity {
+        self.inner.severity
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
@@ -678,6 +713,23 @@ struct SubDiagnosticInner {
     severity: SubDiagnosticSeverity,
     message: DiagnosticMessage,
     annotations: Vec<Annotation>,
+}
+
+/// Returns all annotations, skipping the first primary annotation.
+fn secondary_annotations<'a>(
+    annotations: impl Iterator<Item = &'a Annotation>,
+) -> impl Iterator<Item = &'a Annotation> {
+    let mut seen_primary = false;
+    annotations.filter(move |ann| {
+        if seen_primary {
+            true
+        } else if ann.is_primary {
+            seen_primary = true;
+            false
+        } else {
+            true
+        }
+    })
 }
 
 /// A pointer to a subsequence in the end user's input.
@@ -1002,6 +1054,9 @@ pub enum DiagnosticId {
     /// Use of an invalid command-line option.
     InvalidCliOption,
 
+    /// Experimental feature requires preview mode.
+    PreviewFeature,
+
     /// An internal assumption was violated.
     ///
     /// This indicates a bug in the program rather than a user error.
@@ -1017,6 +1072,13 @@ impl DiagnosticId {
     /// Returns `true` if this `DiagnosticId` represents a lint.
     pub fn is_lint(&self) -> bool {
         matches!(self, DiagnosticId::Lint(_))
+    }
+
+    pub const fn as_lint(&self) -> Option<LintName> {
+        match self {
+            DiagnosticId::Lint(name) => Some(*name),
+            _ => None,
+        }
     }
 
     /// Returns `true` if this `DiagnosticId` represents a lint with the given name.
@@ -1047,6 +1109,7 @@ impl DiagnosticId {
             DiagnosticId::DeprecatedSetting => "deprecated-setting",
             DiagnosticId::Unformatted => "unformatted",
             DiagnosticId::InvalidCliOption => "invalid-cli-option",
+            DiagnosticId::PreviewFeature => "preview-feature",
             DiagnosticId::InternalError => "internal-error",
         }
     }
@@ -1272,6 +1335,8 @@ impl SubDiagnosticSeverity {
 /// Configuration for rendering diagnostics.
 #[derive(Clone, Debug)]
 pub struct DisplayDiagnosticConfig {
+    /// The program name used in structured output formats (e.g., JUnit, GitHub).
+    program: &'static str,
     /// The format to use for diagnostic rendering.
     ///
     /// This uses the "full" format by default.
@@ -1313,6 +1378,21 @@ pub struct DisplayDiagnosticConfig {
 }
 
 impl DisplayDiagnosticConfig {
+    pub fn new(program: &'static str) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            program,
+            format: DiagnosticFormat::default(),
+            color: false,
+            context: 2,
+            preview: false,
+            hide_severity: false,
+            show_fix_status: false,
+            show_fix_diff: false,
+            fix_applicability: Applicability::Safe,
+            cancellation_token: None,
+        }
+    }
+
     /// Whether to enable concise diagnostic output or not.
     pub fn format(self, format: DiagnosticFormat) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig { format, ..self }
@@ -1396,22 +1476,6 @@ impl DisplayDiagnosticConfig {
         self.cancellation_token
             .as_ref()
             .is_some_and(|token| token.is_cancelled())
-    }
-}
-
-impl Default for DisplayDiagnosticConfig {
-    fn default() -> DisplayDiagnosticConfig {
-        DisplayDiagnosticConfig {
-            format: DiagnosticFormat::default(),
-            color: false,
-            context: 2,
-            preview: false,
-            hide_severity: false,
-            show_fix_status: false,
-            show_fix_diff: false,
-            fix_applicability: Applicability::Safe,
-            cancellation_token: None,
-        }
     }
 }
 

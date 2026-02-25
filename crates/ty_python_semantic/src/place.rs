@@ -5,19 +5,21 @@ use ty_module_resolver::{
 };
 
 use crate::dunder_all::dunder_all_names;
-use crate::semantic_index::definition::{Definition, DefinitionState};
+use crate::semantic_index::definition::{Definition, DefinitionKind, DefinitionState};
+use crate::semantic_index::narrowing_constraints::ScopedNarrowingConstraint;
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{
-    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, place_table,
+    BindingWithConstraints, BindingWithConstraintsIterator, DeclarationsIterator, get_loop_header,
+    place_table,
 };
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
     ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, MemberLookupPolicy,
     Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
-    declaration_type, todo_type,
+    declaration_type,
 };
-use crate::{Db, FxOrderSet, Program};
+use crate::{Db, FxIndexSet, FxOrderSet, Program};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -88,6 +90,45 @@ impl Widening {
     }
 }
 
+/// A defined place with its type, origin, definedness, and widening information.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct DefinedPlace<'db> {
+    pub(crate) ty: Type<'db>,
+    pub(crate) origin: TypeOrigin,
+    pub(crate) definedness: Definedness,
+    pub(crate) widening: Widening,
+}
+
+impl<'db> DefinedPlace<'db> {
+    pub(crate) fn new(ty: Type<'db>) -> Self {
+        Self {
+            ty,
+            origin: TypeOrigin::Inferred,
+            definedness: Definedness::AlwaysDefined,
+            widening: Widening::None,
+        }
+    }
+
+    pub(crate) fn with_origin(mut self, origin: TypeOrigin) -> Self {
+        self.origin = origin;
+        self
+    }
+
+    pub(crate) fn with_definedness(mut self, definedness: Definedness) -> Self {
+        self.definedness = definedness;
+        self
+    }
+
+    pub(crate) fn with_widening(mut self, widening: Widening) -> Self {
+        self.widening = widening;
+        self
+    }
+
+    pub(crate) const fn is_definitely_defined(&self) -> bool {
+        matches!(self.definedness, Definedness::AlwaysDefined)
+    }
+}
+
 /// The result of a place lookup, which can either be a (possibly undefined) type
 /// or a completely undefined place.
 ///
@@ -110,50 +151,29 @@ impl Widening {
 ///
 /// If we look up places in this scope, we would get the following results:
 /// ```rs
-/// bound:               Place::Defined(Literal[1], TypeOrigin::Inferred, Definedness::AlwaysDefined, _),
-/// declared:            Place::Defined(int, TypeOrigin::Declared, Definedness::AlwaysDefined, _),
-/// possibly_unbound:    Place::Defined(Literal[2], TypeOrigin::Inferred, Definedness::PossiblyUndefined, _),
-/// possibly_undeclared: Place::Defined(int, TypeOrigin::Declared, Definedness::PossiblyUndefined, _),
-/// bound_or_declared:   Place::Defined(Literal[1], TypeOrigin::Inferred, Definedness::PossiblyUndefined, _),
+/// bound:               Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::AlwaysDefined, .. }),
+/// declared:            Place::Defined(DefinedPlace { ty: int, origin: TypeOrigin::Declared, definedness: Definedness::AlwaysDefined, .. }),
+/// possibly_unbound:    Place::Defined(DefinedPlace { ty: Literal[2], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
+/// possibly_undeclared: Place::Defined(DefinedPlace { ty: int, origin: TypeOrigin::Declared, definedness: Definedness::PossiblyUndefined, .. }),
+/// bound_or_declared:   Place::Defined(DefinedPlace { ty: Literal[1], origin: TypeOrigin::Inferred, definedness: Definedness::PossiblyUndefined, .. }),
 /// non_existent:        Place::Undefined,
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) enum Place<'db> {
-    Defined(Type<'db>, TypeOrigin, Definedness, Widening),
+    Defined(DefinedPlace<'db>),
+    #[default]
     Undefined,
 }
 
 impl<'db> Place<'db> {
     /// Constructor that creates a [`Place`] with type origin [`TypeOrigin::Inferred`] and definedness [`Definedness::AlwaysDefined`].
     pub(crate) fn bound(ty: impl Into<Type<'db>>) -> Self {
-        Place::Defined(
-            ty.into(),
-            TypeOrigin::Inferred,
-            Definedness::AlwaysDefined,
-            Widening::None,
-        )
+        Place::Defined(DefinedPlace::new(ty.into()))
     }
 
     /// Constructor that creates a [`Place`] with type origin [`TypeOrigin::Declared`] and definedness [`Definedness::AlwaysDefined`].
     pub(crate) fn declared(ty: impl Into<Type<'db>>) -> Self {
-        Place::Defined(
-            ty.into(),
-            TypeOrigin::Declared,
-            Definedness::AlwaysDefined,
-            Widening::None,
-        )
-    }
-
-    /// Constructor that creates a [`Place`] with a [`crate::types::TodoType`] type
-    /// and definedness [`Definedness::AlwaysDefined`].
-    #[allow(unused_variables)] // Only unused in release builds
-    pub(crate) fn todo(message: &'static str) -> Self {
-        Place::Defined(
-            todo_type!(message),
-            TypeOrigin::Inferred,
-            Definedness::AlwaysDefined,
-            Widening::None,
-        )
+        Place::Defined(DefinedPlace::new(ty.into()).with_origin(TypeOrigin::Declared))
     }
 
     pub(crate) fn is_undefined(&self) -> bool {
@@ -166,7 +186,7 @@ impl<'db> Place<'db> {
     /// if there is at least one control-flow path where the place is defined, return the type.
     pub(crate) fn ignore_possibly_undefined(&self) -> Option<Type<'db>> {
         match self {
-            Place::Defined(ty, _, _, _) => Some(*ty),
+            Place::Defined(defined) => Some(defined.ty),
             Place::Undefined => None,
         }
     }
@@ -177,7 +197,7 @@ impl<'db> Place<'db> {
     /// is applied lazily when converting to `LookupResult`.
     pub(crate) fn unwidened_type(&self) -> Option<Type<'db>> {
         match self {
-            Place::Defined(ty, _, _, _) => Some(*ty),
+            Place::Defined(defined) => Some(defined.ty),
             Place::Undefined => None,
         }
     }
@@ -192,20 +212,19 @@ impl<'db> Place<'db> {
     #[must_use]
     pub(crate) fn map_type(self, f: impl FnOnce(Type<'db>) -> Type<'db>) -> Place<'db> {
         match self {
-            Place::Defined(ty, origin, definedness, widening) => {
-                Place::Defined(f(ty), origin, definedness, widening)
-            }
+            Place::Defined(defined) => Place::Defined(DefinedPlace {
+                ty: f(defined.ty),
+                ..defined
+            }),
             Place::Undefined => Place::Undefined,
         }
     }
 
     /// Set the widening mode for this place.
     #[must_use]
-    pub(crate) fn with_widening(self, widening: Widening) -> Place<'db> {
+    pub(crate) fn with_widening(self, new_widening: Widening) -> Place<'db> {
         match self {
-            Place::Defined(ty, origin, definedness, _) => {
-                Place::Defined(ty, origin, definedness, widening)
-            }
+            Place::Defined(defined) => Place::Defined(defined.with_widening(new_widening)),
             Place::Undefined => Place::Undefined,
         }
     }
@@ -223,24 +242,32 @@ impl<'db> Place<'db> {
     /// This is used to resolve (potential) descriptor attributes.
     pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Place<'db> {
         match self {
-            Place::Defined(Type::Union(union), origin, definedness, widening) => union
-                .map_with_boundness(db, |elem| {
-                    Place::Defined(*elem, origin, definedness, widening)
-                        .try_call_dunder_get(db, owner)
-                }),
+            Place::Defined(
+                place @ DefinedPlace {
+                    ty: Type::Union(union),
+                    ..
+                },
+            ) => union.map_with_boundness(db, |elem| {
+                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
+            }),
 
-            Place::Defined(Type::Intersection(intersection), origin, definedness, widening) => {
-                intersection.map_with_boundness(db, |elem| {
-                    Place::Defined(*elem, origin, definedness, widening)
-                        .try_call_dunder_get(db, owner)
-                })
-            }
+            Place::Defined(
+                place @ DefinedPlace {
+                    ty: Type::Intersection(intersection),
+                    ..
+                },
+            ) => intersection.map_with_boundness(db, |elem| {
+                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
+            }),
 
-            Place::Defined(self_ty, origin, definedness, widening) => {
+            Place::Defined(defined) => {
                 if let Some((dunder_get_return_ty, _)) =
-                    self_ty.try_call_dunder_get(db, Type::none(db), owner)
+                    defined.ty.try_call_dunder_get(db, None, owner)
                 {
-                    Place::Defined(dunder_get_return_ty, origin, definedness, widening)
+                    Place::Defined(DefinedPlace {
+                        ty: dunder_get_return_ty,
+                        ..defined
+                    })
                 } else {
                     self
                 }
@@ -251,21 +278,29 @@ impl<'db> Place<'db> {
     }
 
     pub(crate) const fn is_definitely_bound(&self) -> bool {
-        matches!(self, Place::Defined(_, _, Definedness::AlwaysDefined, _))
+        matches!(
+            self,
+            Place::Defined(DefinedPlace {
+                definedness: Definedness::AlwaysDefined,
+                ..
+            })
+        )
     }
 }
 
 impl<'db> From<LookupResult<'db>> for PlaceAndQualifiers<'db> {
     fn from(value: LookupResult<'db>) -> Self {
         match value {
-            Ok(type_and_qualifiers) => Place::bound(type_and_qualifiers.inner_type())
-                .with_qualifiers(type_and_qualifiers.qualifiers()),
+            Ok(type_and_qualifiers) => Place::Defined(
+                DefinedPlace::new(type_and_qualifiers.inner_type())
+                    .with_origin(type_and_qualifiers.origin()),
+            )
+            .with_qualifiers(type_and_qualifiers.qualifiers()),
             Err(LookupError::Undefined(qualifiers)) => Place::Undefined.with_qualifiers(qualifiers),
             Err(LookupError::PossiblyUndefined(type_and_qualifiers)) => Place::Defined(
-                type_and_qualifiers.inner_type(),
-                TypeOrigin::Inferred,
-                Definedness::PossiblyUndefined,
-                Widening::None,
+                DefinedPlace::new(type_and_qualifiers.inner_type())
+                    .with_origin(type_and_qualifiers.origin())
+                    .with_definedness(Definedness::PossiblyUndefined),
             )
             .with_qualifiers(type_and_qualifiers.qualifiers()),
         }
@@ -391,20 +426,14 @@ pub(crate) fn global_symbol<'db>(
 ///
 /// If `requires_explicit_reexport` is [`None`], it will be inferred from the file's source type.
 /// For stub files, explicit re-export will be required, while for non-stub files, it will not.
+///
+/// `None` should be passed for the `file` parameter if looking up a symbol on a namespace package.
 pub(crate) fn imported_symbol<'db>(
     db: &'db dyn Db,
-    file: File,
+    file: Option<File>,
     name: &str,
     requires_explicit_reexport: Option<RequiresExplicitReExport>,
 ) -> PlaceAndQualifiers<'db> {
-    let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
-        if file.is_stub(db) {
-            RequiresExplicitReExport::Yes
-        } else {
-            RequiresExplicitReExport::No
-        }
-    });
-
     // If it's not found in the global scope, check if it's present as an instance on
     // `types.ModuleType` or `builtins.object`.
     //
@@ -420,22 +449,49 @@ pub(crate) fn imported_symbol<'db>(
     // ignore `__getattr__`. Typeshed has a fake `__getattr__` on `types.ModuleType` to help out with
     // dynamic imports; we shouldn't use it for `ModuleLiteral` types where we know exactly which
     // module we're dealing with.
-    symbol_impl(
-        db,
-        global_scope(db, file),
-        name,
-        requires_explicit_reexport,
-        ConsideredDefinitions::EndOfScope,
-    )
+    file.map(|file| {
+        let requires_explicit_reexport = requires_explicit_reexport.unwrap_or_else(|| {
+            if file.is_stub(db) {
+                RequiresExplicitReExport::Yes
+            } else {
+                RequiresExplicitReExport::No
+            }
+        });
+
+        symbol_impl(
+            db,
+            global_scope(db, file),
+            name,
+            requires_explicit_reexport,
+            ConsideredDefinitions::EndOfScope,
+        )
+    })
+    .unwrap_or_default()
     .or_fall_back_to(db, || {
-        if name == "__getattr__" {
-            Place::Undefined.into()
-        } else if name == "__builtins__" {
-            Place::bound(Type::any()).into()
-        } else {
-            KnownClass::ModuleType
+        match name {
+            "__file__" => {
+                // We special-case `__file__` here because we know that for a successfully imported
+                // non-namespace-package Python module, that hasn't been explicitly overridden it
+                // is always a string, even though typeshed says `str | None`. For a namespace package,
+                // meanwhile, it will always be `None`.
+                //
+                // Note that C-extension modules (stdlib examples include `sys`, `itertools`, etc.)
+                //  may not have a `__file__` attribute at runtime at all, but that doesn't really
+                // affect the *type* of the attribute, just the *boundness*. There's no way for us
+                // to know right now whether a stub represents a C extension or not, so for now we
+                // do not attempt to detect this; we just infer `str` still. This matches the
+                // behaviour of other major type checkers.
+                if file.is_some() {
+                    Place::bound(KnownClass::Str.to_instance(db)).into()
+                } else {
+                    Place::bound(Type::none(db)).into()
+                }
+            }
+            "__getattr__" => Place::Undefined.into(),
+            "__builtins__" => Place::bound(Type::any()).into(),
+            _ => KnownClass::ModuleType
                 .to_instance(db)
-                .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_GETATTR_LOOKUP)
+                .member_lookup_with_policy(db, name.into(), MemberLookupPolicy::NO_GETATTR_LOOKUP),
         }
     })
 }
@@ -485,7 +541,7 @@ pub(crate) fn known_module_symbol<'db>(
     resolve_module_confident(db, &known_module.name())
         .and_then(|module| {
             let file = module.file(db)?;
-            Some(imported_symbol(db, file, symbol, None))
+            Some(imported_symbol(db, Some(file), symbol, None))
         })
         .unwrap_or_default()
 }
@@ -557,6 +613,7 @@ type DeclaredTypeAndConflictingTypes<'db> = (
 );
 
 /// The result of looking up a declared type from declarations; see [`place_from_declarations`].
+#[derive(Debug, Default)]
 pub(crate) struct PlaceFromDeclarationsResult<'db> {
     place_and_quals: PlaceAndQualifiers<'db>,
     conflicting_types: Option<Box<indexmap::set::Slice<Type<'db>>>>,
@@ -606,38 +663,15 @@ impl<'db> PlaceFromDeclarationsResult<'db> {
 /// that this comes with a [`CLASS_VAR`] type qualifier.
 ///
 /// [`CLASS_VAR`]: crate::types::TypeQualifiers::CLASS_VAR
-#[derive(Debug, Clone, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, Default, Copy, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct PlaceAndQualifiers<'db> {
     pub(crate) place: Place<'db>,
     pub(crate) qualifiers: TypeQualifiers,
 }
 
-impl Default for PlaceAndQualifiers<'_> {
-    fn default() -> Self {
-        PlaceAndQualifiers {
-            place: Place::Undefined,
-            qualifiers: TypeQualifiers::empty(),
-        }
-    }
-}
-
 impl<'db> PlaceAndQualifiers<'db> {
-    /// Constructor that creates a [`PlaceAndQualifiers`] instance with a [`TodoType`] type
-    /// and no qualifiers.
-    ///
-    /// [`TodoType`]: crate::types::TodoType
-    pub(crate) fn todo(message: &'static str) -> Self {
-        Self {
-            place: Place::todo(message),
-            qualifiers: TypeQualifiers::empty(),
-        }
-    }
-
     pub(crate) fn unbound() -> Self {
-        PlaceAndQualifiers {
-            place: Place::Undefined,
-            qualifiers: TypeQualifiers::empty(),
-        }
+        Self::default()
     }
 
     pub(crate) fn is_undefined(&self) -> bool {
@@ -717,20 +751,17 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn into_lookup_result(self, db: &'db dyn Db) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
-                place: Place::Defined(ty, origin, Definedness::AlwaysDefined, widening),
+                place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = widening.apply_if_needed(db, ty);
-                Ok(TypeAndQualifiers::new(ty, origin, qualifiers))
-            }
-            PlaceAndQualifiers {
-                place: Place::Defined(ty, origin, Definedness::PossiblyUndefined, widening),
-                qualifiers,
-            } => {
-                let ty = widening.apply_if_needed(db, ty);
-                Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
-                    ty, origin, qualifiers,
-                )))
+                let ty = place.widening.apply_if_needed(db, place.ty);
+                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers);
+                match place.definedness {
+                    Definedness::AlwaysDefined => Ok(type_and_qualifiers),
+                    Definedness::PossiblyUndefined => {
+                        Err(LookupError::PossiblyUndefined(type_and_qualifiers))
+                    }
+                }
             }
             PlaceAndQualifiers {
                 place: Place::Undefined,
@@ -783,15 +814,10 @@ impl<'db> PlaceAndQualifiers<'db> {
         let place = match (previous_place.place, self.place) {
             // In fixed-point iteration of type inference, the member type must be monotonically widened and not "oscillate".
             // Here, monotonicity is guaranteed by pre-unioning the type of the previous iteration into the current result.
-            (
-                Place::Defined(prev_ty, _, _, _),
-                Place::Defined(ty, origin, definedness, widening),
-            ) => Place::Defined(
-                ty.cycle_normalized(db, prev_ty, cycle),
-                origin,
-                definedness,
-                widening,
-            ),
+            (Place::Defined(prev), Place::Defined(current)) => Place::Defined(DefinedPlace {
+                ty: current.ty.cycle_normalized(db, prev.ty, cycle),
+                ..current
+            }),
             // If a `Place` in the current cycle is `Defined` but `Undefined` in the previous cycle,
             // that means that its definedness depends on the truthiness of the previous cycle value.
             // In this case, the definedness of the current cycle `Place` is set to `PossiblyUndefined`.
@@ -799,26 +825,22 @@ impl<'db> PlaceAndQualifiers<'db> {
             // so convergence is guaranteed without resorting to this handling.
             // However, the handling described above may reduce the exactness of reachability analysis,
             // so it may be better to remove it. In that case, this branch is necessary.
-            (Place::Undefined, Place::Defined(ty, origin, _definedness, widening)) => {
-                Place::Defined(
-                    ty.recursive_type_normalized(db, cycle),
-                    origin,
-                    Definedness::PossiblyUndefined,
-                    widening,
-                )
-            }
+            (Place::Undefined, Place::Defined(current)) => Place::Defined(DefinedPlace {
+                ty: current.ty.recursive_type_normalized(db, cycle),
+                definedness: Definedness::PossiblyUndefined,
+                ..current
+            }),
             // If a `Place` that was `Defined(Divergent)` in the previous cycle is actually found to be unreachable in the current cycle,
             // it is set to `Undefined` (because the cycle initial value does not include meaningful reachability information).
-            (Place::Defined(ty, origin, _definedness, widening), Place::Undefined) => {
-                if cycle.head_ids().any(|id| ty == Type::divergent(id)) {
+            (Place::Defined(prev), Place::Undefined) => {
+                if cycle.head_ids().any(|id| prev.ty == Type::divergent(id)) {
                     Place::Undefined
                 } else {
-                    Place::Defined(
-                        ty.recursive_type_normalized(db, cycle),
-                        origin,
-                        Definedness::PossiblyUndefined,
-                        widening,
-                    )
+                    Place::Defined(DefinedPlace {
+                        ty: prev.ty.recursive_type_normalized(db, cycle),
+                        definedness: Definedness::PossiblyUndefined,
+                        ..prev
+                    })
                 }
             }
             (Place::Undefined, Place::Undefined) => Place::Undefined,
@@ -836,32 +858,13 @@ impl<'db> From<Place<'db>> for PlaceAndQualifiers<'db> {
     }
 }
 
-fn place_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _scope: ScopeId<'db>,
-    _place_id: ScopedPlaceId,
-    _requires_explicit_reexport: RequiresExplicitReExport,
-    _considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    Place::bound(Type::divergent(id)).into()
-}
-
-#[allow(clippy::too_many_arguments)]
-fn place_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_place: &PlaceAndQualifiers<'db>,
-    place: PlaceAndQualifiers<'db>,
-    _scope: ScopeId<'db>,
-    _place_id: ScopedPlaceId,
-    _requires_explicit_reexport: RequiresExplicitReExport,
-    _considered_definitions: ConsideredDefinitions,
-) -> PlaceAndQualifiers<'db> {
-    place.cycle_normalized(db, *previous_place, cycle)
-}
-
-#[salsa::tracked(cycle_fn=place_cycle_recover, cycle_initial=place_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(
+    cycle_initial=|_, id, _, _, _, _| Place::bound(Type::divergent(id)).into(),
+    cycle_fn=|db, cycle, previous: &PlaceAndQualifiers<'db>, place: PlaceAndQualifiers<'db>, _, _, _, _| {
+        place.cycle_normalized(db, *previous, cycle)
+    },
+    heap_size=ruff_memory_usage::heap_size
+)]
 pub(crate) fn place_by_id<'db>(
     db: &'db dyn Db,
     scope: ScopeId<'db>,
@@ -900,32 +903,56 @@ pub(crate) fn place_by_id<'db>(
         // Handle bare `ClassVar` annotations by falling back to the union of `Unknown` and the
         // inferred type.
         PlaceAndQualifiers {
-            place: Place::Defined(Type::Dynamic(DynamicType::Unknown), origin, definedness, _),
+            place:
+                Place::Defined(DefinedPlace {
+                    ty: Type::Dynamic(DynamicType::Unknown),
+                    origin,
+                    definedness,
+                    ..
+                }),
             qualifiers,
         } if qualifiers.contains(TypeQualifiers::CLASS_VAR) => {
             let bindings = all_considered_bindings();
             match place_from_bindings_impl(db, bindings, requires_explicit_reexport).place {
-                Place::Defined(inferred, origin, boundness, _) => Place::Defined(
-                    UnionType::from_elements(db, [Type::unknown(), inferred]),
+                Place::Defined(DefinedPlace {
+                    ty: inferred,
                     origin,
-                    boundness,
-                    Widening::None,
-                )
+                    definedness: boundness,
+                    ..
+                }) => Place::Defined(DefinedPlace {
+                    ty: UnionType::from_elements(db, [Type::unknown(), inferred]),
+                    origin,
+                    definedness: boundness,
+                    widening: Widening::None,
+                })
                 .with_qualifiers(qualifiers),
-                Place::Undefined => {
-                    Place::Defined(Type::unknown(), origin, definedness, Widening::None)
-                        .with_qualifiers(qualifiers)
-                }
+                Place::Undefined => Place::Defined(DefinedPlace {
+                    ty: Type::unknown(),
+                    origin,
+                    definedness,
+                    widening: Widening::None,
+                })
+                .with_qualifiers(qualifiers),
             }
         }
         // Place is declared, trust the declared type
         place_and_quals @ PlaceAndQualifiers {
-            place: Place::Defined(_, _, Definedness::AlwaysDefined, _),
+            place:
+                Place::Defined(DefinedPlace {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                }),
             qualifiers: _,
         } => place_and_quals,
         // Place is possibly declared
         PlaceAndQualifiers {
-            place: Place::Defined(declared_ty, origin, Definedness::PossiblyUndefined, _),
+            place:
+                Place::Defined(DefinedPlace {
+                    ty: declared_ty,
+                    origin,
+                    definedness: Definedness::PossiblyUndefined,
+                    ..
+                }),
             qualifiers,
         } => {
             let bindings = all_considered_bindings();
@@ -938,24 +965,29 @@ pub(crate) fn place_by_id<'db>(
                     // TODO: We probably don't want to report `AlwaysDefined` here. This requires a bit of
                     // design work though as we might want a different behavior for stubs and for
                     // normal modules.
-                    Place::Defined(
-                        declared_ty,
+                    Place::Defined(DefinedPlace {
+                        ty: declared_ty,
                         origin,
-                        Definedness::AlwaysDefined,
-                        Widening::None,
-                    )
+                        definedness: Definedness::AlwaysDefined,
+                        widening: Widening::None,
+                    })
                 }
                 // Place is possibly undeclared and (possibly) bound
-                Place::Defined(inferred_ty, origin, boundness, _) => Place::Defined(
-                    UnionType::from_elements(db, [inferred_ty, declared_ty]),
+                Place::Defined(DefinedPlace {
+                    ty: inferred_ty,
                     origin,
-                    if boundness_analysis == BoundnessAnalysis::AssumeBound {
+                    definedness: boundness,
+                    ..
+                }) => Place::Defined(DefinedPlace {
+                    ty: UnionType::from_elements(db, [inferred_ty, declared_ty]),
+                    origin,
+                    definedness: if boundness_analysis == BoundnessAnalysis::AssumeBound {
                         Definedness::AlwaysDefined
                     } else {
                         boundness
                     },
-                    Widening::None,
-                ),
+                    widening: Widening::None,
+                }),
             };
 
             PlaceAndQualifiers { place, qualifiers }
@@ -971,10 +1003,11 @@ pub(crate) fn place_by_id<'db>(
                 place_from_bindings_impl(db, bindings, requires_explicit_reexport).place;
 
             if boundness_analysis == BoundnessAnalysis::AssumeBound {
-                if let Place::Defined(ty, origin, Definedness::PossiblyUndefined, widening) =
-                    inferred
-                {
-                    inferred = Place::Defined(ty, origin, Definedness::AlwaysDefined, widening);
+                if let Place::Defined(defined) = inferred {
+                    if defined.definedness == Definedness::PossiblyUndefined {
+                        inferred =
+                            Place::Defined(defined.with_definedness(Definedness::AlwaysDefined));
+                    }
                 }
             }
 
@@ -1056,13 +1089,27 @@ fn symbol_impl<'db>(
 ) -> PlaceAndQualifiers<'db> {
     let _span = tracing::trace_span!("symbol", ?name).entered();
 
-    if name == "platform"
-        && file_to_module(db, scope.file(db))
-            .is_some_and(|module| module.is_known(db, KnownModule::Sys))
-    {
+    let is_known_module = |known_module| {
+        file_to_module(db, scope.file(db)).is_some_and(|module| module.is_known(db, known_module))
+    };
+
+    if name == "platform" && is_known_module(KnownModule::Sys) {
         match Program::get(db).python_platform(db) {
             crate::PythonPlatform::Identifier(platform) => {
                 return Place::bound(Type::string_literal(db, platform.as_str())).into();
+            }
+            crate::PythonPlatform::All => {
+                // Fall through to the looked up type
+            }
+        }
+    }
+
+    if name == "name" && is_known_module(KnownModule::Os) {
+        match Program::get(db).python_platform(db) {
+            crate::PythonPlatform::Identifier(platform) => {
+                // In CPython, `os.name` is `"nt"` on Windows and `"posix"` otherwise.
+                let os_name = if platform == "win32" { "nt" } else { "posix" };
+                return Place::bound(Type::string_literal(db, os_name)).into();
             }
             crate::PythonPlatform::All => {
                 // Fall through to the looked up type
@@ -1107,6 +1154,122 @@ fn place_impl<'db>(
         .unwrap_or_default()
 }
 
+/// Pre-computed reachability analysis for loop-back bindings in a loop header.
+#[salsa::tracked(
+    cycle_initial=|db, _, definition| loop_header_reachability_impl(db, definition, true),
+    cycle_fn=loop_header_reachability_cycle_recover,
+    heap_size = ruff_memory_usage::heap_size,
+)]
+pub(crate) fn loop_header_reachability<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> LoopHeaderReachability<'db> {
+    loop_header_reachability_impl(db, definition, false)
+}
+
+fn loop_header_reachability_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    previous: &LoopHeaderReachability<'db>,
+    result: LoopHeaderReachability<'db>,
+    _definition: Definition<'db>,
+) -> LoopHeaderReachability<'db> {
+    result.cycle_normalized(previous)
+}
+
+fn loop_header_reachability_impl<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    is_cycle_initial: bool,
+) -> LoopHeaderReachability<'db> {
+    let DefinitionKind::LoopHeader(loop_header_definition) = definition.kind(db) else {
+        unreachable!("`loop_header_reachability` called with non-loop-header definition");
+    };
+
+    let scope = definition.scope(db);
+    let use_def = use_def_map(db, scope);
+    let loop_header = get_loop_header(db, loop_header_definition.loop_token());
+    let place = loop_header_definition.place();
+
+    let mut has_defined_bindings = false;
+    let mut deleted_reachability = Truthiness::AlwaysFalse;
+    let mut reachable_bindings = FxIndexSet::default();
+
+    for live_binding in loop_header.bindings_for_place(place) {
+        let reachability = if is_cycle_initial {
+            Truthiness::Ambiguous
+        } else {
+            use_def.evaluate_reachability(db, live_binding.reachability_constraint)
+        };
+        // Skip unreachable bindings.
+        if reachability.is_always_false() {
+            continue;
+        }
+
+        match use_def.definition(live_binding.binding) {
+            DefinitionState::Defined(def) => {
+                has_defined_bindings = true;
+                if def != definition {
+                    reachable_bindings.insert(ReachableLoopBinding {
+                        definition: def,
+                        narrowing_constraint: live_binding.narrowing_constraint,
+                    });
+                }
+            }
+            // `del` in the loop body is always visible to code after the loop via the
+            // normal control flow merge. Updating `deleted_reachability` here is
+            // necessary for prior uses in the loop to see it.
+            DefinitionState::Deleted => {
+                deleted_reachability = deleted_reachability.or(reachability);
+            }
+            // If UNBOUND is visible at loop-back, then it was visible before the loop.
+            // Loop header definitions don't shadow preexisting bindings, so we don't
+            // need to do anything with this.
+            DefinitionState::Undefined => {}
+        }
+    }
+
+    LoopHeaderReachability {
+        has_defined_bindings,
+        deleted_reachability,
+        reachable_bindings,
+    }
+}
+
+/// Result of [`loop_header_reachability`]: pre-computed reachability info for loop-back bindings.
+#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct LoopHeaderReachability<'db> {
+    /// Whether any reachable loop-back binding is a defined binding.
+    pub(crate) has_defined_bindings: bool,
+    pub(crate) deleted_reachability: Truthiness,
+    /// Reachable, defined loop-back bindings (excluding the loop header definition itself).
+    pub(crate) reachable_bindings: FxIndexSet<ReachableLoopBinding<'db>>,
+}
+
+impl<'db> LoopHeaderReachability<'db> {
+    fn cycle_normalized(
+        self,
+        previous: &LoopHeaderReachability<'db>,
+    ) -> LoopHeaderReachability<'db> {
+        let mut reachable_bindings = FxIndexSet::default();
+        reachable_bindings.extend(previous.reachable_bindings.iter().copied());
+        reachable_bindings.extend(self.reachable_bindings);
+
+        LoopHeaderReachability {
+            has_defined_bindings: self.has_defined_bindings,
+            deleted_reachability: self.deleted_reachability,
+            reachable_bindings,
+        }
+    }
+}
+
+/// A single reachable loop-back binding with its narrowing constraint.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct ReachableLoopBinding<'db> {
+    pub(crate) definition: Definition<'db>,
+    pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
+}
+
 /// Implementation of [`place_from_bindings`].
 ///
 /// ## Implementation Note
@@ -1146,6 +1309,7 @@ fn place_from_bindings_impl<'db>(
     };
 
     let mut first_definition = None;
+    let mut only_loop_header_bindings = true;
 
     let mut types = bindings_with_constraints.filter_map(
         |BindingWithConstraints {
@@ -1227,6 +1391,23 @@ fn place_from_bindings_impl<'db>(
                 return None;
             }
 
+            // We need to "look through" loop header definitions to do boundness analysis. The
+            // actual type is computed by `infer_loop_header_definition` via `binding_type` below,
+            // like all other bindings, so that it can participate in fixpoint iteration.
+            if binding.kind(db).is_loop_header() {
+                let loop_header = loop_header_reachability(db, binding);
+                deleted_reachability = deleted_reachability.or(loop_header.deleted_reachability);
+                // If all the bindings in the loop are in statically false branches, it might be
+                // that none of them loop-back. In that case short-circuit, so that we don't
+                // produce an `Unknown` fallback type, and so that `Place::Undefined` is still a
+                // possibility below.
+                if !loop_header.has_defined_bindings {
+                    return None;
+                }
+            } else {
+                only_loop_header_bindings = false;
+            }
+
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
             Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
@@ -1251,6 +1432,12 @@ fn place_from_bindings_impl<'db>(
         let boundness = match boundness_analysis {
             BoundnessAnalysis::AssumeBound => Definedness::AlwaysDefined,
             BoundnessAnalysis::BasedOnUnboundVisibility => match unbound_visibility() {
+                Some(Truthiness::AlwaysTrue) if only_loop_header_bindings => {
+                    // Loop header definitions don't shadow prior bindings, so UNBOUND can still be
+                    // definitely-visible alongside a loop header binding. See "Use with loop
+                    // header and also `UNBOUND` definitely visible" in `while_loop.md`.
+                    Definedness::PossiblyUndefined
+                }
                 Some(Truthiness::AlwaysTrue) => {
                     unreachable!(
                         "If we have at least one binding, the implicit `unbound` binding should not be definitely visible"
@@ -1263,14 +1450,11 @@ fn place_from_bindings_impl<'db>(
 
         match deleted_reachability {
             Truthiness::AlwaysFalse => {
-                Place::Defined(ty, TypeOrigin::Inferred, boundness, Widening::None)
+                Place::Defined(DefinedPlace::new(ty).with_definedness(boundness))
             }
             Truthiness::AlwaysTrue => Place::Undefined,
             Truthiness::Ambiguous => Place::Defined(
-                ty,
-                TypeOrigin::Inferred,
-                Definedness::PossiblyUndefined,
-                Widening::None,
+                DefinedPlace::new(ty).with_definedness(Definedness::PossiblyUndefined),
             ),
         }
     } else {
@@ -1501,10 +1685,9 @@ fn place_from_declarations_impl<'db>(
         };
 
         let place_and_quals = Place::Defined(
-            declared.inner_type(),
-            TypeOrigin::Declared,
-            boundness,
-            Widening::None,
+            DefinedPlace::new(declared.inner_type())
+                .with_origin(TypeOrigin::Declared)
+                .with_definedness(boundness),
         )
         .with_qualifiers(declared.qualifiers());
 
@@ -1518,11 +1701,7 @@ fn place_from_declarations_impl<'db>(
             }
         }
     } else {
-        PlaceFromDeclarationsResult {
-            place_and_quals: Place::Undefined.into(),
-            conflicting_types: None,
-            first_declaration: None,
-        }
+        PlaceFromDeclarationsResult::default()
     }
 }
 
@@ -1548,19 +1727,21 @@ fn is_reexported(db: &dyn Db, definition: Definition<'_>) -> bool {
     all_names.contains(symbol_name)
 }
 
-mod implicit_globals {
+pub(crate) mod implicit_globals {
     use ruff_python_ast as ast;
     use ruff_python_ast::name::Name;
 
     use crate::Program;
     use crate::db::Db;
-    use crate::place::{Definedness, PlaceAndQualifiers, TypeOrigin};
+    use crate::place::{Definedness, PlaceAndQualifiers};
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
-    use crate::types::{KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type};
+    use crate::types::{
+        ClassLiteral, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
+    };
     use ruff_python_ast::PythonVersion;
 
-    use super::{Place, Widening, place_from_declarations};
+    use super::{DefinedPlace, Place, place_from_declarations};
 
     pub(crate) fn module_type_implicit_global_declaration<'db>(
         db: &'db dyn Db,
@@ -1576,7 +1757,10 @@ mod implicit_globals {
         else {
             return Place::Undefined.into();
         };
-        let module_type_scope = module_type_class.body_scope(db);
+        let Some(class) = module_type_class.as_static() else {
+            return Place::Undefined.into();
+        };
+        let module_type_scope = class.body_scope(db);
         let place_table = place_table(db, module_type_scope);
         let Some(symbol_id) = place_table.symbol_id(name) else {
             return Place::Undefined.into();
@@ -1618,14 +1802,16 @@ mod implicit_globals {
 
             // Created lazily by the warnings machinery; may be absent.
             // Model as possibly-unbound to avoid false negatives.
-            "__warningregistry__" => Place::Defined(
-                KnownClass::Dict
-                    .to_specialized_instance(db, [Type::any(), KnownClass::Int.to_instance(db)]),
-                TypeOrigin::Inferred,
-                Definedness::PossiblyUndefined,
-                Widening::None,
-            )
-            .into(),
+            "__warningregistry__" => {
+                Place::Defined(
+                    DefinedPlace::new(KnownClass::Dict.to_specialized_instance(
+                        db,
+                        &[Type::any(), KnownClass::Int.to_instance(db)],
+                    ))
+                    .with_definedness(Definedness::PossiblyUndefined),
+                )
+                .into()
+            }
 
             // Marked as possibly-unbound as it is only present in the module namespace
             // if at least one global symbol is annotated in the module.
@@ -1636,16 +1822,14 @@ mod implicit_globals {
                         [Parameter::positional_only(Some(Name::new_static("format")))
                             .with_annotated_type(KnownClass::Int.to_instance(db))],
                     ),
-                    Some(KnownClass::Dict.to_specialized_instance(
+                    KnownClass::Dict.to_specialized_instance(
                         db,
-                        [KnownClass::Str.to_instance(db), Type::any()],
-                    )),
+                        &[KnownClass::Str.to_instance(db), Type::any()],
+                    ),
                 );
                 Place::Defined(
-                    Type::function_like_callable(db, signature),
-                    TypeOrigin::Inferred,
-                    Definedness::PossiblyUndefined,
-                    Widening::None,
+                    DefinedPlace::new(Type::function_like_callable(db, signature))
+                        .with_definedness(Definedness::PossiblyUndefined),
                 )
                 .into()
             }
@@ -1691,7 +1875,7 @@ mod implicit_globals {
     /// so the cost of hashing the names is likely to be more expensive than it's worth.
     #[salsa::tracked(
         returns(deref),
-        cycle_initial=module_type_symbols_initial,
+        cycle_initial=|_, _| smallvec::SmallVec::default(),
         heap_size=ruff_memory_usage::heap_size
     )]
     fn module_type_symbols<'db>(db: &'db dyn Db) -> smallvec::SmallVec<[ast::name::Name; 8]> {
@@ -1704,8 +1888,10 @@ mod implicit_globals {
             return smallvec::SmallVec::default();
         };
 
-        let module_type_scope = module_type.body_scope(db);
-        let module_type_symbol_table = place_table(db, module_type_scope);
+        let ClassLiteral::Static(module_type) = module_type else {
+            return smallvec::SmallVec::default();
+        };
+        let module_type_symbol_table = place_table(db, module_type.body_scope(db));
 
         module_type_symbol_table
             .symbols()
@@ -1721,11 +1907,30 @@ mod implicit_globals {
             .collect()
     }
 
-    fn module_type_symbols_initial(
-        _db: &dyn Db,
-        _id: salsa::Id,
-    ) -> smallvec::SmallVec<[ast::name::Name; 8]> {
-        smallvec::SmallVec::default()
+    /// Returns an iterator over all implicit module global symbols and their types.
+    ///
+    /// This is used for completions in the global scope of a module. It returns
+    /// the correct types for special-cased symbols like `__file__` (which is `str`
+    /// for the current module, not `str | None`).
+    pub(crate) fn all_implicit_module_globals(
+        db: &dyn Db,
+    ) -> impl Iterator<Item = (Name, Type<'_>)> + '_ {
+        // Special-cased implicit globals that are not in `module_type_symbols`
+        let special_cased = ["__builtins__", "__debug__", "__warningregistry__"]
+            .into_iter()
+            .map(Name::new_static);
+
+        // All symbols from ModuleType (already includes `__file__`, `__name__`, etc.)
+        let module_type_syms = module_type_symbols(db).iter().cloned();
+
+        // Combine and map to (name, type) pairs
+        special_cased
+            .chain(module_type_syms)
+            .filter_map(move |name| {
+                let place = module_type_implicit_global_symbol(db, name.as_str());
+                // Only include bound symbols
+                place.place.ignore_possibly_undefined().map(|ty| (name, ty))
+            })
     }
 
     #[cfg(test)]
@@ -1841,27 +2046,47 @@ mod tests {
         use TypeOrigin::Inferred;
 
         let db = setup_db();
-        let ty1 = Type::IntLiteral(1);
-        let ty2 = Type::IntLiteral(2);
+        let ty1 = Type::int_literal(1);
+        let ty2 = Type::int_literal(2);
 
-        let unbound = || Place::Undefined.with_qualifiers(TypeQualifiers::empty());
+        let unbound = || PlaceAndQualifiers::default();
 
         let possibly_unbound_ty1 = || {
-            Place::Defined(ty1, Inferred, PossiblyUndefined, Widening::None)
-                .with_qualifiers(TypeQualifiers::empty())
+            Place::Defined(DefinedPlace {
+                ty: ty1,
+                origin: Inferred,
+                definedness: PossiblyUndefined,
+                widening: Widening::None,
+            })
+            .with_qualifiers(TypeQualifiers::empty())
         };
         let possibly_unbound_ty2 = || {
-            Place::Defined(ty2, Inferred, PossiblyUndefined, Widening::None)
-                .with_qualifiers(TypeQualifiers::empty())
+            Place::Defined(DefinedPlace {
+                ty: ty2,
+                origin: Inferred,
+                definedness: PossiblyUndefined,
+                widening: Widening::None,
+            })
+            .with_qualifiers(TypeQualifiers::empty())
         };
 
         let bound_ty1 = || {
-            Place::Defined(ty1, Inferred, AlwaysDefined, Widening::None)
-                .with_qualifiers(TypeQualifiers::empty())
+            Place::Defined(DefinedPlace {
+                ty: ty1,
+                origin: Inferred,
+                definedness: AlwaysDefined,
+                widening: Widening::None,
+            })
+            .with_qualifiers(TypeQualifiers::empty())
         };
         let bound_ty2 = || {
-            Place::Defined(ty2, Inferred, AlwaysDefined, Widening::None)
-                .with_qualifiers(TypeQualifiers::empty())
+            Place::Defined(DefinedPlace {
+                ty: ty2,
+                origin: Inferred,
+                definedness: AlwaysDefined,
+                widening: Widening::None,
+            })
+            .with_qualifiers(TypeQualifiers::empty())
         };
 
         // Start from an unbound symbol
@@ -1879,22 +2104,22 @@ mod tests {
         );
         assert_eq!(
             possibly_unbound_ty1().or_fall_back_to(&db, possibly_unbound_ty2),
-            Place::Defined(
-                UnionType::from_elements(&db, [ty1, ty2]),
-                Inferred,
-                PossiblyUndefined,
-                Widening::None
-            )
+            Place::Defined(DefinedPlace {
+                ty: UnionType::from_elements(&db, [ty1, ty2]),
+                origin: Inferred,
+                definedness: PossiblyUndefined,
+                widening: Widening::None
+            })
             .into()
         );
         assert_eq!(
             possibly_unbound_ty1().or_fall_back_to(&db, bound_ty2),
-            Place::Defined(
-                UnionType::from_elements(&db, [ty1, ty2]),
-                Inferred,
-                AlwaysDefined,
-                Widening::None
-            )
+            Place::Defined(DefinedPlace {
+                ty: UnionType::from_elements(&db, [ty1, ty2]),
+                origin: Inferred,
+                definedness: AlwaysDefined,
+                widening: Widening::None
+            })
             .into()
         );
 
@@ -1911,7 +2136,11 @@ mod tests {
     fn assert_bound_string_symbol<'db>(db: &'db dyn Db, symbol: Place<'db>) {
         assert!(matches!(
             symbol,
-            Place::Defined(Type::NominalInstance(_), _, Definedness::AlwaysDefined, _)
+            Place::Defined(DefinedPlace {
+                ty: Type::NominalInstance(_),
+                definedness: Definedness::AlwaysDefined,
+                ..
+            })
         ));
         assert_eq!(symbol.expect_type(), KnownClass::Str.to_instance(db));
     }

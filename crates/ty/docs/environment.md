@@ -18,7 +18,7 @@ Accepts any filter compatible with the `tracing_subscriber` crate.
 
 For example:
 
-- `TY_LOG=uv=debug` is the equivalent of `-vv` to the command line
+- `TY_LOG=ty=debug` is the equivalent of `-vv` to the command line
 - `TY_LOG=trace` will enable all trace-level logging.
 
 See the [tracing documentation](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#example-syntax)
@@ -37,6 +37,14 @@ Specifies an upper limit for the number of tasks ty is allowed to run in paralle
 For example, how many files should be checked in parallel.
 This isn't the same as a thread limit. ty may spawn additional threads
 when necessary, e.g. to watch for file system changes or a dedicated UI thread.
+
+### `TY_OUTPUT_FORMAT`
+
+The format to use for printing diagnostic messages.
+
+When set, ty will use this format for output instead of the default.
+
+Accepts the same values as the `--output-format` command-line argument.
 
 ## Externally-defined variables
 

@@ -192,22 +192,22 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 FAST001 [*] FastAPI route with redundant `response_model` argument
-   --> FAST001.py:118:23
+   --> FAST001.py:123:23
     |
-116 | def setup_app(app_arg: FastAPI, non_app: str) -> None:
-117 |     # Error
-118 |     @app_arg.get("/", response_model=str)
+121 | def setup_app(app_arg: FastAPI, non_app: str) -> None:
+122 |     # Error
+123 |     @app_arg.get("/", response_model=str)
     |                       ^^^^^^^^^^^^^^^^^^
-119 |     async def get_root() -> str:
-120 |         return "Hello World!"
+124 |     async def get_root() -> str:
+125 |         return "Hello World!"
     |
 help: Remove argument
-115 | 
-116 | def setup_app(app_arg: FastAPI, non_app: str) -> None:
-117 |     # Error
+120 | 
+121 | def setup_app(app_arg: FastAPI, non_app: str) -> None:
+122 |     # Error
     -     @app_arg.get("/", response_model=str)
-118 +     @app_arg.get("/")
-119 |     async def get_root() -> str:
-120 |         return "Hello World!"
-121 | 
+123 +     @app_arg.get("/")
+124 |     async def get_root() -> str:
+125 |         return "Hello World!"
+126 | 
 note: This is an unsafe fix and may change runtime behavior

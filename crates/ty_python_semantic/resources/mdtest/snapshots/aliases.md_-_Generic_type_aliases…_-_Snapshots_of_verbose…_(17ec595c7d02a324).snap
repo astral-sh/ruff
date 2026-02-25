@@ -1,0 +1,64 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: aliases.md - Generic type aliases: PEP 695 syntax - Snapshots of verbose diagnostics
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/aliases.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class A: ...
+ 2 | class B[T]: ...
+ 3 | 
+ 4 | type AliasA = A
+ 5 | type AliasB = B[int]
+ 6 | 
+ 7 | # fmt: off
+ 8 | 
+ 9 | def f(
+10 |     a: AliasA[int],  # error: [not-subscriptable]
+11 |     b: AliasB[int],  # error: [not-subscriptable]
+12 | ): ...
+13 | 
+14 | # fmt: on
+```
+
+# Diagnostics
+
+```
+error[not-subscriptable]: Cannot specialize non-generic type alias `AliasA`
+  --> src/mdtest_snippet.py:10:8
+   |
+ 9 | def f(
+10 |     a: AliasA[int],  # error: [not-subscriptable]
+   |        ------^^^^^
+   |        |
+   |        Alias to `A`, which is not generic
+11 |     b: AliasB[int],  # error: [not-subscriptable]
+12 | ): ...
+   |
+info: rule `not-subscriptable` is enabled by default
+
+```
+
+```
+error[not-subscriptable]: Cannot specialize non-generic type alias `AliasB`
+  --> src/mdtest_snippet.py:11:8
+   |
+ 9 | def f(
+10 |     a: AliasA[int],  # error: [not-subscriptable]
+11 |     b: AliasB[int],  # error: [not-subscriptable]
+   |        ------^^^^^
+   |        |
+   |        Alias to `B[int]`, which is already specialized
+12 | ): ...
+   |
+info: rule `not-subscriptable` is enabled by default
+
+```

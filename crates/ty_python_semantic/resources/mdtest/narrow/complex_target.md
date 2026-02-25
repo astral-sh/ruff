@@ -279,6 +279,166 @@ def _(t9: tuple[int | None, str] | tuple[str, int]):
         reveal_type(t9)  # revealed: tuple[int | None, str] | tuple[str, int]
 ```
 
+### Tagged unions of tuples (equality narrowing)
+
+Narrow unions of tuples based on literal tag elements using `==` comparison:
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    if x[0] == "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+        reveal_type(x[1])  # revealed: A
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+        reveal_type(x[1])  # revealed: B
+        reveal_type(x[2])  # revealed: C
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    if x[0] != "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+
+# With int literals
+def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
+    if x[0] == 1:
+        reveal_type(x)  # revealed: tuple[Literal[1], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[2], B]
+
+# With bytes literals
+def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
+    if x[0] == b"a":
+        reveal_type(x)  # revealed: tuple[Literal[b"a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[b"b"], B]
+
+# Multiple tuple variants
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B] | tuple[Literal["c"], C]):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    elif x[0] == "b":
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["c"], C]
+
+# Using index 1 instead of 0
+def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
+    if x[1] == "tag1":
+        reveal_type(x)  # revealed: tuple[A, Literal["tag1"]]
+    else:
+        reveal_type(x)  # revealed: tuple[B, Literal["tag2"]]
+
+# Works with reversed equality operands too.
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
+    if "a" == x[0]:
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+
+# Works with reversed inequality operands too.
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
+    if "a" != x[0]:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+```
+
+Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the
+discriminating index, we can't safely narrow with equality:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
+    # Can't narrow because second tuple has `str` (not literal) at index 0
+    if x[0] == "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
+    else:
+        # But we *can* narrow with inequality
+        reveal_type(x)  # revealed: tuple[str, B]
+```
+
+If the index is out of bounds for any tuple in the union, we also skip narrowing (a diagnostic will
+be emitted elsewhere for the out-of-bounds access):
+
+```py
+def _(x: tuple[A, Literal["a"]] | tuple[B]):
+    # error: [index-out-of-bounds]
+    if x[1] == "a":
+        # Can't narrow because index 1 is out of bounds for second tuple
+        reveal_type(x)  # revealed: tuple[A, Literal["a"]] | tuple[B]
+    else:
+        reveal_type(x)  # revealed: tuple[A, Literal["a"]] | tuple[B]
+```
+
+We can still narrow tuples when non-tuple types are present in the union:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
+    if x[0] == "tag1":
+        # A list of ints could have int subclasses in it,
+        # and int subclasses could have custom `__eq__` methods such that they
+        # compare equal to `"tag1"`, so `list[int]` cannot be narrowed out of this
+        # union.
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | list[int]
+```
+
+### PEP 695 type aliases
+
+Tuple narrowing also works when the union is defined via a PEP 695 type alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+
+type TaggedTuple = tuple[Literal["a"], A] | tuple[Literal["b"], B]
+
+def test_equality_narrowing(x: TaggedTuple):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+
+type NullableTuple = tuple[int, int] | tuple[None, None]
+
+def test_is_narrowing(t: NullableTuple):
+    if t[0] is not None:
+        reveal_type(t)  # revealed: tuple[int, int]
+    else:
+        reveal_type(t)  # revealed: tuple[None, None]
+
+# Nested type aliases (an alias referring to another alias) also work:
+type InnerTagged = tuple[Literal["a"], A] | tuple[Literal["b"], B]
+type OuterTagged = InnerTagged
+
+def test_nested_equality_narrowing(x: OuterTagged):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+
+type InnerNullable = tuple[int, int] | tuple[None, None]
+type OuterNullable = InnerNullable
+
+def test_nested_is_narrowing(t: OuterNullable):
+    if t[0] is not None:
+        reveal_type(t)  # revealed: tuple[int, int]
+    else:
+        reveal_type(t)  # revealed: tuple[None, None]
+```
+
 ### String subscript
 
 ```py
@@ -302,4 +462,140 @@ class D:
 d = D()
 if d.c is not None and d.c[0].x[0] is not None:
     reveal_type(d.c[0].x[0])  # revealed: int
+```
+
+## Narrowing with negative subscripts
+
+Narrowing should work with negative subscripts like `x[-1]`:
+
+```py
+def _(x: list[int | None]):
+    if x[-1] is not None:
+        reveal_type(x[-1])  # revealed: int
+
+def _(x: list[str | None]):
+    if x[-1] is None:
+        reveal_type(x[-1])  # revealed: None
+    else:
+        reveal_type(x[-1])  # revealed: str
+```
+
+Nested negative subscripts should also work:
+
+```py
+def _(x: list[list[int | None]]):
+    if x[-1][-1] is not None:
+        reveal_type(x[-1][-1])  # revealed: int
+```
+
+Mixed positive and negative subscripts:
+
+```py
+def _(x: list[list[int | None]]):
+    if x[0][-1] is not None:
+        reveal_type(x[0][-1])  # revealed: int
+
+    if x[-1][0] is not None:
+        reveal_type(x[-1][0])  # revealed: int
+```
+
+Attribute access combined with negative subscripts:
+
+```py
+class Container:
+    items: list[int | None]
+
+def _(c: Container):
+    if c.items[-1] is not None:
+        reveal_type(c.items[-1])  # revealed: int
+```
+
+Multiple conditions in an `and` chain:
+
+```py
+def _(x: list[int | None]):
+    # Narrowing should persist through `and` chains
+    if x[-1] is not None and x[-1] > 0:
+        reveal_type(x[-1])  # revealed: int
+```
+
+Negative indices with tuples:
+
+```py
+def _(t: tuple[int, str, None] | tuple[None, None, int]):
+    if t[-1] is not None:
+        reveal_type(t)  # revealed: tuple[None, None, int]
+    else:
+        reveal_type(t)  # revealed: tuple[int, str, None]
+
+    if t[-3] is not None:
+        reveal_type(t)  # revealed: tuple[int, str, None]
+```
+
+## Narrowing with explicit positive subscripts
+
+Narrowing should work with explicit positive subscripts like `x[+1]`:
+
+```py
+def _(x: list[int | None]):
+    if x[+0] is not None:
+        reveal_type(x[+0])  # revealed: int
+
+    if x[+1] is not None:
+        reveal_type(x[+1])  # revealed: int
+```
+
+## Narrowing with boolean subscripts
+
+Narrowing should work with boolean subscripts like `x[True]` and `x[False]`. We treat `bool`
+subscripts the same as `int` subscripts because `True` always has the same hash and index value as
+`1`, and `False` always has the same hash and index value as `0`:
+
+```py
+def _(x: tuple[object, object]):
+    if isinstance(x[True], str):
+        reveal_type(x[True])  # revealed: str
+        reveal_type(x[1])  # revealed: str
+
+def _(x: list[int | None]):
+    # x[True] is equivalent to x[1]
+    if x[True] is not None:
+        reveal_type(x[True])  # revealed: int
+
+    # x[False] is equivalent to x[0]
+    if x[False] is not None:
+        reveal_type(x[False])  # revealed: int
+```
+
+Combined with other subscript types:
+
+```py
+def _(x: list[list[int | None]]):
+    if x[True][-1] is not None:
+        reveal_type(x[True][-1])  # revealed: int
+
+    if x[False][0] is not None:
+        reveal_type(x[False][0])  # revealed: int
+```
+
+## Narrowing with bytes literal subscripts
+
+Narrowing should work with bytes literal subscripts like `x[b"key"]`:
+
+```py
+def _(d: dict[bytes, str | None]):
+    if d[b"key"] is not None:
+        reveal_type(d[b"key"])  # revealed: str
+        reveal_type(d[b"other"])  # revealed: str | None
+```
+
+Combined with attribute access:
+
+```py
+class Container:
+    data: dict[bytes, int | None]
+
+def _(c: Container):
+    if c.data[b"key"] is not None:
+        reveal_type(c.data[b"key"])  # revealed: int
 ```

@@ -70,8 +70,8 @@ export default function Editor({
 }: Props) {
   const serverRef = useRef<PlaygroundServer | null>(null);
 
-  if (serverRef.current != null) {
-    serverRef.current.update(
+  useEffect(() => {
+    serverRef.current?.update(
       {
         files,
         workspace,
@@ -81,7 +81,14 @@ export default function Editor({
       },
       isViewingVendoredFile,
     );
-  }
+  }, [
+    files,
+    workspace,
+    onOpenFile,
+    onVendoredFileChange,
+    onBackToUserFile,
+    isViewingVendoredFile,
+  ]);
 
   // Update the diagnostics in the editor.
   useEffect(() => {
@@ -106,11 +113,7 @@ export default function Editor({
 
   useEffect(() => {
     return () => {
-      const server = serverRef.current;
-
-      if (server != null) {
-        server.dispose();
-      }
+      serverRef.current?.dispose();
     };
   }, []);
 
@@ -334,11 +337,13 @@ class PlaygroundServer
     const digitsLength = String(completions.length - 1).length;
 
     return {
+      incomplete: true,
       suggestions: completions.map((completion, i) => ({
         label: {
           label: completion.name,
           detail:
-            completion.module_name == null
+            completion.module_name == null ||
+            completion.additional_text_edits == null
               ? undefined
               : ` (import ${completion.module_name})`,
           description: completion.detail ?? undefined,

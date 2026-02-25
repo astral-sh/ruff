@@ -275,7 +275,11 @@ impl FStringConversion {
         }
 
         // Parse the format string.
-        let format_string = FormatString::from_str(contents)?;
+        let format_string = if raw {
+            FormatString::from_raw_str(contents)
+        } else {
+            FormatString::from_str(contents)
+        }?;
 
         // If the format string contains only literal parts, it doesn't need to be converted.
         if format_string

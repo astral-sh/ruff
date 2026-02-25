@@ -34,3 +34,4 @@ ignore = [
 [tool.ty.rules]
 possibly-unresolved-reference = "error"
 division-by-zero = "error"
+unused-ignore-comment = "error"

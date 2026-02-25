@@ -9,6 +9,7 @@ TC004 [*] Move import `collections.abc.Callable` out of type-checking block. Imp
   |                                 ^^^^^^^^
 7 |
 8 | AnyCallable: TypeAlias = Callable[..., Any]
+  |                          -------- Used at runtime here
   |
 help: Move out of type-checking block
 1 | from __future__ import annotations

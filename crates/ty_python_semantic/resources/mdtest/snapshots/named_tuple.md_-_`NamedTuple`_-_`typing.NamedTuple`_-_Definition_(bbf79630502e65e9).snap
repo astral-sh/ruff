@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: named_tuple.md - `NamedTuple` - `typing.NamedTuple` - Definition
 mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md

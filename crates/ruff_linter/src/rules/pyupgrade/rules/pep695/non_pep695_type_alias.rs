@@ -78,6 +78,10 @@ use super::{
 /// new type parameters are restricted in scope to their associated aliases. See
 /// [`private-type-parameter`][UP049] for a rule to update these names.
 ///
+/// ## Options
+///
+/// - `target-version`
+///
 /// [PEP 695]: https://peps.python.org/pep-0695/
 /// [PYI018]: https://docs.astral.sh/ruff/rules/unused-private-type-var/
 /// [UP046]: https://docs.astral.sh/ruff/rules/non-pep695-generic-class/

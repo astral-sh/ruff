@@ -320,6 +320,7 @@ pub enum KnownModule {
     Abc,
     Contextlib,
     Dataclasses,
+    Functools,
     Collections,
     Inspect,
     #[strum(serialize = "string.templatelib")]
@@ -333,6 +334,9 @@ pub enum KnownModule {
     UnittestMock,
     Uuid,
     Warnings,
+    Numbers,
+    #[strum(serialize = "struct", serialize = "_struct")]
+    Struct,
 }
 
 impl KnownModule {
@@ -351,6 +355,7 @@ impl KnownModule {
             Self::Abc => "abc",
             Self::Contextlib => "contextlib",
             Self::Dataclasses => "dataclasses",
+            Self::Functools => "functools",
             Self::Collections => "collections",
             Self::Inspect => "inspect",
             Self::TypeCheckerInternals => "_typeshed._type_checker_internals",
@@ -360,6 +365,8 @@ impl KnownModule {
             Self::UnittestMock => "unittest.mock",
             Self::Uuid => "uuid",
             Self::Templatelib => "string.templatelib",
+            Self::Numbers => "numbers",
+            Self::Struct => "struct",
         }
     }
 
@@ -394,6 +401,10 @@ impl KnownModule {
 
     pub const fn is_importlib(self) -> bool {
         matches!(self, Self::ImportLib)
+    }
+
+    pub const fn is_functools(self) -> bool {
+        matches!(self, Self::Functools)
     }
 }
 
