@@ -1542,29 +1542,31 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.as_union().is_some_and(|union| {
+        let ty = self.resolve_type_alias(db);
+        ty.as_union().is_some_and(|union| {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
                     || ty.is_literal_string()
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
-        }) || self.is_bool(db)
-            || self.is_literal_string()
-            || (self.is_enum(db) && !self.overrides_equality(db))
+        }) || ty.is_bool(db)
+            || ty.is_literal_string()
+            || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.as_union().is_some_and(|union| {
+        let ty = self.resolve_type_alias(db);
+        ty.as_union().is_some_and(|union| {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
                     || ty.is_literal_string()
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
-        }) || self.is_bool(db)
-            || self.is_literal_string()
-            || (self.is_enum(db) && !self.overrides_equality(db))
+        }) || ty.is_bool(db)
+            || ty.is_literal_string()
+            || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
     /// Create a promotable string literal.
