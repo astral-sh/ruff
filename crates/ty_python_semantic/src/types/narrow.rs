@@ -238,7 +238,7 @@ impl<'db> DualNarrowingConstraints<'db> {
     }
 }
 
-#[expect(clippy::unnecessary_wraps)]
+#[allow(clippy::unnecessary_wraps)]
 #[salsa::tracked(
     returns(as_ref),
     cycle_initial=|_, _, _| None,
@@ -255,7 +255,7 @@ fn all_narrowing_constraints_for_expression<'db>(
     )
 }
 
-#[expect(clippy::unnecessary_wraps)]
+#[allow(clippy::unnecessary_wraps)]
 #[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
