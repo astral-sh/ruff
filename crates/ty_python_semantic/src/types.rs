@@ -1795,8 +1795,32 @@ impl<'db> Type<'db> {
         match self {
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
             Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
-            Type::ClassMethodLiteral(_) => Some(KnownClass::Classmethod.to_instance(db)),
-            Type::StaticMethodLiteral(_) => Some(KnownClass::Staticmethod.to_instance(db)),
+            Type::ClassMethodLiteral(f) => {
+                let sig = f.signature(db);
+                if let [signature] = sig.overloads.as_slice()
+                    && let Some(first_param) = signature.parameters().as_slice().first()
+                    && let Type::SubclassOf(subclass_of) = first_param.annotated_type()
+                {
+                    let t = subclass_of.to_instance(db);
+                    let remaining =
+                        Parameters::new(db, signature.parameters().as_slice()[1..].iter().cloned());
+                    let p = Type::paramspec_value_callable(db, remaining);
+                    let r = signature.return_ty;
+                    Some(KnownClass::Classmethod.to_specialized_instance(db, &[t, p, r]))
+                } else {
+                    Some(KnownClass::Classmethod.to_instance(db))
+                }
+            }
+            Type::StaticMethodLiteral(f) => {
+                let sig = f.signature(db);
+                if let [signature] = sig.overloads.as_slice() {
+                    let p = Type::paramspec_value_callable(db, signature.parameters().clone());
+                    let r = signature.return_ty;
+                    Some(KnownClass::Staticmethod.to_specialized_instance(db, &[p, r]))
+                } else {
+                    Some(KnownClass::Staticmethod.to_instance(db))
+                }
+            }
             Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
             _ => None,
         }
