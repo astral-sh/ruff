@@ -938,9 +938,11 @@ impl<'db> Type<'db> {
             // Currently, the only supertype of `AlwaysFalsy` and `AlwaysTruthy` is the universal set (object instance).
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => {
                 relation_visitor.visit((self, target, relation), || {
-                    target.when_equivalent_to_impl(
+                    Type::object().has_relation_to_impl(
                         db,
-                        Type::object(),
+                        target,
+                        inferable,
+                        relation,
                         relation_visitor,
                         disjointness_visitor,
                     )
