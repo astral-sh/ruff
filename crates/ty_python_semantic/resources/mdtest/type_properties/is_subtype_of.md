@@ -2318,6 +2318,30 @@ static_assert(not is_subtype_of(Literal[b"abc"], Sequence[Literal[97, 98]]))  # 
 static_assert(not is_subtype_of(Literal[b"abc"], Sequence[str]))
 ```
 
+## String literals and iterable protocols
+
+```py
+from typing import Iterator, Literal, Protocol
+from ty_extensions import is_subtype_of, static_assert
+
+class IterChars(Protocol):
+    def __iter__(self) -> Iterator[Literal["f", "o"]]: ...
+
+static_assert(is_subtype_of(Literal["foo"], IterChars))
+```
+
+## Bytes literals and iterable protocols
+
+```py
+from typing import Iterator, Literal, Protocol
+from ty_extensions import is_subtype_of, static_assert
+
+class IterBytes(Protocol):
+    def __iter__(self) -> Iterator[Literal[97, 98, 114]]: ...
+
+static_assert(is_subtype_of(Literal[b"bar"], IterBytes))
+```
+
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
 [gradual tuple]: https://typing.python.org/en/latest/spec/tuples.html#tuple-type-form
 [special case for float and complex]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex

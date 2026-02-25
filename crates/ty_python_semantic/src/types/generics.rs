@@ -2256,12 +2256,21 @@ impl<'db> SpecializationBuilder<'db> {
 
             (
                 formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
-                actual_literal @ (Type::StringLiteral(_)
-                | Type::LiteralString
-                | Type::BytesLiteral(_)),
+                actual_literal @ (Type::StringLiteral(_) | Type::BytesLiteral(_)),
             ) => {
-                // Retry specialization with the literal's fallback instance (`str` / `bytes`)
-                // so literal iterables can contribute to generic inference.
+                // String/bytes literals are precise `Sequence[...]` values.
+                let iterated = actual_literal.iterate(self.db);
+                let element_ty = iterated.homogeneous_element_type(self.db);
+                let sequence = KnownClass::Sequence.to_specialized_instance(self.db, &[element_ty]);
+                return self.infer_map_impl(formal, sequence, polarity, f, seen);
+            }
+
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                actual_literal @ Type::LiteralString,
+            ) => {
+                // We don't know the concrete characters of a `LiteralString`, so use `str`
+                // fallback for inference.
                 if let Some(actual_instance) = actual_literal.literal_fallback_instance(self.db) {
                     return self.infer_map_impl(formal, actual_instance, polarity, f, seen);
                 }

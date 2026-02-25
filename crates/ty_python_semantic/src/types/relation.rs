@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
@@ -15,6 +17,53 @@ use crate::{
     Db,
     types::{Type, constraints::ConstraintSet, generics::InferableTypeVars},
 };
+
+fn literal_sequence_spec_from_unique_elements<'db, T, F>(
+    db: &'db dyn Db,
+    elements: FxHashSet<T>,
+    mut element_to_type: F,
+) -> Type<'db>
+where
+    T: Copy + Eq + Hash,
+    F: FnMut(T) -> Type<'db>,
+{
+    match elements.len() {
+        0 => Type::Never,
+        1 => element_to_type(*elements.iter().next().unwrap()),
+        _ => {
+            let union_elements: Box<[Type<'db>]> = elements
+                .into_iter()
+                .map(|element| element_to_type(element))
+                .collect();
+            Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+        }
+    }
+}
+
+fn literal_sequence_element_spec<'db>(db: &'db dyn Db, literal: Type<'db>) -> Option<Type<'db>> {
+    match literal {
+        Type::StringLiteral(value) => {
+            let chars: FxHashSet<char> = value.value(db).chars().collect();
+            Some(literal_sequence_spec_from_unique_elements(db, chars, |c| {
+                Type::single_char_string_literal(db, c)
+            }))
+        }
+        Type::BytesLiteral(value) => {
+            let ints: FxHashSet<i64> = value.value(db).iter().map(|byte| i64::from(*byte)).collect();
+            Some(literal_sequence_spec_from_unique_elements(
+                db,
+                ints,
+                Type::IntLiteral,
+            ))
+        }
+        _ => None,
+    }
+}
+
+fn literal_sequence_surrogate<'db>(db: &'db dyn Db, literal: Type<'db>) -> Option<Type<'db>> {
+    literal_sequence_element_spec(db, literal)
+        .map(|spec| KnownClass::Sequence.to_specialized_instance(db, &[spec]))
+}
 
 /// A non-exhaustive enumeration of relations that can exist between types.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq)]
@@ -1027,6 +1076,34 @@ impl<'db> Type<'db> {
                 )
             }
 
+            (literal @ (Type::StringLiteral(_) | Type::BytesLiteral(_)), Type::ProtocolInstance(protocol)) => {
+                relation_visitor.visit((self, target, relation), || {
+                    let direct_protocol_satisfaction = literal.satisfies_protocol(
+                        db,
+                        protocol,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    );
+
+                    if let Some(sequence_surrogate) = literal_sequence_surrogate(db, literal) {
+                        direct_protocol_satisfaction.or(db, || {
+                            sequence_surrogate.satisfies_protocol(
+                                db,
+                                protocol,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        })
+                    } else {
+                        direct_protocol_satisfaction
+                    }
+                })
+            }
+
             (_, Type::ProtocolInstance(protocol)) => {
                 relation_visitor.visit((self, target, relation), || {
                     self.satisfies_protocol(
@@ -1084,7 +1161,7 @@ impl<'db> Type<'db> {
             // Note that this strictly holds true for all type relations!
             // However, as an optimisation (to avoid interning many single-character string-literal types),
             // we only recognise this as being true for assignability.
-            (Type::StringLiteral(value), Type::NominalInstance(instance)) => {
+            (literal @ Type::StringLiteral(_), Type::NominalInstance(instance)) => {
                 let other_class = instance.class(db);
 
                 if other_class.is_known(db, KnownClass::Str) {
@@ -1101,21 +1178,8 @@ impl<'db> Type<'db> {
                     return ConstraintSet::from(false);
                 }
 
-                let chars: FxHashSet<char> = value.value(db).chars().collect();
-
-                let spec = match chars.len() {
-                    0 => Type::Never,
-                    1 => Type::single_char_string_literal(db, *chars.iter().next().unwrap()),
-                    _ => {
-                        // Optimisation: since we know this union will only include string-literal types,
-                        // avoid eagerly creating string-literal types when unnecessary, and avoid going
-                        // via the union-builder.
-                        let union_elements: Box<[Type<'db>]> = chars
-                            .iter()
-                            .map(|c| Type::single_char_string_literal(db, *c))
-                            .collect();
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
-                    }
+                let Some(spec) = literal_sequence_element_spec(db, literal) else {
+                    return ConstraintSet::from(false);
                 };
 
                 KnownClass::Sequence
@@ -1136,7 +1200,7 @@ impl<'db> Type<'db> {
 
             // A bytes literal `Literal[b"abc"]` is assignable to `bytes` *and* to
             // `Sequence[Literal[97, 98, 99]]` because bytes are sequences of integers.
-            (Type::BytesLiteral(value), Type::NominalInstance(instance)) => {
+            (literal @ Type::BytesLiteral(_), Type::NominalInstance(instance)) => {
                 let other_class = instance.class(db);
 
                 if other_class.is_known(db, KnownClass::Bytes) {
@@ -1153,20 +1217,8 @@ impl<'db> Type<'db> {
                     return ConstraintSet::from(false);
                 }
 
-                let ints: FxHashSet<i64> = value
-                    .value(db)
-                    .iter()
-                    .map(|byte| i64::from(*byte))
-                    .collect();
-
-                let spec = match ints.len() {
-                    0 => Type::Never,
-                    1 => Type::IntLiteral(*ints.iter().next().unwrap()),
-                    _ => {
-                        let union_elements: Box<[Type<'db>]> =
-                            ints.iter().map(|int| Type::IntLiteral(*int)).collect();
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
-                    }
+                let Some(spec) = literal_sequence_element_spec(db, literal) else {
+                    return ConstraintSet::from(false);
                 };
 
                 KnownClass::Sequence

@@ -896,15 +896,29 @@ def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
     return tuple(x for iterable in iterables for x in iterable)
 
 reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
-# TODO: we could have `Literal["a", "b", "c"]` instead of `str` here
-reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
+reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[Literal["a", "b", "c", 1, 2, 3], ...]
 
 def literal_string_case(literal_string: LiteralString):
     reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
 
 reveal_type(flatten(b"abc"))  # revealed: list[int]
 reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
-# TODO: we could have `Literal[97, 98, 99]` instead of `int` in the next two lines
-reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
-reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
+reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[Literal[97, 98, 99], ...]
+reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[Literal[97, 98, 99, "x"], ...]
+```
+
+## Invalid tuple argument keeps inferred return type unknown
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def takes_singleton_tuple(x: tuple[T]) -> T:
+    return x[0]
+
+# error: [invalid-argument-type]
+reveal_type(takes_singleton_tuple("a"))  # revealed: Unknown
 ```
