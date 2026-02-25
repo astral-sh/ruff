@@ -11,7 +11,7 @@ use ruff_db::source::{SourceText, source_text};
 use ruff_index::IndexVec;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::visitor::{Visitor, walk_expr, walk_pattern, walk_stmt};
-use ruff_python_ast::{self as ast, NodeIndex, PySourceType, PythonVersion};
+use ruff_python_ast::{self as ast, AtomicNodeIndex, NodeIndex, PySourceType, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
     YieldOutsideFunctionKind,
@@ -793,7 +793,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     fn add_dict_key_assignment_definitions(
         &mut self,
         targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
-        dict: &'ast ast::ExprDict,
+        dict: &'ast ast::Expr,
         assignment: Definition<'db>,
     ) {
         // TODO: Although we synthesize place expressions for each dictionary key, the definition
@@ -804,16 +804,39 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         };
 
         if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
-            self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
+            self.add_dict_key_assignment_definitions_impl(&target, dict.into(), assignment);
         }
     }
 
     fn add_dict_key_assignment_definitions_impl(
         &mut self,
         target: &MemberExprBuilder,
-        dict: &'ast ast::ExprDict,
+        expr: ast::ExprRef<'ast>,
         assignment: Definition<'db>,
     ) {
+        let ruff_python_ast::ExprRef::Dict(dict) = expr else {
+            let items = match expr {
+                ruff_python_ast::ExprRef::List(list) => &list.elts,
+                ruff_python_ast::ExprRef::Tuple(tuple) => &tuple.elts,
+                _ => return,
+            };
+
+            // Traverse into nested collections that may contain dictionary literals.
+            for (i, item) in items.iter().enumerate() {
+                if let Some(target) = MemberExprBuilder::visit_subscript_expr(
+                    target.clone(),
+                    &ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(ast::Int::from(i as u64)),
+                        range: TextRange::default(),
+                        node_index: AtomicNodeIndex::NONE,
+                    }),
+                ) {
+                    self.add_dict_key_assignment_definitions_impl(&target, item.into(), assignment);
+                }
+            }
+            return;
+        };
+
         for item in &dict.items {
             let Some(key) = item.key.as_ref() else {
                 continue;
@@ -825,9 +848,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
             };
 
             // Recurse into nested dictionaries.
-            if let ast::Expr::Dict(dict_value) = &item.value {
-                self.add_dict_key_assignment_definitions_impl(&member_expr, dict_value, assignment);
-            }
+            self.add_dict_key_assignment_definitions_impl(
+                &member_expr,
+                (&item.value).into(),
+                assignment,
+            );
 
             if let Some(place_expr) = PlaceExpr::try_from_member_expr(member_expr) {
                 let place_id = self.add_place(place_expr);
@@ -2852,13 +2877,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     },
                                 );
 
-                                if let ast::Expr::Dict(dict) = &*node.value {
-                                    self.add_dict_key_assignment_definitions(
-                                        &node.targets,
-                                        dict,
-                                        assignment,
-                                    );
-                                }
+                                self.add_dict_key_assignment_definitions(
+                                    &node.targets,
+                                    &node.value,
+                                    assignment,
+                                );
                             }
                             Some(CurrentAssignment::AnnAssign(ann_assign)) => {
                                 self.add_standalone_type_expression(&ann_assign.annotation);
@@ -2872,10 +2895,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                     },
                                 );
 
-                                if let Some(ast::Expr::Dict(dict)) = ann_assign.value.as_deref() {
+                                if let Some(value) = ann_assign.value.as_deref() {
                                     self.add_dict_key_assignment_definitions(
                                         [&*ann_assign.target],
-                                        dict,
+                                        value,
                                         assignment,
                                     );
                                 }
