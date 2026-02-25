@@ -1167,14 +1167,12 @@ class Foo:
 class Bar(Foo):  # error: [subclass-of-dataclass-with-order]
     def __lt__(self, other: Bar) -> bool: ...  # error: [invalid-method-override]
 
-# Specifying `order=True` on the subclass means that a `__lt__` method is generated that
-# is incompatible with the generated `__lt__` method on the superclass. We don't emit the
-# `subclass-of-dataclass-with-order` diagnostic here because the child class overrides all
-# comparison methods.
+# Specifying `order=True` on the subclass means that comparison methods are generated for the
+# subclass, but cross-class comparisons with the parent still raise `TypeError` at runtime.
 # TODO: We should also emit `invalid-method-override` diagnostics for each generated
 # comparison method since they have incompatible signatures.
 @dataclass(order=True)
-class Bar2(Foo):
+class Bar2(Foo):  # error: [subclass-of-dataclass-with-order]
     y: str
 
 # Although this class does not override any methods of `Foo`, the design of the
@@ -1203,34 +1201,18 @@ class Spam(Baz):
 ```
 
 ```snapshot
-error[invalid-method-override]: Invalid override of method `__lt__`
- --> src/mdtest_snippet.pyi:9:9
-  |
-9 |     def __lt__(self, other: Bar) -> bool: ...  # snapshot: invalid-method-override
-  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Foo.__lt__`
-  |
-info: parameter `other` has an incompatible type: `Foo` is not assignable to `Bar`
-info: This violates the Liskov Substitution Principle
-info: `Foo.__lt__` is a generated method created because `Foo` is a dataclass
- --> src/mdtest_snippet.pyi:5:7
-  |
-5 | class Foo:
-  |       ^^^ Definition of `Foo`
-  |
-
-
 error[invalid-method-override]: Invalid override of method `_asdict`
-  --> src/mdtest_snippet.pyi:54:9
+  --> src/mdtest_snippet.pyi:41:9
    |
-54 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
+41 |     def _asdict(self) -> tuple[int, ...]: ...  # snapshot: invalid-method-override
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Baz._asdict`
    |
 info: incompatible return types: `tuple[int, ...]` is not assignable to `dict[str, Any]`
 info: This violates the Liskov Substitution Principle
 info: `Baz._asdict` is a generated method created because `Baz` inherits from `typing.NamedTuple`
-  --> src/mdtest_snippet.pyi:50:7
+  --> src/mdtest_snippet.pyi:37:7
    |
-50 | class Baz(NamedTuple):
+37 | class Baz(NamedTuple):
    |       ^^^^^^^^^^^^^^^ Definition of `Baz`
    |
 ```

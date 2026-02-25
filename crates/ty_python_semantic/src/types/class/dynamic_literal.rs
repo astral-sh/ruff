@@ -6,8 +6,8 @@ use crate::{
     Db, TypeQualifiers,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ClassBase, ClassLiteral, ClassType, DataclassParams, KnownClass, MemberLookupPolicy,
-        SubclassOfType, Type,
+        ClassBase, ClassLiteral, ClassType, DataclassFlags, DataclassParams, KnownClass,
+        MemberLookupPolicy, SubclassOfType, Type,
         class::{
             ClassMemberResult, CodeGeneratorKind, DisjointBase, InstanceMemberResult, MroLookup,
         },
@@ -485,6 +485,27 @@ impl<'db> DynamicClassLiteral<'db> {
             self.has_dynamic_namespace(db),
             dataclass_params,
         )
+    }
+
+    /// Checks if the given dataclass parameter flag is set for this class.
+    pub(crate) fn has_dataclass_param(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+        param: DataclassFlags,
+    ) -> bool {
+        let transformer_params =
+            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
+                Some(DataclassParams::from_transformer_params(
+                    db,
+                    transformer_params,
+                ))
+            } else {
+                None
+            };
+        self.dataclass_params(db)
+            .is_some_and(|params| params.flags(db).contains(param))
+            || transformer_params.is_some_and(|params| params.flags(db).contains(param))
     }
 }
 
