@@ -5,16 +5,12 @@ use crate::Db;
 use crate::types::{ClassLiteral, KnownClass, Type};
 
 /// A literal value. See [`LiteralValueTypeKind`] for details.
-#[derive(
-    PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct LiteralValueType<'db>(LiteralValueTypeInner<'db>);
 
 // This enum effectively contains two variants, `Promotable(LiteralValueKind)` and `Unpromotable(LiteralValueKind)`,
 // but flattened to reduce the size of the type.
-#[derive(
-    PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 enum LiteralValueTypeInner<'db> {
     PromotableInt(IntLiteralType),
     PromotableBool(bool),
@@ -30,9 +26,7 @@ enum LiteralValueTypeInner<'db> {
     UnpromotableLiteralString,
 }
 
-#[derive(
-    PartialOrd, Ord, Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum LiteralValueTypeKind<'db> {
     /// An integer literal
     Int(IntLiteralType),
@@ -311,11 +305,7 @@ impl std::fmt::Debug for IntLiteralType {
     }
 }
 
-/// # Ordering
-/// Ordering is based on the string literal's salsa-assigned id and not on its value.
-/// The id may change between runs, or when the string literal was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
     pub(crate) value: CompactString,
@@ -331,11 +321,7 @@ impl<'db> StringLiteralType<'db> {
     }
 }
 
-/// # Ordering
-/// Ordering is based on the byte literal's salsa-assigned id and not on its value.
-/// The id may change between runs, or when the byte literal was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct BytesLiteralType<'db> {
     #[returns(deref)]
     pub(crate) value: Box<[u8]>,
@@ -360,7 +346,6 @@ impl<'db> BytesLiteralType<'db> {
 ///     YES = 1
 /// ```
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct EnumLiteralType<'db> {
     /// A reference to the enum class this literal belongs to
     pub(crate) enum_class: ClassLiteral<'db>,

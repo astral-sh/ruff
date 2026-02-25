@@ -160,7 +160,7 @@ bitflags! {
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
     pub struct DataclassTransformerFlags: u8 {
         const EQ_DEFAULT = 1 << 0;
         const ORDER_DEFAULT = 1 << 1;
@@ -180,7 +180,6 @@ impl Default for DataclassTransformerFlags {
 /// Metadata for a dataclass-transformer. Stored inside a `Type::DataclassTransformer(…)`
 /// instance that we use as the return type for `dataclass_transform(…)` calls.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct DataclassTransformerParams<'db> {
     pub flags: DataclassTransformerFlags,
 
@@ -205,13 +204,7 @@ pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
 ///
 /// If a function has multiple overloads, each overload is represented by a separate function
 /// definition in the AST, and is therefore a separate `OverloadLiteral` instance.
-///
-/// # Ordering
-/// Ordering is based on the function's id assigned by salsa and not on the function literal's
-/// values. The id may change between runs, or when the function literal was garbage collected and
-/// recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct OverloadLiteral<'db> {
     /// Name of the function at definition.
     #[returns(ref)]
@@ -649,13 +642,7 @@ impl<'db> OverloadLiteral<'db> {
 /// Representation of a function definition in the AST, along with any previous overloads of the
 /// function. Each overload can be separately generic or not, and each generic overload uses
 /// distinct typevars.
-///
-/// # Ordering
-/// Ordering is based on the function's id assigned by salsa and not on the function literal's
-/// values. The id may change between runs, or when the function literal was garbage collected and
-/// recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
 }
@@ -889,7 +876,6 @@ impl AbstractMethodKind {
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 

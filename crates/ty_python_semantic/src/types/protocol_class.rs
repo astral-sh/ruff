@@ -45,14 +45,7 @@ impl<'db> ClassType<'db> {
 }
 
 /// Representation of a single `Protocol` class definition.
-///
-/// # Ordering
-///
-/// Ordering is based on the wrapped data's salsa-assigned id and not on its values.
-/// The id may change between runs, or when e.g. a `ProtocolClass` was garbage-collected and recreated.
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize, PartialOrd, Ord,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
@@ -184,12 +177,7 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
-///
-/// # Ordering
-/// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
-/// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub(super) struct ProtocolInterface<'db> {
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
