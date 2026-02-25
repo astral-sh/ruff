@@ -3641,7 +3641,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Set initial declared/inferred types for a `**kwargs` keyword-variadic parameter.
     ///
-    /// The annotated type is implicitly wrapped in a string-keyed dictionary.
+    /// The annotated type is implicitly wrapped in a string-keyed dictionary,
+    /// unless it's `Unpack[TypedDict]` (PEP 692) in which case kwargs is typed as the `TypedDict`.
     ///
     /// See [`infer_parameter_definition`] doc comment for some relevant observations about scopes.
     ///
@@ -3688,6 +3689,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         )
                     }
                 }
+            } else if let Type::KnownInstance(KnownInstanceType::UnpackedTypedDict(typed_dict)) =
+                annotated_type
+            {
+                // PEP 692: `**kwargs: Unpack[TypedDict]`
+                // The kwargs inside the function is typed as the TypedDict itself
+                Type::TypedDict(typed_dict)
             } else {
                 KnownClass::Dict.to_specialized_instance(
                     self.db(),

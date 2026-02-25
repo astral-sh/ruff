@@ -2961,6 +2961,13 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.write_str("'>")
             }
             KnownInstanceType::NamedTupleSpec(_) => f.write_str("NamedTupleSpec"),
+            KnownInstanceType::UnpackedTypedDict(typed_dict) => {
+                f.write_str("Unpack[")?;
+                Type::TypedDict(typed_dict)
+                    .display(self.db)
+                    .fmt_detailed(f)?;
+                f.write_char(']')
+            }
         }
     }
 }
