@@ -341,7 +341,7 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,

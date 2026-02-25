@@ -838,7 +838,7 @@ impl ReachabilityConstraints {
     }
 
     /// Inner recursive helper that accumulates narrowing constraints along each TDD path.
-    #[allow(clippy::too_many_arguments)]
+    #[expect(clippy::too_many_arguments)]
     fn narrow_by_constraint_inner<'db>(
         &self,
         db: &'db dyn Db,
