@@ -213,7 +213,7 @@ mod tests {
                     convention: Some(convention),
                     ..Settings::default()
                 },
-                ..settings::LinterSettings::for_rule(Rule::SectionOrderIncorrect)
+                ..settings::LinterSettings::for_rule(Rule::IncorrectSectionOrder)
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
