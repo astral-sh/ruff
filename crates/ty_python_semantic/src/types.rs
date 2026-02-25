@@ -12849,6 +12849,10 @@ pub(super) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
 
 #[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements.
+    ///
+    /// For performance reasons, consider using [`IntersectionType::from_two_elements`] if
+    /// the intersection is constructed from exactly two elements.
     pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
@@ -12859,6 +12863,7 @@ impl<'db> IntersectionType<'db> {
             .build()
     }
 
+    /// Create an intersection type `A & B` from two elements `A` and `B`.
     #[salsa::tracked(
         cycle_initial=|_, id, _, _| Type::divergent(id),
         cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
