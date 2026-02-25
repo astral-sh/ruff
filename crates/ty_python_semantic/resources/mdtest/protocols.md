@@ -3418,12 +3418,12 @@ type of `float` while the other has `str`, we should decide that they're not ass
 
 However, zooming in to the implementation details, `_ReturnT_co` is actually the type of the `value`
 attribute on the `StopIteration` exception that the `Generator` raises when it's finished. This is
-awkward, because protocols don't describe the exceptions that their methods raise. How is `ty`
+awkward, because protocols don't describe the exceptions that their methods raise. How is ty
 supposed to see that incompatible `_ReturnT_co` types imply incompatible `Generator`s?
 
 As of Python 3.13, the `Generator` protocol's `close` method was changed from returning `None` to
 returning `_ReturnT_co | None`. This was motivated by an edge case (you tried to cancel a generator,
-but it caught the related exception and returned something anyway), but coincidentally it tells `ty`
+but it caught the related exception and returned something anyway), but coincidentally it tells ty
 what it needs to know: `_ReturnT_co` is something that some method in this protocol returns.
 Something with a method that returns `float` isn't assignable to something where the same method
 returns `str`. Problem solved.
@@ -3439,7 +3439,7 @@ protocol (prior to 3.13) genuinely tells us nothing about how `_ReturnT_co` inte
 assignability.
 
 As a special case workaround for this, we compare `Generator` implementations *nominally* when the
-target Python version is 3.12 or earlier, in both `has_relation_to` and `is_equivalent_to`.
+target Python version is 3.12 or earlier in `has_relation_to`.
 
 ```toml
 [environment]
@@ -3447,8 +3447,10 @@ python-version = "3.12"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
-from typing import Generator
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert, is_assignable_to
+from typing import Generator, Awaitable, Protocol, TypeVar, Any, Protocol
+
+T_co = TypeVar("T_co", covariant=True)
 
 class A: ...
 class B: ...
@@ -3460,6 +3462,21 @@ static_assert(not is_subtype_of(Generator[None, None, B], Generator[None, None, 
 static_assert(is_equivalent_to(Generator[None, None, A], Generator[None, None, A]))
 static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
 static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+
+# Awaitable is also impacted, since `Awaitable.__await__` returns `Generator`
+
+static_assert(not is_equivalent_to(Awaitable[A], Awaitable[B]))
+static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
+static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
+static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
+
+class CustomCovariantProtocol(Protocol[T_co]):
+    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 ```
 
 ## The `Generator` protocol's `_ReturnT_co` does not need special casing as of Python 3.13
@@ -3473,8 +3490,10 @@ python-version = "3.13"
 ```
 
 ```py
-from ty_extensions import is_equivalent_to, is_subtype_of, static_assert
-from typing import Generator
+from ty_extensions import is_equivalent_to, is_subtype_of, static_assert, is_assignable_to
+from typing import Generator, Awaitable, TypeVar, Protocol, Any
+
+T_co = TypeVar("T_co", covariant=True)
 
 class A: ...
 class B: ...
@@ -3486,6 +3505,19 @@ static_assert(not is_subtype_of(Generator[None, None, B], Generator[None, None, 
 static_assert(is_equivalent_to(Generator[None, None, A], Generator[None, None, A]))
 static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
 static_assert(is_subtype_of(Generator[None, None, A], Generator[None, None, A]))
+
+static_assert(not is_equivalent_to(Awaitable[A], Awaitable[B]))
+static_assert(not is_equivalent_to(Awaitable[A], Awaitable[Any]))
+static_assert(not is_subtype_of(Awaitable[A], Awaitable[B]))
+static_assert(not is_assignable_to(Awaitable[A], Awaitable[B]))
+
+class CustomCovariantProtocol(Protocol[T_co]):
+    def foo(self) -> tuple[list[Generator[None, None, T_co]]]: ...
+
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_equivalent_to(CustomCovariantProtocol[A], CustomCovariantProtocol[Any]))
+static_assert(not is_subtype_of(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
+static_assert(not is_assignable_to(CustomCovariantProtocol[A], CustomCovariantProtocol[B]))
 ```
 
 ## TODO
