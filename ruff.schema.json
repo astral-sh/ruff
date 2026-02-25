@@ -711,6 +711,18 @@
         "type": "string"
       }
     },
+    "ssort": {
+      "description": "Options for the `ssort` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/SSortOptions"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "deprecated": true
+    },
     "target-version": {
       "description": "The minimum Python version to target, e.g., when considering automatic\ncode upgrades, like rewriting type annotations. Ruff will not propose\nchanges using features that are not available in the given version.\n\nFor example, to represent supporting Python >=3.11 or ==3.11\nspecify `target-version = \"py311\"`.\n\nIf you're already using a `pyproject.toml` file, we recommend\n`project.requires-python` instead, as it's based on Python packaging\nstandards, and will be respected by other tools. For example, Ruff\ntreats the following as identical to `target-version = \"py38\"`:\n\n```toml\n[project]\nrequires-python = \">=3.8\"\n```\n\nIf both are specified, `target-version` takes precedence over\n`requires-python`. See [_Inferring the Python version_](https://docs.astral.sh/ruff/configuration/#inferring-the-python-version)\nfor a complete description of how the `target-version` is determined\nwhen left unspecified.\n\nNote that a stub file can [sometimes make use of a typing feature](https://typing.python.org/en/latest/spec/distributing.html#syntax)\nbefore it is available at runtime, as long as the stub does not make\nuse of new *syntax*. For example, a type checker will understand\n`int | str` in a stub as being a `Union` type annotation, even if the\ntype checker is run using Python 3.9, despite the fact that the `|`\noperator can only be used to create union types at runtime on Python\n3.10+. As such, Ruff will often recommend newer features in a stub\nfile than it would for an equivalent runtime file with the same target\nversion.",
       "anyOf": [
@@ -2530,6 +2542,17 @@
             "$ref": "#/definitions/RuleSelector"
           }
         },
+        "ssort": {
+          "description": "Options for the `ssort` plugin.",
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SSortOptions"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "task-tags": {
           "description": "A list of task tags to recognize (e.g., \"TODO\", \"FIXME\", \"XXX\").\n\nComments starting with these tags will be ignored by commented-out code\ndetection (`ERA`), and skipped by line-length rules (`E501`) if\n[`ignore-overlong-task-comments`](#lint_pycodestyle_ignore-overlong-task-comments) is set to `true`.",
           "type": [
@@ -4297,6 +4320,10 @@
         "SLOT000",
         "SLOT001",
         "SLOT002",
+        "SS",
+        "SS0",
+        "SS00",
+        "SS001",
         "T",
         "T1",
         "T10",
@@ -4441,6 +4468,20 @@
         "YTT302",
         "YTT303"
       ]
+    },
+    "SSortOptions": {
+      "description": "Options for the `ssort` plugin.",
+      "type": "object",
+      "properties": {
+        "narrative-order": {
+          "description": "Controls the direction in which dependency-ordered statements are emitted.\n\nBy default, statements are ordered so that each statement appears before any\nstatements that depend on it. This means helper functions, constants, and other\nprerequisites are placed earlier in the file.\n\nWhen `narrative-order` is enabled, this order is simply reversed. Higher-level\nstatements appear first, followed by the lower-level statements they rely on.\n\nFor example, when `narrative-order` is disabled:\n```python\ndef baz(): pass\ndef bar(): baz()\ndef foo(): bar()\n```\n\nFor example, when `narrative-order` is enabled:\n```python\ndef foo(): bar()\ndef bar(): baz()\ndef baz(): pass\n```",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
     },
     "Strictness": {
       "oneOf": [

@@ -209,12 +209,12 @@ pub enum Linter {
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
-    /// [tryceratops](https://pypi.org/project/tryceratops/)
-    #[prefix = "TRY"]
-    Tryceratops,
     /// [ssort](https://pypi.org/project/ssort/)
     #[prefix = "SS"]
     SSort,
+    /// [tryceratops](https://pypi.org/project/tryceratops/)
+    #[prefix = "TRY"]
+    Tryceratops,
 }
 
 pub trait RuleNamespace: Sized {
