@@ -4906,7 +4906,7 @@ impl<'db> Type<'db> {
         // returning overloads get `constructor_instance_ty` as their return type.
         let mut new_mixed_non_instance_sigs = None;
 
-        if let Some((ref new_bindings_inner, ref new_callable)) = new_bindings {
+        if let Some((ref _new_bindings_inner, ref new_callable)) = new_bindings {
             let func = match *new_callable {
                 Type::FunctionLiteral(func) => Some(func),
                 Type::BoundMethod(method) => Some(method.function(db)),
@@ -4935,22 +4935,11 @@ impl<'db> Type<'db> {
 
                     if !non_instance_sigs.is_empty() {
                         if non_instance_sigs.len() == signature.overloads.len() {
-                            // All overloads return non-instance types: use `__new__` directly.
-                            let new_return_ty = new_bindings_inner
-                                .iter_flat()
-                                .flat_map(|cb| cb.overloads().iter())
-                                .map(|overload| overload.signature.return_ty)
-                                .find(|return_ty: &Type<'db>| {
-                                    !return_ty.is_unknown()
-                                        && !return_ty.has_typevar(db)
-                                        && ConstructorReturnDisposition::of(db, *return_ty, class)
-                                            .is_not_instance()
-                                })
-                                .unwrap_or(constructor_instance_ty);
+                            // All overloads return non-instance types: use `__new__`
+                            // directly. Each overload keeps its own return type, so
+                            // overload resolution picks the correct one per call site.
                             let (new_bindings, _) = new_bindings.unwrap();
-                            return new_bindings
-                                .with_generic_context(db, class_generic_context)
-                                .with_constructor_instance_type(new_return_ty);
+                            return new_bindings.with_generic_context(db, class_generic_context);
                         }
 
                         // Mixed: save ALL overloads with correct per-overload return

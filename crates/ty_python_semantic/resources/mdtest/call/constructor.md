@@ -392,6 +392,25 @@ reveal_type(D(1))  # revealed: int
 reveal_type(D("foo"))  # revealed: D
 ```
 
+## Overloaded non-instance `__new__` should preserve matched return type
+
+When all `__new__` overloads return non-instance types, constructor return typing should still use
+the matched overload's return type at each call site.
+
+```py
+from typing import overload
+
+class F:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> str: ...
+    def __new__(cls, x: int | str) -> object: ...
+
+reveal_type(F(1))  # revealed: int
+reveal_type(F("foo"))  # revealed: str
+```
+
 ## Mixed generic `__new__` overloads should still validate `__init__`
 
 For generic classes, if an instance-returning `__new__` overload matches, we still need to validate
