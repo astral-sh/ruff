@@ -1179,9 +1179,9 @@ class Foo: ...
 
 class Decorator:
     @overload
-    def __call__[**P, R](self, task_runner: None) -> Callable[P, R]: ...
+    def __call__[**P, R](self, task_runner: None) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
     @overload
-    def __call__[**P, R](self, task_runner: Foo) -> Callable[P, R]: ...
+    def __call__[**P, R](self, task_runner: Foo) -> Callable[[Callable[P, R]], Callable[P, R]]: ...
 ```
 
 `main.py`:
@@ -1191,7 +1191,7 @@ from typing import Any
 from overloaded import Decorator
 
 def test(decorator: Decorator, argument: Any):
-    # revealed: [**P'return, R'return](**P'return) -> R'return
+    # revealed: [**P'return, R'return]((**P'return) -> R'return, /) -> ((**P'return) -> R'return)
     reveal_type(decorator(argument))
 ```
 
