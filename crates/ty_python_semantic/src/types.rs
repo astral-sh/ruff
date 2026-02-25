@@ -5038,7 +5038,7 @@ impl<'db> Type<'db> {
                 CallableBinding::from_overloads(self_type, combined_sigs).into();
 
             if let Some((init_bindings, _)) = init_bindings {
-                bindings.set_mixed_constructor_init(constructor_instance_ty, init_bindings);
+                bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
             }
 
             return bindings.with_generic_context(db, class_generic_context);
@@ -5053,7 +5053,7 @@ impl<'db> Type<'db> {
                 CallableBinding::from_overloads(self, combined_sigs).into();
 
             if let Some((init_bindings, _)) = init_bindings {
-                bindings.set_mixed_constructor_init(constructor_instance_ty, init_bindings);
+                bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
             }
 
             return bindings.with_generic_context(db, class_generic_context);

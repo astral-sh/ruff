@@ -164,26 +164,28 @@ impl<'db> BindingsElement<'db> {
 /// only when the matched `__new__` overload is instance-returning.
 #[derive(Debug, Clone)]
 struct MixedConstructorInit<'db> {
-    /// The expected instance type of the class being constructed, used to determine
-    /// whether the matched `__new__` overload is instance-returning.
-    ///
-    /// Instance-returning overloads have their `return_ty` explicitly set to this value
-    /// when building the mixed overload list (see `types.rs`), so equality comparison
-    /// is sufficient here.
-    instance_type: Type<'db>,
+    /// The class literal of the class being constructed, used to determine whether
+    /// the matched `__new__` overload is instance-returning by checking if its return
+    /// type is an instance of this class (or a subclass thereof).
+    constructor_class_literal: ClassLiteral<'db>,
     /// The `__init__` bindings to validate conditionally.
     init_bindings: Bindings<'db>,
 }
 
 impl<'db> MixedConstructorInit<'db> {
     /// Returns `true` if any matched overload is instance-returning (i.e., its return type
-    /// equals `self.instance_type`).
-    fn is_instance_returning(&self, elements: &[BindingsElement<'db>]) -> bool {
+    /// is an instance of the constructor class).
+    fn is_instance_returning(&self, db: &'db dyn Db, elements: &[BindingsElement<'db>]) -> bool {
         elements.iter().any(|element| {
             element.bindings.iter().any(|binding| {
-                binding
-                    .matching_overloads()
-                    .any(|(_, overload)| overload.return_ty == self.instance_type)
+                binding.matching_overloads().any(|(_, overload)| {
+                    overload
+                        .return_ty
+                        .as_nominal_instance()
+                        .is_some_and(|inst| {
+                            inst.class(db).class_literal(db) == self.constructor_class_literal
+                        })
+                })
             })
         })
     }
@@ -358,11 +360,11 @@ impl<'db> Bindings<'db> {
 
     pub(crate) fn set_mixed_constructor_init(
         &mut self,
-        instance_type: Type<'db>,
+        constructor_class_literal: ClassLiteral<'db>,
         init_bindings: Bindings<'db>,
     ) {
         self.mixed_constructor_init = Some(Box::new(MixedConstructorInit {
-            instance_type,
+            constructor_class_literal,
             init_bindings,
         }));
     }
@@ -544,7 +546,7 @@ impl<'db> Bindings<'db> {
         // For mixed `__new__` overloads: check `__init__` if matched overload is instance-returning.
         let mut init_error = false;
         if let Some(ref mut mixed_init) = self.mixed_constructor_init {
-            if mixed_init.is_instance_returning(&self.elements)
+            if mixed_init.is_instance_returning(db, &self.elements)
                 && mixed_init
                     .init_bindings
                     .check_types_impl(
@@ -799,7 +801,7 @@ impl<'db> Bindings<'db> {
 
         // Report `__init__` diagnostics for mixed constructor overloads
         if let Some(ref mixed_init) = self.mixed_constructor_init {
-            if mixed_init.is_instance_returning(&self.elements) {
+            if mixed_init.is_instance_returning(context.db(), &self.elements) {
                 mixed_init.init_bindings.report_diagnostics(context, node);
             }
         }

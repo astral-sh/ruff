@@ -392,6 +392,30 @@ reveal_type(D(1))  # revealed: int
 reveal_type(D("foo"))  # revealed: D
 ```
 
+## Mixed generic `__new__` overloads should still validate `__init__`
+
+For generic classes, if an instance-returning `__new__` overload matches, we still need to validate
+`__init__` even when another overload returns a non-instance type.
+
+```py
+from typing import Generic, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: T) -> Self: ...
+    def __new__(cls, x: object) -> object: ...
+    def __init__(self, x: T, y: str) -> None: ...
+
+# The `T -> Self` overload is instance-returning, so `__init__` must also be checked.
+# error: [missing-argument]
+E("foo")
+```
+
 ## Constructor calls through `type[T]` with a bound TypeVar
 
 ```py
