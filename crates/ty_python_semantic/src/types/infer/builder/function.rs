@@ -21,12 +21,12 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            TypeInferenceBuilder, function_known_decorators,
+            TypeInferenceBuilder,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
             },
-            nearest_enclosing_function,
+            function_known_decorators, nearest_enclosing_function,
         },
         infer_definition_types, infer_scope_types, todo_type,
     },
@@ -184,7 +184,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         let decorator_inference = function_known_decorators(db, definition);
-        self.extend_definition(decorator_inference);
+        self.context.extend(decorator_inference.diagnostics());
+        self.expressions.extend(
+            decorator_inference
+                .expression_types()
+                .iter()
+                .map(|(expression, ty)| (*expression, *ty)),
+        );
 
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
@@ -193,7 +199,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut final_decorator = None;
 
         for decorator in decorator_list {
-            let decorator_type = decorator_inference.expression_type(&decorator.expression);
+            let decorator_type = decorator_inference
+                .expression_type(&decorator.expression)
+                .unwrap_or_else(Type::unknown);
             let decorator_function_decorator =
                 FunctionDecorators::from_decorator_type(db, decorator_type);
             function_decorators |= decorator_function_decorator;
