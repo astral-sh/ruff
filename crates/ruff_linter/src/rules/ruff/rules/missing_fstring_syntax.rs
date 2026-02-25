@@ -5,7 +5,6 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_literal::format::FormatSpec;
 use ruff_python_parser::{UnsupportedSyntaxErrorKind, parse_expression};
-use ruff_python_parser::error::FStringKind;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange};
@@ -209,9 +208,7 @@ fn should_be_fstring(
         let has_pep701 = parsed
             .unsupported_syntax_errors()
             .iter()
-            .any(|e| matches!(e.kind,
-                UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash | FStringKind::Comment)
-            ));
+            .any(|e| matches!(e.kind, UnsupportedSyntaxErrorKind::Pep701FString(_)));
         if has_pep701 {
             return false;
         }
