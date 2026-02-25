@@ -4095,10 +4095,28 @@ impl SequentMap {
         let post_constraint = match (lower, upper) {
             // Case 1
             (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
-                if !lower_typevar.is_same_typevar_as(db, upper_typevar) {
+                if lower_typevar.is_same_typevar_as(db, upper_typevar) {
+                    return;
+                }
+
+                // We always want to propagate `lower ≤ upper`, but we must do so using a
+                // canonical top-level typevar ordering.
+                //
+                // Example: if we learn `(A ≤ [T] ≤ B)`, this single-constraint propagation step
+                // should infer `A ≤ B`. Depending on ordering, we might need to encode that as
+                // either `(Never ≤ [A] ≤ B)` or `(A ≤ [B] ≤ object)`. Both render as `A ≤ B`,
+                // but they constrain different typevars and must be created in the orientation
+                // allowed by `can_be_bound_for`.
+                if upper_typevar.can_be_bound_for(db, builder, lower_typevar) {
                     Constraint::new(db, builder, lower_typevar, Type::Never, upper)
                 } else {
-                    return;
+                    Constraint::new(
+                        db,
+                        builder,
+                        upper_typevar,
+                        Type::TypeVar(lower_typevar),
+                        Type::object(),
+                    )
                 }
             }
 
@@ -4262,15 +4280,70 @@ impl SequentMap {
             _ => return,
         };
 
-        let post_constraint =
-            Constraint::new(db, builder, constrained_typevar, new_lower, new_upper);
-        self.add_pair_implication(
-            db,
-            builder,
-            left_constraint,
-            right_constraint,
-            post_constraint,
-        );
+        let mut post_constraints: SmallVec<[ConstraintId; 3]> = SmallVec::new();
+        let mut constrained_lower = new_lower;
+        let mut constrained_upper = new_upper;
+
+        // The transitive rule above gives us an intended post-condition
+        // `new_lower ≤ [constrained] ≤ new_upper`.
+        //
+        // If a top-level bound typevar is "earlier" than `constrained`, we cannot represent that
+        // directly as a bound on `constrained` without violating our canonical ordering.
+        // Instead, split it into equivalent canonical constraints by "moving" that bound onto the
+        // other typevar:
+        //
+        //   invalid lower  `L ≤ [C]`  ->  `(Never ≤ [L] ≤ C)` and drop `L` from C's lower bound
+        //   invalid upper  `[C] ≤ U`  ->  `(C ≤ [U] ≤ object)` and drop `U` from C's upper bound
+        //
+        // Example: if we derive `[A] ≤ T ≤ [B]` but `A`/`B` are not valid top-level bounds for
+        // `T` in this ordering, we emit two pair implications:
+        //   `(Never ≤ [A] ≤ T)` and `(T ≤ [B] ≤ object)`.
+        // This preserves the relationship while keeping all derived constraints canonical.
+        if let Type::TypeVar(lower_bound_typevar) = new_lower
+            && !lower_bound_typevar.can_be_bound_for(db, builder, constrained_typevar)
+        {
+            post_constraints.push(Constraint::new(
+                db,
+                builder,
+                lower_bound_typevar,
+                Type::Never,
+                Type::TypeVar(constrained_typevar),
+            ));
+            constrained_lower = Type::Never;
+        }
+
+        if let Type::TypeVar(upper_bound_typevar) = new_upper
+            && !upper_bound_typevar.can_be_bound_for(db, builder, constrained_typevar)
+        {
+            post_constraints.push(Constraint::new(
+                db,
+                builder,
+                upper_bound_typevar,
+                Type::TypeVar(constrained_typevar),
+                Type::object(),
+            ));
+            constrained_upper = Type::object();
+        }
+
+        if !(constrained_lower.is_never() && constrained_upper.is_object()) {
+            post_constraints.push(Constraint::new(
+                db,
+                builder,
+                constrained_typevar,
+                constrained_lower,
+                constrained_upper,
+            ));
+        }
+
+        for post_constraint in post_constraints {
+            self.add_pair_implication(
+                db,
+                builder,
+                left_constraint,
+                right_constraint,
+                post_constraint,
+            );
+        }
     }
 
     fn add_mutual_sequents_for_same_typevars<'db>(
@@ -4288,46 +4361,94 @@ impl SequentMap {
                 let right_constraint_data = builder.constraint_data(right_constraint);
                 let right_lower = right_constraint_data.lower;
                 let right_upper = right_constraint_data.upper;
-                let new_constraint = |bound_typevar: BoundTypeVarInstance<'db>,
-                                      right_lower: Type<'db>,
-                                      right_upper: Type<'db>| {
-                    let right_lower = if let Type::TypeVar(other_bound_typevar) = right_lower
-                        && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
-                    {
-                        Type::Never
-                    } else {
-                        right_lower
+                let new_constraints =
+                    |bound_typevar: BoundTypeVarInstance<'db>,
+                     right_lower: Type<'db>,
+                     right_upper: Type<'db>| {
+                        let right_lower = if let Type::TypeVar(other_bound_typevar) = right_lower
+                            && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
+                        {
+                            Type::Never
+                        } else {
+                            right_lower
+                        };
+                        let right_upper = if let Type::TypeVar(other_bound_typevar) = right_upper
+                            && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
+                        {
+                            Type::object()
+                        } else {
+                            right_upper
+                        };
+
+                        // Same idea as `add_mutual_sequents_for_different_typevars`: if a derived
+                        // post-condition for `[bound]` has top-level typevar bounds in the wrong
+                        // orientation, split it into equivalent canonical constraints instead of
+                        // dropping it.
+                        let mut post_constraints: SmallVec<[ConstraintId; 3]> = SmallVec::new();
+                        let mut constrained_lower = right_lower;
+                        let mut constrained_upper = right_upper;
+
+                        if let Type::TypeVar(lower_bound_typevar) = right_lower
+                            && !lower_bound_typevar.can_be_bound_for(db, builder, bound_typevar)
+                        {
+                            post_constraints.push(Constraint::new(
+                                db,
+                                builder,
+                                lower_bound_typevar,
+                                Type::Never,
+                                Type::TypeVar(bound_typevar),
+                            ));
+                            constrained_lower = Type::Never;
+                        }
+
+                        if let Type::TypeVar(upper_bound_typevar) = right_upper
+                            && !upper_bound_typevar.can_be_bound_for(db, builder, bound_typevar)
+                        {
+                            post_constraints.push(Constraint::new(
+                                db,
+                                builder,
+                                upper_bound_typevar,
+                                Type::TypeVar(bound_typevar),
+                                Type::object(),
+                            ));
+                            constrained_upper = Type::object();
+                        }
+
+                        if !(constrained_lower.is_never() && constrained_upper.is_object()) {
+                            post_constraints.push(Constraint::new(
+                                db,
+                                builder,
+                                bound_typevar,
+                                constrained_lower,
+                                constrained_upper,
+                            ));
+                        }
+
+                        post_constraints
                     };
-                    let right_upper = if let Type::TypeVar(other_bound_typevar) = right_upper
-                        && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
-                    {
-                        Type::object()
-                    } else {
-                        right_upper
-                    };
-                    Constraint::new(db, builder, bound_typevar, right_lower, right_upper)
-                };
-                let post_constraint = match (left_lower, left_upper) {
+                let post_constraints = match (left_lower, left_upper) {
                     (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
                         if bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
                     {
-                        new_constraint(bound_typevar, right_lower, right_upper)
+                        new_constraints(bound_typevar, right_lower, right_upper)
                     }
                     (Type::TypeVar(bound_typevar), _) => {
-                        new_constraint(bound_typevar, Type::Never, right_upper)
+                        new_constraints(bound_typevar, Type::Never, right_upper)
                     }
                     (_, Type::TypeVar(bound_typevar)) => {
-                        new_constraint(bound_typevar, right_lower, Type::object())
+                        new_constraints(bound_typevar, right_lower, Type::object())
                     }
                     _ => return,
                 };
-                self.add_pair_implication(
-                    db,
-                    builder,
-                    left_constraint,
-                    right_constraint,
-                    post_constraint,
-                );
+                for post_constraint in post_constraints {
+                    self.add_pair_implication(
+                        db,
+                        builder,
+                        left_constraint,
+                        right_constraint,
+                        post_constraint,
+                    );
+                }
             };
 
         try_one_direction(left_constraint, right_constraint);
