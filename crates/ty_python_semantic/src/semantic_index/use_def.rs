@@ -960,7 +960,7 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    fn push_definition_state(&mut self, state: DefinitionState<'db>) -> ScopedDefinitionId {
+    fn push_definition(&mut self, state: DefinitionState<'db>) -> ScopedDefinitionId {
         let def_id = self.all_definitions.push(state);
         let used_id = self.used_bindings.push(false);
         debug_assert_eq!(def_id, used_id);
@@ -1034,7 +1034,7 @@ impl<'db> UseDefMapBuilder<'db> {
         self.bindings_by_definition
             .insert(binding, bindings.clone());
 
-        let def_id = self.push_definition_state(DefinitionState::Defined(binding));
+        let def_id = self.push_definition(DefinitionState::Defined(binding));
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1282,7 +1282,7 @@ impl<'db> UseDefMapBuilder<'db> {
         place: ScopedPlaceId,
         declaration: Definition<'db>,
     ) {
-        let def_id = self.push_definition_state(DefinitionState::Defined(declaration));
+        let def_id = self.push_definition(DefinitionState::Defined(declaration));
 
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
@@ -1312,7 +1312,7 @@ impl<'db> UseDefMapBuilder<'db> {
     ) {
         // We don't need to store anything in self.bindings_by_declaration or
         // self.declarations_by_binding.
-        let def_id = self.push_definition_state(DefinitionState::Defined(definition));
+        let def_id = self.push_definition(DefinitionState::Defined(definition));
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1346,7 +1346,7 @@ impl<'db> UseDefMapBuilder<'db> {
     }
 
     pub(super) fn delete_binding(&mut self, place: ScopedPlaceId) {
-        let def_id = self.push_definition_state(DefinitionState::Deleted);
+        let def_id = self.push_definition(DefinitionState::Deleted);
         let place_state = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
@@ -1367,20 +1367,6 @@ impl<'db> UseDefMapBuilder<'db> {
         use_id: ScopedUseId,
         node_key: NodeKey,
     ) {
-        let bindings = match place {
-            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol].bindings(),
-            ScopedPlaceId::Member(member) => &mut self.member_states[member].bindings(),
-        };
-        // We have a use of a place; clone the current bindings for that place, and record them
-        // as the live bindings for this use.
-        let new_use = self.bindings_by_use.push(bindings.clone());
-        debug_assert_eq!(use_id, new_use);
-
-        let binding_definition_ids = bindings
-            .iter()
-            .map(|live_binding| live_binding.binding)
-            .collect::<Vec<_>>();
-        self.mark_definition_ids_used(binding_definition_ids.into_iter());
         let states = match place {
             ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
             ScopedPlaceId::Member(member) => &mut self.member_states[member],
