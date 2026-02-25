@@ -659,3 +659,196 @@ class MaybeEqWhile:
         def __eq__(self, other: MaybeEqWhile) -> bool:
             return True
 ```
+
+## Overloads with disjoint self types
+
+When a superclass method has overloads with different `self` type annotations, overloads whose
+`self` type is disjoint from the subclass should be ignored when checking method overrides.
+
+For example, `str.__iter__` has an overload with `self: LiteralString` that returns
+`Iterator[LiteralString]`. Since `LiteralString` must be an instance of exactly `str` (not a
+subclass), this overload is disjoint from any `str` subclass and should be ignored.
+
+```py
+from __future__ import annotations
+
+from collections.abc import Iterator
+
+class MyStr(str):
+    # This is valid: we only need to satisfy the `def __iter__(self) -> Iterator[str]` overload,
+    # not the `def __iter__(self: LiteralString) -> Iterator[LiteralString]` overload.
+    def __iter__(self) -> Iterator[str]:
+        raise NotImplementedError
+```
+
+When the self type in an overload refers to a class that is not `@final`, the overload must still be
+considered because a subclass could potentially be an instance of both the subclass and the self
+type class (through multiple inheritance).
+
+```py
+from collections.abc import Iterator
+from typing import overload
+
+class Foo:
+    @overload
+    def method(self: "Bar") -> Iterator[int]: ...
+    @overload
+    def method(self) -> Iterator[str]: ...
+    def method(self) -> Iterator[str] | Iterator[int]:
+        raise NotImplementedError
+
+class Bar: ...
+
+class Baz(Foo):
+    # error: [invalid-method-override] "Invalid override of method `method`"
+    def method(self) -> Iterator[str]:
+        raise NotImplementedError
+```
+
+However, when the self type class is marked as `@final`, the overload can be safely ignored because
+no subclass can also be an instance of the final class.
+
+```py
+from collections.abc import Iterator
+from typing import final, overload
+
+class Foo2:
+    @overload
+    def method(self: "FinalBar") -> Iterator[int]: ...
+    @overload
+    def method(self) -> Iterator[str]: ...
+    def method(self) -> Iterator[str] | Iterator[int]:
+        raise NotImplementedError
+
+@final
+class FinalBar: ...
+
+class Baz2(Foo2):
+    # This is valid: FinalBar is @final, so no subclass of Foo2 can also be a FinalBar.
+    # Therefore, the `self: FinalBar` overload is disjoint from any Foo2 subclass.
+    def method(self) -> Iterator[str]:
+        raise NotImplementedError
+```
+
+The same filtering applies to `@classmethod` overloads with self-type constraints. When the `cls`
+type parameter references a `@final` class, the overload can be safely ignored:
+
+```py
+from collections.abc import Iterator
+from typing import final, overload
+
+class Base:
+    @overload
+    @classmethod
+    def make(cls: "type[FinalOther]") -> Iterator[int]: ...
+    @overload
+    @classmethod
+    def make(cls) -> Iterator[str]: ...
+    @classmethod
+    def make(cls) -> Iterator[str] | Iterator[int]:
+        raise NotImplementedError
+
+@final
+class FinalOther: ...
+
+class Sub(Base):
+    # This is valid: FinalOther is @final, so no subclass of Base can also be FinalOther.
+    @classmethod
+    def make(cls) -> Iterator[str]:
+        raise NotImplementedError
+```
+
+When the `cls` type parameter references a non-`@final` class, the overload must still be considered
+because a subclass could potentially be a subclass of both the base class and the `cls` type class
+(through multiple inheritance):
+
+```py
+from collections.abc import Iterator
+from typing import overload
+
+class Base2:
+    @overload
+    @classmethod
+    def make(cls: "type[NonFinalOther]") -> Iterator[int]: ...
+    @overload
+    @classmethod
+    def make(cls) -> Iterator[str]: ...
+    @classmethod
+    def make(cls) -> Iterator[str] | Iterator[int]:
+        raise NotImplementedError
+
+class NonFinalOther: ...
+
+class Sub2(Base2):
+    @classmethod
+    def make(cls) -> Iterator[str]:  # error: [invalid-method-override]
+        raise NotImplementedError
+```
+
+When all overloads have disjoint self types (unlikely but possible edge case), the base class
+effectively has no applicable signature for the subclass, so any override is allowed:
+
+```py
+from collections.abc import Iterator
+from typing import final, overload
+
+@final
+class FinalA: ...
+
+@final
+class FinalB: ...
+
+class Base3:
+    @overload
+    @classmethod
+    def make(cls: type[FinalA]) -> Iterator[int]: ...
+    @overload
+    @classmethod
+    def make(cls: type[FinalB]) -> Iterator[str]: ...
+    @classmethod
+    def make(cls) -> Iterator[str] | Iterator[int]:
+        raise NotImplementedError
+
+class Sub3(Base3):
+    # No error: all overloads are disjoint from Sub3, so the base class
+    # effectively has no applicable method for Sub3 to override.
+    @classmethod
+    def make(cls) -> Iterator[str]:
+        raise NotImplementedError
+```
+
+The same filtering should apply to generic classes. When a base class has an overload with a
+specialized self type (e.g., `self: Base[int]`), subclasses that specialize to a different type
+parameter should ideally ignore that overload. However, the self-type annotation currently resolves
+to a union containing a `Todo` placeholder, which prevents the disjointness check from filtering the
+overload:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from collections.abc import Iterator
+from typing import overload
+
+class Base[T]:
+    @overload
+    def method(self: "Base[int]") -> Iterator[int]: ...
+    @overload
+    def method(self) -> Iterator[str]: ...
+    def method(self) -> Iterator[str] | Iterator[int]:
+        raise NotImplementedError
+
+class Sub(Base[str]):
+    # TODO: this should not be an error, since `Base[int]` is disjoint from `Sub`
+    # (which inherits from `Base[str]`). Currently, the self-type annotation `Base[int]`
+    # resolves with a `Todo` placeholder that prevents disjointness detection.
+    def method(self) -> Iterator[str]:  # error: [invalid-method-override]
+        raise NotImplementedError
+
+class SubInt(Base[int]):
+    # error: [invalid-method-override]
+    def method(self) -> Iterator[str]:
+        raise NotImplementedError
+```
