@@ -14,8 +14,9 @@ use crate::semantic_index::{
 use crate::types::IntersectionType;
 use crate::types::{
     CallableType, FunctionDecorators, InvalidTypeExpression, InvalidTypeExpressionError,
-    TypeDefinition, TypeQualifiers, generics::typing_self,
-    infer::{function_known_decorators, nearest_enclosing_class},
+    TypeDefinition, TypeQualifiers,
+    generics::typing_self,
+    infer::{function_known_decorator_flags, nearest_enclosing_class},
 };
 use ruff_db::files::File;
 use strum_macros::EnumString;
@@ -696,7 +697,7 @@ impl SpecialFormType {
                     }
 
                     binding_definition.name(db).as_deref() != Some("__new__")
-                        && function_known_decorators(db, binding_definition)
+                        && function_known_decorator_flags(db, binding_definition)
                             .contains(FunctionDecorators::STATICMETHOD)
                 });
                 if in_staticmethod {
@@ -711,7 +712,11 @@ impl SpecialFormType {
                 let is_in_metaclass = KnownClass::Type
                     .to_class_literal(db)
                     .to_class_type(db)
-                    .is_some_and(|type_class| class.is_subclass_of(db, None, type_class));
+                    .is_some_and(|type_class| {
+                        class
+                            .default_specialization(db)
+                            .is_subclass_of(db, type_class)
+                    });
                 if is_in_metaclass {
                     return Err(InvalidTypeExpressionError {
                         fallback_type: Type::unknown(),
