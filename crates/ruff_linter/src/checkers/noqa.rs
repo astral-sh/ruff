@@ -201,7 +201,6 @@ pub(crate) fn check_noqa(
 
                     if !(disabled_codes.is_empty()
                         && duplicated_codes.is_empty()
-                        && unknown_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
                         let edit = if valid_codes.is_empty() {
@@ -230,10 +229,6 @@ pub(crate) fn check_noqa(
                                         .map(|code| (*code).to_string())
                                         .collect(),
                                     duplicated: duplicated_codes
-                                        .iter()
-                                        .map(|code| (*code).to_string())
-                                        .collect(),
-                                    unknown: unknown_codes
                                         .iter()
                                         .map(|code| (*code).to_string())
                                         .collect(),
