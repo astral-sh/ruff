@@ -6996,7 +6996,7 @@ impl<'db> Type<'db> {
                     Some(TypeDefinition::TypeVar(var.definition(db)?))
                 }
                 KnownInstanceType::TypeAliasType(type_alias) => {
-                    type_alias.definition(db).map(TypeDefinition::TypeAlias)
+                    Some(TypeDefinition::TypeAlias(type_alias.definition(db)))
                 }
                 KnownInstanceType::NewType(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
                 _ => None,
@@ -7633,9 +7633,7 @@ impl<'db> KnownInstanceType<'db> {
                 Self::SubscriptedGeneric(context.normalized_impl(db, visitor))
             }
             Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized_impl(db, visitor)),
-            Self::TypeAliasType(type_alias) => {
-                Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
-            }
+            Self::TypeAliasType(type_alias) => Self::TypeAliasType(type_alias),
             Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
             Self::UnionType(instance) => Self::UnionType(instance.normalized_impl(db, visitor)),
             Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
@@ -7673,9 +7671,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(deprecated) => Some(Self::Deprecated(deprecated)),
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
-            Self::TypeAliasType(type_alias) => type_alias
-                .recursive_type_normalized_impl(db, div)
-                .map(Self::TypeAliasType),
+            Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::Field),
@@ -12038,10 +12034,6 @@ impl<'db> PEP695TypeAliasType<'db> {
                 GenericContext::from_type_params(db, index, definition, type_params)
             })
     }
-
-    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
-        self
-    }
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
@@ -12103,17 +12095,6 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     }
 }
 
-impl<'db> ManualPEP695TypeAliasType<'db> {
-    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
-        self
-    }
-
-    #[allow(clippy::unnecessary_wraps)]
-    fn recursive_type_normalized_impl(self, _db: &'db dyn Db, _div: Type<'db>) -> Option<Self> {
-        Some(self)
-    }
-}
-
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update, get_size2::GetSize,
 )]
@@ -12143,26 +12124,6 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeAliasType<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            TypeAliasType::PEP695(type_alias) => {
-                TypeAliasType::PEP695(type_alias.normalized_impl(db, visitor))
-            }
-            TypeAliasType::ManualPEP695(type_alias) => {
-                TypeAliasType::ManualPEP695(type_alias.normalized_impl(db, visitor))
-            }
-        }
-    }
-
-    fn recursive_type_normalized_impl(self, db: &'db dyn Db, div: Type<'db>) -> Option<Self> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => Some(TypeAliasType::PEP695(type_alias)),
-            TypeAliasType::ManualPEP695(type_alias) => Some(TypeAliasType::ManualPEP695(
-                type_alias.recursive_type_normalized_impl(db, div)?,
-            )),
-        }
-    }
-
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
@@ -12170,10 +12131,10 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
-            TypeAliasType::ManualPEP695(type_alias) => Some(type_alias.definition(db)),
+            TypeAliasType::PEP695(type_alias) => type_alias.definition(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
         }
     }
 
@@ -12259,10 +12220,7 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// For example, calling this method on a type alias `D` inside a class `C` in module `a.b`
     /// would return `["a", "b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
-        let Some(definition) = self.type_alias.definition(self.db) else {
-            return vec![];
-        };
-
+        let definition = self.type_alias.definition(self.db);
         let file = definition.file(self.db);
         let file_scope_id = definition.file_scope(self.db);
 
