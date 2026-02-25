@@ -3223,7 +3223,7 @@ impl<'db> StaticClassLiteral<'db> {
                         //     def __gt__(self, other): return not (self == other or self < other)
                         // If `__lt__` returns `int`, then `__gt__` could return `int | bool`.
                         let return_ty =
-                            UnionType::from_elements(db, [signature.return_ty, bool_ty]);
+                            UnionType::from_two_elements(db, signature.return_ty, bool_ty);
                         Signature::new_generic(
                             signature.generic_context,
                             signature.parameters().clone(),
@@ -3500,7 +3500,11 @@ impl<'db> StaticClassLiteral<'db> {
 
                 // This could probably be `weakref | None`, but it does not seem important enough to
                 // model it precisely.
-                Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
+                Some(UnionType::from_two_elements(
+                    db,
+                    Type::any(),
+                    Type::none(db),
+                ))
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
@@ -3734,7 +3738,7 @@ impl<'db> StaticClassLiteral<'db> {
                             if field.is_required() {
                                 field.declared_ty
                             } else {
-                                UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
+                                UnionType::from_two_elements(db, field.declared_ty, Type::none(db))
                             },
                         );
 
@@ -3760,9 +3764,10 @@ impl<'db> StaticClassLiteral<'db> {
                             if field.is_required() {
                                 field.declared_ty
                             } else {
-                                UnionType::from_elements(
+                                UnionType::from_two_elements(
                                     db,
-                                    [field.declared_ty, Type::TypeVar(t_default)],
+                                    field.declared_ty,
+                                    Type::TypeVar(t_default),
                                 )
                             },
                         );
@@ -3781,7 +3786,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(KnownClass::Str.to_instance(db)),
                                 ],
                             ),
-                            UnionType::from_elements(db, [Type::unknown(), Type::none(db)]),
+                            UnionType::from_two_elements(db, Type::unknown(), Type::none(db)),
                         )
                     }))
                     .chain(std::iter::once({
@@ -3804,9 +3809,10 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            UnionType::from_elements(
+                            UnionType::from_two_elements(
                                 db,
-                                [Type::unknown(), Type::TypeVar(t_default)],
+                                Type::unknown(),
+                                Type::TypeVar(t_default),
                             ),
                         )
                     }));
@@ -3864,9 +3870,10 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            UnionType::from_elements(
+                            UnionType::from_two_elements(
                                 db,
-                                [field.declared_ty, Type::TypeVar(t_default)],
+                                field.declared_ty,
+                                Type::TypeVar(t_default),
                             ),
                         );
 
@@ -4702,9 +4709,10 @@ impl<'db> StaticClassLiteral<'db> {
                             } else {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_elements(
+                                        ty: UnionType::from_two_elements(
                                             db,
-                                            [declared_ty, implicit_ty],
+                                            declared_ty,
+                                            implicit_ty,
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
@@ -4764,9 +4772,10 @@ impl<'db> StaticClassLiteral<'db> {
                             {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_elements(
+                                        ty: UnionType::from_two_elements(
                                             db,
-                                            [declared_ty, implicit_ty],
+                                            declared_ty,
+                                            implicit_ty,
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,

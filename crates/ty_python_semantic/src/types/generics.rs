@@ -1373,7 +1373,7 @@ impl<'db> Specialization<'db> {
             .zip(other.types(db))
             .map(|(self_type, other_type)| match (self_type, other_type) {
                 (unknown, known) | (known, unknown) if unknown.is_unknown() => *known,
-                _ => UnionType::from_elements(db, [self_type, other_type]),
+                _ => UnionType::from_two_elements(db, *self_type, *other_type),
             })
             .collect();
         // TODO: Combine the tuple specs too
@@ -1869,7 +1869,7 @@ impl<'db> SpecializationBuilder<'db> {
                     return;
                 }
 
-                *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
+                *entry.get_mut() = UnionType::from_two_elements(self.db, *entry.get(), ty);
             }
             Entry::Vacant(entry) => {
                 entry.insert(ty);

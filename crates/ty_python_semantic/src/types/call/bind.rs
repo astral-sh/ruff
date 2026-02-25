@@ -1415,7 +1415,7 @@ impl<'db> Bindings<'db> {
                             };
 
                             let union_with_default =
-                                |ty| UnionType::from_elements(db, [ty, default]);
+                                |ty| UnionType::from_two_elements(db, ty, default);
 
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
@@ -3802,7 +3802,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if let Some(existing) = self.parameter_tys[parameter_index].replace(argument_type) {
             // We already verified in `match_parameters` that we only match multiple arguments
             // with variadic parameters.
-            let union = UnionType::from_elements(self.db, [existing, argument_type]);
+            let union = UnionType::from_two_elements(self.db, existing, argument_type);
             self.parameter_tys[parameter_index] = Some(union);
         }
     }
