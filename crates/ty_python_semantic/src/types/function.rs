@@ -395,6 +395,15 @@ impl<'db> OverloadLiteral<'db> {
             return None;
         }
 
+        // These can both happen in edge cases where a definition created with a `def`
+        // statement shadows a non-`def` symbol with the same name.
+        if previous_overload.name(db) != self.name(db) {
+            return None;
+        }
+        if previous_overload.definition(db).scope(db) != scope {
+            return None;
+        }
+
         Some(previous_literal)
     }
 
