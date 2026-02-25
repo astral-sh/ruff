@@ -2117,7 +2117,7 @@ declare_lint! {
     /// [total_ordering]: https://docs.python.org/3/library/functools.html#functools.total_ordering
     pub(crate) static SUBCLASS_OF_DATACLASS_WITH_ORDER = {
         summary: "detects subclasses of dataclasses with `order=True`",
-        status: LintStatus::stable("0.0.17"),
+        status: LintStatus::stable("0.0.19"),
         default_level: Level::Warn,
     }
 }

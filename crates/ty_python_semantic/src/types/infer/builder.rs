@@ -1080,46 +1080,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             base_is_frozen,
                         );
                     }
+                }
 
-                    if let Some(base_dataclass_params) =
-                        base_class_literal.dataclass_params(self.db())
-                    {
-                        let base_flags = base_dataclass_params.flags(self.db());
+                if base_class.has_dataclass_param(self.db(), DataclassFlags::ORDER) {
+                    // Suppress the diagnostic if the child class overrides all comparison
+                    // methods, since the user has explicitly fixed the LSP violation.
+                    // This includes the case where the child class also has `order=True`,
+                    // which generates all four comparison methods.
+                    let comparison_methods = ["__lt__", "__le__", "__gt__", "__ge__"];
+                    let child_has_order = class_kind.is_some_and(|kind| {
+                        class.has_dataclass_param(self.db(), kind, DataclassFlags::ORDER)
+                    });
+                    let all_overridden = child_has_order
+                        || comparison_methods.iter().all(|method| {
+                            !class
+                                .own_class_member(self.db(), None, None, method)
+                                .is_undefined()
+                        });
 
-                        if base_flags.contains(DataclassFlags::ORDER) {
-                            // Suppress the diagnostic if the child class overrides all comparison
-                            // methods, since the user has explicitly fixed the LSP violation.
-                            // This includes the case where the child class also has `order=True`,
-                            // which generates all four comparison methods.
-                            let comparison_methods = ["__lt__", "__le__", "__gt__", "__ge__"];
-                            let child_has_order = class
-                                .dataclass_params(self.db())
-                                .is_some_and(|p| {
-                                    p.flags(self.db()).contains(DataclassFlags::ORDER)
-                                });
-                            let all_overridden = child_has_order
-                                || comparison_methods.iter().all(|method| {
-                                    !class
-                                        .own_class_member(self.db(), None, None, method)
-                                        .is_undefined()
-                                });
-
-                            if !all_overridden {
-                                if let Some(builder) = self.context.report_lint(
-                                    &SUBCLASS_OF_DATACLASS_WITH_ORDER,
-                                    &class_node.bases()[i],
-                                ) {
-                                    let mut diagnostic = builder.into_diagnostic(format_args!(
-                                        "Class `{}` inherits from dataclass `{}` which has `order=True`",
-                                        class.name(self.db()),
-                                        base_class.name(self.db()),
-                                    ));
-                                    diagnostic.info(
-                                        "Comparison of instances of the child class with instances \
-                                        of the parent class will raise `TypeError` at runtime",
-                                    );
-                                }
-                            }
+                    if !all_overridden {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, &class_node.bases()[i])
+                        {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Class `{}` inherits from dataclass `{}` which has `order=True`",
+                                class.name(self.db()),
+                                base_class.name(self.db()),
+                            ));
+                            diagnostic.info(
+                                "Comparison of instances of the child class with instances \
+                                of the parent class will raise `TypeError` at runtime",
+                            );
                         }
                     }
                 }

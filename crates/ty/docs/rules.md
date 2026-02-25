@@ -3196,7 +3196,7 @@ static_assert(int(2.0 * 3.0) == 6)  # error: does not have a statically known tr
 
 <small>
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.17">0.0.17</a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.19">0.0.19</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20subclass-of-dataclass-with-order" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2086" target="_blank">View source</a>
 </small>
