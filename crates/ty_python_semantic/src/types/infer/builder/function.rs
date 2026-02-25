@@ -21,7 +21,7 @@ use crate::{
         },
         generics::{enclosing_generic_contexts, typing_self},
         infer::{
-            TypeInferenceBuilder,
+            TypeInferenceBuilder, function_known_decorators,
             builder::{
                 DeclaredAndInferredType, DeferredExpressionState, TypeAndRange,
                 validate_paramspec_components,
@@ -183,6 +183,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
 
+        let decorator_inference = function_known_decorators(db, definition);
+        self.extend_definition(decorator_inference);
+
         let mut decorator_types_and_nodes = Vec::with_capacity(decorator_list.len());
         let mut function_decorators = FunctionDecorators::empty();
         let mut deprecated = None;
@@ -190,7 +193,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut final_decorator = None;
 
         for decorator in decorator_list {
-            let decorator_type = self.infer_decorator(decorator);
+            let decorator_type = decorator_inference.expression_type(&decorator.expression);
             let decorator_function_decorator =
                 FunctionDecorators::from_decorator_type(db, decorator_type);
             function_decorators |= decorator_function_decorator;
