@@ -227,6 +227,23 @@ def f(x: IntAndT[str]) -> None:
     reveal_type(x)  # revealed: Unknown
 ```
 
+### Generic value binds type variables to alias definition
+
+```py
+from typing import Generic
+from typing_extensions import TypeAliasType, TypeVar
+
+T = TypeVar("T", bound=int)
+A = TypeAliasType("A", tuple[T], type_params=(T,))
+
+S = TypeVar("S", bound=tuple[int])
+
+class C(Generic[S]):
+    pass
+
+x: C[A]
+```
+
 ### Error cases
 
 #### Name is not a string literal
