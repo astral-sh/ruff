@@ -6,7 +6,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 +linter.unresolved_target_version = 3.11
 
 --- Summary ---
-Removed: 2
+Removed: 4
 Added: 0
 
 --- Removed ---
@@ -34,17 +34,60 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 RUF027 [*] Possible f-string without an `f` prefix
-  --> RUF027_0.py:92:11
+  --> RUF027_0.py:85:9
    |
-90 | def backslash_test():
-91 |     x = "test"
-92 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+83 | def escaped_format_spec():
+84 |     a = 4
+85 |     b = "{a:\x64}"  # RUF027
+   |         ^^^^^^^^^^
+86 |     c = "{a:\n}"  # RUF027 - newline in format spec is valid via custom __format__
+   |
+help: Add `f` prefix
+82 | 
+83 | def escaped_format_spec():
+84 |     a = 4
+   -     b = "{a:\x64}"  # RUF027
+85 +     b = f"{a:\x64}"  # RUF027
+86 |     c = "{a:\n}"  # RUF027 - newline in format spec is valid via custom __format__
+87 | 
+88 | # Regression test for parser bug
+note: This is an unsafe fix and may change runtime behavior
+
+
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_0.py:86:9
+   |
+84 |     a = 4
+85 |     b = "{a:\x64}"  # RUF027
+86 |     c = "{a:\n}"  # RUF027 - newline in format spec is valid via custom __format__
+   |         ^^^^^^^^
+87 |
+88 | # Regression test for parser bug
+   |
+help: Add `f` prefix
+83 | def escaped_format_spec():
+84 |     a = 4
+85 |     b = "{a:\x64}"  # RUF027
+   -     c = "{a:\n}"  # RUF027 - newline in format spec is valid via custom __format__
+86 +     c = f"{a:\n}"  # RUF027 - newline in format spec is valid via custom __format__
+87 | 
+88 | # Regression test for parser bug
+89 | # https://github.com/astral-sh/ruff/issues/18860
+note: This is an unsafe fix and may change runtime behavior
+
+
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_0.py:97:11
+   |
+95 | def backslash_test():
+96 |     x = "test"
+97 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
    |           ^^^^^^^^^^^^^^^^^^
    |
 help: Add `f` prefix
-89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
-90 | def backslash_test():
-91 |     x = "test"
+94 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
+95 | def backslash_test():
+96 |     x = "test"
    -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
-92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+97 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
 note: This is an unsafe fix and may change runtime behavior
