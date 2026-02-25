@@ -44,7 +44,7 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
@@ -110,37 +110,52 @@ fn definition_cycle_initial<'db>(
 pub(crate) fn function_known_decorators<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> DefinitionInference<'db> {
+) -> FunctionDecoratorInference<'db> {
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
-        .finish_function_decorator_types()
+        .finish_function_decorator_inference()
 }
 
 pub(crate) fn function_known_decorator_flags<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
 ) -> FunctionDecorators {
-    let DefinitionKind::Function(function) = definition.kind(db) else {
-        return FunctionDecorators::empty();
-    };
+    function_known_decorators(db, definition).known_decorators()
+}
 
-    let file = definition.file(db);
-    let module = parsed_module(db, file).load(db);
-    let decorator_inference = function_known_decorators(db, definition);
+/// A compact inference result for function decorators.
+///
+/// Unlike [`DefinitionInference`], this stores only decorator expression types and
+/// diagnostics, plus precomputed known-decorator flags.
+#[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
+pub(crate) struct FunctionDecoratorInference<'db> {
+    expression_types: FxHashMap<ExpressionNodeKey, Type<'db>>,
+    known_decorators: FunctionDecorators,
+    diagnostics: TypeCheckDiagnostics,
+}
 
-    function.node(&module).decorator_list.iter().fold(
-        FunctionDecorators::empty(),
-        |decorators, decorator| {
-            decorators
-                | FunctionDecorators::from_decorator_type(
-                    db,
-                    decorator_inference.expression_type(&decorator.expression),
-                )
-        },
-    )
+impl<'db> FunctionDecoratorInference<'db> {
+    pub(crate) fn expression_type(
+        &self,
+        expression: impl Into<ExpressionNodeKey>,
+    ) -> Option<Type<'db>> {
+        self.expression_types.get(&expression.into()).copied()
+    }
+
+    pub(crate) fn expression_types(&self) -> &FxHashMap<ExpressionNodeKey, Type<'db>> {
+        &self.expression_types
+    }
+
+    pub(crate) fn known_decorators(&self) -> FunctionDecorators {
+        self.known_decorators
+    }
+
+    pub(crate) fn diagnostics(&self) -> &TypeCheckDiagnostics {
+        &self.diagnostics
+    }
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
