@@ -12046,12 +12046,8 @@ impl<'db> PEP695TypeAliasType<'db> {
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
 ///
-/// Unlike [`PEP695TypeAliasType`], the value type is NOT stored in the struct. Instead,
-/// it is computed lazily via [`ManualPEP695TypeAliasType::value_type()`]. This prevents
-/// Salsa cycle non-convergence when mutually recursive `TypeAliasType` definitions
-/// reference each other (e.g. `A = TypeAliasType('A', Union[str, 'B'])`,
-/// `B = TypeAliasType('B', list[A])`), since the interned struct's identity does not
-/// depend on the value type.
+/// The value type is computed lazily via [`ManualPEP695TypeAliasType::value_type()`]
+/// to avoid cycle non-convergence for mutually recursive definitions.
 ///
 /// # Ordering
 /// Ordering is based on the type alias's salsa-assigned id and not on its values.

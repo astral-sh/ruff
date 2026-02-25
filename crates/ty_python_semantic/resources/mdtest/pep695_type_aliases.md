@@ -237,8 +237,29 @@ from typing_extensions import TypeAliasType
 def get_name() -> str:
     return "IntOrStr"
 
-# error: [invalid-type-alias-type] "The name of a `typing.TypeAlias` must be a string literal"
+# error: [invalid-type-alias-type] "The first argument to `TypeAliasType` must be a string literal"
 IntOrStr = TypeAliasType(get_name(), int | str)
+```
+
+#### Name does not match variable
+
+```py
+from typing_extensions import TypeAliasType
+
+# error: [invalid-type-alias-type] "The name of a `TypeAliasType` (`WrongName`) must match the name of the variable it is assigned to (`IntOrStr`)"
+IntOrStr = TypeAliasType("WrongName", int | str)
+```
+
+#### Not a simple variable assignment
+
+`TypeAliasType` must be used in a simple variable assignment. Using it as a standalone expression or
+in a tuple unpacking is not supported.
+
+```py
+from typing_extensions import TypeAliasType
+
+# error: [invalid-type-alias-type] "A `TypeAliasType` definition must be a simple variable assignment"
+TypeAliasType("IntOrStr", int | str)
 ```
 
 ### Mutually recursive `TypeAliasType` definitions
