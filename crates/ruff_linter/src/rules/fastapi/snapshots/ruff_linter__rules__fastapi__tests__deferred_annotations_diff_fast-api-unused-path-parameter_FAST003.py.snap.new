@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
+assertion_line: 41
 ---
 --- Linter settings ---
 -linter.unresolved_target_version = 3.13
@@ -75,21 +76,21 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_init_and_call_instance` signature
-   --> FAST003.py:351:19
+   --> FAST003.py:353:19
     |
-349 | # Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
-350 | # `__call__`, which has `other` — not `thing_id`.
-351 | @app.get("/things/{thing_id}")
+351 | # (the instance was already constructed).
+352 | # Actually this should be an error since __call__ has `other`, not `thing_id`.
+353 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-352 | async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
+354 | async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
     |
 help: Add `thing_id` to function signature
-349 | # Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
-350 | # `__call__`, which has `other` — not `thing_id`.
-351 | @app.get("/things/{thing_id}")
+351 | # (the instance was already constructed).
+352 | # Actually this should be an error since __call__ has `other`, not `thing_id`.
+353 | @app.get("/things/{thing_id}")
     - async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
-352 + async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())], thing_id): ...
-353 | 
-354 | 
-355 | # OK: class with no __init__ and no __call__ (unknown dependency, no diagnostic)
+354 + async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())], thing_id): ...
+355 | 
+356 | 
+357 | # OK: class with no __init__ and no __call__ (unknown dependency, no diagnostic)
 note: This is an unsafe fix and may change runtime behavior

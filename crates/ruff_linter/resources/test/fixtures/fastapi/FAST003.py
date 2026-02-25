@@ -303,7 +303,9 @@ async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
 
 # https://github.com/astral-sh/ruff/issues/23526
 
-# OK: callable class dependency with __call__ method
+# Error: `Depends(CallableQuery)` passes the class itself, so FastAPI uses
+# `__init__` (which has no params here), not `__call__`. The path parameter
+# `thing_id` is unused.
 class CallableQuery:
     def __call__(self, thing_id: int):
         pass
@@ -313,7 +315,14 @@ class CallableQuery:
 async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)]): ...
 
 
-# OK: class with both __init__ and __call__
+# OK: `Depends(CallableQuery())` passes an instance, so FastAPI uses `__call__`,
+# which declares `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_instance(query: Annotated[str, Depends(CallableQuery())]): ...
+
+
+# OK: class with both __init__ and __call__, passed as class reference.
+# FastAPI uses `__init__`, which declares `thing_id`.
 class InitAndCallQuery:
     def __init__(self, thing_id: int):
         pass
@@ -326,7 +335,8 @@ class InitAndCallQuery:
 async def read_thing_init_and_call_dep(query: Annotated[str, Depends(InitAndCallQuery)]): ...
 
 
-# Error: callable class dependency where path param is not in __call__
+# Error: `Depends(CallableQueryOther)` — class reference, uses `__init__` (no
+# params). `thing_id` is unused.
 class CallableQueryOther:
     def __call__(self, other: str):
         pass
@@ -334,6 +344,12 @@ class CallableQueryOther:
 
 @app.get("/things/{thing_id}")
 async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
+
+
+# Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
+# `__call__`, which has `other` — not `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
 
 
 # OK: class with no __init__ and no __call__ (unknown dependency, no diagnostic)
