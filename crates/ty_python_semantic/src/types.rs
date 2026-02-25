@@ -119,7 +119,6 @@ mod special_form;
 mod string_annotation;
 mod subclass_of;
 mod tuple;
-mod type_ordering;
 mod typed_dict;
 mod unpacker;
 mod variance;
@@ -12645,9 +12644,6 @@ pub(crate) trait TypeGuardLike<'db>: Copy {
     /// Get the return type that the type guard narrows to
     fn return_type(self, db: &'db dyn Db) -> Type<'db>;
 
-    /// Get the place info (scope and place ID) if bound
-    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)>;
-
     /// Get the human-readable place name if bound
     fn place_name(self, db: &'db dyn Db) -> Option<String>;
 
@@ -12663,10 +12659,6 @@ impl<'db> TypeGuardLike<'db> for TypeIsType<'db> {
 
     fn return_type(self, db: &'db dyn Db) -> Type<'db> {
         TypeIsType::return_type(self, db)
-    }
-
-    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)> {
-        TypeIsType::place_info(self, db)
     }
 
     fn place_name(self, db: &'db dyn Db) -> Option<String> {
@@ -12687,10 +12679,6 @@ impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
 
     fn return_type(self, db: &'db dyn Db) -> Type<'db> {
         TypeGuardType::return_type(self, db)
-    }
-
-    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)> {
-        TypeGuardType::place_info(self, db)
     }
 
     fn place_name(self, db: &'db dyn Db) -> Option<String> {
