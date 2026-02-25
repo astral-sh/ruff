@@ -819,6 +819,8 @@ fn extract_typed_dict_keys<'db>(
         Type::Dynamic(_)
         | Type::Never
         | Type::FunctionLiteral(_)
+        | Type::ClassMethodLiteral(_)
+        | Type::StaticMethodLiteral(_)
         | Type::BoundMethod(_)
         | Type::KnownBoundMethod(_)
         | Type::WrapperDescriptor(_)

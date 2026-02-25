@@ -316,6 +316,8 @@ impl<'db> AllMembers<'db> {
             Type::LiteralValue(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::BoundMethod(_)
             | Type::KnownBoundMethod(_)
             | Type::WrapperDescriptor(_)

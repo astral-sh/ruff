@@ -1061,7 +1061,11 @@ impl<'db> ClassType<'db> {
             defining_class: ClassType<'db>,
         ) -> Option<AbstractMethodKind> {
             match ty {
-                Type::FunctionLiteral(function) => function.as_abstract_method(db, defining_class),
+                Type::FunctionLiteral(function)
+                | Type::ClassMethodLiteral(function)
+                | Type::StaticMethodLiteral(function) => {
+                    function.as_abstract_method(db, defining_class)
+                }
                 Type::BoundMethod(method) => {
                     method.function(db).as_abstract_method(db, defining_class)
                 }
@@ -1814,7 +1818,9 @@ impl<'db> ClassType<'db> {
         let dunder_new_signature = dunder_new_function_symbol
             .and_then(|place_and_quals| place_and_quals.ignore_possibly_undefined())
             .and_then(|ty| match ty {
-                Type::FunctionLiteral(function) => Some(function.signature(db)),
+                Type::FunctionLiteral(function)
+                | Type::ClassMethodLiteral(function)
+                | Type::StaticMethodLiteral(function) => Some(function.signature(db)),
                 Type::Callable(callable) => Some(callable.signatures(db)),
                 _ => None,
             });
@@ -1864,7 +1870,9 @@ impl<'db> ClassType<'db> {
             dunder_init_function_symbol
         {
             let signature = match ty {
-                Type::FunctionLiteral(dunder_init_function) => {
+                Type::FunctionLiteral(dunder_init_function)
+                | Type::ClassMethodLiteral(dunder_init_function)
+                | Type::StaticMethodLiteral(dunder_init_function) => {
                     Some(dunder_init_function.signature(db))
                 }
                 Type::Callable(callable) => Some(callable.signatures(db)),
@@ -1936,7 +1944,10 @@ impl<'db> ClassType<'db> {
                     .place;
 
                 if let Place::Defined(DefinedPlace {
-                    ty: Type::FunctionLiteral(mut new_function),
+                    ty:
+                        Type::FunctionLiteral(mut new_function)
+                        | Type::ClassMethodLiteral(mut new_function)
+                        | Type::StaticMethodLiteral(mut new_function),
                     ..
                 }) = new_function_symbol
                 {
@@ -3133,10 +3144,12 @@ impl<'db> StaticClassLiteral<'db> {
             match (inherited_generic_context, ty, specialization, name) {
                 (
                     Some(generic_context),
-                    Type::FunctionLiteral(function),
+                    Type::FunctionLiteral(function)
+                    | Type::ClassMethodLiteral(function)
+                    | Type::StaticMethodLiteral(function),
                     Some(_),
                     "__new__" | "__init__",
-                ) => Type::FunctionLiteral(
+                ) => ty.rewrap_function_literal(
                     function.with_inherited_generic_context(db, generic_context),
                 ),
                 _ => ty,
@@ -4025,7 +4038,11 @@ impl<'db> StaticClassLiteral<'db> {
             let symbol = table.symbol(symbol_id);
             let name = symbol.name();
 
-            let Some(Type::FunctionLiteral(literal)) = attr.place.ignore_possibly_undefined()
+            let Some(
+                Type::FunctionLiteral(literal)
+                | Type::ClassMethodLiteral(literal)
+                | Type::StaticMethodLiteral(literal),
+            ) = attr.place.ignore_possibly_undefined()
             else {
                 continue;
             };

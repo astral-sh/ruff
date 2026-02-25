@@ -2457,6 +2457,8 @@ fn completion_kind_from_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Comp
     ) -> Option<CompletionKind> {
         Some(match ty {
             Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::DataclassDecorator(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)

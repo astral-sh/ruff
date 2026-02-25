@@ -710,6 +710,10 @@ pub enum Type<'db> {
     Never,
     /// A specific function object
     FunctionLiteral(FunctionType<'db>),
+    /// A `@classmethod`-decorated function object
+    ClassMethodLiteral(FunctionType<'db>),
+    /// A `@staticmethod`-decorated function object
+    StaticMethodLiteral(FunctionType<'db>),
     /// Represents a callable `instance.method` where `instance` is an instance of a class
     /// and `method` is a method (of that class).
     ///
@@ -865,7 +869,11 @@ impl<'db> Type<'db> {
     /// because their `Self` binding is deferred to call time via the signature binding path.
     fn supports_self_binding(&self, db: &'db dyn Db) -> bool {
         match self {
-            Type::FunctionLiteral(_) | Type::BoundMethod(_) | Type::KnownBoundMethod(_) => false,
+            Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
+            | Type::BoundMethod(_)
+            | Type::KnownBoundMethod(_) => false,
             Type::Callable(callable) if callable.is_function_like(db) => false,
             _ => self.contains_self(db),
         }
@@ -923,10 +931,11 @@ impl<'db> Type<'db> {
             // of our type inference machinery that assume that we infer a single FunctionLiteral
             // type for each overload of each function definition.
             (Type::FunctionLiteral(prev_function), Type::FunctionLiteral(curr_function))
-                if prev_function.definition(db) == curr_function.definition(db) =>
-            {
-                self
-            }
+            | (Type::ClassMethodLiteral(prev_function), Type::ClassMethodLiteral(curr_function))
+            | (
+                Type::StaticMethodLiteral(prev_function),
+                Type::StaticMethodLiteral(curr_function),
+            ) if prev_function.definition(db) == curr_function.definition(db) => self,
 
             _ => {
                 // Also avoid unioning in a previous type which contains a Divergent from the
@@ -1070,7 +1079,9 @@ impl<'db> Type<'db> {
     pub fn is_type_check_only(&self, db: &'db dyn Db) -> bool {
         match self {
             Type::ClassLiteral(class_literal) => class_literal.type_check_only(db),
-            Type::FunctionLiteral(f) => {
+            Type::FunctionLiteral(f)
+            | Type::ClassMethodLiteral(f)
+            | Type::StaticMethodLiteral(f) => {
                 f.has_known_decorator(db, FunctionDecorators::TYPE_CHECK_ONLY)
             }
             _ => false,
@@ -1080,7 +1091,9 @@ impl<'db> Type<'db> {
     /// Returns whether this type is marked as deprecated via `@warnings.deprecated`.
     pub fn is_deprecated(&self, db: &'db dyn Db) -> bool {
         match self {
-            Type::FunctionLiteral(f) => f.implementation_deprecated(db).is_some(),
+            Type::FunctionLiteral(f)
+            | Type::ClassMethodLiteral(f)
+            | Type::StaticMethodLiteral(f) => f.implementation_deprecated(db).is_some(),
             Type::ClassLiteral(c) => c.deprecated(db).is_some(),
             _ => false,
         }
@@ -1465,7 +1478,9 @@ impl<'db> Type<'db> {
 
     pub(crate) const fn as_function_literal(self) -> Option<FunctionType<'db>> {
         match self {
-            Type::FunctionLiteral(function_type) => Some(function_type),
+            Type::FunctionLiteral(function_type)
+            | Type::ClassMethodLiteral(function_type)
+            | Type::StaticMethodLiteral(function_type) => Some(function_type),
             _ => None,
         }
     }
@@ -1478,7 +1493,24 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) const fn is_function_literal(&self) -> bool {
-        matches!(self, Type::FunctionLiteral(..))
+        matches!(
+            self,
+            Type::FunctionLiteral(..)
+                | Type::ClassMethodLiteral(..)
+                | Type::StaticMethodLiteral(..)
+        )
+    }
+
+    /// Given a function-literal-like `Type`, wrap the given [`FunctionType`] in the same variant.
+    ///
+    /// Panics if `self` is not a function-literal-like variant.
+    fn rewrap_function_literal(self, new_function: FunctionType<'db>) -> Type<'db> {
+        match self {
+            Type::FunctionLiteral(_) => Type::FunctionLiteral(new_function),
+            Type::ClassMethodLiteral(_) => Type::ClassMethodLiteral(new_function),
+            Type::StaticMethodLiteral(_) => Type::StaticMethodLiteral(new_function),
+            _ => panic!("rewrap_function_literal called on non-function-literal type"),
+        }
     }
 
     pub(crate) fn as_string_literal(self) -> Option<StringLiteralType<'db>> {
@@ -1639,6 +1671,8 @@ impl<'db> Type<'db> {
             | Type::SpecialForm(_)
             | Type::BoundSuper(_)
             | Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypeVar(_)
@@ -1706,6 +1740,8 @@ impl<'db> Type<'db> {
             | Type::TypeGuard(_)
             | Type::PropertyInstance(_)
             | Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::ModuleLiteral(_)
             | Type::WrapperDescriptor(_)
             | Type::DataclassDecorator(_)
@@ -1758,12 +1794,9 @@ impl<'db> Type<'db> {
         // report look better until we have proper bidirectional type inference.
         match self {
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
-            // Note: this intentionally returns `FunctionType` for all FunctionLiterals,
-            // including classmethods and staticmethods. Using `fallback_class()` here
-            // would introduce Salsa dependencies that break generic type inference.
-            // Classmethod/staticmethod subtype checks against NominalInstance targets
-            // are handled by a dedicated arm in `has_relation_to_impl` instead.
             Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
+            Type::ClassMethodLiteral(_) => Some(KnownClass::Classmethod.to_instance(db)),
+            Type::StaticMethodLiteral(_) => Some(KnownClass::Staticmethod.to_instance(db)),
             Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
             _ => None,
         }
@@ -1787,7 +1820,9 @@ impl<'db> Type<'db> {
         match self {
             Type::LiteralValue(literal) if literal.is_promotable() => literal.fallback_instance(db),
             Type::ModuleLiteral(_) => KnownClass::ModuleType.to_instance(db),
-            Type::FunctionLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
+            Type::FunctionLiteral(literal)
+            | Type::ClassMethodLiteral(literal)
+            | Type::StaticMethodLiteral(literal) => Type::Callable(literal.into_callable_type(db)),
             _ => self,
         }
     }
@@ -1825,8 +1860,10 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => {
                 visitor.visit(self, || instance.normalized_impl(db, visitor))
             }
-            Type::FunctionLiteral(function) => visitor.visit(self, || {
-                Type::FunctionLiteral(function.normalized_impl(db, visitor))
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => visitor.visit(self, || {
+                self.rewrap_function_literal(function.normalized_impl(db, visitor))
             }),
             Type::PropertyInstance(property) => visitor.visit(self, || {
                 Type::PropertyInstance(property.normalized_impl(db, visitor))
@@ -1952,9 +1989,11 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => instance
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::NominalInstance),
-            Type::FunctionLiteral(function) => function
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => function
                 .recursive_type_normalized_impl(db, div, nested)
-                .map(Type::FunctionLiteral),
+                .map(|f| self.rewrap_function_literal(f)),
             Type::PropertyInstance(property) => property
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::PropertyInstance),
@@ -2019,6 +2058,8 @@ impl<'db> Type<'db> {
         match self {
             Type::Never
             | Type::FunctionLiteral(..)
+            | Type::ClassMethodLiteral(..)
+            | Type::StaticMethodLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -2063,7 +2104,9 @@ impl<'db> Type<'db> {
                 Signature::dynamic(self),
             ))),
 
-            Type::FunctionLiteral(function_literal) => {
+            Type::FunctionLiteral(function_literal)
+            | Type::ClassMethodLiteral(function_literal)
+            | Type::StaticMethodLiteral(function_literal) => {
                 Some(CallableTypes::one(function_literal.into_callable_type(db)))
             }
             Type::BoundMethod(bound_method) => {
@@ -2356,6 +2399,8 @@ impl<'db> Type<'db> {
             Type::SubclassOf(..) => false,
             Type::BoundSuper(..) => false,
             Type::FunctionLiteral(..)
+            | Type::ClassMethodLiteral(..)
+            | Type::StaticMethodLiteral(..)
             | Type::WrapperDescriptor(..)
             | Type::ClassLiteral(..)
             | Type::GenericAlias(..)
@@ -2424,6 +2469,8 @@ impl<'db> Type<'db> {
     pub(crate) fn is_single_valued(self, db: &'db dyn Db) -> bool {
         match self {
             Type::FunctionLiteral(..)
+            | Type::ClassMethodLiteral(..)
+            | Type::StaticMethodLiteral(..)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -2614,6 +2661,8 @@ impl<'db> Type<'db> {
                 .find_name_in_mro_with_policy(db, name, policy),
 
             Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::Callable(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
@@ -2732,8 +2781,13 @@ impl<'db> Type<'db> {
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
-            Type::FunctionLiteral(function) => function
-                .fallback_class(db)
+            Type::FunctionLiteral(_) => KnownClass::FunctionType
+                .to_instance(db)
+                .instance_member(db, name),
+            Type::ClassMethodLiteral(_) => KnownClass::Classmethod
+                .to_instance(db)
+                .instance_member(db, name),
+            Type::StaticMethodLiteral(_) => KnownClass::Staticmethod
                 .to_instance(db)
                 .instance_member(db, name),
 
@@ -2874,18 +2928,21 @@ impl<'db> Type<'db> {
                     ))
                 };
             }
-            Type::FunctionLiteral(function) if function.is_classmethod(db) => {
-                // For classmethod FunctionLiterals, model the behavior of `classmethod.__get__`.
-                // The function is bound to the owner class.
+            Type::ClassMethodLiteral(function) => {
+                // Model the behavior of `classmethod.__get__`:
+                // the function is bound to the owner class.
                 return Some((
                     Type::BoundMethod(BoundMethodType::new(db, function, owner)),
                     AttributeKind::NormalOrNonDataDescriptor,
                 ));
             }
-            Type::FunctionLiteral(function) if function.is_staticmethod(db) => {
-                // For staticmethod FunctionLiterals, model the behavior of `staticmethod.__get__`.
-                // The underlying function is returned as-is, without binding self.
-                return Some((self, AttributeKind::NormalOrNonDataDescriptor));
+            Type::StaticMethodLiteral(function) => {
+                // Model the behavior of `staticmethod.__get__`:
+                // the underlying function is returned as-is, without binding self.
+                return Some((
+                    Type::FunctionLiteral(function),
+                    AttributeKind::NormalOrNonDataDescriptor,
+                ));
             }
             Type::FunctionLiteral(function) if instance.is_some_and(|ty| ty.is_none(db)) => {
                 // When the instance is of type `None` (`NoneType`), we must handle
@@ -3278,14 +3335,26 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(..) | Type::Never => Place::bound(self).into(),
 
-            Type::FunctionLiteral(function) if name == "__get__" => Place::bound(
-                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderGet(function)),
-            )
-            .into(),
-            Type::FunctionLiteral(function) if name == "__call__" => Place::bound(
-                Type::KnownBoundMethod(KnownBoundMethodType::FunctionTypeDunderCall(function)),
-            )
-            .into(),
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function)
+                if name == "__get__" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::FunctionTypeDunderGet(function),
+                ))
+                .into()
+            }
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function)
+                if name == "__call__" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::FunctionTypeDunderCall(function),
+                ))
+                .into()
+            }
             Type::PropertyInstance(property) if name == "__get__" => Place::bound(
                 Type::KnownBoundMethod(KnownBoundMethodType::PropertyDunderGet(property)),
             )
@@ -3559,6 +3628,8 @@ impl<'db> Type<'db> {
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
+            | Type::ClassMethodLiteral(..)
+            | Type::StaticMethodLiteral(..)
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeIs(..)
@@ -3866,6 +3937,8 @@ impl<'db> Type<'db> {
             }
 
             Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::BoundMethod(_)
             | Type::WrapperDescriptor(_)
             | Type::KnownBoundMethod(_)
@@ -4137,7 +4210,9 @@ impl<'db> Type<'db> {
             )
             .into(),
 
-            Type::FunctionLiteral(function_type) => match function_type.known(db) {
+            Type::FunctionLiteral(function_type)
+            | Type::ClassMethodLiteral(function_type)
+            | Type::StaticMethodLiteral(function_type) => match function_type.known(db) {
                 Some(
                     KnownFunction::IsEquivalentTo
                     | KnownFunction::IsAssignableTo
@@ -5516,6 +5591,8 @@ impl<'db> Type<'db> {
                 Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
                 Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_)
                 | Type::GenericAlias(_)
                 | Type::BoundMethod(_)
                 | Type::KnownBoundMethod(_)
@@ -5894,6 +5971,8 @@ impl<'db> Type<'db> {
                 Some(Type::object())
             }
             Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::Callable(..)
             | Type::KnownBoundMethod(_)
             | Type::BoundMethod(_)
@@ -5959,6 +6038,8 @@ impl<'db> Type<'db> {
             | Type::DataclassTransformer(_)
             | Type::Never
             | Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::BoundSuper(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
@@ -6136,7 +6217,9 @@ impl<'db> Type<'db> {
                     KnownClass::Str.to_class_literal(db)
                 }
             },
-            Type::FunctionLiteral(function) => function.fallback_class(db).to_class_literal(db),
+            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
+            Type::ClassMethodLiteral(_) => KnownClass::Classmethod.to_class_literal(db),
+            Type::StaticMethodLiteral(_) => KnownClass::Staticmethod.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::KnownBoundMethod(method) => method.class().to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
@@ -6335,25 +6418,17 @@ impl<'db> Type<'db> {
                 },
             }
 
-            Type::FunctionLiteral(function) => visitor.visit(self, || {
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => visitor.visit(self, || {
+                let mapped = function.apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                 match type_mapping {
                     // Promote the types within the signature before promoting the signature to its
                     // callable form.
                     TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => {
-                        Type::FunctionLiteral(function.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            visitor,
-                        ))
-                        .promote_literals_impl(db)
+                        self.rewrap_function_literal(mapped).promote_literals_impl(db)
                     }
-                    _ => Type::FunctionLiteral(function.apply_type_mapping_impl(
-                        db,
-                        type_mapping,
-                        tcx,
-                        visitor,
-                    )),
+                    _ => self.rewrap_function_literal(mapped),
                 }
             }),
 
@@ -6620,7 +6695,9 @@ impl<'db> Type<'db> {
                 }
             }
 
-            Type::FunctionLiteral(function) => {
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => {
                 visitor.visit(self, || {
                     function.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
                 });
@@ -6915,7 +6992,9 @@ impl<'db> Type<'db> {
             Self::BoundMethod(method) => {
                 Some(TypeDefinition::Function(method.function(db).definition(db)))
             }
-            Self::FunctionLiteral(function) => {
+            Self::FunctionLiteral(function)
+            | Self::ClassMethodLiteral(function)
+            | Self::StaticMethodLiteral(function) => {
                 Some(TypeDefinition::Function(function.definition(db)))
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
@@ -7012,7 +7091,11 @@ impl<'db> Type<'db> {
         parameter_index: Option<usize>,
     ) -> Option<(Span, Span)> {
         match self {
-            Type::FunctionLiteral(function) => Some(function.parameter_span(db, parameter_index)),
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => {
+                Some(function.parameter_span(db, parameter_index))
+            }
             Type::BoundMethod(bound_method) => Some(
                 bound_method
                     .function(db)
@@ -7041,7 +7124,9 @@ impl<'db> Type<'db> {
     /// a diagnostic.
     fn function_spans(&self, db: &'db dyn Db) -> Option<FunctionSpans> {
         match self {
-            Type::FunctionLiteral(function) => Some(function.spans(db)),
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => Some(function.spans(db)),
             Type::BoundMethod(bound_method) => Some(bound_method.function(db).spans(db)),
             _ => None,
         }
@@ -7089,7 +7174,9 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         let v = match self {
             Type::ClassLiteral(class_literal) => class_literal.variance_of(db, typevar),
 
-            Type::FunctionLiteral(function_type) => {
+            Type::FunctionLiteral(function_type)
+            | Type::ClassMethodLiteral(function_type)
+            | Type::StaticMethodLiteral(function_type) => {
                 // TODO: do we need to replace self?
                 function_type.signature(db).variance_of(db, typevar)
             }
@@ -8043,7 +8130,12 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
-                    InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
+                    InvalidTypeExpression::InvalidType(
+                        Type::FunctionLiteral(function)
+                        | Type::ClassMethodLiteral(function)
+                        | Type::StaticMethodLiteral(function),
+                        _,
+                    ) => {
                         write!(
                             f,
                             "Function `{function}` is not valid in a type expression",
@@ -8115,7 +8207,12 @@ impl<'db> InvalidTypeExpression<'db> {
         // but currently doing this would require reimplementing the signature "manually"
         // in `Type::bindings()`, which isn't worth it given that we have no other special
         // casing for this function.
-        } else if let InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) = self
+        } else if let InvalidTypeExpression::InvalidType(
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function),
+            _,
+        ) = self
             && function.name(db) == "callable"
             && let function_body_scope = function.literal(db).last_definition(db).body_scope(db)
             && function_body_scope

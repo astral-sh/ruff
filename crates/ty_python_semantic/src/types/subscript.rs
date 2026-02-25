@@ -640,6 +640,8 @@ impl<'db> Type<'db> {
 
             (
                 Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_)
                 | Type::WrapperDescriptor(_)
                 | Type::BoundMethod(_)
                 | Type::DataclassDecorator(_)

@@ -1003,9 +1003,7 @@ fn cached_protocol_interface<'db>(
                 {
                     ProtocolMemberKind::Method(callable)
                 }
-                Type::FunctionLiteral(function)
-                    if function.is_staticmethod(db) || function.is_classmethod(db) =>
-                {
+                Type::ClassMethodLiteral(_) | Type::StaticMethodLiteral(_) => {
                     ProtocolMemberKind::Other(todo_type!(
                         "classmethod and staticmethod protocol members"
                     ))

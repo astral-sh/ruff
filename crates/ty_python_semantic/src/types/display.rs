@@ -959,7 +959,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::KnownInstance(known_instance) => known_instance
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::FunctionLiteral(function) => function
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => function
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
             Type::Callable(callable) => callable
@@ -2686,6 +2688,8 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             ty if should_parenthesize_callable_type(ty, self.db) => write_parentheses(f),
             Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::BoundMethod(_)
             | Type::Union(_) => write_parentheses(f),
             Type::Intersection(intersection) if !intersection.has_one_element(self.db) => {

@@ -570,6 +570,12 @@ impl<'db> BoundSuperType<'db> {
             Type::FunctionLiteral(_) | Type::DataclassDecorator(_) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));
             }
+            Type::ClassMethodLiteral(_) => {
+                return delegate_to(KnownClass::Classmethod.to_instance(db));
+            }
+            Type::StaticMethodLiteral(_) => {
+                return delegate_to(KnownClass::Staticmethod.to_instance(db));
+            }
             Type::WrapperDescriptor(_) => {
                 return delegate_to(KnownClass::WrapperDescriptorType.to_instance(db));
             }

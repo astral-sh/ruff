@@ -127,7 +127,10 @@ pub(crate) fn enum_metadata<'db>(
                 }
                 Place::Defined(DefinedPlace { ty, .. }) => {
                     let special_case = match ty {
-                        Type::Callable(_) | Type::FunctionLiteral(_) => {
+                        Type::Callable(_)
+                        | Type::FunctionLiteral(_)
+                        | Type::ClassMethodLiteral(_)
+                        | Type::StaticMethodLiteral(_) => {
                             // Some types are specifically disallowed for enum members.
                             return None;
                         }

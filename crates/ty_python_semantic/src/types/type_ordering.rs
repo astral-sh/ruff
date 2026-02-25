@@ -92,6 +92,14 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::FunctionLiteral(_), _) => Ordering::Less,
         (_, Type::FunctionLiteral(_)) => Ordering::Greater,
 
+        (Type::ClassMethodLiteral(left), Type::ClassMethodLiteral(right)) => left.cmp(right),
+        (Type::ClassMethodLiteral(_), _) => Ordering::Less,
+        (_, Type::ClassMethodLiteral(_)) => Ordering::Greater,
+
+        (Type::StaticMethodLiteral(left), Type::StaticMethodLiteral(right)) => left.cmp(right),
+        (Type::StaticMethodLiteral(_), _) => Ordering::Less,
+        (_, Type::StaticMethodLiteral(_)) => Ordering::Greater,
+
         (Type::BoundMethod(left), Type::BoundMethod(right)) => left.cmp(right),
         (Type::BoundMethod(_), _) => Ordering::Less,
         (_, Type::BoundMethod(_)) => Ordering::Greater,
