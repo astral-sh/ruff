@@ -235,6 +235,8 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
+        let unnecessary = unused_binding_diagnostics(db, file);
+
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
         // to unwind with a salsa cancellation next.
@@ -251,8 +253,6 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
 
             state.report_progress(&self.work_done);
         }
-
-        let unnecessary = unused_binding_diagnostics(db, file);
 
         // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
         // which also handles the case where a file no longer has diagnostics because
