@@ -763,12 +763,23 @@ impl<'db> BoundSuperType<'db> {
                     disjointness_visitor,
                 ),
             (ClassBase::Class(_), _) => ConstraintSet::from(false),
+
+            // A `Divergent` type is only equivalent to itself
+            (
+                ClassBase::Dynamic(DynamicType::Divergent(l)),
+                ClassBase::Dynamic(DynamicType::Divergent(r)),
+            ) => ConstraintSet::from(l == r),
+            (ClassBase::Dynamic(DynamicType::Divergent(_)), _)
+            | (_, ClassBase::Dynamic(DynamicType::Divergent(_))) => ConstraintSet::from(false),
             (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => ConstraintSet::from(true),
             (ClassBase::Dynamic(_), _) => ConstraintSet::from(false),
+
             (ClassBase::Generic, ClassBase::Generic) => ConstraintSet::from(true),
             (ClassBase::Generic, _) => ConstraintSet::from(false),
+
             (ClassBase::Protocol, ClassBase::Protocol) => ConstraintSet::from(true),
             (ClassBase::Protocol, _) => ConstraintSet::from(false),
+
             (ClassBase::TypedDict, ClassBase::TypedDict) => ConstraintSet::from(true),
             (ClassBase::TypedDict, _) => ConstraintSet::from(false),
         };
@@ -784,6 +795,7 @@ impl<'db> BoundSuperType<'db> {
                     disjointness_visitor,
                 ),
             (SuperOwnerKind::Class(_), _) => ConstraintSet::from(false),
+
             (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => Type::from(left)
                 .when_equivalent_to_impl(
                     db,
@@ -792,8 +804,17 @@ impl<'db> BoundSuperType<'db> {
                     disjointness_visitor,
                 ),
             (SuperOwnerKind::Instance(_), _) => ConstraintSet::from(false),
+
+            // A `Divergent` type is only equivalent to itself
+            (
+                SuperOwnerKind::Dynamic(DynamicType::Divergent(l)),
+                SuperOwnerKind::Dynamic(DynamicType::Divergent(r)),
+            ) => ConstraintSet::from(l == r),
+            (SuperOwnerKind::Dynamic(DynamicType::Divergent(_)), _)
+            | (_, SuperOwnerKind::Dynamic(DynamicType::Divergent(_))) => ConstraintSet::from(false),
             (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => ConstraintSet::from(true),
             (SuperOwnerKind::Dynamic(_), _) => ConstraintSet::from(false),
+
             (
                 SuperOwnerKind::InstanceTypeVar(l_typevar, l_class),
                 SuperOwnerKind::InstanceTypeVar(r_typevar, r_class),
