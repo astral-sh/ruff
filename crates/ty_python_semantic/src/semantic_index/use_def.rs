@@ -417,9 +417,16 @@ impl<'db> UseDefMap<'db> {
         db: &dyn crate::Db,
         reachability: ScopedReachabilityConstraintId,
     ) -> bool {
+        self.evaluate_reachability(db, reachability).may_be_true()
+    }
+
+    pub(crate) fn evaluate_reachability(
+        &self,
+        db: &dyn crate::Db,
+        reachability: ScopedReachabilityConstraintId,
+    ) -> crate::types::Truthiness {
         self.reachability_constraints
             .evaluate(db, &self.predicates, reachability)
-            .may_be_true()
     }
 
     pub(crate) fn definition(&self, id: ScopedDefinitionId) -> DefinitionState<'db> {

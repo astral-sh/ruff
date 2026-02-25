@@ -141,6 +141,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
+    registry.register_lint(&REDUNDANT_FINAL_CLASSVAR);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
@@ -2679,6 +2680,32 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for redundant combinations of the `ClassVar` and `Final` type qualifiers.
+    ///
+    /// ## Why is this bad?
+    /// An attribute that is marked `Final` in a class body is implicitly a class variable.
+    /// Marking it as `ClassVar` is therefore redundant.
+    ///
+    /// Note that this diagnostic is not emitted for dataclass fields, where
+    /// `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import ClassVar, Final
+    ///
+    /// class C:
+    ///     x: ClassVar[Final[int]] = 1  # redundant
+    ///     y: Final[ClassVar[int]] = 1  # redundant
+    /// ```
+    pub(crate) static REDUNDANT_FINAL_CLASSVAR = {
+        summary: "detects redundant combinations of `ClassVar` and `Final`",
+        status: LintStatus::stable("0.0.18"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Detects variables declared as `global` in an inner scope that have no explicit
     /// bindings or declarations in the global scope.
     ///
@@ -3899,7 +3926,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
 pub(crate) fn report_invalid_argument_number_to_special_form(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
-    special_form: SpecialFormType,
+    special_form: impl Into<SpecialFormType>,
     received_arguments: usize,
     expected_arguments: u8,
 ) {
@@ -3912,6 +3939,7 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
         builder.into_diagnostic(format_args!(
             "Special form `{special_form}` expected exactly {expected_arguments} {noun}, \
             got {received_arguments}",
+            special_form = special_form.into(),
         ));
     }
 }

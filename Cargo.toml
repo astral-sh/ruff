@@ -57,11 +57,11 @@ ty_test = { path = "crates/ty_test" }
 ty_vendored = { path = "crates/ty_vendored" }
 
 aho-corasick = { version = "1.1.3" }
-anstream = { version = "0.6.18" }
+anstream = { version = "1.0.0" }
 anstyle = { version = "1.0.10" }
 anyhow = { version = "1.0.80" }
 arc-swap = { version = "1.7.1" }
-argfile = { version = "0.2.0" }
+argfile = { version = "1.0.0" }
 assert_fs = { version = "1.1.0" }
 bincode = { version = "2.0.0" }
 bitflags = { version = "2.5.0" }
@@ -173,7 +173,7 @@ serde_with = { version = "3.6.0", default-features = false, features = [
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.4.0", features = ["inline"] }
 smallvec = { version = "1.13.2", features = ["union", "const_generics", "const_new"] }
-snapbox = { version = "0.6.0", features = [
+snapbox = { version = "1.0.0", features = [
     "diff",
     "term-svg",
     "cmd",
@@ -188,7 +188,7 @@ tempfile = { version = "3.9.0" }
 test-case = { version = "3.3.1" }
 thiserror = { version = "2.0.0" }
 tikv-jemallocator = { version = "0.6.0" }
-toml = { version = "0.9.0" }
+toml = { version = "1.0.0" }
 tracing = { version = "0.1.40" }
 tracing-flame = { version = "0.2.0" }
 tracing-indicatif = { version = "0.3.11" }
@@ -199,7 +199,7 @@ tracing-subscriber = { version = "0.3.18", default-features = false, features = 
     "ansi",
     "smallvec",
 ] }
-tryfn = { version = "0.2.1" }
+tryfn = { version = "1.0.0" }
 typed-arena = { version = "2.0.2" }
 unic-ucd-category = { version = "0.9" }
 unicode-ident = { version = "1.0.12" }

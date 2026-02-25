@@ -271,3 +271,17 @@ def bar():
     # v was reassigned, so any narrowing shouldn't apply
     reveal_type(v)  # revealed: int | None
 ```
+
+## Narrowing preserved when `await`ing a `NoReturn` function in one branch
+
+```py
+from typing import NoReturn
+
+async def stop() -> NoReturn:
+    raise NotImplementedError
+
+async def main(val: int | None):
+    if val is None:
+        await stop()
+    reveal_type(val)  # revealed: int
+```

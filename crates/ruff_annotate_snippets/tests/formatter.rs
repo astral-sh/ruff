@@ -1029,3 +1029,19 @@ error
     let renderer = Renderer::plain().term_width(18).cut_indicator("…");
     assert_data_eq!(renderer.render(input).to_string(), expected);
 }
+
+#[test]
+fn leading_nbsp_no_overflow() {
+    // Regression test: an annotation pointing at leading whitespace caused a
+    // subtraction overflow in Margin::compute because `label_right` can be less
+    // than `whitespace_left`. See https://github.com/astral-sh/ty/issues/836
+    let source = " \u{00A0}                                     'betting_env.datastructure.team_lineup.Tamheet.get_latest': ( 'dataStrcuture/team_lineup.htm#teamsheet.getlatest',";
+    let input = Level::Error.title("test").snippet(
+        Snippet::source(source)
+            .line_start(1)
+            .annotation(Level::Error.span(0..1)),
+    );
+    // Should not panic.
+    let renderer = Renderer::plain();
+    let _ = renderer.render(input).to_string();
+}
