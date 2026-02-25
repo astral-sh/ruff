@@ -907,26 +907,17 @@ impl DefinitionKind<'_> {
             DefinitionKind::MatchPattern(match_pattern) => {
                 match_pattern.identifier.node(module).range()
             }
-            DefinitionKind::ExceptHandler(handler) => handler.node(module).range(),
+            DefinitionKind::ExceptHandler(handler) => handler
+                .node(module)
+                .name
+                .as_ref()
+                .map_or_else(|| handler.node(module).range(), Ranged::range),
             DefinitionKind::TypeVar(type_var) => type_var.node(module).name.range(),
             DefinitionKind::ParamSpec(param_spec) => param_spec.node(module).name.range(),
             DefinitionKind::TypeVarTuple(type_var_tuple) => {
                 type_var_tuple.node(module).name.range()
             }
             DefinitionKind::LoopHeader(loop_header) => loop_header.range(module),
-        }
-    }
-
-    /// Returns the best target range for binding-oriented diagnostics.
-    ///
-    /// Most definition kinds use [`Self::target_range`], but some kinds require
-    /// special handling to point at the exact bound name.
-    pub(crate) fn binding_name_range(&self, module: &ParsedModuleRef) -> Option<TextRange> {
-        match self {
-            DefinitionKind::ExceptHandler(handler) => {
-                handler.node(module).name.as_ref().map(Ranged::range)
-            }
-            _ => Some(self.target_range(module)),
         }
     }
 

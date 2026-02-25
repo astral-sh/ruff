@@ -564,7 +564,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 let place_table = &self.place_tables[scope_id];
                 let symbol_id = place_table.symbol_id(name)?;
                 let symbol = place_table.symbol(symbol_id);
-                (symbol.is_bound() || symbol.is_declared()).then_some(scope_id)
+
+                // Only a true local binding in an ancestor scope can be the resolution target.
+                // `global`/`nonlocal` here are forwarding declarations, not owning bindings.
+                symbol.is_local().then_some(scope_id)
             })
     }
 
@@ -1558,8 +1561,8 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
-        self.sweep_nonlocal_lazy_snapshots();
         self.mark_captured_bindings_used();
+        self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 
         assert_eq!(&self.current_assignments, &[]);
