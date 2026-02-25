@@ -129,9 +129,7 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut diagnostic = checker.report_diagnostic(NoneNotAtEndOfUnion, union.range());
 
     // Skip fix for nested unions to avoid flattening.
-    if !has_nested_union(semantic, union)
-        && !other_exprs.is_empty()
-    {
+    if !has_nested_union(semantic, union) && !other_exprs.is_empty() {
         let nodes: Vec<&Expr> = other_exprs.iter().chain(&none_exprs).copied().collect();
         if let Some(fix) = generate_fix(checker, nodes, union, is_pep604) {
             diagnostic.set_fix(fix);
