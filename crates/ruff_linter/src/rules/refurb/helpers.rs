@@ -113,6 +113,14 @@ impl OpenMode {
             OpenMode::WriteBytes => Name::new_static("write_bytes"),
         }
     }
+
+    fn is_read(self) -> bool {
+        matches!(self, OpenMode::ReadText | OpenMode::ReadBytes)
+    }
+
+    fn is_binary(self) -> bool {
+        matches!(self, OpenMode::ReadBytes | OpenMode::WriteBytes)
+    }
 }
 
 /// A grab bag struct that joins together every piece of information we need to track
@@ -178,15 +186,16 @@ impl Ranged for OpenArgument<'_> {
 }
 
 /// Find and return all `open` operations in the given `with` statement.
-pub(super) fn find_file_opens<'a, 'b>(
+pub(super) fn find_file_opens<'a>(
     with: &'a ast::StmtWith,
-    checker: &Checker<'b>,
+    checker: &Checker<'_>,
     read_mode: bool,
 ) -> Vec<FileOpen<'a>> {
     let semantic = checker.semantic();
     let python_version = checker.target_version();
     let with_parent = semantic.current_statement_parent();
     let module_body = checker.parsed.suite();
+    let following_statements = following_statements_after_with(with, with_parent, module_body);
 
     with.items
         .iter()
@@ -197,8 +206,7 @@ pub(super) fn find_file_opens<'a, 'b>(
                 checker,
                 read_mode,
                 python_version,
-                with_parent,
-                module_body,
+                following_statements,
             )
             .or_else(|| {
                 find_path_open(
@@ -207,8 +215,7 @@ pub(super) fn find_file_opens<'a, 'b>(
                     checker,
                     read_mode,
                     python_version,
-                    with_parent,
-                    module_body,
+                    following_statements,
                 )
             })
         })
@@ -219,31 +226,12 @@ fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
     checker: &Checker,
-    read_mode: bool,
-    with_parent: Option<&ast::Stmt>,
-    module_body: &[ast::Stmt],
+    following_statements: Option<&[ast::Stmt]>,
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
     argument: OpenArgument<'a>,
 ) -> Option<FileOpen<'a>> {
     let semantic = checker.semantic();
-
-    match mode {
-        OpenMode::ReadText | OpenMode::ReadBytes => {
-            if !read_mode {
-                return None;
-            }
-        }
-        OpenMode::WriteText | OpenMode::WriteBytes => {
-            if read_mode {
-                return None;
-            }
-        }
-    }
-
-    if matches!(mode, OpenMode::ReadBytes | OpenMode::WriteBytes) && !keywords.is_empty() {
-        return None;
-    }
     let var = item.optional_vars.as_deref()?.as_name_expr()?;
     let scope = semantic.current_scope();
 
@@ -281,8 +269,6 @@ fn resolve_file_open<'a>(
         return None;
     }
 
-    let following_statements = following_statements_after_with(with, with_parent, module_body);
-
     if use_after_with_before_unconditional_rebind(var.id.as_str(), following_statements) {
         return None;
     }
@@ -312,8 +298,7 @@ fn find_file_open<'a>(
     checker: &Checker,
     read_mode: bool,
     python_version: PythonVersion,
-    with_parent: Option<&ast::Stmt>,
-    module_body: &[ast::Stmt],
+    following_statements: Option<&[ast::Stmt]>,
 ) -> Option<FileOpen<'a>> {
     let semantic = checker.semantic();
 
@@ -344,13 +329,16 @@ fn find_file_open<'a>(
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
+
+    if !is_supported_mode(mode, &keywords, read_mode) {
+        return None;
+    }
+
     resolve_file_open(
         item,
         with,
         checker,
-        read_mode,
-        with_parent,
-        module_body,
+        following_statements,
         mode,
         keywords,
         OpenArgument::Builtin { filename },
@@ -363,8 +351,7 @@ fn find_path_open<'a>(
     checker: &Checker,
     read_mode: bool,
     python_version: PythonVersion,
-    with_parent: Option<&ast::Stmt>,
-    module_body: &[ast::Stmt],
+    following_statements: Option<&[ast::Stmt]>,
 ) -> Option<FileOpen<'a>> {
     let semantic = checker.semantic();
 
@@ -378,9 +365,11 @@ fn find_path_open<'a>(
     {
         return None;
     }
+
     if !is_open_call_from_pathlib(func, semantic) {
         return None;
     }
+
     let attr = func.as_attribute_expr()?;
     let mode = if args.is_empty() {
         OpenMode::ReadText
@@ -390,13 +379,16 @@ fn find_path_open<'a>(
 
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
+
+    if !is_supported_mode(mode, &keywords, read_mode) {
+        return None;
+    }
+
     resolve_file_open(
         item,
         with,
         checker,
-        read_mode,
-        with_parent,
-        module_body,
+        following_statements,
         mode,
         keywords,
         OpenArgument::Pathlib {
@@ -673,6 +665,10 @@ fn match_open_mode(mode: &Expr) -> Option<OpenMode> {
         "wb" => Some(OpenMode::WriteBytes),
         _ => None,
     }
+}
+
+fn is_supported_mode(mode: OpenMode, keywords: &[&ast::Keyword], read_mode: bool) -> bool {
+    mode.is_read() == read_mode && (!mode.is_binary() || keywords.is_empty())
 }
 
 /// A helper function that extracts the `iter` from a [`ast::StmtFor`] node and
