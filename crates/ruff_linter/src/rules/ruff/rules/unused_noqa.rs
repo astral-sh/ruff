@@ -70,13 +70,11 @@ impl UnusedNOQAKind {
 ///     pass
 /// ```
 ///
-/// ## Options
+/// ## See also
 ///
-/// This rule will flag rule codes that are unknown to Ruff, even if they are
-/// valid for other tools. You can tell Ruff to ignore such codes by configuring
-/// the list of known "external" rule codes with the following option:
-///
-/// - `lint.external`
+/// This rule ignores any codes that are unknown to Ruff, as it can't determine
+/// if the codes are valid or used by other tools. Enable [`invalid-rule-code`][RUF102]
+/// to flag any unknown rule codes.
 ///
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
