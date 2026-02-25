@@ -78,6 +78,8 @@ impl UnusedNOQAKind {
 ///
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
+///
+/// [RUF102]: https://docs.astral.sh/ruff/rules/invalid-rule-code/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UnusedNOQA {
