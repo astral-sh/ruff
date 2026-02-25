@@ -466,8 +466,8 @@ class OrderedChild(OrderedParent):  # error: [subclass-of-dataclass-with-order]
     y: str
 ```
 
-If the child class also has `order=True`, the diagnostic is suppressed because the child overrides
-all comparison methods:
+If the child class also has `order=True`, a diagnostic is still emitted because cross-class
+comparisons with the parent class still raise `TypeError` at runtime:
 
 ```py
 @dataclass(order=True)
@@ -475,7 +475,7 @@ class OrderedParent2:
     x: int
 
 @dataclass(order=True)
-class OrderedChild2(OrderedParent2):
+class OrderedChild2(OrderedParent2):  # error: [subclass-of-dataclass-with-order]
     y: str
 ```
 
@@ -500,8 +500,8 @@ class ManualChild(OrderedParent3):  # No warning - all comparison methods overri
         return True
 ```
 
-If a parent dataclass has `order=True` and a child also has `order=True`, a grandchild that does not
-override all comparison methods is warned about the child (not the grandparent):
+If a parent dataclass has `order=True` and a child also has `order=True`, both the child and a
+grandchild are warned:
 
 ```py
 @dataclass(order=True)
@@ -509,14 +509,14 @@ class OrderedGrandparent:
     x: int
 
 @dataclass(order=True)
-class OrderedParent4(OrderedGrandparent):
+class OrderedParent4(OrderedGrandparent):  # error: [subclass-of-dataclass-with-order]
     y: str
 
 class OrderedGrandchild(OrderedParent4):  # error: [subclass-of-dataclass-with-order]
     pass
 
 @dataclass(order=True)
-class OrderedGrandchild2(OrderedParent4):
+class OrderedGrandchild2(OrderedParent4):  # error: [subclass-of-dataclass-with-order]
     z: float
 ```
 

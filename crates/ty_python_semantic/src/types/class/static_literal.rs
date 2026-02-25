@@ -749,7 +749,7 @@ impl<'db> StaticClassLiteral<'db> {
 
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
-    fn has_dataclass_param(
+    pub(crate) fn has_dataclass_param(
         self,
         db: &'db dyn Db,
         field_policy: CodeGeneratorKind<'db>,
