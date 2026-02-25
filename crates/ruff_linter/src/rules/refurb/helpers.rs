@@ -200,17 +200,17 @@ pub(super) fn find_file_opens<'a, 'b>(
                 with_parent,
                 module_body,
             )
-                .or_else(|| {
-                    find_path_open(
-                        item,
-                        with,
-                        checker,
-                        read_mode,
-                        python_version,
-                        with_parent,
-                        module_body,
-                    )
-                })
+            .or_else(|| {
+                find_path_open(
+                    item,
+                    with,
+                    checker,
+                    read_mode,
+                    python_version,
+                    with_parent,
+                    module_body,
+                )
+            })
         })
         .collect()
 }
@@ -281,11 +281,7 @@ fn resolve_file_open<'a>(
         return None;
     }
 
-    let following_statements = following_statements_after_with(
-        with,
-        with_parent,
-        module_body,
-    );
+    let following_statements = following_statements_after_with(with, with_parent, module_body);
 
     if use_after_with_before_unconditional_rebind(var.id.as_str(), following_statements) {
         return None;
