@@ -1324,6 +1324,20 @@ impl<'db> UseDefMapBuilder<'db> {
             .map(|live_binding| live_binding.binding)
             .collect::<Vec<_>>();
         self.mark_definition_ids_used(binding_definition_ids.into_iter());
+        let states = match place {
+            ScopedPlaceId::Symbol(symbol) => &mut self.symbol_states[symbol],
+            ScopedPlaceId::Member(member) => &mut self.member_states[member],
+        };
+
+        let bindings = states.bindings().clone();
+
+        let binding_definition_ids = bindings.iter().map(|live_binding| live_binding.binding);
+        self.mark_definition_ids_used(binding_definition_ids);
+
+        // We have a use of a place; clone the current bindings for that place, and record them
+        // as the live bindings for this use.
+        let new_use = self.bindings_by_use.push(bindings);
+        debug_assert_eq!(use_id, new_use);
 
         // Track reachability of all uses of places to silence `unresolved-reference`
         // diagnostics in unreachable code.
