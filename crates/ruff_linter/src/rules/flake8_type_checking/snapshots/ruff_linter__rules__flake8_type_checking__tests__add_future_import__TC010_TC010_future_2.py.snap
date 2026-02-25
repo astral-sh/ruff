@@ -9,15 +9,9 @@ TC010 [*] Invalid string member in `X | Y`-style union type
 16 | OldS = TypeVar('OldS', int | 'str', str)  # TC010
    |                              ^^^^^
    |
-help: Add `from __future__ import annotations` and unquote
-1  + from __future__ import annotations
-2  | from typing import TypeVar
-3  | 
-4  | 
---------------------------------------------------------------------------------
-14 | 
-15 | type A = Value["int" | str]  # OK
-16 | 
-   - OldS = TypeVar('OldS', int | 'str', str)  # TC010
-17 + OldS = TypeVar('OldS', int | str, str)  # TC010
+help: Add `from __future__ import annotations`
+1 + from __future__ import annotations
+2 | from typing import TypeVar
+3 | 
+4 | 
 note: This is an unsafe fix and may change runtime behavior
