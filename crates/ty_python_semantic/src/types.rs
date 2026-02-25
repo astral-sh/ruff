@@ -907,48 +907,18 @@ impl<'db> Type<'db> {
         // encounter oscillation.
         //
         // However, there are a couple of cases where we don't want to do that, and want to use the
-        // later cycle iteration's result directly. This introduces the theoretical possibility of
-        // cycle oscillation involving such types (because we are not strictly widening the type on
-        // each iteration), but so far we have not seen an example of that.
-        match (previous, self) {
-            // Avoid unioning two generic aliases of the same class together; this union will never
-            // simplify and is likely to cause downstream problems.
-            (Type::GenericAlias(prev_alias), Type::GenericAlias(curr_alias))
-                if prev_alias.origin(db) == curr_alias.origin(db) =>
-            {
-                self
-            }
-
-            // Similarly, don't union together two function literals, since there are several parts
-            // of our type inference machinery that assume that we infer a single FunctionLiteral
-            // type for each overload of each function definition.
-            (Type::FunctionLiteral(prev_function), Type::FunctionLiteral(curr_function))
-                if prev_function.definition(db) == curr_function.definition(db) =>
-            {
-                self
-            }
-
-            _ => {
-                // Also avoid unioning in a previous type which contains a Divergent from the
-                // current cycle, if the most-recent type does not. This cannot cause an
-                // oscillation, since Divergent is only introduced at the start of fixpoint
-                // iteration.
-                let has_divergent_type_in_cycle = |ty| {
-                    any_over_type(db, ty, false, |nested_ty| {
-                        nested_ty
-                            .as_divergent()
-                            .is_some_and(|DivergentType { id }| cycle.head_ids().contains(&id))
-                    })
-                };
-                if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
-                    self
-                } else {
-                    // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
-                    // Consider the case where the order of union types is different between the previous and current cycle.
-                    // We should use the previous union type as the base and only add new element types in this cycle, if any.
-                    UnionType::from_elements_cycle_recovery(db, [previous, self])
-                }
-            }
+        // later cycle iteration's result directly.
+        // For example, if the result of the first iteration is a low-precision value
+        // (such as a value that contains `Divergent` even though it is not originally recursive, or a value for which narrowing does not work well),
+        // the subsequent value will be "contaminated" by the union.
+        // Such values ​​are specific to the first few iterations, where the effect of the initial value `Divergent` remains, so the values ​​from those iterations should not be unioned.
+        if cycle.iteration() <= 1 {
+            self
+        } else {
+            // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
+            // Consider the case where the order of union types is different between the previous and current cycle.
+            // We should use the previous union type as the base and only add new element types in this cycle, if any.
+            UnionType::from_elements_cycle_recovery(db, [previous, self])
         }
         .recursive_type_normalized(db, cycle)
     }
@@ -1308,13 +1278,6 @@ impl<'db> Type<'db> {
     pub(crate) const fn as_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Type::Dynamic(dynamic_type) => Some(dynamic_type),
-            _ => None,
-        }
-    }
-
-    pub(crate) const fn as_divergent(self) -> Option<DivergentType> {
-        match self {
-            Type::Dynamic(DynamicType::Divergent(divergent)) => Some(divergent),
             _ => None,
         }
     }
