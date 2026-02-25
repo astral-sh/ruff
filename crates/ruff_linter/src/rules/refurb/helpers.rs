@@ -460,12 +460,9 @@ fn use_after_with_before_unconditional_rebind(
     name: &str,
     following_statements: Option<&[ast::Stmt]>,
 ) -> bool {
-    let Some(following_statements) = following_statements else {
-        return false;
-    };
-
-    for stmt in following_statements {
-        if statement_rebinds_name_before_uses(stmt, name) {
+    for stmt in following_statements.unwrap_or_default() {
+        if matches!(stmt, ast::Stmt::With(ast::StmtWith { items, .. }) if with_items_bind_name(items, name))
+        {
             return false;
         }
         if statement_uses_name(stmt, name) {
@@ -479,17 +476,6 @@ fn use_after_with_before_unconditional_rebind(
     false
 }
 
-fn statement_rebinds_name_before_uses(stmt: &ast::Stmt, name: &str) -> bool {
-    match stmt {
-        ast::Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
-            item.optional_vars
-                .as_deref()
-                .is_some_and(|target| target_contains_name(target, name))
-        }),
-        _ => false,
-    }
-}
-
 fn statement_unconditionally_rebinds_name(stmt: &ast::Stmt, name: &str) -> bool {
     match stmt {
         ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => targets
@@ -499,31 +485,37 @@ fn statement_unconditionally_rebinds_name(stmt: &ast::Stmt, name: &str) -> bool 
         | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
             target_contains_name(target, name)
         }
-        ast::Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
-            item.optional_vars
-                .as_deref()
-                .is_some_and(|target| target_contains_name(target, name))
-        }),
+        ast::Stmt::With(ast::StmtWith { items, .. }) => with_items_bind_name(items, name),
         ast::Stmt::FunctionDef(ast::StmtFunctionDef {
             name: stmt_name, ..
         })
         | ast::Stmt::ClassDef(ast::StmtClassDef {
             name: stmt_name, ..
         }) => stmt_name.as_str() == name,
-        ast::Stmt::Import(ast::StmtImport { names, .. }) => names.iter().any(|alias| {
-            alias.asname.as_ref().map_or_else(
-                || alias.name.id.as_str() == name,
-                |asname| asname.as_str() == name,
-            )
-        }),
-        ast::Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names.iter().any(|alias| {
-            alias.asname.as_ref().map_or_else(
-                || alias.name.id.as_str() == name,
-                |asname| asname.as_str() == name,
-            )
-        }),
+        ast::Stmt::Import(ast::StmtImport { names, .. })
+        | ast::Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => {
+            import_aliases_bind_name(names, name)
+        }
         _ => false,
     }
+}
+
+fn with_items_bind_name(items: &[ast::WithItem], name: &str) -> bool {
+    items.iter().any(|item| {
+        item.optional_vars
+            .as_deref()
+            .is_some_and(|target| target_contains_name(target, name))
+    })
+}
+
+fn import_aliases_bind_name(names: &[ast::Alias], name: &str) -> bool {
+    names.iter().any(|alias| {
+        alias
+            .asname
+            .as_ref()
+            .map_or(alias.name.id.as_str(), |asname| asname.as_str())
+            == name
+    })
 }
 
 fn target_contains_name(target: &Expr, name: &str) -> bool {
@@ -553,22 +545,17 @@ impl<'a> Visitor<'a> for NameUseVisitor<'_> {
         if self.found {
             return;
         }
-        if let ast::Stmt::With(ast::StmtWith { items, .. }) = stmt {
-            if items.iter().any(|item| {
-                item.optional_vars
-                    .as_deref()
-                    .is_some_and(|target| target_contains_name(target, self.name))
-            }) {
-                // `with ... as name` rebinds `name` before the body executes.
-                // The body should not count as a use of the previous binding.
-                for item in items {
-                    self.visit_expr(&item.context_expr);
-                    if self.found {
-                        return;
-                    }
+        if let ast::Stmt::With(ast::StmtWith { items, .. }) = stmt
+            && with_items_bind_name(items, self.name)
+        {
+            // `with ... as name` rebinds `name` before the body executes, so only check context.
+            for item in items {
+                self.visit_expr(&item.context_expr);
+                if self.found {
+                    return;
                 }
-                return;
             }
+            return;
         }
         if matches!(stmt, ast::Stmt::FunctionDef(_) | ast::Stmt::ClassDef(_)) {
             return;
