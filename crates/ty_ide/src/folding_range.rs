@@ -227,12 +227,8 @@ impl<'a> FoldingRangeVisitor<'a> {
 
     /// Add a folding range for decorators applied to a class or function.
     fn add_decorator_range(&mut self, decorator_list: &[Decorator]) {
-        if !decorator_list.is_empty() {
-            let range = TextRange::new(
-                decorator_list.first().unwrap().start(),
-                decorator_list.last().unwrap().end(),
-            );
-            self.add_range(range);
+        if let (Some(first), Some(last)) = (decorator_list.first(), decorator_list.last()) {
+            self.add_range(TextRange::new(first.start(), last.end()));
         }
     }
 
@@ -245,15 +241,13 @@ impl<'a> FoldingRangeVisitor<'a> {
         decorator_list: &[Decorator],
         target: SimpleTokenKind,
     ) {
-        if decorator_list.is_empty() {
-            self.add_range(range);
-            return;
-        }
-
-        let tokenizer_start = decorator_list.last().unwrap().range().end();
-        let tokenizer = SimpleTokenizer::starts_at(tokenizer_start, self.source);
-        if let Some(token) = tokenizer.skip_trivia().find(|token| token.kind == target) {
-            let range = TextRange::new(token.start(), range.end());
+        if let Some(last) = decorator_list.last() {
+            let tokenizer = SimpleTokenizer::starts_at(last.end(), self.source);
+            if let Some(token) = tokenizer.skip_trivia().find(|token| token.kind == target) {
+                let range = TextRange::new(token.start(), range.end());
+                self.add_range(range);
+            }
+        } else {
             self.add_range(range);
         }
     }
