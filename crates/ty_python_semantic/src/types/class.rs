@@ -409,6 +409,14 @@ pub enum ClassLiteral<'db> {
 }
 
 impl<'db> ClassLiteral<'db> {
+    /// Return a `ClassLiteral` representing the class `builtins.object`
+    pub(super) fn object(db: &'db dyn Db) -> Self {
+        KnownClass::Object
+            .to_class_literal(db)
+            .as_class_literal()
+            .expect("`object` should always be a non-generic class in typeshed")
+    }
+
     /// Returns the name of the class.
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         match self {
@@ -756,6 +764,20 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(_) => self,
         }
     }
+
+    /// Returns all of the explicit base class types for this class.
+    ///
+    /// Note that when this is a namedtuple this always returns a sequence
+    /// of length one corresponding to `tuple`.
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        match self {
+            Self::Static(static_class) => static_class.explicit_bases(db).into(),
+            Self::Dynamic(dynamic_class) => dynamic_class.explicit_bases(db).into(),
+            Self::DynamicNamedTuple(namedtuple) => {
+                [Type::from(namedtuple.tuple_base_class(db))].into()
+            }
+        }
+    }
 }
 
 impl<'db> From<StaticClassLiteral<'db>> for ClassLiteral<'db> {
@@ -795,12 +817,7 @@ pub enum ClassType<'db> {
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
-        ClassType::NonGeneric(
-            KnownClass::Object
-                .to_class_literal(db)
-                .as_class_literal()
-                .expect("`object` should always be a non-generic class in typeshed"),
-        )
+        ClassType::NonGeneric(ClassLiteral::object(db))
     }
 
     pub(super) const fn is_generic(self) -> bool {
