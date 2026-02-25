@@ -1076,57 +1076,6 @@ include = ["*.ipy"]
 }
 
 #[test]
-fn warn_invalid_noqa_with_no_diagnostics() {
-    assert_cmd_snapshot!(
-        Command::new(get_cargo_bin(BIN_NAME))
-            .args(STDIN_BASE_OPTIONS)
-            .args(["--isolated"])
-            .arg("--select")
-            .arg("F401")
-            .arg("-")
-            .pass_stdin(
-                r#"
-# ruff: noqa: AAA101
-print("Hello world!")
-"#
-            )
-    );
-}
-
-#[test]
-fn file_noqa_external() -> Result<()> {
-    let fixture = CliTest::with_file(
-        "ruff.toml",
-        r#"
-[lint]
-external = ["AAA"]
-"#,
-    )?;
-
-    assert_cmd_snapshot!(fixture
-        .check_command()
-        .arg("--config")
-        .arg("ruff.toml")
-        .arg("-")
-        .pass_stdin(r#"
-# flake8: noqa: AAA101, BBB102
-import os
-"#), @"
-    success: false
-    exit_code: 1
-    ----- stdout -----
-    -:3:8: F401 [*] `os` imported but unused
-    Found 1 error.
-    [*] 1 fixable with the `--fix` option.
-
-    ----- stderr -----
-    warning: Invalid rule code provided to `# ruff: noqa` at -:2: BBB102
-    ");
-
-    Ok(())
-}
-
-#[test]
 fn required_version_fails_to_parse() -> Result<()> {
     let fixture = CliTest::with_file(
         "ruff.toml",

@@ -722,6 +722,61 @@ fn benchmark_large_union_narrowing(criterion: &mut Criterion) {
     });
 }
 
+/// Benchmark for narrowing through a long `isinstance` elif chain.
+///
+/// This pattern is common in visitor-style dispatch code (e.g. koda-validate's
+/// `generate_schema_validator`) where a base class parameter is narrowed through
+/// many sequential `isinstance` checks.
+///
+/// Sample code structure:
+/// ```python
+/// class Base: ...
+/// class C0(Base): ...
+/// class C1(Base): ...
+/// ...
+///
+/// def f(obj: Base) -> None:
+///     if isinstance(obj, C0):
+///         pass
+///     elif isinstance(obj, C1):
+///         pass
+///     ...
+/// ```
+fn benchmark_large_isinstance_narrowing(criterion: &mut Criterion) {
+    const NUM_CLASSES: usize = 50;
+
+    setup_rayon();
+
+    let mut code = String::new();
+    writeln!(&mut code, "class Base: ...").ok();
+    for i in 0..NUM_CLASSES {
+        writeln!(&mut code, "class C{i}(Base): ...").ok();
+    }
+    writeln!(&mut code).ok();
+
+    writeln!(&mut code, "def f(obj: Base) -> None:").ok();
+    for i in 0..NUM_CLASSES {
+        if i == 0 {
+            writeln!(&mut code, "    if isinstance(obj, C{i}):").ok();
+        } else {
+            writeln!(&mut code, "    elif isinstance(obj, C{i}):").ok();
+        }
+        writeln!(&mut code, "        pass").ok();
+    }
+
+    criterion.bench_function("ty_micro[large_isinstance_narrowing]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -885,6 +940,7 @@ criterion_group!(
     benchmark_many_enum_members_2,
     benchmark_very_large_tuple,
     benchmark_large_union_narrowing,
+    benchmark_large_isinstance_narrowing,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);

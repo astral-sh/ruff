@@ -19,9 +19,7 @@ use crate::semantic_index::{
 use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::{
-    INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
-};
+use crate::types::diagnostic::{INVALID_DATACLASS_OVERRIDE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
@@ -44,9 +42,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     DeprecatedInstance, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, PropertyInstanceType, TypeAliasType,
-    TypeContext, TypeMapping, TypedDictParams, UnionBuilder, VarianceInferable, binding_type,
-    declaration_type, determine_upper_bound,
+    MaterializationKind, PropertyInstanceType, TypeContext, TypeMapping, TypedDictParams,
+    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -3177,7 +3174,7 @@ impl<'db> StaticClassLiteral<'db> {
                         //     def __gt__(self, other): return not (self == other or self < other)
                         // If `__lt__` returns `int`, then `__gt__` could return `int | bool`.
                         let return_ty =
-                            UnionType::from_elements(db, [signature.return_ty, bool_ty]);
+                            UnionType::from_two_elements(db, signature.return_ty, bool_ty);
                         Signature::new_generic(
                             signature.generic_context,
                             signature.parameters().clone(),
@@ -3454,7 +3451,11 @@ impl<'db> StaticClassLiteral<'db> {
 
                 // This could probably be `weakref | None`, but it does not seem important enough to
                 // model it precisely.
-                Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
+                Some(UnionType::from_two_elements(
+                    db,
+                    Type::any(),
+                    Type::none(db),
+                ))
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
@@ -3688,7 +3689,7 @@ impl<'db> StaticClassLiteral<'db> {
                             if field.is_required() {
                                 field.declared_ty
                             } else {
-                                UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
+                                UnionType::from_two_elements(db, field.declared_ty, Type::none(db))
                             },
                         );
 
@@ -3714,9 +3715,10 @@ impl<'db> StaticClassLiteral<'db> {
                             if field.is_required() {
                                 field.declared_ty
                             } else {
-                                UnionType::from_elements(
+                                UnionType::from_two_elements(
                                     db,
-                                    [field.declared_ty, Type::TypeVar(t_default)],
+                                    field.declared_ty,
+                                    Type::TypeVar(t_default),
                                 )
                             },
                         );
@@ -3735,7 +3737,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(KnownClass::Str.to_instance(db)),
                                 ],
                             ),
-                            UnionType::from_elements(db, [Type::unknown(), Type::none(db)]),
+                            UnionType::from_two_elements(db, Type::unknown(), Type::none(db)),
                         )
                     }))
                     .chain(std::iter::once({
@@ -3758,9 +3760,10 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            UnionType::from_elements(
+                            UnionType::from_two_elements(
                                 db,
-                                [Type::unknown(), Type::TypeVar(t_default)],
+                                Type::unknown(),
+                                Type::TypeVar(t_default),
                             ),
                         )
                     }));
@@ -3818,9 +3821,10 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            UnionType::from_elements(
+                            UnionType::from_two_elements(
                                 db,
-                                [field.declared_ty, Type::TypeVar(t_default)],
+                                field.declared_ty,
+                                Type::TypeVar(t_default),
                             ),
                         );
 
@@ -4656,9 +4660,10 @@ impl<'db> StaticClassLiteral<'db> {
                             } else {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_elements(
+                                        ty: UnionType::from_two_elements(
                                             db,
-                                            [declared_ty, implicit_ty],
+                                            declared_ty,
+                                            implicit_ty,
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
@@ -4718,9 +4723,10 @@ impl<'db> StaticClassLiteral<'db> {
                             {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_elements(
+                                        ty: UnionType::from_two_elements(
                                             db,
-                                            [declared_ty, implicit_ty],
+                                            declared_ty,
+                                            implicit_ty,
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
@@ -8126,42 +8132,6 @@ impl KnownClass {
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
                     DeprecatedInstance::new(db, message.as_string_literal()),
-                )));
-            }
-
-            KnownClass::TypeAliasType => {
-                let assigned_to = index
-                    .try_expression(ast::ExprRef::from(call_expression))
-                    .and_then(|expr| expr.assigned_to(db));
-
-                let containing_assignment = assigned_to.as_ref().and_then(|assigned_to| {
-                    match assigned_to.node(module).targets.as_slice() {
-                        [ast::Expr::Name(target)] => Some(index.expect_single_definition(target)),
-                        _ => None,
-                    }
-                });
-
-                let [Some(name), Some(value), ..] = overload.parameter_types() else {
-                    return;
-                };
-
-                let Some(name) = name.as_string_literal() else {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
-                    {
-                        builder.into_diagnostic(
-                            "The name of a `typing.TypeAlias` must be a string literal",
-                        );
-                    }
-                    return;
-                };
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                    TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
-                        db,
-                        ast::name::Name::new(name.value(db)),
-                        containing_assignment,
-                        value,
-                    )),
                 )));
             }
 

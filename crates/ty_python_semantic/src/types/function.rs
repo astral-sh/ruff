@@ -392,6 +392,15 @@ impl<'db> OverloadLiteral<'db> {
             return None;
         }
 
+        // These can both happen in edge cases where a definition created with a `def`
+        // statement shadows a non-`def` symbol with the same name.
+        if previous_overload.name(db) != self.name(db) {
+            return None;
+        }
+        if previous_overload.definition(db).scope(db) != scope {
+            return None;
+        }
+
         Some(previous_literal)
     }
 
@@ -1410,12 +1419,10 @@ pub(super) fn function_body_kind<'db>(
         } = raise
         && infer_type(exc).is_subtype_of(
             db,
-            UnionType::from_elements(
+            UnionType::from_two_elements(
                 db,
-                [
-                    KnownClass::NotImplementedError.to_class_literal(db),
-                    KnownClass::NotImplementedError.to_instance(db),
-                ],
+                KnownClass::NotImplementedError.to_class_literal(db),
+                KnownClass::NotImplementedError.to_instance(db),
             ),
         )
     {

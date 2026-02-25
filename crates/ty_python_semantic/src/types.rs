@@ -2739,7 +2739,7 @@ impl<'db> Type<'db> {
                     if descr_get_boundness == Definedness::AlwaysDefined {
                         bindings.return_type(db)
                     } else {
-                        UnionType::from_elements(db, [bindings.return_type(db), self])
+                        UnionType::from_two_elements(db, bindings.return_type(db), self)
                     }
                 })
                 // TODO: an error when calling `__get__` will lead to a `TypeError` or similar at runtime;
@@ -2998,7 +2998,7 @@ impl<'db> Type<'db> {
                     widening: fallback_widening,
                 }),
             ) => Place::Defined(DefinedPlace {
-                ty: UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: fallback_boundness,
                 widening: fallback_widening,
@@ -3042,7 +3042,7 @@ impl<'db> Type<'db> {
                     widening: fallback_widening,
                 }),
             ) => Place::Defined(DefinedPlace {
-                ty: UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                ty: UnionType::from_two_elements(db, meta_attr_ty, fallback_ty),
                 origin: meta_origin.merge(fallback_origin),
                 definedness: meta_attr_boundness.max(fallback_boundness),
                 widening: fallback_widening,
@@ -4378,12 +4378,10 @@ impl<'db> Type<'db> {
                                             "object",
                                         ))
                                         // TODO: Should be `ReadableBuffer` instead of this union type:
-                                        .with_annotated_type(UnionType::from_elements(
+                                        .with_annotated_type(UnionType::from_two_elements(
                                             db,
-                                            [
-                                                KnownClass::Bytes.to_instance(db),
-                                                KnownClass::Bytearray.to_instance(db),
-                                            ],
+                                            KnownClass::Bytes.to_instance(db),
+                                            KnownClass::Bytearray.to_instance(db),
                                         ))
                                         .with_default_type(Type::bytes_literal(db, b"")),
                                         Parameter::positional_or_keyword(Name::new_static(
@@ -4485,13 +4483,11 @@ impl<'db> Type<'db> {
                                     Parameter::positional_only(Some(Name::new_static("message")))
                                         .with_annotated_type(Type::literal_string()),
                                     Parameter::keyword_only(Name::new_static("category"))
-                                        .with_annotated_type(UnionType::from_elements(
+                                        .with_annotated_type(UnionType::from_two_elements(
                                             db,
-                                            [
-                                                // TODO: should be `type[Warning]`
-                                                Type::any(),
-                                                KnownClass::NoneType.to_instance(db),
-                                            ],
+                                            // TODO: should be `type[Warning]`
+                                            Type::any(),
+                                            KnownClass::NoneType.to_instance(db),
                                         ))
                                         // TODO: should be `type[Warning]`
                                         .with_default_type(Type::any()),
@@ -4585,36 +4581,31 @@ impl<'db> Type<'db> {
                                 db,
                                 [
                                     Parameter::positional_or_keyword(Name::new_static("fget"))
-                                        .with_annotated_type(UnionType::from_elements(
+                                        .with_annotated_type(UnionType::from_two_elements(
                                             db,
-                                            [
-                                                Type::single_callable(db, getter_signature),
-                                                Type::none(db),
-                                            ],
+                                            Type::single_callable(db, getter_signature),
+                                            Type::none(db),
                                         ))
                                         .with_default_type(Type::none(db)),
                                     Parameter::positional_or_keyword(Name::new_static("fset"))
-                                        .with_annotated_type(UnionType::from_elements(
+                                        .with_annotated_type(UnionType::from_two_elements(
                                             db,
-                                            [
-                                                Type::single_callable(db, setter_signature),
-                                                Type::none(db),
-                                            ],
+                                            Type::single_callable(db, setter_signature),
+                                            Type::none(db),
                                         ))
                                         .with_default_type(Type::none(db)),
                                     Parameter::positional_or_keyword(Name::new_static("fdel"))
-                                        .with_annotated_type(UnionType::from_elements(
+                                        .with_annotated_type(UnionType::from_two_elements(
                                             db,
-                                            [
-                                                Type::single_callable(db, deleter_signature),
-                                                Type::none(db),
-                                            ],
+                                            Type::single_callable(db, deleter_signature),
+                                            Type::none(db),
                                         ))
                                         .with_default_type(Type::none(db)),
                                     Parameter::positional_or_keyword(Name::new_static("doc"))
-                                        .with_annotated_type(UnionType::from_elements(
+                                        .with_annotated_type(UnionType::from_two_elements(
                                             db,
-                                            [KnownClass::Str.to_instance(db), Type::none(db)],
+                                            KnownClass::Str.to_instance(db),
+                                            Type::none(db),
                                         ))
                                         .with_default_type(Type::none(db)),
                                 ],
@@ -5494,9 +5485,10 @@ impl<'db> Type<'db> {
                                 // and the type returned by the `__getitem__` method.
                                 //
                                 // No diagnostic is emitted; iteration will always succeed!
-                                Cow::Owned(TupleSpec::homogeneous(UnionType::from_elements(
+                                Cow::Owned(TupleSpec::homogeneous(UnionType::from_two_elements(
                                     db,
-                                    [dunder_next_return, dunder_getitem_return_type],
+                                    dunder_next_return,
+                                    dunder_getitem_return_type,
                                 )))
                             })
                             .map_err(|dunder_getitem_error| {
@@ -6749,7 +6741,7 @@ impl<'db> Type<'db> {
                     Some(TypeDefinition::TypeVar(var.definition(db)?))
                 }
                 KnownInstanceType::TypeAliasType(type_alias) => {
-                    type_alias.definition(db).map(TypeDefinition::TypeAlias)
+                    Some(TypeDefinition::TypeAlias(type_alias.definition(db)))
                 }
                 KnownInstanceType::NewType(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
                 _ => None,
@@ -7390,9 +7382,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(deprecated) => Some(Self::Deprecated(deprecated)),
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
-            Self::TypeAliasType(type_alias) => type_alias
-                .recursive_type_normalized_impl(db, div)
-                .map(Self::TypeAliasType),
+            Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::Field),
@@ -9677,9 +9667,10 @@ impl<'db> IterationError<'db> {
             } => match dunder_getitem_error {
                 CallDunderError::MethodNotAvailable => Some(*dunder_next_return),
                 CallDunderError::PossiblyUnbound(dunder_getitem_outcome) => {
-                    Some(UnionType::from_elements(
+                    Some(UnionType::from_two_elements(
                         db,
-                        [*dunder_next_return, dunder_getitem_outcome.return_type(db)],
+                        *dunder_next_return,
+                        dunder_getitem_outcome.return_type(db),
                     ))
                 }
                 CallDunderError::CallError(CallErrorKind::NotCallable, _) => {
@@ -9687,8 +9678,11 @@ impl<'db> IterationError<'db> {
                 }
                 CallDunderError::CallError(_, dunder_getitem_bindings) => {
                     let dunder_getitem_return = dunder_getitem_bindings.return_type(db);
-                    let elements = [*dunder_next_return, dunder_getitem_return];
-                    Some(UnionType::from_elements(db, elements))
+                    Some(UnionType::from_two_elements(
+                        db,
+                        *dunder_next_return,
+                        dunder_getitem_return,
+                    ))
                 }
             },
 
@@ -10962,9 +10956,10 @@ impl<'db> KnownBoundMethodType<'db> {
                                 Parameter::positional_only(Some(Name::new_static("instance")))
                                     .with_annotated_type(Type::object()),
                                 Parameter::positional_only(Some(Name::new_static("owner")))
-                                    .with_annotated_type(UnionType::from_elements(
+                                    .with_annotated_type(UnionType::from_two_elements(
                                         db,
-                                        [KnownClass::Type.to_instance(db), Type::none(db)],
+                                        KnownClass::Type.to_instance(db),
+                                        Type::none(db),
                                     ))
                                     .with_default_type(Type::none(db)),
                             ],
@@ -10997,26 +10992,23 @@ impl<'db> KnownBoundMethodType<'db> {
                         db,
                         [
                             Parameter::positional_only(Some(Name::new_static("prefix")))
-                                .with_annotated_type(UnionType::from_elements(
+                                .with_annotated_type(UnionType::from_two_elements(
                                     db,
-                                    [
-                                        KnownClass::Str.to_instance(db),
-                                        Type::homogeneous_tuple(
-                                            db,
-                                            KnownClass::Str.to_instance(db),
-                                        ),
-                                    ],
+                                    KnownClass::Str.to_instance(db),
+                                    Type::homogeneous_tuple(db, KnownClass::Str.to_instance(db)),
                                 )),
                             Parameter::positional_only(Some(Name::new_static("start")))
-                                .with_annotated_type(UnionType::from_elements(
+                                .with_annotated_type(UnionType::from_two_elements(
                                     db,
-                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                                    KnownClass::SupportsIndex.to_instance(db),
+                                    Type::none(db),
                                 ))
                                 .with_default_type(Type::none(db)),
                             Parameter::positional_only(Some(Name::new_static("end")))
-                                .with_annotated_type(UnionType::from_elements(
+                                .with_annotated_type(UnionType::from_two_elements(
                                     db,
-                                    [KnownClass::SupportsIndex.to_instance(db), Type::none(db)],
+                                    KnownClass::SupportsIndex.to_instance(db),
+                                    Type::none(db),
                                 ))
                                 .with_default_type(Type::none(db)),
                         ],
@@ -11087,9 +11079,10 @@ impl<'db> KnownBoundMethodType<'db> {
                         db,
                         [Parameter::keyword_only(Name::new_static("inferable"))
                             .type_form()
-                            .with_annotated_type(UnionType::from_elements(
+                            .with_annotated_type(UnionType::from_two_elements(
                                 db,
-                                [Type::homogeneous_tuple(db, Type::any()), Type::none(db)],
+                                Type::homogeneous_tuple(db, Type::any()),
+                                Type::none(db),
                             ))
                             .with_default_type(Type::none(db))],
                     ),
@@ -11106,9 +11099,10 @@ impl<'db> KnownBoundMethodType<'db> {
                                 .with_annotated_type(KnownClass::ConstraintSet.to_instance(db)),
                         ],
                     ),
-                    UnionType::from_elements(
+                    UnionType::from_two_elements(
                         db,
-                        [KnownClass::Specialization.to_instance(db), Type::none(db)],
+                        KnownClass::Specialization.to_instance(db),
+                        Type::none(db),
                     ),
                 )))
             }
@@ -11167,9 +11161,10 @@ impl WrapperDescriptorKind {
                             Parameter::positional_only(Some(Name::new_static("instance")))
                                 .with_annotated_type(Type::object()),
                             Parameter::positional_only(Some(Name::new_static("owner")))
-                                .with_annotated_type(UnionType::from_elements(
+                                .with_annotated_type(UnionType::from_two_elements(
                                     db,
-                                    [type_instance, none],
+                                    type_instance,
+                                    none,
                                 ))
                                 .with_default_type(none),
                         ],
@@ -11487,6 +11482,9 @@ impl<'db> PEP695TypeAliasType<'db> {
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
 ///
+/// The value type is computed lazily via [`ManualPEP695TypeAliasType::value_type()`]
+/// to avoid cycle non-convergence for mutually recursive definitions.
+///
 /// # Ordering
 /// Ordering is based on the type alias's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the alias was garbage collected and recreated.
@@ -11495,8 +11493,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 pub struct ManualPEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
-    pub definition: Option<Definition<'db>>,
-    pub value: Type<'db>,
+    pub definition: Definition<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -11507,19 +11504,38 @@ fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value(db));
+    visitor.visit_type(db, type_alias.value_type(db));
 }
 
+#[salsa::tracked]
 impl<'db> ManualPEP695TypeAliasType<'db> {
-    // TODO: with full support for manual PEP-695 style type aliases, this method should become unnecessary.
-    fn recursive_type_normalized_impl(self, db: &'db dyn Db, div: Type<'db>) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.name(db),
-            self.definition(db),
-            self.value(db)
-                .recursive_type_normalized_impl(db, div, true)?,
-        ))
+    /// The value type of this manual type alias.
+    ///
+    /// Computed lazily from the definition to avoid including the value in the interned
+    /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+            return Type::unknown();
+        };
+        let value_node = assignment.value(&module);
+        let ast::Expr::Call(call) = value_node else {
+            return Type::unknown();
+        };
+        // The value is the second positional argument to TypeAliasType(name, value).
+        let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
+            return Type::unknown();
+        };
+        definition_expression_type(db, definition, value_arg)
     }
 }
 
@@ -11552,15 +11568,6 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeAliasType<'db> {
-    fn recursive_type_normalized_impl(self, db: &'db dyn Db, div: Type<'db>) -> Option<Self> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => Some(TypeAliasType::PEP695(type_alias)),
-            TypeAliasType::ManualPEP695(type_alias) => Some(TypeAliasType::ManualPEP695(
-                type_alias.recursive_type_normalized_impl(db, div)?,
-            )),
-        }
-    }
-
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
@@ -11568,9 +11575,9 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
+            TypeAliasType::PEP695(type_alias) => type_alias.definition(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
         }
     }
@@ -11578,14 +11585,14 @@ impl<'db> TypeAliasType<'db> {
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
 
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
 
@@ -11657,10 +11664,7 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// For example, calling this method on a type alias `D` inside a class `C` in module `a.b`
     /// would return `["a", "b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
-        let Some(definition) = self.type_alias.definition(self.db) else {
-            return vec![];
-        };
-
+        let definition = self.type_alias.definition(self.db);
         let file = definition.file(self.db);
         let file_scope_id = definition.file_scope(self.db);
 
@@ -11710,9 +11714,13 @@ pub(crate) fn walk_union<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for UnionType<'_> {}
 
+#[salsa::tracked]
 impl<'db> UnionType<'db> {
     /// Create a union from a list of elements
     /// (which may be eagerly simplified into a different variant of [`Type`] altogether).
+    ///
+    /// For performance reasons, consider using [`UnionType::from_two_elements`] if
+    /// the union is constructed from exactly two elements.
     pub fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
@@ -11724,6 +11732,18 @@ impl<'db> UnionType<'db> {
                 builder.add(element.into())
             })
             .build()
+    }
+
+    /// Create a union type `A | B` from two elements `A` and `B`.
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+            result.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
+        UnionBuilder::new(db).add(a).add(b).build()
     }
 
     /// Create a union from a list of elements without unpacking type aliases.
@@ -12021,12 +12041,10 @@ pub(crate) enum KnownUnion {
 impl KnownUnion {
     pub(crate) fn to_type(self, db: &dyn Db) -> Type<'_> {
         match self {
-            KnownUnion::Float => UnionType::from_elements(
+            KnownUnion::Float => UnionType::from_two_elements(
                 db,
-                [
-                    KnownClass::Int.to_instance(db),
-                    KnownClass::Float.to_instance(db),
-                ],
+                KnownClass::Int.to_instance(db),
+                KnownClass::Float.to_instance(db),
             ),
             KnownUnion::Complex => UnionType::from_elements(
                 db,
