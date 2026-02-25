@@ -294,6 +294,7 @@ impl<'db> Bindings<'db> {
             elements,
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
+            mixed_constructor_init: None,
         }
     }
 
@@ -340,13 +341,15 @@ impl<'db> Bindings<'db> {
             }
         }
         if let Some(ref mut mixed_init) = self.mixed_constructor_init {
-            for binding in &mut mixed_init.init_bindings.elements {
-                for overload in &mut binding.overloads {
-                    overload.signature.generic_context = GenericContext::merge_optional(
-                        db,
-                        overload.signature.generic_context,
-                        Some(generic_context),
-                    );
+            for element in &mut mixed_init.init_bindings.elements {
+                for binding in &mut element.bindings {
+                    for overload in &mut binding.overloads {
+                        overload.signature.generic_context = GenericContext::merge_optional(
+                            db,
+                            overload.signature.generic_context,
+                            Some(generic_context),
+                        );
+                    }
                 }
             }
         }
@@ -472,7 +475,7 @@ impl<'db> Bindings<'db> {
         }
         if let Some(ref mut mixed_init) = self.mixed_constructor_init {
             let mut init_forms = ArgumentForms::new(arguments.len());
-            for binding in &mut mixed_init.init_bindings.elements {
+            for binding in mixed_init.init_bindings.iter_flat_mut() {
                 binding.match_parameters(db, arguments, &mut init_forms);
             }
         }
@@ -638,7 +641,7 @@ impl<'db> Bindings<'db> {
         let constructor_class = constructor_instance_type
             .as_nominal_instance()
             .map(|inst| inst.class(db));
-        for binding in &self.elements {
+        for binding in self.iter_flat() {
             let Some((_, overload)) = binding.matching_overloads().next() else {
                 continue;
             };
@@ -665,12 +668,15 @@ impl<'db> Bindings<'db> {
             // Check if the resolved type is an instance of the constructing class or a
             // base class. If so, it's a normal instance-returning `__new__` and should be
             // handled by the standard constructor return logic below.
-            let is_instance_return = resolved.as_nominal_instance().is_some_and(|inst| {
-                constructor_class.is_some_and(|cc| {
-                    cc.class_literal(db) == inst.class(db).class_literal(db)
-                        || cc.is_subclass_of(db, inst.class(db))
-                })
-            });
+            let is_instance_return =
+                resolved
+                    .as_nominal_instance()
+                    .is_some_and(|inst: NominalInstanceType<'db>| {
+                        constructor_class.is_some_and(|cc| {
+                            cc.class_literal(db) == inst.class(db).class_literal(db)
+                                || cc.is_subclass_of(db, inst.class(db))
+                        })
+                    });
             if !is_instance_return {
                 return Some(resolved);
             }
@@ -781,26 +787,14 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        // If this is a single callable (not a union or intersection), report its diagnostics.
         if let Some(binding) = self.single_element() {
             binding.report_diagnostics(context, node, None);
         } else {
-            for binding in self {
-                if binding.as_result().is_ok() {
-                    continue;
-                }
-                let union_diag = UnionDiagnostic {
-                    callable_type: self.callable_type(),
-                    binding,
-                };
-                binding.report_diagnostics(context, node, Some(&union_diag));
+            // Report diagnostics for each element (union variant).
+            // Each element may be a single binding or an intersection of bindings.
+            for element in &self.elements {
+                self.report_element_diagnostics(context, node, element);
             }
-        }
-
-        // Report diagnostics for each element (union variant).
-        // Each element may be a single binding or an intersection of bindings.
-        for element in &self.elements {
-            self.report_element_diagnostics(context, node, element);
         }
 
         // Report `__init__` diagnostics for mixed constructor overloads
@@ -3817,9 +3811,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            let return_ty = self.constructor_instance_type.unwrap_or(self.return_ty);
+            let return_ty = self.return_ty;
 
-            let mut combined_tcx = TypeContext::default();
             let mut variance_in_return = TypeVarVariance::Bivariant;
 
             // Find all occurrences of the type variable in the return type.
