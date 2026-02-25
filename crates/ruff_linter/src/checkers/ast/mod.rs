@@ -192,7 +192,7 @@ impl ExpectedDocstringKind {
 
 pub(crate) struct Checker<'a> {
     /// The [`Parsed`] output for the source code.
-    parsed: &'a Parsed<ModModule>,
+    pub(crate) parsed: &'a Parsed<ModModule>,
     /// An internal cache for parsed string annotations
     parsed_annotations_cache: ParsedAnnotationsCache<'a>,
     /// The [`Parsed`] output for the type annotation the checker is currently in.
@@ -470,11 +470,6 @@ impl<'a> Checker<'a> {
 
     pub(crate) const fn source(&self) -> &'a str {
         self.locator.contents()
-    }
-
-    /// The AST body for the current module.
-    pub(crate) fn python_ast(&self) -> &'a [Stmt] {
-        self.parsed.suite()
     }
 
     /// The [`Stylist`] for the current file, which detects the current line ending, quote, and

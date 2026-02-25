@@ -10,9 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{
-    FileOpen, OpenArgument, find_file_opens, following_statements_after_with,
-};
+use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -90,18 +88,7 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
     }
 
     // First we go through all the items in the statement and find all `open` operations.
-    let following_statements = following_statements_after_with(
-        with,
-        checker.semantic().current_statement_parent(),
-        checker.python_ast(),
-    );
-    let candidates = find_file_opens(
-        with,
-        checker.semantic(),
-        true,
-        checker.target_version(),
-        following_statements,
-    );
+    let candidates = find_file_opens(with, checker, true);
     if candidates.is_empty() {
         return;
     }

@@ -4,7 +4,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
 use ruff_python_codegen::Generator;
-use ruff_python_semantic::{ResolvedReference, SemanticModel};
+use ruff_python_semantic::ResolvedReference;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -126,7 +126,7 @@ pub(super) struct FileOpen<'a> {
     /// The file open keywords.
     pub(super) keywords: Vec<&'a ast::Keyword>,
     /// We only check `open` operations whose file handles are used exactly once.
-    pub(super) reference: &'a ResolvedReference,
+    pub(super) reference: TextRange,
     pub(super) argument: OpenArgument<'a>,
 }
 
@@ -134,7 +134,7 @@ impl FileOpen<'_> {
     /// Determine whether an expression is a reference to the file handle, by comparing
     /// their ranges. If two expressions have the same range, they must be the same expression.
     pub(super) fn is_ref(&self, expr: &Expr) -> bool {
-        expr.range() == self.reference.range()
+        expr.range() == self.reference
     }
 }
 
@@ -178,56 +178,55 @@ impl Ranged for OpenArgument<'_> {
 }
 
 /// Find and return all `open` operations in the given `with` statement.
-pub(super) fn find_file_opens<'a>(
+pub(super) fn find_file_opens<'a, 'b>(
     with: &'a ast::StmtWith,
-    semantic: &'a SemanticModel<'a>,
+    checker: &Checker<'b>,
     read_mode: bool,
-    python_version: PythonVersion,
-    following_statements: Option<&'a [ast::Stmt]>,
 ) -> Vec<FileOpen<'a>> {
+    let semantic = checker.semantic();
+    let python_version = checker.target_version();
+    let with_parent = semantic.current_statement_parent();
+    let module_body = checker.parsed.suite();
+
     with.items
         .iter()
         .filter_map(|item| {
             find_file_open(
                 item,
                 with,
-                semantic,
+                checker,
                 read_mode,
                 python_version,
-                following_statements,
+                with_parent,
+                module_body,
             )
-            .or_else(|| {
-                find_path_open(
-                    item,
-                    with,
-                    semantic,
-                    read_mode,
-                    python_version,
-                    following_statements,
-                )
-            })
+                .or_else(|| {
+                    find_path_open(
+                        item,
+                        with,
+                        checker,
+                        read_mode,
+                        python_version,
+                        with_parent,
+                        module_body,
+                    )
+                })
         })
         .collect()
 }
 
-struct OpenResolutionContext<'a> {
-    with: &'a ast::StmtWith,
-    semantic: &'a SemanticModel<'a>,
-    read_mode: bool,
-    following_statements: Option<&'a [ast::Stmt]>,
-}
-
 fn resolve_file_open<'a>(
     item: &'a ast::WithItem,
+    with: &'a ast::StmtWith,
+    checker: &Checker,
+    read_mode: bool,
+    with_parent: Option<&ast::Stmt>,
+    module_body: &[ast::Stmt],
     mode: OpenMode,
     keywords: Vec<&'a ast::Keyword>,
     argument: OpenArgument<'a>,
-    context: &OpenResolutionContext<'a>,
 ) -> Option<FileOpen<'a>> {
-    let with = context.with;
-    let semantic = context.semantic;
-    let read_mode = context.read_mode;
-    let following_statements = context.following_statements;
+    let semantic = checker.semantic();
 
     match mode {
         OpenMode::ReadText | OpenMode::ReadBytes => {
@@ -278,9 +277,17 @@ fn resolve_file_open<'a>(
         })
     });
 
-    if has_use_after_with
-        || use_after_with_before_unconditional_rebind(var.id.as_str(), following_statements)
-    {
+    if has_use_after_with {
+        return None;
+    }
+
+    let following_statements = following_statements_after_with(
+        with,
+        with_parent,
+        module_body,
+    );
+
+    if use_after_with_before_unconditional_rebind(var.id.as_str(), following_statements) {
         return None;
     }
 
@@ -297,7 +304,7 @@ fn resolve_file_open<'a>(
         item,
         mode,
         keywords,
-        reference,
+        reference: reference.range(),
         argument,
     })
 }
@@ -306,11 +313,14 @@ fn resolve_file_open<'a>(
 fn find_file_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
-    semantic: &'a SemanticModel<'a>,
+    checker: &Checker,
     read_mode: bool,
     python_version: PythonVersion,
-    following_statements: Option<&'a [ast::Stmt]>,
+    with_parent: Option<&ast::Stmt>,
+    module_body: &[ast::Stmt],
 ) -> Option<FileOpen<'a>> {
+    let semantic = checker.semantic();
+
     // We want to match `open(...) as var`.
     let ast::ExprCall {
         func,
@@ -338,29 +348,30 @@ fn find_file_open<'a>(
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
 
     let mode = kw_mode.unwrap_or(pos_mode);
-    let context = OpenResolutionContext {
-        with,
-        semantic,
-        read_mode,
-        following_statements,
-    };
     resolve_file_open(
         item,
+        with,
+        checker,
+        read_mode,
+        with_parent,
+        module_body,
         mode,
         keywords,
         OpenArgument::Builtin { filename },
-        &context,
     )
 }
 
 fn find_path_open<'a>(
     item: &'a ast::WithItem,
     with: &'a ast::StmtWith,
-    semantic: &'a SemanticModel<'a>,
+    checker: &Checker,
     read_mode: bool,
     python_version: PythonVersion,
-    following_statements: Option<&'a [ast::Stmt]>,
+    with_parent: Option<&ast::Stmt>,
+    module_body: &[ast::Stmt],
 ) -> Option<FileOpen<'a>> {
+    let semantic = checker.semantic();
+
     let ast::ExprCall {
         func,
         arguments: ast::Arguments { args, keywords, .. },
@@ -383,20 +394,18 @@ fn find_path_open<'a>(
 
     let (keywords, kw_mode) = match_open_keywords(keywords, read_mode, python_version)?;
     let mode = kw_mode.unwrap_or(mode);
-    let context = OpenResolutionContext {
-        with,
-        semantic,
-        read_mode,
-        following_statements,
-    };
     resolve_file_open(
         item,
+        with,
+        checker,
+        read_mode,
+        with_parent,
+        module_body,
         mode,
         keywords,
         OpenArgument::Pathlib {
             path: attr.value.as_ref(),
         },
-        &context,
     )
 }
 
@@ -583,7 +592,14 @@ impl<'a> Visitor<'a> for NameUseVisitor<'_> {
         if self.found {
             return;
         }
-        if matches!(expr, Expr::Lambda(_)) {
+        if matches!(
+            expr,
+            Expr::Lambda(_)
+                | Expr::ListComp(_)
+                | Expr::SetComp(_)
+                | Expr::DictComp(_)
+                | Expr::Generator(_)
+        ) {
             return;
         }
         if let Expr::Name(ast::ExprName { id, ctx, .. }) = expr {
