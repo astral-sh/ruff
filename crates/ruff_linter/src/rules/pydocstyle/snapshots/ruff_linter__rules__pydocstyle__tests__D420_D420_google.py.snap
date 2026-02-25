@@ -65,3 +65,14 @@ D420 Section "Args" appears after section "Returns" but should be before it
 156 |         x: Description.
 157 |     """
     |
+
+D420 Section "Args" appears after section "Returns" but should be before it
+   --> D420_google.py:189:5
+    |
+187 |         int
+188 |
+189 |     Args:
+    |     ^^^^
+190 |         x: Description.
+191 |     """
+    |

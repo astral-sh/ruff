@@ -66,3 +66,14 @@ D420 Section "Attributes" appears after section "Methods" but should be before i
 178 |     ----------
 179 |     x : int
     |
+
+D420 Section "Returns" appears after section "Notes" but should be before it
+   --> D420_numpy.py:222:5
+    |
+220 |     Some notes.
+221 |
+222 |     Returns
+    |     ^^^^^^^
+223 |     -------
+224 |     int
+    |

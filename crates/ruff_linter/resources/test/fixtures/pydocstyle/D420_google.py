@@ -178,3 +178,30 @@ class UnorderedClassDocstring:
     Attributes:
         x: Description.
     """
+
+
+def _private_function_out_of_order():
+    """Summary.
+
+    Returns:
+        int
+
+    Args:
+        x: Description.
+    """
+
+
+def no_sections():
+    """Summary.
+
+    This is a docstring with no recognized sections at all.
+    It just has some plain text that shouldn't trigger D420.
+    """
+
+
+def plain_text_with_section_like_words():
+    """Summary.
+
+    Returns the value of x. Notes that this is important.
+    This should not be detected as having sections.
+    """
