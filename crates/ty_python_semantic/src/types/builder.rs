@@ -54,6 +54,81 @@ enum LiteralKind<'db> {
     Enum { enum_class: ClassLiteral<'db> },
 }
 
+/// Extract `(core, guard)` from truthiness-guarded intersections.
+///
+/// e.g.
+/// - `A & ~AlwaysTruthy` -> `Some((A, ~AlwaysTruthy))`
+/// - `A & ~AlwaysFalsy` -> `Some((A, ~AlwaysFalsy))`
+/// - `A` -> `None`
+/// - `A & ~AlwaysTruthy & ~AlwaysFalsy` -> `None` (not a single-guard shape)
+///
+/// This only recognizes the "single truthiness guard" forms used by truthiness narrowing.
+fn split_truthiness_guarded_intersection<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<(Type<'db>, Type<'db>)> {
+    let Type::Intersection(intersection) = ty else {
+        return None;
+    };
+
+    let has_not_truthy = intersection.negative(db).contains(&Type::AlwaysTruthy);
+    let has_not_falsy = intersection.negative(db).contains(&Type::AlwaysFalsy);
+    let guard = match (has_not_truthy, has_not_falsy) {
+        (true, false) => Type::AlwaysTruthy.negate(db),
+        (false, true) => Type::AlwaysFalsy.negate(db),
+        _ => return None,
+    };
+
+    let mut core = IntersectionBuilder::new(db);
+    for positive in intersection.positive(db) {
+        core = core.add_positive(*positive);
+    }
+    for negative in intersection.negative(db) {
+        if (guard == Type::AlwaysTruthy.negate(db) && *negative == Type::AlwaysTruthy)
+            || (guard == Type::AlwaysFalsy.negate(db) && *negative == Type::AlwaysFalsy)
+        {
+            continue;
+        }
+        core = core.add_negative(*negative);
+    }
+    Some((core.build(), guard))
+}
+
+/// Try to merge a complementary guarded pair into an unguarded core.
+///
+/// e.g.
+/// - `(A & ~AlwaysTruthy, A & ~AlwaysFalsy)` -> `Some(A)`
+/// - `(A & ~AlwaysTruthy, B & ~AlwaysFalsy)` -> `Some(A | B)` if reconstruction is exact
+/// - `(A & ~AlwaysTruthy, C)` -> `None`
+///
+/// Safety rule:
+/// The candidate merge is accepted only if adding each original guard back reconstructs
+/// exactly the original operands (`left` and `right`).
+fn merge_truthiness_guarded_pair<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let (left_core, left_guard) = split_truthiness_guarded_intersection(db, left)?;
+    let (right_core, right_guard) = split_truthiness_guarded_intersection(db, right)?;
+    if left_guard == right_guard {
+        return None;
+    }
+
+    if left_core.is_equivalent_to(db, right_core) {
+        return Some(left_core);
+    }
+
+    let candidate = UnionType::from_elements(db, [left_core, right_core]);
+    let left_reconstructed = IntersectionType::from_two_elements(db, candidate, left_guard);
+    let right_reconstructed = IntersectionType::from_two_elements(db, candidate, right_guard);
+    if left_reconstructed == left && right_reconstructed == right {
+        Some(candidate)
+    } else {
+        None
+    }
+}
+
 impl<'db> Type<'db> {
     /// Return `true` if this type can be a supertype of some literals of `kind` and not others.
     fn splits_literals(self, db: &'db dyn Db, kind: LiteralKind) -> bool {
@@ -266,11 +341,13 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 /// if reachability analysis etc. fails when analysing these enums.
 const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 
+#[expect(clippy::struct_excessive_bools)]
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
     order_elements: bool,
+    check_redundancy: bool,
     /// This is enabled when joining types in a `cycle_recovery` function.
     /// Since a cycle cannot be created within a `cycle_recovery` function,
     /// execution of `is_redundant_with` is skipped.
@@ -285,6 +362,7 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             order_elements: false,
+            check_redundancy: true,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
         }
@@ -300,9 +378,15 @@ impl<'db> UnionBuilder<'db> {
         self
     }
 
+    pub(crate) fn check_redundancy(mut self, val: bool) -> Self {
+        self.check_redundancy = val;
+        self
+    }
+
     pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
         self.cycle_recovery = val;
         if self.cycle_recovery {
+            self.check_redundancy = false;
             self.unpack_aliases = false;
         }
         self
@@ -658,16 +742,16 @@ impl<'db> UnionBuilder<'db> {
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        let bool_pair = if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
-            Some(LiteralValueTypeKind::Bool(!b))
-        } else {
-            None
+        let mut ty = ty;
+        let bool_pair = |lit: LiteralValueTypeKind| match lit {
+            LiteralValueTypeKind::Bool(b) => Some(LiteralValueTypeKind::Bool(!b)),
+            _ => None,
         };
 
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && self.check_redundancy;
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -694,9 +778,16 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
+            if let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type) {
+                to_remove.push(i);
+                ty = merged_type;
+                continue;
+            }
+
             if element_type
                 .as_literal_value_kind()
-                .zip(bool_pair)
+                .zip(ty.as_literal_value_kind().and_then(bool_pair))
                 .is_some_and(|(element, pair)| element == pair)
             {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
@@ -721,19 +812,27 @@ impl<'db> UnionBuilder<'db> {
                     continue;
                 }
 
-                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
-                if negated.is_subtype_of(self.db, element_type) {
-                    // We add `ty` to the union. We just checked that `~ty` is a subtype of an
-                    // existing `element`. This also means that `~ty | ty` is a subtype of
-                    // `element | ty`, because both elements in the first union are subtypes of
-                    // the corresponding elements in the second union. But `~ty | ty` is just
-                    // `object`. Since `object` is a subtype of `element | ty`, we can only
-                    // conclude that `element | ty` must be `object` (object has no other
-                    // supertypes). This means we can simplify the whole union to just
-                    // `object`, since all other potential elements would also be subtypes of
-                    // `object`.
-                    self.collapse_to_object();
-                    return;
+                // Skip the negate/subtype check for intersection-to-intersection pairs.
+                // For intersections, ~(A & B & ...) = ~A | ~B | ..., which is a broad union
+                // of complements. Such a union cannot be a subtype of another intersection
+                // of class types in practice, making this check always false but expensive.
+                if !(ty.is_nontrivial_intersection(self.db)
+                    && element_type.is_nontrivial_intersection(self.db))
+                {
+                    let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                    if negated.is_subtype_of(self.db, element_type) {
+                        // We add `ty` to the union. We just checked that `~ty` is a subtype of an
+                        // existing `element`. This also means that `~ty | ty` is a subtype of
+                        // `element | ty`, because both elements in the first union are subtypes of
+                        // the corresponding elements in the second union. But `~ty | ty` is just
+                        // `object`. Since `object` is a subtype of `element | ty`, we can only
+                        // conclude that `element | ty` must be `object` (object has no other
+                        // supertypes). This means we can simplify the whole union to just
+                        // `object`, since all other potential elements would also be subtypes of
+                        // `object`.
+                        self.collapse_to_object();
+                        return;
+                    }
                 }
             }
         }

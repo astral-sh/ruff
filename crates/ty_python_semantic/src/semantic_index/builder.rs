@@ -913,27 +913,253 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
     }
 
     fn build_predicate(&mut self, predicate_node: &ast::Expr) -> PredicateOrLiteral<'db> {
+        /// Returns if the expression is a `TYPE_CHECKING` expression.
+        fn is_if_type_checking(expr: &ast::Expr) -> bool {
+            fn is_dotted_name(expr: &ast::Expr) -> bool {
+                match expr {
+                    ast::Expr::Name(_) => true,
+                    ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+                    _ => false,
+                }
+            }
+
+            match expr {
+                ast::Expr::Name(ast::ExprName { id, .. }) => id == "TYPE_CHECKING",
+                ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) => {
+                    attr == "TYPE_CHECKING" && is_dotted_name(value)
+                }
+                _ => false,
+            }
+        }
+
         // Some commonly used test expressions are eagerly evaluated as `true`
         // or `false` here for performance reasons. This list does not need to
         // be exhaustive. More complex expressions will still evaluate to the
         // correct value during type-checking.
         fn resolve_to_literal(node: &ast::Expr) -> Option<bool> {
-            match node {
-                ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => Some(*value),
-                ast::Expr::Name(ast::ExprName { id, .. }) if id == "TYPE_CHECKING" => Some(true),
-                ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
-                    value: ast::Number::Int(n),
-                    ..
-                }) => Some(*n != 0),
-                ast::Expr::EllipsisLiteral(_) => Some(true),
-                ast::Expr::NoneLiteral(_) => Some(false),
-                ast::Expr::UnaryOp(ast::ExprUnaryOp {
-                    op: ast::UnaryOp::Not,
-                    operand,
-                    ..
-                }) => Some(!resolve_to_literal(operand)?),
-                _ => None,
+            #[derive(Copy, Clone)]
+            enum ConstExpr {
+                Bool(bool),
+                Int(i64),
+                None,
+                Ellipsis,
             }
+
+            impl ConstExpr {
+                fn truthiness(self) -> bool {
+                    match self {
+                        ConstExpr::Bool(value) => value,
+                        ConstExpr::Int(value) => value != 0,
+                        ConstExpr::None => false,
+                        ConstExpr::Ellipsis => true,
+                    }
+                }
+
+                fn as_int(self) -> Option<i64> {
+                    match self {
+                        ConstExpr::Int(value) => Some(value),
+                        ConstExpr::Bool(value) => Some(i64::from(value)),
+                        _ => None,
+                    }
+                }
+            }
+
+            fn resolve_const_expr(node: &ast::Expr) -> Option<ConstExpr> {
+                match node {
+                    ast::Expr::BooleanLiteral(ast::ExprBooleanLiteral { value, .. }) => {
+                        Some(ConstExpr::Bool(*value))
+                    }
+                    ast::Expr::NumberLiteral(ast::ExprNumberLiteral {
+                        value: ast::Number::Int(n),
+                        ..
+                    }) => n.as_i64().map(ConstExpr::Int),
+                    ast::Expr::EllipsisLiteral(_) => Some(ConstExpr::Ellipsis),
+                    ast::Expr::NoneLiteral(_) => Some(ConstExpr::None),
+                    // See also: `TypeInferenceBuilder::infer_unary_expression_type`
+                    ast::Expr::UnaryOp(ast::ExprUnaryOp { op, operand, .. }) => {
+                        let operand = resolve_const_expr(operand)?;
+                        match op {
+                            ast::UnaryOp::Not => Some(ConstExpr::Bool(!operand.truthiness())),
+                            ast::UnaryOp::UAdd => Some(ConstExpr::Int(operand.as_int()?)),
+                            ast::UnaryOp::USub => {
+                                Some(ConstExpr::Int(operand.as_int()?.checked_neg()?))
+                            }
+                            ast::UnaryOp::Invert => Some(ConstExpr::Int(!operand.as_int()?)),
+                        }
+                    }
+                    // See also: `TypeInferenceBuilder::infer_binary_expression_type`
+                    ast::Expr::BinOp(ast::ExprBinOp {
+                        left, op, right, ..
+                    }) => {
+                        let left = resolve_const_expr(left)?.as_int()?;
+                        let right = resolve_const_expr(right)?.as_int()?;
+                        let value = match op {
+                            ast::Operator::Add => left.checked_add(right)?,
+                            ast::Operator::Sub => left.checked_sub(right)?,
+                            ast::Operator::Mult => left.checked_mul(right)?,
+                            ast::Operator::FloorDiv => {
+                                let mut q = left.checked_div(right);
+                                let r = left.checked_rem(right);
+                                // Division works differently in Python than in Rust. If the
+                                // result is negative and there is a remainder, floor division
+                                // rounds down (instead of toward zero).
+                                if left.is_negative() != right.is_negative() && r.unwrap_or(0) != 0
+                                {
+                                    q = q.map(|q| q - 1);
+                                }
+                                q?
+                            }
+                            ast::Operator::Mod => {
+                                let mut r = left.checked_rem(right);
+                                // Python's modulo keeps the sign of the divisor. Adjust the Rust
+                                // remainder accordingly so that `q * right + r == left`.
+                                if left.is_negative() != right.is_negative() && r.unwrap_or(0) != 0
+                                {
+                                    r = r.map(|x| x + right);
+                                }
+                                r?
+                            }
+                            ast::Operator::BitAnd => left & right,
+                            ast::Operator::BitOr => left | right,
+                            ast::Operator::BitXor => left ^ right,
+                            ast::Operator::LShift => {
+                                if left == 0 && right >= 0 {
+                                    0
+                                } else {
+                                    // An additional overflow check beyond `checked_shl` is
+                                    // necessary here, because `checked_shl` only rejects shift
+                                    // amounts >= 64; it does not detect when significant bits
+                                    // are shifted into (or past) the sign bit.
+                                    //
+                                    // We compute the "headroom": the number of redundant
+                                    // sign-extension bits minus one (for the sign bit itself).
+                                    // A shift is safe iff `shift <= headroom`.
+                                    let headroom = if left >= 0 {
+                                        left.leading_zeros().saturating_sub(1)
+                                    } else {
+                                        left.leading_ones().saturating_sub(1)
+                                    };
+                                    u32::try_from(right)
+                                        .ok()
+                                        .filter(|&shift| shift <= headroom)
+                                        .and_then(|shift| left.checked_shl(shift))?
+                                }
+                            }
+                            ast::Operator::RShift => match u32::try_from(right) {
+                                Ok(shift) => left >> shift.clamp(0, 63),
+                                Err(_) if right > 0 => {
+                                    if left >= 0 {
+                                        0
+                                    } else {
+                                        -1
+                                    }
+                                }
+                                Err(_) => return None,
+                            },
+                            ast::Operator::Pow => {
+                                let exp = u32::try_from(right).ok()?;
+                                left.checked_pow(exp)?
+                            }
+                            ast::Operator::Div | ast::Operator::MatMult => return None,
+                        };
+                        Some(ConstExpr::Int(value))
+                    }
+                    ast::Expr::BoolOp(ast::ExprBoolOp { op, values, .. }) => {
+                        let value = match op {
+                            ast::BoolOp::And => {
+                                let mut all_true = true;
+                                for expr in values {
+                                    if !resolve_const_expr(expr)?.truthiness() {
+                                        all_true = false;
+                                        break;
+                                    }
+                                }
+                                all_true
+                            }
+                            ast::BoolOp::Or => {
+                                let mut any_true = false;
+                                for expr in values {
+                                    if resolve_const_expr(expr)?.truthiness() {
+                                        any_true = true;
+                                        break;
+                                    }
+                                }
+                                any_true
+                            }
+                        };
+                        Some(ConstExpr::Bool(value))
+                    }
+                    ast::Expr::Compare(ast::ExprCompare {
+                        left,
+                        ops,
+                        comparators,
+                        ..
+                    }) => {
+                        let mut left_value = resolve_const_expr(left)?;
+                        for (op, comparator) in ops.iter().zip(comparators.iter()) {
+                            let right_value = resolve_const_expr(comparator)?;
+                            let eq = |left: ConstExpr, right: ConstExpr| match (left, right) {
+                                (ConstExpr::Int(left), ConstExpr::Int(right)) => {
+                                    Some(left == right)
+                                }
+                                (ConstExpr::None, ConstExpr::None)
+                                | (ConstExpr::Ellipsis, ConstExpr::Ellipsis) => Some(true),
+                                (ConstExpr::None | ConstExpr::Ellipsis, _)
+                                | (_, ConstExpr::None | ConstExpr::Ellipsis) => Some(false),
+                                _ => None,
+                            };
+                            let result = match op {
+                                ast::CmpOp::Eq => eq(left_value, right_value)?,
+                                ast::CmpOp::NotEq => !eq(left_value, right_value)?,
+                                ast::CmpOp::Lt => left_value.as_int()? < right_value.as_int()?,
+                                ast::CmpOp::LtE => left_value.as_int()? <= right_value.as_int()?,
+                                ast::CmpOp::Gt => left_value.as_int()? > right_value.as_int()?,
+                                ast::CmpOp::GtE => left_value.as_int()? >= right_value.as_int()?,
+                                ast::CmpOp::Is => match (left_value, right_value) {
+                                    (ConstExpr::None, ConstExpr::None)
+                                    | (ConstExpr::Ellipsis, ConstExpr::Ellipsis)
+                                    | (ConstExpr::Bool(true), ConstExpr::Bool(true))
+                                    | (ConstExpr::Bool(false), ConstExpr::Bool(false)) => true,
+                                    (
+                                        ConstExpr::None | ConstExpr::Ellipsis | ConstExpr::Bool(_),
+                                        _,
+                                    )
+                                    | (
+                                        _,
+                                        ConstExpr::None | ConstExpr::Ellipsis | ConstExpr::Bool(_),
+                                    ) => false,
+                                    _ => return None,
+                                },
+                                ast::CmpOp::IsNot => match (left_value, right_value) {
+                                    (ConstExpr::None, ConstExpr::None)
+                                    | (ConstExpr::Ellipsis, ConstExpr::Ellipsis)
+                                    | (ConstExpr::Bool(true), ConstExpr::Bool(true))
+                                    | (ConstExpr::Bool(false), ConstExpr::Bool(false)) => false,
+                                    (
+                                        ConstExpr::None | ConstExpr::Ellipsis | ConstExpr::Bool(_),
+                                        _,
+                                    )
+                                    | (
+                                        _,
+                                        ConstExpr::None | ConstExpr::Ellipsis | ConstExpr::Bool(_),
+                                    ) => true,
+                                    _ => return None,
+                                },
+                                ast::CmpOp::In | ast::CmpOp::NotIn => return None,
+                            };
+                            if !result {
+                                return Some(ConstExpr::Bool(false));
+                            }
+                            left_value = right_value;
+                        }
+                        Some(ConstExpr::Bool(true))
+                    }
+                    _ if is_if_type_checking(node) => Some(ConstExpr::Bool(true)),
+                    _ => None,
+                }
+            }
+
+            Some(resolve_const_expr(node)?.truthiness())
         }
 
         let expression = self.add_standalone_expression(predicate_node);
@@ -1970,14 +2196,14 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 if let Some(msg) = msg {
                     let post_test = self.flow_snapshot();
                     let negated_predicate = predicate.negated();
-                    self.record_narrowing_constraint(negated_predicate);
-                    self.record_reachability_constraint(negated_predicate);
+                    let predicate_id = self.record_narrowing_constraint(negated_predicate);
+                    self.record_reachability_constraint_id(predicate_id);
                     self.visit_expr(msg);
                     self.flow_restore(post_test);
                 }
 
-                self.record_narrowing_constraint(predicate);
-                self.record_reachability_constraint(predicate);
+                let predicate_id = self.record_narrowing_constraint(predicate);
+                self.record_reachability_constraint_id(predicate_id);
             }
 
             ast::Stmt::Assign(node) => {
@@ -2095,7 +2321,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 let (mut last_predicate, mut last_narrowing_id) =
                     self.record_expression_narrowing_constraint(&node.test);
                 let mut last_reachability_constraint =
-                    self.record_reachability_constraint(last_predicate);
+                    self.record_reachability_constraint_id(last_narrowing_id);
 
                 let is_outer_block_in_type_checking = self.in_type_checking_block;
 
@@ -2146,7 +2372,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             self.record_expression_narrowing_constraint(elif_test);
 
                         last_reachability_constraint =
-                            self.record_reachability_constraint(last_predicate);
+                            self.record_reachability_constraint_id(last_narrowing_id);
                     }
 
                     // Determine if this clause is in type checking context
@@ -2210,7 +2436,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // after the loop.
                 let pre_loop = self.flow_snapshot();
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
-                self.record_reachability_constraint(predicate);
+                self.record_reachability_constraint_id(predicate_id);
 
                 let outer_loop = self.push_loop();
                 self.visit_body(body);
@@ -2390,36 +2616,25 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         );
                     previous_pattern = Some(match_pattern_predicate);
                     let reachability_constraint =
-                        self.record_reachability_constraint(match_predicate);
+                        self.record_reachability_constraint_id(match_narrowing_id);
 
                     let match_success_guard_failure = case.guard.as_ref().map(|guard| {
-                        let guard_expr = self.add_standalone_expression(guard);
-                        // We could also add the guard expression as a reachability constraint, but
-                        // it seems unlikely that both the case predicate as well as the guard are
-                        // statically known conditions, so we currently don't model that.
-                        self.record_ambiguous_reachability();
                         self.visit_expr(guard);
                         let post_guard_eval = self.flow_snapshot();
-                        let predicate = PredicateOrLiteral::Predicate(Predicate {
-                            node: PredicateNode::Expression(guard_expr),
-                            is_positive: true,
-                        });
-                        // Add the predicate once, then use TDD-level negation for the failure
-                        // path. This ensures the positive and negative atoms share the same ID.
-                        let guard_predicate_id = self.add_predicate(predicate);
-                        let possibly_narrowed = self.compute_possibly_narrowed_places(&predicate);
-                        self.current_use_def_map_mut()
-                            .record_negated_narrowing_constraint_for_places(
-                                guard_predicate_id,
-                                &possibly_narrowed,
-                            );
-                        let match_success_guard_failure = self.flow_snapshot();
+                        let (guard_predicate, guard_predicate_id) =
+                            self.record_expression_narrowing_constraint(guard);
+                        let guard_reachability_constraint =
+                            self.record_reachability_constraint_id(guard_predicate_id);
+
+                        let guard_success_state = self.flow_snapshot();
                         self.flow_restore(post_guard_eval);
-                        self.current_use_def_map_mut()
-                            .record_narrowing_constraint_for_places(
-                                guard_predicate_id,
-                                &possibly_narrowed,
-                            );
+                        self.record_negated_narrowing_constraint(
+                            guard_predicate,
+                            guard_predicate_id,
+                        );
+                        self.record_negated_reachability_constraint(guard_reachability_constraint);
+                        let match_success_guard_failure = self.flow_snapshot();
+                        self.flow_restore(guard_success_state);
                         match_success_guard_failure
                     });
 
@@ -2993,7 +3208,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.visit_expr(test);
                 let pre_if = self.flow_snapshot();
                 let (predicate, predicate_id) = self.record_expression_narrowing_constraint(test);
-                let reachability_constraint = self.record_reachability_constraint(predicate);
+                let reachability_constraint = self.record_reachability_constraint_id(predicate_id);
                 self.visit_expr(body);
                 let post_body = self.flow_snapshot();
                 self.flow_restore(pre_if);
