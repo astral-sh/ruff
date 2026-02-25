@@ -70,7 +70,7 @@ impl Convention {
                 Rule::MissingTerminalPunctuation,
                 Rule::MissingSectionNameColon,
                 Rule::UndocumentedParam,
-                Rule::SectionOrderIncorrect,
+                Rule::IncorrectSectionOrder,
             ],
         }
     }

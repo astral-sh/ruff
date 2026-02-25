@@ -1439,7 +1439,7 @@ impl Violation for SectionOrderIncorrect {
     fn message(&self) -> String {
         let SectionOrderIncorrect { current, previous } = self;
         format!(
-            "Section \"{current}\" appears after section \"{previous}\" but should be before it"
+            r#"Section "{current}" appears after section "{previous}" but should be before it"#
         )
     }
 }
