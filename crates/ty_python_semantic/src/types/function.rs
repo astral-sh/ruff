@@ -395,12 +395,12 @@ impl<'db> OverloadLiteral<'db> {
             return None;
         }
 
-        // These can both happen in edge cases involving not-yet-complete function definitions
-        // (invalid syntax).
+        // These can both happen in edge cases where a definition created with a `def`
+        // statement shadows a non-`def` symbol with the same name.
         if previous_overload.name(db) != self.name(db) {
             return None;
         }
-        if previous_overload.body_scope(db).file(db) != self.file(db) {
+        if previous_overload.definition(db).scope(db) != scope {
             return None;
         }
 
