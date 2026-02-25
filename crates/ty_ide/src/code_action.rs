@@ -775,7 +775,7 @@ mod tests {
 
             let mut buf = String::new();
 
-            let config = DisplayDiagnosticConfig::default()
+            let config = DisplayDiagnosticConfig::new("ty")
                 .color(false)
                 .show_fix_diff(true)
                 .format(DiagnosticFormat::Full);

@@ -147,7 +147,7 @@ assumed to be Python code examples and also formatted.
 * reStructuredText [literal blocks]. While literal blocks may contain things
 other than Python, this is meant to reflect a long-standing convention in the
 Python ecosystem where literal blocks often contain Python code.
-* reStructuredText [`code-block` and `sourcecode` directives]. As with
+* reStructuredText [`code-block` and `sourcecode` directives][directives]. As with
 Markdown, the language names recognized for Python are `python`, `py`,
 `python3`, or `py3`.
 
@@ -223,7 +223,116 @@ def f(x):
 [doctest]: https://docs.python.org/3/library/doctest.html
 [fenced code blocks]: https://spec.commonmark.org/0.30/#fenced-code-blocks
 [literal blocks]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#literal-blocks
-[`code-block` and `sourcecode` directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+[directives]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
+
+## Markdown code formatting
+
+*This feature is currently only available in [preview mode](preview.md#preview).*
+
+The Ruff formatter can also format Python code blocks in Markdown files.
+In these files, Ruff will format any CommonMark [fenced code blocks][]
+with the following info strings: `python`, `py`, `python3`, `py3`, or `pyi`.
+Fenced code blocks without an info string are assumed to be Python code examples
+and will also be formatted.
+
+If a code example is recognized and treated as Python, the Ruff formatter will
+automatically skip it if the code does not parse as valid Python or if the
+reformatted code would produce an invalid Python program.
+
+Code blocks marked as `python`, `py`, `python3`, or `py3` will be formatted with
+the normal Python code formatting style, while any code blocks marked with
+`pyi` will be formatted like Python type stub files:
+
+````markdown
+```py
+print("hello")
+```
+
+```pyi
+def foo(): ...
+def bar(): ...
+```
+````
+
+Ruff also supports [Quarto](https://quarto.org/) style executable code blocks
+with curly braces surrounding the language name:
+
+````markdown
+```{python}
+print("hello")
+```
+````
+
+While [formatting suppression](#format-suppression) comments will be handled as
+usual within code blocks, the formatter will also skip formatting any code block
+surrounded by appropriate HTML comments, such as:
+
+````markdown
+<!-- fmt:off -->
+```py
+print( 'hello' )
+```
+<!-- fmt:on -->
+````
+
+Any number of code blocks may be contained within a matching pair of `off` and
+`on` HTML comments, and any `off`  comment *without* a matching `on` comment
+will implicitly cover the remaining portion of the document.
+
+The Ruff formatter will also recognize HTML comments from [blacken-docs][],
+`<!-- blacken-docs:off -->` and `<!-- blacken-docs:on -->`, which are equivalent
+to `<!-- fmt:off -->` and `<!-- fmt:on -->` respectively.
+
+[blacken-docs]: https://github.com/adamchainz/blacken-docs/
+
+Ruff will not automatically discover or format Markdown files in your project,
+but will format any Markdown files explicitly passed with a `.md` extension:
+
+```shell-session
+$ ruff format --preview --check docs/
+warning: No Python files found under the given path(s)
+
+$ ruff format --preview --check docs/*.md
+13 files already formatted
+```
+
+This is likely to change in a future release when the feature is stabilized.
+Including Markdown files without also enabling [preview mode](preview.md#preview)
+will result in an error message and non-zero [exit code](#exit-codes).
+
+To include Markdown files by default when running Ruff on your project, add them
+with [`extend-include`](settings.md#extend-include) in your project settings:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # Find and format code blocks in Markdown files
+    extend-include = ["*.md"]
+    # OR
+    extend-include = ["docs/*.md"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # Find and format code blocks in Markdown files
+    extend-include = ["*.md"]
+    # OR
+    extend-include = ["docs/*.md"]
+    ```
+
+If you run Ruff via [`ruff-pre-commit`](https://github.com/astral-sh/ruff-pre-commit), Markdown
+support needs to be explicitly included by adding it to `types_or`:
+
+```yaml title=".pre-commit-config.yaml"
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.2
+    hooks:
+      - id: ruff-format
+        types_or: [python, pyi, jupyter, markdown]
+```
 
 ## Format suppression
 
@@ -331,6 +440,7 @@ When using Ruff as a formatter, we recommend avoiding the following lint rules:
 - [`bad-quotes-multiline-string`](rules/bad-quotes-multiline-string.md) (`Q001`)
 - [`bad-quotes-docstring`](rules/bad-quotes-docstring.md) (`Q002`)
 - [`avoidable-escaped-quote`](rules/avoidable-escaped-quote.md) (`Q003`)
+- [`unnecessary-escaped-quote`](rules/unnecessary-escaped-quote.md) (`Q004`)
 - [`missing-trailing-comma`](rules/missing-trailing-comma.md) (`COM812`)
 - [`prohibited-trailing-comma`](rules/prohibited-trailing-comma.md) (`COM819`)
 - [`multi-line-implicit-string-concatenation`](rules/multi-line-implicit-string-concatenation.md) (`ISC002`) if used without `ISC001` and `flake8-implicit-str-concat.allow-multiline = false`

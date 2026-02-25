@@ -14,16 +14,14 @@ use ruff_python_trivia::{Cursor, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
-use crate::checkers::ast::LintContext;
+use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
-use crate::preview::is_range_suppressions_enabled;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
-use crate::settings::LinterSettings;
 use crate::{Locator, Violation};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -185,18 +183,9 @@ impl<'a> SuppressionDiagnostic<'a> {
 }
 
 impl Suppressions {
-    pub fn from_tokens(
-        settings: &LinterSettings,
-        source: &str,
-        tokens: &Tokens,
-        indexer: &Indexer,
-    ) -> Suppressions {
-        if is_range_suppressions_enabled(settings) {
-            let builder = SuppressionsBuilder::new(source);
-            builder.load_from_tokens(tokens, indexer)
-        } else {
-            Suppressions::default()
-        }
+    pub fn from_tokens(source: &str, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
+        let builder = SuppressionsBuilder::new(source);
+        builder.load_from_tokens(tokens, indexer)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -231,17 +220,17 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
-        let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
-        let mut unmatched_ranges = FxHashSet::default();
-        for suppression in &self.valid {
-            let key = suppression.comments.disable_comment().range;
-
-            // Process any pending grouped diagnostics
-            if let Some((group_key, ref group)) = grouped_diagnostic
-                && key != group_key
+        fn process_pending_diagnostics(
+            key: Option<TextRange>,
+            grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
+            context: &LintContext,
+            locator: &Locator,
+        ) -> bool {
+            if let Some((group_key, group)) = grouped_diagnostic
+                && key.is_none_or(|key| key != *group_key)
             {
                 if group.any_invalid() {
-                    Suppressions::report_suppression_codes(
+                    if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
                         context,
                         locator,
                         group.suppression,
@@ -253,7 +242,11 @@ impl Suppressions {
                             whole_comment: group.suppression.codes().len()
                                 == group.invalid_codes.len(),
                         },
-                    );
+                    ) {
+                        diagnostic.help(
+                            "Add non-Ruff rule codes to the `lint.external` configuration option",
+                        );
+                    }
                 }
                 if group.any_unused() {
                     let mut codes = group.disabled_codes.clone();
@@ -287,6 +280,20 @@ impl Suppressions {
                         },
                     );
                 }
+                true
+            } else {
+                false
+            }
+        }
+
+        let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
+        let mut unmatched_ranges = FxHashSet::default();
+
+        for suppression in &self.valid {
+            let key = suppression.comments.disable_comment().range;
+
+            if process_pending_diagnostics(Some(key), grouped_diagnostic.as_ref(), context, locator)
+            {
                 grouped_diagnostic = None;
             }
 
@@ -335,6 +342,8 @@ impl Suppressions {
             }
         }
 
+        process_pending_diagnostics(None, grouped_diagnostic.as_ref(), context, locator);
+
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {
                 context
@@ -365,14 +374,14 @@ impl Suppressions {
         }
     }
 
-    fn report_suppression_codes<T: Violation>(
-        context: &LintContext,
+    fn report_suppression_codes<'a, 'b, T: Violation>(
+        context: &'a LintContext<'b>,
         locator: &Locator,
         suppression: &Suppression,
         remove_codes: &[&str],
         highlight_only_code: bool,
         kind: T,
-    ) {
+    ) -> Option<DiagnosticGuard<'a, 'b>> {
         let disable_comment = suppression.comments.disable_comment();
         let (range, edit) = Suppressions::delete_codes_or_comment(
             locator,
@@ -380,7 +389,7 @@ impl Suppressions {
             remove_codes,
             highlight_only_code,
         );
-        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(kind, range) {
+        if let Some(mut diagnostic) = context.report_custom_diagnostic_if_enabled(kind, range) {
             if let Some(enable_comment) = suppression.comments.enable_comment() {
                 let (enable_range, enable_range_edit) = Suppressions::delete_codes_or_comment(
                     locator,
@@ -393,7 +402,9 @@ impl Suppressions {
             } else {
                 diagnostic.set_fix(Fix::safe_edit(edit));
             }
+            return Some(diagnostic);
         }
+        None
     }
 
     fn delete_codes_or_comment(
@@ -501,9 +512,18 @@ impl<'a> SuppressionsBuilder<'a> {
             indents.clear();
 
             let (before, after) = tokens.split_at(suppression.range.start());
+            let mut count = 0;
             let last_indent = before
                 .iter()
-                .rfind(|token| token.kind() == TokenKind::Indent)
+                .rfind(|token| {
+                    // look for the last indent not matched by a dedent
+                    count += match token.kind() {
+                        TokenKind::Dedent => 1,
+                        TokenKind::Indent => -1,
+                        _ => return false,
+                    };
+                    token.kind() == TokenKind::Indent && count < 0
+                })
                 .map(|token| self.source.slice(token))
                 .unwrap_or_default();
 
@@ -836,12 +856,9 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
     use similar::DiffableStr;
 
-    use crate::{
-        settings::LinterSettings,
-        suppression::{
-            InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
-            SuppressionParser, Suppressions,
-        },
+    use crate::suppression::{
+        InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
+        SuppressionParser, Suppressions,
     };
 
     #[test]
@@ -908,6 +925,74 @@ print('hello')
                         action: Enable,
                         codes: [
                             "foo",
+                        ],
+                        reason: "",
+                    },
+                },
+            ],
+            invalid: [],
+            errors: [],
+        }
+        "##,
+        );
+    }
+
+    #[test]
+    fn single_range_suppression_after_dedent() {
+        let source = "
+def outer():
+    def inner():
+        pass
+
+    # ruff: disable[foo]
+    print('hello')
+    # ruff: enable[foo]
+
+# ruff: disable[bar]
+print('hello')
+# ruff: enable[bar]
+";
+        assert_debug_snapshot!(
+            Suppressions::debug(source),
+            @r##"
+        Suppressions {
+            valid: [
+                Suppression {
+                    covered_source: "# ruff: disable[foo]\n    print('hello')\n    # ruff: enable[foo]",
+                    code: "foo",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: disable[foo]",
+                        action: Disable,
+                        codes: [
+                            "foo",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: SuppressionComment {
+                        text: "# ruff: enable[foo]",
+                        action: Enable,
+                        codes: [
+                            "foo",
+                        ],
+                        reason: "",
+                    },
+                },
+                Suppression {
+                    covered_source: "# ruff: disable[bar]\nprint('hello')\n# ruff: enable[bar]",
+                    code: "bar",
+                    disable_comment: SuppressionComment {
+                        text: "# ruff: disable[bar]",
+                        action: Disable,
+                        codes: [
+                            "bar",
+                        ],
+                        reason: "",
+                    },
+                    enable_comment: SuppressionComment {
+                        text: "# ruff: enable[bar]",
+                        action: Enable,
+                        codes: [
+                            "bar",
                         ],
                         reason: "",
                     },
@@ -1727,12 +1812,7 @@ def bar():
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
             let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
             let indexer = Indexer::from_tokens(parsed.tokens(), source);
-            let suppressions = Suppressions::from_tokens(
-                &LinterSettings::default().with_preview_mode(),
-                source,
-                parsed.tokens(),
-                &indexer,
-            );
+            let suppressions = Suppressions::from_tokens(source, parsed.tokens(), &indexer);
             DebugSuppressions {
                 source,
                 suppressions,

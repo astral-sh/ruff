@@ -263,15 +263,13 @@ class C(Generic[T]):
     x: T
 
 c: C[int] = C()
-# TODO: revealed: C[int]
-reveal_type(c)  # revealed: C[Unknown]
+reveal_type(c)  # revealed: C[int]
 ```
 
 The typevars of a fully specialized generic class should no longer be visible:
 
 ```py
-# TODO: revealed: int
-reveal_type(c.x)  # revealed: Unknown
+reveal_type(c.x)  # revealed: int
 ```
 
 If the type parameter is not specified explicitly, and there are no constraints that let us infer a
@@ -316,7 +314,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -338,7 +336,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -363,7 +361,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 ```
 
@@ -388,6 +386,7 @@ reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
+# TODO: The revealed type in the error message should be `C[str]`.
 # error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five")
 
@@ -404,7 +403,8 @@ reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
 
-# error: [invalid-assignment] "Object of type `D[int | str]` is not assignable to `D[int]`"
+# TODO: The revealed type in the error message should be `D[str]`.
+# error: [invalid-assignment] "Object of type `D[str | int]` is not assignable to `D[int]`"
 wrong_innards: D[int] = D("five")
 ```
 
@@ -550,7 +550,7 @@ reveal_type(C(1, 1))  # revealed: C[int]
 reveal_type(C(1, "string"))  # revealed: C[int]
 reveal_type(C(1, True))  # revealed: C[int]
 
-# error: [invalid-assignment] "Object of type `C[int | str]` is not assignable to `C[int]`"
+# error: [invalid-assignment] "Object of type `C[str]` is not assignable to `C[int]`"
 wrong_innards: C[int] = C("five", 1)
 ```
 
@@ -561,7 +561,7 @@ from typing_extensions import overload, Generic, TypeVar
 from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
-U = TypeVar("U")
+U = TypeVar("U", covariant=True)
 
 class C(Generic[T]):
     @overload
@@ -611,9 +611,9 @@ reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_callable(D)))
 
-reveal_type(D("string"))  # revealed: D[str, str]
-reveal_type(D(1))  # revealed: D[str, int]
-reveal_type(D(1, "string"))  # revealed: D[int, str]
+reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
+reveal_type(D(1))  # revealed: D[str, Literal[1]]
+reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
 ```
 
 ### Synthesized methods with dataclasses
@@ -819,6 +819,38 @@ class WithOverloadedMethod(Generic[T]):
 
 # revealed: Overload[(self, x: int) -> int, [S](self, x: S) -> S | int]
 reveal_type(WithOverloadedMethod[int].method)
+```
+
+## `Callable` return annotations preserve enclosing generic context
+
+When a method annotation contains a `Callable[P, T]` return type, where `P`/`T` are bound by an
+enclosing generic class or protocol, those typevars must remain tied to the enclosing context.
+
+```py
+from typing import Callable, cast
+from typing_extensions import Generic, ParamSpec, Protocol, TypeVar
+
+P = ParamSpec("P")
+T = TypeVar("T")
+
+class GenericClass(Generic[P, T]):
+    def hint(self) -> Callable[P, T]:
+        raise NotImplementedError
+
+class GenericProtocol(Protocol[P, T]):
+    def hint(self) -> Callable[P, T]: ...
+
+def class_case(x: GenericClass[[int], str]) -> None:
+    # revealed: bound method GenericClass[(int, /), str].hint() -> ((int, /) -> str)
+    reveal_type(x.hint)
+    # revealed: (int, /) -> str
+    reveal_type(x.hint())
+
+def protocol_case(x: GenericProtocol[[int], str]) -> None:
+    # revealed: bound method GenericProtocol[(int, /), str].hint() -> ((int, /) -> str)
+    reveal_type(x.hint)
+    # revealed: (int, /) -> str
+    reveal_type(x.hint())
 ```
 
 ## Cyclic class definitions

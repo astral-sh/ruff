@@ -5,9 +5,8 @@ use crate::session::{ClientOptions, SuspendedWorkspaceDiagnosticRequest};
 use anyhow::anyhow;
 use crossbeam::select;
 use lsp_server::Message;
+use lsp_types::Url;
 use lsp_types::notification::Notification;
-use lsp_types::{ConfigurationParams, Url};
-use serde_json::Value;
 
 pub(crate) type ConnectionSender = crossbeam::channel::Sender<Message>;
 pub(crate) type MainLoopSender = crossbeam::channel::Sender<Event>;
@@ -151,7 +150,7 @@ impl Server {
 
                     Action::InitializeWorkspaces(workspaces_with_options) => {
                         self.session
-                            .initialize_workspaces(workspaces_with_options, &client);
+                            .initialize_workspace_folders(&client, workspaces_with_options);
                         // We do this here after workspaces have been initialized
                         // so that the file watcher globs can take project search
                         // paths into account.
@@ -196,92 +195,8 @@ impl Server {
     }
 
     fn initialize(&mut self, client: &Client) {
-        self.request_workspace_configurations(client);
-    }
-
-    /// Requests workspace configurations from the client for all the workspaces in the session.
-    ///
-    /// If the client does not support workspace configuration, it initializes the workspaces
-    /// using the initialization options provided by the client.
-    fn request_workspace_configurations(&mut self, client: &Client) {
-        if !self
-            .session
-            .client_capabilities()
-            .supports_workspace_configuration()
-        {
-            tracing::info!(
-                "Client does not support workspace configuration, initializing workspaces \
-                using the initialization options"
-            );
-            self.session.initialize_workspaces(
-                self.session
-                    .workspaces()
-                    .urls()
-                    .cloned()
-                    .map(|url| (url, self.session.initialization_options().options.clone()))
-                    .collect::<Vec<_>>(),
-                client,
-            );
-            return;
-        }
-
-        let urls = self
-            .session
-            .workspaces()
-            .urls()
-            .cloned()
-            .collect::<Vec<_>>();
-
-        let items = urls
-            .iter()
-            .map(|root| lsp_types::ConfigurationItem {
-                scope_uri: Some(root.clone()),
-                section: Some("ty".to_string()),
-            })
-            .collect();
-
-        tracing::debug!("Requesting workspace configuration for workspaces");
-        client.send_request::<lsp_types::request::WorkspaceConfiguration>(
-            &self.session,
-            ConfigurationParams { items },
-            |client, result: Vec<Value>| {
-                tracing::debug!("Received workspace configurations, initializing workspaces");
-
-                // This shouldn't fail because, as per the spec, the client needs to provide a
-                // `null` value even if it cannot provide a configuration for a workspace.
-                assert_eq!(
-                    result.len(),
-                    urls.len(),
-                    "Mismatch in number of workspace URLs ({}) and configuration results ({})",
-                    urls.len(),
-                    result.len()
-                );
-
-                let workspaces_with_options: Vec<_> = urls
-                    .into_iter()
-                    .zip(result)
-                    .map(|(url, value)| {
-                        if value.is_null() {
-                            tracing::debug!(
-                                "No workspace options provided for {url}, using default options"
-                            );
-                            return (url, ClientOptions::default());
-                        }
-                        let options: ClientOptions =
-                            serde_json::from_value(value).unwrap_or_else(|err| {
-                                tracing::error!(
-                                    "Failed to deserialize workspace options for {url}: {err}. \
-                                        Using default options"
-                                );
-                                ClientOptions::default()
-                            });
-                        (url, options)
-                    })
-                    .collect();
-
-                client.queue_action(Action::InitializeWorkspaces(workspaces_with_options));
-            },
-        );
+        self.session
+            .request_uninitialized_workspace_folder_configurations(client);
     }
 }
 

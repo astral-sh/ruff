@@ -1,8 +1,9 @@
 use crate::checkers::ast::Checker;
+use crate::rules::airflow::helpers::{FunctionSignatureChange, is_method_in_subclass};
 use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, Identifier};
+use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall, Identifier, StmtFunctionDef};
 use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
@@ -38,7 +39,7 @@ use ruff_text_size::Ranged;
 #[violation_metadata(preview_since = "0.14.11")]
 pub(crate) struct Airflow3IncompatibleFunctionSignature {
     function_name: String,
-    change_type: FunctionSignatureChangeType,
+    change: FunctionSignatureChange,
 }
 
 impl Violation for Airflow3IncompatibleFunctionSignature {
@@ -46,26 +47,14 @@ impl Violation for Airflow3IncompatibleFunctionSignature {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let Airflow3IncompatibleFunctionSignature {
-            function_name,
-            change_type,
-        } = self;
-        match change_type {
-            FunctionSignatureChangeType::KeywordOnly { .. }
-            | FunctionSignatureChangeType::PositionalArgumentChange { .. } => {
-                format!("`{function_name}` signature is changed in Airflow 3.0")
-            }
-        }
+        let Airflow3IncompatibleFunctionSignature { function_name, .. } = self;
+        format!("`{function_name}` signature is changed in Airflow 3.0")
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Airflow3IncompatibleFunctionSignature { change_type, .. } = self;
-        match change_type {
-            FunctionSignatureChangeType::KeywordOnly { message }
-            | FunctionSignatureChangeType::PositionalArgumentChange { message } => {
-                Some(message.to_string())
-            }
-        }
+        let Airflow3IncompatibleFunctionSignature { change, .. } = self;
+        let FunctionSignatureChange::Message(message) = change;
+        Some((*message).to_string())
     }
 }
 
@@ -106,6 +95,60 @@ pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, expr:
     check_constructor_arguments(checker, &qualified_name, arguments, func);
 }
 
+/// AIR303
+pub(crate) fn airflow_3_incompatible_method_signature_def(
+    checker: &Checker,
+    function_def: &StmtFunctionDef,
+) {
+    if !checker.semantic().seen_module(Modules::AIRFLOW) {
+        return;
+    }
+
+    // Check for deprecated get_link signature in BaseOperatorLink subclasses
+    if is_method_in_subclass(
+        function_def,
+        checker.semantic(),
+        "get_link",
+        |qualified_name| {
+            matches!(
+                qualified_name.segments(),
+                ["airflow", "models" | "sdk", .., "BaseOperatorLink"]
+            )
+        },
+    ) {
+        let parameters = &function_def.parameters;
+        let positional_count = parameters.posonlyargs.len() + parameters.args.len();
+
+        let is_valid_signature = match positional_count {
+            // check valid signature `def get_link(self, operator, *, ti_key)`
+            2 => parameters
+                .kwonlyargs
+                .iter()
+                .any(|p| p.name().as_str() == "ti_key"),
+            // check valid signature `def get_link(self, operator, ti_key)`
+            3 => parameters
+                .posonlyargs
+                .iter()
+                .chain(parameters.args.iter())
+                .nth(2)
+                .is_some_and(|p| p.name().as_str() == "ti_key"),
+            _ => false,
+        };
+
+        if !is_valid_signature {
+            checker.report_diagnostic(
+                Airflow3IncompatibleFunctionSignature {
+                    function_name: "get_link".to_string(),
+                    change: FunctionSignatureChange::Message(
+                        "Use `def get_link(self, operator, *, ti_key)` or `def get_link(self, operator, ti_key)` as the method signature.",
+                    ),
+                },
+                function_def.name.range(),
+            );
+        }
+    }
+}
+
 fn check_method_arguments(
     checker: &Checker,
     qualified_name: &QualifiedName,
@@ -120,9 +163,9 @@ fn check_method_arguments(
             checker.report_diagnostic(
                 Airflow3IncompatibleFunctionSignature {
                     function_name: attr.to_string(),
-                    change_type: FunctionSignatureChangeType::KeywordOnly {
-                        message: "Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)",
-                    },
+                    change: FunctionSignatureChange::Message(
+                        "Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)",
+                    ),
                 },
                 attr.range(),
             );
@@ -146,9 +189,9 @@ fn check_constructor_arguments(
                 checker.report_diagnostic(
                     Airflow3IncompatibleFunctionSignature {
                         function_name,
-                        change_type: FunctionSignatureChangeType::PositionalArgumentChange {
-                            message: "Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)",
-                        },
+                        change: FunctionSignatureChange::Message(
+                            "Use keyword argument `extra` instead of passing a dict as the second positional argument (e.g., `Asset(name=..., uri=..., extra=...)`)",
+                        ),
                     },
                     func.range(),
                 );
@@ -173,12 +216,4 @@ fn is_dict_expression(checker: &Checker, expr: &Expr) -> bool {
             .is_some_and(|binding| typing::is_dict(binding, checker.semantic())),
         _ => false,
     }
-}
-
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum FunctionSignatureChangeType {
-    /// Function signature changed to only accept keyword arguments.
-    KeywordOnly { message: &'static str },
-    /// Function signature changed to not accept certain positional arguments.
-    PositionalArgumentChange { message: &'static str },
 }

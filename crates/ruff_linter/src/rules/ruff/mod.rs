@@ -134,6 +134,22 @@ mod tests {
     }
 
     #[test]
+    fn missing_fstring_syntax_backslash_py311() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/RUF027_0.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY311.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+        );
+        Ok(())
+    }
+
+    #[test]
     fn prefer_parentheses_getitem_tuple() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF031_prefer_parens.py"),
@@ -331,7 +347,7 @@ mod tests {
 
     #[test]
     fn range_suppressions() -> Result<()> {
-        assert_diagnostics_diff!(
+        let diagnostics = test_path(
             Path::new("ruff/suppressions.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
@@ -342,17 +358,8 @@ mod tests {
                 Rule::UnmatchedSuppressionComment,
             ])
             .with_external_rules(&["TK421"]),
-            &settings::LinterSettings::for_rules(vec![
-                Rule::UnusedVariable,
-                Rule::AmbiguousVariableName,
-                Rule::UnusedNOQA,
-                Rule::InvalidRuleCode,
-                Rule::InvalidSuppressionComment,
-                Rule::UnmatchedSuppressionComment,
-            ])
-            .with_external_rules(&["TK421"])
-            .with_preview_mode(),
-        );
+        )?;
+        assert_diagnostics!(diagnostics);
         Ok(())
     }
 
@@ -611,6 +618,8 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008.py"))]
+    #[test_case(Rule::MutableDataclassDefault, Path::new("RUF008_attrs.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039.py"))]
     #[test_case(Rule::UnrawRePattern, Path::new("RUF039_concat.py"))]
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_0.py"))]
@@ -619,6 +628,8 @@ mod tests {
     #[test_case(Rule::UnnecessaryRegularExpression, Path::new("RUF055_3.py"))]
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
+    #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
+    #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

@@ -114,6 +114,12 @@ impl MemoryFileSystem {
         matches!(by_path.get(&normalized), Some(Entry::Directory(_)))
     }
 
+    pub fn is_executable(&self, path: &SystemPath) -> bool {
+        // Since the permissions of every file are 755,
+        // it follows that every file is executable.
+        self.is_file(path)
+    }
+
     pub fn read_to_string(&self, path: impl AsRef<SystemPath>) -> Result<String> {
         fn read_to_string(fs: &MemoryFileSystem, path: &SystemPath) -> Result<String> {
             let by_path = fs.inner.by_path.read().unwrap();

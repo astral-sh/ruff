@@ -1495,13 +1495,38 @@ static_assert(is_subtype_of(CallableTypeOf[kwargs_float], CallableTypeOf[kwargs_
 static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[kwargs_float]))
 ```
 
-A variadic parameter can be omitted in the subtype:
+A variadic parameter can be added in a subtype, since callers can omit it:
 
 ```py
 def empty() -> None: ...
 
 static_assert(is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[empty]))
 static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[kwargs_int]))
+```
+
+A positional parameter with default can also be added to the subtype, since callers can omit it:
+
+```py
+def positional_with_default(x: int = 0) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_with_default]))
+
+def positional_with_default_and_kwargs(x: int = 0, **kwargs: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default_and_kwargs], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_with_default_and_kwargs]))
+
+static_assert(is_subtype_of(CallableTypeOf[positional_with_default_and_kwargs], CallableTypeOf[kwargs_int]))
+static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[positional_with_default_and_kwargs]))
+
+def positional_only_with_default_and_kwargs(x: int = 0, /, **kwargs: int) -> None: ...
+
+static_assert(is_subtype_of(CallableTypeOf[positional_only_with_default_and_kwargs], CallableTypeOf[empty]))
+static_assert(not is_subtype_of(CallableTypeOf[empty], CallableTypeOf[positional_only_with_default_and_kwargs]))
+
+static_assert(is_subtype_of(CallableTypeOf[positional_only_with_default_and_kwargs], CallableTypeOf[kwargs_int]))
+static_assert(not is_subtype_of(CallableTypeOf[kwargs_int], CallableTypeOf[positional_only_with_default_and_kwargs]))
 ```
 
 #### Keyword-variadic with keyword-only
@@ -2119,31 +2144,26 @@ class Other: ...
 def pg(a: Parent) -> None: ...
 @overload
 def pg(a: Grandparent) -> None: ...
-
 @overload
 def po(a: Parent) -> None: ...
 @overload
 def po(a: Other) -> None: ...
-
 @overload
 def go(a: Grandparent) -> None: ...
 @overload
 def go(a: Other) -> None: ...
-
 @overload
 def cpg(a: Child) -> None: ...
 @overload
 def cpg(a: Parent) -> None: ...
 @overload
 def cpg(a: Grandparent) -> None: ...
-
 @overload
 def empty_go() -> Child: ...
 @overload
 def empty_go(a: Grandparent) -> None: ...
 @overload
 def empty_go(a: Other) -> Other: ...
-
 @overload
 def empty_cp() -> Parent: ...
 @overload
@@ -2191,7 +2211,6 @@ class B: ...
 def overload_ab(x: A) -> None: ...
 @overload
 def overload_ab(x: B) -> None: ...
-
 @overload
 def overload_ba(x: B) -> None: ...
 @overload
@@ -2275,6 +2294,28 @@ static_assert(is_subtype_of(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  #
 static_assert(not is_subtype_of(Literal["abc"], Sequence[Literal["a", "b"]]))  # 'c' not allowed
 static_assert(not is_subtype_of(Literal["x"], Sequence[Literal["a", "b"]]))  # 'x' not allowed
 static_assert(not is_subtype_of(Literal["aa"], Sequence[Literal[""]]))
+```
+
+## Bytes literals and Sequence
+
+Bytes literals are sequences of integers.
+
+```py
+from typing import Literal, Sequence, Iterable, Collection, Reversible
+from ty_extensions import is_subtype_of, static_assert
+
+static_assert(is_subtype_of(Literal[b"abba"], Sequence[int]))
+static_assert(is_subtype_of(Literal[b"abba"], Sequence[Literal[97, 98]]))
+static_assert(is_subtype_of(Literal[b"abb"], Iterable[int]))
+static_assert(is_subtype_of(Literal[b"abb"], Iterable[Literal[97, 98]]))
+static_assert(is_subtype_of(Literal[b"abb"], Collection[int]))
+static_assert(is_subtype_of(Literal[b"abb"], Collection[Literal[97, 98]]))
+static_assert(is_subtype_of(Literal[b""], Sequence[int]))
+
+static_assert(not is_subtype_of(Literal[b"abc"], Sequence[Literal[97, 98]]))  # '99' not allowed
+
+# bytes literals are NOT subtypes of non-int element sequences
+static_assert(not is_subtype_of(Literal[b"abc"], Sequence[str]))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

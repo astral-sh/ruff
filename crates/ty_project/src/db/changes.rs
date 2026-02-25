@@ -147,8 +147,9 @@ impl ProjectDatabase {
 
                     if self.system().is_file(&path) {
                         if project.is_file_included(self, &path) {
-                            // Add the parent directory because `walkdir` always visits explicitly passed files
-                            // even if they match an exclude filter.
+                            // Add the parent directory because `walkdir`
+                            // always visits explicitly passed files even if
+                            // they match an exclude filter.
                             added_paths.insert(path.parent().unwrap().to_path_buf());
                         }
                     } else if project.is_directory_included(self, &path) {

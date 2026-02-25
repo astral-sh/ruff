@@ -334,6 +334,20 @@ def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
         reveal_type(x)  # revealed: tuple[A, Literal["tag1"]]
     else:
         reveal_type(x)  # revealed: tuple[B, Literal["tag2"]]
+
+# Works with reversed equality operands too.
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
+    if "a" == x[0]:
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+
+# Works with reversed inequality operands too.
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B]):
+    if "a" != x[0]:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
 ```
 
 Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the
@@ -372,6 +386,57 @@ def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
         # compare equal to `"tag1"`, so `list[int]` cannot be narrowed out of this
         # union.
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | list[int]
+```
+
+### PEP 695 type aliases
+
+Tuple narrowing also works when the union is defined via a PEP 695 type alias:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+
+type TaggedTuple = tuple[Literal["a"], A] | tuple[Literal["b"], B]
+
+def test_equality_narrowing(x: TaggedTuple):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+
+type NullableTuple = tuple[int, int] | tuple[None, None]
+
+def test_is_narrowing(t: NullableTuple):
+    if t[0] is not None:
+        reveal_type(t)  # revealed: tuple[int, int]
+    else:
+        reveal_type(t)  # revealed: tuple[None, None]
+
+# Nested type aliases (an alias referring to another alias) also work:
+type InnerTagged = tuple[Literal["a"], A] | tuple[Literal["b"], B]
+type OuterTagged = InnerTagged
+
+def test_nested_equality_narrowing(x: OuterTagged):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+
+type InnerNullable = tuple[int, int] | tuple[None, None]
+type OuterNullable = InnerNullable
+
+def test_nested_is_narrowing(t: OuterNullable):
+    if t[0] is not None:
+        reveal_type(t)  # revealed: tuple[int, int]
+    else:
+        reveal_type(t)  # revealed: tuple[None, None]
 ```
 
 ### String subscript

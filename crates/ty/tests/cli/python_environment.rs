@@ -223,6 +223,31 @@ fn src_subdirectory_takes_precedence_over_repo_root() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// If there is an `src/__init__.py(i)` file, don't add `./src` as a root.
+/// This is an antipattern (you're meant to have a top-level package directory
+/// *inside* `src/`), but it's a mistake that a surprising number of people make,
+/// and the diagnostic issued by ty is confusing if imports don't work.
+#[test]
+fn src_subdirectory_not_added_as_root_if_src_package_exists() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        ("src/__init__.py", ""),
+        ("src/box.py", "class Box: ..."),
+        ("src/test_box.py", "from .box import Box"),
+    ])?;
+
+    // The import is only resolvable because `src` was *not* added as a root.
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// This tests that, even if no Python *version* has been specified on the CLI or in a config file,
 /// ty is still able to infer the Python version from a `--python` argument on the CLI,
 /// *even if* the `--python` argument points to a system installation.
@@ -2156,7 +2181,7 @@ fn ty_environment_and_active_environment() -> anyhow::Result<()> {
 }
 
 /// When ty is installed in a system environment rather than a virtual environment, it should
-/// not include the environment's site-packages in its search path.
+/// include the environment's site-packages in its search path.
 #[test]
 fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
     let ty_system_site_packages = if cfg!(windows) {
@@ -2174,7 +2199,7 @@ fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
     let ty_package_path = format!("{ty_system_site_packages}/system_package/__init__.py");
 
     let case = CliTest::with_files([
-        // Package in system Python installation (should NOT be discovered)
+        // Package in system Python installation (should be discovered)
         (ty_package_path.as_str(), "class SystemClass: ..."),
         // Note: NO pyvenv.cfg - this is a system installation, not a venv
         (
@@ -2187,18 +2212,85 @@ fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
     .with_ty_at(ty_executable_path)?;
 
     assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// When ty is installed in a system environment and there's also a local `.venv`,
+/// the system environment's site-packages should not be included at all.
+/// This is the opposite of when ty is installed in a virtual environment (like `uvx --with ...`),
+/// where ty's venv takes priority but both are included.
+#[test]
+fn ty_system_environment_and_local_venv() -> anyhow::Result<()> {
+    let ty_system_site_packages = if cfg!(windows) {
+        "system-python/Lib/site-packages"
+    } else {
+        "system-python/lib/python3.13/site-packages"
+    };
+
+    let ty_executable_path = if cfg!(windows) {
+        "system-python/Scripts/ty.exe"
+    } else {
+        "system-python/bin/ty"
+    };
+
+    let local_venv_site_packages = if cfg!(windows) {
+        ".venv/Lib/site-packages"
+    } else {
+        ".venv/lib/python3.13/site-packages"
+    };
+
+    let ty_unique_package = format!("{ty_system_site_packages}/system_package/__init__.py");
+    let local_unique_package = format!("{local_venv_site_packages}/local_package/__init__.py");
+
+    let case = CliTest::with_files([
+        (ty_unique_package.as_str(), "class SystemEnvClass: ..."),
+        (local_unique_package.as_str(), "class LocalClass: ..."),
+        // Note: NO pyvenv.cfg for system-python - this is a system installation, not a venv
+        (
+            ".venv/pyvenv.cfg",
+            r"
+            home = ./
+            version = 3.13
+            ",
+        ),
+        (
+            "test.py",
+            r"
+            # Should NOT resolve (system Python site-packages excluded when .venv exists)
+            from system_package import SystemEnvClass
+            # Should resolve from local .venv
+            from local_package import LocalClass
+            ",
+        ),
+    ])?
+    .with_ty_at(ty_executable_path)?
+    .with_filter(&site_packages_filter("3.13"), "<site-packages>");
+
+    assert_cmd_snapshot!(case.command().env_remove("VIRTUAL_ENV"), @"
     success: false
     exit_code: 1
     ----- stdout -----
     error[unresolved-import]: Cannot resolve imported module `system_package`
-     --> test.py:2:6
+     --> test.py:3:6
       |
-    2 | from system_package import SystemClass
+    2 | # Should NOT resolve (system Python site-packages excluded when .venv exists)
+    3 | from system_package import SystemEnvClass
       |      ^^^^^^^^^^^^^^
+    4 | # Should resolve from local .venv
+    5 | from local_package import LocalClass
       |
     info: Searched in the following paths during module resolution:
     info:   1. <temp_dir>/ (first-party code)
     info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/.venv/<site-packages> (site-packages)
     info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
     info: rule `unresolved-import` is enabled by default
 
@@ -2376,6 +2468,38 @@ fn default_root_project_name_folder() -> anyhow::Result<()> {
             print(f"{foo} {bar}")
             "#,
         ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command(), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+/// This is the "flat layout", but it looks *nearly* like the "src variant" layout.
+/// If `psycopg/__init__.py` didn't exist, we'd add `psycopg/` as a search path --
+/// but because it *does*, we can see that this is clearly meant to be the flat layout.
+#[test]
+fn default_root_flat_layout_variant() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "pyproject.toml",
+            r#"
+            [project]
+            name = "psycopg"
+            "#,
+        ),
+        ("psycopg/__init__.py", ""),
+        ("psycopg/box.py", "class Box: ..."),
+        // This import only resolves because of the fact that
+        // `./psycopg` was *not* added as a search path.
+        ("psycopg/psycopg/__init__.py", "from psycopg.box import Box"),
     ])?;
 
     assert_cmd_snapshot!(case.command(), @"

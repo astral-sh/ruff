@@ -564,4 +564,65 @@ def f(x: list[int]):
     reveal_type((42, 56, *x, 97))  # revealed: tuple[Literal[42], Literal[56], *tuple[int, ...], Literal[97]]
 ```
 
+## `Literal` promotion for large unannotated tuples
+
+We infer `Literal` types for a tuple's elements only if it has \<=64 elements. For larger tuples, if
+they are unannotated, we promote `Literal` types inside the tuple.
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Final, Literal
+
+# fmt: off
+
+has_64_elements = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64)
+
+reveal_type(len(has_64_elements))  # revealed: Literal[64]
+
+# revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4], Literal[5], Literal[6], Literal[7], Literal[8], Literal[9], Literal[10], Literal[11], Literal[12], Literal[13], Literal[14], Literal[15], Literal[16], Literal[17], Literal[18], Literal[19], Literal[20], Literal[21], Literal[22], Literal[23], Literal[24], Literal[25], Literal[26], Literal[27], Literal[28], Literal[29], Literal[30], Literal[31], Literal[32], Literal[33], Literal[34], Literal[35], Literal[36], Literal[37], Literal[38], Literal[39], Literal[40], Literal[41], Literal[42], Literal[43], Literal[44], Literal[45], Literal[46], Literal[47], Literal[48], Literal[49], Literal[50], Literal[51], Literal[52], Literal[53], Literal[54], Literal[55], Literal[56], Literal[57], Literal[58], Literal[59], Literal[60], Literal[61], Literal[62], Literal[63], Literal[64]]
+reveal_type(has_64_elements)
+
+annotated_tuple_with_64: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64)
+
+reveal_type(len(annotated_tuple_with_64))  # revealed: Literal[64]
+
+# revealed: tuple[Literal[1], Literal[2], Literal[3], Literal[4], Literal[5], Literal[6], Literal[7], Literal[8], Literal[9], Literal[10], Literal[11], Literal[12], Literal[13], Literal[14], Literal[15], Literal[16], Literal[17], Literal[18], Literal[19], Literal[20], Literal[21], Literal[22], Literal[23], Literal[24], Literal[25], Literal[26], Literal[27], Literal[28], Literal[29], Literal[30], Literal[31], Literal[32], Literal[33], Literal[34], Literal[35], Literal[36], Literal[37], Literal[38], Literal[39], Literal[40], Literal[41], Literal[42], Literal[43], Literal[44], Literal[45], Literal[46], Literal[47], Literal[48], Literal[49], Literal[50], Literal[51], Literal[52], Literal[53], Literal[54], Literal[55], Literal[56], Literal[57], Literal[58], Literal[59], Literal[60], Literal[61], Literal[62], Literal[63], Literal[64]]
+reveal_type(annotated_tuple_with_64)
+
+has_65_elements = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(has_65_elements))  # revealed: Literal[65]
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(has_65_elements)
+
+final_tuple_with_65: Final = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(final_tuple_with_65))  # revealed: Literal[65]
+
+# revealed: tuple[int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int]
+reveal_type(final_tuple_with_65)
+
+# fmt: on
+```
+
+Literal promotion can always be avoided by providing explicit type annotations:
+
+```py
+# fmt: off
+
+annotated_tuple_with_65: tuple[Literal[1], Literal[2], *tuple[int, ...], Literal[64], Literal[65]] = (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65)
+
+reveal_type(len(annotated_tuple_with_65))  # revealed: Literal[65]
+
+# revealed: tuple[Literal[1], Literal[2], int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, int, Literal[64], Literal[65]]
+reveal_type(annotated_tuple_with_65)
+
+# fmt: on
+```
+
 [not a singleton type]: https://discuss.python.org/t/should-we-specify-in-the-language-reference-that-the-empty-tuple-is-a-singleton/67957

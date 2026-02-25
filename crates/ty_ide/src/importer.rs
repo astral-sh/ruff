@@ -362,11 +362,18 @@ impl<'ast> MembersInScope<'ast> {
             .collect();
         MembersInScope { at, map }
     }
+
+    pub(crate) fn find_member(&self, symbol_name: &str) -> Option<&MemberInScope> {
+        self.map
+            .iter()
+            .find(|(name, _)| *name == symbol_name)
+            .map(|(_, member)| member)
+    }
 }
 
 #[derive(Debug)]
-struct MemberInScope<'ast> {
-    ty: Type<'ast>,
+pub(crate) struct MemberInScope<'ast> {
+    pub(crate) ty: Type<'ast>,
     kind: MemberImportKind<'ast>,
 }
 

@@ -5,7 +5,9 @@
 use std::hash::BuildHasherDefault;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
-use crate::suppression::{IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT};
+use crate::suppression::{
+    IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_TYPE_IGNORE_COMMENT,
+};
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use program::{Program, ProgramSettings};
@@ -14,24 +16,26 @@ use rustc_hash::FxHasher;
 pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
-pub use suppression::{UNUSED_IGNORE_COMMENT, suppress_all, suppress_single};
+pub use suppression::{
+    UNUSED_IGNORE_COMMENT, is_unused_ignore_comment_lint, suppress_all, suppress_single,
+};
 pub use ty_module_resolver::MisconfigurationMode;
+use ty_module_resolver::ModuleGlobSet;
 pub use ty_site_packages::{
     PythonEnvironment, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
     SitePackagesPaths, SysPrefixPathOrigin,
 };
-pub use types::DisplaySettings;
 pub use types::ide_support::{
     ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,
     definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
     map_stub_definition,
 };
+pub use types::{DisplaySettings, TypeQualifiers};
 
 pub mod ast_node_ref;
 mod db;
 mod dunder_all;
 pub mod lint;
-pub(crate) mod list;
 mod node_key;
 pub(crate) mod place;
 mod program;
@@ -68,6 +72,7 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
+    registry.register_lint(&UNUSED_TYPE_IGNORE_COMMENT);
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
 }
@@ -82,12 +87,18 @@ pub struct AnalysisSettings {
     /// * report unused `type: ignore` comments
     /// * report invalid `type: ignore` comments
     pub respect_type_ignore_comments: bool,
+
+    pub allowed_unresolved_imports: ModuleGlobSet,
+
+    pub replace_imports_with_any: ModuleGlobSet,
 }
 
 impl Default for AnalysisSettings {
     fn default() -> Self {
         Self {
             respect_type_ignore_comments: true,
+            allowed_unresolved_imports: ModuleGlobSet::empty(),
+            replace_imports_with_any: ModuleGlobSet::empty(),
         }
     }
 }

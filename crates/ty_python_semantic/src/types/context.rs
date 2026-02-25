@@ -9,7 +9,7 @@ use ruff_db::{
 };
 use ruff_text_size::{Ranged, TextRange};
 
-use super::{Type, TypeCheckDiagnostics, binding_type};
+use super::{Type, TypeCheckDiagnostics, infer_definition_types};
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
@@ -190,17 +190,22 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
 
                 let scope_id = self.scope.file_scope_id(self.db);
 
-                // Inspect all ancestor function scopes by walking bottom up and infer the function's type.
-                let mut function_scope_tys = index
+                // Inspect all ancestor function scopes by walking bottom up and check
+                // if any is decorated with `@no_type_check`. We use the undecorated type
+                // rather than the binding type because other decorators (e.g. unknown ones)
+                // may transform the function type into a non-`FunctionLiteral`.
+                // `undecorated_type()` can be `None` during cycle recovery.
+                index
                     .ancestor_scopes(scope_id)
                     .filter_map(|(_, scope)| scope.node().as_function())
-                    .map(|node| binding_type(self.db, index.expect_single_definition(node)))
-                    .filter_map(Type::as_function_literal);
-
-                // Iterate over all functions and test if any is decorated with `@no_type_check`.
-                function_scope_tys.any(|function_ty| {
-                    function_ty.has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
-                })
+                    .filter_map(|node| {
+                        infer_definition_types(self.db, index.expect_single_definition(node))
+                            .undecorated_type()
+                            .and_then(Type::as_function_literal)
+                    })
+                    .any(|function_ty| {
+                        function_ty.has_known_decorator(self.db, FunctionDecorators::NO_TYPE_CHECK)
+                    })
             }
             InNoTypeCheck::Yes => true,
         }

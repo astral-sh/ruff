@@ -10,7 +10,6 @@ use crate::expression::parentheses::{
 use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
-use crate::preview::is_parenthesize_lambda_bodies_enabled;
 
 #[derive(Default)]
 pub struct FormatExprLambda {
@@ -31,7 +30,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
-        let preview = is_parenthesize_lambda_bodies_enabled(f.context());
 
         write!(f, [token("lambda")])?;
 
@@ -108,7 +106,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.
-            if preview && !comments.contains_comments(parameters.into()) {
+            if !comments.contains_comments(parameters.into()) {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
                 write!(
                     buffer,
@@ -134,12 +132,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         if dangling_header_comments.is_empty() {
             write!(f, [space()])?;
-        } else if !preview {
-            write!(f, [dangling_comments(dangling_header_comments)])?;
-        }
-
-        if !preview {
-            return body.format().fmt(f);
         }
 
         let fmt_body = FormatBody {

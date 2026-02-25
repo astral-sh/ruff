@@ -72,7 +72,7 @@ class Sub8(Super):
     def method(self, x: int, *args, **kwargs): ...  # fine
 
 class Sub9(Super):
-    def method(self, x: int, extra_positional_arg=42, /): ... # fine
+    def method(self, x: int, extra_positional_arg=42, /): ...  # fine
 
 class Sub10(Super):
     def method(self, x: int, extra_pos_or_kw_arg=42): ...  # fine
@@ -411,10 +411,11 @@ python-version = "3.13"
 ```
 
 ```pyi
-from dataclasses import dataclass
+from dataclasses import dataclass, InitVar
 from typing_extensions import Self
 
 class Grandparent: ...
+
 class Parent(Grandparent):
     def __new__(cls, x: int) -> Self: ...
     def __init__(self, x: int) -> None: ...
@@ -425,14 +426,14 @@ class Child(Parent):
 
 @dataclass(init=False)
 class DataSuper:
-    x: int
+    x: InitVar[int]
 
     def __post_init__(self, x: int) -> None:
         self.x = x
 
 @dataclass(init=False)
 class DataSub(DataSuper):
-    y: str
+    y: InitVar[str]
 
     def __post_init__(self, x: int, y: str) -> None:
         self.y = y
@@ -476,6 +477,18 @@ class Bad:
     x: int
     def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
         return self.x == other.x
+```
+
+## Class-private names do not override
+
+```py
+class X:
+    def __get_value(self) -> int:
+        return 0
+
+class Y(X):
+    def __get_value(self) -> str:
+        return "s"
 ```
 
 ## Synthesized methods
@@ -605,6 +618,32 @@ class GoodChild2(Parent):
     def class_method(cls, x: object) -> bool: ...
     @staticmethod
     def static_method(x: object) -> bool: ...
+```
+
+## Overloaded methods with positional-only parameters with defaults
+
+When a base class has an overloaded method where one overload accepts only keyword arguments
+(`**kwargs`), and the subclass overrides it with a positional-only parameter that has a default, the
+override should be valid because callers can still call it without positional arguments.
+
+```pyi
+from typing import overload
+
+class Base:
+    @overload
+    def method(self, x: int, /) -> None: ...
+    @overload
+    def method(self, **kwargs: int) -> None: ...
+    def method(self, *args, **kwargs) -> None: ...
+
+class GoodChild(Base):
+    # This should be fine: the positional-only parameter has a default,
+    # so calls like `obj.method(a=1)` are still valid
+    def method(self, x: int = 0, /, **kwargs: int) -> None: ...
+
+class BadChild(Base):
+    # `x` has no default, so `obj.method(a=1)` would fail
+    def method(self, x: int, /, **kwargs: int) -> None: ...  # error: [invalid-method-override]
 ```
 
 ## Definitely bound members with no reachable definitions(!)

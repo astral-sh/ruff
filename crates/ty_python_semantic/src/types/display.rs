@@ -11,12 +11,17 @@ use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::str::{Quote, TripleQuotes};
 use ruff_python_literal::escape::AsciiEscape;
 use ruff_source_file::LineColumn;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+use ruff_db::parsed::parsed_module;
+use ty_module_resolver::file_to_module;
 
 use crate::Db;
 use crate::place::{DefinedPlace, Place};
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::scope::{FileScopeId, ScopeKind};
+use crate::semantic_index::semantic_index;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -27,10 +32,40 @@ use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BindingContext, BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType,
-    KnownBoundMethodType, KnownClass, KnownInstanceType, MaterializationKind, Protocol,
-    ProtocolInstanceType, SpecialFormType, StringLiteralType, SubclassOfInner, SubclassOfType,
-    Type, TypeGuardLike, TypedDictType, UnionType, WrapperDescriptorKind, visitor,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueType, LiteralValueTypeKind,
+    MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType, StringLiteralType,
+    SubclassOfInner, SubclassOfType, Type, TypeAliasType, TypeGuardLike, TypedDictType, UnionType,
+    WrapperDescriptorKind, visitor,
 };
+
+/// A named item that can be either a class or a type alias.
+///
+/// This wrapper allows tracking both classes and type aliases together for
+/// disambiguation, since a class and type alias with the same name in different
+/// modules need to be distinguished in error messages.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum NamedItem<'db> {
+    Class(ClassLiteral<'db>),
+    TypeAlias(TypeAliasType<'db>),
+}
+
+impl<'db> NamedItem<'db> {
+    fn name(self, db: &'db dyn Db) -> &'db str {
+        match self {
+            NamedItem::Class(class) => class.name(db),
+            NamedItem::TypeAlias(type_alias) => type_alias.name(db),
+        }
+    }
+
+    fn qualified_name_components(self, db: &'db dyn Db) -> Vec<String> {
+        match self {
+            NamedItem::Class(class) => class.qualified_name(db).components_excluding_self(),
+            NamedItem::TypeAlias(type_alias) => {
+                type_alias.qualified_name(db).components_excluding_self()
+            }
+        }
+    }
+}
 
 /// Settings for displaying types and signatures
 #[derive(Debug, Clone, Default)]
@@ -40,6 +75,9 @@ pub struct DisplaySettings<'db> {
     /// Class names that should be displayed fully qualified
     /// (e.g., `module.ClassName` instead of just `ClassName`)
     pub qualified: Rc<FxHashMap<&'db str, QualificationLevel>>,
+    /// Type alias names that should be displayed fully qualified
+    /// (e.g., `A.Alias` instead of just `Alias`)
+    pub qualified_type_aliases: Rc<FxHashMap<&'db str, QualificationLevel>>,
     /// Whether long unions and literals are displayed in full
     pub preserve_full_unions: bool,
     /// Disallow Signature printing to introduce a name
@@ -49,6 +87,9 @@ pub struct DisplaySettings<'db> {
     /// whose type parameters are currently being displayed).
     /// Used to suppress redundant `@{scope}` suffixes for type variables.
     pub active_scopes: Rc<FxHashSet<Definition<'db>>>,
+    /// Function types that are currently being displayed.
+    /// Used to prevent infinite recursion when displaying self-referential function types.
+    pub visited_function_types: Rc<FxHashSet<FunctionType<'db>>>,
 }
 
 impl<'db> DisplaySettings<'db> {
@@ -109,24 +150,19 @@ impl<'db> DisplaySettings<'db> {
         T: Into<Type<'db>>,
     {
         fn build_display_settings<'db>(
-            collector: &AmbiguousClassCollector<'db>,
+            collector: &AmbiguousNameCollector<'db>,
         ) -> DisplaySettings<'db> {
+            // Both classes and type aliases use the same qualification map since
+            // a class and type alias with the same name need to be disambiguated.
+            let qualification_map = Rc::new(collector.qualification_map());
             DisplaySettings {
-                qualified: Rc::new(
-                    collector
-                        .class_names
-                        .borrow()
-                        .iter()
-                        .filter_map(|(name, ambiguity)| {
-                            Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
-                        })
-                        .collect(),
-                ),
+                qualified: Rc::clone(&qualification_map),
+                qualified_type_aliases: qualification_map,
                 ..DisplaySettings::default()
             }
         }
 
-        let collector = AmbiguousClassCollector::default();
+        let collector = AmbiguousNameCollector::default();
 
         for ty in types {
             collector.visit_type(db, ty.into());
@@ -374,43 +410,45 @@ impl QualificationLevel {
 }
 
 #[derive(Debug, Default)]
-struct AmbiguousClassCollector<'db> {
+struct AmbiguousNameCollector<'db> {
     visited_types: RefCell<FxHashSet<Type<'db>>>,
-    class_names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
+    names: RefCell<FxHashMap<&'db str, AmbiguityState<'db>>>,
 }
 
-impl<'db> AmbiguousClassCollector<'db> {
-    fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
-        match self.class_names.borrow_mut().entry(class.name(db)) {
+impl<'db> AmbiguousNameCollector<'db> {
+    /// Records an item for ambiguity tracking.
+    ///
+    /// This updates the ambiguity state for items with the same name:
+    /// - First occurrence: `Unambiguous`
+    /// - Different qualified paths: `RequiresFullyQualifiedName`
+    /// - Same qualified paths: `RequiresFileAndLineNumber`
+    fn record(&self, db: &'db dyn Db, item: NamedItem<'db>) {
+        match self.names.borrow_mut().entry(item.name(db)) {
             Entry::Vacant(entry) => {
-                entry.insert(AmbiguityState::Unambiguous(class));
+                entry.insert(AmbiguityState::Unambiguous(item));
             }
             Entry::Occupied(mut entry) => {
                 let value = entry.get_mut();
                 match value {
                     AmbiguityState::Unambiguous(existing) => {
-                        if *existing != class {
-                            let qualified_name_components =
-                                class.qualified_name(db).components_excluding_self();
-                            if existing.qualified_name(db).components_excluding_self()
-                                == qualified_name_components
-                            {
+                        if *existing != item {
+                            let qualified_name_components = item.qualified_name_components(db);
+                            if existing.qualified_name_components(db) == qualified_name_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
                             } else {
                                 *value = AmbiguityState::RequiresFullyQualifiedName {
-                                    class,
+                                    item,
                                     qualified_name_components,
                                 };
                             }
                         }
                     }
                     AmbiguityState::RequiresFullyQualifiedName {
-                        class: existing,
+                        item: existing,
                         qualified_name_components,
                     } => {
-                        if *existing != class {
-                            let new_components =
-                                class.qualified_name(db).components_excluding_self();
+                        if *existing != item {
+                            let new_components = item.qualified_name_components(db);
                             if *qualified_name_components == new_components {
                                 *value = AmbiguityState::RequiresFileAndLineNumber;
                             }
@@ -421,25 +459,47 @@ impl<'db> AmbiguousClassCollector<'db> {
             }
         }
     }
+
+    fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
+        self.record(db, NamedItem::Class(class));
+    }
+
+    fn record_type_alias(&self, db: &'db dyn Db, type_alias: TypeAliasType<'db>) {
+        self.record(db, NamedItem::TypeAlias(type_alias));
+    }
+
+    /// Returns the qualification level map for all names.
+    ///
+    /// When there's any ambiguity for a name (including conflicts between a class
+    /// and a type alias), the name is included so that items with that name get qualified.
+    fn qualification_map(&self) -> FxHashMap<&'db str, QualificationLevel> {
+        self.names
+            .borrow()
+            .iter()
+            .filter_map(|(name, ambiguity)| {
+                Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
+            })
+            .collect()
+    }
 }
 
-/// Whether or not a class can be unambiguously identified by its *unqualified* name
+/// Whether or not an item can be unambiguously identified by its *unqualified* name
 /// given the other types that are present in the same context.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum AmbiguityState<'db> {
-    /// The class can be displayed unambiguously using its unqualified name
-    Unambiguous(ClassLiteral<'db>),
-    /// The class must be displayed using its fully qualified name to avoid ambiguity.
+    /// The item can be displayed unambiguously using its unqualified name.
+    Unambiguous(NamedItem<'db>),
+    /// The item must be displayed using its fully qualified name to avoid ambiguity.
     RequiresFullyQualifiedName {
-        class: ClassLiteral<'db>,
+        item: NamedItem<'db>,
         qualified_name_components: Vec<String>,
     },
-    /// Even the class's fully qualified name is not sufficient;
+    /// Even the item's fully qualified name is not sufficient;
     /// we must also include the file and line number.
     RequiresFileAndLineNumber,
 }
 
-impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
+impl<'db> TypeVisitor<'db> for AmbiguousNameCollector<'db> {
     fn should_visit_lazy_type_attributes(&self) -> bool {
         false
     }
@@ -447,12 +507,15 @@ impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
-            Type::EnumLiteral(literal) => {
-                self.record_class(db, literal.enum_class(db));
+            Type::LiteralValue(literal) => {
+                if let LiteralValueTypeKind::Enum(literal) = literal.kind() {
+                    self.record_class(db, literal.enum_class(db));
+                }
             }
             Type::GenericAlias(alias) => {
                 self.record_class(db, ClassLiteral::Static(alias.origin(db)));
             }
+            Type::TypeAlias(type_alias) => self.record_type_alias(db, type_alias),
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -526,12 +589,14 @@ impl<'db> DisplayType<'db> {
 impl<'db> FmtDetailed<'db> for DisplayType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let representation = self.ty.representation(self.db, self.settings.clone());
-        match self.ty {
-            Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_) => {
+        match self.ty.as_literal_value_kind() {
+            Some(
+                LiteralValueTypeKind::Int(_)
+                | LiteralValueTypeKind::Bool(_)
+                | LiteralValueTypeKind::String(_)
+                | LiteralValueTypeKind::Bytes(_)
+                | LiteralValueTypeKind::Enum(_),
+            ) => {
                 f.with_type(Type::SpecialForm(SpecialFormType::Literal))
                     .write_str("Literal")?;
                 f.write_char('[')?;
@@ -553,6 +618,77 @@ impl fmt::Debug for DisplayType<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         Display::fmt(self, f)
     }
+}
+
+/// Format a file location suffix for disambiguation (e.g., " @ path:line:column")
+fn fmt_file_location<'db>(
+    db: &'db dyn Db,
+    file: ruff_db::files::File,
+    offset: TextSize,
+    f: &mut TypeWriter<'_, '_, 'db>,
+) -> fmt::Result {
+    let path = file.path(db);
+    let path = match path {
+        FilePath::System(path) => Cow::Owned(FilePath::System(
+            path.strip_prefix(db.system().current_directory())
+                .unwrap_or(path)
+                .to_path_buf(),
+        )),
+        FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
+    };
+    let line_index = line_index(db, file);
+    let LineColumn { line, column } = line_index.line_column(offset, &source_text(db, file));
+    f.set_invalid_type_annotation();
+    write!(f, " @ {path}:{line}:{column}")
+}
+
+/// Returns the qualified name components for a scope, excluding the item itself.
+///
+/// This is the shared logic used by both [`QualifiedClassName`](super::class::QualifiedClassName)
+/// and [`QualifiedTypeAliasName`](super::QualifiedTypeAliasName) to compute the path components
+/// (module, enclosing classes, functions) leading to an item.
+///
+/// # Returns
+/// A vector of path components in order (e.g., `["module", "OuterClass", "InnerClass"]`)
+pub(super) fn qualified_name_components_from_scope(
+    db: &dyn Db,
+    file: ruff_db::files::File,
+    file_scope_id: FileScopeId,
+    skip_count: usize,
+) -> Vec<String> {
+    let module_ast = parsed_module(db, file).load(db);
+    let index = semantic_index(db, file);
+
+    let mut name_parts = vec![];
+
+    for (_, ancestor_scope) in index.ancestor_scopes(file_scope_id).skip(skip_count) {
+        let node = ancestor_scope.node();
+
+        match ancestor_scope.kind() {
+            ScopeKind::Class => {
+                if let Some(class_def) = node.as_class() {
+                    name_parts.push(class_def.node(&module_ast).name.as_str().to_string());
+                }
+            }
+            ScopeKind::Function => {
+                if let Some(function_def) = node.as_function() {
+                    name_parts.push(format!(
+                        "<locals of function '{}'>",
+                        function_def.node(&module_ast).name.as_str()
+                    ));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(module) = file_to_module(db, file) {
+        let module_name = module.name(db);
+        name_parts.push(module_name.as_str().to_string());
+    }
+
+    name_parts.reverse();
+    name_parts
 }
 
 impl<'db> ClassLiteral<'db> {
@@ -585,27 +721,69 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
             let file = self.class.file(self.db);
-            let class_offset = self.class.header_range(self.db).start();
-            let path = file.path(self.db);
-            let path = match path {
-                FilePath::System(path) => Cow::Owned(FilePath::System(
-                    path.strip_prefix(self.db.system().current_directory())
-                        .unwrap_or(path)
-                        .to_path_buf(),
-                )),
-                FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
-            };
-            let line_index = line_index(self.db, file);
-            let LineColumn { line, column } =
-                line_index.line_column(class_offset, &source_text(self.db, file));
-            f.set_invalid_type_annotation();
-            write!(f, " @ {path}:{line}:{column}")?;
+            let offset = self.class.header_range(self.db).start();
+            fmt_file_location(self.db, file, offset, f)?;
         }
         Ok(())
     }
 }
 
 impl Display for ClassDisplay<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
+}
+
+impl<'db> TypeAliasType<'db> {
+    fn display_with(
+        self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> TypeAliasDisplay<'db> {
+        TypeAliasDisplay {
+            db,
+            type_alias: self,
+            settings,
+        }
+    }
+}
+
+struct TypeAliasDisplay<'db> {
+    db: &'db dyn Db,
+    type_alias: TypeAliasType<'db>,
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        let qualification_level = self
+            .settings
+            .qualified_type_aliases
+            .get(self.type_alias.name(self.db));
+
+        let ty = Type::TypeAlias(self.type_alias);
+        if qualification_level.is_some() {
+            let qualified_name = self.type_alias.qualified_name(self.db);
+            write!(f.with_type(ty), "{qualified_name}")?;
+        } else {
+            write!(f.with_type(ty), "{}", self.type_alias.name(self.db))?;
+        }
+
+        if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
+            if let Some(definition) = self.type_alias.definition(self.db) {
+                let file = definition.file(self.db);
+                let offset = definition
+                    .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
+                    .range()
+                    .start();
+                fmt_file_location(self.db, file, offset, f)?;
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Display for TypeAliasDisplay<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         self.fmt_detailed(&mut TypeWriter::Formatter(f))
     }
@@ -881,7 +1059,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         KnownClass::Property,
                         "startswith",
                         "string",
-                        Type::StringLiteral(literal),
+                        Type::LiteralValue(LiteralValueType::promotable(
+                            LiteralValueTypeKind::String(literal),
+                        )),
                         Some(literal.value(self.db)),
                     ),
                     KnownBoundMethodType::ConstraintSetRange => {
@@ -967,40 +1147,45 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::Intersection(intersection) => intersection
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            Type::IntLiteral(n) => write!(f.with_type(self.ty), "{n}"),
-            Type::BooleanLiteral(boolean) => {
-                f.with_type(self.ty)
-                    .write_str(if boolean { "True" } else { "False" })
-            }
-            Type::StringLiteral(string) => {
-                write!(
-                    f.with_type(self.ty),
-                    "{}",
-                    string.display_with(self.db, self.settings.clone())
-                )
-            }
-            // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
-            // which would mean users would be able to jump to the definition of `LiteralString` from the
-            // inlay hint, but that seems less useful than the definition of `str` for a variable that is
-            // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
-            // at runtime)
-            Type::LiteralString => f.with_type(self.ty).write_str("LiteralString"),
-            Type::BytesLiteral(bytes) => {
-                let escape = AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(n) => write!(f.with_type(self.ty), "{n}"),
+                LiteralValueTypeKind::Bool(boolean) => {
+                    f.with_type(self.ty)
+                        .write_str(if boolean { "True" } else { "False" })
+                }
+                LiteralValueTypeKind::String(string) => {
+                    write!(
+                        f.with_type(self.ty),
+                        "{}",
+                        string.display_with(self.db, self.settings.clone()),
+                    )
+                }
+                // an alternative would be to use `Type::SpecialForm(SpecialFormType::LiteralString)` here,
+                // which would mean users would be able to jump to the definition of `LiteralString` from the
+                // inlay hint, but that seems less useful than the definition of `str` for a variable that is
+                // inferred as an *inhabitant* of `LiteralString` (since that variable will just be a string
+                // at runtime)
+                LiteralValueTypeKind::LiteralString => {
+                    f.with_type(self.ty).write_str("LiteralString")
+                }
+                LiteralValueTypeKind::Bytes(bytes) => {
+                    let escape =
+                        AsciiEscape::with_preferred_quote(bytes.value(self.db), Quote::Double);
 
-                write!(
-                    f.with_type(self.ty),
-                    "{}",
-                    escape.bytes_repr(TripleQuotes::No)
-                )
-            }
-            Type::EnumLiteral(enum_literal) => {
-                enum_literal
-                    .enum_class(self.db)
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
-                write!(f, ".{}", enum_literal.name(self.db))
-            }
+                    write!(
+                        f.with_type(self.ty),
+                        "{}",
+                        escape.bytes_repr(TripleQuotes::No)
+                    )
+                }
+                LiteralValueTypeKind::Enum(enum_literal) => {
+                    enum_literal
+                        .enum_class(self.db)
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)?;
+                    write!(f, ".{}", enum_literal.name(self.db))
+                }
+            },
             Type::TypeVar(bound_typevar) => {
                 f.set_invalid_type_annotation();
                 write!(
@@ -1056,7 +1241,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_char('>')
             }
             Type::TypeAlias(alias) => {
-                f.write_str(alias.name(self.db))?;
+                alias
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
                 match alias.specialization(self.db) {
                     None => Ok(()),
                     Some(specialization) => specialization
@@ -1282,6 +1469,19 @@ pub(crate) struct DisplayFunctionType<'db> {
 
 impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        // Detect self-referential function types to prevent infinite recursion.
+        if self.settings.visited_function_types.contains(&self.ty) {
+            f.set_invalid_type_annotation();
+            f.write_str("def ")?;
+            write!(f, "{}", self.ty.name(self.db))?;
+            return f.write_str("(...)");
+        }
+
+        let mut settings = self.settings.clone();
+        let mut visited = (*settings.visited_function_types).clone();
+        visited.insert(self.ty);
+        settings.visited_function_types = Rc::new(visited);
+
         let signature = self.ty.signature(self.db);
 
         match signature.overloads.as_slice() {
@@ -1291,7 +1491,7 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 let type_parameters = DisplayOptionalGenericContext {
                     generic_context: signature.generic_context.as_ref(),
                     db: self.db,
-                    settings: self.settings.clone(),
+                    settings: settings.clone(),
                     hide_unused_self,
                 };
                 f.set_invalid_type_annotation();
@@ -1299,24 +1499,24 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 write!(f, "{}", self.ty.name(self.db))?;
                 type_parameters.fmt_detailed(f)?;
                 signature
-                    .display_with(self.db, self.settings.disallow_signature_name())
+                    .display_with(self.db, settings.disallow_signature_name())
                     .fmt_detailed(f)
             }
             signatures => {
                 // TODO: How to display overloads?
-                if !self.settings.multiline {
+                if !settings.multiline {
                     // TODO: This should ideally have a TypeDetail but we actually
                     // don't have a type for @overload (we just detect the decorator)
                     f.write_str("Overload")?;
                     f.write_char('[')?;
                 }
-                let separator = if self.settings.multiline { "\n" } else { ", " };
+                let separator = if settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
                 for signature in signatures {
-                    join.entry(&signature.display_with(self.db, self.settings.clone()));
+                    join.entry(&signature.display_with(self.db, settings.clone()));
                 }
                 join.finish()?;
-                if !self.settings.multiline {
+                if !settings.multiline {
                     f.write_str("]")?;
                 }
                 Ok(())
@@ -1838,9 +2038,18 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
 
         // Return type
         f.write_str(" -> ")?;
+
+        let should_parenthesize_return_type =
+            should_parenthesize_callable_type(self.return_ty, self.db);
+        if should_parenthesize_return_type {
+            f.write_char('(')?;
+        }
         self.return_ty
             .display_with(self.db, settings.singleline())
             .fmt_detailed(&mut f)?;
+        if should_parenthesize_return_type {
+            f.write_char(')')?;
+        }
 
         if self.parameters.is_top() {
             f.write_str("]")?;
@@ -1963,8 +2172,12 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
             }
             ParametersKind::ParamSpec(typevar) => {
                 write!(f, "**{}", typevar.name(self.db))?;
-                if let Some(name) = typevar.binding_context(self.db).name(self.db) {
-                    write!(f, "@{name}")?;
+                let binding_context = typevar.binding_context(self.db);
+                if let Some(binding_context_name) = binding_context.name(self.db)
+                    && let Some(definition) = binding_context.definition()
+                    && !self.settings.active_scopes.contains(&definition)
+                {
+                    write!(f, "@{binding_context_name}")?;
                 }
             }
         }
@@ -2021,11 +2234,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     f.write_str("=")?;
                 }
                 match default_type {
-                    Type::IntLiteral(_)
-                    | Type::BooleanLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::EnumLiteral(_)
-                    | Type::BytesLiteral(_) => {
+                    Type::LiteralValue(literal)
+                        if matches!(
+                            literal.kind(),
+                            LiteralValueTypeKind::Int(_)
+                                | LiteralValueTypeKind::Bool(_)
+                                | LiteralValueTypeKind::String(_)
+                                | LiteralValueTypeKind::Enum(_)
+                                | LiteralValueTypeKind::Bytes(_)
+                        ) =>
+                    {
                         // For Literal types display the value without `Literal[..]` wrapping
                         let representation =
                             default_type.representation(self.db, self.settings.clone());
@@ -2141,12 +2359,14 @@ impl<'db> FmtDetailed<'db> for DisplayUnionType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         fn is_condensable(ty: Type<'_>) -> bool {
             matches!(
-                ty,
-                Type::IntLiteral(_)
-                    | Type::StringLiteral(_)
-                    | Type::BytesLiteral(_)
-                    | Type::BooleanLiteral(_)
-                    | Type::EnumLiteral(_)
+                ty.as_literal_value_kind(),
+                Some(
+                    LiteralValueTypeKind::Int(_)
+                        | LiteralValueTypeKind::String(_)
+                        | LiteralValueTypeKind::Bytes(_)
+                        | LiteralValueTypeKind::Bool(_)
+                        | LiteralValueTypeKind::Enum(_)
+                )
             )
         }
 
@@ -2430,6 +2650,22 @@ impl Display for DisplayMaybeNegatedType<'_> {
     }
 }
 
+/// Returns `true` if the given type is a callable type that should be parenthesized
+/// when appearing as a parameter annotation or return type of another callable.
+///
+/// Callable types with arrow syntax like `(int, str) -> bool` are parenthesized to
+/// avoid ambiguity in nested callable displays. The exceptions are:
+/// - Overloaded callables, which display as `Overload[...]` (already unambiguous)
+/// - Callables with top-materialization parameters, which display as `Top[...]` (already unambiguous)
+fn should_parenthesize_callable_type(ty: Type<'_>, db: &dyn Db) -> bool {
+    if let Type::Callable(callable) = ty {
+        let overloads = &callable.signatures(db).overloads;
+        overloads.len() == 1 && !overloads[0].parameters().is_top()
+    } else {
+        false
+    }
+}
+
 struct DisplayMaybeParenthesizedType<'db> {
     ty: Type<'db>,
     db: &'db dyn Db,
@@ -2447,14 +2683,7 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             f.write_char(')')
         };
         match self.ty {
-            Type::Callable(callable)
-                if callable.signatures(self.db).overloads.len() == 1
-                    && !callable.signatures(self.db).overloads[0]
-                        .parameters()
-                        .is_top() =>
-            {
-                write_parentheses(f)
-            }
+            ty if should_parenthesize_callable_type(ty, self.db) => write_parentheses(f),
             Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
@@ -2799,7 +3028,7 @@ mod tests {
         let mut items = TypedDictSchema::default();
         items.insert(
             Name::new("foo"),
-            TypedDictFieldBuilder::new(Type::IntLiteral(42))
+            TypedDictFieldBuilder::new(Type::int_literal(42))
                 .required(true)
                 .build(),
         );
@@ -2949,22 +3178,22 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("b")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db)),
                     Parameter::positional_only(Some(Name::new_static("c")))
-                        .with_default_type(Type::IntLiteral(1)),
+                        .with_default_type(Type::int_literal(1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(2)),
+                        .with_default_type(Type::int_literal(2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
-                        .with_default_type(Type::IntLiteral(3)),
+                        .with_default_type(Type::int_literal(3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(4)),
+                        .with_default_type(Type::int_literal(4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
-                        .with_default_type(Type::IntLiteral(5)),
+                        .with_default_type(Type::int_literal(5)),
                     Parameter::keyword_only(Name::new_static("h"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(6)),
+                        .with_default_type(Type::int_literal(6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],
@@ -3103,22 +3332,22 @@ mod tests {
                     Parameter::positional_only(Some(Name::new_static("b")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db)),
                     Parameter::positional_only(Some(Name::new_static("c")))
-                        .with_default_type(Type::IntLiteral(1)),
+                        .with_default_type(Type::int_literal(1)),
                     Parameter::positional_only(Some(Name::new_static("d")))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(2)),
+                        .with_default_type(Type::int_literal(2)),
                     Parameter::positional_or_keyword(Name::new_static("e"))
-                        .with_default_type(Type::IntLiteral(3)),
+                        .with_default_type(Type::int_literal(3)),
                     Parameter::positional_or_keyword(Name::new_static("f"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(4)),
+                        .with_default_type(Type::int_literal(4)),
                     Parameter::variadic(Name::new_static("args"))
                         .with_annotated_type(Type::object()),
                     Parameter::keyword_only(Name::new_static("g"))
-                        .with_default_type(Type::IntLiteral(5)),
+                        .with_default_type(Type::int_literal(5)),
                     Parameter::keyword_only(Name::new_static("h"))
                         .with_annotated_type(KnownClass::Int.to_instance(&db))
-                        .with_default_type(Type::IntLiteral(6)),
+                        .with_default_type(Type::int_literal(6)),
                     Parameter::keyword_variadic(Name::new_static("kwargs"))
                         .with_annotated_type(KnownClass::Str.to_instance(&db)),
                 ],

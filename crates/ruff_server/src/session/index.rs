@@ -564,9 +564,10 @@ impl DocumentQuery {
     /// Generate a source kind used by the linter.
     pub(crate) fn make_source_kind(&self) -> ruff_linter::source_kind::SourceKind {
         match self {
-            Self::Text { document, .. } => {
-                ruff_linter::source_kind::SourceKind::Python(document.contents().to_string())
-            }
+            Self::Text { document, .. } => ruff_linter::source_kind::SourceKind::Python {
+                code: document.contents().to_string(),
+                is_stub: ruff_python_ast::PySourceType::from(self.virtual_file_path()).is_stub(),
+            },
             Self::Notebook { notebook, .. } => {
                 ruff_linter::source_kind::SourceKind::ipy_notebook(notebook.make_ruff_notebook())
             }
@@ -582,10 +583,12 @@ impl DocumentQuery {
     }
 
     /// Get the source type of the document associated with this query.
-    pub(crate) fn source_type(&self) -> ruff_python_ast::PySourceType {
+    pub(crate) fn source_type(&self) -> ruff_python_ast::SourceType {
         match self {
-            Self::Text { .. } => ruff_python_ast::PySourceType::from(self.virtual_file_path()),
-            Self::Notebook { .. } => ruff_python_ast::PySourceType::Ipynb,
+            Self::Text { .. } => ruff_python_ast::SourceType::from(self.virtual_file_path()),
+            Self::Notebook { .. } => {
+                ruff_python_ast::SourceType::Python(ruff_python_ast::PySourceType::Ipynb)
+            }
         }
     }
 

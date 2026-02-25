@@ -97,6 +97,9 @@ pub(super) fn request(req: server::Request) -> Task {
         requests::SelectionRangeRequestHandler::METHOD => background_document_request_task::<
             requests::SelectionRangeRequestHandler,
         >(req, BackgroundSchedule::Worker),
+        requests::FoldingRangeRequestHandler::METHOD => background_document_request_task::<
+            requests::FoldingRangeRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::DocumentSymbolRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentSymbolRequestHandler,
         >(req, BackgroundSchedule::Worker),
@@ -162,6 +165,9 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         }
         notifications::DidChangeWatchedFiles::METHOD => {
             sync_notification_task::<notifications::DidChangeWatchedFiles>(notif)
+        }
+        notifications::DidChangeWorkspaceFoldersHandler::METHOD => {
+            sync_notification_task::<notifications::DidChangeWorkspaceFoldersHandler>(notif)
         }
         lsp_types::notification::Cancel::METHOD => {
             sync_notification_task::<notifications::CancelNotificationHandler>(notif)

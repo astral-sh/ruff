@@ -288,6 +288,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Pylint, "R1706") => rules::pylint::rules::AndOrTernary,
         (Pylint, "R1708") => rules::pylint::rules::StopIterationReturn,
         (Pylint, "R1711") => rules::pylint::rules::UselessReturn,
+        (Pylint, "R1712") => rules::pylint::rules::SwapWithTemporaryVariable,
         (Pylint, "R1714") => rules::pylint::rules::RepeatedEqualityComparison,
         (Pylint, "R1722") => rules::pylint::rules::SysExitAlias,
         (Pylint, "R1730") => rules::pylint::rules::IfStmtMinMax,
@@ -1062,6 +1063,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "066") => rules::ruff::rules::PropertyWithoutReturn,
         (Ruff, "067") => rules::ruff::rules::NonEmptyInitModule,
         (Ruff, "068") => rules::ruff::rules::DuplicateEntryInDunderAll,
+        (Ruff, "069") => rules::ruff::rules::FloatEqualityComparison,
+        (Ruff, "070") => rules::ruff::rules::UnnecessaryAssignBeforeYield,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
@@ -1128,6 +1131,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Airflow, "303") => rules::airflow::rules::Airflow3IncompatibleFunctionSignature,
         (Airflow, "311") => rules::airflow::rules::Airflow3SuggestedUpdate,
         (Airflow, "312") => rules::airflow::rules::Airflow3SuggestedToMoveToProvider,
+        (Airflow, "321") => rules::airflow::rules::Airflow31Moved,
 
         // perflint
         (Perflint, "101") => rules::perflint::rules::UnnecessaryListCast,

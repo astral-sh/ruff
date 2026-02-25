@@ -22,7 +22,7 @@ def foo1[**P]() -> None:
 TODO: This results in a lot of syntax errors mainly because the AST doesn't accept them in this
 position. The parser could do a better job in recovering from these errors.
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
@@ -37,7 +37,7 @@ def foo[**P: int]() -> None:
     pass
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 ## Default
 
@@ -255,14 +255,14 @@ it having the same AST as the one without the parentheses. Both mypy and Pyright
 reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
 ```
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 # error: [invalid-syntax]
 reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 
@@ -649,12 +649,10 @@ from typing import overload
 def int_int(x: int) -> int: ...
 @overload
 def int_int(x: str) -> int: ...
-
 @overload
 def int_str(x: int) -> int: ...
 @overload
 def int_str(x: str) -> str: ...
-
 @overload
 def str_str(x: int) -> str: ...
 @overload
@@ -936,4 +934,155 @@ reveal_type(generic_context(c.generic_method))
 reveal_type(c.generic_method)  # revealed: [T](value: T) -> T
 reveal_type(c.generic_method(100))  # revealed: Literal[100]
 reveal_type(c.generic_method([1, 2, 3]))  # revealed: list[Unknown | int]
+```
+
+## Callable protocols with `ParamSpec` and class constructors
+
+When a class is passed to a function expecting a callable protocol with `ParamSpec`, the `ParamSpec`
+should be inferred from the class's constructor signature. This inferred signature must then be used
+to validate any additional arguments that use the `ParamSpec` components.
+
+```py
+from typing import Protocol
+
+class ParentClass: ...
+
+class MyProto[**P](Protocol):
+    def __call__(self, *args: P.args, **kwargs: P.kwargs) -> ParentClass: ...
+
+class MyType(ParentClass):
+    def __init__(self, x: int):
+        pass
+
+def create[**P](p: MyProto[P], *args: P.args, **kwargs: P.kwargs) -> ParentClass:
+    return p(*args, **kwargs)
+
+# When MyType is passed, P should be inferred as [x: int] from MyType's __init__.
+# Since create() requires *args: P.args and **kwargs: P.kwargs, and P is [x: int],
+# we must provide the `x` argument.
+
+# error: [missing-argument] "No argument provided for required parameter `x`"
+create(MyType)
+
+# These should work since we're providing the required argument
+create(MyType, 1)
+create(MyType, x=1)
+
+# error: [invalid-argument-type]
+create(MyType, "wrong type")
+```
+
+A class with no required constructor parameters should work without additional arguments:
+
+```py
+class NoArgs(ParentClass):
+    pass
+
+create(NoArgs)  # OK - P is inferred as []
+```
+
+Multiple parameters:
+
+```py
+class MultiParam(ParentClass):
+    def __init__(self, x: int, y: str):
+        pass
+
+# error: [missing-argument]
+create(MultiParam)
+
+# error: [missing-argument]
+create(MultiParam, 1)
+
+create(MultiParam, 1, "hello")
+create(MultiParam, x=1, y="hello")
+create(MultiParam, 1, y="hello")
+
+# error: [too-many-positional-arguments]
+create(MultiParam, 1, "hello", "extra")
+
+# error: [invalid-argument-type]
+create(MultiParam, "wrong", "hello")
+```
+
+Optional parameters (default values):
+
+```py
+class WithDefaults(ParentClass):
+    def __init__(self, x: int, y: str = "default"):
+        pass
+
+# error: [missing-argument]
+create(WithDefaults)
+
+# OK - y has a default
+create(WithDefaults, 1)
+create(WithDefaults, 1, "custom")
+create(WithDefaults, x=1)
+create(WithDefaults, x=1, y="custom")
+```
+
+Keyword-only parameters:
+
+```py
+class KeywordOnly(ParentClass):
+    def __init__(self, *, x: int):
+        pass
+
+# error: [missing-argument]
+create(KeywordOnly)
+
+# Passing positional where keyword-only is expected
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+create(KeywordOnly, 1)
+
+create(KeywordOnly, x=1)
+```
+
+Positional-only parameters:
+
+```py
+class PositionalOnly(ParentClass):
+    def __init__(self, x: int, /):
+        pass
+
+# error: [missing-argument]
+create(PositionalOnly)
+
+create(PositionalOnly, 1)
+
+# error: [positional-only-parameter-as-kwarg]
+create(PositionalOnly, x=1)
+```
+
+The protocol requires the return type to be `ParentClass`, so passing a class that doesn't inherit
+from `ParentClass` should produce an error:
+
+```py
+class Unrelated:
+    def __init__(self, x: int):
+        pass
+
+# error: [invalid-argument-type]
+create(Unrelated, 1)
+```
+
+When the protocol has parameters before the `ParamSpec` (i.e., `Concatenate`-style signatures), the
+callable should still match correctly and `P` should be inferred as empty:
+
+```py
+def my_factory(arg: str) -> int:
+    return 0
+
+class Factory[**P](Protocol):
+    def __call__(self, arg: str, *args: P.args, **kwargs: P.kwargs) -> int: ...
+
+def call_factory[**P](ctr: Factory[P], *args: P.args, **kwargs: P.kwargs) -> int:
+    return ctr("", *args, **kwargs)
+
+# TODO: This should be OK - P should be inferred as [] since my_factory only has `arg: str`
+# which matches the prefix. Currently this is a false positive.
+# error: [invalid-argument-type]
+call_factory(my_factory)
 ```

@@ -131,7 +131,7 @@ reveal_type(os.stat("my_file.txt"))  # revealed: stat_result
 reveal_type(os.stat("my_file.txt")[stat.ST_MODE])  # revealed: int
 reveal_type(os.stat("my_file.txt")[stat.ST_ATIME])  # revealed: int | float
 
-# revealed: (<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[int | float]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'stat_result'>, <class 'structseq[int | float]'>, <class 'tuple[int, int, int, int, int, int, int, int | float, int | float, int | float]'>, <class 'Sequence[int | float]'>, <class 'Reversible[int | float]'>, <class 'Collection[int | float]'>, <class 'Iterable[int | float]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(os.stat_result)
 
 # There are no specific overloads for the `float` elements in `os.stat_result`,
@@ -351,12 +351,12 @@ from ty_extensions import reveal_mro
 
 class A(tuple[int, str]): ...
 
-# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 
 class C(tuple): ...
 
-# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(C)
 ```
 
@@ -393,12 +393,12 @@ from ty_extensions import reveal_mro
 
 class A(Tuple[int, str]): ...
 
-# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[int | str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'A'>, <class 'tuple[int, str]'>, <class 'Sequence[int | str]'>, <class 'Reversible[int | str]'>, <class 'Collection[int | str]'>, <class 'Iterable[int | str]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(A)
 
 class C(Tuple): ...
 
-# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
+# revealed: (<class 'C'>, <class 'tuple[Unknown, ...]'>, <class 'Sequence[Unknown]'>, <class 'Reversible[Unknown]'>, <class 'Collection[Unknown]'>, <class 'Iterable[Unknown]'>, <class 'Container[Any]'>, typing.Protocol, typing.Generic, <class 'object'>)
 reveal_mro(C)
 ```
 
@@ -429,8 +429,7 @@ class Foo: ...
 class Bar: ...
 
 def test4(val: Intersection[tuple[Foo], tuple[Bar]]):
-    # TODO: should be `Foo & Bar`
-    reveal_type(val[0])  # revealed: @Todo(Subscript expressions with intersections)
+    reveal_type(val[0])  # revealed: Foo & Bar
 ```
 
 ## Intersection slice access
@@ -450,8 +449,7 @@ def f(
 ):
     reveal_type(x[1:])  # revealed: tuple[B]
     reveal_type(y[1:])  # revealed: tuple[D]
-    # TODO: should be `tuple[B] & tuple[D]`
-    reveal_type(z[1:])  # revealed: @Todo(Subscript expressions with intersections)
+    reveal_type(z[1:])  # revealed: tuple[B] & tuple[D]
 ```
 
 ```py
@@ -462,6 +460,5 @@ class C: ...
 def g(x: tuple[A, B]):
     reveal_type(x[1:])  # revealed: tuple[B]
     if isinstance(x, C):
-        # TODO: should be `tuple[B]`
-        reveal_type(x[1:])  # revealed: @Todo(Subscript expressions with intersections)
+        reveal_type(x[1:])  # revealed: tuple[B]
 ```

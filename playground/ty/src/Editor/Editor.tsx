@@ -342,7 +342,8 @@ class PlaygroundServer
         label: {
           label: completion.name,
           detail:
-            completion.module_name == null
+            completion.module_name == null ||
+            completion.additional_text_edits == null
               ? undefined
               : ` (import ${completion.module_name})`,
           description: completion.detail ?? undefined,

@@ -293,6 +293,7 @@ reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 def f():
     if returns_bool():
         class C: ...
+
     else:
         class C: ...
 
@@ -530,7 +531,7 @@ exception at runtime, not a sub-expression in the class's bases list.
 # error: [duplicate-base]
 class D(
     A,
-    # error: [unused-ignore-comment]
+    # error: [unused-type-ignore-comment]
     A,  # type: ignore[duplicate-base]
 ): ...
 
@@ -539,7 +540,7 @@ class E(
     A,
     A
 ):
-    # error: [unused-ignore-comment]
+    # error: [unused-type-ignore-comment]
     x: int  # type: ignore[duplicate-base]
 
 # fmt: on
@@ -709,19 +710,23 @@ python-version = "3.13"
 from ty_extensions import reveal_mro
 
 class C(C.a): ...
+
 reveal_type(C.__class__)  # revealed: <class 'type'>
 reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 
 class D(D.a):
     a: D
+
 reveal_type(D.__class__)  # revealed: <class 'type'>
 reveal_mro(D)  # revealed: (<class 'D'>, Unknown, <class 'object'>)
 
 class E[T](E.a): ...
+
 reveal_type(E.__class__)  # revealed: <class 'type'>
 reveal_mro(E)  # revealed: (<class 'E[Unknown]'>, Unknown, typing.Generic, <class 'object'>)
 
 class F[T](F(), F): ...  # error: [cyclic-class-definition]
+
 reveal_type(F.__class__)  # revealed: type[Unknown]
 reveal_mro(F)  # revealed: (<class 'F[Unknown]'>, Unknown, <class 'object'>)
 ```

@@ -15,8 +15,8 @@ on:
       - .github/workflows/build-wasm.yml
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: build-wasm-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions: {}
 
@@ -35,7 +35,7 @@ jobs:
         target: [web, bundler, nodejs]
       fail-fast: false
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
       - name: "Install Rust toolchain"
@@ -54,5 +54,6 @@ jobs:
       - name: "Upload wasm artifact"
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
-          name: artifacts-wasm-${{ matrix.target }}
+          # Avoid prefixing the name with `artifacts-` here to exclude it from the GitHub release.
+          name: wasm-npm-${{ matrix.target }}
           path: crates/ruff_wasm/pkg

@@ -139,6 +139,31 @@ else:
     reveal_type(x)  # revealed: Literal[1, 2]
 ```
 
+## `is` with two narrowable operands
+
+Both operands should be narrowed when both are narrowable expressions.
+
+```py
+from typing import Literal
+
+def _(t: Literal[True], tn: Literal[True] | None):
+    if tn is t:
+        reveal_type(tn)  # revealed: Literal[True]
+    if t is tn:
+        reveal_type(tn)  # revealed: Literal[True]
+```
+
+Both operands should also be narrowed in chained comparisons:
+
+```py
+from typing import Literal
+
+def _(a: Literal[1], b: Literal[1, 2], c: Literal[1, 2, 3]):
+    if a is b is c:
+        reveal_type(b)  # revealed: Literal[1]
+        reveal_type(c)  # revealed: Literal[1]
+```
+
 ## `is` where the other operand is a call expression
 
 ```py

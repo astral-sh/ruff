@@ -31,7 +31,6 @@
 
 use crate::Db;
 use bitflags::bitflags;
-use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{
@@ -541,43 +540,16 @@ impl<'db> SemanticTokenVisitor<'db> {
         parameters: &ast::Parameters,
         func: Option<&ast::StmtFunctionDef>,
     ) {
-        let mut param_index = 0;
-
-        // The `parameters.iter` method does return the parameters in sorted order but only if
-        // the AST is well-formed, but e.g. not for:
-        // ```py
-        // def foo(self, **key, value):
-        //     return
-        // ```
-        // Ideally, the ast would use a single vec for all parameters to avoid this issue as
-        // discussed here https://github.com/astral-sh/ruff/issues/14315 and
-        // here https://github.com/astral-sh/ruff/blob/71f8389f61a243a0c7584adffc49134ccf792aba/crates/ruff_python_parser/src/parser/statement.rs#L3176-L3179
-        let parameters_by_start = parameters
-            .iter()
-            .sorted_by_key(ruff_text_size::Ranged::start);
-
-        for any_param in parameters_by_start {
+        for (param_index, any_param) in parameters.iter_source_order().enumerate() {
             let parameter = any_param.as_parameter();
 
             let token_type = match any_param {
-                ast::AnyParameterRef::NonVariadic(_) => {
-                    // For non-variadic parameters (positional-only, regular, keyword-only),
-                    // check if this should be classified as self/cls parameter
-                    if let Some(func) = func {
-                        let result = self.classify_parameter(parameter, param_index == 0, func);
-                        param_index += 1;
-                        result
-                    } else {
-                        // For lambdas, all parameters are just parameters (no self/cls)
-                        param_index += 1;
-                        SemanticTokenType::Parameter
-                    }
-                }
-                ast::AnyParameterRef::Variadic(_) => {
-                    // Variadic parameters (*args, **kwargs) are always just parameters
-                    param_index += 1;
-                    SemanticTokenType::Parameter
-                }
+                // For non-variadic parameters in function defs, preserve self/cls classification.
+                ast::AnyParameterRef::NonVariadic(_) => func
+                    .map_or(SemanticTokenType::Parameter, |func| {
+                        self.classify_parameter(parameter, param_index == 0, func)
+                    }),
+                ast::AnyParameterRef::Variadic(_) => SemanticTokenType::Parameter,
             };
 
             self.add_token(
@@ -1056,7 +1028,30 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 }
             }
             ast::Pattern::MatchMapping(pattern_mapping) => {
-                // Visit keys and patterns in source order by interleaving them
+                // `**rest` can appear before or after the key-value pairs
+                // (the parser can produce either AST, but emits an
+                // invalid-syntax error for the former).
+                let rest_before_keys = pattern_mapping.rest.as_ref().filter(|rest| {
+                    pattern_mapping
+                        .keys
+                        .first()
+                        .is_some_and(|key| rest.start() < key.start())
+                });
+                let rest_after_keys = pattern_mapping.rest.as_ref().filter(|rest| {
+                    pattern_mapping
+                        .keys
+                        .first()
+                        .is_none_or(|key| rest.start() >= key.start())
+                });
+
+                if let Some(rest_name) = rest_before_keys {
+                    self.add_token(
+                        rest_name.range(),
+                        SemanticTokenType::Variable,
+                        SemanticTokenModifier::empty(),
+                    );
+                }
+
                 for (key, nested_pattern) in
                     pattern_mapping.keys.iter().zip(&pattern_mapping.patterns)
                 {
@@ -1064,8 +1059,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                     self.visit_pattern(nested_pattern);
                 }
 
-                // Handle the rest parameter (after "**") - this comes last
-                if let Some(rest_name) = &pattern_mapping.rest {
+                if let Some(rest_name) = rest_after_keys {
                     self.add_token(
                         rest_name.range(),
                         SemanticTokenType::Variable,
@@ -1144,6 +1138,62 @@ mod tests {
         "Foo" @ 6..9: Class [definition]
         "x" @ 12..13: Variable
         "m" @ 15..16: Variable
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_match_class_pattern_keyword_before_positional() {
+        // Regression test for https://github.com/astral-sh/ty/issues/2417
+        // This used to cause a panic because keyword patterns and positional
+        // patterns in a match class were not visited in source order.
+        let test = SemanticTokenTest::new(
+            "
+import ast
+def f(x: ast.AST):
+    match x:
+        case ast.Attribute(value=ast.Name(id), attr):
+            pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "ast" @ 8..11: Namespace
+        "f" @ 16..17: Function [definition]
+        "x" @ 18..19: Parameter [definition]
+        "ast" @ 21..24: Namespace
+        "AST" @ 25..28: Variable [readonly]
+        "x" @ 41..42: Parameter
+        "ast" @ 57..60: Namespace
+        "Attribute" @ 61..70: Class
+        "ast" @ 77..80: Namespace
+        "Name" @ 81..85: Class
+        "id" @ 86..88: Variable
+        "attr" @ 91..95: Variable
+        "#);
+    }
+
+    #[test]
+    fn semantic_tokens_match_mapping_pattern_rest_before_keys() {
+        let test = SemanticTokenTest::new(
+            "
+def f(x):
+    match x:
+        case {**rest, 'key': value}:
+            pass
+",
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "f" @ 5..6: Function [definition]
+        "x" @ 7..8: Parameter [definition]
+        "x" @ 21..22: Parameter
+        "rest" @ 40..44: Variable
+        "'key'" @ 46..51: String
+        "value" @ 53..58: Variable
         "#);
     }
 
@@ -1660,6 +1710,67 @@ w5: "float
         "float" @ 114..119: Class
         "w5" @ 121..123: Variable [definition]
         "float" @ 126..131: Class
+        "#);
+    }
+
+    #[test]
+    fn str_annotation_nested() {
+        let test = SemanticTokenTest::new(
+            r#"
+x: int
+y: "int"
+z: "'int'"
+w: """'"int"'"""
+
+a: list[int | str] | None
+b: list["int | str"] | None
+c: "list[int | str] | None"
+d: "list[int | str]" | "None"
+e: 'list["int | str"] | "None"'
+f: """'list["int | str"]' | 'None'""" 
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "x" @ 1..2: Variable [definition]
+        "int" @ 4..7: Class
+        "y" @ 8..9: Variable [definition]
+        "int" @ 12..15: Class
+        "z" @ 17..18: Variable [definition]
+        "int" @ 22..25: Class
+        "w" @ 28..29: Variable [definition]
+        "\"int\"" @ 35..40: String
+        "a" @ 46..47: Variable [definition]
+        "list" @ 49..53: Class
+        "int" @ 54..57: Class
+        "str" @ 60..63: Class
+        "None" @ 67..71: BuiltinConstant
+        "b" @ 72..73: Variable [definition]
+        "list" @ 75..79: Class
+        "int" @ 81..84: Class
+        "str" @ 87..90: Class
+        "None" @ 95..99: BuiltinConstant
+        "c" @ 100..101: Variable [definition]
+        "list" @ 104..108: Class
+        "int" @ 109..112: Class
+        "str" @ 115..118: Class
+        "None" @ 122..126: BuiltinConstant
+        "d" @ 128..129: Variable [definition]
+        "list" @ 132..136: Class
+        "int" @ 137..140: Class
+        "str" @ 143..146: Class
+        "None" @ 152..156: BuiltinConstant
+        "e" @ 158..159: Variable [definition]
+        "list" @ 162..166: Class
+        "int" @ 168..171: Class
+        "str" @ 174..177: Class
+        "None" @ 183..187: BuiltinConstant
+        "f" @ 190..191: Variable [definition]
+        "list" @ 197..201: Class
+        "\"int | str\"" @ 202..213: String
+        "None" @ 219..223: BuiltinConstant
         "#);
     }
 

@@ -1,0 +1,110 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: union.md - Unions in calls - Union of intersections with failing bindings
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/union.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from ty_extensions import Intersection
+ 2 | from typing import Callable
+ 3 | 
+ 4 | class IntCaller:
+ 5 |     def __call__(self, x: int) -> int:
+ 6 |         return x
+ 7 | 
+ 8 | class StrCaller:
+ 9 |     def __call__(self, x: str) -> str:
+10 |         return x
+11 | 
+12 | class BytesCaller:
+13 |     def __call__(self, x: bytes) -> bytes:
+14 |         return x
+15 | 
+16 | def test(f: Intersection[IntCaller, StrCaller] | BytesCaller):
+17 |     # Call with None - should fail for IntCaller, StrCaller, and BytesCaller
+18 |     # error: [invalid-argument-type]
+19 |     # error: [invalid-argument-type]
+20 |     # error: [invalid-argument-type]
+21 |     f(None)
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+19 |     # error: [invalid-argument-type]
+20 |     # error: [invalid-argument-type]
+21 |     f(None)
+   |       ^^^^ Expected `int`, found `None`
+   |
+info: Method defined here
+ --> src/mdtest_snippet.py:5:9
+  |
+4 | class IntCaller:
+5 |     def __call__(self, x: int) -> int:
+  |         ^^^^^^^^       ------ Parameter declared here
+6 |         return x
+  |
+info: Intersection element `IntCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+19 |     # error: [invalid-argument-type]
+20 |     # error: [invalid-argument-type]
+21 |     f(None)
+   |       ^^^^ Expected `str`, found `None`
+   |
+info: Method defined here
+  --> src/mdtest_snippet.py:9:9
+   |
+ 8 | class StrCaller:
+ 9 |     def __call__(self, x: str) -> str:
+   |         ^^^^^^^^       ------ Parameter declared here
+10 |         return x
+   |
+info: Intersection element `StrCaller` is incompatible with this call site
+info: Attempted to call intersection type `IntCaller & StrCaller`
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Argument to bound method `__call__` is incorrect
+  --> src/mdtest_snippet.py:21:7
+   |
+19 |     # error: [invalid-argument-type]
+20 |     # error: [invalid-argument-type]
+21 |     f(None)
+   |       ^^^^ Expected `bytes`, found `None`
+   |
+info: Method defined here
+  --> src/mdtest_snippet.py:13:9
+   |
+12 | class BytesCaller:
+13 |     def __call__(self, x: bytes) -> bytes:
+   |         ^^^^^^^^       -------- Parameter declared here
+14 |         return x
+   |
+info: Union variant `BytesCaller` is incompatible with this call site
+info: Attempted to call union type `(IntCaller & StrCaller) | BytesCaller`
+info: rule `invalid-argument-type` is enabled by default
+
+```

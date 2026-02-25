@@ -11,6 +11,7 @@ use lsp_types::{
 use ruff_db::system::SystemPath;
 use ty_server::{ClientOptions, DiagnosticMode, PartialWorkspaceProgress};
 
+use crate::workspace_folders::condensed_document_diagnostic_snapshot;
 use crate::{AwaitResponseError, TestServer, TestServerBuilder};
 
 #[test]
@@ -1032,6 +1033,68 @@ def hello() -> str:
     Ok(())
 }
 
+/// Regression test for diagnostics disappearing in some cases.
+///
+/// The specific way this fails is when a file that was never in the "open
+/// file set" is closed. When that happens, there was a bug where the
+/// open file set was completely cleared. This in turn would result in
+/// `Project::should_check_file` returning `false` for any other open file. And
+/// that would finally result in an empty set of diagnostics being returned,
+/// which would effectively clear any existing diagnostics.
+///
+/// Moreover, since the file was no longer in the open set, there's likely
+/// other mysterious failures happening.
+///
+/// See: <https://github.com/astral-sh/ty-vscode/issues/342>
+#[test]
+fn closing_external_file_preserves_open_files() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let main_path = SystemPath::new("src/main.py");
+    let main_content = "\
+def foo() -> str:
+    return 42  # intentional type error to provoke some diagnostics
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(main_path, main_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    // Assert that we get diagnostics as expected.
+    server.open_text_document(main_path, main_content, 1);
+    let diagnostics_before = server.document_diagnostic_request(main_path, None);
+    insta::assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics_before),
+        @"1:11..1:13[ERROR]: Return type does not match returned value: expected `str`, found `Literal[42]`",
+    );
+
+    // Open an "external" file, e.g., this is what happens
+    // when a user does goto definition on `str`.
+    //
+    // The path has to be outside of the workspace root so
+    // that the file is not considered part of the open file
+    // set.
+    server.open_text_document("external/builtins.pyi", "class str: ...", 1);
+    // This is what had resulted in the open file set being
+    // completely cleared.
+    server.close_text_document("external/builtins.pyi");
+
+    // Now request diagnostics again. We should get back the same
+    // diagnostics as above. The bug here resulted in no diagnostics
+    // being returned.
+    let diagnostics_after = server.document_diagnostic_request(main_path, None);
+    insta::assert_snapshot!(
+        condensed_document_diagnostic_snapshot(diagnostics_after),
+        @"1:11..1:13[ERROR]: Return type does not match returned value: expected `str`, found `Literal[42]`",
+    );
+
+    Ok(())
+}
+
 // Helper functions for long-polling tests
 fn create_workspace_server_with_file(
     workspace_root: &SystemPath,
@@ -1052,7 +1115,7 @@ fn create_workspace_server_with_file(
 /// Sends a workspace diagnostic request to the server.
 ///
 /// Unlike [`TestServer::workspace_diagnostic_request`], this function does not wait for the response.
-fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
+pub(crate) fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::RequestId {
     server.send_request::<WorkspaceDiagnosticRequest>(WorkspaceDiagnosticParams {
         identifier: None,
         previous_result_ids: Vec::new(),
@@ -1065,7 +1128,7 @@ fn send_workspace_diagnostic_request(server: &mut TestServer) -> lsp_server::Req
     })
 }
 
-fn shutdown_and_await_workspace_diagnostic(
+pub(crate) fn shutdown_and_await_workspace_diagnostic(
     mut server: TestServer,
     request_id: &RequestId,
 ) -> WorkspaceDiagnosticReportResult {
@@ -1083,7 +1146,7 @@ fn shutdown_and_await_workspace_diagnostic(
 }
 
 #[track_caller]
-fn assert_workspace_diagnostics_suspends_for_long_polling(
+pub(crate) fn assert_workspace_diagnostics_suspends_for_long_polling(
     server: &mut TestServer,
     request_id: &lsp_server::RequestId,
 ) {

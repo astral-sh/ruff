@@ -297,18 +297,22 @@ class GroupedDiagnostics:
                 else:
                     # We select the line with the most diagnostics
                     # as our true positive, while the rest are false positives
+                    # TODO: The ty diagnostics below are because we are not
+                    # inferring a precise type for the `key` lambda, which gives
+                    # us the wrong type for `max_line`.
+                    # https://github.com/astral-sh/ty/issues/181
                     max_line = max(
                         groupby(
                             diagnostics, key=lambda d: d.location.positions.begin.line
                         ),
                         key=lambda x: len(x[1]),
                     )
-                    remaining = len(diagnostics) - max_line
+                    remaining = len(diagnostics) - max_line  # ty: ignore[unsupported-operator]
                     # We can never exceed the number of distinct lines
                     # if the diagnostic is multi, so we ignore that case
                     return Evaluation(
                         classification=Classification.FALSE_POSITIVE,
-                        true_positives=max_line,
+                        true_positives=max_line,  # ty: ignore[invalid-argument-type]
                         false_positives=remaining,
                         true_negatives=0,
                         false_negatives=0,
@@ -454,7 +458,11 @@ def collect_ty_diagnostics(
     source: Source,
     test_files: Sequence[Path],
     python_version: str = "3.12",
+    extra_search_paths: Sequence[Path] = (),
 ) -> list[Diagnostic]:
+    extra_search_path_args = [
+        f"--extra-search-path={path}" for path in extra_search_paths
+    ]
     process = subprocess.run(
         [
             *ty_path,
@@ -462,7 +470,11 @@ def collect_ty_diagnostics(
             f"--python-version={python_version}",
             "--output-format=gitlab",
             "--ignore=assert-type-unspellable-subtype",
+            "--error=invalid-legacy-positional-parameter",
+            "--error=deprecated",
+            "--error=redundant-final-classvar",
             "--exit-zero",
+            *extra_search_path_args,
             *map(str, test_files),
         ],
         capture_output=True,
@@ -496,7 +508,10 @@ def group_diagnostics_by_key(
 
     for diag in chain(old, new):
         diag.tag = tagged_lines.get(
-            (diag.location.path.name, diag.location.positions.begin.line), None
+            (
+                diag.location.path.name,
+                diag.location.positions.begin.line,
+            )
         )
 
     diagnostics = [
@@ -818,11 +833,14 @@ def main():
 
     expected = collect_expected_diagnostics(test_files)
 
+    extra_search_paths = [tests_dir / "tests"]
+
     old = collect_ty_diagnostics(
         ty_path=args.old_ty,
         test_files=test_files,
         source=Source.OLD,
         python_version=args.python_version,
+        extra_search_paths=extra_search_paths,
     )
 
     new = collect_ty_diagnostics(
@@ -830,6 +848,7 @@ def main():
         test_files=test_files,
         source=Source.NEW,
         python_version=args.python_version,
+        extra_search_paths=extra_search_paths,
     )
 
     grouped = group_diagnostics_by_key(

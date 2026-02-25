@@ -8,18 +8,21 @@ use std::borrow::Cow;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
-use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{self as ast, AnyNodeRef};
+use ruff_python_ast::token::{Token, TokenAt, TokenKind, Tokens};
+use ruff_python_ast::{self as ast, AnyNodeRef, ExprRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ty_python_semantic::ResolvedDefinition;
+use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
 use ty_python_semantic::types::ide_support::{
-    call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
+    call_signature_details, call_type_simplified_by_overloads,
+    definitions_and_overloads_for_function, definitions_for_keyword_argument,
+    typed_dict_key_definition,
 };
 use ty_python_semantic::{
-    HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
-    definitions_for_name,
+    HasDefinition, HasType, ImportAliasResolution, SemanticModel, TypeQualifiers,
+    definitions_for_imported_symbol, definitions_for_name,
 };
 
 #[derive(Clone, Debug)]
@@ -199,6 +202,13 @@ pub(crate) enum GotoTarget<'a> {
         callable: ast::ExprRef<'a>,
         /// The call of the callable
         call: &'a ast::ExprCall,
+        /// Whether the cursor is positioned on the parenthesis.
+        ///
+        /// This is useful for tweaking the behavior of goto-def.
+        /// e.g., When on the name of a class, we jump to its
+        /// class definition. When on the paren, we jump to its
+        /// constructor (if present).
+        on_parenthesis: bool,
     },
 
     /// Go to on a sub-expression of a string annotation's sub-AST
@@ -215,8 +225,18 @@ pub(crate) enum GotoTarget<'a> {
         string_expr: &'a ast::ExprStringLiteral,
         /// The range to query in the sub-AST for the sub-expression.
         subrange: TextRange,
+        /// "How many levels of sub-ASTs are you on?"
+        /// "idk maybe 1 or 2?"
+        /// "You are like ch-- actually that's the hardcoded limit we don't allow more"
+        levels: usize,
         /// If the expression is a Name of some kind this is the name (just a cached result).
         name: Option<String>,
+    },
+
+    /// Go to on a string-literal subscript key (e.g. `person["name"]`).
+    SubscriptStringLiteralKey {
+        subscript: &'a ast::ExprSubscript,
+        literal_key: &'a str,
     },
 }
 
@@ -249,9 +269,10 @@ impl<'db> Definitions<'db> {
     /// In this case it basically returns exactly what was found.
     pub(crate) fn declaration_targets(
         self,
-        db: &'db dyn ty_python_semantic::Db,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
     ) -> Option<crate::NavigationTargets> {
-        definitions_to_navigation_targets(db, None, self.0)
+        definitions_to_navigation_targets(model, None, goto_target, self.0)
     }
 
     /// Get the "goto-definition" interpretation of this definition
@@ -260,9 +281,15 @@ impl<'db> Definitions<'db> {
     /// if the definition we have is found in a stub file.
     pub(crate) fn definition_targets(
         self,
-        db: &'db dyn ty_python_semantic::Db,
+        model: &SemanticModel<'db>,
+        goto_target: &GotoTarget<'_>,
     ) -> Option<crate::NavigationTargets> {
-        definitions_to_navigation_targets(db, Some(&StubMapper::new(db)), self.0)
+        definitions_to_navigation_targets(
+            model,
+            Some(&StubMapper::new(model.db())),
+            goto_target,
+            self.0,
+        )
     }
 
     /// Get the docstring for this definition
@@ -323,20 +350,37 @@ impl GotoTarget<'_> {
             GotoTarget::StringAnnotationSubexpr {
                 string_expr,
                 subrange,
+                levels,
                 ..
             } => {
-                let (subast, _submodel) = model.enter_string_annotation(string_expr)?;
-                let submod = subast.syntax();
-                let subnode = covering_node(submod.into(), *subrange).node();
-
-                // The type checker knows the type of the full annotation but nothing else
-                if AnyNodeRef::from(&*submod.body) == subnode {
-                    string_expr.inferred_type(model)
+                let model_to_use;
+                let expr_to_use;
+                let subsubast;
+                let (subast, submodel) = model.enter_string_annotation(string_expr)?;
+                // Must filter to exprs to get ExprStringLiteral over StringLiteral
+                let subexpr = covering_node(subast.syntax().into(), *subrange)
+                    .find_first(AnyNodeRef::is_expression)
+                    .ok()?
+                    .node()
+                    .as_expr_ref()?;
+                if *levels == 2
+                    && let ExprRef::StringLiteral(string_expr) = subexpr
+                {
+                    // Do it again if we're a nested string annotation!
+                    let (new_subast, subsubmodel) =
+                        submodel.enter_string_annotation(string_expr)?;
+                    subsubast = new_subast;
+                    model_to_use = subsubmodel;
+                    expr_to_use = covering_node(subsubast.syntax().into(), *subrange)
+                        .find_first(AnyNodeRef::is_expression)
+                        .ok()?
+                        .node()
+                        .as_expr_ref()?;
                 } else {
-                    // TODO: force the typechecker to tell us its secrets
-                    // (it computes but then immediately discards these types)
-                    None
+                    model_to_use = submodel;
+                    expr_to_use = subexpr;
                 }
+                expr_to_use.inferred_type(&model_to_use)
             }
             GotoTarget::BinOp { expression, .. } => {
                 let (_, ty) = ty_python_semantic::definitions_for_bin_op(model, expression)?;
@@ -345,6 +389,9 @@ impl GotoTarget<'_> {
             GotoTarget::UnaryOp { expression, .. } => {
                 let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
                 Some(ty)
+            }
+            GotoTarget::SubscriptStringLiteralKey { subscript, .. } => {
+                subscript.inferred_type(model)
             }
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
@@ -355,6 +402,14 @@ impl GotoTarget<'_> {
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
             | GotoTarget::Globals { .. } => None,
+        }
+    }
+
+    /// Returns the type qualifiers (e.g. `Final`, `ClassVar`) for this goto target.
+    pub(crate) fn type_qualifiers(&self, model: &SemanticModel<'_>) -> TypeQualifiers {
+        match self {
+            GotoTarget::Expression(expr) => model.type_qualifiers(*expr),
+            _ => TypeQualifiers::empty(),
         }
     }
 
@@ -391,10 +446,18 @@ impl GotoTarget<'_> {
             GotoTarget::Expression(expression) => {
                 definitions_for_expression(model, *expression, alias_resolution)
             }
-            // For already-defined symbols, they are their own definitions
-            GotoTarget::FunctionDef(function) => Some(vec![ResolvedDefinition::Definition(
-                function.definition(model),
-            )]),
+            // For already-defined symbols, they are their own definitions.
+            // For property setters/deleters, the getter is a co-definition of
+            // the same logical symbol.
+            GotoTarget::FunctionDef(function) => {
+                let mut defs = definitions_and_overloads_for_function(model, function);
+                defs.extend(
+                    property_getter_definitions(function, model, alias_resolution)
+                        .into_iter()
+                        .flatten(),
+                );
+                Some(defs)
+            }
 
             GotoTarget::ClassDef(class) => Some(vec![ResolvedDefinition::Definition(
                 class.definition(model),
@@ -504,7 +567,7 @@ impl GotoTarget<'_> {
             // For callables, both the definition of the callable and the actual function impl are relevant.
             //
             // Prefer the function impl over the callable so that its docstrings win if defined.
-            GotoTarget::Call { callable, call } => {
+            GotoTarget::Call { callable, call, .. } => {
                 let mut definitions = Vec::new();
 
                 // We prefer the specific overload for hover, go-to-def etc. However,
@@ -544,13 +607,37 @@ impl GotoTarget<'_> {
             GotoTarget::StringAnnotationSubexpr {
                 string_expr,
                 subrange,
+                levels,
                 ..
             } => {
+                let model_to_use;
+                let expr_to_use;
+                let subsubast;
                 let (subast, submodel) = model.enter_string_annotation(string_expr)?;
+                // Must filter to exprs to get ExprStringLiteral over StringLiteral
                 let subexpr = covering_node(subast.syntax().into(), *subrange)
+                    .find_first(AnyNodeRef::is_expression)
+                    .ok()?
                     .node()
                     .as_expr_ref()?;
-                definitions_for_expression(&submodel, subexpr, alias_resolution)
+                if *levels == 2
+                    && let ExprRef::StringLiteral(string_expr) = subexpr
+                {
+                    // Do it again if we're a nested string annotation!
+                    let (new_subast, subsubmodel) =
+                        submodel.enter_string_annotation(string_expr)?;
+                    subsubast = new_subast;
+                    model_to_use = subsubmodel;
+                    expr_to_use = covering_node(subsubast.syntax().into(), *subrange)
+                        .find_first(AnyNodeRef::is_expression)
+                        .ok()?
+                        .node()
+                        .as_expr_ref()?;
+                } else {
+                    model_to_use = submodel;
+                    expr_to_use = subexpr;
+                }
+                definitions_for_expression(&model_to_use, expr_to_use, alias_resolution)
             }
 
             // nonlocal and global are essentially loads, but again they're statements,
@@ -594,6 +681,12 @@ impl GotoTarget<'_> {
                     alias_resolution,
                 ))
             }
+
+            GotoTarget::SubscriptStringLiteralKey {
+                subscript,
+                literal_key,
+            } => typed_dict_key_definition(model, subscript, literal_key)
+                .map(|definition| vec![definition]),
         };
         definitions.map(Definitions)
     }
@@ -659,7 +752,9 @@ impl GotoTarget<'_> {
             }
             GotoTarget::NonLocal { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
             GotoTarget::Globals { identifier, .. } => Some(Cow::Borrowed(identifier.as_str())),
-            GotoTarget::BinOp { .. } | GotoTarget::UnaryOp { .. } => None,
+            GotoTarget::BinOp { .. }
+            | GotoTarget::UnaryOp { .. }
+            | GotoTarget::SubscriptStringLiteralKey { .. } => None,
         }
     }
 
@@ -672,7 +767,102 @@ impl GotoTarget<'_> {
     ) -> Option<GotoTarget<'a>> {
         tracing::trace!("Covering node is of kind {:?}", covering_node.node().kind());
 
-        match covering_node.node() {
+        let node = covering_node.node();
+        let string_annotation = match node {
+            AnyNodeRef::ExprStringLiteral(string_expr) => {
+                model.enter_string_annotation(string_expr)
+            }
+            _ => None,
+        };
+
+        // Special-case subscripts: if the cursor lands on a literal index/key, slice bound, or
+        // slice inside `value[...]`, retarget to the parent `ExprSubscript` (or a string-literal
+        // key target). Non-literal subscripts (e.g. `value[a<CURSOR>b]`) still hover the
+        // identifier itself. This avoids "no hover" on literals and lets hover/goto show the
+        // subscript result type.
+        if let Some(expr) = node.as_expr_ref()
+            && string_annotation.is_none()
+        {
+            let enclosing_subscript_with_slice_range =
+                |range: TextRange| -> Option<&'a ast::ExprSubscript> {
+                    covering_node.ancestors().find_map(|node| {
+                        let AnyNodeRef::ExprSubscript(subscript) = node else {
+                            return None;
+                        };
+                        (subscript.slice.range() == range).then_some(subscript)
+                    })
+                };
+
+            // 1. Cursor on the `ExprSlice` itself (e.g. `values[<CURSOR>:2]`,
+            // `values[:<CURSOR>2]`).
+            if expr.is_slice_expr()
+                && let Some(subscript) = enclosing_subscript_with_slice_range(expr.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 2. Cursor on a literal or signed-literal `ExprSubscript.slice` (e.g. `values[0]`,
+            // `person["name"]`, `values[-1]` where the covering node is the bracketed
+            // expression).
+            let slice_expr_range = if expr.is_literal_expr() {
+                Some(expr.range())
+            } else if let Some(unary_op) = expr.unary_op_expr()
+                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand.is_literal_expr()
+            {
+                Some(unary_op.range())
+            } else {
+                None
+            };
+
+            if let Some(slice_range) = slice_expr_range
+                && let Some(subscript) = enclosing_subscript_with_slice_range(slice_range)
+            {
+                if let Some(literal) = subscript.slice.as_string_literal_expr() {
+                    let key = literal.value.to_str();
+                    return Some(GotoTarget::SubscriptStringLiteralKey {
+                        subscript,
+                        literal_key: key,
+                    });
+                }
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 3. Cursor on the unary-op operand for `values[-1]` (e.g. `values[-<CURSOR>1]`,
+            // covering node is the inner literal and parent is `ExprUnaryOp`).
+            if expr.is_literal_expr()
+                && let Some(AnyNodeRef::ExprUnaryOp(unary_op)) = covering_node.parent()
+                && matches!(unary_op.op, ast::UnaryOp::USub | ast::UnaryOp::UAdd)
+                && unary_op.operand.is_literal_expr()
+                && unary_op.operand.range() == expr.range()
+                && let Some(subscript) = enclosing_subscript_with_slice_range(unary_op.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 4. Cursor on a literal or signed-literal `ExprSlice` bound (e.g. `values[1:<CURSOR>2]`,
+            // `values[:-<CURSOR>1]`).
+            if slice_expr_range.is_some()
+                && let Some(slice) = covering_node.ancestors().find_map(|node| match node {
+                    AnyNodeRef::ExprSlice(slice) => Some(slice),
+                    _ => None,
+                })
+                && let Some(subscript) = enclosing_subscript_with_slice_range(slice.range())
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+
+            // 5. Cursor immediately before the `[` (e.g. `values<CURSOR>[0]` or
+            // `values<CURSOR>[1:]`).
+            if let Some(AnyNodeRef::ExprSubscript(subscript)) = covering_node.parent()
+                && subscript.value.range() == expr.range()
+                && expr.range().end() == offset
+            {
+                return Some(GotoTarget::Expression(subscript.into()));
+            }
+        }
+
+        match node {
             AnyNodeRef::Identifier(identifier) => match covering_node.parent() {
                 Some(AnyNodeRef::StmtFunctionDef(function)) => {
                     Some(GotoTarget::FunctionDef(function))
@@ -802,6 +992,7 @@ impl GotoTarget<'_> {
                             return Some(GotoTarget::Call {
                                 call,
                                 callable: attribute_expr,
+                                on_parenthesis: parenthesis_token(tokens, offset).is_some(),
                             });
                         }
                     }
@@ -859,39 +1050,67 @@ impl GotoTarget<'_> {
 
             node @ AnyNodeRef::ExprStringLiteral(string_expr) => {
                 // Check if we've clicked on a sub-GotoTarget inside a string annotation's sub-AST
-                if let Some((subast, submodel)) = model.enter_string_annotation(string_expr)
-                    && let Some(GotoTarget::Expression(subexpr)) = find_goto_target_impl(
+                if let Some((subast, submodel)) = string_annotation
+                    && let Some(sub_goto_target) = find_goto_target_impl(
                         &submodel,
                         subast.tokens(),
                         subast.syntax().into(),
                         offset,
                     )
                 {
-                    let name = match subexpr {
-                        ast::ExprRef::Name(name) => Some(name.id.to_string()),
-                        ast::ExprRef::Attribute(attr) => Some(attr.attr.to_string()),
-                        _ => None,
-                    };
-                    Some(GotoTarget::StringAnnotationSubexpr {
-                        string_expr,
-                        subrange: subexpr.range(),
-                        name,
-                    })
+                    match sub_goto_target {
+                        // Regrettably, nested string annotations are supported
+                        GotoTarget::StringAnnotationSubexpr {
+                            string_expr: _,
+                            subrange,
+                            levels,
+                            name,
+                        } => Some(GotoTarget::StringAnnotationSubexpr {
+                            string_expr,
+                            subrange,
+                            levels: levels + 1,
+                            name,
+                        }),
+                        GotoTarget::Expression(subexpr) => {
+                            let name = match subexpr {
+                                ast::ExprRef::Name(name) => Some(name.id.to_string()),
+                                ast::ExprRef::Attribute(attr) => Some(attr.attr.to_string()),
+                                _ => None,
+                            };
+                            Some(GotoTarget::StringAnnotationSubexpr {
+                                string_expr,
+                                subrange: subexpr.range(),
+                                levels: 1,
+                                name,
+                            })
+                        }
+                        _ => node.as_expr_ref().map(GotoTarget::Expression),
+                    }
                 } else {
                     node.as_expr_ref().map(GotoTarget::Expression)
                 }
             }
 
             node => {
-                // Check if this is seemingly a callable being invoked (the `x` in `x(...)`)
-                let parent = covering_node.parent();
-                if let (Some(AnyNodeRef::ExprCall(call)), AnyNodeRef::ExprName(name)) =
-                    (parent, node)
+                // Check if this is seemingly a callable being invoked (the `x` in `x(...)`).
+                //
+                // Note that `node` might be the `foo()` call itself or
+                // the name `foo` inside of `foo()`. So we check both the
+                // parent and the current node for a callable target.
+                for node in covering_node
+                    .parent()
+                    .into_iter()
+                    .chain(std::iter::once(node))
                 {
-                    return Some(GotoTarget::Call {
-                        call,
-                        callable: name.into(),
-                    });
+                    if let AnyNodeRef::ExprCall(call) = node
+                        && let ast::Expr::Name(ref name) = *call.func
+                    {
+                        return Some(GotoTarget::Call {
+                            call,
+                            callable: name.into(),
+                            on_parenthesis: parenthesis_token(tokens, offset).is_some(),
+                        });
+                    }
                 }
                 node.as_expr_ref().map(GotoTarget::Expression)
             }
@@ -933,6 +1152,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::Globals { identifier, .. } => identifier.range,
             GotoTarget::BinOp { operator_range, .. }
             | GotoTarget::UnaryOp { operator_range, .. } => *operator_range,
+            GotoTarget::SubscriptStringLiteralKey { subscript, .. } => subscript.slice.range(),
         }
     }
 }
@@ -972,6 +1192,29 @@ fn convert_resolved_definitions_to_targets<'db>(
         .collect()
 }
 
+/// If a function is a property setter or deleter (e.g., decorated with
+/// `@my_property.setter`), return the definitions for the property getter.
+/// This ensures that the setter/deleter function name is recognized as a
+/// co-definition of the same logical symbol as the getter.
+fn property_getter_definitions<'db>(
+    function: &ast::StmtFunctionDef,
+    model: &SemanticModel<'db>,
+    alias_resolution: ImportAliasResolution,
+) -> Option<Vec<ResolvedDefinition<'db>>> {
+    for decorator in &function.decorator_list {
+        if let Some(attr_expr) = decorator.expression.as_attribute_expr()
+            && matches!(attr_expr.attr.as_str(), "setter" | "deleter")
+            && matches!(
+                attr_expr.value.inferred_type(model),
+                Some(Type::PropertyInstance(_))
+            )
+        {
+            return definitions_for_expression(model, (&*attr_expr.value).into(), alias_resolution);
+        }
+    }
+    None
+}
+
 /// Shared helper to get definitions for an expr (that is presumably a name/attr)
 fn definitions_for_expression<'db>(
     model: &SemanticModel<'db>,
@@ -1005,18 +1248,60 @@ fn definitions_for_callable<'db>(
 }
 
 /// Shared helper to map and convert resolved definitions into navigation targets.
+///
+/// The `goto_target` corresponds to the original target that definitions were
+/// requested for. In some cases, this can influence the targets returned. For
+/// example, when the target is a constructor for a class, definitions other
+/// than the class definition are filtered out.
 fn definitions_to_navigation_targets<'db>(
-    db: &dyn ty_python_semantic::Db,
+    model: &SemanticModel<'db>,
     stub_mapper: Option<&StubMapper<'db>>,
+    goto_target: &GotoTarget<'_>,
     mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
 ) -> Option<crate::NavigationTargets> {
+    // When our target is a class constructor, we want to exclude
+    // navigation targets to its `__init__` or `__new__` methods.
+    //
+    // ... unless the cursor is on the parenthesis of the call,
+    // in which case we want to prefer the constructor methods
+    // if available.
+    //
+    // See: https://github.com/astral-sh/ty/issues/2218
+    if let GotoTarget::Call { on_parenthesis, .. } = *goto_target
+        && goto_target
+            .inferred_type(model)
+            .is_some_and(|ty| ty.is_class_literal())
+    {
+        let is_constructor_method = |resolved_def: &ty_python_semantic::ResolvedDefinition<'_>| {
+            let Some(def) = resolved_def.definition() else {
+                return false;
+            };
+            if !matches!(*def.kind(model.db()), DefinitionKind::Function(_)) {
+                return false;
+            }
+            def.name(model.db())
+                .is_some_and(|name| name == "__init__" || name == "__new__")
+        };
+
+        if on_parenthesis {
+            // Only limit to constructor methods if we have at least one.
+            // Otherwise we could end up removing all navigation targets.
+            // e.g., See `goto_definition_dynamic_namedtuple_literal_parenthesis`
+            // test.
+            if definitions.iter().any(is_constructor_method) {
+                definitions.retain(|resolved_def| is_constructor_method(resolved_def));
+            }
+        } else {
+            definitions.retain(|resolved_def| !is_constructor_method(resolved_def));
+        }
+    }
     if let Some(mapper) = stub_mapper {
         definitions = mapper.map_definitions(definitions);
     }
     if definitions.is_empty() {
         None
     } else {
-        let targets = convert_resolved_definitions_to_targets(db, definitions);
+        let targets = convert_resolved_definitions_to_targets(model.db(), definitions);
         Some(crate::NavigationTargets::unique(targets))
     }
 }
@@ -1035,22 +1320,28 @@ pub(crate) fn find_goto_target_impl<'a>(
     syntax: AnyNodeRef<'a>,
     offset: TextSize,
 ) -> Option<GotoTarget<'a>> {
-    let token = tokens
-        .at_offset(offset)
-        .max_by_key(|token| match token.kind() {
-            TokenKind::Name
-            | TokenKind::String
-            | TokenKind::Complex
-            | TokenKind::Float
-            | TokenKind::Int => 1,
+    let token = parenthesis_token(tokens, offset).or_else(|| {
+        tokens
+            .at_offset(offset)
+            .max_by_key(|token| match token.kind() {
+                TokenKind::Name
+                | TokenKind::String
+                | TokenKind::Complex
+                | TokenKind::Float
+                | TokenKind::Int => 1,
 
-            TokenKind::Comment => -1,
+                TokenKind::Comment => -1,
 
-            // if we have a<CURSOR>+b`, prefer the `+` token (by respecting the token ordering)
-            // This matches VS Code's behavior where it sends the start of the clicked token as offset.
-            kind if kind.as_binary_operator().is_some() || kind.as_unary_operator().is_some() => 1,
-            _ => 0,
-        })?;
+                // if we have a<CURSOR>+b`, prefer the `+` token (by respecting the token ordering)
+                // This matches VS Code's behavior where it sends the start of the clicked token as offset.
+                kind if kind.as_binary_operator().is_some()
+                    || kind.as_unary_operator().is_some() =>
+                {
+                    1
+                }
+                _ => 0,
+            })
+    })?;
 
     if token.kind().is_comment() {
         return None;
@@ -1118,4 +1409,32 @@ fn import_name(module_name: &str, component_index: usize) -> &str {
         .unwrap_or(module_name.len());
 
     &module_name[..idx]
+}
+
+/// Helper to return a parenthesis token only when the cursor (at
+/// `offset`) is on a parenthesis token.
+fn parenthesis_token(tokens: &Tokens, offset: TextSize) -> Option<Token> {
+    match tokens.at_offset(offset) {
+        TokenAt::Single(tok) => {
+            if matches!(tok.kind(), TokenKind::Lpar | TokenKind::Rpar) {
+                return Some(tok);
+            }
+        }
+        // Note that we specifically only look for a opening parenthesis
+        // here. Matching on a closing parenthesis seems ambiguous. e.g.,
+        // what do you do in the case of `func(a<CURSOR>)`? Arguably the
+        // cursor is "inside" the function call. In any case, when AG tried
+        // to match on a closing parenthesis here, a bunch of tests failed
+        // in an undesirable way.
+        //
+        // ... Except, we allow a closing parenthesis when the left token
+        // is an opening parenthesis. i.e., There's no ambiguity with
+        // `foo(<CURSOR>)`.
+        TokenAt::Between(left, right) => match (left.kind(), right.kind()) {
+            (_, TokenKind::Lpar) | (TokenKind::Lpar, TokenKind::Rpar) => return Some(left),
+            _ => {}
+        },
+        TokenAt::None => {}
+    }
+    None
 }

@@ -158,10 +158,10 @@ from collections import OrderedDict
 from collections import OrderedDict as Foo
 
 A, B = 1, (C := 2)
-D: (E := 4) = (F := 5)  # error: [invalid-type-form]
+D: (E := 4) = (F := 5)  # error: [invalid-type-form]  # fmt:skip
 
 for G in [1]:
-    ...
+    pass
 
 for (H := 4).whatever in [2]:  # error: [unresolved-attribute]
     ...
@@ -187,13 +187,13 @@ def get_object() -> object:
 
 match get_object():
     case {"something": M}:
-        ...
+        pass
     case [*N]:
-        ...
+        pass
     case [O]:
-        ...
+        pass
     case I(foo=R):
-        ...
+        pass
     case P | Q:  # error: [invalid-syntax] "alternative patterns bind different names"
         ...
 
@@ -202,14 +202,14 @@ match 56:
         ...
 
     case object(S):
-        ...
+        pass
 
 match 12345:
     case x if something_unresolvable:  # error: [unresolved-reference]
         ...
 
     case T:
-        ...
+        pass
 
 def boolean_condition() -> bool:
     return True
@@ -283,25 +283,25 @@ K = 11
 L = 12
 
 for A in [1]:
-    ...
+    pass
 
 match 42:
     case {"something": B}:
-        ...
+        pass
     case [*C]:
-        ...
+        pass
     case [D]:
-        ...
+        pass
     # error: [invalid-syntax] "name capture `E` makes remaining patterns unreachable"
     # error: [invalid-syntax] "alternative patterns bind different names"
     case E | F:
-        ...
+        pass
     case object(foo=G):
-        ...
+        pass
     case object(H):
-        ...
+        pass
     case I:
-        ...
+        pass
 
 def boolean_condition() -> bool:
     return True
@@ -353,25 +353,25 @@ might not take place, each symbol is definitely bound by a later definition.
 from typing import Literal
 
 for A in [1]:
-    ...
+    pass
 
 match 42:
     case {"something": B}:
-        ...
+        pass
     case [*C]:
-        ...
+        pass
     case [D]:
-        ...
+        pass
     # error: [invalid-syntax] "name capture `E` makes remaining patterns unreachable"
     # error: [invalid-syntax] "alternative patterns bind different names"
     case E | F:
-        ...
+        pass
     case object(foo=G):
-        ...
+        pass
     case object(H):
-        ...
+        pass
     case I:
-        ...
+        pass
 
 def boolean_condition() -> bool:
     return True
@@ -1485,7 +1485,7 @@ _Z: bool = True
 
 `b.py`:
 
-<!-- blacken-docs:off -->
+<!-- fmt:off -->
 
 ```py
 from a import *, _Y  # error: [invalid-syntax]
@@ -1509,6 +1509,6 @@ from a import *, _Y as fooo  # error: [invalid-syntax]
 from a import *, *, _Y  # error: [invalid-syntax]
 ```
 
-<!-- blacken-docs:on -->
+<!-- fmt:on -->
 
 [python language reference for import statements]: https://docs.python.org/3/reference/simple_stmts.html#the-import-statement

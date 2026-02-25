@@ -151,4 +151,5 @@ DEFAULT_TARGETS = [
     ),
     Project(repo=Repository(owner="pdm-project", name="pdm", ref="main")),
     Project(repo=Repository(owner="astropy", name="astropy", ref="main")),
+    Project(repo=Repository(owner="home-assistant", name="core", ref="dev")),
 ]
