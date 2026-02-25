@@ -1174,8 +1174,7 @@ impl<'db> ClassType<'db> {
             match base {
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
-                    | TypeRelation::Redundancy
-                    | TypeRelation::PureRedundancy
+                    | TypeRelation::Redundancy { .. }
                     | TypeRelation::SubtypingAssuming(_) => {
                         ConstraintSet::from(other.is_object(db))
                     }

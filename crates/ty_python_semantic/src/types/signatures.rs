@@ -1153,7 +1153,7 @@ impl<'db> Signature<'db> {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
                     ConstraintSet::from(false)
                 }
-                TypeRelation::Redundancy | TypeRelation::PureRedundancy => result.intersect(
+                TypeRelation::Redundancy { .. } => result.intersect(
                     db,
                     ConstraintSet::from(
                         self.parameters.is_gradual() && other.parameters.is_gradual(),

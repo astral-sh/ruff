@@ -87,35 +87,45 @@ pub(crate) enum TypeRelation<'db> {
     /// [materialization]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
     Assignability,
 
-    /// The "pure redundancy" relation.
+    /// The "redundancy" relation.
     ///
-    /// The pure redundancy relation dictates whether two types represent the same set of
-    /// possible sets of runtime values: that is, whether they have the same top materialization
-    /// and the same bottom materialization.
+    /// The redundancy relation is really an alternative, less strict, version of subtyping.
+    /// Unlike the subtyping relation, the redundancy relation sometimes allows a non-fully-static
+    /// type to be considered redundant with another type, and allows some types to be considered
+    /// redundant with non-fully-static types.
     ///
-    /// For a pair of [fully static] types `A` and `B`, the pure redundancy relation between `A`
+    /// For a pair of [fully static] types `A` and `B`, the redundancy relation between `A`
     /// and `B` is the same as the subtyping relation.
     ///
     /// Between a pair of `C` and `D` where either `C` or `D` is not fully static, the
-    /// pure redundancy relation sits in between the subtyping relation and the assignability
-    /// relation. `D` can be said to be purely redundant in a union with `C` if the top
-    /// materialization of the type `C | D` is equivalent to the top materialization of `C`,
-    /// *and* the bottom materialization of `C | D` is equivalent to the bottom materialization
-    /// of `C`.  More concisely: `D <: C` iff `Top[C | D] == Top[C]` AND `Bottom[C | D] == Bottom[C]`.
+    /// redundancy relation sits in between the subtyping relation and the assignability relation.
+    /// `D` can be said to be redundant in a union with `C` if the top materialization of the type
+    /// `C | D` is equivalent to the top materialization of `C`, *and* the bottom materialization
+    /// of `C | D` is equivalent to the bottom materialization of `C`.
+    /// More concisely: `D <: C` iff `Top[C | D] == Top[C]` AND `Bottom[C | D] == Bottom[C]`.
     ///
-    /// Practically speaking, in most respects the pure redundancy relation is the same as the
-    /// subtyping relation. It is redundant to add `bool` to a union that includes `int`,
-    /// because `bool` is a subtype of `int`, so inference of attribute access or binary
-    /// expressions on the union `int | bool` would always produce a type that represents the
-    /// same set of possible sets of runtime values as if ty had inferred the attribute access
-    /// or binary expression on `int` alone.
+    /// As stated above, in most respects the redundancy relation is the same as the subtyping
+    /// relation. It is redundant to add `bool` to a union that includes `int`, because `bool` is a
+    /// subtype of `int`, so inference of attribute access or binary expressions on the union
+    /// `int | bool` would always produce a type that represents the same set of possible sets of
+    /// runtime values as if ty had inferred the attribute access or binary expression on `int`
+    /// alone.
     ///
-    /// Where the pure redundancy relation differs from the subtyping relation is that there are
-    /// a number of simplifications that can be made when simplifying unions that are not
-    /// strictly permitted by the subtyping relation. For example, it is safe to avoid adding
-    /// `Any` to a union that already includes `Any`, because `Any` already represents an
-    /// unknown set of possible sets of runtime values that can materialize to any type in a
-    /// gradual, permissive way. Inferring attribute access or binary expressions over
+    /// The redundancy relation is used prominently in two places as of 2026-02-25: for
+    /// simplifying unions and intersections in our smart type builders, and for calculating
+    /// equivalence between types. Union simplification is pragmatic, and passes `pure: false`;
+    /// equivalence checking requires "pure redundancy", and thus passes `pure: true`. Practically,
+    /// the behaviour difference here is that we want `Literal[False]` to always be considered
+    /// equivalent to `Literal[False]`, but we don't *necessarily* want `Literal[False]` to always
+    /// be considered redundant with `Literal[False]` if one `Literal[False]` is promotable and the
+    /// other is not.
+    ///
+    /// In comparing the redundancy relation with subtyping, one practical way in which they differ is
+    /// that the redundancy relation permits a number of simplifications that can be made when
+    /// simplifying unions that would not be strictly permitted by the subtyping relation. For example,
+    /// it is safe to avoid adding `Any` to a union that already includes `Any`, because `Any` already
+    /// represents an unknown set of possible sets of runtime values that can materialize to any type in
+    /// a gradual, permissive way. Inferring attribute access or binary expressions over
     /// `Any | Any` could never conceivably yield a type that represents a different set of
     /// possible sets of runtime values to inferring the same expression over `Any` alone;
     /// although `Any` is not a subtype of `Any`, top materialization of both `Any` and
@@ -136,33 +146,13 @@ pub(crate) enum TypeRelation<'db> {
     /// materialization of `Any` and `int | Any` may be the same type (`object`), but the
     /// two differ in their bottom materializations (`Never` and `int`, respectively).
     ///
-    /// This relation is used for type equivalence checks, where both directions of the
-    /// relation are tested (i.e. `A` is equivalent to `B` iff `A` is purely redundant in a
-    /// union with `B` *and* `B` is purely redundant in a union with `A`).
+    /// Despite the above principles, there is one exceptional type that should never be union-simplified: the `Divergent` type.
+    /// This is a kind of dynamic type, but it acts as a marker to track recursive type structures.
+    /// If this type is accidentally eliminated by simplification, the fixed-point iteration will not converge.
     ///
     /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
     /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
-    PureRedundancy,
-
-    /// The "redundancy" relation, used for union simplification.
-    ///
-    /// This relation is a practical adaptation of the [pure redundancy](`Self::PureRedundancy`)
-    /// relation for use in union simplification. It shares the same theoretical basis (comparing
-    /// top and bottom materializations), but may differ in minor respects to better serve the
-    /// needs of union simplification. For example, for a pair of literal values of the same kind
-    /// (e.g. two `bool` literals), this relation is asymmetric: a promotable literal (such as
-    /// `True`) is considered redundant with a non-promotable literal of the same kind (such as
-    /// `Literal[True]`), but not vice versa. This ensures that union simplification preserves
-    /// the unpromotable form of a literal value.
-    ///
-    /// Note: `Divergent` types (dynamic types used as markers to track recursive type structures)
-    /// must never be eliminated by union simplification, as doing so would prevent the fixed-point
-    /// iteration from converging. This is enforced by an early-return branch in `has_relation_to_impl`
-    /// that applies to both this relation and `PureRedundancy`.
-    ///
-    /// [fully static]: https://typing.python.org/en/latest/spec/glossary.html#term-fully-static-type
-    /// [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
-    Redundancy,
+    Redundancy { pure: bool },
 
     /// The "constraint implication" relationship, aka "implies subtype of".
     ///
@@ -220,16 +210,11 @@ impl TypeRelation<'_> {
         matches!(self, TypeRelation::Subtyping)
     }
 
-    pub(crate) const fn is_redundancy(self) -> bool {
-        matches!(self, TypeRelation::Redundancy)
-    }
-
     pub(crate) const fn can_safely_assume_reflexivity(self, ty: Type) -> bool {
         match self {
             TypeRelation::Assignability
             | TypeRelation::ConstraintSetAssignability
-            | TypeRelation::PureRedundancy
-            | TypeRelation::Redundancy => true,
+            | TypeRelation::Redundancy { .. } => true,
             TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
                 ty.subtyping_is_always_reflexive()
             }
@@ -327,7 +312,12 @@ impl<'db> Type<'db> {
             other: Type<'db>,
         ) -> bool {
             self_ty
-                .has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
+                .has_relation_to(
+                    db,
+                    other,
+                    InferableTypeVars::None,
+                    TypeRelation::Redundancy { pure: false },
+                )
                 .is_always_satisfied(db)
         }
 
@@ -483,7 +473,7 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(match relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                    TypeRelation::Redundancy | TypeRelation::PureRedundancy => match target {
+                    TypeRelation::Redundancy { .. } => match target {
                         Type::Dynamic(_) => true,
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
                         _ => false,
@@ -493,7 +483,7 @@ impl<'db> Type<'db> {
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
                 TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
-                TypeRelation::Redundancy | TypeRelation::PureRedundancy => match self {
+                TypeRelation::Redundancy { .. } => match self {
                     Type::Dynamic(_) => true,
                     Type::Intersection(intersection) => {
                         // If a `Divergent` type is involved, it must not be eliminated.
@@ -832,8 +822,7 @@ impl<'db> Type<'db> {
                     // of redundancy may not generally lead to simpler types in many situations.
                     let self_ty = match relation {
                         TypeRelation::Subtyping
-                        | TypeRelation::Redundancy
-                        | TypeRelation::PureRedundancy
+                        | TypeRelation::Redundancy { .. }
                         | TypeRelation::SubtypingAssuming(_) => self,
                         TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
                             self.bottom_materialization(db)
@@ -842,8 +831,7 @@ impl<'db> Type<'db> {
                     intersection.negative(db).iter().when_all(db, |&neg_ty| {
                         let neg_ty = match relation {
                             TypeRelation::Subtyping
-                            | TypeRelation::Redundancy
-                            | TypeRelation::PureRedundancy
+                            | TypeRelation::Redundancy { .. }
                             | TypeRelation::SubtypingAssuming(_) => neg_ty,
                             TypeRelation::Assignability
                             | TypeRelation::ConstraintSetAssignability => {
@@ -1003,7 +991,9 @@ impl<'db> Type<'db> {
 
             // For union simplification, we want to preserve the unpromotable form of a literal value,
             // and so redundancy is not symmetric.
-            (Type::LiteralValue(this), Type::LiteralValue(target)) if relation.is_redundancy() => {
+            (Type::LiteralValue(this), Type::LiteralValue(target))
+                if matches!(relation, TypeRelation::Redundancy { pure: false }) =>
+            {
                 ConstraintSet::from(this.kind() == target.kind() && this.is_promotable())
             }
 
@@ -1631,7 +1621,7 @@ impl<'db> Type<'db> {
             db,
             other,
             InferableTypeVars::None,
-            TypeRelation::PureRedundancy,
+            TypeRelation::Redundancy { pure: true },
             relation_visitor,
             disjointness_visitor,
         )
@@ -1640,7 +1630,7 @@ impl<'db> Type<'db> {
                 db,
                 self,
                 InferableTypeVars::None,
-                TypeRelation::PureRedundancy,
+                TypeRelation::Redundancy { pure: true },
                 relation_visitor,
                 disjointness_visitor,
             )
