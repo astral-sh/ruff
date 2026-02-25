@@ -44,7 +44,7 @@ use salsa::plumbing::AsId;
 
 use crate::Db;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
-use crate::semantic_index::definition::Definition;
+use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
@@ -100,29 +100,47 @@ fn definition_cycle_initial<'db>(
     DefinitionInference::cycle_initial(definition.scope(db), Type::divergent(id))
 }
 
-/// Infer just the known-decorator flags for a function definition.
+/// Infer decorator expression types for a function definition.
 ///
 /// This is a lightweight query that avoids the cycle risk of calling
 /// `infer_definition_types` when we need to check decorators while
 /// already inside definition inference (e.g. checking `Self` in a
 /// `@staticmethod`).
-///
-/// TODO: This results in double inference of decorator expressions, since
-/// `infer_function_definition` also infers them independently. Ideally we'd
-/// reuse this query there, but that would require returning a full
-/// `TypeInference` (with expression types) rather than just `FunctionDecorators`,
-/// increasing memory usage for every function.
-#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+#[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn function_known_decorators<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
-) -> FunctionDecorators {
+) -> DefinitionInference<'db> {
     let file = definition.file(db);
     let module = parsed_module(db, file).load(db);
     let index = semantic_index(db, file);
 
     TypeInferenceBuilder::new(db, InferenceRegion::Definition(definition), index, &module)
-        .finish_function_decorators()
+        .finish_function_decorator_types()
+}
+
+pub(crate) fn function_known_decorator_flags<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+) -> FunctionDecorators {
+    let DefinitionKind::Function(function) = definition.kind(db) else {
+        return FunctionDecorators::empty();
+    };
+
+    let file = definition.file(db);
+    let module = parsed_module(db, file).load(db);
+    let decorator_inference = function_known_decorators(db, definition);
+
+    function.node(&module).decorator_list.iter().fold(
+        FunctionDecorators::empty(),
+        |decorators, decorator| {
+            decorators
+                | FunctionDecorators::from_decorator_type(
+                    db,
+                    decorator_inference.expression_type(&decorator.expression),
+                )
+        },
+    )
 }
 
 /// Infer types for all deferred type expressions in a [`Definition`].
