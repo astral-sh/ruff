@@ -1037,6 +1037,21 @@ impl<'db> FunctionType<'db> {
             .any(|overload| overload.is_staticmethod(db))
     }
 
+    /// Returns the runtime class that this function literal is an instance of.
+    ///
+    /// At runtime, `@classmethod`-decorated functions are instances of `classmethod`,
+    /// `@staticmethod`-decorated functions are instances of `staticmethod`, and plain
+    /// functions are instances of `types.FunctionType`.
+    pub(crate) fn fallback_class(self, db: &'db dyn Db) -> KnownClass {
+        if self.is_classmethod(db) {
+            KnownClass::Classmethod
+        } else if self.is_staticmethod(db) {
+            KnownClass::Staticmethod
+        } else {
+            KnownClass::FunctionType
+        }
+    }
+
     /// If the implementation of this function is deprecated, returns the `@warnings.deprecated`.
     ///
     /// Checking if an overload is deprecated requires deeper call analysis.

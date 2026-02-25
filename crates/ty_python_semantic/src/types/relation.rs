@@ -1213,6 +1213,23 @@ impl<'db> Type<'db> {
                 ))
             }
 
+            // For classmethod/staticmethod FunctionLiterals, use the correct fallback
+            // class (classmethod/staticmethod) instead of FunctionType when checking
+            // against a NominalInstance target. We only do this for NominalInstance
+            // targets to avoid introducing Salsa dependencies in other paths
+            // (e.g. generic type inference).
+            (Type::FunctionLiteral(function), Type::NominalInstance(_)) => function
+                .fallback_class(db)
+                .to_instance(db)
+                .has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+
             // Except for the special `BytesLiteral`, `LiteralString`, and string literal cases above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
@@ -2324,11 +2341,12 @@ impl<'db> Type<'db> {
                     .negate(db)
             }
 
-            (Type::FunctionLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
-                // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
-                // (it cannot be an instance of a `types.FunctionType` subclass)
-                KnownClass::FunctionType
+            (Type::FunctionLiteral(function), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::FunctionLiteral(function)) => {
+                // A `Type::FunctionLiteral()` is an instance of `types.FunctionType`,
+                // `classmethod`, or `staticmethod` depending on its decorators.
+                function
+                    .fallback_class(db)
                     .when_subclass_of(db, instance.class(db))
                     .negate(db)
             }

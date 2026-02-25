@@ -1758,6 +1758,11 @@ impl<'db> Type<'db> {
         // report look better until we have proper bidirectional type inference.
         match self {
             Type::ModuleLiteral(_) => Some(KnownClass::ModuleType.to_instance(db)),
+            // Note: this intentionally returns `FunctionType` for all FunctionLiterals,
+            // including classmethods and staticmethods. Using `fallback_class()` here
+            // would introduce Salsa dependencies that break generic type inference.
+            // Classmethod/staticmethod subtype checks against NominalInstance targets
+            // are handled by a dedicated arm in `has_relation_to_impl` instead.
             Type::FunctionLiteral(_) => Some(KnownClass::FunctionType.to_instance(db)),
             Type::LiteralValue(literal) => Some(literal.fallback_instance(db)),
             _ => None,
@@ -2727,7 +2732,8 @@ impl<'db> Type<'db> {
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
-            Type::FunctionLiteral(_) => KnownClass::FunctionType
+            Type::FunctionLiteral(function) => function
+                .fallback_class(db)
                 .to_instance(db)
                 .instance_member(db, name),
 
@@ -2868,11 +2874,20 @@ impl<'db> Type<'db> {
                     ))
                 };
             }
-            Type::FunctionLiteral(function)
-                if instance.is_some_and(|ty| ty.is_none(db))
-                    && !function.is_staticmethod(db)
-                    && !function.is_classmethod(db) =>
-            {
+            Type::FunctionLiteral(function) if function.is_classmethod(db) => {
+                // For classmethod FunctionLiterals, model the behavior of `classmethod.__get__`.
+                // The function is bound to the owner class.
+                return Some((
+                    Type::BoundMethod(BoundMethodType::new(db, function, owner)),
+                    AttributeKind::NormalOrNonDataDescriptor,
+                ));
+            }
+            Type::FunctionLiteral(function) if function.is_staticmethod(db) => {
+                // For staticmethod FunctionLiterals, model the behavior of `staticmethod.__get__`.
+                // The underlying function is returned as-is, without binding self.
+                return Some((self, AttributeKind::NormalOrNonDataDescriptor));
+            }
+            Type::FunctionLiteral(function) if instance.is_some_and(|ty| ty.is_none(db)) => {
                 // When the instance is of type `None` (`NoneType`), we must handle
                 // `FunctionType.__get__` here rather than falling through to the generic
                 // `__get__` path. The stubs for `FunctionType.__get__` use an overload
@@ -6121,7 +6136,7 @@ impl<'db> Type<'db> {
                     KnownClass::Str.to_class_literal(db)
                 }
             },
-            Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
+            Type::FunctionLiteral(function) => function.fallback_class(db).to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::KnownBoundMethod(method) => method.class().to_class_literal(db),
             Type::WrapperDescriptor(_) => KnownClass::WrapperDescriptorType.to_class_literal(db),
