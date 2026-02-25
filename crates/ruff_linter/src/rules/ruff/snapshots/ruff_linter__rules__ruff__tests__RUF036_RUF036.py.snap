@@ -35,7 +35,7 @@ help: Move `None` to the end of the type union
 10 | 
 11 | 
 
-RUF036 `None` not at the end of the type union.
+RUF036 [*] `None` not at the end of the type union.
   --> RUF036.py:12:16
    |
 12 | def func3(arg: None | None | int): 
@@ -43,6 +43,14 @@ RUF036 `None` not at the end of the type union.
 13 |     ...
    |
 help: Move `None` to the end of the type union
+9  |     ...
+10 | 
+11 | 
+   - def func3(arg: None | None | int): 
+12 + def func3(arg: int | None | None): 
+13 |     ...
+14 | 
+15 | 
 
 RUF036 [*] `None` not at the end of the type union.
   --> RUF036.py:16:16
@@ -203,4 +211,39 @@ help: Move `None` to the end of the type union
 56 + def func12(io: int | None = None) -> int | None:
 57 |     ...
 58 | 
-59 |
+59 | 
+
+RUF036 [*] `None` not at the end of the type union.
+  --> RUF036.py:61:17
+   |
+60 | # 3+ member PEP 604 chains
+61 | def func13(arg: None | int | str):
+   |                 ^^^^^^^^^^^^^^^^
+62 |     ...
+   |
+help: Move `None` to the end of the type union
+58 | 
+59 | 
+60 | # 3+ member PEP 604 chains
+   - def func13(arg: None | int | str):
+61 + def func13(arg: int | str | None):
+62 |     ...
+63 | 
+64 | 
+
+RUF036 [*] `None` not at the end of the type union.
+  --> RUF036.py:65:17
+   |
+65 | def func14(arg: None | int | str | bytes):
+   |                 ^^^^^^^^^^^^^^^^^^^^^^^^
+66 |     ...
+   |
+help: Move `None` to the end of the type union
+62 |     ...
+63 | 
+64 | 
+   - def func14(arg: None | int | str | bytes):
+65 + def func14(arg: int | str | bytes | None):
+66 |     ...
+67 | 
+68 |

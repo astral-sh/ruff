@@ -1,6 +1,8 @@
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::helpers::pep_604_union;
 use ruff_python_ast::{Expr, ExprBinOp, Operator};
+use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing::traverse_union;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -46,6 +48,45 @@ impl Violation for NoneNotAtEndOfUnion {
     }
 }
 
+/// Returns `true` if a union expression contains nested sub-unions that would
+/// need to be flattened by a fix.
+///
+/// For PEP 604 unions (`a | b | c`), the AST is left-recursive: `(a | b) | c`.
+/// Only right-hand unions indicate actual nesting from parenthesization, e.g.
+/// `a | (b | c)`. For `typing.Union`, any tuple element that is itself a union
+/// is considered nested.
+fn has_nested_union(semantic: &SemanticModel, expr: &Expr) -> bool {
+    match expr {
+        Expr::BinOp(ExprBinOp {
+            op: Operator::BitOr,
+            left,
+            right,
+            ..
+        }) => is_union_expr(semantic, right) || has_nested_union(semantic, left),
+        Expr::Subscript(subscript) if semantic.match_typing_expr(&subscript.value, "Union") => {
+            if let Expr::Tuple(tuple) = &*subscript.slice {
+                tuple.iter().any(|elt| is_union_expr(semantic, elt))
+            } else {
+                false
+            }
+        }
+        _ => false,
+    }
+}
+
+/// Returns `true` if `expr` is itself a union type (PEP 604 `|` or
+/// `typing.Union[...]`).
+fn is_union_expr(semantic: &SemanticModel, expr: &Expr) -> bool {
+    match expr {
+        Expr::BinOp(ExprBinOp {
+            op: Operator::BitOr,
+            ..
+        }) => true,
+        Expr::Subscript(subscript) => semantic.match_typing_expr(&subscript.value, "Union"),
+        _ => false,
+    }
+}
+
 /// RUF036
 pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let semantic = checker.semantic();
@@ -53,21 +94,11 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut other_exprs: Vec<&Expr> = Vec::new();
 
     let mut last_expr: Option<&Expr> = None;
-    let mut first_parent: Option<&Expr> = None;
-    let mut has_nested_union = false;
     let mut is_pep604 = false;
 
     let mut collect_members = |expr: &'a Expr, parent: &'a Expr| {
-        // Detect nested unions by checking if the parent changes during traversal.
-        match first_parent {
-            None => {
-                first_parent = Some(parent);
-                is_pep604 = matches!(parent, Expr::BinOp(_));
-            }
-            Some(first) if !std::ptr::eq(first, parent) => {
-                has_nested_union = true;
-            }
-            _ => {}
+        if !is_pep604 {
+            is_pep604 = matches!(parent, Expr::BinOp(_));
         }
 
         if matches!(expr, Expr::NoneLiteral(_)) {
@@ -98,89 +129,52 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut diagnostic = checker.report_diagnostic(NoneNotAtEndOfUnion, union.range());
 
     // Skip fix for nested unions to avoid flattening.
-    if !has_nested_union
-        && let Some(fix) = generate_fix(checker, &other_exprs, &none_exprs, union, is_pep604)
+    if !has_nested_union(semantic, union)
+        && !other_exprs.is_empty()
     {
-        diagnostic.set_fix(fix);
+        let nodes: Vec<&Expr> = other_exprs.iter().chain(&none_exprs).copied().collect();
+        if let Some(fix) = generate_fix(checker, nodes, union, is_pep604) {
+            diagnostic.set_fix(fix);
+        }
     }
 }
 
 fn generate_fix(
     checker: &Checker,
-    other_exprs: &[&Expr],
-    none_exprs: &[&Expr],
+    nodes: Vec<&Expr>,
     annotation: &Expr,
     is_pep604: bool,
 ) -> Option<Fix> {
-    if other_exprs.is_empty() {
-        return None;
-    }
-
     let applicability = if checker.comment_ranges().intersects(annotation.range()) {
         Applicability::Unsafe
     } else {
         Applicability::Safe
     };
 
-    let reordered: Vec<&Expr> = [other_exprs, none_exprs].concat();
+    let reordered: Vec<Expr> = nodes.into_iter().cloned().collect();
 
-    let edit = if is_pep604 {
-        generate_pep604_fix(checker, reordered, annotation)
+    let new_expr = if is_pep604 {
+        pep_604_union(&reordered)
     } else {
-        generate_typing_union_fix(checker, reordered, annotation)?
-    };
-
-    Some(Fix::applicable_edit(edit, applicability))
-}
-
-fn generate_pep604_fix(checker: &Checker, nodes: Vec<&Expr>, annotation: &Expr) -> Edit {
-    debug_assert!(nodes.len() >= 2, "At least two nodes required");
-
-    let new_expr = nodes
-        .into_iter()
-        .fold(None, |acc: Option<Expr>, right: &Expr| {
-            if let Some(left) = acc {
-                Some(Expr::BinOp(ExprBinOp {
-                    left: Box::new(left),
-                    op: Operator::BitOr,
-                    right: Box::new(right.clone()),
-                    range: TextRange::default(),
-                    node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                }))
-            } else {
-                Some(right.clone())
-            }
-        })
-        .unwrap();
-
-    Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range())
-}
-
-fn generate_typing_union_fix(
-    checker: &Checker,
-    nodes: Vec<&Expr>,
-    annotation: &Expr,
-) -> Option<Edit> {
-    let Expr::Subscript(subscript) = annotation else {
-        return None;
-    };
-
-    let new_expr = Expr::Subscript(ruff_python_ast::ExprSubscript {
-        value: subscript.value.clone(),
-        slice: Box::new(Expr::Tuple(ruff_python_ast::ExprTuple {
-            elts: nodes.into_iter().cloned().collect(),
+        // Preserve the original subscript value (e.g., `Union`, `U`, `typing.Union`).
+        let Expr::Subscript(subscript) = annotation else {
+            return None;
+        };
+        Expr::Subscript(ruff_python_ast::ExprSubscript {
+            value: subscript.value.clone(),
+            slice: Box::new(Expr::Tuple(ruff_python_ast::ExprTuple {
+                elts: reordered,
+                ctx: ruff_python_ast::ExprContext::Load,
+                range: TextRange::default(),
+                node_index: ruff_python_ast::AtomicNodeIndex::NONE,
+                parenthesized: false,
+            })),
             ctx: ruff_python_ast::ExprContext::Load,
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            parenthesized: false,
-        })),
-        ctx: ruff_python_ast::ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    });
+        })
+    };
 
-    Some(Edit::range_replacement(
-        checker.generator().expr(&new_expr),
-        annotation.range(),
-    ))
+    let edit = Edit::range_replacement(checker.generator().expr(&new_expr), annotation.range());
+    Some(Fix::applicable_edit(edit, applicability))
 }

@@ -57,8 +57,17 @@ def func12(io: None | int = None) -> int | None:
     ...
 
 
+# 3+ member PEP 604 chains
+def func13(arg: None | int | str):
+    ...
+
+
+def func14(arg: None | int | str | bytes):
+    ...
+
+
 # Ok
-def good_func1(arg: int | None): 
+def good_func1(arg: int | None):
     ...
 
 
