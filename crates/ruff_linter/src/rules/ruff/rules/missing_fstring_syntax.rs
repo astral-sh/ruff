@@ -4,7 +4,8 @@ use rustc_hash::FxHashSet;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_python_literal::format::FormatSpec;
-use ruff_python_parser::parse_expression;
+use ruff_python_parser::{UnsupportedSyntaxErrorKind, parse_expression};
+use ruff_python_parser::error::FStringKind;
 use ruff_python_semantic::analyze::logging::is_logger_candidate;
 use ruff_python_semantic::{Modules, SemanticModel, TypingOnlyBindingsStatus};
 use ruff_text_size::{Ranged, TextRange};
@@ -183,55 +184,6 @@ fn is_method_call_on_literal(call_expr: &ast::ExprCall, literal: &ast::StringLit
     value.as_slice().contains(literal)
 }
 
-/// Returns `true` if `text` contains a `#` character that would start a comment,
-/// i.e., a `#` that appears outside of any nested string literal.
-///
-/// In Python < 3.12, f-string interpolations cannot contain comments, but a `#`
-/// inside a nested string (e.g., `f"{'#'}"`) is not a comment and is valid.
-fn has_comment_hash(text: &str) -> bool {
-    let mut chars = text.chars().peekable();
-    while let Some(ch) = chars.next() {
-        match ch {
-            // Entering a string literal — skip until the matching closing quote.
-            '\'' | '"' => {
-                let quote = ch;
-                // Check for triple-quote.
-                let triple = chars.as_str().starts_with([quote, quote].as_slice())
-                    && {
-                        // consume the two extra quotes
-                        chars.next();
-                        chars.next();
-                        true
-                    };
-                loop {
-                    match chars.next() {
-                        None => break,
-                        Some('\\') => {
-                            chars.next(); // skip escaped char
-                        }
-                        Some(c) if c == quote => {
-                            if triple {
-                                // need two more matching quotes
-                                if chars.as_str().starts_with([quote, quote].as_slice()) {
-                                    chars.next();
-                                    chars.next();
-                                    break;
-                                }
-                            } else {
-                                break;
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-            }
-            '#' => return true,
-            _ => {}
-        }
-    }
-    false
-}
-
 /// Returns `true` if `literal` is likely an f-string with a missing `f` prefix.
 /// See [`MissingFStringSyntax`] for the validation criteria.
 fn should_be_fstring(
@@ -248,6 +200,22 @@ fn should_be_fstring(
     let Ok(parsed) = parse_expression(&fstring_expr) else {
         return false;
     };
+
+    // For Python < 3.12, reject if the parser detected any PEP 701 f-string
+    // features (backslashes or comments in interpolations). This correctly handles
+    // all nesting levels, including cases like `{1:{x #}}` where a comment appears
+    // inside a nested interpolation within a format spec.
+    if target_version < PythonVersion::PY312 {
+        let has_pep701 = parsed
+            .unsupported_syntax_errors()
+            .iter()
+            .any(|e| matches!(e.kind,
+                UnsupportedSyntaxErrorKind::Pep701FString(FStringKind::Backslash | FStringKind::Comment)
+            ));
+        if has_pep701 {
+            return false;
+        }
+    }
 
     // Note: Range offsets for `value` are based on `fstring_expr`
     let ast::Expr::FString(ast::ExprFString { value, .. }) = parsed.expr() else {
@@ -275,25 +243,6 @@ fn should_be_fstring(
     for f_string in value.f_strings() {
         let mut has_name = false;
         for element in f_string.elements.interpolations() {
-            // Check if the interpolation expression contains backslashes or comments.
-            // F-strings with backslashes or comments in interpolations are only valid in Python 3.12+.
-            // Notes:
-            // - A `#` inside a nested string literal (e.g., `{'#'}`) is NOT a comment.
-            // - A `#` inside a format spec (e.g., `{1:#x}`) is NOT a comment; only check
-            //   the expression part (before the format spec) for comment hashes.
-            let interpolation_text = &fstring_expr[element.range()];
-            if target_version < PythonVersion::PY312 && interpolation_text.contains('\\') {
-                return false;
-            }
-            if target_version < PythonVersion::PY312 {
-                // Only scan up to the end of the expression, not into the format spec.
-                let expr_end = usize::from(element.expression.end() - element.start());
-                let expr_text = &interpolation_text[..expr_end.min(interpolation_text.len())];
-                if has_comment_hash(expr_text) {
-                    return false;
-                }
-            }
-
             if let ast::Expr::Name(ast::ExprName { id, .. }) = element.expression.as_ref() {
                 if arg_names.contains(id) {
                     return false;
