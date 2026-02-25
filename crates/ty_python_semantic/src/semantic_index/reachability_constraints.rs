@@ -209,8 +209,8 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, NarrowingConstraint, Truthiness, Type, TypeContext,
-    UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+    CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, Type,
+    TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -330,6 +330,10 @@ fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type
     ty
 }
 
+fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
+    KnownClass::Mapping.to_instance(db).top_materialization(db)
+}
+
 /// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
 /// match that pattern.
 fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) -> Type<'db> {
@@ -352,6 +356,13 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
                     .to_instance(db)
                     .unwrap_or(Type::Never)
                     .top_materialization(db)
+            } else {
+                Type::Never
+            }
+        }
+        PatternPredicateKind::Mapping(kind) => {
+            if kind.is_irrefutable() {
+                mapping_pattern_type(db)
             } else {
                 Type::Never
             }
@@ -1049,6 +1060,20 @@ impl ReachabilityConstraints {
                         Truthiness::Ambiguous
                     }
                 })
+            }
+            PatternPredicateKind::Mapping(kind) => {
+                let mapping_ty = mapping_pattern_type(db);
+                if subject_ty.is_subtype_of(db, mapping_ty) {
+                    if kind.is_irrefutable() {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::Ambiguous
+                    }
+                } else if subject_ty.is_disjoint_from(db, mapping_ty) {
+                    Truthiness::AlwaysFalse
+                } else {
+                    Truthiness::Ambiguous
+                }
             }
             PatternPredicateKind::As(pattern, _) => pattern
                 .as_deref()

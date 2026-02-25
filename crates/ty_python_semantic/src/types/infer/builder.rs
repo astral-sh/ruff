@@ -6593,6 +6593,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 self.infer_definition(name);
             }
+            ast::Expr::Starred(ast::ExprStarred {
+                value: starred_value,
+                ..
+            }) => {
+                self.infer_target_impl(starred_value, value, infer_assigned_ty);
+            }
             ast::Expr::List(ast::ExprList { elts, .. })
             | ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => {
                 let assigned_ty = infer_assigned_ty.map(|f| f(self, TypeContext::default()));
@@ -10820,7 +10826,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // different overloads provide different type context; unioning may be more
                     // correct in those cases.
                     *argument_type = argument_type
-                        .map(|current| IntersectionType::from_elements(db, [inferred_ty, current]))
+                        .map(|current| {
+                            IntersectionType::from_two_elements(db, inferred_ty, current)
+                        })
                         .or(Some(inferred_ty));
                 }
 
@@ -11034,7 +11042,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .annotation
                             .is_none_or(|tcx| ty.is_assignable_to(db, tcx))
                         {
-                            *current = IntersectionType::from_elements(db, [*current, ty]);
+                            *current = IntersectionType::from_two_elements(db, *current, ty);
                         }
                     })
                     .or_insert(ty);

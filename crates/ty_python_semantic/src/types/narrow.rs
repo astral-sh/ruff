@@ -588,6 +588,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PatternPredicateKind::Class(cls, kind) => {
                 self.evaluate_match_pattern_class(subject, *cls, *kind, is_positive)
             }
+            PatternPredicateKind::Mapping(kind) => {
+                self.evaluate_match_pattern_mapping(subject, *kind, is_positive)
+            }
             PatternPredicateKind::Value(expr) => {
                 self.evaluate_match_pattern_value(subject, *expr, is_positive)
             }
@@ -760,6 +763,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_eq(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let rhs_ty = rhs_ty.resolve_type_alias(self.db);
+
         // We can only narrow on equality checks against single-valued types.
         if rhs_ty.is_single_valued(self.db) || rhs_ty.is_union_of_single_valued(self.db) {
             // The fully-general (and more efficient) approach here would be to introduce a
@@ -870,6 +875,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     // TODO `expr_in` and `expr_not_in` should perhaps be unified with `expr_eq` and `expr_ne`,
     // since `eq` and `ne` are equivalent to `in` and `not in` with only one element in the RHS.
     fn evaluate_expr_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let lhs_ty = lhs_ty.resolve_type_alias(self.db);
+
         if lhs_ty.is_single_valued(self.db) || lhs_ty.is_union_of_single_valued(self.db) {
             rhs_ty
                 .try_iterate(self.db)
@@ -913,6 +920,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
     }
 
     fn evaluate_expr_not_in(&mut self, lhs_ty: Type<'db>, rhs_ty: Type<'db>) -> Option<Type<'db>> {
+        let lhs_ty = lhs_ty.resolve_type_alias(self.db);
+
         let rhs_values = rhs_ty
             .try_iterate(self.db)
             .ok()?
@@ -1367,7 +1376,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .or_insert(constraint);
 
                 // Use the narrowed type for subsequent comparisons in a chain.
-                last_rhs_ty = Some(IntersectionType::from_elements(self.db, [rhs_ty, ty]));
+                last_rhs_ty = Some(IntersectionType::from_two_elements(self.db, rhs_ty, ty));
             } else {
                 last_rhs_ty = Some(rhs_ty);
             }
@@ -1567,6 +1576,29 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         Some(NarrowingConstraints::from_iter([(
             place,
             NarrowingConstraint::intersection(narrowed_type),
+        )]))
+    }
+
+    fn evaluate_match_pattern_mapping(
+        &mut self,
+        subject: Expression<'db>,
+        kind: ClassPatternKind,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        if !kind.is_irrefutable() && !is_positive {
+            return None;
+        }
+
+        let subject = PlaceExpr::try_from_expr(subject.node_ref(self.db, self.module))?;
+        let place = self.expect_place(&subject);
+
+        let mapping_type = ClassInfoConstraintFunction::IsInstance
+            .generate_constraint(self.db, KnownClass::Mapping.to_class_literal(self.db))?
+            .negate_if(self.db, !is_positive);
+
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::intersection(mapping_type),
         )]))
     }
 

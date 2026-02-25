@@ -2080,7 +2080,7 @@ impl<'db> SpecializationBuilder<'db> {
                             // check here.
                             self.add_type_mapping(
                                 bound_typevar,
-                                IntersectionType::from_elements(self.db, [bound, ty]),
+                                IntersectionType::from_two_elements(self.db, bound, ty),
                                 polarity,
                                 f,
                             );

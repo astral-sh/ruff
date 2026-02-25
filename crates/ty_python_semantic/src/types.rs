@@ -1479,29 +1479,31 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn is_union_of_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.as_union().is_some_and(|union| {
+        let ty = self.resolve_type_alias(db);
+        ty.as_union().is_some_and(|union| {
             union.elements(db).iter().all(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
                     || ty.is_literal_string()
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
-        }) || self.is_bool(db)
-            || self.is_literal_string()
-            || (self.is_enum(db) && !self.overrides_equality(db))
+        }) || ty.is_bool(db)
+            || ty.is_literal_string()
+            || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
     pub(crate) fn is_union_with_single_valued(&self, db: &'db dyn Db) -> bool {
-        self.as_union().is_some_and(|union| {
+        let ty = self.resolve_type_alias(db);
+        ty.as_union().is_some_and(|union| {
             union.elements(db).iter().any(|ty| {
                 ty.is_single_valued(db)
                     || ty.is_bool(db)
                     || ty.is_literal_string()
                     || (ty.is_enum(db) && !ty.overrides_equality(db))
             })
-        }) || self.is_bool(db)
-            || self.is_literal_string()
-            || (self.is_enum(db) && !self.overrides_equality(db))
+        }) || ty.is_bool(db)
+            || ty.is_literal_string()
+            || (ty.is_enum(db) && !ty.overrides_equality(db))
     }
 
     /// Create a promotable string literal.
@@ -4272,7 +4274,7 @@ impl<'db> Type<'db> {
                     .with_annotated_type(typevar_meta)];
                 // Intersect with `Any` for the return type to reflect the fact that the `dataclass()`
                 // decorator adds methods to the class
-                let returns = IntersectionType::from_elements(db, [typevar_meta, Type::any()]);
+                let returns = IntersectionType::from_two_elements(db, typevar_meta, Type::any());
                 let signature =
                     Signature::new_generic(Some(context), Parameters::new(db, parameters), returns);
                 Binding::single(self, signature).into()
@@ -12283,7 +12285,12 @@ pub(super) fn walk_intersection_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>
     }
 }
 
+#[salsa::tracked]
 impl<'db> IntersectionType<'db> {
+    /// Create an intersection type `E1 & E2 & ... & En` from a list of (positive) elements.
+    ///
+    /// For performance reasons, consider using [`IntersectionType::from_two_elements`] if
+    /// the intersection is constructed from exactly two elements.
     pub(crate) fn from_elements<I, T>(db: &'db dyn Db, elements: I) -> Type<'db>
     where
         I: IntoIterator<Item = T>,
@@ -12291,6 +12298,20 @@ impl<'db> IntersectionType<'db> {
     {
         IntersectionBuilder::new(db)
             .positive_elements(elements)
+            .build()
+    }
+
+    /// Create an intersection type `A & B` from two elements `A` and `B`.
+    #[salsa::tracked(
+        cycle_initial=|_, id, _, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, result: Type<'db>, _, _| {
+            result.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn from_two_elements(db: &'db dyn Db, a: Type<'db>, b: Type<'db>) -> Type<'db> {
+        IntersectionBuilder::new(db)
+            .positive_elements([a, b])
             .build()
     }
 

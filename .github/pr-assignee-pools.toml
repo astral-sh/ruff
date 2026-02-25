@@ -1,0 +1,36 @@
+[[pools]]
+name = "ty-semantic"
+paths = ["/crates/ty_python_semantic/**"]
+reviewers = ["carljm", "AlexWaygood", "sharkdp", "dcreager", "ibraheemdev", "oconnor663"]
+
+[[pools]]
+name = "ty-module-resolver"
+paths = ["/crates/ty_module_resolver/**", "/crates/ty_site_packages/**"]
+reviewers = ["carljm", "AlexWaygood", "MichaReiser", "BurntSushi"]
+
+[[pools]]
+name = "ty-infra"
+paths = [
+  "/crates/ruff_db/**",
+  "/crates/ty_combine/**",
+  "/crates/ty_project/**",
+  "/crates/ty/**",
+  "/crates/ty_benchmark/**",
+  "/crates/ruff_benchmark/benches/ty*",
+]
+reviewers = ["carljm", "MichaReiser", "BurntSushi"]
+
+[[pools]]
+name = "ty-wasm"
+paths = ["/crates/ty_wasm/**"]
+reviewers = ["MichaReiser", "BurntSushi"]
+
+[[pools]]
+name = "ty-ide"
+paths = ["/crates/ty_ide/**"]
+reviewers = ["MichaReiser", "AlexWaygood", "BurntSushi", "dhruvmanila"]
+
+[[pools]]
+name = "ty-server"
+paths = ["/crates/ty_server/**"]
+reviewers = ["MichaReiser", "BurntSushi", "dhruvmanila"]
