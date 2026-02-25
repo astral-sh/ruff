@@ -201,9 +201,7 @@ fn should_be_fstring(
     };
 
     // For Python < 3.12, reject if the parser detected any PEP 701 f-string
-    // features (backslashes or comments in interpolations). This correctly handles
-    // all nesting levels, including cases like `{1:{x #}}` where a comment appears
-    // inside a nested interpolation within a format spec.
+    // features.
     if target_version < PythonVersion::PY312 {
         let has_pep701 = parsed
             .unsupported_syntax_errors()
