@@ -339,6 +339,95 @@ impl ModuleName {
     ) -> Result<Self, ModuleNameResolutionError> {
         Self::from_identifier_parts(db, importing_file, None, 1)
     }
+
+    /// Returns `true` if the module name given appears to be a test module.
+    ///
+    /// This routine is meant to codify a Python ecosystem convention. That is,
+    /// a module is considered a test module if any of the following are true:
+    ///
+    /// * Any non-root component is `test` or `tests`
+    ///   (e.g., `numpy.tests.test_core`).
+    /// * The final component is `conftest` (pytest configuration).
+    ///
+    /// Note that top-level "testing" modules like `pandas.testing` are
+    /// intentionally not filtered, as they provide utilities meant for external
+    /// use.
+    ///
+    /// # Usage
+    ///
+    /// Callers should be mindful when using this routine to filter items
+    /// presented to end users. For example, auto-import uses this to filter
+    /// completions offered, but only for completions outside of the end
+    /// user's first party code. That is, end users still expect to see
+    /// suggestions from their own test modules, but not for test modules in
+    /// their dependencies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// // Some positive examples.
+    /// let module_name = ModuleName::new_static("numpy.tests").unwrap();
+    /// assert!(module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("requests.test").unwrap();
+    /// assert!(module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("conftest").unwrap();
+    /// assert!(module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("foo.bar.conftest").unwrap();
+    /// assert!(module_name.is_test_module());
+    ///
+    /// // Some negative examples.
+    /// let module_name = ModuleName::new_static("foo.testing").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("tests").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("test").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("pytest").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// let module_name = ModuleName::new_static("unittest").unwrap();
+    /// assert!(!module_name.is_test_module());
+    /// ```
+    pub fn is_test_module(&self) -> bool {
+        if self.components().next_back() == Some("conftest") {
+            return true;
+        }
+        self.components()
+            .skip(1)
+            .any(|c| c == "test" || c == "tests")
+    }
+
+    /// Returns `true` if the module name is considered private.
+    ///
+    /// This routine is meant to codify a Python ecosystem convention. That is,
+    /// a module is considered private if itself or any of its parent modules
+    /// starts with a `_`.
+    ///
+    /// # Usage
+    ///
+    /// Callers should be mindful when using this routine to filter items
+    /// presented to end users. For example, auto-import uses this to filter
+    /// completions offered, but only for completions outside of the end user's
+    /// first party code. That is, end users still expect to see suggestions
+    /// from their private modules, but not for private modules in their
+    /// dependencies.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use ty_module_resolver::ModuleName;
+    ///
+    /// let module_name = ModuleName::new_static("_foo").unwrap();
+    /// assert!(module_name.is_private());
+    /// let module_name = ModuleName::new_static("foo._bar").unwrap();
+    /// assert!(module_name.is_private());
+    /// let module_name = ModuleName::new_static("foo._bar.quux").unwrap();
+    /// assert!(module_name.is_private());
+    /// ```
+    pub fn is_private(&self) -> bool {
+        self.components().any(|c| c.starts_with('_'))
+    }
 }
 
 impl Deref for ModuleName {
