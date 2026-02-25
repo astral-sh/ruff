@@ -1,4 +1,12 @@
 [[pools]]
+name = "ruff"
+paths = [
+  "/crates/ruff/**",
+  "/crates/ruff_linter/**",
+]
+reviewers = ["amyreese", "ntBre"]
+
+[[pools]]
 name = "ty-semantic"
 paths = ["/crates/ty_python_semantic/**"]
 reviewers = ["carljm", "sharkdp", "dcreager", "ibraheemdev", "oconnor663"]
