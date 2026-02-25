@@ -22,7 +22,7 @@ use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec_inline};
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
-use type_ordering::union_or_intersection_elements_ordering;
+use type_ordering::{OrderingPurpose, type_ordering};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub(crate) use self::class::DynamicClassLiteral;
@@ -666,6 +666,12 @@ impl From<DataclassTransformerFlags> for DataclassFlags {
 /// Metadata for a dataclass. Stored inside a `Type::DataclassDecorator(…)`
 /// instance that we use as the return type of a `dataclasses.dataclass` and
 /// dataclass-transformer decorator calls.
+///
+/// ## Ordering
+///
+/// Ordering is based on the dataclass params' salsa-assigned id and not on its values.
+/// The id may change between runs, or when the dataclass params were garbage collected
+/// and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct DataclassParams<'db> {
@@ -803,6 +809,33 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+#[derive(Copy, Clone)]
+pub(crate) struct TypeOrdering<'db> {
+    db: &'db dyn Db,
+    ty: Type<'db>,
+}
+
+impl Eq for TypeOrdering<'_> {}
+
+impl PartialEq for TypeOrdering<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.cmp(other).is_eq()
+    }
+}
+
+impl PartialOrd for TypeOrdering<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TypeOrdering<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        debug_assert!(std::ptr::eq(self.db, other.db));
+        type_ordering(self.db, &self.ty, &other.ty, OrderingPurpose::Determinism)
+    }
+}
+
 /// Helper for `recursive_type_normalized_impl` for `TypeGuardLike` types.
 fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
@@ -850,6 +883,10 @@ impl<'db> Type<'db> {
 
     pub(crate) const fn is_never(&self) -> bool {
         matches!(self, Type::Never)
+    }
+
+    pub(crate) fn ordering(self, db: &'db dyn Db) -> TypeOrdering<'db> {
+        TypeOrdering { db, ty: self }
     }
 
     /// Returns `true` if this type contains a `Self` type variable.
@@ -7769,7 +7806,7 @@ impl std::fmt::Display for DynamicType<'_> {
 
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash, Ord, PartialOrd)]
     pub struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
@@ -8186,7 +8223,7 @@ impl<'db> FieldInstance<'db> {
 
 /// Whether this typevar was created via the legacy `TypeVar` constructor, using PEP 695 syntax,
 /// or an implicit typevar like `Self` was used.
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, Ord, PartialOrd, get_size2::GetSize)]
 pub enum TypeVarKind {
     /// `T = TypeVar("T")`
     Legacy,
@@ -8797,6 +8834,12 @@ fn lazy_default_cycle_recover<'db>(
 }
 
 /// Where a type variable is bound and usable.
+///
+/// ## Ordering
+///
+/// Ordering is based on the salsa-assigned id of the bound type var instance that defines the context,
+/// and not on the context's values. The id may change between runs, or when the bound type var instance
+/// was garbage collected and recreated.
 #[derive(
     Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, salsa::Update, get_size2::GetSize,
 )]
@@ -11041,6 +11084,13 @@ impl<'db> CallableTypes<'db> {
 ///
 /// Unlike bound methods of user-defined classes, these are not generally instances
 /// of `types.BoundMethodType` at runtime.
+///
+/// ## Ordering
+///
+/// Ordering between variants is guaranteed to be stable between different runs of ty.
+/// Ordering within variants is based on the salsa-assigned ids of the types they contain,
+/// and not on their values. It may change between runs, or when the types they contain
+/// were garbage collected and recreated.
 #[derive(
     Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
 )]
@@ -12895,8 +12945,8 @@ impl<'db> IntersectionType<'db> {
 
         let mut negative = self.negative(db).map(|ty| ty.normalized_impl(db, visitor));
 
-        positive.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
-        negative.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
+        positive.sort_unstable_by(|l, r| type_ordering(db, l, r, OrderingPurpose::Normalization));
+        negative.sort_unstable_by(|l, r| type_ordering(db, l, r, OrderingPurpose::Normalization));
 
         IntersectionType::new(db, positive, negative)
     }
