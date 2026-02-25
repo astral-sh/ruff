@@ -354,19 +354,28 @@ impl<'a> Dependency<'a> {
                                 .map(|name| name.id.as_str())
                         })
                         .collect()
-                } else if let Some(init_def) = class_def
+                } else if let Some(method_def) = class_def
                     .body
                     .iter()
                     .filter_map(|stmt| stmt.as_function_def_stmt())
-                    .find(|func_def| func_def.name.as_str() == "__init__")
+                    .find(|func_def| {
+                        func_def.name.as_str() == "__init__"
+                            || func_def.name.as_str() == "__call__"
+                    })
                 {
-                    // Skip `self` parameter
-                    non_posonly_non_variadic_parameters(init_def)
+                    // Skip `self` parameter.
+                    //
+                    // For classes used as FastAPI dependencies, the parameters
+                    // can come from either `__init__` (when the class itself is
+                    // passed to `Depends`) or `__call__` (when an instance of
+                    // the class is passed to `Depends`). We check `__init__`
+                    // first, falling back to `__call__`.
+                    non_posonly_non_variadic_parameters(method_def)
                         .skip(1)
                         .map(|param| param.name().as_str())
                         .collect()
                 } else {
-                    return None;
+                    return Some(Self::Unknown);
                 };
 
                 Some(Self::Class(parameter_names))

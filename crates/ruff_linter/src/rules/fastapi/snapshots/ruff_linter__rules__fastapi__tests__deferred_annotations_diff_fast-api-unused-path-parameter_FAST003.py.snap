@@ -1,12 +1,13 @@
 ---
 source: crates/ruff_linter/src/rules/fastapi/mod.rs
+assertion_line: 41
 ---
 --- Linter settings ---
 -linter.unresolved_target_version = 3.13
 +linter.unresolved_target_version = 3.14
 
 --- Summary ---
-Removed: 3
+Removed: 4
 Added: 0
 
 --- Removed ---
@@ -71,4 +72,23 @@ help: Add `id` to function signature
 203 | @app.get("/{id}")
 204 | async def get_id_init_not_annotated(params = Depends(InitParams)): ...
 205 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_callable_dep_missing` signature
+   --> FAST003.py:335:19
+    |
+335 | @app.get("/things/{thing_id}")
+    |                   ^^^^^^^^^^
+336 | async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
+    |
+help: Add `thing_id` to function signature
+333 | 
+334 | 
+335 | @app.get("/things/{thing_id}")
+    - async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
+336 + async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)], thing_id): ...
+337 | 
+338 | 
+339 | # OK: class with no __init__ and no __call__ (unknown dependency, no diagnostic)
 note: This is an unsafe fix and may change runtime behavior

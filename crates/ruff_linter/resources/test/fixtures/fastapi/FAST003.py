@@ -299,3 +299,47 @@ async def read_thing_posonly_default_trailing(query: str = "", /,): ...
 
 @app.get("/things/{thing_id}")
 async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
+
+
+# https://github.com/astral-sh/ruff/issues/23526
+
+# OK: callable class dependency with __call__ method
+class CallableQuery:
+    def __call__(self, thing_id: int):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)]): ...
+
+
+# OK: class with both __init__ and __call__
+class InitAndCallQuery:
+    def __init__(self, thing_id: int):
+        pass
+
+    def __call__(self, other: str):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_dep(query: Annotated[str, Depends(InitAndCallQuery)]): ...
+
+
+# Error: callable class dependency where path param is not in __call__
+class CallableQueryOther:
+    def __call__(self, other: str):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
+
+
+# OK: class with no __init__ and no __call__ (unknown dependency, no diagnostic)
+class EmptyClass:
+    pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
