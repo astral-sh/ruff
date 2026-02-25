@@ -62,12 +62,14 @@ fn split_truthiness_guarded_intersection<'db>(
     let Type::Intersection(intersection) = ty else {
         return None;
     };
+    let falsy = Type::AlwaysTruthy.negate(db);
+    let truthy = Type::AlwaysFalsy.negate(db);
 
     let has_not_truthy = intersection.negative(db).contains(&Type::AlwaysTruthy);
     let has_not_falsy = intersection.negative(db).contains(&Type::AlwaysFalsy);
     let guard = match (has_not_truthy, has_not_falsy) {
-        (true, false) => Type::AlwaysTruthy.negate(db),
-        (false, true) => Type::AlwaysFalsy.negate(db),
+        (true, false) => falsy,
+        (false, true) => truthy,
         _ => return None,
     };
 
@@ -76,8 +78,8 @@ fn split_truthiness_guarded_intersection<'db>(
         core = core.add_positive(*positive);
     }
     for negative in intersection.negative(db) {
-        if (guard == Type::AlwaysTruthy.negate(db) && *negative == Type::AlwaysTruthy)
-            || (guard == Type::AlwaysFalsy.negate(db) && *negative == Type::AlwaysFalsy)
+        if (guard == falsy && *negative == Type::AlwaysTruthy)
+            || (guard == truthy && *negative == Type::AlwaysFalsy)
         {
             continue;
         }
@@ -112,8 +114,8 @@ fn merge_truthiness_guarded_pair<'db>(
     }
 
     let candidate = UnionType::from_elements(db, [left_core, right_core]);
-    let left_reconstructed = IntersectionType::from_elements(db, [candidate, left_guard]);
-    let right_reconstructed = IntersectionType::from_elements(db, [candidate, right_guard]);
+    let left_reconstructed = IntersectionType::from_two_elements(db, candidate, left_guard);
+    let right_reconstructed = IntersectionType::from_two_elements(db, candidate, right_guard);
     if left_reconstructed == left && right_reconstructed == right {
         Some(candidate)
     } else {
