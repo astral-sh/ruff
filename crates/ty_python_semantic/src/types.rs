@@ -12057,7 +12057,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 pub struct ManualPEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
-    pub definition: Option<Definition<'db>>,
+    pub definition: Definition<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -12085,9 +12085,7 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
         heap_size=ruff_memory_usage::heap_size
     )]
     pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
-        let Some(definition) = self.definition(db) else {
-            return Type::unknown();
-        };
+        let definition = self.definition(db);
         let file = definition.file(db);
         let module = parsed_module(db, file).load(db);
         let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
@@ -12175,7 +12173,7 @@ impl<'db> TypeAliasType<'db> {
     pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
+            TypeAliasType::ManualPEP695(type_alias) => Some(type_alias.definition(db)),
         }
     }
 

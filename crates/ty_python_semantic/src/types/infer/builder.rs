@@ -7535,7 +7535,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
                 db,
                 ast::name::Name::new(name),
-                Some(definition),
+                definition,
             )),
         ))
     }
