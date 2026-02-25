@@ -770,14 +770,13 @@ impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
         }
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
-            if let Some(definition) = self.type_alias.definition(self.db) {
-                let file = definition.file(self.db);
-                let offset = definition
-                    .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
-                    .range()
-                    .start();
-                fmt_file_location(self.db, file, offset, f)?;
-            }
+            let definition = self.type_alias.definition(self.db);
+            let file = definition.file(self.db);
+            let offset = definition
+                .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
+                .range()
+                .start();
+            fmt_file_location(self.db, file, offset, f)?;
         }
         Ok(())
     }

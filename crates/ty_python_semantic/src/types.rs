@@ -6912,7 +6912,7 @@ impl<'db> Type<'db> {
                     Some(TypeDefinition::TypeVar(var.definition(db)?))
                 }
                 KnownInstanceType::TypeAliasType(type_alias) => {
-                    type_alias.definition(db).map(TypeDefinition::TypeAlias)
+                    Some(TypeDefinition::TypeAlias(type_alias.definition(db)))
                 }
                 KnownInstanceType::NewType(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
                 _ => None,
@@ -7549,9 +7549,7 @@ impl<'db> KnownInstanceType<'db> {
                 Self::SubscriptedGeneric(context.normalized_impl(db, visitor))
             }
             Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized_impl(db, visitor)),
-            Self::TypeAliasType(type_alias) => {
-                Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
-            }
+            Self::TypeAliasType(type_alias) => Self::TypeAliasType(type_alias),
             Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
             Self::UnionType(instance) => Self::UnionType(instance.normalized_impl(db, visitor)),
             Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
@@ -7589,9 +7587,7 @@ impl<'db> KnownInstanceType<'db> {
             Self::Deprecated(deprecated) => Some(Self::Deprecated(deprecated)),
             Self::ConstraintSet(set) => Some(Self::ConstraintSet(set)),
             Self::TypeVar(typevar) => Some(Self::TypeVar(typevar)),
-            Self::TypeAliasType(type_alias) => type_alias
-                .recursive_type_normalized_impl(db, div)
-                .map(Self::TypeAliasType),
+            Self::TypeAliasType(type_alias) => Some(Self::TypeAliasType(type_alias)),
             Self::Field(field) => field
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Self::Field),
@@ -11955,13 +11951,12 @@ impl<'db> PEP695TypeAliasType<'db> {
                 GenericContext::from_type_params(db, index, definition, type_params)
             })
     }
-
-    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
-        self
-    }
 }
 
 /// A PEP 695 `types.TypeAliasType` created by manually calling the constructor.
+///
+/// The value type is computed lazily via [`ManualPEP695TypeAliasType::value_type()`]
+/// to avoid cycle non-convergence for mutually recursive definitions.
 ///
 /// # Ordering
 /// Ordering is based on the type alias's salsa-assigned id and not on its values.
@@ -11971,8 +11966,7 @@ impl<'db> PEP695TypeAliasType<'db> {
 pub struct ManualPEP695TypeAliasType<'db> {
     #[returns(ref)]
     pub name: ast::name::Name,
-    pub definition: Option<Definition<'db>>,
-    pub value: Type<'db>,
+    pub definition: Definition<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -11983,28 +11977,38 @@ fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     type_alias: ManualPEP695TypeAliasType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, type_alias.value(db));
+    visitor.visit_type(db, type_alias.value_type(db));
 }
 
+#[salsa::tracked]
 impl<'db> ManualPEP695TypeAliasType<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
-            db,
-            self.name(db),
-            self.definition(db),
-            self.value(db).normalized_impl(db, visitor),
-        )
-    }
-
-    // TODO: with full support for manual PEP-695 style type aliases, this method should become unnecessary.
-    fn recursive_type_normalized_impl(self, db: &'db dyn Db, div: Type<'db>) -> Option<Self> {
-        Some(Self::new(
-            db,
-            self.name(db),
-            self.definition(db),
-            self.value(db)
-                .recursive_type_normalized_impl(db, div, true)?,
-        ))
+    /// The value type of this manual type alias.
+    ///
+    /// Computed lazily from the definition to avoid including the value in the interned
+    /// struct's identity. Returns `Divergent` if the type alias is defined cyclically.
+    #[salsa::tracked(
+        cycle_initial=|_, id, _| Type::divergent(id),
+        cycle_fn=|db, cycle, previous: &Type<'db>, value: Type<'db>, _| {
+            value.cycle_normalized(db, *previous, cycle)
+        },
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+            return Type::unknown();
+        };
+        let value_node = assignment.value(&module);
+        let ast::Expr::Call(call) = value_node else {
+            return Type::unknown();
+        };
+        // The value is the second positional argument to TypeAliasType(name, value).
+        let Some(value_arg) = call.arguments.find_argument_value("value", 1) else {
+            return Type::unknown();
+        };
+        definition_expression_type(db, definition, value_arg)
     }
 }
 
@@ -12037,26 +12041,6 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeAliasType<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            TypeAliasType::PEP695(type_alias) => {
-                TypeAliasType::PEP695(type_alias.normalized_impl(db, visitor))
-            }
-            TypeAliasType::ManualPEP695(type_alias) => {
-                TypeAliasType::ManualPEP695(type_alias.normalized_impl(db, visitor))
-            }
-        }
-    }
-
-    fn recursive_type_normalized_impl(self, db: &'db dyn Db, div: Type<'db>) -> Option<Self> {
-        match self {
-            TypeAliasType::PEP695(type_alias) => Some(TypeAliasType::PEP695(type_alias)),
-            TypeAliasType::ManualPEP695(type_alias) => Some(TypeAliasType::ManualPEP695(
-                type_alias.recursive_type_normalized_impl(db, div)?,
-            )),
-        }
-    }
-
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
@@ -12064,9 +12048,9 @@ impl<'db> TypeAliasType<'db> {
         }
     }
 
-    pub(crate) fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+    pub(crate) fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         match self {
-            TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
+            TypeAliasType::PEP695(type_alias) => type_alias.definition(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
         }
     }
@@ -12074,14 +12058,14 @@ impl<'db> TypeAliasType<'db> {
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
 
     pub(crate) fn raw_value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
 
@@ -12153,10 +12137,7 @@ impl<'db> QualifiedTypeAliasName<'db> {
     /// For example, calling this method on a type alias `D` inside a class `C` in module `a.b`
     /// would return `["a", "b", "C"]`.
     pub(crate) fn components_excluding_self(&self) -> Vec<String> {
-        let Some(definition) = self.type_alias.definition(self.db) else {
-            return vec![];
-        };
-
+        let definition = self.type_alias.definition(self.db);
         let file = definition.file(self.db);
         let file_scope_id = definition.file_scope(self.db);
 
