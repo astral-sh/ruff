@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/pyflakes/mod.rs
+assertion_line: 191
+---
+F821 Undefined name `EarlyDel`
+  --> F821_34.pyi:19:13
+   |
+17 | class EarlyDel: ...
+18 | del EarlyDel
+19 | def f2(cls: EarlyDel) -> None: ...  # F821
+   |             ^^^^^^^^
+   |
+
+F821 Undefined name `Undefined`
+  --> F821_34.pyi:22:10
+   |
+21 | # Error: name that was never defined
+22 | def g(x: Undefined) -> None: ...  # F821
+   |          ^^^^^^^^^
+   |
