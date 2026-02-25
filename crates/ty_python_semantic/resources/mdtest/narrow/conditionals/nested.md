@@ -497,7 +497,7 @@ g: str | Literal[1] | None = "a"
 
 def f(flag: bool):
     class C:
-        (g := None) if flag else (g := None)
+        (g := 1) if flag else (g := None)
         # `g` is always bound here, so narrowing checks don't apply to nested scopes
         if g is not None:
             class F:

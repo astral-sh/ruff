@@ -187,12 +187,12 @@ elif TYPE_CHECKING:
     def j() -> str: ...
 
 else:
-    def j_() -> str: ...  # error: [empty-body]
+    def j_() -> str: ...
 
 if False:
     pass
 elif not TYPE_CHECKING:
-    def k_() -> str: ...  # error: [empty-body]
+    def k_() -> str: ...
 
 else:
     def k() -> str: ...
@@ -224,19 +224,19 @@ if typing.TYPE_CHECKING:
     def o() -> str: ...
 
 if not typing.TYPE_CHECKING:
-    def p() -> str: ...  # error: [empty-body]
+    def p() -> str: ...
 
 if compat.sub.sub.TYPE_CHECKING:
     def q() -> str: ...
 
 if not compat.sub.sub.TYPE_CHECKING:
-    def r() -> str: ...  # error: [empty-body]
+    def r() -> str: ...
 
 if t.TYPE_CHECKING:
     def s() -> str: ...
 
 if not t.TYPE_CHECKING:
-    def t() -> str: ...  # error: [empty-body]
+    def t() -> str: ...
 ```
 
 ## Conditional return type

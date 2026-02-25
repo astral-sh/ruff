@@ -148,6 +148,14 @@ pub fn check_types(db: &dyn Db, file: File) -> Vec<Diagnostic> {
             continue;
         }
 
+        // Skip unreachable scopes (e.g., function bodies inside `if False:` blocks).
+        // Without this check, deferred annotation evaluation (PEP 649, Python 3.14+)
+        // can resolve annotations from the end-of-scope perspective, leading to false
+        // positive diagnostics in dead code.
+        if !index.is_scope_reachable(db, scope_id.file_scope_id(db)) {
+            continue;
+        }
+
         let result = infer_scope_types(db, scope_id, TypeContext::default());
 
         if let Some(scope_diagnostics) = result.diagnostics() {

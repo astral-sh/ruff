@@ -623,8 +623,6 @@ class C:
         self.c = c
     if False:
         def set_e(self, e: str) -> None:
-            # TODO: Should not emit this diagnostic
-            # error: [unresolved-attribute]
             self.e = e
 
 # TODO: this would ideally be `Unknown | Literal[1]`

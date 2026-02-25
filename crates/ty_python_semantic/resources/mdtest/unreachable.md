@@ -464,6 +464,27 @@ if False:
             print(x)
 ```
 
+### Nested scopes with deferred annotations (PEP 649)
+
+On Python 3.14+, annotations are evaluated lazily using end-of-scope semantics (PEP 649). This means
+that annotations in function parameters can resolve to types that are defined outside the
+unreachable section. We should still not emit diagnostics for nested scopes in unreachable sections,
+even when deferred annotation resolution finds valid types.
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class NonCallable:
+    pass
+
+if False:
+    def _(non_callable: NonCallable):
+        non_callable()
+```
+
 ### Type annotations
 
 Silencing of diagnostics also works for type annotations, even if they are stringified:
