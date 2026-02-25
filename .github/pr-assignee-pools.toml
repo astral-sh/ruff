@@ -16,6 +16,7 @@ paths = [
   "/crates/ty_project/**",
   "/crates/ty/**",
   "/crates/ty_benchmark/**",
+  "/crates/ruff_benchmark/benches/ty*",
 ]
 reviewers = ["carljm", "MichaReiser", "BurntSushi"]
 
