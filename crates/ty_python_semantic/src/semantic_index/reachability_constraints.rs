@@ -772,7 +772,7 @@ fn accumulate_constraint<'db>(
     new: Option<NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc, db)),
+        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(db, acc)),
         (None, Some(new_c)) => Some(new_c),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
@@ -838,8 +838,8 @@ impl ReachabilityConstraints {
             ALWAYS_TRUE | AMBIGUOUS => {
                 // Apply all accumulated narrowing constraints to the base type
                 match accumulated {
-                    Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                        .merge_constraint_and(constraint, db)
+                    Some(constraint) => NarrowingConstraint::intersection(db, base_ty)
+                        .merge_constraint_and(db, constraint)
                         .evaluate_constraint_type(db),
                     None => base_ty,
                 }
@@ -913,8 +913,7 @@ impl ReachabilityConstraints {
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
-                let true_accumulated =
-                    accumulate_constraint(db, accumulated.clone(), pos_constraint);
+                let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
                 let true_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
