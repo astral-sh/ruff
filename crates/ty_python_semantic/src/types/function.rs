@@ -1460,12 +1460,10 @@ pub(super) fn function_body_kind<'db>(
         } = raise
         && infer_type(exc).is_subtype_of(
             db,
-            UnionType::from_elements(
+            UnionType::from_two_elements(
                 db,
-                [
-                    KnownClass::NotImplementedError.to_class_literal(db),
-                    KnownClass::NotImplementedError.to_instance(db),
-                ],
+                KnownClass::NotImplementedError.to_class_literal(db),
+                KnownClass::NotImplementedError.to_instance(db),
             ),
         )
     {
