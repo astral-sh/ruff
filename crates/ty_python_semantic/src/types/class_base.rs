@@ -161,6 +161,8 @@ impl<'db> ClassBase<'db> {
             Type::PropertyInstance(_)
             | Type::LiteralValue(_)
             | Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::Callable(..)
             | Type::BoundMethod(_)
             | Type::KnownBoundMethod(_)

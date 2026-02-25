@@ -765,8 +765,14 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::WrapperDescriptor(WrapperDescriptorKind::FunctionTypeDunderGet) => {
-                        if let [Some(function_ty @ Type::FunctionLiteral(function)), ..] =
-                            overload.parameter_types()
+                        if let [
+                            Some(
+                                function_ty @ (Type::FunctionLiteral(function)
+                                | Type::ClassMethodLiteral(function)
+                                | Type::StaticMethodLiteral(function)),
+                            ),
+                            ..,
+                        ] = overload.parameter_types()
                         {
                             if function.is_classmethod(db) {
                                 match overload.parameter_types() {
@@ -976,9 +982,15 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::DataclassTransformer(params) => {
-                        if let [Some(Type::FunctionLiteral(function))] = overload.parameter_types()
+                        if let [
+                            Some(
+                                function_ty @ (Type::FunctionLiteral(function)
+                                | Type::ClassMethodLiteral(function)
+                                | Type::StaticMethodLiteral(function)),
+                            ),
+                        ] = overload.parameter_types()
                         {
-                            overload.set_return_type(Type::FunctionLiteral(
+                            overload.set_return_type(function_ty.rewrap_function_literal(
                                 function.with_dataclass_transformer_params(db, params),
                             ));
                         }
@@ -1065,7 +1077,9 @@ impl<'db> Bindings<'db> {
                         }
                     }
 
-                    function @ Type::FunctionLiteral(function_type)
+                    function @ (Type::FunctionLiteral(function_type)
+                    | Type::ClassMethodLiteral(function_type)
+                    | Type::StaticMethodLiteral(function_type))
                         if dataclass_field_specifiers.contains(&function)
                             || function_type.is_known(db, KnownFunction::Field) =>
                     {
@@ -1143,7 +1157,9 @@ impl<'db> Bindings<'db> {
                         )));
                     }
 
-                    Type::FunctionLiteral(function_type) => match function_type.known(db) {
+                    Type::FunctionLiteral(function_type)
+                    | Type::ClassMethodLiteral(function_type)
+                    | Type::StaticMethodLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
@@ -1224,7 +1240,9 @@ impl<'db> Bindings<'db> {
                                         class.generic_context(db).map(wrap_generic_context)
                                     }
 
-                                    Type::FunctionLiteral(function) => {
+                                    Type::FunctionLiteral(function)
+                                    | Type::ClassMethodLiteral(function)
+                                    | Type::StaticMethodLiteral(function) => {
                                         signature_generic_context(function.signature(db))
                                     }
 
@@ -2841,7 +2859,11 @@ impl<'db> CallableBinding<'db> {
                 //
                 // [1]: https://github.com/astral-sh/ty/issues/274#issuecomment-2881856028
                 let function_type_and_kind = match self.signature_type {
-                    Type::FunctionLiteral(function) => Some((FunctionKind::Function, function)),
+                    Type::FunctionLiteral(function)
+                    | Type::ClassMethodLiteral(function)
+                    | Type::StaticMethodLiteral(function) => {
+                        Some((FunctionKind::Function, function))
+                    }
                     Type::BoundMethod(bound_method) => Some((
                         FunctionKind::BoundMethod,
                         bound_method.function(context.db()),
@@ -4582,7 +4604,9 @@ impl<'db> CallableDescription<'db> {
         callable_type: Type<'db>,
     ) -> Option<CallableDescription<'db>> {
         match callable_type {
-            Type::FunctionLiteral(function) => Some(CallableDescription {
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => Some(CallableDescription {
                 kind: "function",
                 name: function.name(db),
             }),
@@ -4852,7 +4876,9 @@ impl<'db> BindingError<'db> {
         matching_overload: Option<&MatchingOverloadLiteral<'_>>,
     ) {
         let callable_kind = match callable_ty {
-            Type::FunctionLiteral(_) => "Function",
+            Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_) => "Function",
             Type::BoundMethod(_) => "Method",
             _ => "Callable",
         };

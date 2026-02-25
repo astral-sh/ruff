@@ -162,7 +162,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
             | Type::Dynamic(_) => TypeKind::Atomic,
 
             // Non-atomic types
-            Type::FunctionLiteral(function) => {
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => {
                 TypeKind::NonAtomic(NonAtomicType::FunctionLiteral(function))
             }
             Type::Intersection(intersection) => {

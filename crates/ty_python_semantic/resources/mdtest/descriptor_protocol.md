@@ -617,6 +617,32 @@ c = C()
 reveal_type(c.helper("string"))  # revealed: str
 ```
 
+### Specialization of `staticmethod` and `classmethod` literals
+
+When a `staticmethod`- or `classmethod`-decorated function is checked against a parameterized
+`staticmethod` or `classmethod` type (e.g. via an overloaded function), the literal's fallback
+instance should be properly specialized so that type parameters are inferred correctly.
+
+```py
+from inspect import getattr_static
+from ty_extensions import static_assert, is_subtype_of, TypeOf
+
+class C:
+    @staticmethod
+    def static_method(x: int) -> str:
+        return ""
+
+    @classmethod
+    def class_method(cls, x: int) -> bool:
+        return True
+
+    # Inside the class body, the value is a StaticMethodLiteral.
+    static_assert(is_subtype_of(TypeOf[static_method], staticmethod[[int], str]))
+
+# `getattr_static` bypasses descriptors, so the value is still a ClassMethodLiteral.
+static_assert(is_subtype_of(TypeOf[getattr_static(C, "class_method")], classmethod[C, [int], bool]))
+```
+
 ### Functions as descriptors
 
 Functions are descriptors because they implement a `__get__` method. This is crucial in making sure

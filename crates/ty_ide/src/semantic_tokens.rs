@@ -403,7 +403,9 @@ impl<'db> SemanticTokenVisitor<'db> {
         match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
             Type::TypeVar(_) => (SemanticTokenType::TypeParameter, modifiers),
-            Type::FunctionLiteral(_) => {
+            Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_) => {
                 // Check if this is a method based on current scope
                 if self.in_class_scope {
                     (SemanticTokenType::Method, modifiers)
@@ -434,7 +436,9 @@ impl<'db> SemanticTokenVisitor<'db> {
         // Classify based on the inferred type of the attribute
         match ty {
             Type::ClassLiteral(_) => (SemanticTokenType::Class, modifiers),
-            Type::FunctionLiteral(_) => {
+            Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_) => {
                 // This is a function accessed as an attribute, likely a method
                 (SemanticTokenType::Method, modifiers)
             }

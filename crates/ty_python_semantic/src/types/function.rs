@@ -381,7 +381,10 @@ impl<'db> OverloadLiteral<'db> {
             .scoped_use_id(db, scope);
 
         let Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(previous_type),
+            ty:
+                Type::FunctionLiteral(previous_type)
+                | Type::ClassMethodLiteral(previous_type)
+                | Type::StaticMethodLiteral(previous_type),
             definedness: Definedness::AlwaysDefined,
             ..
         }) = place_from_bindings(db, use_def.bindings_at_use(use_id)).place
@@ -1361,13 +1364,15 @@ fn is_instance_truthiness<'db>(
             always_true_if(is_instance(&newtype.concrete_base_type(db)))
         }
 
-        Type::LiteralValue(..) | Type::ModuleLiteral(..) | Type::FunctionLiteral(..) => {
-            always_true_if(
-                ty.literal_fallback_instance(db)
-                    .as_ref()
-                    .is_some_and(is_instance),
-            )
-        }
+        Type::LiteralValue(..)
+        | Type::ModuleLiteral(..)
+        | Type::FunctionLiteral(..)
+        | Type::ClassMethodLiteral(..)
+        | Type::StaticMethodLiteral(..) => always_true_if(
+            ty.literal_fallback_instance(db)
+                .as_ref()
+                .is_some_and(is_instance),
+        ),
 
         Type::ClassLiteral(..) => always_true_if(is_instance(&KnownClass::Type.to_instance(db))),
 

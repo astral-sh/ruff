@@ -110,7 +110,7 @@ use crate::types::diagnostic::{
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
     FunctionBodyKind, FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction,
-    OverloadLiteral, function_body_kind, is_implicit_classmethod,
+    OverloadLiteral, function_body_kind, is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, SpecializationBuilder, bind_typevar,
@@ -684,8 +684,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            let Some(Type::FunctionLiteral(function_type)) =
-                infer_definition_types(db, *definition).undecorated_type()
+            let Some(
+                Type::FunctionLiteral(function_type)
+                | Type::ClassMethodLiteral(function_type)
+                | Type::StaticMethodLiteral(function_type),
+            ) = infer_definition_types(db, *definition).undecorated_type()
             else {
                 continue;
             };
@@ -1974,7 +1977,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for place in overloaded_function_places {
             if let Place::Defined(DefinedPlace {
-                ty: Type::FunctionLiteral(function),
+                ty:
+                    Type::FunctionLiteral(function)
+                    | Type::ClassMethodLiteral(function)
+                    | Type::StaticMethodLiteral(function),
                 definedness: Definedness::AlwaysDefined,
                 ..
             }) = place_from_bindings(
@@ -2977,7 +2983,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.function_decorator_types(function)
             .any(|decorator_type| {
                 match decorator_type {
-                    Type::FunctionLiteral(function) => matches!(
+                    Type::FunctionLiteral(function)
+                    | Type::ClassMethodLiteral(function)
+                    | Type::StaticMethodLiteral(function) => matches!(
                         function.known(self.db()),
                         Some(KnownFunction::Overload | KnownFunction::AbstractMethod)
                     ),
@@ -3198,7 +3206,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function_decorators |= decorator_function_decorator;
 
             match decorator_type {
-                Type::FunctionLiteral(function) => {
+                Type::FunctionLiteral(function)
+                | Type::ClassMethodLiteral(function)
+                | Type::StaticMethodLiteral(function) => {
                     if let Some(KnownFunction::NoTypeCheck) = function.known(self.db()) {
                         // If the function is decorated with the `no_type_check` decorator,
                         // we need to suppress any errors that come after the decorators.
@@ -3258,9 +3268,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_transformer_params,
         );
         let function_literal = FunctionLiteral::new(self.db(), overload_literal);
+        let function_type = FunctionType::new(self.db(), function_literal, None, None);
 
-        let mut inferred_ty =
-            Type::FunctionLiteral(FunctionType::new(self.db(), function_literal, None, None));
+        let in_class_scope = self
+            .index
+            .scope(self.scope().file_scope_id(self.db()))
+            .kind()
+            .is_class();
+
+        let mut inferred_ty = if function_decorators.contains(FunctionDecorators::CLASSMETHOD)
+            || (in_class_scope && is_implicit_classmethod(&name.id))
+        {
+            Type::ClassMethodLiteral(function_type)
+        } else if function_decorators.contains(FunctionDecorators::STATICMETHOD)
+            || (in_class_scope && is_implicit_staticmethod(&name.id))
+        {
+            Type::StaticMethodLiteral(function_type)
+        } else {
+            Type::FunctionLiteral(function_type)
+        };
         self.undecorated_type = Some(inferred_ty);
 
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
@@ -3788,7 +3814,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
-            if let Type::FunctionLiteral(f) = decorator_ty {
+            if let Type::FunctionLiteral(f)
+            | Type::ClassMethodLiteral(f)
+            | Type::StaticMethodLiteral(f) = decorator_ty
+            {
                 // We do not yet detect or flag `@dataclass_transform` applied to more than one
                 // overload, or an overload and the implementation both. Nevertheless, this is not
                 // allowed. We do not try to treat the offenders intelligently -- just use the
@@ -3895,7 +3924,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut prev_in_no_type_check = self.context.set_in_no_type_check(InNoTypeCheck::Yes);
         for decorator in &function.decorator_list {
             let decorator_type = self.infer_decorator(decorator);
-            if let Type::FunctionLiteral(function) = decorator_type
+            if let Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) = decorator_type
                 && let Some(KnownFunction::NoTypeCheck) = function.known(self.db())
             {
                 // If the function is decorated with the `no_type_check` decorator,
@@ -6102,6 +6133,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::KnownInstance(..)
             | Type::PropertyInstance(..)
             | Type::FunctionLiteral(..)
+            | Type::ClassMethodLiteral(..)
+            | Type::StaticMethodLiteral(..)
             | Type::Callable(..)
             | Type::BoundMethod(_)
             | Type::KnownBoundMethod(_)
@@ -10364,6 +10397,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::Dynamic(_)
                 | Type::Never
                 | Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_)
                 | Type::BoundMethod(_)
                 | Type::KnownBoundMethod(_)
                 | Type::WrapperDescriptor(_)
@@ -10395,16 +10430,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // computing the signature requires evaluating those defaults which may trigger
         // deferred inference.
         let propagatable_kind = match decorated_ty {
-            Type::FunctionLiteral(func) => {
-                let db = self.db();
-                if func.is_classmethod(db) {
-                    Some(CallableTypeKind::ClassMethodLike)
-                } else if func.is_staticmethod(db) {
-                    Some(CallableTypeKind::StaticMethodLike)
-                } else {
-                    Some(CallableTypeKind::FunctionLike)
-                }
-            }
+            Type::FunctionLiteral(_) => Some(CallableTypeKind::FunctionLike),
+            Type::ClassMethodLiteral(_) => Some(CallableTypeKind::ClassMethodLike),
+            Type::StaticMethodLiteral(_) => Some(CallableTypeKind::StaticMethodLike),
             _ => decorated_ty
                 .try_upcast_to_callable(self.db())
                 .and_then(CallableTypes::exactly_one)
@@ -12431,7 +12459,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        if let Type::FunctionLiteral(function) = callable_type {
+        if let Some(function) = callable_type.as_function_literal() {
             // Make sure that the `function.definition` is only called when the function is defined
             // in the same file as the one we're currently inferring the types for. This is because
             // the `definition` method accesses the semantic index, which could create a
@@ -12478,7 +12506,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
-            Type::FunctionLiteral(function) if function.is_staticmethod(self.db()) => {
+            Type::StaticMethodLiteral(function) | Type::FunctionLiteral(function)
+                if function.is_staticmethod(self.db()) =>
+            {
                 if let ast::Expr::Attribute(ast::ExprAttribute { value, .. }) = func.as_ref() {
                     let value_type = self.expression_type(value);
                     if let Some(class) = value_type.to_class_type(self.db()) {
@@ -12603,7 +12633,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let binding_type = binding.callable_type;
             for (_, overload) in binding.matching_overloads_mut() {
                 match binding_type {
-                    Type::FunctionLiteral(function_literal) => {
+                    Type::FunctionLiteral(function_literal)
+                    | Type::ClassMethodLiteral(function_literal)
+                    | Type::StaticMethodLiteral(function_literal) => {
                         if let Some(known_function) = function_literal.known(self.db()) {
                             known_function.check_call(
                                 &self.context,
@@ -12837,7 +12869,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Next handle functions
         let function = match ty {
-            Type::FunctionLiteral(function) => function,
+            Type::FunctionLiteral(function)
+            | Type::ClassMethodLiteral(function)
+            | Type::StaticMethodLiteral(function) => function,
             Type::BoundMethod(bound) => bound.function(self.db()),
             _ => return,
         };
@@ -13364,7 +13398,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let first_parameter_name = first_parameter.name();
 
         let function_definition = self.index.expect_single_definition(current_function);
-        let Type::FunctionLiteral(function_type) = binding_type(self.db(), function_definition)
+        let (Type::FunctionLiteral(function_type)
+        | Type::ClassMethodLiteral(function_type)
+        | Type::StaticMethodLiteral(function_type)) = binding_type(self.db(), function_definition)
         else {
             return;
         };
@@ -13606,10 +13642,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             "Class `{}` has no attribute `{attr_name}`",
                             alias.display(db),
                         )),
-                        Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
-                            "Function `{}` has no attribute `{attr_name}`",
-                            function.name(db),
-                        )),
+                        Type::FunctionLiteral(function)
+                        | Type::ClassMethodLiteral(function)
+                        | Type::StaticMethodLiteral(function) => {
+                            builder.into_diagnostic(format_args!(
+                                "Function `{}` has no attribute `{attr_name}`",
+                                function.name(db),
+                            ))
+                        }
                         _ => builder.into_diagnostic(format_args!(
                             "Object of type `{}` has no attribute `{attr_name}`",
                             value_type.display(db),
@@ -13931,6 +13971,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 ast::UnaryOp::UAdd | ast::UnaryOp::USub | ast::UnaryOp::Invert,
                 Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_)
                 | Type::Callable(..)
                 | Type::WrapperDescriptor(_)
                 | Type::KnownBoundMethod(_)
@@ -14700,6 +14742,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // fall back on looking for dunder methods on one of the operand types.
             (
                 Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
                 | Type::WrapperDescriptor(_)
@@ -14725,6 +14769,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_),
                 Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_)
                 | Type::Callable(..)
                 | Type::BoundMethod(_)
                 | Type::WrapperDescriptor(_)

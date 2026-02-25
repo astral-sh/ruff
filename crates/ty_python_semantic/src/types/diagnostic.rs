@@ -3226,7 +3226,9 @@ fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
                 class.name(context.db()),
             ));
         }
-        Type::FunctionLiteral(function) => {
+        Type::FunctionLiteral(function)
+        | Type::ClassMethodLiteral(function)
+        | Type::StaticMethodLiteral(function) => {
             diag.info(format_args!(
                 "Implicit shadowing of function `{}`, add an annotation to make it explicit if this is intentional",
                 function.name(context.db()),
@@ -4912,7 +4914,9 @@ pub(crate) fn report_rebound_typevar<'db>(
     };
     let span = match binding_type(db, other_definition) {
         Type::ClassLiteral(class) => class.header_span(db),
-        Type::FunctionLiteral(function) => function.spans(db).signature,
+        Type::FunctionLiteral(function)
+        | Type::ClassMethodLiteral(function)
+        | Type::StaticMethodLiteral(function) => function.spans(db).signature,
         _ => return,
     };
     diagnostic.annotate(Annotation::secondary(span).message(format_args!(
@@ -4982,11 +4986,17 @@ pub(super) fn report_invalid_method_override<'db>(
     };
 
     if let Place::Defined(DefinedPlace {
-        ty: Type::FunctionLiteral(subclass_function),
+        ty:
+            Type::FunctionLiteral(subclass_function)
+            | Type::ClassMethodLiteral(subclass_function)
+            | Type::StaticMethodLiteral(subclass_function),
         ..
     }) = class_member(subclass)
         && let Place::Defined(DefinedPlace {
-            ty: Type::FunctionLiteral(superclass_function),
+            ty:
+                Type::FunctionLiteral(superclass_function)
+                | Type::ClassMethodLiteral(superclass_function)
+                | Type::StaticMethodLiteral(superclass_function),
             ..
         }) = class_member(superclass)
         && let Ok(superclass_function_kind) =
@@ -5030,7 +5040,9 @@ pub(super) fn report_invalid_method_override<'db>(
                 );
 
                 let superclass_function_span = match superclass_type {
-                    Type::FunctionLiteral(function) => Some(signature_span(function)),
+                    Type::FunctionLiteral(function)
+                    | Type::ClassMethodLiteral(function)
+                    | Type::StaticMethodLiteral(function) => Some(signature_span(function)),
                     Type::BoundMethod(method) => Some(signature_span(method.function(db))),
                     _ => None,
                 };
@@ -5204,7 +5216,9 @@ pub(super) fn report_overridden_final_method<'db>(
     // We also only provide autofixes if the subclass member is a function definition (not an
     // assignment like `method = some_function`). If it's an assignment, the function type
     // might be from a different file, and the autofix should delete the assignment instead, which we don't handle today.
-    if let Type::FunctionLiteral(function) = subclass_type
+    if let Type::FunctionLiteral(function)
+    | Type::ClassMethodLiteral(function)
+    | Type::StaticMethodLiteral(function) = subclass_type
         && subclass_definition.kind(db).is_function_def()
     {
         let Some((subclass_literal, _)) = subclass.static_class_literal(db) else {

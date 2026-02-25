@@ -418,8 +418,7 @@ reveal_type(Derived().f(1))  # revealed: str
 
 ### Accessing the classmethod as a static member
 
-Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object. We
-currently don't model this explicitly:
+Accessing a `@classmethod`-decorated function at runtime returns a `classmethod` object:
 
 ```py
 from inspect import getattr_static
@@ -433,7 +432,7 @@ reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
 reveal_type(getattr_static(C, "f").__get__)
 ```
 
-But we correctly model how the `classmethod` descriptor works:
+We correctly model how the `classmethod` descriptor works:
 
 ```py
 reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: bound method <class 'C'>.f() -> Unknown
@@ -657,6 +656,86 @@ class Base:
     def __init_subclass__(cls, arg: int): ...
 
 class Valid(Base, arg=5, metaclass=object): ...
+```
+
+### Classmethods are not instances of `types.FunctionType`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+At runtime, `@classmethod`-decorated functions are instances of `classmethod`, not
+`types.FunctionType`. Classmethods have a `__func__` attribute, but do not have attributes specific
+to plain functions such as `__kwdefaults__`.
+
+```py
+from inspect import getattr_static
+from types import FunctionType
+from ty_extensions import static_assert, is_subtype_of, TypeOf
+
+class C:
+    @classmethod
+    def f(cls) -> int:
+        return 1
+
+    def g(self) -> str:
+        return "hello"
+
+type Ff = TypeOf[getattr_static(C, "f")]
+type Fg = TypeOf[getattr_static(C, "g")]
+
+# A classmethod is not a subtype of FunctionType
+static_assert(not is_subtype_of(Ff, FunctionType))
+
+# A regular method IS a subtype of FunctionType
+static_assert(is_subtype_of(Fg, FunctionType))
+
+# Classmethods have `__func__`
+reveal_type(getattr_static(C, "f").__func__)  # revealed: (...) -> Unknown
+
+# Classmethods do NOT have `__kwdefaults__` (only plain functions do)
+getattr_static(C, "f").__kwdefaults__  # error: [unresolved-attribute]
+```
+
+### Staticmethods are not instances of `types.FunctionType`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+At runtime, `@staticmethod`-decorated functions are instances of `staticmethod`, not
+`types.FunctionType`. Staticmethods have a `__func__` attribute, but do not have attributes specific
+to plain functions such as `__kwdefaults__`.
+
+```py
+from inspect import getattr_static
+from types import FunctionType
+from ty_extensions import static_assert, is_subtype_of, TypeOf
+
+class C:
+    @staticmethod
+    def f() -> int:
+        return 1
+
+    def g(self) -> str:
+        return "hello"
+
+type Ff = TypeOf[getattr_static(C, "f")]
+type Fg = TypeOf[getattr_static(C, "g")]
+
+# A staticmethod is not a subtype of FunctionType
+static_assert(not is_subtype_of(Ff, FunctionType))
+
+# A regular method IS a subtype of FunctionType
+static_assert(is_subtype_of(Fg, FunctionType))
+
+# Staticmethods have `__func__`
+reveal_type(getattr_static(C, "f").__func__)  # revealed: (...) -> Unknown
+
+# Staticmethods do NOT have `__kwdefaults__` (only plain functions do)
+getattr_static(C, "f").__kwdefaults__  # error: [unresolved-attribute]
 ```
 
 ## `@staticmethod`

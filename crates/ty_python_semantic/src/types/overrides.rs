@@ -320,7 +320,10 @@ fn check_class_declaration<'db>(
             }
 
             // TODO: Check Liskov on non-methods too
-            let Type::FunctionLiteral(subclass_function) = member.ty else {
+            let (Type::FunctionLiteral(subclass_function)
+            | Type::ClassMethodLiteral(subclass_function)
+            | Type::StaticMethodLiteral(subclass_function)) = member.ty
+            else {
                 continue;
             };
 
@@ -563,7 +566,9 @@ fn extract_underlying_functions<'db>(
     ty: Type<'db>,
 ) -> Option<smallvec::SmallVec<[FunctionType<'db>; 1]>> {
     match ty {
-        Type::FunctionLiteral(function) => Some(smallvec::smallvec_inline![function]),
+        Type::FunctionLiteral(function)
+        | Type::ClassMethodLiteral(function)
+        | Type::StaticMethodLiteral(function) => Some(smallvec::smallvec_inline![function]),
         Type::BoundMethod(method) => Some(smallvec::smallvec_inline![method.function(db)]),
         Type::PropertyInstance(property) => extract_underlying_functions(db, property.getter(db)?),
         Type::Union(union) => {

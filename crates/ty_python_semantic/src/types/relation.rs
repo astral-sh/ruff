@@ -933,16 +933,22 @@ impl<'db> Type<'db> {
             // our representation of a function literal includes any specialization that should be
             // applied to the signature. Different specializations of the same function literal are
             // only subtypes of each other if they result in the same signature.
-            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.has_relation_to_impl(
-                    db,
-                    target_function,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function))
+            | (
+                Type::ClassMethodLiteral(self_function),
+                Type::ClassMethodLiteral(target_function),
+            )
+            | (
+                Type::StaticMethodLiteral(self_function),
+                Type::StaticMethodLiteral(target_function),
+            ) => self_function.has_relation_to_impl(
+                db,
+                target_function,
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            ),
             (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => self_method
                 .has_relation_to_impl(
                     db,
@@ -988,10 +994,14 @@ impl<'db> Type<'db> {
                 Type::LiteralValue(_)
                 | Type::ClassLiteral(_)
                 | Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_)
                 | Type::ModuleLiteral(_),
                 Type::LiteralValue(_)
                 | Type::ClassLiteral(_)
                 | Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_)
                 | Type::ModuleLiteral(_),
             ) => ConstraintSet::from(false),
 
@@ -1216,18 +1226,23 @@ impl<'db> Type<'db> {
             // Except for the special `BytesLiteral`, `LiteralString`, and string literal cases above,
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
-            (Type::ModuleLiteral(_) | Type::LiteralValue(_) | Type::FunctionLiteral(_), _) => {
-                (self.literal_fallback_instance(db)).when_some_and(|instance| {
-                    instance.has_relation_to_impl(
-                        db,
-                        target,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
-            }
+            (
+                Type::ModuleLiteral(_)
+                | Type::LiteralValue(_)
+                | Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_),
+                _,
+            ) => (self.literal_fallback_instance(db)).when_some_and(|instance| {
+                instance.has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }),
 
             // The same reasoning applies for these special callable types:
             (Type::BoundMethod(_), _) => {
@@ -1649,9 +1664,15 @@ impl<'db> Type<'db> {
                 first.is_equivalent_to_impl(db, second, inferable, visitor)
             }
 
-            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function)) => {
-                self_function.is_equivalent_to_impl(db, target_function, inferable, visitor)
-            }
+            (Type::FunctionLiteral(self_function), Type::FunctionLiteral(target_function))
+            | (
+                Type::ClassMethodLiteral(self_function),
+                Type::ClassMethodLiteral(target_function),
+            )
+            | (
+                Type::StaticMethodLiteral(self_function),
+                Type::StaticMethodLiteral(target_function),
+            ) => self_function.is_equivalent_to_impl(db, target_function, inferable, visitor),
             (Type::BoundMethod(self_method), Type::BoundMethod(target_method)) => {
                 self_method.is_equivalent_to_impl(db, target_method, inferable, visitor)
             }
@@ -1992,6 +2013,8 @@ impl<'db> Type<'db> {
             (
                 // note `LiteralString` is not single-valued, but we handle the special case above
                 left @ (Type::FunctionLiteral(..)
+                | Type::ClassMethodLiteral(..)
+                | Type::StaticMethodLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
@@ -2000,6 +2023,8 @@ impl<'db> Type<'db> {
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::FunctionLiteral(..)
+                | Type::ClassMethodLiteral(..)
+                | Type::StaticMethodLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
@@ -2013,6 +2038,8 @@ impl<'db> Type<'db> {
                 Type::SubclassOf(_),
                 Type::LiteralValue(..)
                 | Type::FunctionLiteral(..)
+                | Type::ClassMethodLiteral(..)
+                | Type::StaticMethodLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
@@ -2021,6 +2048,8 @@ impl<'db> Type<'db> {
             | (
                 Type::LiteralValue(..)
                 | Type::FunctionLiteral(..)
+                | Type::ClassMethodLiteral(..)
+                | Type::StaticMethodLiteral(..)
                 | Type::BoundMethod(..)
                 | Type::KnownBoundMethod(..)
                 | Type::WrapperDescriptor(..)
@@ -2102,6 +2131,8 @@ impl<'db> Type<'db> {
                 ty @ (Type::LiteralValue(..)
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
+                | Type::ClassMethodLiteral(..)
+                | Type::StaticMethodLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)),
                 Type::ProtocolInstance(protocol),
@@ -2111,6 +2142,8 @@ impl<'db> Type<'db> {
                 ty @ (Type::LiteralValue(..)
                 | Type::ClassLiteral(..)
                 | Type::FunctionLiteral(..)
+                | Type::ClassMethodLiteral(..)
+                | Type::StaticMethodLiteral(..)
                 | Type::ModuleLiteral(..)
                 | Type::GenericAlias(..)),
             ) => disjointness_visitor.visit((self, other), || {
@@ -2324,11 +2357,21 @@ impl<'db> Type<'db> {
                     .negate(db)
             }
 
-            (Type::FunctionLiteral(..), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::FunctionLiteral(..)) => {
-                // A `Type::FunctionLiteral()` must be an instance of exactly `types.FunctionType`
-                // (it cannot be an instance of a `types.FunctionType` subclass)
+            (Type::FunctionLiteral(_), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::FunctionLiteral(_)) => {
                 KnownClass::FunctionType
+                    .when_subclass_of(db, instance.class(db))
+                    .negate(db)
+            }
+            (Type::ClassMethodLiteral(_), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::ClassMethodLiteral(_)) => {
+                KnownClass::Classmethod
+                    .when_subclass_of(db, instance.class(db))
+                    .negate(db)
+            }
+            (Type::StaticMethodLiteral(_), Type::NominalInstance(instance))
+            | (Type::NominalInstance(instance), Type::StaticMethodLiteral(_)) => {
+                KnownClass::Staticmethod
                     .when_subclass_of(db, instance.class(db))
                     .negate(db)
             }
@@ -2365,8 +2408,19 @@ impl<'db> Type<'db> {
                     )
             }
 
-            (Type::Callable(_) | Type::FunctionLiteral(_), Type::Callable(_))
-            | (Type::Callable(_), Type::FunctionLiteral(_)) => {
+            (
+                Type::Callable(_)
+                | Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_),
+                Type::Callable(_),
+            )
+            | (
+                Type::Callable(_),
+                Type::FunctionLiteral(_)
+                | Type::ClassMethodLiteral(_)
+                | Type::StaticMethodLiteral(_),
+            ) => {
                 // No two callable types are ever disjoint because
                 // `(*args: object, **kwargs: object) -> Never` is a subtype of all fully static
                 // callable types.

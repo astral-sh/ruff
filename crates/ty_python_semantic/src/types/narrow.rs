@@ -258,6 +258,8 @@ impl ClassInfoConstraintFunction {
             | Type::KnownBoundMethod(_)
             | Type::ModuleLiteral(_)
             | Type::FunctionLiteral(_)
+            | Type::ClassMethodLiteral(_)
+            | Type::StaticMethodLiteral(_)
             | Type::ProtocolInstance(_)
             | Type::PropertyInstance(_)
             | Type::KnownInstance(_)
@@ -1905,6 +1907,8 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
         Type::Dynamic(_)
         | Type::Never
         | Type::FunctionLiteral(_)
+        | Type::ClassMethodLiteral(_)
+        | Type::StaticMethodLiteral(_)
         | Type::BoundMethod(_)
         | Type::KnownBoundMethod(_)
         | Type::WrapperDescriptor(_)
@@ -1993,6 +1997,8 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         Type::Dynamic(_)
         | Type::Never
         | Type::FunctionLiteral(_)
+        | Type::ClassMethodLiteral(_)
+        | Type::StaticMethodLiteral(_)
         | Type::BoundMethod(_)
         | Type::KnownBoundMethod(_)
         | Type::WrapperDescriptor(_)
