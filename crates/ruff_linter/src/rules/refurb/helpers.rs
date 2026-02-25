@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::traversal::{EnclosingSuite, suite};
 use ruff_python_ast::visitor::{self, Visitor};
 use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
 use ruff_python_codegen::Generator;
@@ -398,61 +399,14 @@ fn find_path_open<'a>(
 }
 
 pub(super) fn following_statements_after_with<'a>(
-    with: &ast::StmtWith,
+    with: &'a ast::StmtWith,
     with_parent: Option<&'a ast::Stmt>,
     module_body: &'a [ast::Stmt],
 ) -> Option<&'a [ast::Stmt]> {
-    let with_range = with.range();
-    match with_parent {
-        Some(parent) => match parent {
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | ast::Stmt::ClassDef(ast::StmtClassDef { body, .. })
-            | ast::Stmt::With(ast::StmtWith { body, .. })
-            | ast::Stmt::For(ast::StmtFor { body, .. })
-            | ast::Stmt::While(ast::StmtWhile { body, .. }) => {
-                find_following_in_body(body, with_range)
-            }
-            ast::Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => find_following_in_body(body, with_range).or_else(|| {
-                elif_else_clauses
-                    .iter()
-                    .find_map(|clause| find_following_in_body(&clause.body, with_range))
-            }),
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => find_following_in_body(body, with_range)
-                .or_else(|| {
-                    handlers.iter().find_map(|handler| match handler {
-                        ast::ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
-                            body,
-                            ..
-                        }) => find_following_in_body(body, with_range),
-                    })
-                })
-                .or_else(|| find_following_in_body(orelse, with_range))
-                .or_else(|| find_following_in_body(finalbody, with_range)),
-            ast::Stmt::Match(ast::StmtMatch { cases, .. }) => cases
-                .iter()
-                .find_map(|case| find_following_in_body(&case.body, with_range)),
-            _ => None,
-        },
-        None => find_following_in_body(module_body, with_range),
-    }
-}
-
-fn find_following_in_body(body: &[ast::Stmt], with_range: TextRange) -> Option<&[ast::Stmt]> {
-    body.iter()
-        .position(|stmt| stmt.range() == with_range)
-        .map(|index| {
-            let next = index + 1;
-            &body[next..]
+    with_parent
+        .and_then(|parent| suite(with, parent).map(|enclosing| enclosing.next_siblings()))
+        .or_else(|| {
+            EnclosingSuite::new(module_body, with.into()).map(|enclosing| enclosing.next_siblings())
         })
 }
 
