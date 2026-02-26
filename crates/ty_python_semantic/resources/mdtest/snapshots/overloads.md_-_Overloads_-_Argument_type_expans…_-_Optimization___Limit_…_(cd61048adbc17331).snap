@@ -38,7 +38,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/call/overloads.md
  4 | def _(a: int | None):
  5 |     reveal_type(
  6 |         # error: [no-matching-overload]
- 7 |         # revealed: Unknown
+ 7 |         # revealed: Any
  8 |         f(
  9 |             A(),
 10 |             a1=a,
@@ -82,7 +82,7 @@ error[no-matching-overload]: No overload of function `f` matches arguments
   --> src/mdtest_snippet.py:8:9
    |
  6 |           # error: [no-matching-overload]
- 7 |           # revealed: Unknown
+ 7 |           # revealed: Any
  8 | /         f(
  9 | |             A(),
 10 | |             a1=a,

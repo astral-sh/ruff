@@ -44,7 +44,7 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
     FieldInstance, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
     PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
@@ -2557,44 +2557,33 @@ impl<'db> CallableBinding<'db> {
         // unmatched for the given argument types.
         let mut filter_remaining_overloads = false;
 
-        for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
-            if filter_remaining_overloads {
-                self.overloads[*current_index].mark_as_unmatched_overload();
-                continue;
-            }
-
+        // Build a tuple of participating parameter types for a single overload.
+        //
+        // A given participating parameter can receive multiple argument sources (for example,
+        // through variadics), so we union those types for that parameter index.
+        let participating_parameter_tuple_for_overload = |overload: &Binding<'db>| {
             let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
                 .take(max_parameter_count)
                 .collect::<Vec<_>>();
 
-            // The number of parameters that have been skipped because they don't participate in
-            // the filtering process. This is used to make sure the types are added to the
-            // corresponding parameter index in `union_parameter_types`.
-            let mut skipped_parameters = 0;
-
             for argument_index in 0..arguments.len() {
-                for overload_index in &matching_overload_indexes[..=upto] {
-                    let overload = &self.overloads[*overload_index];
-                    for parameter_index in &overload.argument_matches[argument_index].parameters {
-                        if !participating_parameter_indexes.contains(parameter_index) {
-                            skipped_parameters += 1;
-                            continue;
-                        }
-                        // TODO: For an unannotated `self` / `cls` parameter, the type should be
-                        // `typing.Self` / `type[typing.Self]`
-                        let mut parameter_type =
-                            overload.signature.parameters()[*parameter_index].annotated_type();
-                        if let Some(specialization) = overload.specialization {
-                            parameter_type =
-                                parameter_type.apply_specialization(db, specialization);
-                        }
-                        union_parameter_types[parameter_index.saturating_sub(skipped_parameters)]
-                            .add_in_place(parameter_type);
+                for parameter_index in &overload.argument_matches[argument_index].parameters {
+                    if !participating_parameter_indexes.contains(parameter_index) {
+                        continue;
                     }
+
+                    // TODO: For an unannotated `self` / `cls` parameter, the type should be
+                    // `typing.Self` / `type[typing.Self]`
+                    let mut parameter_type =
+                        overload.signature.parameters()[*parameter_index].annotated_type();
+                    if let Some(specialization) = overload.specialization {
+                        parameter_type = parameter_type.apply_specialization(db, specialization);
+                    }
+                    union_parameter_types[*parameter_index].add_in_place(parameter_type);
                 }
             }
 
-            let parameter_types = Type::heterogeneous_tuple(
+            Type::heterogeneous_tuple(
                 db,
                 union_parameter_types.into_iter().filter_map(|builder| {
                     if builder.is_empty() {
@@ -2603,9 +2592,30 @@ impl<'db> CallableBinding<'db> {
                         Some(builder.build())
                     }
                 }),
+            )
+        };
+
+        for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
+            if filter_remaining_overloads {
+                self.overloads[*current_index].mark_as_unmatched_overload();
+                continue;
+            }
+
+            // Use a union of per-overload parameter tuples rather than a tuple of per-parameter
+            // unions, so we preserve cross-argument correlations from each overload.
+            let parameter_types = UnionType::from_elements(
+                db,
+                matching_overload_indexes[..=upto]
+                    .iter()
+                    .map(|overload_index| {
+                        participating_parameter_tuple_for_overload(&self.overloads[*overload_index])
+                    }),
             );
 
-            if top_materialized_argument_type.is_assignable_to(db, parameter_types) {
+            if top_materialized_argument_type
+                .when_assignable_to(db, parameter_types, InferableTypeVars::None)
+                .is_always_satisfied(db)
+            {
                 filter_remaining_overloads = true;
             }
         }
@@ -2763,7 +2773,7 @@ impl<'db> CallableBinding<'db> {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
                 OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_)
-                | OverloadCallReturnType::Ambiguous => Type::unknown(),
+                | OverloadCallReturnType::Ambiguous => Type::Dynamic(DynamicType::Any),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {

@@ -1361,7 +1361,7 @@ def _(
     reveal_type(person[str_key])  # revealed: Unknown
 
     # No error here:
-    reveal_type(person[unknown_key])  # revealed: Unknown
+    reveal_type(person[unknown_key])  # revealed: Any
 
     reveal_type(being["name"])  # revealed: str
 
