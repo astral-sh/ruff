@@ -72,6 +72,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
         Rule::UnderIndentation,
         Rule::UndocumentedMagicMethod,
         Rule::UndocumentedParam,
+        Rule::IncorrectSectionOrder,
         Rule::UndocumentedPublicClass,
         Rule::UndocumentedPublicFunction,
         Rule::UndocumentedPublicInit,
@@ -286,6 +287,7 @@ pub(crate) fn definitions(checker: &mut Checker) {
                 Rule::MismatchedSectionUnderlineLength,
                 Rule::OverindentedSectionUnderline,
                 Rule::UndocumentedParam,
+                Rule::IncorrectSectionOrder,
             ]);
             if enforce_sections || enforce_pydoclint {
                 let section_contexts = pydocstyle::helpers::get_section_contexts(

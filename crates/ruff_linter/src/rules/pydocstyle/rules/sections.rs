@@ -1348,8 +1348,102 @@ impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
     }
 }
 
+/// ## What it does
+/// Checks for docstring sections that appear out of order.
+///
+/// ## Why is this bad?
+/// Docstring sections should follow the canonical ordering specified by the
+/// docstring convention (NumPy or Google). Consistent ordering makes
+/// docstrings easier to read and navigate.
+///
+/// For the NumPy convention, all sections have a prescribed order per the
+/// numpydoc style guide. For the Google convention, only the relative ordering
+/// of `Args`, `Returns`/`Yields`, and `Raises` is enforced; all other sections
+/// are unordered.
+///
+/// ## Example
+///
+/// Given `lint.pydocstyle.convention = "numpy"`:
+///
+/// ```python
+/// def func() -> int:
+///     """Summary.
+///
+///     Notes
+///     -----
+///     Some notes.
+///
+///     Returns
+///     -------
+///     int
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def func() -> int:
+///     """Summary.
+///
+///     Returns
+///     -------
+///     int
+///
+///     Notes
+///     -----
+///     Some notes.
+///     """
+/// ```
+///
+/// Given `lint.pydocstyle.convention = "google"`:
+///
+/// ```python
+/// def func(x: int) -> int:
+///     """Summary.
+///
+///     Returns:
+///         int
+///
+///     Args:
+///         x: Description.
+///     """
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def func(x: int) -> int:
+///     """Summary.
+///
+///     Args:
+///         x: Description.
+///
+///     Returns:
+///         int
+///     """
+/// ```
+///
+/// ## Options
+/// - `lint.pydocstyle.convention`
+///
+/// ## References
+/// - [NumPy docstring standard](https://numpydoc.readthedocs.io/en/latest/format.html)
+/// - [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods)
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+pub(crate) struct IncorrectSectionOrder {
+    current: String,
+    previous: String,
+}
+
+impl Violation for IncorrectSectionOrder {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let IncorrectSectionOrder { current, previous } = self;
+        format!(r#"Section "{current}" appears after section "{previous}" but should be before it"#)
+    }
+}
+
 /// D212, D214, D215, D405, D406, D407, D408, D409, D410, D411, D412, D413,
-/// D414, D416, D417
+/// D414, D416, D417, D420
 pub(crate) fn sections(
     checker: &Checker,
     docstring: &Docstring,
@@ -1357,11 +1451,23 @@ pub(crate) fn sections(
     convention: Option<Convention>,
 ) {
     match convention {
-        Some(Convention::Google) => parse_google_sections(checker, docstring, section_contexts),
-        Some(Convention::Numpy) => parse_numpy_sections(checker, docstring, section_contexts),
+        Some(Convention::Google) => {
+            check_section_order(checker, section_contexts, google_section_order);
+            parse_google_sections(checker, docstring, section_contexts);
+        }
+        Some(Convention::Numpy) => {
+            check_section_order(checker, section_contexts, numpy_section_order);
+            parse_numpy_sections(checker, docstring, section_contexts);
+        }
         Some(Convention::Pep257) | None => match section_contexts.style() {
-            SectionStyle::Google => parse_google_sections(checker, docstring, section_contexts),
-            SectionStyle::Numpy => parse_numpy_sections(checker, docstring, section_contexts),
+            SectionStyle::Google => {
+                check_section_order(checker, section_contexts, google_section_order);
+                parse_google_sections(checker, docstring, section_contexts);
+            }
+            SectionStyle::Numpy => {
+                check_section_order(checker, section_contexts, numpy_section_order);
+                parse_numpy_sections(checker, docstring, section_contexts);
+            }
         },
     }
 }
@@ -2060,5 +2166,118 @@ fn parse_google_sections(
         if has_args {
             missing_args(checker, docstring, &documented_args);
         }
+    }
+}
+
+/// Canonical ordering of NumPy-style docstring sections.
+///
+/// Variant order matches the [numpydoc style guide](https://numpydoc.readthedocs.io/en/latest/format.html).
+#[derive(PartialEq, Eq, PartialOrd)]
+enum NumpySectionOrder {
+    ShortSummary,
+    ExtendedSummary,
+    Parameters,
+    Returns,
+    Yields,
+    Receives,
+    OtherParameters,
+    Raises,
+    Warns,
+    Warnings,
+    SeeAlso,
+    Notes,
+    References,
+    Examples,
+    Attributes,
+    Methods,
+}
+
+fn numpy_section_order(kind: SectionKind) -> Option<NumpySectionOrder> {
+    match kind {
+        SectionKind::ShortSummary => Some(NumpySectionOrder::ShortSummary),
+        SectionKind::ExtendedSummary => Some(NumpySectionOrder::ExtendedSummary),
+        SectionKind::Parameters => Some(NumpySectionOrder::Parameters),
+        SectionKind::Returns => Some(NumpySectionOrder::Returns),
+        SectionKind::Yields => Some(NumpySectionOrder::Yields),
+        SectionKind::Receives => Some(NumpySectionOrder::Receives),
+        SectionKind::OtherParams | SectionKind::OtherParameters => {
+            Some(NumpySectionOrder::OtherParameters)
+        }
+        SectionKind::Raises => Some(NumpySectionOrder::Raises),
+        SectionKind::Warns => Some(NumpySectionOrder::Warns),
+        SectionKind::Warnings => Some(NumpySectionOrder::Warnings),
+        SectionKind::SeeAlso => Some(NumpySectionOrder::SeeAlso),
+        SectionKind::Notes => Some(NumpySectionOrder::Notes),
+        SectionKind::References => Some(NumpySectionOrder::References),
+        SectionKind::Examples => Some(NumpySectionOrder::Examples),
+        SectionKind::Attributes => Some(NumpySectionOrder::Attributes),
+        SectionKind::Methods => Some(NumpySectionOrder::Methods),
+        _ => None,
+    }
+}
+
+/// Canonical ordering of Google-style docstring sections.
+///
+/// Only enforces the ordering explicitly documented in the
+/// [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods):
+/// Args before Returns/Yields, Raises after those. All other sections are
+/// unordered and return `None`.
+#[derive(PartialEq, Eq, PartialOrd)]
+enum GoogleSectionOrder {
+    Args,
+    Returns,
+    Yields,
+    Raises,
+}
+
+fn google_section_order(kind: SectionKind) -> Option<GoogleSectionOrder> {
+    match kind {
+        SectionKind::Args
+        | SectionKind::Arguments
+        | SectionKind::KeywordArgs
+        | SectionKind::KeywordArguments
+        | SectionKind::OtherArgs
+        | SectionKind::OtherArguments => Some(GoogleSectionOrder::Args),
+        SectionKind::Returns | SectionKind::Return => Some(GoogleSectionOrder::Returns),
+        SectionKind::Yields | SectionKind::Yield => Some(GoogleSectionOrder::Yields),
+        SectionKind::Raises => Some(GoogleSectionOrder::Raises),
+        _ => None,
+    }
+}
+
+/// D420
+fn check_section_order<P: PartialOrd>(
+    checker: &Checker,
+    section_contexts: &SectionContexts,
+    order_fn: fn(SectionKind) -> Option<P>,
+) {
+    if !checker.is_rule_enabled(Rule::IncorrectSectionOrder) {
+        return;
+    }
+
+    let mut max_order: Option<(P, &str)> = None;
+
+    for context in section_contexts {
+        let Some(position) = order_fn(context.kind()) else {
+            continue;
+        };
+
+        if let Some((ref prev_pos, prev_name)) = max_order
+            && position < *prev_pos
+        {
+            checker.report_diagnostic(
+                IncorrectSectionOrder {
+                    current: context.section_name().to_string(),
+                    previous: prev_name.to_string(),
+                },
+                context.section_name_range(),
+            );
+            // Don't update max_order: keep tracking against the highest-seen
+            // position so that subsequent sections are compared against the
+            // same out-of-place section.
+            continue;
+        }
+
+        max_order = Some((position, context.section_name()));
     }
 }

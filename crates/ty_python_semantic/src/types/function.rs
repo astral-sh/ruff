@@ -80,18 +80,15 @@ use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_definition_types,
-    walk_signature,
+    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
+    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 
@@ -163,7 +160,7 @@ bitflags! {
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
     pub struct DataclassTransformerFlags: u8 {
         const EQ_DEFAULT = 1 << 0;
         const ORDER_DEFAULT = 1 << 1;
@@ -183,7 +180,6 @@ impl Default for DataclassTransformerFlags {
 /// Metadata for a dataclass-transformer. Stored inside a `Type::DataclassTransformer(…)`
 /// instance that we use as the return type for `dataclass_transform(…)` calls.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct DataclassTransformerParams<'db> {
     pub flags: DataclassTransformerFlags,
 
@@ -208,13 +204,7 @@ pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
 ///
 /// If a function has multiple overloads, each overload is represented by a separate function
 /// definition in the AST, and is therefore a separate `OverloadLiteral` instance.
-///
-/// # Ordering
-/// Ordering is based on the function's id assigned by salsa and not on the function literal's
-/// values. The id may change between runs, or when the function literal was garbage collected and
-/// recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct OverloadLiteral<'db> {
     /// Name of the function at definition.
     #[returns(ref)]
@@ -392,6 +382,15 @@ impl<'db> OverloadLiteral<'db> {
         let previous_literal = previous_type.literal(db);
         let previous_overload = previous_literal.last_definition(db);
         if !previous_overload.is_overload(db) {
+            return None;
+        }
+
+        // These can both happen in edge cases where a definition created with a `def`
+        // statement shadows a non-`def` symbol with the same name.
+        if previous_overload.name(db) != self.name(db) {
+            return None;
+        }
+        if previous_overload.definition(db).scope(db) != scope {
             return None;
         }
 
@@ -643,13 +642,7 @@ impl<'db> OverloadLiteral<'db> {
 /// Representation of a function definition in the AST, along with any previous overloads of the
 /// function. Each overload can be separately generic or not, and each generic overload uses
 /// distinct typevars.
-///
-/// # Ordering
-/// Ordering is based on the function's id assigned by salsa and not on the function literal's
-/// values. The id may change between runs, or when the function literal was garbage collected and
-/// recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
 }
@@ -883,7 +876,6 @@ impl AbstractMethodKind {
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 
@@ -1220,24 +1212,6 @@ impl<'db> FunctionType<'db> {
         )
     }
 
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self.normalized(db) == other.normalized(db) {
-            return ConstraintSet::from(true);
-        }
-        if self.literal(db) != other.literal(db) {
-            return ConstraintSet::from(false);
-        }
-        let self_signature = self.signature(db);
-        let other_signature = other.signature(db);
-        self_signature.is_equivalent_to_impl(db, other_signature, inferable, visitor)
-    }
-
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -1249,26 +1223,6 @@ impl<'db> FunctionType<'db> {
         for signature in &signatures.overloads {
             signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
-    }
-
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let literal = self.literal(db);
-        let updated_signature = self
-            .updated_signature(db)
-            .map(|signature| signature.normalized_impl(db, visitor));
-        let updated_last_definition_signature = self
-            .updated_last_definition_signature(db)
-            .map(|signature| signature.normalized_impl(db, visitor));
-        Self::new(
-            db,
-            literal,
-            updated_signature,
-            updated_last_definition_signature,
-        )
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -1451,12 +1405,10 @@ pub(super) fn function_body_kind<'db>(
         } = raise
         && infer_type(exc).is_subtype_of(
             db,
-            UnionType::from_elements(
+            UnionType::from_two_elements(
                 db,
-                [
-                    KnownClass::NotImplementedError.to_class_literal(db),
-                    KnownClass::NotImplementedError.to_instance(db),
-                ],
+                KnownClass::NotImplementedError.to_class_literal(db),
+                KnownClass::NotImplementedError.to_instance(db),
             ),
         )
     {

@@ -635,5 +635,24 @@ reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>
 static_assert(not is_equivalent_to(TypeOf[imported], TypeOf[other_imported]))
 ```
 
+## Bound-super types
+
+Two bound-super types are equivalent if the pivot class and the instance are equivalent:
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from ty_extensions import is_equivalent_to, TypeOf, static_assert
+
+class Foo[T]:
+    x: T
+
+def bar(a: Foo[int | str], b: Foo[str | int]):
+    static_assert(is_equivalent_to(TypeOf[super(Foo, a)], TypeOf[super(Foo, b)]))
+```
+
 [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize
 [the equivalence relation]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent

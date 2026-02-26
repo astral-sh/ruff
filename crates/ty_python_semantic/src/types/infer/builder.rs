@@ -78,15 +78,15 @@ use crate::types::diagnostic::{
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
     INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
     INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
-    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM,
-    INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER,
-    INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD,
-    NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT,
-    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
-    UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
+    INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT,
+    NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
+    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
+    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
@@ -131,14 +131,14 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
     CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedConstraintSet, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, LiteralValueType, LiteralValueTypeKind, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
-    Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance, any_over_type, binding_type, definition_expression_type,
-    infer_complete_scope_types, infer_scope_types, todo_type,
+    LintDiagnosticGuard, LiteralValueType, LiteralValueTypeKind, ManualPEP695TypeAliasType,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
+    ParameterForm, Parameters, Signature, SpecialFormType, StaticClassLiteral, SubclassOfType,
+    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarConstraints,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, any_over_type, binding_type,
+    definition_expression_type, infer_complete_scope_types, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -386,7 +386,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             match self.cycle_recovery {
                 Some(existing) => {
                     self.cycle_recovery =
-                        Some(UnionType::from_elements(self.db(), [existing, other]));
+                        Some(UnionType::from_two_elements(self.db(), existing, other));
                 }
                 None => {
                     self.cycle_recovery = Some(other);
@@ -3489,7 +3489,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             let ty = if let Some(default_expr) = default_expr {
                 let default_ty = self.file_expression_type(default_expr);
-                UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
+                UnionType::from_two_elements(self.db(), Type::unknown(), default_ty)
             } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
                 ty
             } else {
@@ -4265,12 +4265,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .unwrap_or_else(|| KnownClass::BaseException.to_instance(self.db()))
         } else if node_ty.is_assignable_to(
             self.db(),
-            UnionType::from_elements(
+            UnionType::from_two_elements(
                 self.db(),
-                [
-                    type_base_exception,
-                    Type::homogeneous_tuple(self.db(), type_base_exception),
-                ],
+                type_base_exception,
+                Type::homogeneous_tuple(self.db(), type_base_exception),
             ),
         ) {
             KnownClass::BaseException.to_instance(self.db())
@@ -6762,6 +6760,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // signalling that we must fall back to normal call inference.
                                 self.infer_builtins_type_call(call_expr, Some(definition))
                             }
+                            Some(KnownClass::TypeAliasType) => {
+                                self.infer_typealiastype_call(target, call_expr, definition)
+                            }
                             Some(_) | None => {
                                 self.infer_call_expression_impl(call_expr, callable_type, tcx)
                             }
@@ -7320,6 +7321,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.infer_newtype_assignment_deferred(arguments);
                 return;
             }
+            (Some(KnownClass::TypeAliasType), InferenceRegion::Deferred(definition)) => {
+                self.infer_typealiastype_assignment_deferred(definition, arguments);
+                return;
+            }
             (Some(KnownClass::Type), InferenceRegion::Deferred(definition)) => {
                 self.infer_builtins_type_deferred(definition, value);
                 return;
@@ -7431,6 +7436,113 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diag.info("The base of a `NewType` must be a class type or another `NewType`.");
             }
         }
+    }
+
+    /// Infer a `TypeAliasType("Name", value)` call in a simple assignment context.
+    ///
+    /// Follows the same pattern as [`Self::infer_newtype_expression`]: validates the
+    /// arguments, constructs a [`ManualPEP695TypeAliasType`], and defers inference of
+    /// the value argument.
+    fn infer_typealiastype_call(
+        &mut self,
+        target: &ast::Expr,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        fn error<'db>(
+            context: &InferContext<'db, '_>,
+            message: impl std::fmt::Display,
+            node: impl Ranged,
+        ) -> Type<'db> {
+            if let Some(builder) = context.report_lint(&INVALID_TYPE_ALIAS_TYPE, node) {
+                builder.into_diagnostic(message);
+            }
+            Type::unknown()
+        }
+
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+
+        if let Some(starred) = arguments.args.iter().find(|arg| arg.is_starred_expr()) {
+            return error(
+                &self.context,
+                "Starred arguments are not supported in `TypeAliasType` creation",
+                starred,
+            );
+        }
+
+        if arguments.args.len() != 2 {
+            return error(
+                &self.context,
+                format_args!(
+                    "Wrong number of arguments in `TypeAliasType` creation: expected 2, found {}",
+                    arguments.args.len()
+                ),
+                call_expr,
+            );
+        }
+
+        let name_param_ty = self.infer_expression(&arguments.args[0], TypeContext::default());
+
+        let Some(name) = name_param_ty.as_string_literal().map(|name| name.value(db)) else {
+            return error(
+                &self.context,
+                "The first argument to `TypeAliasType` must be a string literal",
+                &arguments.args[0],
+            );
+        };
+
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
+            return error(
+                &self.context,
+                "A `TypeAliasType` definition must be a simple variable assignment",
+                target,
+            );
+        };
+
+        if name != target_name {
+            return error(
+                &self.context,
+                format_args!(
+                    "The name of a `TypeAliasType` (`{name}`) must match \
+                    the name of the variable it is assigned to (`{target_name}`)"
+                ),
+                target,
+            );
+        }
+
+        // Inference of the value argument must be deferred, to avoid cycles.
+        self.deferred.insert(definition, self.multi_inference_state);
+
+        Type::KnownInstance(KnownInstanceType::TypeAliasType(
+            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                db,
+                ast::name::Name::new(name),
+                definition,
+            )),
+        ))
+    }
+
+    /// Infer the deferred value type of a `TypeAliasType`.
+    fn infer_typealiastype_assignment_deferred(
+        &mut self,
+        definition: Definition<'db>,
+        arguments: &ast::Arguments,
+    ) {
+        // Match the binding context used by eager assignment inference so legacy type variables
+        // in the alias value are bound to the alias definition.
+        let previous_context = self.typevar_binding_context.replace(definition);
+
+        self.infer_type_expression(&arguments.args[1]);
+        // Infer keyword arguments (e.g. `type_params`) so their types are stored.
+        for keyword in &arguments.keywords {
+            self.infer_expression(&keyword.value, TypeContext::default());
+        }
+
+        self.typevar_binding_context = previous_context;
     }
 
     /// Deferred inference for assigned `type()` calls.
@@ -8185,7 +8297,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // Emit diagnostic for invalid types (not Iterable[Any] | None).
                     let iterable_any =
                         KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
-                    let valid_type = UnionType::from_elements(db, [iterable_any, Type::none(db)]);
+                    let valid_type = UnionType::from_two_elements(db, iterable_any, Type::none(db));
                     if !kw_type.is_assignable_to(db, valid_type)
                         && let Some(builder) =
                             self.context.report_lint(&INVALID_ARGUMENT_TYPE, &kw.value)
@@ -8218,9 +8330,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
                 "module" if kind.is_collections() => {
                     // Emit diagnostic for invalid types (not str | None).
-                    let valid_type = UnionType::from_elements(
+                    let valid_type = UnionType::from_two_elements(
                         db,
-                        [KnownClass::Str.to_instance(db), Type::none(db)],
+                        KnownClass::Str.to_instance(db),
+                        Type::none(db),
                     );
                     if !kw_type.is_assignable_to(db, valid_type)
                         && let Some(builder) =
@@ -8406,7 +8519,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Emit diagnostic if the type is outright invalid (not str | Iterable[str]).
             let iterable_str = KnownClass::Iterable.to_specialized_instance(db, &[Type::any()]);
             let valid_type =
-                UnionType::from_elements(db, [KnownClass::Str.to_instance(db), iterable_str]);
+                UnionType::from_two_elements(db, KnownClass::Str.to_instance(db), iterable_str);
             if !fields_type.is_assignable_to(db, valid_type)
                 && let Some(builder) = self.context.report_lint(&INVALID_ARGUMENT_TYPE, fields_arg)
             {
@@ -8585,7 +8698,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 SequenceKind::Tuple => Type::heterogeneous_tuple(db, [name_type, declared_type]),
                 SequenceKind::List => KnownClass::List.to_specialized_instance(
                     db,
-                    &[UnionType::from_elements(db, [name_type, declared_type])],
+                    &[UnionType::from_two_elements(db, name_type, declared_type)],
                 ),
             };
 
@@ -9320,9 +9433,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         let value_ty = infer_value_ty(self, TypeContext::default());
                         binary_return_ty(self, value_ty)
                     }
-                    Err(CallDunderError::PossiblyUnbound(outcome)) => UnionType::from_elements(
+                    Err(CallDunderError::PossiblyUnbound(outcome)) => UnionType::from_two_elements(
                         db,
-                        [outcome.return_type(db), binary_return_ty(self, *value_ty)],
+                        outcome.return_type(db),
+                        binary_return_ty(self, *value_ty),
                     ),
                     Err(CallDunderError::CallError(_, bindings)) => {
                         report_unsupported_augmented_assignment(
@@ -9748,9 +9862,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let base_exception_instance = KnownClass::BaseException.to_instance(self.db());
 
         let can_be_raised =
-            UnionType::from_elements(self.db(), [base_exception_type, base_exception_instance]);
+            UnionType::from_two_elements(self.db(), base_exception_type, base_exception_instance);
         let can_be_exception_cause =
-            UnionType::from_elements(self.db(), [can_be_raised, Type::none(self.db())]);
+            UnionType::from_two_elements(self.db(), can_be_raised, Type::none(self.db()));
 
         if let Some(raised) = exc {
             let raised_type = self.infer_expression(raised, TypeContext::default());
@@ -12130,7 +12244,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }) {
             Truthiness::AlwaysTrue => body_ty,
             Truthiness::AlwaysFalse => orelse_ty,
-            Truthiness::Ambiguous => UnionType::from_elements(self.db(), [body_ty, orelse_ty]),
+            Truthiness::Ambiguous => UnionType::from_two_elements(self.db(), body_ty, orelse_ty),
         }
     }
 
@@ -12519,11 +12633,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 report_attempted_protocol_instantiation(&self.context, call_expression, protocol);
             }
 
-            // Inference of correctly-placed `TypeVar`, `ParamSpec`, and `NewType` definitions
-            // is done in `infer_legacy_typevar`, `infer_paramspec`, and
-            // `infer_newtype_expression`, and doesn't use the full call-binding machinery. If
-            // we reach here, it means that someone is trying to instantiate one of these in an
-            // invalid context.
+            // Inference of correctly-placed `TypeVar`, `ParamSpec`, `NewType`, and
+            // `TypeAliasType` definitions is done in `infer_legacy_typevar`,
+            // `infer_paramspec`, `infer_newtype_expression`, and
+            // `infer_typealiastype_call`, and doesn't use the full call-binding
+            // machinery. If we reach here, it means that someone is trying to
+            // instantiate one of these in an invalid context.
             match class.known(self.db()) {
                 Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar) => {
                     if let Some(builder) = self
@@ -12551,6 +12666,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         builder.into_diagnostic(
                             "A `NewType` definition must be a simple variable assignment",
+                        );
+                    }
+                }
+                Some(KnownClass::TypeAliasType) => {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `TypeAliasType` definition must be a simple variable assignment",
                         );
                     }
                 }
@@ -16006,7 +16131,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         UnionTypeInstance::new(
                             db,
                             None,
-                            Ok(UnionType::from_elements(db, [ty, Type::none(db)])),
+                            Ok(UnionType::from_two_elements(db, ty, Type::none(db))),
                         ),
                     ));
                 }
