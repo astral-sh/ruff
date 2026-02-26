@@ -1864,7 +1864,7 @@ def _(
     reveal_type(person[str_key])  # revealed: Unknown
 
     # No error here:
-    reveal_type(person[unknown_key])  # revealed: Any
+    reveal_type(person[unknown_key])  # revealed: Unknown
 
     reveal_type(movie[recursive_key[0]])  # revealed: Unknown
 
