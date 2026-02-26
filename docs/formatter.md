@@ -331,7 +331,7 @@ these mapped extensions in file discovery:
     ```toml
     [tool.ruff]
     # Treat `.mdx` and `.qmd` files as Markdown
-    extension = {mdx="markdown", qmd="markdown"}
+    extension = { mdx = "markdown", qmd = "markdown" }
     ```
 
 === "ruff.toml"
