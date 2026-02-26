@@ -130,8 +130,7 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
 
     // Skip fix for nested unions to avoid flattening.
     if !has_nested_union(semantic, union) && !other_exprs.is_empty() {
-        let nodes: Vec<&Expr> = other_exprs.iter().chain(&none_exprs).copied().collect();
-        if let Some(fix) = generate_fix(checker, nodes, union, is_pep604) {
+        if let Some(fix) = generate_fix(checker, &other_exprs, &none_exprs, union, is_pep604) {
             diagnostic.set_fix(fix);
         }
     }
@@ -139,7 +138,8 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
 
 fn generate_fix(
     checker: &Checker,
-    nodes: Vec<&Expr>,
+    other_exprs: &[&Expr],
+    none_exprs: &[&Expr],
     annotation: &Expr,
     is_pep604: bool,
 ) -> Option<Fix> {
@@ -149,7 +149,12 @@ fn generate_fix(
         Applicability::Safe
     };
 
-    let reordered: Vec<Expr> = nodes.into_iter().cloned().collect();
+    let reordered: Vec<Expr> = other_exprs
+        .iter()
+        .chain(none_exprs)
+        .copied()
+        .cloned()
+        .collect();
 
     let new_expr = if is_pep604 {
         pep_604_union(&reordered)
