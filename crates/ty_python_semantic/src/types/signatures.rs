@@ -372,29 +372,6 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    fn single_required_positional_parameter_type(signature: &Signature<'db>) -> Option<Type<'db>> {
-        if signature.parameters().len() != 1 {
-            return None;
-        }
-        let parameter = signature.parameters().get(0)?;
-
-        match parameter.kind() {
-            ParameterKind::PositionalOnly {
-                default_type: None, ..
-            }
-            | ParameterKind::PositionalOrKeyword {
-                default_type: None, ..
-            } => Some(parameter.annotated_type()),
-            _ => None,
-        }
-    }
-
-    fn is_unary_overload_aggregate_candidate_type(db: &'db dyn Db, ty: Type<'db>) -> bool {
-        // Keep aggregate probing away from inference-sensitive shapes and defer them to the
-        // legacy path, which already handles dynamic/typevar interactions.
-        !ty.has_dynamic(db) && !ty.has_typevar_or_typevar_instance(db)
-    }
-
     /// Fast path for unary callable assignability: compare overload sets by aggregating
     /// overlapping parameter domains and return types.
     ///
@@ -407,16 +384,38 @@ impl<'db> CallableSignature<'db> {
         inferable: InferableTypeVars<'_, 'db>,
         relation: TypeRelation<'db>,
     ) -> Option<ConstraintSet<'db>> {
-        let other_parameter_type =
-            Self::single_required_positional_parameter_type(other_signature)?;
+        let single_required_positional_parameter_type = |signature: &Signature<'db>| {
+            if signature.parameters().len() != 1 {
+                return None;
+            }
+            let parameter = signature.parameters().get(0)?;
+
+            match parameter.kind() {
+                ParameterKind::PositionalOnly {
+                    default_type: None, ..
+                }
+                | ParameterKind::PositionalOrKeyword {
+                    default_type: None, ..
+                } => Some(parameter.annotated_type()),
+                _ => None,
+            }
+        };
+
+        let is_unary_overload_aggregate_candidate_type = |ty: Type<'db>| {
+            // Keep aggregate probing away from inference-sensitive shapes and defer them to the
+            // legacy path, which already handles dynamic/typevar interactions.
+            !ty.has_dynamic(db) && !ty.has_typevar_or_typevar_instance(db)
+        };
+
+        let other_parameter_type = single_required_positional_parameter_type(other_signature)?;
         // Keep this aggregate path narrowly scoped to unary target callables whose parameter
         // domain is an explicit union.
         //
         // Broader overload-set assignability (non-union unary domains, higher arity,
         // typevars/dynamic interactions) needs dedicated relation logic.
         if !matches!(other_parameter_type, Type::Union(_))
-            || !Self::is_unary_overload_aggregate_candidate_type(db, other_parameter_type)
-            || !Self::is_unary_overload_aggregate_candidate_type(db, other_signature.return_ty)
+            || !is_unary_overload_aggregate_candidate_type(other_parameter_type)
+            || !is_unary_overload_aggregate_candidate_type(other_signature.return_ty)
         {
             return None;
         }
@@ -430,10 +429,9 @@ impl<'db> CallableSignature<'db> {
         let aggregate_disjointness_visitor = IsDisjointVisitor::default();
 
         for self_signature in self_signatures {
-            let self_parameter_type =
-                Self::single_required_positional_parameter_type(self_signature)?;
-            if !Self::is_unary_overload_aggregate_candidate_type(db, self_parameter_type)
-                || !Self::is_unary_overload_aggregate_candidate_type(db, self_signature.return_ty)
+            let self_parameter_type = single_required_positional_parameter_type(self_signature)?;
+            if !is_unary_overload_aggregate_candidate_type(self_parameter_type)
+                || !is_unary_overload_aggregate_candidate_type(self_signature.return_ty)
             {
                 return None;
             }
