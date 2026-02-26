@@ -278,9 +278,9 @@ struct Conjunctions<'db> {
 
 impl<'db> Conjunctions<'db> {
     fn singleton(ty: Type<'db>) -> Self {
-        let mut conjuncts = SmallVec::new();
-        conjuncts.push(ty);
-        Self { conjuncts }
+        Self {
+            conjuncts: smallvec![ty],
+        }
     }
 
     fn and_with(mut self, other: Self) -> Self {
@@ -382,7 +382,7 @@ impl<'db> NarrowingConstraint<'db> {
             return other;
         }
 
-        let mut new_intersection_disjuncts = SmallVec::new();
+        let mut new_intersection_disjuncts = smallvec![];
         for intersection_disjunct in &self.intersection_disjuncts {
             for other_intersection_disjunct in &other.intersection_disjuncts {
                 let merged = intersection_disjunct
@@ -394,8 +394,7 @@ impl<'db> NarrowingConstraint<'db> {
             }
         }
 
-        let mut additional_replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]> =
-            SmallVec::new();
+        let mut additional_replacement_disjuncts: SmallVec<[Conjunctions<'db>; 1]> = smallvec![];
         for replacement_disjunct in &self.replacement_disjuncts {
             for other_intersection_disjunct in &other.intersection_disjuncts {
                 let merged = replacement_disjunct

@@ -98,6 +98,10 @@ fn split_truthiness_guarded_intersection<'db>(
 /// Safety rule:
 /// The candidate merge is accepted only if adding each original guard back reconstructs
 /// exactly the original operands (`left` and `right`).
+///
+/// TODO: This processing is specialized for `AlwaysTruthy/AlwaysFalsy`.
+/// It would be nice to generalize this in the future.
+/// Discussion: <https://github.com/astral-sh/ty/issues/224>
 fn merge_truthiness_guarded_pair<'db>(
     db: &'db dyn Db,
     left: Type<'db>,
