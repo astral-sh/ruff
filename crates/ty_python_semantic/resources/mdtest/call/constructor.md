@@ -435,6 +435,21 @@ class E(Generic[T]):
 E("foo")
 ```
 
+## `__new__` returning a subclass is normalized to the constructed class
+
+```py
+class C:
+    def __new__(cls) -> "D":
+        return object.__new__(D)
+
+class D(C): ...
+
+# This currently reveals `C` (like mypy), not `D` (like pyright/pyrefly).
+# Preserving `D` here would be more precise, but constructor mixed-overload handling
+# currently normalizes instance-returning paths to the expected constructed instance type.
+reveal_type(C())  # revealed: C
+```
+
 ## Constructor calls through `type[T]` with a bound TypeVar
 
 ```py

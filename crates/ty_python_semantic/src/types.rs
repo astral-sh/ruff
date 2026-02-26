@@ -4816,8 +4816,12 @@ impl<'db> Type<'db> {
 
                 // Mixed: save ALL overloads with correct per-overload return types.
                 // Non-instance overloads keep their return type; instance-returning
-                // overloads get `constructor_instance_ty`. We defer `__init__` validation
-                // to call checking time (only when the matched overload is instance-returning).
+                // overloads get `constructor_instance_ty`. This intentionally normalizes
+                // instance-returning overloads to the constructed class type (instead of
+                // preserving explicit subclass returns like `__new__ -> D` when constructing
+                // `C`) so later checks can use simple equality on normalized overload returns.
+                // We defer `__init__` validation to call checking time (only when the matched
+                // overload is instance-returning).
                 let metaclass_self = metaclass_call_method.self_instance(db);
                 metaclass_mixed_non_instance_sigs = Some(
                     signature
@@ -4945,6 +4949,8 @@ impl<'db> Type<'db> {
                         // Mixed: save ALL overloads with correct per-overload return
                         // types. Non-instance overloads keep their return type;
                         // instance-returning overloads get `constructor_instance_ty`.
+                        // Like metaclass `__call__` above, this intentionally normalizes
+                        // to the constructed class type for instance-returning overloads.
                         new_mixed_non_instance_sigs = Some(
                             signature
                                 .overloads
