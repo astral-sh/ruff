@@ -23,17 +23,20 @@ use crate::{
     },
     types::{
         CallableType, ClassBase, ClassType, KnownClass, Parameter, Parameters, Signature,
-        StaticClassLiteral, Type, TypeQualifiers,
+        StaticClassLiteral, Type, TypeContext, TypeQualifiers,
+        call::CallArguments,
         class::{CodeGeneratorKind, FieldKind},
         context::InferContext,
         diagnostic::{
-            INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE,
-            INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD, OVERRIDE_OF_FINAL_VARIABLE,
-            report_invalid_method_override, report_overridden_final_method,
-            report_overridden_final_variable,
+            INVALID_ASSIGNMENT, INVALID_DATACLASS, INVALID_EXPLICIT_OVERRIDE,
+            INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE, OVERRIDE_OF_FINAL_METHOD,
+            OVERRIDE_OF_FINAL_VARIABLE, report_invalid_method_override,
+            report_overridden_final_method, report_overridden_final_variable,
         },
+        enums::{EnumMetadata, enum_metadata},
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        tuple::Tuple,
     },
 };
 
@@ -66,15 +69,24 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: StaticCla
     let class_specialized = class.identity_specialization(db);
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+    let enum_info = enum_metadata(db, class.into());
 
     for member in own_class_members {
-        check_class_declaration(context, configuration, class_specialized, scope, &member);
+        check_class_declaration(
+            context,
+            configuration,
+            enum_info,
+            class_specialized,
+            scope,
+            &member,
+        );
     }
 }
 
 fn check_class_declaration<'db>(
     context: &InferContext<'db, '_>,
     configuration: OverrideRulesConfig,
+    enum_info: Option<&EnumMetadata<'db>>,
     class: ClassType<'db>,
     class_scope: ScopeId<'db>,
     member: &MemberWithDefinition<'db>,
@@ -171,6 +183,67 @@ fn check_class_declaration<'db>(
             policy,
         ),
         Some(CodeGeneratorKind::TypedDict) | None => {}
+    }
+
+    // Check for invalid Enum member values.
+    if let Some(enum_info) = enum_info {
+        if member.name != "_value_"
+            && matches!(
+                first_reachable_definition.kind(db),
+                DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_)
+            )
+        {
+            // Use the value type from `EnumMetadata` rather than `member.ty`, because
+            // for annotated assignments like `X: Final = "value"`, the member may come
+            // from the declaration chain (where `ty` is the declared type, e.g. `Unknown`)
+            // rather than the binding chain (where `ty` is the actual value type).
+            let Some(&member_value_type) = enum_info.members.get(&member.name) else {
+                return;
+            };
+
+            // TODO ideally this would be a syntactic check that only matches on literal `...`
+            // in the source, rather than matching on the type. But this would require storing
+            // additional information in `EnumMetadata`.
+            let is_ellipsis = matches!(
+                member_value_type,
+                Type::NominalInstance(nominal_instance)
+                    if nominal_instance.has_known_class(db, KnownClass::EllipsisType)
+            );
+            // `auto()` values are computed at runtime by the enum metaclass,
+            // so we can't validate them against _value_ or __init__ at the type level.
+            let is_auto = enum_info.auto_members.contains(&member.name);
+            let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
+
+            if !skip_type_check {
+                if let Some(init_function) = enum_info.init_function {
+                    check_enum_member_against_init(
+                        context,
+                        init_function,
+                        instance_of_class,
+                        member_value_type,
+                        &member.name,
+                        *first_reachable_definition,
+                    );
+                } else if let Some(expected_type) = enum_info.value_annotation {
+                    if !member_value_type.is_assignable_to(db, expected_type) {
+                        if let Some(builder) = context.report_lint(
+                            &INVALID_ASSIGNMENT,
+                            first_reachable_definition.focus_range(db, context.module()),
+                        ) {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Enum member `{}` value is not assignable to expected type",
+                                &member.name
+                            ));
+                            diagnostic.info(format_args!(
+                                "Expected `{}`, got `{}`",
+                                expected_type.display(db),
+                                member_value_type.display(db)
+                            ));
+                        }
+                    }
+                }
+            }
+        }
     }
 
     let mut subclass_overrides_superclass_declaration = false;
@@ -455,6 +528,7 @@ bitflags! {
         const PROHIBITED_NAMED_TUPLE_ATTR = 1 << 3;
         const INVALID_DATACLASS = 1 << 4;
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 5;
+        const INVALID_ENUM_VALUE = 1 << 6;
     }
 }
 
@@ -482,6 +556,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         }
         if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_VARIABLE)) {
             config |= OverrideRulesConfig::FINAL_VARIABLE_OVERRIDDEN;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_ASSIGNMENT)) {
+            config |= OverrideRulesConfig::INVALID_ENUM_VALUE;
         }
 
         config
@@ -652,4 +729,62 @@ fn check_post_init_signature<'db>(
         "`__post_init__` methods must accept all `InitVar` fields \
             as positional-only parameters",
     );
+}
+
+/// Validates an enum member value against the enum's `__init__` signature.
+///
+/// The enum metaclass unpacks tuple values as positional arguments to `__init__`,
+/// and passes non-tuple values as a single argument. This function synthesizes
+/// a call to `__init__` with the appropriate arguments and reports a diagnostic
+/// if the call would fail.
+fn check_enum_member_against_init<'db>(
+    context: &InferContext<'db, '_>,
+    init_function: FunctionType<'db>,
+    self_type: Type<'db>,
+    member_value_type: Type<'db>,
+    member_name: &Name,
+    definition: Definition<'db>,
+) {
+    let db = context.db();
+
+    // The enum metaclass unpacks tuple values as positional args:
+    //   MEMBER = (a, b, c)  →  __init__(self, a, b, c)
+    //   MEMBER = x          →  __init__(self, x)
+    let args: Vec<Type<'db>> = if let Type::NominalInstance(instance) = member_value_type {
+        if let Some(spec) = instance.tuple_spec(db) {
+            if let Tuple::Fixed(fixed) = &*spec {
+                fixed.all_elements().to_vec()
+            } else {
+                // Variable-length tuples: can't determine exact args, skip validation.
+                return;
+            }
+        } else {
+            vec![member_value_type]
+        }
+    } else {
+        vec![member_value_type]
+    };
+
+    let call_args = CallArguments::positional(args);
+    let call_args = call_args.with_self(Some(self_type));
+
+    let result = Type::FunctionLiteral(init_function)
+        .bindings(db)
+        .match_parameters(db, &call_args)
+        .check_types(db, &call_args, TypeContext::default(), &[]);
+
+    if result.is_err() {
+        if let Some(builder) = context.report_lint(
+            &INVALID_ASSIGNMENT,
+            definition.focus_range(db, context.module()),
+        ) {
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "Enum member `{member_name}` is incompatible with `__init__`",
+            ));
+            diagnostic.info(format_args!(
+                "Expected compatible arguments for `{}`",
+                Type::FunctionLiteral(init_function).display(db),
+            ));
+        }
+    }
 }

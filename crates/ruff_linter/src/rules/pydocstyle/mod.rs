@@ -202,6 +202,24 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Convention::Numpy, Path::new("D420_numpy.py"))]
+    #[test_case(Convention::Google, Path::new("D420_google.py"))]
+    fn d420(convention: Convention, path: &Path) -> Result<()> {
+        let snapshot = format!("D420_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pydocstyle").join(path).as_path(),
+            &settings::LinterSettings {
+                pydocstyle: Settings {
+                    convention: Some(convention),
+                    ..Settings::default()
+                },
+                ..settings::LinterSettings::for_rule(Rule::IncorrectSectionOrder)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test]
     fn d209_d400() -> Result<()> {
         let diagnostics = test_path(

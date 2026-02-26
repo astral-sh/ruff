@@ -460,7 +460,7 @@ relevant lines (with the appropriate rule codes), run Ruff with `--add-noqa`, li
 $ ruff check /path/to/file.py --add-noqa
 ```
 
-### Action comments
+### isort action comments
 
 Ruff respects isort's [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 (`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which

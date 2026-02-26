@@ -168,6 +168,25 @@ def _(flag1: bool, flag2: bool):
         reveal_type(x)  # revealed: Literal[2]
 ```
 
+## `==` with PEP 695 alias to a union of literals
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+type Y = Literal[2, 3]
+
+def _(x: Literal[1, 2], y: Y):
+    if x == y:
+        reveal_type(x)  # revealed: Literal[2]
+    else:
+        reveal_type(x)  # revealed: Literal[1, 2]
+```
+
 ## `!=` for non-single-valued types
 
 Only single-valued types should narrow the type:

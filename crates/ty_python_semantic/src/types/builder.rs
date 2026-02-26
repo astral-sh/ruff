@@ -37,7 +37,6 @@
 //! (unless exactly the same literal type), we can avoid many unnecessary redundancy checks.
 
 use crate::types::enums::{enum_member_literals, enum_metadata};
-use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
     BytesLiteralType, ClassLiteral, EnumLiteralType, IntersectionType, KnownClass,
     LiteralValueType, LiteralValueTypeKind, NegativeIntersectionElements, StringLiteralType, Type,
@@ -45,6 +44,87 @@ use crate::types::{
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 use smallvec::SmallVec;
+
+/// Extract `(core, guard)` from truthiness-guarded intersections.
+///
+/// e.g.
+/// - `A & ~AlwaysTruthy` -> `Some((A, ~AlwaysTruthy))`
+/// - `A & ~AlwaysFalsy` -> `Some((A, ~AlwaysFalsy))`
+/// - `A` -> `None`
+/// - `A & ~AlwaysTruthy & ~AlwaysFalsy` -> `None` (not a single-guard shape)
+///
+/// This only recognizes the "single truthiness guard" forms used by truthiness narrowing.
+fn split_truthiness_guarded_intersection<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+) -> Option<(Type<'db>, Type<'db>)> {
+    let Type::Intersection(intersection) = ty else {
+        return None;
+    };
+    let falsy = Type::AlwaysTruthy.negate(db);
+    let truthy = Type::AlwaysFalsy.negate(db);
+
+    let has_not_truthy = intersection.negative(db).contains(&Type::AlwaysTruthy);
+    let has_not_falsy = intersection.negative(db).contains(&Type::AlwaysFalsy);
+    let guard = match (has_not_truthy, has_not_falsy) {
+        (true, false) => falsy,
+        (false, true) => truthy,
+        _ => return None,
+    };
+
+    let mut core = IntersectionBuilder::new(db);
+    for positive in intersection.positive(db) {
+        core = core.add_positive(*positive);
+    }
+    for negative in intersection.negative(db) {
+        if (guard == falsy && *negative == Type::AlwaysTruthy)
+            || (guard == truthy && *negative == Type::AlwaysFalsy)
+        {
+            continue;
+        }
+        core = core.add_negative(*negative);
+    }
+    Some((core.build(), guard))
+}
+
+/// Try to merge a complementary guarded pair into an unguarded core.
+///
+/// e.g.
+/// - `(A & ~AlwaysTruthy, A & ~AlwaysFalsy)` -> `Some(A)`
+/// - `(A & ~AlwaysTruthy, B & ~AlwaysFalsy)` -> `Some(A | B)` if reconstruction is exact
+/// - `(A & ~AlwaysTruthy, C)` -> `None`
+///
+/// Safety rule:
+/// The candidate merge is accepted only if adding each original guard back reconstructs
+/// exactly the original operands (`left` and `right`).
+///
+/// TODO: This processing is specialized for `AlwaysTruthy/AlwaysFalsy`.
+/// It would be nice to generalize this in the future.
+/// Discussion: <https://github.com/astral-sh/ty/issues/224>
+fn merge_truthiness_guarded_pair<'db>(
+    db: &'db dyn Db,
+    left: Type<'db>,
+    right: Type<'db>,
+) -> Option<Type<'db>> {
+    let (left_core, left_guard) = split_truthiness_guarded_intersection(db, left)?;
+    let (right_core, right_guard) = split_truthiness_guarded_intersection(db, right)?;
+    if left_guard == right_guard {
+        return None;
+    }
+
+    if left_core.is_equivalent_to(db, right_core) {
+        return Some(left_core);
+    }
+
+    let candidate = UnionType::from_elements(db, [left_core, right_core]);
+    let left_reconstructed = IntersectionType::from_two_elements(db, candidate, left_guard);
+    let right_reconstructed = IntersectionType::from_two_elements(db, candidate, right_guard);
+    if left_reconstructed == left && right_reconstructed == right {
+        Some(candidate)
+    } else {
+        None
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum LiteralKind<'db> {
@@ -256,7 +336,7 @@ impl RecursivelyDefined {
 
 /// If the value ​​is defined recursively, widening is performed from fewer literal elements,
 /// resulting in faster convergence of the fixed-point iteration.
-const MAX_RECURSIVE_UNION_LITERALS: usize = 10;
+const MAX_RECURSIVE_UNION_LITERALS: usize = 5;
 /// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
 /// so in principle we can have as many literal elements as we want,
 /// but to avoid unintended huge computational loads, we limit it to 256.
@@ -270,7 +350,6 @@ pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
-    order_elements: bool,
     /// This is enabled when joining types in a `cycle_recovery` function.
     /// Since a cycle cannot be created within a `cycle_recovery` function,
     /// execution of `is_redundant_with` is skipped.
@@ -284,7 +363,6 @@ impl<'db> UnionBuilder<'db> {
             db,
             elements: vec![],
             unpack_aliases: true,
-            order_elements: false,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
         }
@@ -292,11 +370,6 @@ impl<'db> UnionBuilder<'db> {
 
     pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
         self.unpack_aliases = val;
-        self
-    }
-
-    pub(crate) fn order_elements(mut self, val: bool) -> Self {
-        self.order_elements = val;
         self
     }
 
@@ -658,10 +731,13 @@ impl<'db> UnionBuilder<'db> {
     }
 
     fn push_type(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        let bool_pair = if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
-            Some(LiteralValueTypeKind::Bool(!b))
-        } else {
-            None
+        let mut ty = ty;
+        let bool_pair = |ty: Type<'db>| {
+            if let Some(LiteralValueTypeKind::Bool(b)) = ty.as_literal_value_kind() {
+                Some(LiteralValueTypeKind::Bool(!b))
+            } else {
+                None
+            }
         };
 
         // If an alias gets here, it means we aren't unpacking aliases, and we also
@@ -694,9 +770,16 @@ impl<'db> UnionBuilder<'db> {
                 return;
             }
 
+            // Fold `(T & ~AlwaysTruthy) | (T & ~AlwaysFalsy)` to `T`.
+            if let Some(merged_type) = merge_truthiness_guarded_pair(self.db, ty, element_type) {
+                to_remove.push(i);
+                ty = merged_type;
+                continue;
+            }
+
             if element_type
                 .as_literal_value_kind()
-                .zip(bool_pair)
+                .zip(bool_pair(ty))
                 .is_some_and(|(element, pair)| element == pair)
             {
                 self.add_in_place_impl(KnownClass::Bool.to_instance(self.db), seen_aliases);
@@ -781,9 +864,6 @@ impl<'db> UnionBuilder<'db> {
                 UnionElement::Type(ty) => types.push(ty),
             }
         }
-        if self.order_elements {
-            types.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(self.db, l, r));
-        }
         match types.len() {
             0 => None,
             1 => Some(types[0]),
@@ -804,7 +884,6 @@ pub(crate) struct IntersectionBuilder<'db> {
     // but if a union is added to the intersection, we'll distribute ourselves over that union and
     // create a union of intersections.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
-    order_elements: bool,
     db: &'db dyn Db,
 }
 
@@ -812,7 +891,6 @@ impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
-            order_elements: false,
             intersections: vec![InnerIntersectionBuilder::default()],
         }
     }
@@ -820,7 +898,6 @@ impl<'db> IntersectionBuilder<'db> {
     fn empty(db: &'db dyn Db) -> Self {
         Self {
             db,
-            order_elements: false,
             intersections: vec![],
         }
     }
@@ -1024,7 +1101,6 @@ impl<'db> IntersectionBuilder<'db> {
                         // For enum-containing intersections, add the remaining members as positive
                         let mut enum_builder = IntersectionBuilder {
                             db,
-                            order_elements: self.order_elements,
                             intersections: enum_intersections,
                         }
                         .add_positive_impl(remaining_members, seen_aliases);
@@ -1032,7 +1108,6 @@ impl<'db> IntersectionBuilder<'db> {
                         // For non-enum intersections, just add the negative normally
                         let mut other_builder = IntersectionBuilder {
                             db,
-                            order_elements: self.order_elements,
                             intersections: other_intersections,
                         };
                         for inner in &mut other_builder.intersections {
@@ -1077,16 +1152,13 @@ impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn build(mut self) -> Type<'db> {
         // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
         if self.intersections.len() == 1 {
-            self.intersections
-                .pop()
-                .unwrap()
-                .build(self.db, self.order_elements)
+            self.intersections.pop().unwrap().build(self.db)
         } else {
             UnionType::from_elements(
                 self.db,
                 self.intersections
                     .into_iter()
-                    .map(|inner| inner.build(self.db, self.order_elements)),
+                    .map(|inner| inner.build(self.db)),
             )
         }
     }
@@ -1473,7 +1545,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    fn build(mut self, db: &'db dyn Db, order_elements: bool) -> Type<'db> {
+    fn build(mut self, db: &'db dyn Db) -> Type<'db> {
         self.simplify_constrained_typevars(db);
 
         // If any typevars are in `self.positive`, speculatively solve all bounded type variables
@@ -1514,12 +1586,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 self.positive.shrink_to_fit();
                 self.negative.shrink_to_fit();
-                if order_elements {
-                    self.positive
-                        .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
-                    self.negative
-                        .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
-                }
                 Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
             }
         }

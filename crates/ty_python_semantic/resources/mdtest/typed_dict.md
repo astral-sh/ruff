@@ -1197,9 +1197,7 @@ def f(var: Foo | int):
     assert_type(var, Foo | int)
     assert_type(var, Bar | int)
     assert_type(var, Baz | int)
-    # TODO: Union simplification compares `TypedDict`s by name/identity to avoid cycles. This assert
-    # should also pass once that's fixed.
-    assert_type(var, Foo | Bar | Baz | int)  # error: [type-assertion-failure]
+    assert_type(var, Foo | Bar | Baz | int)
 ```
 
 Here are several cases that are not equivalent. In particular, assignability does not imply

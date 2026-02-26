@@ -1,0 +1,19 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF102 [*] Invalid rule code in `# noqa`: INVALID123
+ --> RUF102_1.py:2:1
+  |
+1 | # Invalid file-level code
+2 | # ruff: noqa: INVALID123
+  | ^^^^^^^^^^^^^^^^^^^^^^^^
+3 |
+4 | # External file-level code
+  |
+help: Add non-Ruff rule codes to the `lint.external` configuration option
+help: Remove the `# noqa` comment
+1 | # Invalid file-level code
+  - # ruff: noqa: INVALID123
+2 | 
+3 | # External file-level code
+4 | # ruff: noqa: V123

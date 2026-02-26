@@ -184,20 +184,12 @@ impl std::io::Write for FmtAdapter<'_> {
 mod tests {
     use crate::diagnostic::{
         DiagnosticFormat,
-        render::tests::{
-            create_diagnostics, create_sub_diagnostics, create_syntax_error_diagnostics,
-        },
+        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
     };
 
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Junit);
-        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
-    }
-
-    #[test]
-    fn sub_diagnostics() {
-        let (env, diagnostics) = create_sub_diagnostics(DiagnosticFormat::Junit);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
     }
 

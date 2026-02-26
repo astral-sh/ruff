@@ -1146,8 +1146,7 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
+                                let constraints = ty_a.when_equivalent_to(db, *ty_b);
                                 let tracked = InternedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -1415,7 +1414,7 @@ impl<'db> Bindings<'db> {
                             };
 
                             let union_with_default =
-                                |ty| UnionType::from_elements(db, [ty, default]);
+                                |ty| UnionType::from_two_elements(db, ty, default);
 
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
@@ -2482,14 +2481,7 @@ impl<'db> CallableBinding<'db> {
                         overload.signature.parameters()[parameter_index].annotated_type();
                     let first_parameter_type = &mut first_parameter_types[parameter_index];
                     if let Some(first_parameter_type) = first_parameter_type {
-                        if !first_parameter_type
-                            .when_equivalent_to(
-                                db,
-                                current_parameter_type,
-                                overload.inferable_typevars,
-                            )
-                            .is_always_satisfied(db)
-                        {
+                        if !first_parameter_type.is_equivalent_to(db, current_parameter_type) {
                             participating_parameter_indexes.insert(parameter_index);
                         }
                     } else {
@@ -2630,12 +2622,7 @@ impl<'db> CallableBinding<'db> {
                 matching_overloads.all(|(_, overload)| {
                     overload
                         .return_type()
-                        .when_equivalent_to(
-                            db,
-                            first_overload_return_type,
-                            overload.inferable_typevars,
-                        )
-                        .is_always_satisfied(db)
+                        .is_equivalent_to(db, first_overload_return_type)
                 })
             } else {
                 // No matching overload
@@ -3802,7 +3789,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if let Some(existing) = self.parameter_tys[parameter_index].replace(argument_type) {
             // We already verified in `match_parameters` that we only match multiple arguments
             // with variadic parameters.
-            let union = UnionType::from_elements(self.db, [existing, argument_type]);
+            let union = UnionType::from_two_elements(self.db, existing, argument_type);
             self.parameter_tys[parameter_index] = Some(union);
         }
     }
