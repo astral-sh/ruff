@@ -9,7 +9,7 @@ use lsp_types::{
 use ruff_diagnostics::Applicability;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
-use ty_python_semantic::types::unused_bindings::unused_bindings;
+use ty_python_semantic::types::ide_support::unused_bindings;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
@@ -99,24 +99,23 @@ impl Diagnostics {
 
             LspDiagnostics::NotebookDocument(cell_diagnostics)
         } else {
-            let diagnostics: Vec<Diagnostic> = self
-                .items
-                .iter()
-                .filter_map(|diagnostic| {
-                    Some(
-                        to_lsp_diagnostic(
-                            db,
-                            diagnostic,
-                            self.encoding,
-                            client_capabilities,
-                            global_settings,
-                        )?
-                        .1,
-                    )
-                })
-                .collect();
-
-            LspDiagnostics::TextDocument(diagnostics)
+            LspDiagnostics::TextDocument(
+                self.items
+                    .iter()
+                    .filter_map(|diagnostic| {
+                        Some(
+                            to_lsp_diagnostic(
+                                db,
+                                diagnostic,
+                                self.encoding,
+                                client_capabilities,
+                                global_settings,
+                            )?
+                            .1,
+                        )
+                    })
+                    .collect(),
+            )
         }
     }
 }
