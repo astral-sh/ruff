@@ -114,7 +114,6 @@ class Color(Enum):
     GREEN = "green"  # error: [invalid-assignment]
     BLUE = ...
     YELLOW = None  # error: [invalid-assignment]
-    # In stub files, `[]` is not exempt from type checking (only `...` is).
     PURPLE = []  # error: [invalid-assignment]
 ```
 
