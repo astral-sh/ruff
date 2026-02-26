@@ -105,12 +105,9 @@ def entrypoint():
         for signal in [SIGINT, SIGTERM]:
             loop.add_signal_handler(signal, main_task.cancel)
         try:
-            had_errors = loop.run_until_complete(main_task)
+            loop.run_until_complete(main_task)
         finally:
             loop.close()
-
-        if had_errors:
-            exit(1)
 
 
 def parse_args() -> argparse.Namespace:
