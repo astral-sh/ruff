@@ -13074,10 +13074,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let place_table = self.index.place_table(file_scope_id);
         let use_def = self.index.use_def_map(file_scope_id);
 
-        // If we're inferring types of deferred expressions, look them up from end-of-scope.
+        // Deferred expressions usually use end-of-scope lookup semantics.
+        // But if the expression is itself unreachable, preserve use-site lookup
+        // semantics so we keep suppressing diagnostics in dead code.
         if self.is_deferred() {
+            let unreachable = !self.is_reachable(expr_ref);
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                if unreachable {
+                    let use_id = expr_ref.scoped_use_id(db, scope);
+                    place_from_bindings(db, use_def.bindings_at_use(use_id)).place
+                } else {
+                    place_from_bindings(db, use_def.reachable_bindings(place_id)).place
+                }
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),

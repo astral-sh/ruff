@@ -489,6 +489,23 @@ if sys.version_info >= (3, 11):
             return self
 ```
 
+For Python 3.14+, deferred annotation lookups in unreachable blocks should also stay
+unreachable-aware:
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+class NonCallable:
+    pass
+
+if False:
+    def _(non_callable: NonCallable):
+        non_callable()
+```
+
 ### Use of unreachable symbols in type annotations, or as class bases
 
 We should not show any diagnostics in type annotations inside unreachable sections.
