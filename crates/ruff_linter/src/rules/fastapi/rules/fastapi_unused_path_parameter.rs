@@ -411,8 +411,7 @@ impl<'a> Dependency<'a> {
                 .map(|param| param.name().as_str())
                 .collect()
         } else {
-            // No matching method found — treat as unknown to suppress false positives.
-            return Some(Self::Unknown);
+            return None;
         };
 
         Some(Self::Class(parameter_names))
