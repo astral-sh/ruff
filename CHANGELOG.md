@@ -27,7 +27,7 @@ Released on 2026-02-26.
 
 - \[`flake8-import-conventions`\] Add missing conventions from upstream (`ICN001`, `ICN002`) ([#21373](https://github.com/astral-sh/ruff/pull/21373))
 
-- \[`pydocstyle`\] Add rule `D420` to enforce docstring section ordering ([#23537](https://github.com/astral-sh/ruff/pull/23537))
+- \[`pydocstyle`\] Add rule to enforce docstring section ordering (`D420`) ([#23537](https://github.com/astral-sh/ruff/pull/23537))
 
 - \[`pylint`\] Implement `swap-with-temporary-variable` (`PLR1712`) ([#22205](https://github.com/astral-sh/ruff/pull/22205))
 
