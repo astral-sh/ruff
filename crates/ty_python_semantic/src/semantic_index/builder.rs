@@ -3109,6 +3109,11 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
                 walk_expr(self, expr);
             }
+            ast::Expr::List(_) | ast::Expr::Set(_) | ast::Expr::Dict(_) => {
+                // Collection literals must be standalone expressions for full-scope bidirectional inference.
+                self.add_standalone_expression(expr);
+                walk_expr(self, expr);
+            }
             _ => {
                 walk_expr(self, expr);
             }

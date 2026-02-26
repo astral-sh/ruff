@@ -4089,7 +4089,15 @@ impl<'db> Type<'db> {
             }
 
             Type::BoundMethod(bound_method) => {
-                let signature = bound_method.function(db).signature(db);
+                let mut signature = bound_method.function(db).signature(db).clone();
+
+                if let Type::NominalInstance(instance) = bound_method.self_instance(db)
+                    && let Some(class_literal) = instance.class_literal(db).as_static()
+                    && let Some(generic_context) = class_literal.inherited_generic_context(db)
+                {
+                    signature = signature.with_inherited_generic_context(generic_context);
+                }
+
                 CallableBinding::from_overloads(self, signature.overloads.iter().cloned())
                     .with_bound_type(bound_method.self_instance(db))
                     .into()

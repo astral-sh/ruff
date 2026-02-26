@@ -48,6 +48,7 @@ use crate::ast_node_ref::AstNodeRef;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
+use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
@@ -338,7 +339,7 @@ impl<'db> InferExpression<'db> {
         expression: Expression<'db>,
         tcx: TypeContext<'db>,
     ) -> InferExpression<'db> {
-        if tcx.annotation.is_some() {
+        if tcx.annotation.is_some() || tcx.target.is_some() {
             InferExpression::WithContext(ExpressionWithContext::new(db, expression, tcx))
         } else {
             InferExpression::Bare(expression)
@@ -557,6 +558,9 @@ struct ScopeInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// The type context of every place in this region.
+    use_contexts: FxHashMap<ScopedPlaceId, Vec<Type<'db>>>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
@@ -596,6 +600,18 @@ impl<'db> ScopeInference<'db> {
     pub(crate) fn expression_type(&self, expression: impl Into<ExpressionNodeKey>) -> Type<'db> {
         self.try_expression_type(expression)
             .unwrap_or_else(Type::unknown)
+    }
+
+    pub(crate) fn place_use_contexts(
+        &self,
+        place: ScopedPlaceId,
+    ) -> impl Iterator<Item = Type<'db>> {
+        self.extra
+            .as_deref()
+            .and_then(|extra| extra.use_contexts.get(&place))
+            .into_iter()
+            .flatten()
+            .copied()
     }
 
     pub(crate) fn try_expression_type(

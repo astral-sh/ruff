@@ -929,11 +929,25 @@ impl<'db> FunctionType<'db> {
     ) -> Self {
         let updated_signature = self
             .signature(db)
-            .with_inherited_generic_context(db, inherited_generic_context);
+            .with_inherited_generic_context(inherited_generic_context);
         let updated_last_definition_signature = self
             .last_definition_signature(db)
             .clone()
-            .with_inherited_generic_context(db, inherited_generic_context);
+            .with_inherited_generic_context(inherited_generic_context);
+        Self::new(
+            db,
+            self.literal(db),
+            Some(updated_signature),
+            Some(updated_last_definition_signature),
+        )
+    }
+
+    pub(crate) fn merge_inherited_generic_context(self, db: &'db dyn Db) -> Self {
+        let updated_signature = self.signature(db).merge_inherited_generic_context(db);
+        let updated_last_definition_signature = self
+            .last_definition_signature(db)
+            .clone()
+            .merge_inherited_generic_context(db);
         Self::new(
             db,
             self.literal(db),

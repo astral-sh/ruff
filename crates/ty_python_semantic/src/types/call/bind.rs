@@ -3492,6 +3492,7 @@ struct ArgumentTypeChecker<'a, 'db> {
 
     inferable_typevars: InferableTypeVars<'db, 'db>,
     specialization: Option<Specialization<'db>>,
+    inherited_specialization: Option<Specialization<'db>>,
 
     /// Argument indices for which specialization inference has already produced a sufficiently
     /// precise argument mismatch. We can then silence `check_argument_type` for those arguments to
@@ -3516,6 +3517,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         return_ty: Type<'db>,
         errors: &'a mut Vec<BindingError<'db>>,
     ) -> Self {
+        dbg!(signature);
         Self {
             db,
             signature_type,
@@ -3529,6 +3531,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             errors,
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
+            inherited_specialization: None,
             constraint_set_errors: vec![false; arguments.len()],
         }
     }
@@ -3561,6 +3564,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     }
 
     fn infer_specialization(&mut self) {
+        self.infer_inherited_specialization();
+
         let Some(generic_context) = self.signature.generic_context else {
             return;
         };
@@ -3702,6 +3707,24 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         self.specialization = Some(specialization);
     }
 
+    fn infer_inherited_specialization(&mut self) {
+        let Some(inherited_generic_context) = self.signature.inherited_generic_context else {
+            return;
+        };
+
+        let inferable_typevars = dbg!(inherited_generic_context.inferable_typevars(self.db));
+        let mut builder = SpecializationBuilder::new(self.db, inferable_typevars);
+
+        self.infer_argument_types(
+            &mut builder,
+            &FxHashMap::default(),
+            &FxHashSet::default(),
+            &mut Vec::new(),
+        );
+
+        self.inherited_specialization = Some(builder.build(inherited_generic_context));
+    }
+
     fn infer_argument_types(
         &mut self,
         builder: &mut SpecializationBuilder<'db>,
@@ -3718,6 +3741,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
+                eprintln!(
+                    "{} -> {}",
+                    parameters[parameter_index]
+                        .annotated_type()
+                        .display(self.db),
+                    variadic_argument_type
+                        .unwrap_or(argument_type)
+                        .display(self.db),
+                );
                 let specialization_result = builder.infer_map(
                     parameters[parameter_index].annotated_type(),
                     variadic_argument_type.unwrap_or(argument_type),
@@ -4135,9 +4167,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) -> (
         InferableTypeVars<'db, 'db>,
         Option<Specialization<'db>>,
+        Option<Specialization<'db>>,
         Type<'db>,
     ) {
-        (self.inferable_typevars, self.specialization, self.return_ty)
+        (
+            self.inferable_typevars,
+            self.inherited_specialization,
+            self.specialization,
+            self.return_ty,
+        )
     }
 }
 
@@ -4211,6 +4249,9 @@ pub(crate) struct Binding<'db> {
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
 
+    /// The inherited specialization that was inferred from the argument types, if the callable is generic.
+    inherited_specialization: Option<Specialization<'db>>,
+
     /// Information about which parameter(s) each argument was matched with, in argument source
     /// order.
     argument_matches: Box<[MatchedArgument<'db>]>,
@@ -4237,6 +4278,7 @@ impl<'db> Binding<'db> {
             return_ty: Type::unknown(),
             inferable_typevars: InferableTypeVars::None,
             specialization: None,
+            inherited_specialization: None,
             argument_matches: Box::from([]),
             variadic_argument_matched_to_variadic_parameter: false,
             parameter_tys: Box::from([]),
@@ -4318,7 +4360,12 @@ impl<'db> Binding<'db> {
         checker.infer_specialization();
         checker.check_argument_types();
 
-        (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
+        (
+            self.inferable_typevars,
+            self.inherited_specialization,
+            self.specialization,
+            self.return_ty,
+        ) = checker.finish();
     }
 
     pub(crate) fn set_return_type(&mut self, return_ty: Type<'db>) {
@@ -4447,6 +4494,10 @@ impl<'db> Binding<'db> {
 
     pub(crate) fn specialization(&self) -> Option<Specialization<'db>> {
         self.specialization
+    }
+
+    pub(crate) fn inherited_specialization(&self) -> Option<Specialization<'db>> {
+        self.inherited_specialization
     }
 
     pub(crate) fn errors(&self) -> &[BindingError<'db>] {
