@@ -245,6 +245,9 @@ outside_callable(int_identity)("string")
 
 ## Overloaded callable as generic `Callable` argument
 
+An overloaded callable should be assignable to a non-overloaded callable type when the overload set
+as a whole is compatible with the target callable.
+
 The type variable should be inferred from the first matching overload, rather than unioning
 parameter types across all overloads (which would create an unsatisfiable expected type for
 contravariant type variables).
@@ -252,7 +255,7 @@ contravariant type variables).
 ```py
 from typing import Callable, overload
 
-def accepts_callable[T](converter: Callable[[T], None]) -> None:
+def accepts_callable[T](converter: Callable[[T], None]) -> T:
     raise NotImplementedError
 
 @overload
@@ -262,7 +265,7 @@ def f(val: bytes) -> None: ...
 def f(val: str | bytes) -> None:
     pass
 
-accepts_callable(f)  # fine
+reveal_type(accepts_callable(f))  # revealed: str | bytes
 ```
 
 When `T` is constrained to a union by other arguments, the overloaded callable must still be treated
