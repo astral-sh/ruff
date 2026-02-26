@@ -906,7 +906,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 }
             }
             (_, Some(LiteralValueTypeKind::Bool(b))) => Some(
-                UnionType::from_elements(self.db, [rhs_ty, Type::int_literal(i64::from(b))])
+                UnionType::from_two_elements(self.db, rhs_ty, Type::int_literal(i64::from(b)))
                     .negate(self.db),
             ),
             _ if rhs_ty.is_single_valued(self.db) => Some(rhs_ty.negate(self.db)),
@@ -1005,7 +1005,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .build();
 
             // Keep order: first literal complement, then broader arms.
-            let result = UnionType::from_elements(self.db, [narrowed_single, rest_union]);
+            let result = UnionType::from_two_elements(self.db, narrowed_single, rest_union);
             Some(result)
         } else {
             None

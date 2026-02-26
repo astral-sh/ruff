@@ -938,7 +938,7 @@ impl ReachabilityConstraints {
                     false_accumulated,
                 );
 
-                UnionType::from_elements(db, [true_ty, false_ty])
+                UnionType::from_two_elements(db, true_ty, false_ty)
             }
         }
     }

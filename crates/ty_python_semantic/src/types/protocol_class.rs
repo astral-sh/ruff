@@ -18,8 +18,8 @@ use crate::{
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassType,
         FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor, KnownFunction,
-        MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, StaticClassLiteral,
-        Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
+        MemberLookupPolicy, PropertyInstanceType, Signature, StaticClassLiteral, Type, TypeMapping,
+        TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -45,14 +45,7 @@ impl<'db> ClassType<'db> {
 }
 
 /// Representation of a single `Protocol` class definition.
-///
-/// # Ordering
-///
-/// Ordering is based on the wrapped data's salsa-assigned id and not on its values.
-/// The id may change between runs, or when e.g. a `ProtocolClass` was garbage-collected and recreated.
-#[derive(
-    Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize, PartialOrd, Ord,
-)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) struct ProtocolClass<'db>(ClassType<'db>);
 
 impl<'db> ProtocolClass<'db> {
@@ -184,12 +177,7 @@ impl<'db> From<ProtocolClass<'db>> for Type<'db> {
 }
 
 /// The interface of a protocol: the members of that protocol, and the types of those members.
-///
-/// # Ordering
-/// Ordering is based on the protocol interface member's salsa-assigned id and not on its members.
-/// The id may change between runs, or when the protocol instance members was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub(super) struct ProtocolInterface<'db> {
     #[returns(ref)]
     inner: BTreeMap<Name, ProtocolMemberData<'db>>,
@@ -226,7 +214,7 @@ impl<'db> ProtocolInterface<'db> {
                         db,
                         [Parameter::positional_only(Some(Name::new_static("self")))],
                     ),
-                    ty.normalized(db),
+                    ty,
                 );
                 let property_getter = Type::single_callable(db, property_getter_signature);
                 let property = PropertyInstanceType::new(db, Some(property_getter), None);
@@ -399,16 +387,6 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
-            db,
-            self.inner(db)
-                .iter()
-                .map(|(name, data)| (name.clone(), data.normalized_impl(db, visitor)))
-                .collect::<BTreeMap<_, _>>(),
-        )
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -429,11 +407,12 @@ impl<'db> ProtocolInterface<'db> {
         ))
     }
 
-    pub(super) fn specialized_and_normalized<'a>(
+    pub(super) fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
         type_mapping: &TypeMapping<'a, 'db>,
         tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self::new(
             db,
@@ -442,13 +421,7 @@ impl<'db> ProtocolInterface<'db> {
                 .map(|(name, data)| {
                     (
                         name.clone(),
-                        data.apply_type_mapping_impl(
-                            db,
-                            type_mapping,
-                            tcx,
-                            &ApplyTypeMappingVisitor::default(),
-                        )
-                        .normalized(db),
+                        data.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
                     )
                 })
                 .collect::<BTreeMap<_, _>>(),
@@ -510,18 +483,6 @@ pub(super) struct ProtocolMemberData<'db> {
 }
 
 impl<'db> ProtocolMemberData<'db> {
-    fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self {
-            kind: self.kind.normalized_impl(db, visitor),
-            qualifiers: self.qualifiers,
-            definition: None,
-        }
-    }
-
     fn recursive_type_normalized_impl(
         &self,
         db: &'db dyn Db,
@@ -627,20 +588,6 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
-            }
-            ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.normalized_impl(db, visitor))
-            }
-            ProtocolMemberKind::Other(ty) => {
-                ProtocolMemberKind::Other(ty.normalized_impl(db, visitor))
-            }
-        }
-    }
-
     fn apply_type_mapping_impl<'a>(
         &self,
         db: &'db dyn Db,

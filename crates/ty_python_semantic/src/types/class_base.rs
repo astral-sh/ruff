@@ -4,8 +4,8 @@ use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, NormalizedVisitor, SpecialFormType, StaticMroError, Type, TypeContext,
-    TypeMapping, todo_type,
+    MaterializationKind, SpecialFormType, StaticMroError, Type, TypeContext, TypeMapping,
+    todo_type,
 };
 use crate::{Db, DisplaySettings};
 
@@ -34,14 +34,6 @@ pub enum ClassBase<'db> {
 impl<'db> ClassBase<'db> {
     pub(crate) const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
-            Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::Protocol | Self::Generic | Self::TypedDict => self,
-        }
     }
 
     pub(super) fn recursive_type_normalized_impl(
