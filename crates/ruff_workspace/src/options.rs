@@ -2531,12 +2531,13 @@ pub struct IsortOptions {
         default = r#"{}"#,
         value_type = r#"dict["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str, str]"#,
         example = r#"
-            [tool.ruff.lint.isort.import-heading]
-            future = "Future imports"
-            standard-library = "Standard library imports"
-            third-party = "Third party imports"
-            first-party = "First party imports"
-            local-folder = "Local folder imports"
+            import-heading = {
+                future = "Future imports",
+                standard-library = "Standard library imports",
+                third-party = "Third party imports",
+                first-party = "First party imports",
+                local-folder = "Local folder imports",
+            }
         "#
     )]
     pub import_heading: Option<FxHashMap<ImportSection, String>>,
