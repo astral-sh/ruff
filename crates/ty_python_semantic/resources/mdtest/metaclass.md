@@ -272,6 +272,29 @@ Foo("hello")  # error: [invalid-argument-type]
 Foo()  # error: [no-matching-overload]
 ```
 
+### Overloaded metaclass `__call__` preserving strict-subclass return
+
+```py
+from typing import Any, overload
+
+class Meta(type):
+    @overload
+    def __call__(cls, x: int) -> int: ...
+    @overload
+    def __call__(cls, x: str) -> "Child": ...
+    def __call__(cls, x: int | str) -> Any:
+        return super().__call__(x)
+
+class Parent(metaclass=Meta):
+    def __init__(self, x: str) -> None:
+        pass
+
+class Child(Parent): ...
+
+reveal_type(Parent(1))  # revealed: int
+reveal_type(Parent("hello"))  # revealed: Child
+```
+
 ### Overloaded metaclass `__call__` returning only non-instance types
 
 When all overloads of a metaclass `__call__` return non-instance types, the metaclass fully

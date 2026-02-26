@@ -176,6 +176,7 @@ impl<'db> MixedConstructorInit<'db> {
     /// Returns `true` if any matched overload is instance-returning (i.e., its return type
     /// is an instance of the constructor class).
     fn is_instance_returning(&self, db: &'db dyn Db, elements: &[BindingsElement<'db>]) -> bool {
+        let constructor_class = self.constructor_class_literal.default_specialization(db);
         elements.iter().any(|element| {
             element.bindings.iter().any(|binding| {
                 binding.matching_overloads().any(|(_, overload)| {
@@ -183,7 +184,9 @@ impl<'db> MixedConstructorInit<'db> {
                         .return_ty
                         .as_nominal_instance()
                         .is_some_and(|inst| {
-                            inst.class(db).class_literal(db) == self.constructor_class_literal
+                            let returned_class = inst.class(db);
+                            returned_class.class_literal(db) == self.constructor_class_literal
+                                || returned_class.is_subclass_of(db, constructor_class)
                         })
                 })
             })
@@ -681,6 +684,32 @@ impl<'db> Bindings<'db> {
                     });
             if !is_instance_return {
                 return Some(resolved);
+            }
+        }
+
+        // Preserve explicit strict-subclass constructor returns, e.g. constructing `C` from
+        // `__new__ -> D` where `D` is a subclass of `C`.
+        if let Some(constructor_class) = constructor_class {
+            for binding in self.iter_flat() {
+                let Some((_, overload)) = binding.matching_overloads().next() else {
+                    continue;
+                };
+
+                let sig_return = overload.signature.return_ty;
+                if sig_return.has_typevar(db) || sig_return.is_unknown() {
+                    continue;
+                }
+
+                let Some(returned_instance) = sig_return.as_nominal_instance() else {
+                    continue;
+                };
+                let returned_class = returned_instance.class(db);
+
+                if returned_class.class_literal(db) != constructor_class.class_literal(db)
+                    && returned_class.is_subclass_of(db, constructor_class)
+                {
+                    return Some(sig_return);
+                }
             }
         }
 

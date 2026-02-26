@@ -4786,6 +4786,13 @@ impl<'db> Type<'db> {
             !sig.return_ty.has_typevar(db)
                 && ConstructorReturnDisposition::of(db, sig.return_ty, class).is_not_instance()
         };
+        let is_explicit_strict_subclass_return = |sig: &Signature<'db>| {
+            sig.return_ty.as_nominal_instance().is_some_and(|inst| {
+                let returned_class = inst.class(db);
+                returned_class.class_literal(db) != class.class_literal(db)
+                    && returned_class.is_subclass_of(db, class)
+            })
+        };
 
         // For overloaded metaclass `__call__` with mixed return types, we save the
         // non-instance overloads and combine them with `__init__` after lookup.
@@ -4814,14 +4821,10 @@ impl<'db> Type<'db> {
                     return Type::BoundMethod(metaclass_call_method).bindings(db);
                 }
 
-                // Mixed: save ALL overloads with correct per-overload return types.
-                // Non-instance overloads keep their return type; instance-returning
-                // overloads get `constructor_instance_ty`. This intentionally normalizes
-                // instance-returning overloads to the constructed class type (instead of
-                // preserving explicit subclass returns like `__new__ -> D` when constructing
-                // `C`) so later checks can use simple equality on normalized overload returns.
-                // We defer `__init__` validation to call checking time (only when the matched
-                // overload is instance-returning).
+                // Mixed: save ALL overloads. Non-instance overloads keep their return type.
+                // Instance-returning overloads keep strict-subclass returns (e.g. `-> D` while
+                // constructing `C`) but otherwise normalize to `constructor_instance_ty` so that
+                // `Self`-like returns remain instance-typed.
                 let metaclass_self = metaclass_call_method.self_instance(db);
                 metaclass_mixed_non_instance_sigs = Some(
                     signature
@@ -4829,7 +4832,9 @@ impl<'db> Type<'db> {
                         .iter()
                         .map(|sig| {
                             let mut bound = sig.bind_self(db, Some(metaclass_self));
-                            if !is_non_instance_overload(sig) {
+                            if !is_non_instance_overload(sig)
+                                && !is_explicit_strict_subclass_return(sig)
+                            {
                                 bound.return_ty = constructor_instance_ty;
                             }
                             bound
@@ -4946,18 +4951,19 @@ impl<'db> Type<'db> {
                             return new_bindings.with_generic_context(db, class_generic_context);
                         }
 
-                        // Mixed: save ALL overloads with correct per-overload return
-                        // types. Non-instance overloads keep their return type;
-                        // instance-returning overloads get `constructor_instance_ty`.
-                        // Like metaclass `__call__` above, this intentionally normalizes
-                        // to the constructed class type for instance-returning overloads.
+                        // Mixed: save ALL overloads. Non-instance overloads keep their return
+                        // type. Instance-returning overloads keep strict-subclass returns but
+                        // otherwise normalize to `constructor_instance_ty` so `Self`-like
+                        // returns stay instance-typed.
                         new_mixed_non_instance_sigs = Some(
                             signature
                                 .overloads
                                 .iter()
                                 .map(|sig| {
                                     let mut bound = sig.bind_self(db, Some(self_type));
-                                    if !is_non_instance_overload(sig) {
+                                    if !is_non_instance_overload(sig)
+                                        && !is_explicit_strict_subclass_return(sig)
+                                    {
                                         bound.return_ty = constructor_instance_ty;
                                     }
                                     bound
