@@ -3664,7 +3664,7 @@ lambda: fu
             name: str
             print(name)
         ",
-            &[],
+            &[Rule::UndefinedName],
         );
         flakes(
             r"

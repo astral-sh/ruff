@@ -1,4 +1,21 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
+F821 Undefined name `x`
+ --> F821_34.py:9:11
+  |
+7 | def demonstrate_bare_local_annotation():
+8 |     x: int
+9 |     print(x)
+  |           ^
+  |
 
+F821 Undefined name `x`
+  --> F821_34.py:17:16
+   |
+16 |     def get_value() -> int:
+17 |         return x
+   |                ^
+18 |
+19 |     return get_value
+   |
