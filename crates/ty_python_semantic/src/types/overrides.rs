@@ -528,6 +528,7 @@ bitflags! {
         const PROHIBITED_NAMED_TUPLE_ATTR = 1 << 3;
         const INVALID_DATACLASS = 1 << 4;
         const FINAL_VARIABLE_OVERRIDDEN = 1 << 5;
+        const INVALID_ENUM_VALUE = 1 << 6;
     }
 }
 
@@ -555,6 +556,9 @@ impl From<&InferContext<'_, '_>> for OverrideRulesConfig {
         }
         if rule_selection.is_enabled(LintId::of(&OVERRIDE_OF_FINAL_VARIABLE)) {
             config |= OverrideRulesConfig::FINAL_VARIABLE_OVERRIDDEN;
+        }
+        if rule_selection.is_enabled(LintId::of(&INVALID_ASSIGNMENT)) {
+            config |= OverrideRulesConfig::INVALID_ENUM_VALUE;
         }
 
         config

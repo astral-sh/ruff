@@ -323,15 +323,8 @@ pub(crate) fn enum_metadata<'db>(
 
     // Look up an explicit `_value_` annotation, if present. Falls back to
     // checking parent enum classes in the MRO.
-    let value_annotation = place_table(db, scope_id)
-        .symbol_id("_value_")
-        .and_then(|symbol_id| {
-            let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
-            place_from_declarations(db, declarations)
-                .ignore_conflicting_declarations()
-                .ignore_possibly_undefined()
-        })
-        .or_else(|| inherited_value_annotation(db, class));
+    let value_annotation =
+        custom_value_annotation(db, scope_id).or_else(|| inherited_value_annotation(db, class));
 
     // Look up a custom `__init__`, falling back to parent enum classes.
     let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
@@ -361,25 +354,22 @@ fn iter_parent_enum_classes<'db>(
         })
 }
 
+/// Returns the `_value_` annotation type if one is declared in the given scope.
+fn custom_value_annotation<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<Type<'db>> {
+    let symbol_id = place_table(db, scope).symbol_id("_value_")?;
+    let declarations = use_def_map(db, scope).end_of_scope_symbol_declarations(symbol_id);
+    place_from_declarations(db, declarations)
+        .ignore_conflicting_declarations()
+        .ignore_possibly_undefined()
+}
+
 /// Looks up an inherited `_value_` annotation from parent enum classes in the MRO.
 fn inherited_value_annotation<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> Option<Type<'db>> {
-    for base_class in iter_parent_enum_classes(db, class) {
-        let scope_id = base_class.body_scope(db);
-        let use_def = use_def_map(db, scope_id);
-        if let Some(symbol_id) = place_table(db, scope_id).symbol_id("_value_") {
-            let declarations = use_def.end_of_scope_symbol_declarations(symbol_id);
-            if let Some(ty) = place_from_declarations(db, declarations)
-                .ignore_conflicting_declarations()
-                .ignore_possibly_undefined()
-            {
-                return Some(ty);
-            }
-        }
-    }
-    None
+    iter_parent_enum_classes(db, class)
+        .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
 }
 
 /// Looks up an inherited `__init__` from parent enum classes in the MRO.
@@ -387,12 +377,7 @@ fn inherited_init<'db>(
     db: &'db dyn Db,
     class: StaticClassLiteral<'db>,
 ) -> Option<FunctionType<'db>> {
-    for base_class in iter_parent_enum_classes(db, class) {
-        if let Some(f) = custom_init(db, base_class.body_scope(db)) {
-            return Some(f);
-        }
-    }
-    None
+    iter_parent_enum_classes(db, class).find_map(|base| custom_init(db, base.body_scope(db)))
 }
 
 /// Returns the custom `__init__` function type if one is defined on the enum.
