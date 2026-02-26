@@ -3725,6 +3725,23 @@ pub struct FormatOptions {
     )]
     pub skip_magic_trailing_comma: Option<bool>,
 
+    /// Preserve extra spaces before trailing end-of-line comments.
+    ///
+    /// When enabled, Ruff preserves the existing spacing for trailing comments if the source line
+    /// has more than two spaces before the `#`.
+    ///
+    /// Ruff will still normalize spacing to two spaces when there are fewer than two spaces before
+    /// the `#`.
+    #[option(
+        default = "false",
+        value_type = "bool",
+        example = r#"
+            # Keep hand-aligned trailing comments with extra spacing.
+            ignore-excess-whitespace-before-trailing-comments = true
+        "#
+    )]
+    pub ignore_excess_whitespace_before_trailing_comments: Option<bool>,
+
     /// The character Ruff uses at the end of a line.
     ///
     /// * `auto`: The newline style is detected automatically on a file per file basis. Files with mixed line endings will be converted to the first detected line ending. Defaults to `\n` for files that contain no line endings.

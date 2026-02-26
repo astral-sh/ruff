@@ -373,6 +373,13 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let slice = self.comment.slice();
         let source = SourceCode::new(f.context().source());
+        let leading_spaces = trailing_comment_leading_spaces(
+            self.comment,
+            f.context().source(),
+            f.options()
+                .ignore_excess_whitespace_before_trailing_comments(),
+        );
+        let leading_spaces_width = u32::try_from(leading_spaces).unwrap_or(u32::MAX);
 
         let normalized_comment = normalize_comment(self.comment, source)?;
 
@@ -380,9 +387,7 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
         let reserved_width = if is_pragma_comment(&normalized_comment) {
             0
         } else {
-            // Start with 2 because of the two leading spaces.
-
-            2u32.saturating_add(
+            leading_spaces_width.saturating_add(
                 TextWidth::from_text(&normalized_comment, f.options().indent_width())
                     .width()
                     .expect("Expected comment not to contain any newlines")
@@ -390,13 +395,14 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
             )
         };
 
+        let leading_whitespace = " ".repeat(leading_spaces);
+
         write!(
             f,
             [
                 line_suffix(
                     &format_args![
-                        space(),
-                        space(),
+                        text(&leading_whitespace),
                         format_normalized_comment(normalized_comment, slice.range())
                     ],
                     reserved_width
@@ -405,6 +411,25 @@ impl Format<PyFormatContext<'_>> for FormatTrailingEndOfLineComment<'_> {
             ]
         )
     }
+}
+
+fn trailing_comment_leading_spaces(
+    comment: &SourceComment,
+    source: &str,
+    preserve_excess: bool,
+) -> usize {
+    if !preserve_excess {
+        return 2;
+    }
+
+    let comment_start = usize::from(comment.start());
+    let spaces = source[..comment_start]
+        .bytes()
+        .rev()
+        .take_while(|byte| *byte == b' ')
+        .count();
+
+    spaces.max(2)
 }
 
 /// A helper that constructs formattable normalized comment text as efficiently as
