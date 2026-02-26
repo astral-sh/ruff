@@ -7,29 +7,54 @@ Released on 2026-02-26.
 ### Preview features
 
 - Drop explicit support for `.qmd` file extension ([#23572](https://github.com/astral-sh/ruff/pull/23572))
+
+    This can now be enabled instead by setting the [`extension`](https://docs.astral.sh/ruff/settings/#extension) option:
+
+    ```toml
+    # ruff.toml
+    extension = { qmd = "markdown" }
+
+    # pyproject.toml
+    [tool.ruff]
+    extension = { qmd = "markdown" }
+    ```
+
 - Include configured extensions in file discovery ([#23400](https://github.com/astral-sh/ruff/pull/23400))
+
 - \[`flake8-bandit`\] Allow suspicious imports in `TYPE_CHECKING` blocks (`S401`-`S415`) ([#23441](https://github.com/astral-sh/ruff/pull/23441))
+
 - \[`flake8-bugbear`\] Allow `B901` in pytest hook wrappers ([#21931](https://github.com/astral-sh/ruff/pull/21931))
+
 - \[`flake8-import-conventions`\] Add missing conventions from upstream (`ICN001`, `ICN002`) ([#21373](https://github.com/astral-sh/ruff/pull/21373))
+
 - \[`pydocstyle`\] Add rule `D420` to enforce docstring section ordering ([#23537](https://github.com/astral-sh/ruff/pull/23537))
+
 - \[`pylint`\] Implement `swap-with-temporary-variable` (`PLR1712`) ([#22205](https://github.com/astral-sh/ruff/pull/22205))
+
 - \[`ruff`\] Add `unnecessary-assign-before-yield` (`RUF070`) ([#23300](https://github.com/astral-sh/ruff/pull/23300))
-- \[`ruff`\] Support file level noqa in `RUF102` ([#23535](https://github.com/astral-sh/ruff/pull/23535))
+
+- \[`ruff`\] Support file-level noqa in `RUF102` ([#23535](https://github.com/astral-sh/ruff/pull/23535))
+
 - \[`ruff`\] Suppress diagnostic for invalid f-strings before Python 3.12 (`RUF027`) ([#23480](https://github.com/astral-sh/ruff/pull/23480))
-- `[flake8-bandit]` Don't flag `BaseLoader`/`CBaseLoader` as unsafe in preview (`S506`) ([#23510](https://github.com/astral-sh/ruff/pull/23510))
+
+- \[`flake8-bandit`\] Don't flag `BaseLoader`/`CBaseLoader` as unsafe (`S506`) ([#23510](https://github.com/astral-sh/ruff/pull/23510))
 
 ### Bug fixes
 
 - Avoid infinite loop between `I002` and `PYI025` ([#23352](https://github.com/astral-sh/ruff/pull/23352))
-- Fix F811 false positive for overloaded functions from typing-modules ([#23357](https://github.com/astral-sh/ruff/pull/23357))
-- \[`pyupgrade`\] Fix false positive for `TypeVar` default before 3.12 (`UP046`) ([#23540](https://github.com/astral-sh/ruff/pull/23540))
+- \[`pyflakes`\] Fix false positive for `@overload` from `lint.typing-modules` (`F811`) ([#23357](https://github.com/astral-sh/ruff/pull/23357))
+- \[`pyupgrade`\] Fix false positive for `TypeVar` default before Python 3.12 (`UP046`) ([#23540](https://github.com/astral-sh/ruff/pull/23540))
 - \[`pyupgrade`\] Fix handling of `\N` in raw strings (`UP032`) ([#22149](https://github.com/astral-sh/ruff/pull/22149))
 
 ### Rule changes
 
 - Render sub-diagnostics in the GitHub output format ([#23455](https://github.com/astral-sh/ruff/pull/23455))
+
 - \[`flake8-bugbear`\] Tag certain `B007` diagnostics as unnecessary ([#23453](https://github.com/astral-sh/ruff/pull/23453))
-- \[`ruff`\] Ignore "unknown" rule codes in `RUF100` when `RUF102` is enabled ([#23531](https://github.com/astral-sh/ruff/pull/23531))
+
+- \[`ruff`\] Ignore unknown rule codes in `RUF100` ([#23531](https://github.com/astral-sh/ruff/pull/23531))
+
+    These are now flagged by [`RUF102`](https://docs.astral.sh/ruff/rules/invalid-rule-code/) instead.
 
 ### Documentation
 
@@ -39,9 +64,7 @@ Released on 2026-02-26.
 
 ### Other changes
 
-- Try out assigned reviewers for ruff ([#23571](https://github.com/astral-sh/ruff/pull/23571))
 - Update the Python module (notably `find_ruff_bin`) for parity with uv ([#23406](https://github.com/astral-sh/ruff/pull/23406))
-- [ty] fix protocol generic inference with literal integers ([#23534](https://github.com/astral-sh/ruff/pull/23534))
 
 ### Contributors
 
