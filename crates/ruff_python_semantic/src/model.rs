@@ -502,7 +502,48 @@ impl<'a> SemanticModel<'a> {
                     // print(x)
                     //
                     // The `x` in `print(x)` should be treated as unresolved.
-                    BindingKind::Deletion | BindingKind::UnboundException(None) => {
+                    BindingKind::Deletion => {
+                        // In stub files, `del` is used to hide names from re-export
+                        // while the name is still valid for use in type annotations
+                        // within the same file. Since annotations are deferred in
+                        // stubs, the `Deletion` binding is seen at resolve time even
+                        // though the reference textually precedes the `del`. Resolve
+                        // to the shadowed (pre-`del`) binding when available.
+                        if self.in_stub_file() {
+                            if let Some(shadowed_id) =
+                                self.scopes[scope_id].shadowed_binding(binding_id)
+                            {
+                                // Only suppress F821 when the reference textually precedes
+                                // the `del` statement. If `del` comes before the reference,
+                                // the name is genuinely undefined at that point and F821
+                                // should still fire.
+                                let deletion_range = self.bindings[binding_id].range;
+                                if !self.bindings[shadowed_id].is_unbound()
+                                    && name.range.start() < deletion_range.start()
+                                {
+                                    let reference_id = self.resolved_references.push(
+                                        self.scope_id,
+                                        self.node_id,
+                                        ExprContext::Load,
+                                        self.flags,
+                                        name.range,
+                                    );
+                                    self.bindings[shadowed_id].references.push(reference_id);
+                                    self.resolved_names.insert(name.into(), shadowed_id);
+                                    return ReadResult::Resolved(shadowed_id);
+                                }
+                            }
+                        }
+
+                        self.unresolved_references.push(
+                            name.range,
+                            self.exceptions(),
+                            UnresolvedReferenceFlags::empty(),
+                        );
+                        return ReadResult::UnboundLocal(binding_id);
+                    }
+
+                    BindingKind::UnboundException(None) => {
                         self.unresolved_references.push(
                             name.range,
                             self.exceptions(),
