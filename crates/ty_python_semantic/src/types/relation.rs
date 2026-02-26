@@ -325,39 +325,6 @@ impl<'db> Type<'db> {
             return true;
         }
 
-        // Fast path for intersection types: use set-based subset check instead of
-        // the full `has_relation_to` machinery. This is critical for narrowing where
-        // many intersection types with overlapping positive elements are produced.
-        if let (Type::Intersection(self_inter), Type::Intersection(other_inter)) = (self, other) {
-            let self_pos = self_inter.positive(db);
-            let other_pos = other_inter.positive(db);
-            let self_neg = self_inter.negative(db);
-            let other_neg = other_inter.negative(db);
-            let other_pos_subset = other_pos.iter().all(|p| self_pos.contains(p));
-            let other_neg_subset = other_neg.iter().all(|n| self_neg.contains(n));
-
-            // Intersection(pos_self, neg_self) is redundant with Intersection(pos_other, neg_other) if:
-            //   pos_other ⊆ pos_self AND neg_other ⊆ neg_self
-            // Conversely, if pos_other ⊄ pos_self (some positive of other is missing from self),
-            // then self is NOT redundant with other.
-            if other_pos_subset && other_neg_subset {
-                return true;
-            }
-
-            // If all positive elements are `NominalInstance` types and some positive
-            // of `other` is not contained in `self`'s positives, we can assume
-            // non-redundancy without the full `has_relation_to` check.
-            // This is not strictly correct for classes with inheritance relationship,
-            // but such a false negative is safe: it only causes the union to retain
-            // an extra element without affecting correctness.
-            if !other_pos_subset
-                && self_pos.iter().all(|t| t.is_nominal_instance())
-                && other_pos.iter().all(|t| t.is_nominal_instance())
-            {
-                return false;
-            }
-        }
-
         is_redundant_with_impl(db, self, other)
     }
 
@@ -826,60 +793,100 @@ impl<'db> Type<'db> {
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
             // but none of A, B, or C is a subtype of (A & B).
-            (_, Type::Intersection(intersection)) => intersection
-                .positive(db)
-                .iter()
-                .when_all(db, |&pos_ty| {
-                    self.has_relation_to_impl(
-                        db,
-                        pos_ty,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
-                .and(db, || {
-                    // For subtyping, we would want to check whether the *top materialization* of `self`
-                    // is disjoint from the *top materialization* of `neg_ty`. As an optimization, however,
-                    // we can avoid this explicit transformation here, since our `Type::is_disjoint_from`
-                    // implementation already only returns true for `T.is_disjoint_from(U)` if the *top
-                    // materialization* of `T` is disjoint from the *top materialization* of `U`.
-                    //
-                    // Note that the implementation of redundancy here may be too strict from a
-                    // theoretical perspective: under redundancy, `T <: ~U` if `Bottom[T]` is disjoint
-                    // from `Top[U]` and `Bottom[U]` is disjoint from `Top[T]`. It's possible that this
-                    // could be improved. For now, however, we err on the side of strictness for our
-                    // redundancy implementation: a fully complete implementation of redundancy may lead
-                    // to non-transitivity (highly undesirable); and pragmatically, a full implementation
-                    // of redundancy may not generally lead to simpler types in many situations.
-                    let self_ty = match relation {
-                        TypeRelation::Subtyping
-                        | TypeRelation::Redundancy { .. }
-                        | TypeRelation::SubtypingAssuming(_) => self,
-                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                            self.bottom_materialization(db)
-                        }
-                    };
-                    intersection.negative(db).iter().when_all(db, |&neg_ty| {
-                        let neg_ty = match relation {
-                            TypeRelation::Subtyping
-                            | TypeRelation::Redundancy { .. }
-                            | TypeRelation::SubtypingAssuming(_) => neg_ty,
-                            TypeRelation::Assignability
-                            | TypeRelation::ConstraintSetAssignability => {
-                                neg_ty.bottom_materialization(db)
-                            }
-                        };
-                        self_ty.is_disjoint_from_impl(
+            (_, Type::Intersection(intersection)) => {
+                // Fast path for redundancy of intersection types: use set-based subset
+                // check before the full check. This is critical for narrowing where
+                // many intersection types with overlapping positive elements are produced.
+                if matches!(relation, TypeRelation::Redundancy { .. })
+                    && let Type::Intersection(self_inter) = self
+                {
+                    let self_pos = self_inter.positive(db);
+                    let target_pos = intersection.positive(db);
+                    let self_neg = self_inter.negative(db);
+                    let target_neg = intersection.negative(db);
+                    let target_pos_subset = target_pos.iter().all(|p| self_pos.contains(p));
+                    let target_neg_subset = target_neg.iter().all(|n| self_neg.contains(n));
+
+                    // Intersection(self_pos, self_neg) is redundant with
+                    // Intersection(target_pos, target_neg) if:
+                    //   target_pos ⊆ self_pos AND target_neg ⊆ self_neg
+                    if target_pos_subset && target_neg_subset {
+                        return ConstraintSet::from(true);
+                    }
+
+                    // If all positive elements are `NominalInstance` types and some
+                    // positive of `target` is not contained in `self`'s positives, we
+                    // can assume non-redundancy without the full check.
+                    // This is not strictly correct for classes with inheritance
+                    // relationship, but such a false negative is safe: it only causes
+                    // the union to retain an extra element without affecting correctness.
+                    // This must NOT apply to pure redundancy (equivalence), where a false
+                    // negative would incorrectly report non-equivalent types.
+                    if matches!(relation, TypeRelation::Redundancy { pure: false })
+                        && !target_pos_subset
+                        && self_pos.iter().all(|t| t.is_nominal_instance())
+                        && target_pos.iter().all(|t| t.is_nominal_instance())
+                    {
+                        return ConstraintSet::from(false);
+                    }
+                }
+
+                intersection
+                    .positive(db)
+                    .iter()
+                    .when_all(db, |&pos_ty| {
+                        self.has_relation_to_impl(
                             db,
-                            neg_ty,
+                            pos_ty,
                             inferable,
-                            disjointness_visitor,
+                            relation,
                             relation_visitor,
+                            disjointness_visitor,
                         )
                     })
-                }),
+                    .and(db, || {
+                        // For subtyping, we would want to check whether the *top materialization* of `self`
+                        // is disjoint from the *top materialization* of `neg_ty`. As an optimization, however,
+                        // we can avoid this explicit transformation here, since our `Type::is_disjoint_from`
+                        // implementation already only returns true for `T.is_disjoint_from(U)` if the *top
+                        // materialization* of `T` is disjoint from the *top materialization* of `U`.
+                        //
+                        // Note that the implementation of redundancy here may be too strict from a
+                        // theoretical perspective: under redundancy, `T <: ~U` if `Bottom[T]` is disjoint
+                        // from `Top[U]` and `Bottom[U]` is disjoint from `Top[T]`. It's possible that this
+                        // could be improved. For now, however, we err on the side of strictness for our
+                        // redundancy implementation: a fully complete implementation of redundancy may lead
+                        // to non-transitivity (highly undesirable); and pragmatically, a full implementation
+                        // of redundancy may not generally lead to simpler types in many situations.
+                        let self_ty = match relation {
+                            TypeRelation::Subtyping
+                            | TypeRelation::Redundancy { .. }
+                            | TypeRelation::SubtypingAssuming(_) => self,
+                            TypeRelation::Assignability
+                            | TypeRelation::ConstraintSetAssignability => {
+                                self.bottom_materialization(db)
+                            }
+                        };
+                        intersection.negative(db).iter().when_all(db, |&neg_ty| {
+                            let neg_ty = match relation {
+                                TypeRelation::Subtyping
+                                | TypeRelation::Redundancy { .. }
+                                | TypeRelation::SubtypingAssuming(_) => neg_ty,
+                                TypeRelation::Assignability
+                                | TypeRelation::ConstraintSetAssignability => {
+                                    neg_ty.bottom_materialization(db)
+                                }
+                            };
+                            self_ty.is_disjoint_from_impl(
+                                db,
+                                neg_ty,
+                                inferable,
+                                disjointness_visitor,
+                                relation_visitor,
+                            )
+                        })
+                    })
+            }
 
             (Type::Intersection(intersection), _) => {
                 // An intersection type is a subtype of another type if at least one of its
