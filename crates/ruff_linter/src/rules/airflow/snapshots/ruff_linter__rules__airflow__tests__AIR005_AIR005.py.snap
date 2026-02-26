@@ -1,0 +1,51 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR005 `Variable.get()` outside of a task; use Jinja templates or move into a `@task`-decorated function
+  --> AIR005.py:12:7
+   |
+11 | # Variable.get() at module level
+12 | foo = Variable.get("foo")  # AIR005
+   |       ^^^^^^^^^^^^^^^^^^^
+13 | bar = SdkVariable.get("bar")  # AIR005
+   |
+
+AIR005 `Variable.get()` outside of a task; use Jinja templates or move into a `@task`-decorated function
+  --> AIR005.py:13:7
+   |
+11 | # Variable.get() at module level
+12 | foo = Variable.get("foo")  # AIR005
+13 | bar = SdkVariable.get("bar")  # AIR005
+   |       ^^^^^^^^^^^^^^^^^^^^^^
+14 |
+15 | # Variable.get() in operator constructor arguments
+   |
+
+AIR005 `Variable.get()` outside of a task; use Jinja templates or move into a `@task`-decorated function
+  --> AIR005.py:18:26
+   |
+16 | BashOperator(
+17 |     task_id="bad_inline",
+18 |     bash_command=f"echo {Variable.get('foo')}",  # AIR005
+   |                          ^^^^^^^^^^^^^^^^^^^
+19 | )
+   |
+
+AIR005 `Variable.get()` outside of a task; use Jinja templates or move into a `@task`-decorated function
+  --> AIR005.py:24:17
+   |
+22 |     task_id="bad_env",
+23 |     bash_command="echo $FOO",
+24 |     env={"FOO": Variable.get("foo")},  # AIR005
+   |                 ^^^^^^^^^^^^^^^^^^^
+25 | )
+   |
+
+AIR005 `Variable.get()` outside of a task; use Jinja templates or move into a `@task`-decorated function
+  --> AIR005.py:29:12
+   |
+27 | # Variable.get() in a regular (non-task) function
+28 | def helper():
+29 |     return Variable.get("foo")  # AIR005
+   |            ^^^^^^^^^^^^^^^^^^^
+   |
