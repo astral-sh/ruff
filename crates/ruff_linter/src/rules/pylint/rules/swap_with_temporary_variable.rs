@@ -64,7 +64,7 @@ impl Violation for SwapWithTemporaryVariable<'_> {
 
 pub(crate) fn swap_with_temporary_variable(checker: &Checker, scope_id: ScopeId, scope: &Scope) {
     let consecutive_assignments = scope.binding_ids().filter_map(|binding_id| {
-        match_consecutive_assignments(checker.semantic(), scope_id, binding_id)
+        match_consecutive_assignments(checker, checker.semantic(), scope_id, binding_id)
     });
 
     for (stmt_a, stmt_b, stmt_c) in consecutive_assignments {
@@ -110,6 +110,7 @@ pub(crate) fn swap_with_temporary_variable(checker: &Checker, scope_id: ScopeId,
 ///
 /// Also see the `repeated_append` rule for a similar use case.
 fn match_consecutive_assignments<'a>(
+    checker: &Checker,
     semantic: &'a SemanticModel<'a>,
     scope_id: ScopeId,
     binding_id: BindingId,
@@ -133,6 +134,10 @@ fn match_consecutive_assignments<'a>(
     // Find the enclosing suite so we can look at the next siblings.
     // For the global scope, use the module body; otherwise, find the parent statement.
     let suite = if scope_id.is_global() {
+        assert!(
+            !checker.is_rule_enabled(crate::codes::Rule::MissingTypeFunctionArgument),
+            "TODO(brent) remove this"
+        );
         traversal::EnclosingSuite::new(semantic.definitions.python_ast()?, stmt.into())
     } else {
         traversal::suite(stmt, semantic.parent_statement(node_id)?)
