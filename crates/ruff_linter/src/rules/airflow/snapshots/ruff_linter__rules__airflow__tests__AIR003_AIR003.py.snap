@@ -1,0 +1,41 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR003 A `@task.branch` that can be replaced with `@task.short_circuit`
+  --> AIR003.py:10:1
+   |
+ 8 |   # Violations (should trigger AIR003):
+ 9 |
+10 | / @task.branch
+11 | | def two_returns_one_non_empty():  # AIR003
+12 | |     if condition1:
+13 | |         return ["my_downstream_task"]
+14 | |     return []
+   | |_____________^
+   |
+
+AIR003 A `@task.branch` that can be replaced with `@task.short_circuit`
+  --> AIR003.py:17:1
+   |
+17 | / @task.branch
+18 | | def three_returns_one_non_empty():  # AIR003
+19 | |     if condition1:
+20 | |         return []
+21 | |     if condition2:
+22 | |         return ["another_downstream_task"]
+23 | |     return []
+   | |_____________^
+   |
+
+AIR003 A `@task.branch` that can be replaced with `@task.short_circuit`
+  --> AIR003.py:26:1
+   |
+26 | / @task.branch
+27 | | def nested_returns_one_non_empty():  # AIR003
+28 | |     if condition1:
+29 | |         if condition2:
+30 | |             return []
+31 | |         return ["downstream_task"]
+32 | |     return []
+   | |_____________^
+   |
