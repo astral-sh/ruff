@@ -423,10 +423,6 @@ impl<'db> CallableSignature<'db> {
         let mut parameter_type_union = UnionBuilder::new(db);
         let mut return_type_union = UnionBuilder::new(db);
         let mut has_overlapping_domain = false;
-        // Keep speculative aggregate checks isolated from the caller's cycle visitors. If the
-        // aggregate probe fails, fallback should behave like the legacy `when_any` path.
-        let aggregate_relation_visitor = HasRelationToVisitor::default();
-        let aggregate_disjointness_visitor = IsDisjointVisitor::default();
 
         for self_signature in self_signatures {
             let self_parameter_type = single_required_positional_parameter_type(self_signature)?;
@@ -436,13 +432,7 @@ impl<'db> CallableSignature<'db> {
                 return None;
             }
             let signatures_are_disjoint = self_parameter_type
-                .is_disjoint_from_impl(
-                    db,
-                    other_parameter_type,
-                    inferable,
-                    &aggregate_disjointness_visitor,
-                    &aggregate_relation_visitor,
-                )
+                .when_disjoint_from(db, other_parameter_type, inferable)
                 .is_always_satisfied(db);
 
             if signatures_are_disjoint {
@@ -459,21 +449,17 @@ impl<'db> CallableSignature<'db> {
         }
 
         // Function assignability here is parameter-contravariant and return-covariant.
-        let parameters_cover_target = other_parameter_type.has_relation_to_impl(
+        let parameters_cover_target = other_parameter_type.has_relation_to(
             db,
             parameter_type_union.build(),
             inferable,
             relation,
-            &aggregate_relation_visitor,
-            &aggregate_disjointness_visitor,
         );
-        let returns_match_target = return_type_union.build().has_relation_to_impl(
+        let returns_match_target = return_type_union.build().has_relation_to(
             db,
             other_signature.return_ty,
             inferable,
             relation,
-            &aggregate_relation_visitor,
-            &aggregate_disjointness_visitor,
         );
         let aggregate_relation = parameters_cover_target.and(db, || returns_match_target);
         aggregate_relation
