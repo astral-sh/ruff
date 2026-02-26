@@ -100,6 +100,195 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+### Declared `_value_` annotation
+
+If a `_value_` annotation is defined on an `Enum` class, all enum member values must be compatible
+with the declared type:
+
+```pyi
+from enum import Enum
+
+class Color(Enum):
+    _value_: int
+    RED = 1
+    GREEN = "green"  # error: [invalid-assignment]
+    BLUE = ...
+    YELLOW = None  # error: [invalid-assignment]
+    PURPLE = []  # error: [invalid-assignment]
+```
+
+When `_value_` is annotated, `.value` and `._value_` are inferred as the declared type:
+
+```py
+from enum import Enum
+from typing import Final
+
+class Color2(Enum):
+    _value_: int
+    RED = 1
+    GREEN = 2
+
+reveal_type(Color2.RED.value)  # revealed: int
+reveal_type(Color2.RED._value_)  # revealed: int
+
+class WantsInt(Enum):
+    _value_: int
+    OK: Final = 1
+    BAD: Final = "oops"  # error: [invalid-assignment]
+```
+
+### `_value_` annotation with `__init__`
+
+When `__init__` is defined, member values are validated by synthesizing a call to `__init__`. The
+`_value_` annotation still constrains assignments to `self._value_` inside `__init__`:
+
+```py
+from enum import Enum
+
+class Planet(Enum):
+    _value_: int
+
+    def __init__(self, value: int, mass: float, radius: float):
+        self._value_ = value
+
+    MERCURY = (1, 3.303e23, 2.4397e6)
+    SATURN = "saturn"  # error: [invalid-assignment]
+
+reveal_type(Planet.MERCURY.value)  # revealed: int
+reveal_type(Planet.MERCURY._value_)  # revealed: int
+```
+
+`Final`-annotated members are also validated against `__init__`:
+
+```py
+from enum import Enum
+from typing import Final
+
+class Planet(Enum):
+    def __init__(self, mass: float, radius: float):
+        self.mass = mass
+        self.radius = radius
+
+    MERCURY: Final = (3.303e23, 2.4397e6)
+    BAD: Final = "not a planet"  # error: [invalid-assignment]
+```
+
+### `_value_` annotation incompatible with `__init__`
+
+When `_value_` and `__init__` disagree, the assignment inside `__init__` is flagged:
+
+```py
+from enum import Enum
+
+class Planet(Enum):
+    _value_: str
+
+    def __init__(self, value: int, mass: float, radius: float):
+        self._value_ = value  # error: [invalid-assignment]
+
+    MERCURY = (1, 3.303e23, 2.4397e6)
+    SATURN = "saturn"  # error: [invalid-assignment]
+
+reveal_type(Planet.MERCURY.value)  # revealed: str
+reveal_type(Planet.MERCURY._value_)  # revealed: str
+```
+
+### `__init__` without `_value_` annotation
+
+When `__init__` is defined but no explicit `_value_` annotation exists, member values are validated
+against the `__init__` signature. Values that are incompatible with `__init__` are flagged:
+
+```py
+from enum import Enum
+
+class Planet2(Enum):
+    def __init__(self, mass: float, radius: float):
+        self.mass = mass
+        self.radius = radius
+
+    MERCURY = (3.303e23, 2.4397e6)
+    VENUS = (4.869e24, 6.0518e6)
+    INVALID = "not a planet"  # error: [invalid-assignment]
+
+reveal_type(Planet2.MERCURY.value)  # revealed: Any
+reveal_type(Planet2.MERCURY._value_)  # revealed: Any
+```
+
+### Inherited `_value_` annotation
+
+A `_value_` annotation on a parent enum is inherited by subclasses. Member values are validated
+against the inherited annotation, and `.value` uses the declared type:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    _value_: int
+
+class Child(Base):
+    A = 1
+    B = "not an int"  # error: [invalid-assignment]
+
+reveal_type(Child.A.value)  # revealed: int
+```
+
+This also works through multiple levels of inheritance, where `_value_` is declared on an
+intermediate class:
+
+```py
+from enum import Enum
+
+class Grandparent(Enum):
+    pass
+
+class Parent(Grandparent):
+    _value_: int
+
+class Child(Parent):
+    A = 1
+    B = "not an int"  # error: [invalid-assignment]
+
+reveal_type(Child.A.value)  # revealed: int
+```
+
+### Inherited `__init__`
+
+A custom `__init__` on a parent enum is inherited by subclasses. Member values are validated against
+the inherited `__init__` signature:
+
+```py
+from enum import Enum
+
+class Base(Enum):
+    def __init__(self, a: int, b: str):
+        self._value_ = a
+
+class Child(Base):
+    A = (1, "foo")
+    B = "should be checked against __init__"  # error: [invalid-assignment]
+
+reveal_type(Child.A.value)  # revealed: Any
+```
+
+This also works through multiple levels of inheritance:
+
+```py
+from enum import Enum
+
+class Grandparent(Enum):
+    def __init__(self, a: int, b: str):
+        self._value_ = a
+
+class Parent(Grandparent):
+    pass
+
+class Child(Parent):
+    A = (1, "foo")
+    B = "bad"  # error: [invalid-assignment]
+
+reveal_type(Child.A.value)  # revealed: Any
+```
+
 ### Non-member attributes with disallowed type
 
 Methods, callables, descriptors (including properties), and nested classes that are defined in the
@@ -358,7 +547,8 @@ class SingleMember(StrEnum):
 reveal_type(SingleMember.SINGLE.value)  # revealed: Literal["single"]
 ```
 
-Using `auto()` with `IntEnum` also works as expected:
+Using `auto()` with `IntEnum` also works as expected. `IntEnum` declares `_value_: int` in typeshed,
+so `.value` is typed as `int` rather than a precise literal:
 
 ```py
 from enum import IntEnum, auto
@@ -367,8 +557,8 @@ class Answer(IntEnum):
     YES = auto()
     NO = auto()
 
-reveal_type(Answer.YES.value)  # revealed: Literal[1]
-reveal_type(Answer.NO.value)  # revealed: Literal[2]
+reveal_type(Answer.YES.value)  # revealed: int
+reveal_type(Answer.NO.value)  # revealed: int
 ```
 
 As does using `auto()` for other enums that use `int` as a mixin:
@@ -433,6 +623,30 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+`auto()` values are computed at runtime by the enum metaclass, so we skip validation against both
+`_value_` annotations and custom `__init__` signatures:
+
+```py
+from enum import Enum, auto
+
+class WithValue(Enum):
+    _value_: int
+    A = auto()
+    B = auto()
+
+reveal_type(WithValue.A.value)  # revealed: int
+
+class WithInit(Enum):
+    def __init__(self, mass: float, radius: float):
+        self.mass = mass
+        self.radius = radius
+
+    MERCURY = (3.303e23, 2.4397e6)
+    AUTO = auto()
+
+reveal_type(WithInit.MERCURY.value)  # revealed: Any
+```
+
 ### `member` and `nonmember`
 
 ```toml
@@ -475,13 +689,14 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
-### Class-private names
+### Dunder and class-private names
 
-An attribute with a [class-private name] (beginning with, but not ending in, a double underscore) is
-treated as a non-member:
+An attribute with a name beginning with a double underscore is treated as a non-member. This
+includes both [class-private names] (not ending in `__`) and dunder names (ending in `__`).
+CPython's enum metaclass excludes all such names from membership:
 
 ```py
-from enum import Enum
+from enum import Enum, IntEnum
 from ty_extensions import enum_members
 
 class Answer(Enum):
@@ -491,8 +706,22 @@ class Answer(Enum):
     __private_member = 3
     __maybe__ = 4
 
-# revealed: tuple[Literal["YES"], Literal["NO"], Literal["__maybe__"]]
+# revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+```
+
+Setting `__module__` (a common pattern to control `repr()` and `pickle` behavior) does not make it
+an enum member, even when the value type differs from the enum's value type:
+
+```py
+class ExitCode(IntEnum):
+    OK = 0
+    ERROR = 1
+
+    __module__ = "my_package"  # no error, not a member
+
+# revealed: tuple[Literal["OK"], Literal["ERROR"]]
+reveal_type(enum_members(ExitCode))
 ```
 
 ### Ignored names
@@ -1123,4 +1352,4 @@ class MyEnum[T](MyEnumBase):
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>
 - Documentation: <https://docs.python.org/3/library/enum.html>
 
-[class-private name]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
+[class-private names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers

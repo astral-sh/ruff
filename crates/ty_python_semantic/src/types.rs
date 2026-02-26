@@ -3335,7 +3335,7 @@ impl<'db> Type<'db> {
             {
                 let enum_literal = literal.as_enum().unwrap();
                 enum_metadata(db, enum_literal.enum_class(db))
-                    .and_then(|metadata| metadata.members.get(enum_literal.name(db)))
+                    .and_then(|metadata| metadata.value_type(enum_literal.name(db)))
                     .map_or_else(|| Place::Undefined, Place::bound)
                     .into()
             }
@@ -3359,10 +3359,10 @@ impl<'db> Type<'db> {
             {
                 enum_metadata(db, instance.class_literal(db))
                     .and_then(|metadata| {
-                        let (_, ty) = metadata.members.get_index(0)?;
-                        Some(Place::bound(*ty))
+                        let (name, _) = metadata.members.get_index(0)?;
+                        metadata.value_type(name)
                     })
-                    .unwrap_or_default()
+                    .map_or_else(Place::default, Place::bound)
                     .into()
             }
 
