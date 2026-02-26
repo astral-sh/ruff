@@ -37,7 +37,7 @@ async def main(
     format_comparison: FormatComparison | None,
     max_parallelism: int = 50,
     raise_on_failure: bool = False,
-) -> None:
+) -> bool:
     logger.debug("Using command %s", command.value)
     logger.debug("Using baseline executable at %s", baseline_executable)
     logger.debug("Using comparison executable at %s", comparison_executable)
