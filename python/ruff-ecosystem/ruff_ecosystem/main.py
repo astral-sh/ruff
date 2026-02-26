@@ -96,7 +96,7 @@ async def main(
         case _:
             raise ValueError(f"Unknown output format {format}")
 
-    return None
+    return bool(result.errored)
 
 
 async def clone_and_compare(
