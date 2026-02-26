@@ -114,7 +114,6 @@ pub(crate) fn enum_metadata<'db>(
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
     let mut auto_members = FxHashSet::default();
-
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
         let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
         let ignore_place = place_from_bindings(db, ignore_bindings).place;
@@ -138,8 +137,9 @@ pub(crate) fn enum_metadata<'db>(
         .filter_map(|(symbol_id, bindings)| {
             let name = table.symbol(symbol_id).name();
 
-            if name.starts_with("__") && !name.ends_with("__") {
-                // Skip private attributes
+            if name.starts_with("__") {
+                // Skip private attributes (`__private`) and dunders (`__module__`, etc.).
+                // CPython's enum metaclass never treats these as members.
                 return None;
             }
 

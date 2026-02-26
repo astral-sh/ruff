@@ -689,13 +689,14 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
-### Class-private names
+### Dunder and class-private names
 
-An attribute with a [class-private name] (beginning with, but not ending in, a double underscore) is
-treated as a non-member:
+An attribute with a name beginning with a double underscore is treated as a non-member. This
+includes both [class-private names] (not ending in `__`) and dunder names (ending in `__`).
+CPython's enum metaclass excludes all such names from membership:
 
 ```py
-from enum import Enum
+from enum import Enum, IntEnum
 from ty_extensions import enum_members
 
 class Answer(Enum):
@@ -705,8 +706,22 @@ class Answer(Enum):
     __private_member = 3
     __maybe__ = 4
 
-# revealed: tuple[Literal["YES"], Literal["NO"], Literal["__maybe__"]]
+# revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+```
+
+Setting `__module__` (a common pattern to control `repr()` and `pickle` behavior) does not make it
+an enum member, even when the value type differs from the enum's value type:
+
+```py
+class ExitCode(IntEnum):
+    OK = 0
+    ERROR = 1
+
+    __module__ = "my_package"  # no error, not a member
+
+# revealed: tuple[Literal["OK"], Literal["ERROR"]]
+reveal_type(enum_members(ExitCode))
 ```
 
 ### Ignored names
@@ -1337,4 +1352,4 @@ class MyEnum[T](MyEnumBase):
 - Typing spec: <https://typing.python.org/en/latest/spec/enums.html>
 - Documentation: <https://docs.python.org/3/library/enum.html>
 
-[class-private name]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
+[class-private names]: https://docs.python.org/3/reference/lexical_analysis.html#reserved-classes-of-identifiers
