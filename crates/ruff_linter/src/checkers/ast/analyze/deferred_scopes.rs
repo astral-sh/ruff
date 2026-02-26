@@ -28,7 +28,6 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
         Rule::RuntimeImportInTypeCheckingBlock,
         Rule::SingledispatchMethod,
         Rule::SingledispatchmethodFunction,
-        Rule::SwapWithTemporaryVariable,
         Rule::TooManyLocals,
         Rule::TypingOnlyFirstPartyImport,
         Rule::TypingOnlyStandardLibraryImport,
@@ -93,10 +92,6 @@ pub(crate) fn deferred_scopes(checker: &Checker) {
 
         if checker.is_rule_enabled(Rule::GlobalVariableNotAssigned) {
             pylint::rules::global_variable_not_assigned(checker, scope);
-        }
-
-        if checker.is_rule_enabled(Rule::SwapWithTemporaryVariable) {
-            pylint::rules::swap_with_temporary_variable(checker, scope_id, scope);
         }
 
         if checker.is_rule_enabled(Rule::RedefinedArgumentFromLocal) {
