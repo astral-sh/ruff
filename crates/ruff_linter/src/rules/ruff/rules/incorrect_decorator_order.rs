@@ -1,3 +1,6 @@
+use std::fmt;
+
+use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Decorator;
 use ruff_python_ast::helpers::map_callable;
@@ -43,8 +46,8 @@ use crate::checkers::ast::Checker;
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
 pub(crate) struct IncorrectDecoratorOrder {
-    outer_decorator: String,
-    inner_decorator: String,
+    outer_decorator: KnownDecorator,
+    inner_decorator: KnownDecorator,
 }
 
 impl Violation for IncorrectDecoratorOrder {
@@ -60,27 +63,21 @@ impl Violation for IncorrectDecoratorOrder {
 
 /// RUF071
 pub(crate) fn incorrect_decorator_order(checker: &Checker, decorator_list: &[Decorator]) {
-    if decorator_list.len() < 2 {
-        return;
-    }
-
-    for (i, outer_decorator) in decorator_list.iter().enumerate() {
-        let Some(outer) = classify_decorator(checker, outer_decorator) else {
+    for (outer_decorator, inner_decorator) in decorator_list.iter().tuple_windows() {
+        let (Some(outer), Some(inner)) = (
+            classify_decorator(checker, outer_decorator),
+            classify_decorator(checker, inner_decorator),
+        ) else {
             continue;
         };
-        for inner_decorator in &decorator_list[i + 1..] {
-            let Some(inner) = classify_decorator(checker, inner_decorator) else {
-                continue;
-            };
-            if is_incorrect_order(outer, inner) {
-                checker.report_diagnostic(
-                    IncorrectDecoratorOrder {
-                        outer_decorator: outer.display_name().to_string(),
-                        inner_decorator: inner.display_name().to_string(),
-                    },
-                    outer_decorator.range(),
-                );
-            }
+        if is_incorrect_order(outer, inner) {
+            checker.report_diagnostic(
+                IncorrectDecoratorOrder {
+                    outer_decorator: outer,
+                    inner_decorator: inner,
+                },
+                outer_decorator.range(),
+            );
         }
     }
 }
@@ -98,9 +95,9 @@ enum KnownDecorator {
     FunctoolsLruCache,
 }
 
-impl KnownDecorator {
-    const fn display_name(self) -> &'static str {
-        match self {
+impl fmt::Display for KnownDecorator {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
             Self::AbstractMethod => "abstractmethod",
             Self::Property => "property",
             Self::ClassMethod => "classmethod",
@@ -110,7 +107,7 @@ impl KnownDecorator {
             Self::FunctoolsCache => "functools.cache",
             Self::FunctoolsCachedProperty => "functools.cached_property",
             Self::FunctoolsLruCache => "functools.lru_cache",
-        }
+        })
     }
 }
 
@@ -151,7 +148,5 @@ fn is_incorrect_order(outer: KnownDecorator, inner: KnownDecorator) -> bool {
         | (KnownDecorator::FunctoolsCache | KnownDecorator::FunctoolsLruCache, KnownDecorator::Property | KnownDecorator::ClassMethod | KnownDecorator::FunctoolsCachedProperty)
         // @classmethod conflicts with @cached_property
         | (KnownDecorator::ClassMethod, KnownDecorator::FunctoolsCachedProperty)
-        // @cached_property must not wrap @abstractmethod
-        | (KnownDecorator::FunctoolsCachedProperty, KnownDecorator::AbstractMethod)
     )
 }

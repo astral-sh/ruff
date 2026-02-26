@@ -84,11 +84,6 @@ class ClassmethodAboveCachedProperty:
     @cached_property
     def foo(cls): ...
 
-class CachedPropertyAboveAbstractmethod:
-    @cached_property  # RUF071
-    @abstractmethod
-    def foo(self): ...
-
 # --- Qualified imports ---
 
 class QualifiedAbstractAboveProperty:
@@ -118,14 +113,6 @@ class DeprecatedAbstractStaticmethodBelowAbstractmethod:
     @abstractstaticmethod
     def foo(): ...
 
-# --- Interleaved unknown decorator ---
-
-class InterleavedDecorator:
-    @abstractmethod  # RUF071 (still wrong; unrelated decorator between them doesn't help)
-    @some_other_decorator
-    @property
-    def foo(self): ...
-
 # --- Decorator call form ---
 
 class LruCacheCallAboveProperty:
@@ -138,12 +125,12 @@ class LruCacheCallWithArgsAboveProperty:
     @property
     def foo(self): ...
 
-# --- Multiple violations on same function ---
+# --- Multiple violations on same function (adjacent pairs only) ---
 
 class MultipleViolations:
-    @abstractmethod  # RUF071 (x2: above both property and classmethod... though unusual)
-    @contextmanager  # RUF071 (above classmethod)
+    @abstractmethod  # RUF071
     @property
+    @contextmanager  # RUF071
     @classmethod
     def foo(cls): ...
 
@@ -189,6 +176,19 @@ class CorrectPropertyAboveLruCache:
 class CorrectAbstractmethodAboveCachedProperty:
     @abstractmethod
     @cached_property
+    def foo(self): ...
+
+class CachedPropertyAboveAbstractmethod:
+    @cached_property
+    @abstractmethod
+    def foo(self): ...
+
+# --- Non-adjacent known-bad pair (only adjacent pairs are checked) ---
+
+class InterleavedDecorator:
+    @abstractmethod
+    @some_other_decorator
+    @property
     def foo(self): ...
 
 # --- Single decorators ---
