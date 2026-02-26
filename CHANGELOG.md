@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.15.4
+
+Released on 2026-02-26.
+
+This is a follow-up release to 0.15.3 that resolves a panic when the new rule `PLR1712` was enabled with any rule that analyzes definitions, such as many of the `ANN` or `D` rules.
+
+### Bug fixes
+
+- Fix panic on access to definitions after analyzing definitions ([#23588](https://github.com/astral-sh/ruff/pull/23588))
+- \[`pyflakes`\] Suppress false positive in `F821` for names used before `del` in stub files ([#23550](https://github.com/astral-sh/ruff/pull/23550))
+
+### Documentation
+
+- Clarify first-party import detection in Ruff ([#23591](https://github.com/astral-sh/ruff/pull/23591))
+- Fix incorrect `import-heading` example ([#23568](https://github.com/astral-sh/ruff/pull/23568))
+
+### Contributors
+
+- [@stakeswky](https://github.com/stakeswky)
+- [@ntBre](https://github.com/ntBre)
+- [@thejcannon](https://github.com/thejcannon)
+- [@GeObts](https://github.com/GeObts)
+
 ## 0.15.3
 
 Released on 2026-02-26.
