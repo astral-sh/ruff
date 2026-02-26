@@ -184,6 +184,100 @@ def _(c: Callable[[int, str], int]):
     reveal_type(c)  # revealed: (int, str, /) -> int
 ```
 
+## Overloaded callable assignability
+
+An overloaded callable should be assignable to a non-overloaded callable type when the overload set
+as a whole is compatible with the target callable.
+
+```py
+from typing import Callable, overload
+
+@overload
+def foo(x: int) -> str: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> str:
+    return str(x)
+
+def expects(c: Callable[[int | str], str]) -> None:
+    pass
+
+expects(foo)
+```
+
+```py
+from typing import overload
+
+@overload
+def foo(x: int) -> str: ...
+@overload
+def foo(x: str) -> str: ...
+def foo(x: int | str) -> str:
+    return str(x)
+
+def errors() -> None:
+    for x in map(foo, range(1, 10)):
+        print(x)
+```
+
+```py
+from typing import Callable, overload
+
+@overload
+def converter(x: int) -> str: ...
+@overload
+def converter(x: bytes) -> bytes: ...
+def converter(x: int | bytes) -> str | bytes:
+    if isinstance(x, int):
+        return str(x)
+    return x
+
+def expects_int_str(c: Callable[[int], str]) -> None:
+    pass
+
+expects_int_str(converter)
+```
+
+The overload set must cover the full target parameter domain.
+
+```py
+from typing import Callable, overload
+
+@overload
+def partial_converter(x: int) -> str: ...
+@overload
+def partial_converter(x: bytes) -> str: ...
+def partial_converter(x: int | bytes) -> str:
+    return str(x)
+
+def expects_int_or_str(c: Callable[[int | str], str]) -> None:
+    pass
+
+# error: [invalid-argument-type]
+expects_int_or_str(partial_converter)
+```
+
+Even when the parameter domain is covered, return compatibility must still hold.
+
+```py
+from typing import Callable, overload
+
+@overload
+def wide_return_converter(x: int) -> str: ...
+@overload
+def wide_return_converter(x: str) -> bytes: ...
+def wide_return_converter(x: int | str) -> str | bytes:
+    if isinstance(x, int):
+        return str(x)
+    return x.encode()
+
+def expects_str_return(c: Callable[[int | str], str]) -> None:
+    pass
+
+# error: [invalid-argument-type]
+expects_str_return(wide_return_converter)
+```
+
 ## Union
 
 ```py

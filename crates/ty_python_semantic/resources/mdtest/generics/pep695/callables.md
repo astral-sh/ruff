@@ -288,3 +288,93 @@ result = apply_twice(f, x, y)
 # revealed: tuple[int | str, int | str]
 reveal_type(result)
 ```
+
+An overloaded callable returned from a generic callable factory should still be assignable to the
+declared generic callable return type.
+
+```py
+from collections.abc import Callable, Coroutine
+from typing import Any, overload
+
+def singleton[S](flag: bool = False) -> Callable[[Callable[[int], S]], Callable[[int], S]]:
+    @overload
+    def wrapper[T](func: Callable[[int], Coroutine[Any, Any, T]]) -> Callable[[int], Coroutine[Any, Any, T]]: ...
+    @overload
+    def wrapper[U](func: Callable[[int], U]) -> Callable[[int], U]: ...
+    def wrapper[T, U](func: Callable[[int], Coroutine[Any, Any, T] | U]) -> Callable[[int], Coroutine[Any, Any, T] | U]:
+        return func
+
+    return wrapper
+```
+
+## SymPy one-import MRE scaffold (multi-file)
+
+Reduced regression lock for a SymPy overload/protocol shape that can panic in the
+overload-assignability path.
+
+```py
+from __future__ import annotations
+
+from sympy.polys.compatibility import Domain, IPolys
+from typing import overload
+
+class DefaultPrinting:
+    pass
+
+class PolyRing[T](DefaultPrinting, IPolys[T]):
+    symbols: tuple[object, ...]
+    domain: Domain[T]
+
+    def clone(
+        self,
+        symbols: object | None = None,
+        domain: object | None = None,
+        order: object | None = None,
+    ) -> PolyRing[T]:
+        return self
+
+    @overload
+    def __getitem__(self, key: int) -> PolyRing[T]: ...
+    @overload
+    def __getitem__(self, key: slice) -> PolyRing[T] | Domain[T]: ...
+    def __getitem__(self, key: slice | int) -> PolyRing[T] | Domain[T]:
+        symbols = self.symbols[key]
+        if not symbols:
+            return self.domain
+        return self.clone(symbols=symbols)
+
+def takes_ring(x: PolyRing[int]) -> None:
+    reveal_type(x[0])  # revealed: PolyRing[int]
+    reveal_type(x[:])  # revealed: PolyRing[int] | Domain[int]
+```
+
+`sympy/polys/compatibility.pyi`:
+
+```pyi
+from __future__ import annotations
+
+from typing import Protocol, overload
+
+class Domain[T]: ...
+
+class IPolys[T](Protocol):
+    @overload
+    def clone(
+        self,
+        symbols: object | None = None,
+        domain: None = None,
+        order: None = None,
+    ) -> IPolys[T]: ...
+    @overload
+    def clone[S](
+        self,
+        symbols: object | None = None,
+        *,
+        domain: Domain[S],
+        order: None = None,
+    ) -> IPolys[S]: ...
+    @overload
+    def __getitem__(self, key: int) -> IPolys[T]: ...
+    @overload
+    def __getitem__(self, key: slice) -> IPolys[T] | Domain[T]: ...
+```
