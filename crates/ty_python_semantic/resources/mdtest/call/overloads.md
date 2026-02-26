@@ -880,7 +880,7 @@ from typing_extensions import reveal_type
 def _(a: int | None):
     reveal_type(
         # error: [no-matching-overload]
-        # revealed: Any
+        # revealed: Unknown
         f(
             A(),
             a1=a,
@@ -1231,8 +1231,8 @@ def _(list_int: list[int], list_any: list[Any]):
     # All materializations of `list[Any]` are assignable to `list[int]` and `list[Any]`, but the
     # return type of first and second overloads are not equivalent, so the overload matching
     # is ambiguous.
-    reveal_type(f(list_any))  # revealed: Any
-    reveal_type(f(*(list_any,)))  # revealed: Any
+    reveal_type(f(list_any))  # revealed: Unknown
+    reveal_type(f(*(list_any,)))  # revealed: Unknown
 ```
 
 ### Single tuple argument
@@ -1277,8 +1277,8 @@ def _(int_str: tuple[int, str], int_any: tuple[int, Any], any_any: tuple[Any, An
 
     # All materializations of `tuple[Any, Any]` are assignable to the parameters of all the
     # overloads, but the return types aren't equivalent, so the overload matching is ambiguous
-    reveal_type(f(any_any))  # revealed: Any
-    reveal_type(f(*(any_any,)))  # revealed: Any
+    reveal_type(f(any_any))  # revealed: Unknown
+    reveal_type(f(*(any_any,)))  # revealed: Unknown
 ```
 
 ### `Unknown` passed into an overloaded function annotated with protocols
@@ -1309,15 +1309,15 @@ def f(a: Foo, b: list[str], c: list[LiteralString], e):
     reveal_type(a.join(b))  # revealed: str
     reveal_type(a.join(c))  # revealed: LiteralString
 
-    # Since both overloads match and they have return types that are not equivalent,
+    # since both overloads match and they have return types that are not equivalent,
     # step (5) of the overload evaluation algorithm says we must evaluate the result of the
-    # call as `Any`.
+    # call as `Unknown`.
     #
     # Note: although the spec does not state as such (since intersections in general are not
     # specified currently), `(str | LiteralString) & Unknown` might also be a reasonable type
     # here (the union of all overload returns, intersected with `Unknown`) -- here that would
     # simplify to `str & Unknown`.
-    reveal_type(a.join(e))  # revealed: Any
+    reveal_type(a.join(e))  # revealed: Unknown
 ```
 
 ### Multiple arguments
@@ -1367,8 +1367,8 @@ def _(list_int: list[int], list_any: list[Any], int_str: tuple[int, str], int_an
     # All materializations of first argument is assignable to the second overload and for the second
     # argument, they're assignable to the third overload, so no overloads are filtered out; the
     # return types of the remaining overloads are not equivalent, so overload matching is ambiguous
-    reveal_type(f(list_int, any_any))  # revealed: Any
-    reveal_type(f(*(list_int, any_any)))  # revealed: Any
+    reveal_type(f(list_int, any_any))  # revealed: Unknown
+    reveal_type(f(*(list_int, any_any)))  # revealed: Unknown
 ```
 
 ### `LiteralString` and `str`
@@ -1400,8 +1400,8 @@ def _(literal: LiteralString, string: str, any: Any):
 
     # `Any` matches both overloads, but the return types are not equivalent.
     # Pyright and mypy both reveal `str` here, contrary to the spec.
-    reveal_type(f(any))  # revealed: Any
-    reveal_type(f(*(any,)))  # revealed: Any
+    reveal_type(f(any))  # revealed: Unknown
+    reveal_type(f(*(any,)))  # revealed: Unknown
 ```
 
 ### Generics
@@ -1436,11 +1436,11 @@ def _(list_int: list[int], list_str: list[str], list_any: list[Any], any: Any):
     reveal_type(f(list_str))  # revealed: str
     reveal_type(f(*(list_str,)))  # revealed: str
 
-    reveal_type(f(list_any))  # revealed: Any
-    reveal_type(f(*(list_any,)))  # revealed: Any
+    reveal_type(f(list_any))  # revealed: Unknown
+    reveal_type(f(*(list_any,)))  # revealed: Unknown
 
-    reveal_type(f(any))  # revealed: Any
-    reveal_type(f(*(any,)))  # revealed: Any
+    reveal_type(f(any))  # revealed: Unknown
+    reveal_type(f(*(any,)))  # revealed: Unknown
 ```
 
 ### Generics (multiple arguments)
@@ -1513,7 +1513,7 @@ def _(a_int: A[int], a_str: A[str], a_any: A[Any]):
 def _(b_int: B[int], b_str: B[str], b_any: B[Any]):
     reveal_type(b_int.method())  # revealed: int
     reveal_type(b_str.method())  # revealed: str
-    reveal_type(b_any.method())  # revealed: Any
+    reveal_type(b_any.method())  # revealed: Unknown
 ```
 
 ### Ambiguous `Any` overloads (multiple arguments)
@@ -1550,8 +1550,7 @@ def _(x: A[None], y: A[Any]) -> None:
     assert_type(op(x, x), A[None])
     assert_type(op(x, y), A[None])
     assert_type(op(y, x), A[None])
-    assert_type(op(y, y), Any)
-    reveal_type(op(y, y))  # revealed: Any
+    reveal_type(op(y, y))  # revealed: Unknown
 ```
 
 ### Variadic argument
@@ -1595,11 +1594,11 @@ def _(arg: list[Any]):
     # Matches both overload and the return types are equivalent
     reveal_type(f1(*arg))  # revealed: A
     # Matches both overload but the return types aren't equivalent
-    reveal_type(f2(*arg))  # revealed: Any
+    reveal_type(f2(*arg))  # revealed: Unknown
     # Filters out the final overload and the return types are equivalent
     reveal_type(f3(*arg))  # revealed: A
     # Filters out the final overload but the return types aren't equivalent
-    reveal_type(f4(*arg))  # revealed: Any
+    reveal_type(f4(*arg))  # revealed: Unknown
 ```
 
 ### Varidic argument with generics
@@ -1658,15 +1657,15 @@ def _(args1: list[int], args2: list[Any]):
 reveal_type(f2())  # revealed: tuple[Any, ...]
 reveal_type(f2(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
 # TODO: Should be `tuple[Literal[1], Literal[2]]`
-reveal_type(f2(x1=1, x2=2))  # revealed: Any
+reveal_type(f2(x1=1, x2=2))  # revealed: Unknown
 # TODO: Should be `tuple[Literal[2], Literal[1]]`
-reveal_type(f2(x2=1, x1=2))  # revealed: Any
+reveal_type(f2(x2=1, x1=2))  # revealed: Unknown
 reveal_type(f2(1, 2, z=3))  # revealed: tuple[Any, ...]
 
 reveal_type(f3(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f3(1, 2, 3))  # revealed: tuple[Any, ...]
 # TODO: Should be `tuple[Literal[1], Literal[2]]`
-reveal_type(f3(x1=1, x2=2))  # revealed: Any
+reveal_type(f3(x1=1, x2=2))  # revealed: Unknown
 reveal_type(f3(z=1))  # revealed: dict[str, Any]
 
 # error: [no-matching-overload]
@@ -1823,8 +1822,8 @@ from typing import Any
 from overloaded import A, B, C, f
 
 def _(arg: tuple[A | B, Any]):
-    reveal_type(f(arg))  # revealed: A | Any
-    reveal_type(f(*(arg,)))  # revealed: A | Any
+    reveal_type(f(arg))  # revealed: A | Unknown
+    reveal_type(f(*(arg,)))  # revealed: A | Unknown
 ```
 
 #### Both argument lists ambiguous
@@ -1857,8 +1856,8 @@ from typing import Any
 from overloaded import A, B, C, f
 
 def _(arg: tuple[A | B, Any]):
-    reveal_type(f(arg))  # revealed: Any
-    reveal_type(f(*(arg,)))  # revealed: Any
+    reveal_type(f(arg))  # revealed: Unknown
+    reveal_type(f(*(arg,)))  # revealed: Unknown
 ```
 
 ### Unknown argument with TypeVar overload
@@ -1888,10 +1887,10 @@ from nonexistent_module import something_unknown  # error: [unresolved-import]
 
 reveal_type(something_unknown)  # revealed: Unknown
 
-# The result should be `Any`, not `Literal[b""]`.
-reveal_type(f(something_unknown))  # revealed: Any
-reveal_type(f((something_unknown, something_unknown, something_unknown)))  # revealed: Any
-reveal_type(f((something_unknown, None, something_unknown)))  # revealed: Any
+# The result should be `Unknown`, not `Literal[b""]`.
+reveal_type(f(something_unknown))  # revealed: Unknown
+reveal_type(f((something_unknown, something_unknown, something_unknown)))  # revealed: Unknown
+reveal_type(f((something_unknown, None, something_unknown)))  # revealed: Unknown
 
 # Concrete arguments should still resolve correctly.
 def _(s: str):

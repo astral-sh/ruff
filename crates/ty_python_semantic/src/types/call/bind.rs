@@ -44,7 +44,7 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType,
+    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, GenericAlias, InternedConstraintSet, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, LiteralValueTypeKind, MemberLookupPolicy, NominalInstanceType,
     PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
@@ -2601,8 +2601,6 @@ impl<'db> CallableBinding<'db> {
                 continue;
             }
 
-            // Use a union of per-overload parameter tuples rather than a tuple of per-parameter
-            // unions, so we preserve cross-argument correlations from each overload.
             let parameter_types = UnionType::from_elements(
                 db,
                 matching_overload_indexes[..=upto]
@@ -2612,10 +2610,7 @@ impl<'db> CallableBinding<'db> {
                     }),
             );
 
-            if top_materialized_argument_type
-                .when_assignable_to(db, parameter_types, InferableTypeVars::None)
-                .is_always_satisfied(db)
-            {
+            if top_materialized_argument_type.is_assignable_to(db, parameter_types) {
                 filter_remaining_overloads = true;
             }
         }
@@ -2773,7 +2768,7 @@ impl<'db> CallableBinding<'db> {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
                 OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_)
-                | OverloadCallReturnType::Ambiguous => Type::Dynamic(DynamicType::Any),
+                | OverloadCallReturnType::Ambiguous => Type::unknown(),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
