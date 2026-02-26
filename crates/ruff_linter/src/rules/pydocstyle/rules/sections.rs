@@ -1428,7 +1428,7 @@ impl AlwaysFixableViolation for BlankLinesBetweenHeaderAndContent {
 /// - [NumPy docstring standard](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html#383-functions-and-methods)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.3")]
 pub(crate) struct IncorrectSectionOrder {
     current: String,
     previous: String,
