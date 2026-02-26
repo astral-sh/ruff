@@ -2,6 +2,7 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
+use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
@@ -788,18 +789,22 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
     // Creates a definition for each key-value assignment in the dictionary.
     //
-    // If there are multiple targets, a given key-value definition will be created multiple
-    // times for each target.
+    // If there are multiple targets, no definitions will be created.
     fn add_dict_key_assignment_definitions(
         &mut self,
         targets: impl IntoIterator<Item = &'ast ast::Expr> + Copy,
         dict: &'ast ast::ExprDict,
         assignment: Definition<'db>,
     ) {
-        for target in targets {
-            if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
-                self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
-            }
+        // TODO: Although we synthesize place expressions for each dictionary key, the definition
+        // is still uniquely associated with the AST node of the key expression, and so multiple target
+        // places cannot refer to the same key.
+        let Ok(target) = targets.into_iter().exactly_one() else {
+            return;
+        };
+
+        if let Some(target) = MemberExprBuilder::visit_expr(target.into()) {
+            self.add_dict_key_assignment_definitions_impl(&target, dict, assignment);
         }
     }
 
@@ -1129,6 +1134,15 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                         ClassPatternKind::Refutable
                     },
                 )
+            }
+            ast::Pattern::MatchMapping(pattern) => {
+                // `case {}` and `case {**rest}` match every mapping, while keyed mapping
+                // patterns are refutable (`case {"x": _}` may fail for some mappings).
+                PatternPredicateKind::Mapping(if pattern.keys.is_empty() {
+                    ClassPatternKind::Irrefutable
+                } else {
+                    ClassPatternKind::Refutable
+                })
             }
             ast::Pattern::MatchOr(pattern) => {
                 let predicates = pattern
@@ -1471,9 +1485,10 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                 ));
                 Some(unpackable.as_current_assignment(unpack))
             }
-            ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                Some(unpackable.as_current_assignment(None))
-            }
+            ast::Expr::Name(_)
+            | ast::Expr::Starred(_)
+            | ast::Expr::Attribute(_)
+            | ast::Expr::Subscript(_) => Some(unpackable.as_current_assignment(None)),
             _ => None,
         };
 
@@ -2708,8 +2723,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.visit_expr(value);
 
-                // If the statement is a call, it could possibly be a call to a function
-                // marked with `NoReturn` (for example, `sys.exit()`). In this case, we use a special
+                // If the statement is a call (or an `await` wrapping a call), it could
+                // possibly be a call to a function marked with `NoReturn` (for example,
+                // `sys.exit()` or `await async_exit()`). In this case, we use a special
                 // kind of constraint to mark the following code as unreachable.
                 //
                 // Ideally, these constraints should be added for every call expression, even those in
@@ -2721,15 +2737,29 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // We also only add these inside function scopes, since considering module-level
                 // constraints can affect the type of imported symbols, leading to a lot more
                 // work in third-party code.
-                if let ast::Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+                let call_info = match value.as_ref() {
+                    ast::Expr::Call(ast::ExprCall { func, .. }) => {
+                        Some((func.as_ref(), value.as_ref(), false))
+                    }
+                    ast::Expr::Await(ast::ExprAwait { value: inner, .. }) => match inner.as_ref() {
+                        ast::Expr::Call(ast::ExprCall { func, .. }) => {
+                            Some((func.as_ref(), value.as_ref(), true))
+                        }
+                        _ => None,
+                    },
+                    _ => None,
+                };
+
+                if let Some((func, expr, is_await)) = call_info {
                     if !self.source_type.is_stub() && self.in_function_scope() {
                         let callable = self.add_standalone_expression(func);
-                        let call_expr = self.add_standalone_expression(value.as_ref());
+                        let call_expr = self.add_standalone_expression(expr);
 
                         let predicate = Predicate {
                             node: PredicateNode::ReturnsNever(CallableAndCallExpr {
                                 callable,
                                 call_expr,
+                                is_await,
                             }),
                             is_positive: false,
                         };

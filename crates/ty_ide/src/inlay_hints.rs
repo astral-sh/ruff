@@ -1269,6 +1269,73 @@ mod tests {
     }
 
     #[test]
+    fn test_starred_unpacked_tuple_assignment() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(x: tuple[int, ...]):
+                (a, *b) = x
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+
+        def foo(x: tuple[int, ...]):
+            (a[: int], *b[: list[int]]) = x
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:10
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |          ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:3:21
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |                     ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:26
+          |
+        2 | def foo(x: tuple[int, ...]):
+        3 |     (a[: int], *b[: list[int]]) = x
+          |                          ^^^
+          |
+        "#);
+    }
+
+    #[test]
     fn test_leading_underscore_variable_assignment_has_no_type_inlay_hint() {
         let mut test = inlay_hint_test(
             "
@@ -1281,7 +1348,7 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
+        assert_snapshot!(test.inlay_hints(), @"
 
         def i(x: int, /) -> int:
             return x
@@ -1289,7 +1356,7 @@ mod tests {
         _ = i(1)
         _ignored = i(1)
         __ignored = i(1)
-        "#);
+        ");
     }
 
     #[test]
@@ -2598,6 +2665,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         a[: list[Unknown | int]] = [1, 2]
         b[: list[Unknown | int | float]] = [1.0, 2.0]
         c[: list[Unknown | bool]] = [True, False]
@@ -3330,6 +3398,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class MyClass:
             def __init__(self):
                 self.x: int = 1
@@ -3496,6 +3565,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
                 self.x[: list[T@MyClass]] = x
@@ -4617,7 +4687,8 @@ mod tests {
             foo(val.y()[1])",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from typing import List
 
         def foo(x: int): pass
@@ -6456,7 +6527,7 @@ mod tests {
         // and since *names is variadic, no parameter name hints should be shown.
         // Before the fix, this incorrectly showed `name=` and `is_symmetric=` hints
         // from the first overload.
-        assert_snapshot!(test.inlay_hints(), @"
+        assert_snapshot!(test.inlay_hints(), @r#"
 
         from typing import overload, Optional, Sequence
 
@@ -6476,7 +6547,7 @@ mod tests {
         1564 |
         1565 | class Sequence(Reversible[_T_co], Collection[_T_co]):
              |       ^^^^^^^^
-        1566 |     \"\"\"All the operations on a read-only sequence.
+        1566 |     """All the operations on a read-only sequence.
              |
         info: Source
           --> main2.py:11:5
@@ -6493,7 +6564,7 @@ mod tests {
         914 | @disjoint_base
         915 | class str(Sequence[str]):
             |       ^^^
-        916 |     \"\"\"str(object='') -> str
+        916 |     """str(object='') -> str
         917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
             |
         info: Source
@@ -6519,7 +6590,7 @@ mod tests {
             pass
 
         b: Sequence[str] = S('x', 'y')
-        ");
+        "#);
     }
 
     #[test]
@@ -6542,7 +6613,7 @@ mod tests {
         // Neither overload matches via type checking (list[Unknown] is neither int nor str),
         // so `matching_overloads()` returns empty. The arity-based fallback picks the first
         // overload (1 matched arg out of 1 required), and we should see the `x=` hint.
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
 
         from typing import overload
 
@@ -7444,6 +7515,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from typing_extensions import TypeAliasType
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
@@ -7529,6 +7601,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         def f(xyxy: object):
             if isinstance(xyxy, list):
                 x[: Top[list[Unknown]]] = xyxy
@@ -7633,6 +7706,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         import foo
 
         a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
@@ -7844,6 +7918,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from foo import C
 
         a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
@@ -8050,7 +8125,8 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from foo import D
 
         class Baz: ...
@@ -8351,7 +8427,8 @@ mod tests {
         "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @"
+
         from foo import foo
 
         a[: bar.A | baz.A] = foo()
@@ -8442,6 +8519,7 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
+
         from foo import foo
         from bar import B
 

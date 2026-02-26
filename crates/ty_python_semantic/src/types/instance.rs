@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use ruff_python_ast::PythonVersion;
 use ruff_python_ast::name::Name;
 use ty_module_resolver::{ModuleName, file_to_module};
 
@@ -14,15 +15,13 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor, NormalizedVisitor,
-    TypeContext, TypeMapping, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
+    LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
 
 impl<'db> Type<'db> {
@@ -133,11 +132,7 @@ impl<'db> Type<'db> {
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
-            SynthesizedProtocolType::new(
-                db,
-                ProtocolInterface::with_property_members(db, members),
-                &NormalizedVisitor::default(),
-            ),
+            SynthesizedProtocolType::new(ProtocolInterface::with_property_members(db, members)),
         ))
     }
 
@@ -180,6 +175,20 @@ impl<'db> Type<'db> {
             {
                 return result;
             }
+        }
+
+        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
+        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
+        // out assignability). We don't want generators with different return types to be
+        // assignable to each other. In this case we use the result of the nominal check above.
+        if let Some(self_protocol) = self.as_protocol_instance()
+            && let Protocol::FromClass(self_class) = self_protocol.inner
+            && let Protocol::FromClass(proto_class) = protocol.inner
+            && self_class.known(db) == Some(KnownClass::Generator)
+            && proto_class.known(db) == Some(KnownClass::Generator)
+            && Program::get(db).python_version(db) < PythonVersion::PY313
+        {
+            return result;
         }
 
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
@@ -239,6 +248,10 @@ impl<'db> NominalInstanceType<'db> {
     /// Returns the name of the class this is an instance of.
     ///
     /// For example, for an instance of `builtins.str`, this returns `"str"`.
+    ///
+    /// As of 2026-02-16, this method is not used in any crates in the Ruff
+    /// repo, but is exposed as a public API for external users of
+    /// `ty_python_semantic`.
     pub fn class_name(&self, db: &'db dyn Db) -> &'db Name {
         self.class(db).name(db)
     }
@@ -249,6 +262,10 @@ impl<'db> NominalInstanceType<'db> {
     /// For example, for an instance of `pathlib.Path`, this returns
     /// `Some("pathlib")`. Returns `None` if the class's file cannot be resolved
     /// to a known module (e.g. for classes defined in scripts or notebooks).
+    ///
+    /// As of 2026-02-16, this method is not used in any crates in the Ruff
+    /// repo, but is exposed as a public API for external users of
+    /// `ty_python_semantic`.
     pub fn class_module_name(&self, db: &'db dyn Db) -> Option<&'db ModuleName> {
         let file = self.class(db).class_literal(db).file(db);
         file_to_module(db, file).map(|module| module.name(db))
@@ -375,8 +392,11 @@ impl<'db> NominalInstanceType<'db> {
         };
 
         let to_u32 = |ty: &Type<'db>| match ty {
-            Type::IntLiteral(n) => i32::try_from(*n).map(Some).ok(),
-            Type::BooleanLiteral(b) => Some(Some(i32::from(*b))),
+            Type::LiteralValue(literal) => match literal.kind() {
+                LiteralValueTypeKind::Int(n) => i32::try_from(n.as_i64()).map(Some).ok(),
+                LiteralValueTypeKind::Bool(b) => Some(Some(i32::from(b))),
+                _ => None,
+            },
             Type::NominalInstance(instance)
                 if instance.has_known_class(db, KnownClass::NoneType) =>
             {
@@ -389,22 +409,6 @@ impl<'db> NominalInstanceType<'db> {
             stop: to_u32(stop)?,
             step: to_u32(step)?,
         })
-    }
-
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Type<'db> {
-        match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => {
-                Type::tuple(tuple.normalized_impl(db, visitor))
-            }
-            NominalInstanceInner::NonTuple(class) => Type::NominalInstance(NominalInstanceType(
-                NominalInstanceInner::NonTuple(class.normalized_impl(db, visitor)),
-            )),
-            NominalInstanceInner::Object => Type::object(),
-        }
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -456,28 +460,6 @@ impl<'db> NominalInstanceType<'db> {
                 relation_visitor,
                 disjointness_visitor,
             ),
-        }
-    }
-
-    pub(super) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match (self.0, other.0) {
-            (
-                NominalInstanceInner::ExactTuple(tuple1),
-                NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.is_equivalent_to_impl(db, tuple2, inferable, visitor),
-            (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
-                ConstraintSet::from(true)
-            }
-            (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
-                class1.is_equivalent_to_impl(db, class2, inferable, visitor)
-            }
-            _ => ConstraintSet::from(false),
         }
     }
 
@@ -631,9 +613,7 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct ProtocolInstanceType<'db> {
     pub(super) inner: Protocol<'db>,
 
@@ -747,32 +727,6 @@ impl<'db> ProtocolInstanceType<'db> {
         is_equivalent_to_object_inner(db, self, ())
     }
 
-    /// Return a "normalized" version of this `Protocol` type.
-    ///
-    /// See [`Type::normalized`] for more details.
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
-    /// Return a "normalized" version of this `Protocol` type.
-    ///
-    /// See [`Type::normalized`] for more details.
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Type<'db> {
-        if self.is_equivalent_to_object(db) {
-            return Type::object();
-        }
-        match self.inner {
-            Protocol::FromClass(_) => Type::ProtocolInstance(Self::synthesized(
-                SynthesizedProtocolType::new(db, self.inner.interface(db), visitor),
-            )),
-            Protocol::Synthesized(_) => Type::ProtocolInstance(self),
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -783,26 +737,6 @@ impl<'db> ProtocolInstanceType<'db> {
             inner: self.inner.recursive_type_normalized_impl(db, div, nested)?,
             _phantom: PhantomData,
         })
-    }
-
-    /// Return `true` if this protocol type is equivalent to the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self == other {
-            return ConstraintSet::from(true);
-        }
-        let self_normalized = self.normalized(db);
-        if self_normalized == Type::ProtocolInstance(other) {
-            return ConstraintSet::from(true);
-        }
-        ConstraintSet::from(self_normalized == other.normalized(db))
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
@@ -874,15 +808,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
-///
-/// # Ordering
-///
-/// Ordering between variants is stable and should be the same between runs.
-/// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
-/// The id may change between runs, or when e.g. a `Protocol` was garbage-collected and recreated.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) enum Protocol<'db> {
     FromClass(ProtocolClass<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
@@ -929,32 +855,18 @@ mod synthesized_protocol {
     use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-        NormalizedVisitor, Type, TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, Type,
+        TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
-    ///
-    /// Two synthesized protocol types with the same members will share the same Salsa ID,
-    /// making them easy to compare for equivalence. A synthesized protocol type is therefore
-    /// returned by [`super::ProtocolInstanceType::normalized`] so that two protocols with the same members
-    /// will be understood as equivalent even in the context of differently ordered unions or intersections.
-    ///
-    /// The constructor method of this type maintains the invariant that a synthesized protocol type
-    /// is always constructed from a *normalized* protocol interface.
-    #[derive(
-        Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-    )]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
     pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
 
     impl<'db> SynthesizedProtocolType<'db> {
-        pub(super) fn new(
-            db: &'db dyn Db,
-            interface: ProtocolInterface<'db>,
-            visitor: &NormalizedVisitor<'db>,
-        ) -> Self {
-            Self(interface.normalized_impl(db, visitor))
+        pub(super) fn new(interface: ProtocolInterface<'db>) -> Self {
+            Self(interface)
         }
 
         pub(super) fn apply_type_mapping_impl<'a>(
@@ -962,9 +874,12 @@ mod synthesized_protocol {
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
             tcx: TypeContext<'db>,
-            _visitor: &ApplyTypeMappingVisitor<'db>,
+            visitor: &ApplyTypeMappingVisitor<'db>,
         ) -> Self {
-            Self(self.0.specialized_and_normalized(db, type_mapping, tcx))
+            Self(
+                self.0
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )
         }
 
         pub(super) fn find_legacy_typevars_impl(

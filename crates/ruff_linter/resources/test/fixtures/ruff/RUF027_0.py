@@ -84,3 +84,37 @@ def in_type_def():
 # https://github.com/astral-sh/ruff/issues/18860
 def fuzz_bug():
     c('{\t"i}')
+
+# Test case for backslash handling in f-string interpolations
+# Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
+def backslash_test():
+    x = "test"
+    print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+
+# Test case for comment handling in f-string interpolations
+# Should not trigger RUF027 for Python < 3.12 due to comments in interpolations
+def comment_test():
+    x = "!"
+    print("""{x  # }
+}""")
+
+# Test case for `#` inside a nested string literal in interpolation
+# `#` inside a string is NOT a comment — should trigger RUF027 even on Python < 3.12
+def hash_in_string_test():
+    x = "world"
+    print("Hello {'#'}{x}")   # RUF027: `#` is inside a string, not a comment
+    print("Hello {\"#\"}{x}") # RUF027: same, double-quoted
+
+# Test case for `#` in format spec (e.g., `{1:#x}`)
+# `#` in a format spec is NOT a comment — should trigger RUF027 even on Python < 3.12
+def hash_in_format_spec_test():
+    n = 255
+    print("Hex: {n:#x}")   # RUF027: `#` is in format spec, not a comment
+    print("Oct: {n:#o}")   # RUF027: same
+
+# Test case for `#` in nested interpolation inside format spec (e.g., `{1:{x #}}`)
+# The `#` is a comment inside a nested interpolation — should NOT trigger RUF027 on Python < 3.12
+def hash_in_nested_format_spec_test():
+    x = 5
+    print("""{1:{x #}}
+}""")  # Should not trigger RUF027 for Python < 3.12

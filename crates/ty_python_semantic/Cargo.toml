@@ -45,7 +45,6 @@ serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }
 smallvec = { workspace = true }
 static_assertions = { workspace = true }
-strsim = "0.11.1"
 strum = { workspace = true }
 strum_macros = { workspace = true }
 test-case = { workspace = true }

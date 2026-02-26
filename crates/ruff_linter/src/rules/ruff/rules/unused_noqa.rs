@@ -8,7 +8,6 @@ use crate::AlwaysFixableViolation;
 pub(crate) struct UnusedCodes {
     pub disabled: Vec<String>,
     pub duplicated: Vec<String>,
-    pub unknown: Vec<String>,
     pub unmatched: Vec<String>,
 }
 
@@ -71,11 +70,16 @@ impl UnusedNOQAKind {
 ///     pass
 /// ```
 ///
-/// ## Options
-/// - `lint.external`
+/// ## See also
+///
+/// This rule ignores any codes that are unknown to Ruff, as it can't determine
+/// if the codes are valid or used by other tools. Enable [`invalid-rule-code`][RUF102]
+/// to flag any unknown rule codes.
 ///
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
+///
+/// [RUF102]: https://docs.astral.sh/ruff/rules/invalid-rule-code/
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.155")]
 pub(crate) struct UnusedNOQA {
@@ -114,16 +118,6 @@ impl AlwaysFixableViolation for UnusedNOQA {
                         "duplicated: {}",
                         codes
                             .duplicated
-                            .iter()
-                            .map(|code| format!("`{code}`"))
-                            .join(", ")
-                    ));
-                }
-                if !codes.unknown.is_empty() {
-                    codes_by_reason.push(format!(
-                        "unknown: {}",
-                        codes
-                            .unknown
                             .iter()
                             .map(|code| format!("`{code}`"))
                             .join(", ")

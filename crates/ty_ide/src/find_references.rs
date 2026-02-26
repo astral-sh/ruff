@@ -410,7 +410,7 @@ test("test")
             )
             .build();
 
-        assert_snapshot!(test.references(), @"
+        assert_snapshot!(test.references(), @r#"
         info[references]: Found 6 references
           --> lib.py:5:5
            |
@@ -433,10 +433,10 @@ test("test")
          2 | from lib import test
            |                 ----
          3 |
-         4 | test(\"test\")
+         4 | test("test")
            | ----
            |
-        ");
+        "#);
     }
 
     #[test]
@@ -1242,7 +1242,7 @@ result = func(value=42)
             )
             .build();
 
-        assert_snapshot!(test.references(), @r#"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:4:15
           |
@@ -1258,7 +1258,7 @@ result = func(value=42)
         3 |     return value * 2
           |            -----
           |
-        "#);
+        ");
     }
 
     #[test]
@@ -1282,7 +1282,7 @@ async def main():
             )
             .build();
 
-        assert_snapshot!(test.references(), @r#"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 3 references
          --> main.py:5:23
           |
@@ -1297,7 +1297,7 @@ async def main():
         3 |     return value * 2
           |            -----
           |
-        "#);
+        ");
     }
 
     #[test]
@@ -1321,7 +1321,7 @@ instance = ExampleClass(old_name="test")
             )
             .build();
 
-        assert_snapshot!(test.references(), @r#"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 1 references
          --> example_rename_2.py:4:14
           |
@@ -1330,7 +1330,7 @@ instance = ExampleClass(old_name="test")
         4 |         self.old_name = old_name
           |              --------
           |
-        "#);
+        ");
     }
 
     #[test]
@@ -1359,7 +1359,7 @@ result = func(value=10)
         // TODO(parameter-keyword-references): Nested callable owners are intentionally excluded by
         // the external-visibility heuristic (perf/signal tradeoff).
         // Ideal output would also include `caller.py` at `func(value=10)` on `value`.
-        assert_snapshot!(test.references(), @r#"
+        assert_snapshot!(test.references(), @"
         info[references]: Found 2 references
          --> outer.py:3:15
           |
@@ -1370,7 +1370,7 @@ result = func(value=10)
           |                -----
         5 |     return inner
           |
-        "#);
+        ");
     }
 
     #[test]

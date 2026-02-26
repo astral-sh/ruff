@@ -19,9 +19,7 @@ use crate::semantic_index::{
 use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::{
-    INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
-};
+use crate::types::diagnostic::{INVALID_DATACLASS_OVERRIDE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
@@ -35,9 +33,7 @@ use crate::types::generics::{
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
 use crate::types::mro::DynamicMroError;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{Tuple, TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
@@ -46,9 +42,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     DeprecatedInstance, FindLegacyTypeVarsVisitor, IntersectionBuilder, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    TypeAliasType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder, VarianceInferable,
-    binding_type, declaration_type, determine_upper_bound,
+    MaterializationKind, PropertyInstanceType, TypeContext, TypeMapping, TypedDictParams,
+    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -272,12 +267,7 @@ impl<'db> CodeGeneratorKind<'db> {
 }
 
 /// A specialization of a generic class with a particular assignment of types to typevars.
-///
-/// # Ordering
-/// Ordering is based on the generic aliases's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the alias was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct GenericAlias<'db> {
     pub(crate) origin: StaticClassLiteral<'db>,
     pub(crate) specialization: Specialization<'db>,
@@ -295,14 +285,6 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::new(
-            db,
-            self.origin(db),
-            self.specialization(db).normalized_impl(db, visitor),
-        )
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -413,17 +395,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
 /// A class literal, either defined via a `class` statement or a `type` function call.
 #[derive(
-    Clone,
-    Copy,
-    Debug,
-    Eq,
-    Hash,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    salsa::Supertype,
-    salsa::Update,
-    get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
 )]
 pub enum ClassLiteral<'db> {
     /// A class defined via a `class` statement.
@@ -805,17 +777,7 @@ impl<'db> From<DynamicNamedTupleLiteral<'db>> for ClassLiteral<'db> {
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
 #[derive(
-    Clone,
-    Copy,
-    Debug,
-    Eq,
-    Hash,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    salsa::Supertype,
-    salsa::Update,
-    get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
 )]
 pub enum ClassType<'db> {
     // `NonGeneric` is intended to mean that the `ClassLiteral` has no type parameters. There are
@@ -847,13 +809,6 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(_) => None,
             Self::Generic(generic) => Some(generic),
-        }
-    }
-
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        match self {
-            Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
         }
     }
 
@@ -1088,6 +1043,7 @@ impl<'db> ClassType<'db> {
             let ClassBase::Class(class) = supercls else {
                 continue;
             };
+
             // Currently we do not recognize dynamic classes as being able to define abstract methods,
             // but we do recognise them as being able to override abstract methods defined in static classes.
             let ClassLiteral::Static(class_literal) = class.class_literal(db) else {
@@ -1095,11 +1051,32 @@ impl<'db> ClassType<'db> {
                     .retain(|name, _| class.own_class_member(db, None, name).is_undefined());
                 continue;
             };
+
             let scope = class_literal.body_scope(db);
             let place_table = place_table(db, scope);
-            for (symbol_id, bindings_iterator) in
-                use_def_map(db, class_literal.body_scope(db)).all_end_of_scope_symbol_bindings()
-            {
+            let use_def_map = use_def_map(db, class_literal.body_scope(db));
+
+            // Treat abstract methods from superclasses as having been overridden
+            // if this class has a synthesized method by that name,
+            // or this class has a `ClassVar` declaration by that name
+            abstract_methods.retain(|name, _| {
+                if class_literal
+                    .own_synthesized_member(db, None, None, name)
+                    .is_some()
+                {
+                    return false;
+                }
+
+                place_table.symbol_id(name).is_none_or(|symbol_id| {
+                    let declarations = use_def_map.end_of_scope_symbol_declarations(symbol_id);
+                    !place_from_declarations(db, declarations)
+                        .ignore_conflicting_declarations()
+                        .qualifiers
+                        .contains(TypeQualifiers::CLASS_VAR)
+                })
+            });
+
+            for (symbol_id, bindings_iterator) in use_def_map.all_end_of_scope_symbol_bindings() {
                 let name = place_table.symbol(symbol_id).name();
                 let place_and_definition = place_from_bindings(db, bindings_iterator);
                 let Place::Defined(DefinedPlace { ty, .. }) = place_and_definition.place else {
@@ -1169,7 +1146,7 @@ impl<'db> ClassType<'db> {
             match base {
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
-                    | TypeRelation::Redundancy
+                    | TypeRelation::Redundancy { .. }
                     | TypeRelation::SubtypingAssuming(_) => {
                         ConstraintSet::from(other.is_object(db))
                     }
@@ -1211,37 +1188,6 @@ impl<'db> ClassType<'db> {
                 },
             }
         })
-    }
-
-    pub(super) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: ClassType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self == other {
-            return ConstraintSet::from(true);
-        }
-
-        match (self, other) {
-            // Two non-generic classes are only equivalent if they are equal (handled above).
-            // A non-generic class is never equivalent to a generic class.
-            (ClassType::NonGeneric(_), _) | (_, ClassType::NonGeneric(_)) => {
-                ConstraintSet::from(false)
-            }
-
-            (ClassType::Generic(this), ClassType::Generic(other)) => {
-                ConstraintSet::from(this.origin(db) == other.origin(db)).and(db, || {
-                    this.specialization(db).is_equivalent_to_impl(
-                        db,
-                        other.specialization(db),
-                        inferable,
-                        visitor,
-                    )
-                })
-            }
-        }
     }
 
     /// Return the metaclass of this class, or `type[Unknown]` if the metaclass cannot be inferred.
@@ -1441,7 +1387,7 @@ impl<'db> ClassType<'db> {
                     .and_then(|spec| spec.tuple(db))
                     .and_then(|tuple| tuple.len().into_fixed_length())
                     .and_then(|len| i64::try_from(len).ok())
-                    .map(Type::IntLiteral)
+                    .map(Type::int_literal)
                     .unwrap_or_else(|| KnownClass::Int.to_instance(db));
 
                 let parameters = Parameters::new(
@@ -1577,7 +1523,7 @@ impl<'db> ClassType<'db> {
 
                                 let index_annotation = UnionType::from_elements(
                                     db,
-                                    indices.into_iter().map(Type::IntLiteral),
+                                    indices.into_iter().map(Type::int_literal),
                                 );
 
                                 Some(synthesize_getitem_overload_signature(
@@ -2118,12 +2064,7 @@ impl<'db> Field<'db> {
 ///
 /// This does not in itself represent a type, but can be transformed into a [`ClassType`] that
 /// does. (For generic classes, this requires specializing its generic context.)
-///
-/// # Ordering
-/// Ordering is based on the class's id assigned by salsa and not on the class literal's values.
-/// The id may change between runs, or when the class literal was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct StaticClassLiteral<'db> {
     /// Name of the class at definition
     #[returns(ref)]
@@ -2179,6 +2120,17 @@ impl<'db> StaticClassLiteral<'db> {
             }
             _ => false,
         })
+    }
+
+    /// Returns `true` if this class is a dataclass-like class.
+    ///
+    /// This covers `@dataclass`-decorated classes, as well as classes created via
+    /// `dataclass_transform` (function-based, metaclass-based, and base-class-based).
+    pub(crate) fn is_dataclass_like(self, db: &'db dyn Db) -> bool {
+        matches!(
+            CodeGeneratorKind::from_class(db, ClassLiteral::Static(self), None),
+            Some(CodeGeneratorKind::DataclassLike(_))
+        )
     }
 
     /// Returns a new [`StaticClassLiteral`] with the given dataclass params, preserving all other fields.
@@ -3192,7 +3144,7 @@ impl<'db> StaticClassLiteral<'db> {
                         //     def __gt__(self, other): return not (self == other or self < other)
                         // If `__lt__` returns `int`, then `__gt__` could return `int | bool`.
                         let return_ty =
-                            UnionType::from_elements(db, [signature.return_ty, bool_ty]);
+                            UnionType::from_two_elements(db, signature.return_ty, bool_ty);
                         Signature::new_generic(
                             signature.generic_context,
                             signature.parameters().clone(),
@@ -3256,21 +3208,26 @@ impl<'db> StaticClassLiteral<'db> {
                         // descriptor attribute, data-classes will (implicitly) call the `__set__` method
                         // of the descriptor. This means that the synthesized `__init__` parameter for
                         // this attribute is determined by possible `value` parameter types with which
-                        // the `__set__` method can be called. We build a union of all possible options
-                        // to account for possible overloads.
-                        let mut value_types = UnionBuilder::new(db);
-                        for binding in &dunder_set.bindings(db) {
+                        // the `__set__` method can be called.
+                        //
+                        // We union parameter types across overloads of a single callable, intersect
+                        // callable bindings inside an intersection element, and union outer elements.
+                        field_ty = dunder_set.bindings(db).map_types(db, |binding| {
+                            let mut value_types = UnionBuilder::new(db);
+                            let mut has_value_type = false;
                             for overload in binding {
                                 if let Some(value_param) =
                                     overload.signature.parameters().get_positional(2)
                                 {
                                     value_types = value_types.add(value_param.annotated_type());
+                                    has_value_type = true;
                                 } else if overload.signature.parameters().is_gradual() {
                                     value_types = value_types.add(Type::unknown());
+                                    has_value_type = true;
                                 }
                             }
-                        }
-                        field_ty = value_types.build();
+                            has_value_type.then(|| value_types.build())
+                        });
 
                         // The default value of the attribute is *not* determined by the right hand side
                         // of the class-body assignment. Instead, the runtime invokes `__get__` on the
@@ -3464,7 +3421,11 @@ impl<'db> StaticClassLiteral<'db> {
 
                 // This could probably be `weakref | None`, but it does not seem important enough to
                 // model it precisely.
-                Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
+                Some(UnionType::from_two_elements(
+                    db,
+                    Type::any(),
+                    Type::none(db),
+                ))
             }
             (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
                 KnownClass::NamedTupleFallback
@@ -3698,7 +3659,7 @@ impl<'db> StaticClassLiteral<'db> {
                             if field.is_required() {
                                 field.declared_ty
                             } else {
-                                UnionType::from_elements(db, [field.declared_ty, Type::none(db)])
+                                UnionType::from_two_elements(db, field.declared_ty, Type::none(db))
                             },
                         );
 
@@ -3724,9 +3685,10 @@ impl<'db> StaticClassLiteral<'db> {
                             if field.is_required() {
                                 field.declared_ty
                             } else {
-                                UnionType::from_elements(
+                                UnionType::from_two_elements(
                                     db,
-                                    [field.declared_ty, Type::TypeVar(t_default)],
+                                    field.declared_ty,
+                                    Type::TypeVar(t_default),
                                 )
                             },
                         );
@@ -3745,7 +3707,7 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(KnownClass::Str.to_instance(db)),
                                 ],
                             ),
-                            UnionType::from_elements(db, [Type::unknown(), Type::none(db)]),
+                            UnionType::from_two_elements(db, Type::unknown(), Type::none(db)),
                         )
                     }))
                     .chain(std::iter::once({
@@ -3768,9 +3730,10 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            UnionType::from_elements(
+                            UnionType::from_two_elements(
                                 db,
-                                [Type::unknown(), Type::TypeVar(t_default)],
+                                Type::unknown(),
+                                Type::TypeVar(t_default),
                             ),
                         )
                     }));
@@ -3828,9 +3791,10 @@ impl<'db> StaticClassLiteral<'db> {
                                         .with_annotated_type(Type::TypeVar(t_default)),
                                 ],
                             ),
-                            UnionType::from_elements(
+                            UnionType::from_two_elements(
                                 db,
-                                [field.declared_ty, Type::TypeVar(t_default)],
+                                field.declared_ty,
+                                Type::TypeVar(t_default),
                             ),
                         );
 
@@ -4666,9 +4630,10 @@ impl<'db> StaticClassLiteral<'db> {
                             } else {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_elements(
+                                        ty: UnionType::from_two_elements(
                                             db,
-                                            [declared_ty, implicit_ty],
+                                            declared_ty,
+                                            implicit_ty,
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
@@ -4728,9 +4693,10 @@ impl<'db> StaticClassLiteral<'db> {
                             {
                                 Member {
                                     inner: Place::Defined(DefinedPlace {
-                                        ty: UnionType::from_elements(
+                                        ty: UnionType::from_two_elements(
                                             db,
-                                            [declared_ty, implicit_ty],
+                                            declared_ty,
+                                            implicit_ty,
                                         ),
                                         origin: TypeOrigin::Declared,
                                         definedness: declaredness,
@@ -5043,7 +5009,6 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// - For dangling `type()` calls, a relative node offset anchored to the enclosing scope
 ///   provides stable identity that only changes when the scope itself changes.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct DynamicClassLiteral<'db> {
     /// The name of the class (from the first argument to `type()`).
     #[returns(ref)]
@@ -5432,7 +5397,7 @@ impl<'db> DynamicClassLiteral<'db> {
                         spec.len().into_fixed_length().is_some_and(|len| len > 0)
                     }),
                     // __slots__ = "abc"  # Same as ("abc",)
-                    Type::StringLiteral(_) => true,
+                    Type::LiteralValue(literal) if literal.is_string() => true,
                     // Other types are considered dynamic/unknown
                     _ => false,
                 };
@@ -5616,7 +5581,6 @@ pub struct NamedTupleField<'db> {
 ///
 /// The type of `Point` would be `type[Point]` where `Point` is a `DynamicNamedTupleLiteral`.
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct DynamicNamedTupleLiteral<'db> {
     /// The name of the namedtuple (from the first argument).
     #[returns(ref)]
@@ -6007,13 +5971,7 @@ pub enum DynamicNamedTupleAnchor<'db> {
 
 /// A specification describing the fields of a dynamic `namedtuple`
 /// or `NamedTuple` class.
-///
-/// # Ordering
-///
-/// Ordering is based on the spec's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the spec was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct NamedTupleSpec<'db> {
     #[returns(deref)]
     pub(crate) fields: Box<[NamedTupleField<'db>]>,
@@ -6030,20 +5988,6 @@ impl<'db> NamedTupleSpec<'db> {
     /// Create a [`NamedTupleSpec`] that indicates a namedtuple class has unknown fields.
     pub(crate) fn unknown(db: &'db dyn Db) -> Self {
         Self::new(db, Box::default(), false)
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let fields: Box<_> = self
-            .fields(db)
-            .iter()
-            .map(|f| NamedTupleField {
-                name: f.name.clone(),
-                ty: f.ty.normalized_impl(db, visitor),
-                default: None,
-            })
-            .collect();
-
-        Self::new(db, fields, self.has_known_fields(db))
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -8153,42 +8097,6 @@ impl KnownClass {
                 )));
             }
 
-            KnownClass::TypeAliasType => {
-                let assigned_to = index
-                    .try_expression(ast::ExprRef::from(call_expression))
-                    .and_then(|expr| expr.assigned_to(db));
-
-                let containing_assignment = assigned_to.as_ref().and_then(|assigned_to| {
-                    match assigned_to.node(module).targets.as_slice() {
-                        [ast::Expr::Name(target)] => Some(index.expect_single_definition(target)),
-                        _ => None,
-                    }
-                });
-
-                let [Some(name), Some(value), ..] = overload.parameter_types() else {
-                    return;
-                };
-
-                let Some(name) = name.as_string_literal() else {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
-                    {
-                        builder.into_diagnostic(
-                            "The name of a `typing.TypeAlias` must be a string literal",
-                        );
-                    }
-                    return;
-                };
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                    TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
-                        db,
-                        ast::name::Name::new(name.value(db)),
-                        containing_assignment,
-                        value,
-                    )),
-                )));
-            }
-
             _ => {}
         }
     }
@@ -8334,7 +8242,7 @@ impl SlotsKind {
             },
 
             // __slots__ = "abc"  # Same as `("abc",)`
-            Type::StringLiteral(_) => Self::NotEmpty,
+            Type::LiteralValue(literal) if literal.is_string() => Self::NotEmpty,
 
             _ => Self::Dynamic,
         }

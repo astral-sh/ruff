@@ -1,11 +1,10 @@
-use std::collections::BTreeSet;
-
 use crate::Db;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::ConstraintSet;
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use rustc_hash::FxHashSet;
 
 /// A `typing.NewType` declaration, either from the perspective of the
 /// identity-callable-that-acts-like-a-subtype-in-type-expressions returned by the call to
@@ -22,12 +21,7 @@ use ruff_python_ast as ast;
 /// - `typing.NewType`: `Type::ClassLiteral(ClassLiteral)` with `KnownClass::NewType`.
 /// - `Foo`: `Type::KnownInstance(KnownInstanceType::NewType(NewType { .. }))`
 /// - `x`: `Type::NewTypeInstance(NewType { .. })`
-///
-/// # Ordering
-/// Ordering is based on the newtype's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the newtype was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct NewType<'db> {
     /// The name of this NewType (e.g. `"Foo"`)
     #[returns(ref)]
@@ -96,7 +90,7 @@ impl<'db> NewType<'db> {
     fn iter_bases(self, db: &'db dyn Db) -> NewTypeBaseIter<'db> {
         NewTypeBaseIter {
             current: Some(self),
-            seen_before: BTreeSet::new(),
+            seen_before: FxHashSet::default(),
             db,
         }
     }
@@ -256,7 +250,7 @@ impl<'db> NewTypeBase<'db> {
 /// over the base class need to pass down a cycle-detecting visitor as usual.
 struct NewTypeBaseIter<'db> {
     current: Option<NewType<'db>>,
-    seen_before: BTreeSet<NewType<'db>>,
+    seen_before: FxHashSet<NewType<'db>>,
     db: &'db dyn Db,
 }
 

@@ -79,7 +79,10 @@ T = TypeVar("T")
 class CanIndex(Protocol[T]):
     def __getitem__(self, index: int, /) -> T: ...
 
-class ExplicitlyImplements(CanIndex[T]): ...
+class ExplicitlyImplements(CanIndex[T]):
+    def __getitem__(self, index: int, /) -> T:
+        raise NotImplementedError
+
 class SubProtocol(CanIndex[T], Protocol): ...
 
 def takes_in_list(x: list[T]) -> list[T]:
@@ -879,4 +882,32 @@ def f(x: T) -> T:
 
 def g(x: S) -> S:
     return f(x)  # error: [invalid-argument-type]
+```
+
+## Inferring typevars in iterable parameters from literal string and bytes arguments
+
+```py
+from typing import Iterable, TypeVar
+from typing_extensions import LiteralString
+
+FlatT = TypeVar("FlatT")
+
+def flatten(*iterables: Iterable[FlatT]) -> list[FlatT]:
+    return [x for iterable in iterables for x in iterable]
+
+def flatten_covariant(*iterables: Iterable[FlatT]) -> tuple[FlatT, ...]:
+    return tuple(x for iterable in iterables for x in iterable)
+
+reveal_type(flatten("abc", (1, 2, 3)))  # revealed: list[str | int]
+# TODO: we could have `Literal["a", "b", "c"]` instead of `str` here
+reveal_type(flatten_covariant("abc", (1, 2, 3)))  # revealed: tuple[str | Literal[1, 2, 3], ...]
+
+def literal_string_case(literal_string: LiteralString):
+    reveal_type(flatten(literal_string, (1, 2, 3)))  # revealed: list[str | int]
+
+reveal_type(flatten(b"abc"))  # revealed: list[int]
+reveal_type(flatten(b"abc", ("x",)))  # revealed: list[int | str]
+# TODO: we could have `Literal[97, 98, 99]` instead of `int` in the next two lines
+reveal_type(flatten_covariant(b"abc"))  # revealed: tuple[int, ...]
+reveal_type(flatten_covariant(b"abc", ("x",)))  # revealed: tuple[int | Literal["x"], ...]
 ```

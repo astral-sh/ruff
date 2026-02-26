@@ -102,6 +102,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_ARGUMENTS);
     registry.register_lint(&INVALID_TYPE_CHECKING_CONSTANT);
     registry.register_lint(&INVALID_TYPE_FORM);
+    registry.register_lint(&INVALID_MATCH_PATTERN);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
@@ -140,6 +141,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&STATIC_ASSERT_ERROR);
     registry.register_lint(&INVALID_ATTRIBUTE_ACCESS);
     registry.register_lint(&REDUNDANT_CAST);
+    registry.register_lint(&REDUNDANT_FINAL_CLASSVAR);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
@@ -1638,6 +1640,28 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for invalid match patterns.
+    ///
+    /// ## Why is this bad?
+    /// Matching on invalid patterns will lead to a runtime error.
+    ///
+    /// ## Examples
+    /// ```python
+    /// NotAClass = 42
+    ///
+    /// match x:
+    ///     case NotAClass():    # TypeError at runtime: must be a class
+    ///         ...
+    /// ```
+    pub(crate) static INVALID_MATCH_PATTERN = {
+        summary: "detect invalid match patterns",
+        status: LintStatus::stable("0.0.18"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Checks for type guard functions without
     /// a first non-self-like non-keyword-only non-variadic parameter.
     ///
@@ -2650,6 +2674,32 @@ declare_lint! {
     pub(crate) static REDUNDANT_CAST = {
         summary: "detects redundant `cast` calls",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for redundant combinations of the `ClassVar` and `Final` type qualifiers.
+    ///
+    /// ## Why is this bad?
+    /// An attribute that is marked `Final` in a class body is implicitly a class variable.
+    /// Marking it as `ClassVar` is therefore redundant.
+    ///
+    /// Note that this diagnostic is not emitted for dataclass fields, where
+    /// `ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.
+    ///
+    /// ## Examples
+    /// ```python
+    /// from typing import ClassVar, Final
+    ///
+    /// class C:
+    ///     x: ClassVar[Final[int]] = 1  # redundant
+    ///     y: Final[ClassVar[int]] = 1  # redundant
+    /// ```
+    pub(crate) static REDUNDANT_FINAL_CLASSVAR = {
+        summary: "detects redundant combinations of `ClassVar` and `Final`",
+        status: LintStatus::stable("0.0.18"),
         default_level: Level::Warn,
     }
 }
@@ -3876,7 +3926,7 @@ pub(crate) fn report_invalid_arguments_to_annotated(
 pub(crate) fn report_invalid_argument_number_to_special_form(
     context: &InferContext,
     subscript: &ast::ExprSubscript,
-    special_form: SpecialFormType,
+    special_form: impl Into<SpecialFormType>,
     received_arguments: usize,
     expected_arguments: u8,
 ) {
@@ -3889,6 +3939,7 @@ pub(crate) fn report_invalid_argument_number_to_special_form(
         builder.into_diagnostic(format_args!(
             "Special form `{special_form}` expected exactly {expected_arguments} {noun}, \
             got {received_arguments}",
+            special_form = special_form.into(),
         ));
     }
 }
@@ -3973,6 +4024,22 @@ pub(crate) fn report_invalid_arguments_to_callable(
     builder.into_diagnostic(format_args!(
         "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
     ));
+}
+
+pub(crate) fn report_invalid_class_match_pattern<T: Ranged>(
+    context: &InferContext,
+    pattern_cls: T,
+    cls_ty: Type,
+) {
+    let Some(builder) = context.report_lint(&INVALID_MATCH_PATTERN, pattern_cls) else {
+        return;
+    };
+    let db = context.db();
+    let class_display = cls_ty.display(db);
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "`{class_display}` cannot be used in a class pattern because it is not a type"
+    ));
+    diagnostic.set_primary_message("This will raise `TypeError` at runtime");
 }
 
 pub(crate) fn add_type_expression_reference_link<'db, 'ctx>(
@@ -4254,7 +4321,7 @@ pub(crate) fn report_undeclared_protocol_member(
     if definition.kind(db).is_unannotated_assignment() {
         let binding_type = binding_type(db, definition);
 
-        let suggestion = binding_type.promote_literals(db, TypeContext::default());
+        let suggestion = binding_type.promote_literals(db);
 
         if should_give_hint(db, suggestion) {
             diagnostic.set_primary_message(format_args!(
@@ -4496,8 +4563,8 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
-        match key_ty {
-            Type::StringLiteral(key) => {
+        match key_ty.as_string_literal() {
+            Some(key) => {
                 let key = key.value(db);
                 let typed_dict_name = typed_dict_ty.display(db);
 
@@ -4521,7 +4588,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
                         .message(format_args!("TypedDict `{typed_dict_name}`"))
                 });
 
-                let existing_keys = items.keys();
+                let existing_keys = items.keys().map(Name::as_str);
                 if let Some(suggestion) = did_you_mean(existing_keys, key) {
                     if let AnyNodeRef::ExprStringLiteral(literal) = key_node {
                         let quoted_suggestion = format!(
@@ -5295,7 +5362,7 @@ pub(super) fn report_unsupported_comparison<'db>(
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
 
-    if left_ty == right_ty {
+    if left_ty.is_equivalent_to(db, right_ty) {
         diagnostic.set_primary_message(format_args!(
             "Both operands have type `{}`",
             left_ty.display_with(db, display_settings.clone())
@@ -5340,7 +5407,7 @@ pub(super) fn report_unsupported_comparison<'db>(
                 .zip(rhs_spec.all_elements())
                 .position(|tup| tup == (&error.left_ty, &error.right_ty))
         {
-            if error.left_ty == error.right_ty {
+            if error.left_ty.is_equivalent_to(db, error.right_ty) {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported between \
                     the tuple elements at index {} (both of type `{}`)",
@@ -5359,7 +5426,7 @@ pub(super) fn report_unsupported_comparison<'db>(
                 ));
             }
         } else {
-            if error.left_ty == error.right_ty {
+            if error.left_ty.is_equivalent_to(db, error.right_ty) {
                 diagnostic.info(format_args!(
                     "Operation fails because operator `{}` is not supported \
                     between two objects of type `{}`",
@@ -5465,7 +5532,7 @@ fn report_unsupported_binary_operation_impl<'a>(
     let mut diagnostic =
         diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));
 
-    if left_ty == right_ty {
+    if left_ty.is_equivalent_to(db, right_ty) {
         diagnostic.set_primary_message(format_args!(
             "Both operands have type `{}`",
             left_ty.display_with(db, display_settings.clone())

@@ -755,9 +755,36 @@ def _() -> NoReturn:
     f("")
 ```
 
+### Generic functions
+
+If a generic function's return type depends on a type variable, and the argument passed resolves
+that type variable to `Never`, the call should still be treated as terminal.
+
+```py
+from typing import TypeVar, NoReturn
+
+T = TypeVar("T")
+
+def identity(x: T) -> T:
+    return x
+
+# No "implicitly returns `None`" diagnostic
+def _() -> NoReturn:
+    identity(exit())
+
+def _(flag: bool):
+    if flag:
+        x = "test"
+    else:
+        x = "terminal"
+        identity(exit())
+
+    reveal_type(x)  # revealed: Literal["test"]
+```
+
 ### Other callables
 
-If other types of callables are annotated with `NoReturn`, we should still be ablt to infer correct
+If other types of callables are annotated with `NoReturn`, we should still be able to infer correct
 reachability.
 
 ```py
@@ -779,6 +806,28 @@ def _() -> NoReturn:
 # No "implicitly returns `None`" diagnostic
 def _() -> NoReturn:
     C().die()
+```
+
+### Awaiting async `NoReturn` functions
+
+Awaiting an async function annotated as returning `NoReturn` should be treated as terminal, just
+like calling a synchronous `NoReturn` function.
+
+```py
+from typing import NoReturn
+
+async def stop() -> NoReturn:
+    raise NotImplementedError
+
+async def main(flag: bool):
+    if flag:
+        x = "terminal"
+        await stop()
+    else:
+        x = "test"
+        pass
+
+    reveal_type(x)  # revealed: Literal["test"]
 ```
 
 ## Nested functions

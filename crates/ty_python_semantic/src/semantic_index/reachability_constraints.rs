@@ -209,8 +209,8 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, NarrowingConstraint, Truthiness, Type, TypeContext,
-    UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+    CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, Type,
+    TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -314,14 +314,24 @@ const AMBIGUOUS: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId
 const ALWAYS_FALSE: ScopedReachabilityConstraintId = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 const SMALLEST_TERMINAL: ScopedReachabilityConstraintId = ALWAYS_FALSE;
 
+/// Maximum number of interior TDD nodes per scope. When exceeded, new constraint
+/// operations return `AMBIGUOUS` to prevent exponential blowup on pathological inputs
+/// (e.g., a 5000-line while loop with hundreds of if-branches). This can lead to less precise
+/// reachability analysis and type narrowing.
+const MAX_INTERIOR_NODES: usize = 512 * 1024;
+
 fn singleton_to_type(db: &dyn Db, singleton: ruff_python_ast::Singleton) -> Type<'_> {
     let ty = match singleton {
         ruff_python_ast::Singleton::None => Type::none(db),
-        ruff_python_ast::Singleton::True => Type::BooleanLiteral(true),
-        ruff_python_ast::Singleton::False => Type::BooleanLiteral(false),
+        ruff_python_ast::Singleton::True => Type::bool_literal(true),
+        ruff_python_ast::Singleton::False => Type::bool_literal(false),
     };
     debug_assert!(ty.is_singleton(db));
     ty
+}
+
+fn mapping_pattern_type(db: &dyn Db) -> Type<'_> {
+    KnownClass::Mapping.to_instance(db).top_materialization(db)
 }
 
 /// Turn a `match` pattern kind into a type that represents the set of all values that would definitely
@@ -346,6 +356,13 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
                     .to_instance(db)
                     .unwrap_or(Type::Never)
                     .top_materialization(db)
+            } else {
+                Type::Never
+            }
+        }
+        PatternPredicateKind::Mapping(kind) => {
+            if kind.is_irrefutable() {
+                mapping_pattern_type(db)
             } else {
                 Type::Never
             }
@@ -588,6 +605,11 @@ impl ReachabilityConstraintsBuilder {
         if let Some(cached) = self.not_cache.get(&a) {
             return *cached;
         }
+
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return AMBIGUOUS;
+        }
+
         let a_node = self.interiors[a];
         let if_true = self.add_not_constraint(a_node.if_true);
         let if_ambiguous = self.add_not_constraint(a_node.if_ambiguous);
@@ -619,6 +641,10 @@ impl ReachabilityConstraintsBuilder {
         let (a, b) = if b.0 < a.0 { (b, a) } else { (a, b) };
         if let Some(cached) = self.or_cache.get(&(a, b)) {
             return *cached;
+        }
+
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return AMBIGUOUS;
         }
 
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
@@ -687,6 +713,10 @@ impl ReachabilityConstraintsBuilder {
             return *cached;
         }
 
+        if self.interiors.len() >= MAX_INTERIOR_NODES {
+            return AMBIGUOUS;
+        }
+
         let (atom, if_true, if_ambiguous, if_false) = match self.cmp_atoms(a, b) {
             Ordering::Equal => {
                 let a_node = self.interiors[a];
@@ -737,12 +767,11 @@ impl ReachabilityConstraintsBuilder {
 
 /// AND a new optional narrowing constraint with an accumulated one.
 fn accumulate_constraint<'db>(
-    db: &'db dyn Db,
     accumulated: Option<NarrowingConstraint<'db>>,
     new: Option<NarrowingConstraint<'db>>,
 ) -> Option<NarrowingConstraint<'db>> {
     match (accumulated, new) {
-        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc, db)),
+        (Some(acc), Some(new_c)) => Some(new_c.merge_constraint_and(acc)),
         (None, Some(new_c)) => Some(new_c),
         (Some(acc), None) => Some(acc),
         (None, None) => None,
@@ -809,7 +838,7 @@ impl ReachabilityConstraints {
                 // Apply all accumulated narrowing constraints to the base type
                 match accumulated {
                     Some(constraint) => NarrowingConstraint::intersection(base_ty)
-                        .merge_constraint_and(constraint, db)
+                        .merge_constraint_and(constraint)
                         .evaluate_constraint_type(db),
                     None => base_ty,
                 }
@@ -858,7 +887,7 @@ impl ReachabilityConstraints {
                         is_positive: !predicate.is_positive,
                     };
                     let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                    let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                    let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
                         predicates,
@@ -871,7 +900,7 @@ impl ReachabilityConstraints {
 
                 // If the false branch is statically unreachable, skip it entirely.
                 if node.if_false == ALWAYS_FALSE {
-                    let true_accumulated = accumulate_constraint(db, accumulated, pos_constraint);
+                    let true_accumulated = accumulate_constraint(accumulated, pos_constraint);
                     return self.narrow_by_constraint_inner(
                         db,
                         predicates,
@@ -883,8 +912,7 @@ impl ReachabilityConstraints {
                 }
 
                 // True branch: predicate holds → accumulate positive narrowing
-                let true_accumulated =
-                    accumulate_constraint(db, accumulated.clone(), pos_constraint);
+                let true_accumulated = accumulate_constraint(accumulated.clone(), pos_constraint);
                 let true_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
@@ -900,7 +928,7 @@ impl ReachabilityConstraints {
                     is_positive: !predicate.is_positive,
                 };
                 let neg_constraint = infer_narrowing_constraint(db, neg_predicate, place);
-                let false_accumulated = accumulate_constraint(db, accumulated, neg_constraint);
+                let false_accumulated = accumulate_constraint(accumulated, neg_constraint);
                 let false_ty = self.narrow_by_constraint_inner(
                     db,
                     predicates,
@@ -910,7 +938,7 @@ impl ReachabilityConstraints {
                     false_accumulated,
                 );
 
-                UnionType::from_elements(db, [true_ty, false_ty])
+                UnionType::from_two_elements(db, true_ty, false_ty)
             }
         }
     }
@@ -1031,6 +1059,20 @@ impl ReachabilityConstraints {
                     }
                 })
             }
+            PatternPredicateKind::Mapping(kind) => {
+                let mapping_ty = mapping_pattern_type(db);
+                if subject_ty.is_subtype_of(db, mapping_ty) {
+                    if kind.is_irrefutable() {
+                        Truthiness::AlwaysTrue
+                    } else {
+                        Truthiness::Ambiguous
+                    }
+                } else if subject_ty.is_disjoint_from(db, mapping_ty) {
+                    Truthiness::AlwaysFalse
+                } else {
+                    Truthiness::Ambiguous
+                }
+            }
             PatternPredicateKind::As(pattern, _) => pattern
                 .as_deref()
                 .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
@@ -1051,6 +1093,7 @@ impl ReachabilityConstraints {
             PredicateNode::ReturnsNever(CallableAndCallExpr {
                 callable,
                 call_expr,
+                is_await,
             }) => {
                 // We first infer just the type of the callable. In the most likely case that the
                 // function is not marked with `NoReturn`, or that it always returns `NoReturn`,
@@ -1081,18 +1124,18 @@ impl ReachabilityConstraints {
                     return Truthiness::AlwaysFalse.negate_if(!predicate.is_positive);
                 };
 
-                let (no_overloads_return_never, all_overloads_return_never) = overloads_iterator
-                    .fold((true, true), |(none, all), overload| {
-                        let overload_returns_never =
-                            overload.return_ty.is_equivalent_to(db, Type::Never);
+                let mut no_overloads_return_never = true;
+                let mut all_overloads_return_never = true;
+                let mut any_overload_is_generic = false;
 
-                        (
-                            none && !overload_returns_never,
-                            all && overload_returns_never,
-                        )
-                    });
+                for overload in overloads_iterator {
+                    let returns_never = overload.return_ty.is_equivalent_to(db, Type::Never);
+                    no_overloads_return_never &= !returns_never;
+                    all_overloads_return_never &= returns_never;
+                    any_overload_is_generic |= overload.return_ty.has_typevar(db);
+                }
 
-                if no_overloads_return_never {
+                if no_overloads_return_never && !any_overload_is_generic && !is_await {
                     Truthiness::AlwaysFalse
                 } else if all_overloads_return_never {
                     Truthiness::AlwaysTrue

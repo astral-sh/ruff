@@ -1,4 +1,8 @@
-use crate::diagnostic::{Diagnostic, FileResolver, Severity};
+use ruff_text_size::TextRange;
+
+use crate::diagnostic::{
+    Annotation, Diagnostic, FileResolver, Severity, SubDiagnosticSeverity, UnifiedFile,
+};
 
 pub(super) struct GithubRenderer<'a> {
     resolver: &'a dyn FileResolver,
@@ -87,10 +91,94 @@ impl<'a> GithubRenderer<'a> {
                 write!(f, "{id}:", id = diagnostic.id())?;
             }
 
-            writeln!(f, " {}", diagnostic.concise_message())?;
+            write!(f, " {}", diagnostic.concise_message())?;
+
+            // After rendering the main diagnostic, render its secondary annotations and
+            // sub-diagnostics. Note that lines within a single diagnostic must be separated by
+            // URL-encoded newlines (`%0A`) to render properly in GitHub annotations.
+            for annotation in diagnostic.secondary_annotations().filter_map(|annotation| {
+                GithubAnnotation::from_annotation(annotation, self.resolver)
+            }) {
+                write!(f, "%0A{annotation}")?;
+            }
+
+            for subdiagnostic in diagnostic.sub_diagnostics() {
+                let severity = match subdiagnostic.severity() {
+                    SubDiagnosticSeverity::Help => "help",
+                    SubDiagnosticSeverity::Info => "info",
+                    SubDiagnosticSeverity::Warning => "warning",
+                    SubDiagnosticSeverity::Error | SubDiagnosticSeverity::Fatal => "error",
+                };
+                if let Some(annotation) = subdiagnostic.primary_annotation()
+                    && let span = annotation.get_span()
+                    && let file = span.file()
+                    && let Some(range) = span.range()
+                {
+                    let diagnostic_source = file.diagnostic_source(self.resolver);
+                    let source_code = diagnostic_source.as_source_code();
+                    let message = subdiagnostic.concise_message();
+                    let start_location = source_code.line_column(range.start());
+                    write!(
+                        f,
+                        "%0A  {path}:{row}:{column}: {severity}: {message}",
+                        path = file.relative_path(self.resolver).display(),
+                        row = start_location.line,
+                        column = start_location.column,
+                    )?;
+                } else {
+                    write!(f, "%0A  {severity}: {}", subdiagnostic.concise_message())?;
+                }
+
+                for annotation in subdiagnostic
+                    .secondary_annotations()
+                    .filter_map(|annotation| {
+                        GithubAnnotation::from_annotation(annotation, self.resolver)
+                    })
+                {
+                    write!(f, "%0A  {annotation}")?;
+                }
+            }
+
+            writeln!(f)?;
         }
 
         Ok(())
+    }
+}
+
+struct GithubAnnotation<'a> {
+    message: &'a str,
+    range: TextRange,
+    file: &'a UnifiedFile,
+    resolver: &'a dyn FileResolver,
+}
+
+impl<'a> GithubAnnotation<'a> {
+    fn from_annotation(annotation: &'a Annotation, resolver: &'a dyn FileResolver) -> Option<Self> {
+        let span = annotation.get_span();
+        Some(Self {
+            message: annotation.get_message()?,
+            range: span.range()?,
+            file: span.file(),
+            resolver,
+        })
+    }
+}
+
+impl std::fmt::Display for GithubAnnotation<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let diagnostic_source = self.file.diagnostic_source(self.resolver);
+        let source_code = diagnostic_source.as_source_code();
+        let start_location = source_code.line_column(self.range.start());
+        write!(
+            f,
+            "  {path}:{row}:{column}:",
+            path = self.file.relative_path(self.resolver).display(),
+            row = start_location.line,
+            column = start_location.column,
+        )?;
+
+        write!(f, " {message}", message = self.message)
     }
 }
 

@@ -121,6 +121,7 @@ mod tests {
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
+    #[test_case(Rule::InvalidRuleCode, Path::new("RUF102_1.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
     #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -130,6 +131,22 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn missing_fstring_syntax_backslash_py311() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/RUF027_0.py"),
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+            &LinterSettings {
+                unresolved_target_version: PythonVersion::PY311.into(),
+                ..LinterSettings::for_rule(Rule::MissingFStringSyntax)
+            },
+        );
         Ok(())
     }
 
@@ -481,16 +498,22 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn invalid_rule_code_external_rules() -> Result<()> {
+    #[test_case(Path::new("ruff/RUF102.py"))]
+    #[test_case(Path::new("ruff/RUF102_1.py"))]
+    fn invalid_rule_code_external_rules(path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "invalid_rule_code_external_rules_{}",
+            path.to_string_lossy(),
+        );
         let diagnostics = test_path(
-            Path::new("ruff/RUF102.py"),
+            path,
             &settings::LinterSettings {
                 external: vec!["V".to_string()],
+                preview: PreviewMode::Enabled,
                 ..settings::LinterSettings::for_rule(Rule::InvalidRuleCode)
             },
         )?;
-        assert_diagnostics!(diagnostics);
+        assert_diagnostics!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -613,6 +636,7 @@ mod tests {
     #[test_case(Rule::IndentedFormFeed, Path::new("RUF054.py"))]
     #[test_case(Rule::ImplicitClassVarInDataclass, Path::new("RUF045.py"))]
     #[test_case(Rule::FloatEqualityComparison, Path::new("RUF069.py"))]
+    #[test_case(Rule::UnnecessaryAssignBeforeYield, Path::new("RUF070.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",

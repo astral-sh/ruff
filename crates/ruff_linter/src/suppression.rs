@@ -14,7 +14,7 @@ use ruff_python_trivia::{Cursor, indentation_at_offset};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
-use crate::checkers::ast::LintContext;
+use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::rule_redirects::get_redirect_target;
@@ -220,73 +220,79 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
+        fn process_pending_diagnostics(
+            key: Option<TextRange>,
+            grouped_diagnostic: Option<&(TextRange, SuppressionDiagnostic)>,
+            context: &LintContext,
+            locator: &Locator,
+        ) -> bool {
+            if let Some((group_key, group)) = grouped_diagnostic
+                && key.is_none_or(|key| key != *group_key)
+            {
+                if group.any_invalid() {
+                    if let Some(mut diagnostic) = Suppressions::report_suppression_codes(
+                        context,
+                        locator,
+                        group.suppression,
+                        &group.invalid_codes,
+                        true,
+                        InvalidRuleCode {
+                            rule_code: group.invalid_codes.iter().join(", "),
+                            kind: InvalidRuleCodeKind::Suppression,
+                            whole_comment: group.suppression.codes().len()
+                                == group.invalid_codes.len(),
+                        },
+                    ) {
+                        diagnostic.help(
+                            "Add non-Ruff rule codes to the `lint.external` configuration option",
+                        );
+                    }
+                }
+                if group.any_unused() {
+                    let mut codes = group.disabled_codes.clone();
+                    codes.extend(group.unused_codes.clone());
+                    Suppressions::report_suppression_codes(
+                        context,
+                        locator,
+                        group.suppression,
+                        &codes,
+                        false,
+                        UnusedNOQA {
+                            codes: Some(UnusedCodes {
+                                disabled: group
+                                    .disabled_codes
+                                    .iter()
+                                    .map(ToString::to_string)
+                                    .collect_vec(),
+                                duplicated: group
+                                    .duplicated_codes
+                                    .iter()
+                                    .map(ToString::to_string)
+                                    .collect_vec(),
+                                unmatched: group
+                                    .unused_codes
+                                    .iter()
+                                    .map(ToString::to_string)
+                                    .collect_vec(),
+                            }),
+                            kind: UnusedNOQAKind::Suppression,
+                        },
+                    );
+                }
+                true
+            } else {
+                false
+            }
+        }
+
         let mut grouped_diagnostic: Option<(TextRange, SuppressionDiagnostic)> = None;
         let mut unmatched_ranges = FxHashSet::default();
-
-        let process_pending_diagnostics =
-            |key: Option<TextRange>,
-             grouped_diagnostic: &Option<(TextRange, SuppressionDiagnostic)>|
-             -> bool {
-                if let Some((group_key, group)) = grouped_diagnostic
-                    && key.is_none_or(|key| key != *group_key)
-                {
-                    if group.any_invalid() {
-                        Suppressions::report_suppression_codes(
-                            context,
-                            locator,
-                            group.suppression,
-                            &group.invalid_codes,
-                            true,
-                            InvalidRuleCode {
-                                rule_code: group.invalid_codes.iter().join(", "),
-                                kind: InvalidRuleCodeKind::Suppression,
-                                whole_comment: group.suppression.codes().len()
-                                    == group.invalid_codes.len(),
-                            },
-                        );
-                    }
-                    if group.any_unused() {
-                        let mut codes = group.disabled_codes.clone();
-                        codes.extend(group.unused_codes.clone());
-                        Suppressions::report_suppression_codes(
-                            context,
-                            locator,
-                            group.suppression,
-                            &codes,
-                            false,
-                            UnusedNOQA {
-                                codes: Some(UnusedCodes {
-                                    disabled: group
-                                        .disabled_codes
-                                        .iter()
-                                        .map(ToString::to_string)
-                                        .collect_vec(),
-                                    duplicated: group
-                                        .duplicated_codes
-                                        .iter()
-                                        .map(ToString::to_string)
-                                        .collect_vec(),
-                                    unmatched: group
-                                        .unused_codes
-                                        .iter()
-                                        .map(ToString::to_string)
-                                        .collect_vec(),
-                                    ..Default::default()
-                                }),
-                                kind: UnusedNOQAKind::Suppression,
-                            },
-                        );
-                    }
-                    true
-                } else {
-                    false
-                }
-            };
 
         for suppression in &self.valid {
             let key = suppression.comments.disable_comment().range;
 
-            if process_pending_diagnostics(Some(key), &grouped_diagnostic) {
+            if process_pending_diagnostics(Some(key), grouped_diagnostic.as_ref(), context, locator)
+            {
                 grouped_diagnostic = None;
             }
 
@@ -335,7 +341,7 @@ impl Suppressions {
             }
         }
 
-        process_pending_diagnostics(None, &grouped_diagnostic);
+        process_pending_diagnostics(None, grouped_diagnostic.as_ref(), context, locator);
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             for error in &self.errors {
@@ -367,14 +373,14 @@ impl Suppressions {
         }
     }
 
-    fn report_suppression_codes<T: Violation>(
-        context: &LintContext,
+    fn report_suppression_codes<'a, 'b, T: Violation>(
+        context: &'a LintContext<'b>,
         locator: &Locator,
         suppression: &Suppression,
         remove_codes: &[&str],
         highlight_only_code: bool,
         kind: T,
-    ) {
+    ) -> Option<DiagnosticGuard<'a, 'b>> {
         let disable_comment = suppression.comments.disable_comment();
         let (range, edit) = Suppressions::delete_codes_or_comment(
             locator,
@@ -382,7 +388,7 @@ impl Suppressions {
             remove_codes,
             highlight_only_code,
         );
-        if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(kind, range) {
+        if let Some(mut diagnostic) = context.report_custom_diagnostic_if_enabled(kind, range) {
             if let Some(enable_comment) = suppression.comments.enable_comment() {
                 let (enable_range, enable_range_edit) = Suppressions::delete_codes_or_comment(
                     locator,
@@ -395,7 +401,9 @@ impl Suppressions {
             } else {
                 diagnostic.set_fix(Fix::safe_edit(edit));
             }
+            return Some(diagnostic);
         }
+        None
     }
 
     fn delete_codes_or_comment(

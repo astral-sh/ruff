@@ -47,6 +47,12 @@ pr-run-mode = "plan"
 dispatch-releases = true
 # Which phase dist should use to create the GitHub release
 github-release = "announce"
+# Whether to enable GitHub Attestations
+github-attestations = true
+# When to generate GitHub Attestations
+github-attestations-phase = "announce"
+# Patterns to attest when creating attestations for release artifacts
+github-attestations-filters = ["*.json", "*.sh", "*.ps1", "*.zip", "*.tar.gz"]
 # Whether CI should include auto-generated code to build local artifacts
 build-local-artifacts = false
 # Local artifacts jobs to run in CI
@@ -56,7 +62,7 @@ publish-jobs = ["./publish-pypi", "./publish-wasm"]
 # Post-announce jobs to run in CI
 post-announce-jobs = ["./notify-dependents", "./publish-docs", "./publish-playground", "./publish-versions"]
 # Custom permissions for GitHub Jobs
-github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
+github-custom-job-permissions = { "build-docker" = { packages = "write", contents = "read", id-token = "write", attestations = "write" }, "publish-wasm" = { contents = "read", id-token = "write", packages = "write" } }
 # Whether to install an updater program
 install-updater = false
 # Path that installers should place binaries in
@@ -69,4 +75,4 @@ global = "depot-ubuntu-latest-4"
 "actions/checkout" = "de0fac2e4500dabe0009e67214ff5f5447ce83dd" # v6.0.2
 "actions/upload-artifact" = "b7c566a772e6b6bfb58ed0dc250532a479d7789f" # v6.0.0
 "actions/download-artifact" = "37930b1c2abaa49bbe596cd826c3c89aef350131" # v7.0.0
-"actions/attest-build-provenance" = "c074443f1aee8d4aeeae555aebba3282517141b2" #v2.2.3
+"actions/attest-build-provenance" = "00014ed6ed5efc5b1ab7f7f34a39eb55d41aa4f8" # v3.1.0

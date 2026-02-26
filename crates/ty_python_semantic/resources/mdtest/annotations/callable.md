@@ -20,10 +20,13 @@ is the return type. Here, we explore various invalid forms.
 A bare `Callable` without any type arguments:
 
 ```py
-from typing import Callable
+from typing import Callable, Any
+from ty_extensions import is_equivalent_to, static_assert
 
 def _(c: Callable):
     reveal_type(c)  # revealed: (...) -> Unknown
+
+static_assert(is_equivalent_to(Callable, Callable[..., Any]))
 ```
 
 ### Invalid parameter type argument
@@ -328,7 +331,7 @@ And, as the return type:
 
 ```py
 def _(c: Callable[[int, str], Callable[[int], int]]):
-    reveal_type(c)  # revealed: (int, str, /) -> (int, /) -> int
+    reveal_type(c)  # revealed: (int, str, /) -> ((int, /) -> int)
 ```
 
 ## Gradual form

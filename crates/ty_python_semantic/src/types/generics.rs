@@ -15,9 +15,7 @@ use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension, Solutions};
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Parameters};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::variance::VarianceInferable;
@@ -25,9 +23,9 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     CallableType, CallableTypes, ClassLiteral, FindLegacyTypeVarsVisitor, IntersectionType,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeAliasType,
-    TypeContext, TypeMapping, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_callable_type,
+    KnownClass, KnownInstanceType, MaterializationKind, Type, TypeAliasType, TypeContext,
+    TypeMapping, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance, TypeVarKind,
+    TypeVarVariance, UnionType, declaration_type, walk_callable_type,
     walk_manual_pep_695_type_alias, walk_pep_695_type_alias, walk_type_var_bounds,
 };
 use crate::{Db, FxIndexMap, FxOrderMap, FxOrderSet};
@@ -269,12 +267,7 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
 }
 
 /// A list of formal type variables for a generic function, class, or type alias.
-///
-/// # Ordering
-/// Ordering is based on the context's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
@@ -953,26 +946,13 @@ impl<'db> GenericContext<'db> {
     {
         Specialization::new(db, self, self.fill_in_defaults(db, types), None, None)
     }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let variables = self
-            .variables(db)
-            .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor));
-
-        Self::from_typevar_instances(db, variables)
-    }
 }
 
 /// An assignment of a specific type to each type variable in a generic scope.
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
 /// the lexically containing context.
-///
-/// # Ordering
-/// Ordering is based on the context's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]
@@ -1146,7 +1126,9 @@ fn has_relation_in_invariant_position<'db>(
         (
             None,
             Some(base_mat),
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_),
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy { .. }
+            | TypeRelation::SubtypingAssuming(_),
         ) => is_subtype_in_invariant_position(
             db,
             derived_type,
@@ -1160,7 +1142,9 @@ fn has_relation_in_invariant_position<'db>(
         (
             Some(derived_mat),
             None,
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_),
+            TypeRelation::Subtyping
+            | TypeRelation::Redundancy { .. }
+            | TypeRelation::SubtypingAssuming(_),
         ) => is_subtype_in_invariant_position(
             db,
             derived_type,
@@ -1373,31 +1357,12 @@ impl<'db> Specialization<'db> {
             .zip(other.types(db))
             .map(|(self_type, other_type)| match (self_type, other_type) {
                 (unknown, known) | (known, unknown) if unknown.is_unknown() => *known,
-                _ => UnionType::from_elements(db, [self_type, other_type]),
+                _ => UnionType::from_two_elements(db, *self_type, *other_type),
             })
             .collect();
         // TODO: Combine the tuple specs too
         // TODO(jelle): specialization type?
         Specialization::new(db, self.generic_context(db), types, None, None)
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let types: Box<[_]> = self
-            .types(db)
-            .iter()
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .collect();
-        let tuple_inner = self
-            .tuple_inner(db)
-            .and_then(|tuple| tuple.normalized_impl(db, visitor));
-        let context = self.generic_context(db).normalized_impl(db, visitor);
-        Self::new(
-            db,
-            context,
-            types,
-            self.materialization_kind(db),
-            tuple_inner,
-        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -1646,61 +1611,6 @@ impl<'db> Specialization<'db> {
         )
     }
 
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Specialization<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self.materialization_kind(db) != other.materialization_kind(db) {
-            return ConstraintSet::from(false);
-        }
-        let generic_context = self.generic_context(db);
-        if generic_context != other.generic_context(db) {
-            return ConstraintSet::from(false);
-        }
-
-        let mut result = ConstraintSet::from(true);
-        for ((bound_typevar, self_type), other_type) in generic_context
-            .variables(db)
-            .zip(self.types(db))
-            .zip(other.types(db))
-        {
-            // Equivalence of each type in the specialization depends on the variance of the
-            // corresponding typevar:
-            //   - covariant: verify that self_type == other_type
-            //   - contravariant: verify that other_type == self_type
-            //   - invariant: verify that self_type == other_type
-            //   - bivariant: skip, can't make equivalence false
-            let compatible = match bound_typevar.variance(db) {
-                TypeVarVariance::Invariant
-                | TypeVarVariance::Covariant
-                | TypeVarVariance::Contravariant => {
-                    self_type.is_equivalent_to_impl(db, *other_type, inferable, visitor)
-                }
-                TypeVarVariance::Bivariant => ConstraintSet::from(true),
-            };
-            if result.intersect(db, compatible).is_never_satisfied(db) {
-                return result;
-            }
-        }
-
-        match (self.tuple_inner(db), other.tuple_inner(db)) {
-            (Some(_), None) | (None, Some(_)) => return ConstraintSet::from(false),
-            (None, None) => {}
-            (Some(self_tuple), Some(other_tuple)) => {
-                let compatible =
-                    self_tuple.is_equivalent_to_impl(db, other_tuple, inferable, visitor);
-                if result.intersect(db, compatible).is_never_satisfied(db) {
-                    return result;
-                }
-            }
-        }
-
-        result
-    }
-
     pub(crate) fn find_legacy_typevars_impl(
         self,
         db: &'db dyn Db,
@@ -1868,7 +1778,8 @@ impl<'db> SpecializationBuilder<'db> {
                 if bound_typevar.is_paramspec(self.db) {
                     return;
                 }
-                *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
+
+                *entry.get_mut() = UnionType::from_two_elements(self.db, *entry.get(), ty);
             }
             Entry::Vacant(entry) => {
                 entry.insert(ty);
@@ -2157,7 +2068,7 @@ impl<'db> SpecializationBuilder<'db> {
                             // check here.
                             self.add_type_mapping(
                                 bound_typevar,
-                                IntersectionType::from_elements(self.db, [bound, ty]),
+                                IntersectionType::from_two_elements(self.db, bound, ty),
                                 polarity,
                                 f,
                             );
@@ -2252,6 +2163,16 @@ impl<'db> SpecializationBuilder<'db> {
                         seen,
                     );
                 }
+            }
+
+            (
+                formal @ (Type::NominalInstance(_) | Type::ProtocolInstance(_)),
+                Type::LiteralValue(literal),
+            ) => {
+                // Retry specialization with the literal's fallback instance so literals can
+                // contribute to generic inference for nominal and protocol formals.
+                let actual_instance = literal.fallback_instance(self.db);
+                return self.infer_map_impl(formal, actual_instance, polarity, f, seen);
             }
 
             (formal, Type::ProtocolInstance(actual_protocol)) => {

@@ -85,7 +85,7 @@ jobs:
       # Adapted from https://docs.docker.com/build/ci/github-actions/multi-platform/
       - name: Build and push by digest
         id: build
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: ${{ matrix.platform }}
@@ -117,6 +117,10 @@ jobs:
     needs:
       - docker-build
     if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+    permissions:
+      attestations: write
+      id-token: write
+      packages: write
     steps:
       - name: Download digests
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
@@ -155,6 +159,26 @@ jobs:
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
 
+      - name: Export manifest digest
+        id: manifest-digest
+        env:
+          IMAGE: ${{ env.RUFF_BASE_IMG }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          digest="$(
+            docker buildx imagetools inspect \
+              "${IMAGE}:${VERSION}" \
+              --format '{{json .Manifest}}' \
+            | jq -r '.digest'
+          )"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-name: ${{ env.RUFF_BASE_IMG }}
+          subject-digest: ${{ steps.manifest-digest.outputs.digest }}
+
   docker-publish-extra:
     name: Publish additional Docker image based on ${{ matrix.image-mapping }}
     runs-on: ubuntu-latest
@@ -163,6 +187,10 @@ jobs:
     needs:
       - docker-publish
     if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+    permissions:
+      attestations: write
+      id-token: write
+      packages: write
     strategy:
       fail-fast: false
       matrix:
@@ -237,7 +265,8 @@ jobs:
             ${{ env.TAG_PATTERNS }}
 
       - name: Build and push
-        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        id: build-and-push
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -248,6 +277,12 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           annotations: ${{ steps.meta.outputs.annotations }}
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-name: ${{ env.RUFF_BASE_IMG }}
+          subject-digest: ${{ steps.build-and-push.outputs.digest }}
 
   # This is effectively a duplicate of `docker-publish` to make https://github.com/astral-sh/ruff/pkgs/container/ruff
   # show the ruff base image first since GitHub always shows the last updated image digests
@@ -260,6 +295,10 @@ jobs:
     needs:
       - docker-publish-extra
     if: ${{ inputs.plan != '' && !fromJson(inputs.plan).announcement_tag_is_implicit }}
+    permissions:
+      attestations: write
+      id-token: write
+      packages: write
     steps:
       - name: Download digests
         uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
@@ -303,3 +342,23 @@ jobs:
             "${annotations[@]}" \
             $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
             $(printf "${RUFF_BASE_IMG}@sha256:%s " *)
+
+      - name: Export manifest digest
+        id: manifest-digest
+        env:
+          IMAGE: ${{ env.RUFF_BASE_IMG }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          digest="$(
+            docker buildx imagetools inspect \
+              "${IMAGE}:${VERSION}" \
+              --format '{{json .Manifest}}' \
+            | jq -r '.digest'
+          )"
+          echo "digest=${digest}" >> "$GITHUB_OUTPUT"
+
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@96278af6caaf10aea03fd8d33a09a777ca52d62f # v3.2.0
+        with:
+          subject-name: ${{ env.RUFF_BASE_IMG }}
+          subject-digest: ${{ steps.manifest-digest.outputs.digest }}

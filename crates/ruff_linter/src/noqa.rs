@@ -40,7 +40,7 @@ pub fn generate_noqa_edits(
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
-    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
     let comments = find_noqa_comments(
         diagnostics,
         locator,
@@ -277,24 +277,18 @@ impl<'a> FileNoqaDirectives<'a> {
                             vec![]
                         }
                         Directive::Codes(codes) => {
-                            codes.iter().filter_map(|code| {
-                                let code = code.as_str();
-                                // Ignore externally-defined rules.
-                                if external.iter().any(|external| code.starts_with(external)) {
-                                    return None;
-                                }
+                            codes
+                                .iter()
+                                .filter_map(|code| {
+                                    let code = code.as_str();
+                                    // Ignore externally-defined rules.
+                                    if external.iter().any(|external| code.starts_with(external)) {
+                                        return None;
+                                    }
 
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
-                                {
-                                    Some(rule)
-                                } else {
-                                    #[expect(deprecated)]
-                                    let line = locator.compute_line_index(range.start());
-                                    let path_display = relativize_path(path);
-                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
-                                    None
-                                }
-                            }).collect()
+                                    Rule::from_code(get_redirect_target(code).unwrap_or(code)).ok()
+                                })
+                                .collect()
                         }
                     };
 
@@ -771,7 +765,7 @@ fn add_noqa_inner(
     let directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&directives);
 
-    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
+    let directives = NoqaDirectives::from_commented_ranges(comment_ranges, path, locator);
 
     let comments = find_noqa_comments(
         diagnostics,
@@ -1082,7 +1076,6 @@ pub(crate) struct NoqaDirectives<'a> {
 impl<'a> NoqaDirectives<'a> {
     pub(crate) fn from_commented_ranges(
         comment_ranges: &CommentRanges,
-        external: &[String],
         path: &Path,
         locator: &'a Locator<'a>,
     ) -> Self {
@@ -1104,29 +1097,6 @@ impl<'a> NoqaDirectives<'a> {
                             warn!(
                                 "Missing or joined rule code(s) at {path_display}:{line}: {warning}"
                             );
-                        }
-                    }
-                    if let Directive::Codes(codes) = &directive {
-                        // Warn on invalid rule codes.
-                        for code in &codes.codes {
-                            // Ignore externally-defined rules.
-                            if !external
-                                .iter()
-                                .any(|external| code.as_str().starts_with(external))
-                            {
-                                if Rule::from_code(
-                                    get_redirect_target(code.as_str()).unwrap_or(code.as_str()),
-                                )
-                                .is_err()
-                                {
-                                    #[expect(deprecated)]
-                                    let line = locator.compute_line_index(range.start());
-                                    let path_display = relativize_path(path);
-                                    warn!(
-                                        "Invalid rule code provided to `# noqa` at {path_display}:{line}: {code}"
-                                    );
-                                }
-                            }
                         }
                     }
                     // noqa comments are guaranteed to be single line.

@@ -1,0 +1,147 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..45,
+        body: [
+            FunctionDef(
+                StmtFunctionDef {
+                    node_index: NodeIndex(None),
+                    range: 0..44,
+                    is_async: false,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("foo"),
+                        range: 4..7,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    parameters: Parameters {
+                        range: 7..39,
+                        node_index: NodeIndex(None),
+                        posonlyargs: [
+                            ParameterWithDefault {
+                                range: 18..19,
+                                node_index: NodeIndex(None),
+                                parameter: Parameter {
+                                    range: 18..19,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("a"),
+                                        range: 18..19,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: None,
+                                },
+                                default: None,
+                            },
+                        ],
+                        args: [
+                            ParameterWithDefault {
+                                range: 24..28,
+                                node_index: NodeIndex(None),
+                                parameter: Parameter {
+                                    range: 24..25,
+                                    node_index: NodeIndex(None),
+                                    name: Identifier {
+                                        id: Name("b"),
+                                        range: 24..25,
+                                        node_index: NodeIndex(None),
+                                    },
+                                    annotation: None,
+                                },
+                                default: Some(
+                                    NumberLiteral(
+                                        ExprNumberLiteral {
+                                            node_index: NodeIndex(None),
+                                            range: 26..28,
+                                            value: Int(
+                                                10,
+                                            ),
+                                        },
+                                    ),
+                                ),
+                            },
+                        ],
+                        vararg: Some(
+                            Parameter {
+                                range: 33..38,
+                                node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("args"),
+                                    range: 34..38,
+                                    node_index: NodeIndex(None),
+                                },
+                                annotation: None,
+                            },
+                        ),
+                        kwonlyargs: [],
+                        kwarg: Some(
+                            Parameter {
+                                range: 8..16,
+                                node_index: NodeIndex(None),
+                                name: Identifier {
+                                    id: Name("kwargs"),
+                                    range: 10..16,
+                                    node_index: NodeIndex(None),
+                                },
+                                annotation: None,
+                            },
+                        ),
+                    },
+                    returns: None,
+                    body: [
+                        Expr(
+                            StmtExpr {
+                                node_index: NodeIndex(None),
+                                range: 41..44,
+                                value: EllipsisLiteral(
+                                    ExprEllipsisLiteral {
+                                        node_index: NodeIndex(None),
+                                        range: 41..44,
+                                    },
+                                ),
+                            },
+                        ),
+                    ],
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | def foo(**kwargs, a, /, b=10, *, *args): ...
+  |                   ^ Syntax Error: Parameter cannot follow var-keyword parameter
+  |
+
+
+  |
+1 | def foo(**kwargs, a, /, b=10, *, *args): ...
+  |                      ^ Syntax Error: Parameter cannot follow var-keyword parameter
+  |
+
+
+  |
+1 | def foo(**kwargs, a, /, b=10, *, *args): ...
+  |                         ^ Syntax Error: Parameter cannot follow var-keyword parameter
+  |
+
+
+  |
+1 | def foo(**kwargs, a, /, b=10, *, *args): ...
+  |                               ^ Syntax Error: Parameter cannot follow var-keyword parameter
+  |
+
+
+  |
+1 | def foo(**kwargs, a, /, b=10, *, *args): ...
+  |                                  ^ Syntax Error: Parameter cannot follow var-keyword parameter
+  |
