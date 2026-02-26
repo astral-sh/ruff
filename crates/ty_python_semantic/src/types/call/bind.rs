@@ -54,11 +54,12 @@ use crate::types::typed_dict::extract_unpacked_typed_dict_keys_from_value_type;
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypes, ClassLiteral,
-    DATACLASS_FLAGS, DataclassFlags, DataclassParams, GenericAlias, InternedConstraintSet,
-    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
-    TypeVarBoundOrConstraints, TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members,
+    DATACLASS_FLAGS, DataclassFlags, DataclassParams, DynamicType, GenericAlias,
+    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
+    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
+    SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints,
+    TypeVarVariance, UnionAccumulator, UnionBuilder, UnionType, WrapperDescriptorKind,
+    enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
@@ -3384,6 +3385,17 @@ impl<'db> CallableBinding<'db> {
         // unmatched for the given argument types.
         let mut filter_remaining_overloads = false;
 
+        let participating_parameter_tuple_for_slots = |slots: &[OverloadFilterSlot<'db>]| {
+            Type::heterogeneous_tuple(
+                db,
+                slots.iter().enumerate().filter_map(|(slot_index, slot)| {
+                    participating_slot_indices
+                        .contains(&slot_index)
+                        .then_some(slot.parameter)
+                }),
+            )
+        };
+
         for (upto, current_index) in matching_overload_indexes.iter().enumerate() {
             if filter_remaining_overloads {
                 self.overloads[*current_index].mark_as_unmatched_overload();
@@ -3423,29 +3435,19 @@ impl<'db> CallableBinding<'db> {
                     }),
             );
 
-            let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
-                .take(max_slot_count)
-                .collect::<Vec<_>>();
-            for (_, slots) in &matching_overload_slots[..=upto] {
-                for (slot_index, slot) in slots.iter().enumerate() {
-                    if participating_slot_indices.contains(&slot_index) {
-                        union_parameter_types[slot_index].add_in_place(slot.parameter);
-                    }
-                }
-            }
-
-            let parameter_types = Type::heterogeneous_tuple(
+            // Use a union of per-overload parameter tuples rather than a tuple of per-parameter
+            // unions, so we preserve cross-argument correlations from each overload.
+            let parameter_types = UnionType::from_elements(
                 db,
-                union_parameter_types.into_iter().filter_map(|builder| {
-                    if builder.is_empty() {
-                        None
-                    } else {
-                        Some(builder.build())
-                    }
-                }),
+                matching_overload_slots[..=upto]
+                    .iter()
+                    .map(|(_, slots)| participating_parameter_tuple_for_slots(slots)),
             );
 
-            if top_materialized_argument_type.is_assignable_to(db, parameter_types) {
+            if top_materialized_argument_type
+                .when_assignable_to(db, parameter_types, InferableTypeVars::None)
+                .is_always_satisfied(db)
+            {
                 filter_remaining_overloads = true;
             }
         }
@@ -3604,7 +3606,7 @@ impl<'db> CallableBinding<'db> {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
                 OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_)
-                | OverloadCallReturnType::Ambiguous => Type::unknown(),
+                | OverloadCallReturnType::Ambiguous => Type::Dynamic(DynamicType::Any),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
