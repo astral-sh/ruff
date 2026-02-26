@@ -1,5 +1,6 @@
 ---
 source: crates/ty_test/src/lib.rs
+assertion_line: 623
 expression: snapshot
 ---
 
@@ -77,6 +78,13 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
 15 |     # compatible with `C.get` and `B.get`, but not with `A.get`.
 16 |     # Since `B.get` already violates LSP with `A.get`, we don't report for `D`.
 17 |     def get(self, my_default): ...
+```
+
+## mdtest_snippet.pyi
+
+```
+1 | class C(list[int]):
+2 |     def __getitem__(self, key): ...
 ```
 
 # Diagnostics

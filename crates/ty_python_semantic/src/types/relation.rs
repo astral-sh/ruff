@@ -328,7 +328,7 @@ impl<'db> Type<'db> {
         is_redundant_with_impl(db, self, other)
     }
 
-    fn has_relation_to(
+    pub(super) fn has_relation_to(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
