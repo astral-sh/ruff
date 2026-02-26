@@ -190,56 +190,55 @@ fn check_class_declaration<'db>(
         if member.name != "_value_"
             && matches!(
                 first_reachable_definition.kind(db),
-                DefinitionKind::Assignment(_)
+                DefinitionKind::Assignment(_) | DefinitionKind::AnnotatedAssignment(_)
             )
         {
-            let is_enum_member = enum_info.resolve_member(&member.name).is_some();
-            if is_enum_member {
-                let member_value_type = member.ty;
+            // Use the value type from `EnumMetadata` rather than `member.ty`, because
+            // for annotated assignments like `X: Final = "value"`, the member may come
+            // from the declaration chain (where `ty` is the declared type, e.g. `Unknown`)
+            // rather than the binding chain (where `ty` is the actual value type).
+            let Some(&member_value_type) = enum_info.members.get(&member.name) else {
+                return;
+            };
 
-                // TODO ideally this would be a syntactic check that only matches on literal `...`
-                // in the source, rather than matching on the type. But this would require storing
-                // additional information in `EnumMetadata`.
-                let is_ellipsis = matches!(
-                    member_value_type,
-                    Type::NominalInstance(nominal_instance)
-                        if nominal_instance.has_known_class(db, KnownClass::EllipsisType)
-                );
-                // `auto()` values are computed at runtime by the enum metaclass,
-                // so we can't validate them against _value_ or __init__ at the type level.
-                let is_auto = matches!(
-                    member_value_type,
-                    Type::NominalInstance(nominal_instance)
-                        if nominal_instance.has_known_class(db, KnownClass::Auto)
-                );
-                let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
+            // TODO ideally this would be a syntactic check that only matches on literal `...`
+            // in the source, rather than matching on the type. But this would require storing
+            // additional information in `EnumMetadata`.
+            let is_ellipsis = matches!(
+                member_value_type,
+                Type::NominalInstance(nominal_instance)
+                    if nominal_instance.has_known_class(db, KnownClass::EllipsisType)
+            );
+            // `auto()` values are computed at runtime by the enum metaclass,
+            // so we can't validate them against _value_ or __init__ at the type level.
+            let is_auto = enum_info.auto_members.contains(&member.name);
+            let skip_type_check = (context.in_stub() && is_ellipsis) || is_auto;
 
-                if !skip_type_check {
-                    if let Some(init_function) = enum_info.init_function {
-                        check_enum_member_against_init(
-                            context,
-                            init_function,
-                            instance_of_class,
-                            member_value_type,
-                            &member.name,
-                            *first_reachable_definition,
-                        );
-                    } else if let Some(expected_type) = enum_info.value_annotation {
-                        if !member_value_type.is_assignable_to(db, expected_type) {
-                            if let Some(builder) = context.report_lint(
-                                &INVALID_ASSIGNMENT,
-                                first_reachable_definition.focus_range(db, context.module()),
-                            ) {
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Enum member `{}` value is not assignable to expected type",
-                                    &member.name
-                                ));
-                                diagnostic.info(format_args!(
-                                    "Expected `{}`, got `{}`",
-                                    expected_type.display(db),
-                                    member_value_type.display(db)
-                                ));
-                            }
+            if !skip_type_check {
+                if let Some(init_function) = enum_info.init_function {
+                    check_enum_member_against_init(
+                        context,
+                        init_function,
+                        instance_of_class,
+                        member_value_type,
+                        &member.name,
+                        *first_reachable_definition,
+                    );
+                } else if let Some(expected_type) = enum_info.value_annotation {
+                    if !member_value_type.is_assignable_to(db, expected_type) {
+                        if let Some(builder) = context.report_lint(
+                            &INVALID_ASSIGNMENT,
+                            first_reachable_definition.focus_range(db, context.module()),
+                        ) {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "Enum member `{}` value is not assignable to expected type",
+                                &member.name
+                            ));
+                            diagnostic.info(format_args!(
+                                "Expected `{}`, got `{}`",
+                                expected_type.display(db),
+                                member_value_type.display(db)
+                            ));
                         }
                     }
                 }

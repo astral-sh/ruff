@@ -121,6 +121,7 @@ When `_value_` is annotated, `.value` and `._value_` are inferred as the declare
 
 ```py
 from enum import Enum
+from typing import Final
 
 class Color2(Enum):
     _value_: int
@@ -129,6 +130,11 @@ class Color2(Enum):
 
 reveal_type(Color2.RED.value)  # revealed: int
 reveal_type(Color2.RED._value_)  # revealed: int
+
+class WantsInt(Enum):
+    _value_: int
+    OK: Final = 1
+    BAD: Final = "oops"  # error: [invalid-assignment]
 ```
 
 ### `_value_` annotation with `__init__`
@@ -150,6 +156,21 @@ class Planet(Enum):
 
 reveal_type(Planet.MERCURY.value)  # revealed: int
 reveal_type(Planet.MERCURY._value_)  # revealed: int
+```
+
+`Final`-annotated members are also validated against `__init__`:
+
+```py
+from enum import Enum
+from typing import Final
+
+class Planet(Enum):
+    def __init__(self, mass: float, radius: float):
+        self.mass = mass
+        self.radius = radius
+
+    MERCURY: Final = (3.303e23, 2.4397e6)
+    BAD: Final = "not a planet"  # error: [invalid-assignment]
 ```
 
 ### `_value_` annotation incompatible with `__init__`

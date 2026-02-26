@@ -1,5 +1,5 @@
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::{
@@ -19,6 +19,9 @@ pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
 
+    /// Members whose values were defined using `auto()`.
+    pub(crate) auto_members: FxHashSet<Name>,
+
     /// The explicit `_value_` annotation type, if declared.
     pub(crate) value_annotation: Option<Type<'db>>,
 
@@ -36,6 +39,7 @@ impl<'db> EnumMetadata<'db> {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
+            auto_members: FxHashSet::default(),
             value_annotation: None,
             init_function: None,
         }
@@ -109,6 +113,7 @@ pub(crate) fn enum_metadata<'db>(
 
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
+    let mut auto_members = FxHashSet::default();
 
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
         let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
@@ -174,6 +179,7 @@ pub(crate) fn enum_metadata<'db>(
                             // enum.auto
                             Some(KnownClass::Auto) => {
                                 auto_counter += 1;
+                                auto_members.insert(name.clone());
 
                                 // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
                                 let auto_value_ty =
@@ -333,6 +339,7 @@ pub(crate) fn enum_metadata<'db>(
     Some(EnumMetadata {
         members,
         aliases,
+        auto_members,
         value_annotation,
         init_function,
     })
