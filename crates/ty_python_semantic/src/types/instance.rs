@@ -613,9 +613,7 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct ProtocolInstanceType<'db> {
     pub(super) inner: Protocol<'db>,
 
@@ -810,15 +808,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
-///
-/// # Ordering
-///
-/// Ordering between variants is stable and should be the same between runs.
-/// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
-/// The id may change between runs, or when e.g. a `Protocol` was garbage-collected and recreated.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) enum Protocol<'db> {
     FromClass(ProtocolClass<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
@@ -871,9 +861,7 @@ mod synthesized_protocol {
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
-    #[derive(
-        Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-    )]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
     pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
 
     impl<'db> SynthesizedProtocolType<'db> {

@@ -267,12 +267,7 @@ impl<'db> CodeGeneratorKind<'db> {
 }
 
 /// A specialization of a generic class with a particular assignment of types to typevars.
-///
-/// # Ordering
-/// Ordering is based on the generic aliases's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the alias was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct GenericAlias<'db> {
     pub(crate) origin: StaticClassLiteral<'db>,
     pub(crate) specialization: Specialization<'db>,
@@ -400,17 +395,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
 
 /// A class literal, either defined via a `class` statement or a `type` function call.
 #[derive(
-    Clone,
-    Copy,
-    Debug,
-    Eq,
-    Hash,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    salsa::Supertype,
-    salsa::Update,
-    get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
 )]
 pub enum ClassLiteral<'db> {
     /// A class defined via a `class` statement.
@@ -792,17 +777,7 @@ impl<'db> From<DynamicNamedTupleLiteral<'db>> for ClassLiteral<'db> {
 /// Represents a class type, which might be a non-generic class, or a specialization of a generic
 /// class.
 #[derive(
-    Clone,
-    Copy,
-    Debug,
-    Eq,
-    Hash,
-    Ord,
-    PartialEq,
-    PartialOrd,
-    salsa::Supertype,
-    salsa::Update,
-    get_size2::GetSize,
+    Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update, get_size2::GetSize,
 )]
 pub enum ClassType<'db> {
     // `NonGeneric` is intended to mean that the `ClassLiteral` has no type parameters. There are
@@ -2089,12 +2064,7 @@ impl<'db> Field<'db> {
 ///
 /// This does not in itself represent a type, but can be transformed into a [`ClassType`] that
 /// does. (For generic classes, this requires specializing its generic context.)
-///
-/// # Ordering
-/// Ordering is based on the class's id assigned by salsa and not on the class literal's values.
-/// The id may change between runs, or when the class literal was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct StaticClassLiteral<'db> {
     /// Name of the class at definition
     #[returns(ref)]
@@ -5039,7 +5009,6 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
 /// - For dangling `type()` calls, a relative node offset anchored to the enclosing scope
 ///   provides stable identity that only changes when the scope itself changes.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct DynamicClassLiteral<'db> {
     /// The name of the class (from the first argument to `type()`).
     #[returns(ref)]
@@ -5612,7 +5581,6 @@ pub struct NamedTupleField<'db> {
 ///
 /// The type of `Point` would be `type[Point]` where `Point` is a `DynamicNamedTupleLiteral`.
 #[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct DynamicNamedTupleLiteral<'db> {
     /// The name of the namedtuple (from the first argument).
     #[returns(ref)]
@@ -6003,13 +5971,7 @@ pub enum DynamicNamedTupleAnchor<'db> {
 
 /// A specification describing the fields of a dynamic `namedtuple`
 /// or `NamedTuple` class.
-///
-/// # Ordering
-///
-/// Ordering is based on the spec's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the spec was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct NamedTupleSpec<'db> {
     #[returns(deref)]
     pub(crate) fields: Box<[NamedTupleField<'db>]>,

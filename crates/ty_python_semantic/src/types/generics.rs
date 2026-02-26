@@ -267,12 +267,7 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
 }
 
 /// A list of formal type variables for a generic function, class, or type alias.
-///
-/// # Ordering
-/// Ordering is based on the context's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct GenericContext<'db> {
     #[returns(ref)]
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
@@ -957,12 +952,7 @@ impl<'db> GenericContext<'db> {
 ///
 /// TODO: Handle nested specializations better, with actual parent links to the specialization of
 /// the lexically containing context.
-///
-/// # Ordering
-/// Ordering is based on the context's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct Specialization<'db> {
     pub(crate) generic_context: GenericContext<'db>,
     #[returns(deref)]

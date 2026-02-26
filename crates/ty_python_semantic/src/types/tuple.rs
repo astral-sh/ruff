@@ -126,11 +126,7 @@ impl TupleLength {
     }
 }
 
-/// # Ordering
-/// Ordering is based on the tuple's salsa-assigned id and not on its elements.
-/// The id may change between runs, or when the tuple was garbage collected and recreated.
 #[salsa::interned(debug, constructor=new_internal, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct TupleType<'db> {
     #[returns(ref)]
     pub(crate) tuple: TupleSpec<'db>,
