@@ -51,11 +51,11 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::typevar::BoundTypeVarIdentity;
 use crate::types::{
     BoundMethodType, BoundTypeVarInstance, CallableType, ClassLiteral, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, DynamicType, EvaluationMode, GenericAlias,
-    InternedConstraintSet, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, LiteralValueTypeKind, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, TypeAliasType, TypeContext, TypeVarBoundOrConstraints, TypeVarVariance,
-    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
+    DataclassFlags, DataclassParams, EvaluationMode, GenericAlias, InternedConstraintSet,
+    IntersectionType, KnownBoundMethodType, KnownClass, KnownInstanceType, LiteralValueTypeKind,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TypeAliasType, TypeContext,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
+    enums, list_members,
 };
 use crate::{DisplaySettings, FxOrderSet, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
@@ -3075,9 +3075,6 @@ impl<'db> CallableBinding<'db> {
                         }
                     }),
             );
-
-            // Use a union of per-overload parameter tuples rather than a tuple of per-parameter
-            // unions, so we preserve cross-argument correlations from each overload.
             let parameter_types = UnionType::from_elements(
                 db,
                 matching_overload_indexes[..=upto]
@@ -3087,10 +3084,7 @@ impl<'db> CallableBinding<'db> {
                     }),
             );
 
-            if top_materialized_argument_type
-                .when_assignable_to(db, parameter_types, InferableTypeVars::None)
-                .is_always_satisfied(db)
-            {
+            if top_materialized_argument_type.is_assignable_to(db, parameter_types) {
                 filter_remaining_overloads = true;
             }
         }
@@ -3249,7 +3243,7 @@ impl<'db> CallableBinding<'db> {
             return match overload_call_return_type {
                 OverloadCallReturnType::ArgumentTypeExpansion(return_type) => return_type,
                 OverloadCallReturnType::ArgumentTypeExpansionLimitReached(_)
-                | OverloadCallReturnType::Ambiguous => Type::Dynamic(DynamicType::Any),
+                | OverloadCallReturnType::Ambiguous => Type::unknown(),
             };
         }
         if let Some((_, first_overload)) = self.matching_overloads().next() {
