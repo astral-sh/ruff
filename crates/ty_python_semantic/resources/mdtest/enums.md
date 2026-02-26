@@ -602,6 +602,30 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+`auto()` values are computed at runtime by the enum metaclass, so we skip validation against both
+`_value_` annotations and custom `__init__` signatures:
+
+```py
+from enum import Enum, auto
+
+class WithValue(Enum):
+    _value_: int
+    A = auto()
+    B = auto()
+
+reveal_type(WithValue.A.value)  # revealed: int
+
+class WithInit(Enum):
+    def __init__(self, mass: float, radius: float):
+        self.mass = mass
+        self.radius = radius
+
+    MERCURY = (3.303e23, 2.4397e6)
+    AUTO = auto()
+
+reveal_type(WithInit.MERCURY.value)  # revealed: Any
+```
+
 ### `member` and `nonmember`
 
 ```toml
