@@ -1266,12 +1266,8 @@ fn resolve_name_impl<'a>(
         // First record what kinds of things we found
         let mut found_regular_package = None;
         let mut found_module = None;
-        let mut found_legacy_namespace_package = None;
         for candidate in &next_candidates {
             match (candidate.module, candidate.py_typed) {
-                (ResolvedModule::LegacyNamespacePackage(file), _) => {
-                    found_legacy_namespace_package = Some(file);
-                }
                 (ResolvedModule::RegularPackage(file), PyTyped::Untyped | PyTyped::Full) => {
                     found_regular_package = Some(file);
                 }
@@ -1283,11 +1279,16 @@ fn resolve_name_impl<'a>(
         }
 
         next_candidates.retain(|candidate| {
-            if let Some(_legacy) = found_legacy_namespace_package
-                && !matches!(candidate.module, ResolvedModule::LegacyNamespacePackage(_))
-            {
-                // TODO: it would be nice to emit a warning about this but we just assume it's fine
-            }
+            // TODO: it might be nice to emit a warning in the case that
+            // we found a legacy namespace package and this candidate is
+            // anything *else*. When that "else" is a regular package or
+            // module, then the logic below will drop the legacy namespace
+            // package under the presumption that regular modules always shadow
+            // _all_ namespace packages, regardless of search path order. But
+            // I suppose there could be a case where we found both a legacy
+            // namespace package and a non-legacy namespace package (and no
+            // regular packages/modules). In that case, this logic currently
+            // retains both candidates.
 
             // Regular packages and modules both shadow namespace packages
             // independent of search path order.
