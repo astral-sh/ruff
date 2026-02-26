@@ -518,7 +518,7 @@ a nested cycle, but we strip out _that_ `Divergent` in another part of cycle rec
 get the narrowing right and infer that `node` is of type `Node`, but then our monotonic widening
 step will union `Node` with `Node | None` from the previous iteration, reproduce the same wrong
 answer, and declare that to be the fixpoint. Finally we get false-positive warnings from the fact
-that `Node` doesn't have a `.next` field.
+that `None` doesn't have a `.next` field.
 
 So, because we do monotonic widening in cycle recovery, we need to make sure that temporarily
 `Divergent` expressions in narrowing constraints don't lead to too-wide-but-not-visibly-`Divergent`
