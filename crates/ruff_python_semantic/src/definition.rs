@@ -282,7 +282,11 @@ impl<'a> Definitions<'a> {
 
     /// Returns a reference to the Python AST.
     pub fn python_ast(&self) -> Option<&'a [Stmt]> {
-        let module = self[DefinitionId::module()].as_module()?;
+        let Some(definition) = self.get(DefinitionId::module()) else {
+            debug_assert!(false, "Module definition unavailable");
+            return None;
+        };
+        let module = definition.as_module()?;
         Some(module.python_ast)
     }
 }
