@@ -600,15 +600,13 @@ impl<'db> CallableSignature<'db> {
 
             // `self` is possibly overloaded while `other` is definitely not overloaded.
             (_, [other_signature]) => {
-                if (relation.is_assignability() || relation.is_constraint_set_assignability())
-                    && let Some(aggregate_relation) = Self::try_unary_overload_aggregate_relation(
-                        db,
-                        self_signatures,
-                        other_signature,
-                        inferable,
-                        relation,
-                    )
-                {
+                if let Some(aggregate_relation) = Self::try_unary_overload_aggregate_relation(
+                    db,
+                    self_signatures,
+                    other_signature,
+                    inferable,
+                    relation,
+                ) {
                     return aggregate_relation;
                 }
 
