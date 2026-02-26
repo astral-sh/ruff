@@ -1,0 +1,10 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+EXE003 Shebang should contain `python`, `pytest`, or `uv run`
+ --> <filename>:1:1
+  |
+1 | #!/usr/bin/env bash
+  | ^^^^^^^^^^^^^^^^^^^
+2 |         #noqa: EXE003
+  |

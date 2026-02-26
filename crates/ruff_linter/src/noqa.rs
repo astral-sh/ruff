@@ -12,6 +12,7 @@ use log::warn;
 use ruff_db::diagnostic::{Diagnostic, SecondaryCode};
 use ruff_python_trivia::{CommentRanges, Cursor, indentation_at_offset};
 use ruff_source_file::{LineEnding, LineRanges};
+use ruff_source_file::{LineIndex, OneIndexed};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 
@@ -1163,6 +1164,30 @@ impl<'a> NoqaDirectives<'a> {
             .ok()
     }
 
+    pub(crate) fn find_noqa_on_line_mut(
+        &mut self,
+        target_index: OneIndexed,
+        line_index: &LineIndex,
+    ) -> Option<&mut NoqaDirectiveLine<'a>> {
+        if let Ok(index) = self.find_noqa_by_line_index(target_index, line_index) {
+            Some(&mut self.inner[index])
+        } else {
+            None
+        }
+    }
+
+    fn find_noqa_by_line_index(
+        &self,
+        target_index: OneIndexed,
+        line_index: &LineIndex,
+    ) -> Result<usize, usize> {
+        self.inner.binary_search_by(|directive| {
+            // `directive.range.start()` is already ordered.
+            let start = line_index.line_index(directive.range.start());
+            start.cmp(&target_index)
+        })
+    }
+
     pub(crate) fn lines(&self) -> &[NoqaDirectiveLine<'_>] {
         &self.inner
     }
@@ -1245,13 +1270,15 @@ mod tests {
 
     use insta::assert_debug_snapshot;
 
+    use ruff_python_index::Indexer;
+    use ruff_python_parser::{Mode, ParseOptions};
     use ruff_python_trivia::CommentRanges;
-    use ruff_source_file::{LineEnding, SourceFileBuilder};
+    use ruff_source_file::{LineEnding, LineIndex, OneIndexed, SourceFileBuilder};
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::noqa::{
-        Directive, LexicalError, NoqaLexerOutput, NoqaMapping, add_noqa_inner, lex_codes,
-        lex_file_exemption, lex_inline_noqa,
+        Directive, LexicalError, NoqaDirectiveLine, NoqaDirectives, NoqaLexerOutput, NoqaMapping,
+        add_noqa_inner, lex_codes, lex_file_exemption, lex_inline_noqa,
     };
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
@@ -2945,6 +2972,79 @@ mod tests {
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
+    }
+
+    // Implement an immutable "find_noqa_on_line_mut" for test purposes.
+    // The ultimate goal is to test find_noqa_by_line_index.
+    // We cannot use find_noqa_on_line_mut for test purposes because the test need something immutable.
+    impl<'a> NoqaDirectives<'a> {
+        pub(crate) fn find_noqa_on_line(
+            &self,
+            target_index: OneIndexed,
+            line_index: &LineIndex,
+        ) -> Option<&NoqaDirectiveLine<'a>> {
+            if let Ok(index) = self.find_noqa_by_line_index(target_index, line_index) {
+                Some(&self.inner[index])
+            } else {
+                None
+            }
+        }
+    }
+
+    #[test]
+    fn noqa_on_certain_line() {
+        let path = Path::new("/tmp/foo.py");
+        let source = r#"#noqa:D001
+#noqa:D002
+#noqa:D003"#;
+        let locator = &Locator::new(source);
+        let parsed = ruff_python_parser::parse_unchecked(source, ParseOptions::from(Mode::Module))
+            .try_into_module()
+            .unwrap();
+        let indexer = Indexer::from_tokens(parsed.tokens(), source);
+
+        let noqa_directives =
+            NoqaDirectives::from_commented_ranges(indexer.comment_ranges(), path, locator);
+
+        let noqa_on_second_line = {
+            noqa_directives
+                .find_noqa_on_line(OneIndexed::new(2).unwrap(), locator.to_index())
+                .unwrap()
+        };
+
+        // // The first noqa is on line 1. This is not what we want.
+
+        assert_ne!(
+            std::ptr::from_ref(&noqa_directives.inner[0]),
+            std::ptr::from_ref(noqa_on_second_line)
+        );
+        // Second noqa is on line 2. This is the one we want.
+        assert_eq!(
+            std::ptr::from_ref(&noqa_directives.inner[1]),
+            std::ptr::from_ref(noqa_on_second_line)
+        );
+        // The third noqa is on line 3. This is not what we want.
+        assert_ne!(
+            std::ptr::from_ref(&noqa_directives.inner[2]),
+            std::ptr::from_ref(noqa_on_second_line)
+        );
+
+        // This time, nothing on line 2
+        let source = r#"#noqa:D001
+
+#noqa:D003"#;
+        let locator = &Locator::new(source);
+        let parsed = ruff_python_parser::parse_unchecked(source, ParseOptions::from(Mode::Module))
+            .try_into_module()
+            .unwrap();
+        let indexer = Indexer::from_tokens(parsed.tokens(), source);
+
+        let noqa_directives =
+            NoqaDirectives::from_commented_ranges(indexer.comment_ranges(), path, locator);
+
+        let noqa_on_second_line =
+            { noqa_directives.find_noqa_on_line(OneIndexed::new(2).unwrap(), locator.to_index()) };
+        assert!(noqa_on_second_line.is_none());
     }
 
     #[test]

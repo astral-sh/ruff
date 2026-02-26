@@ -3,12 +3,16 @@
 use std::path::Path;
 
 use itertools::Itertools;
+use ruff_db::diagnostic::SecondaryCode;
+use ruff_source_file::OneIndexed;
 use rustc_hash::FxHashSet;
 
 use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::comments::shebang::ShebangDirective;
 use crate::fix::edits::delete_comment;
+use crate::noqa::NoqaDirectiveLine;
 use crate::noqa::{
     Code, Directive, FileExemption, FileNoqaDirectives, NoqaDirectives, NoqaMapping,
 };
@@ -48,6 +52,16 @@ pub(crate) fn check_noqa(
 
     let exemption = FileExemption::from(&file_noqa_directives);
 
+    // Prepare for special case: for some checks that always have their noqa on 0:0 location (UndocumentedPublicModule, ...)
+    // the noqa can mess up with the shebang (see https://github.com/astral-sh/ruff/issues/14442).
+    // Thus, we accept noqa on second line for these specific checks when there is a shebang.
+    // We directly check if there is a shebang, so we check only once.
+    let has_any_shebang = comment_ranges
+        .iter()
+        .any(|range| ShebangDirective::try_extract(locator.slice(range)).is_some());
+    let second_line_index = OneIndexed::new(2).unwrap();
+    let locator_index = locator.to_index();
+
     // Indices of diagnostics that were ignored by a `noqa` directive.
     let mut ignored_diagnostics = vec![];
 
@@ -85,32 +99,15 @@ pub(crate) fn check_noqa(
         for noqa_offset in noqa_offsets {
             if let Some(directive_line) = noqa_directives.find_line_with_directive_mut(noqa_offset)
             {
-                let suppressed = match &directive_line.directive {
-                    Directive::All(_) => {
-                        let Ok(rule) = Rule::from_code(code) else {
-                            debug_assert!(false, "Invalid secondary code `{code}`");
-                            continue;
-                        };
-                        directive_line.matches.push(rule);
-                        ignored_diagnostics.push(index);
-                        true
-                    }
-                    Directive::Codes(directive) => {
-                        if directive.includes(code) {
-                            let Ok(rule) = Rule::from_code(code) else {
-                                debug_assert!(false, "Invalid secondary code `{code}`");
-                                continue;
-                            };
-                            directive_line.matches.push(rule);
-                            ignored_diagnostics.push(index);
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                };
-
-                if suppressed {
+                if try_suppress(directive_line, code, &mut ignored_diagnostics, index) {
+                    continue 'outer;
+                }
+            }
+            if has_any_shebang && // Only works on files with shebang
+               diagnostic.range().is_some_and(|x| x.start().to_u32() == 0 && x.end().to_u32() == 0) &&// Only works for noqa that begins at 0
+               let Some(directive_line) = noqa_directives.find_noqa_on_line_mut(second_line_index, locator_index)
+            {
+                if try_suppress(directive_line, code, &mut ignored_diagnostics, index) {
                     continue 'outer;
                 }
             }
@@ -276,4 +273,36 @@ pub(crate) fn check_noqa(
 
     ignored_diagnostics.sort_unstable();
     ignored_diagnostics
+}
+
+fn try_suppress(
+    directive_line: &mut NoqaDirectiveLine<'_>,
+    code: &SecondaryCode,
+    ignored_diagnostics: &mut Vec<usize>,
+    index: usize,
+) -> bool {
+    match &directive_line.directive {
+        Directive::All(_) => {
+            let Ok(rule) = Rule::from_code(code) else {
+                debug_assert!(false, "Invalid secondary code `{code}`");
+                return false;
+            };
+            directive_line.matches.push(rule);
+            ignored_diagnostics.push(index);
+            true
+        }
+        Directive::Codes(directive) => {
+            if directive.includes(code) {
+                let Ok(rule) = Rule::from_code(code) else {
+                    debug_assert!(false, "Invalid secondary code `{code}`");
+                    return false;
+                };
+                directive_line.matches.push(rule);
+                ignored_diagnostics.push(index);
+                true
+            } else {
+                false
+            }
+        }
+    }
 }
