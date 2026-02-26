@@ -1728,6 +1728,139 @@ with open("file.txt") as f:
         }
     }
 
+    #[test]
+    fn test_folding_range_decorated_function1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@decorator
+def my_function():
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @r"
+        info[folding-range]: Folding Range
+         --> main.py:3:1
+          |
+        2 |   @decorator
+        3 | / def my_function():
+        4 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_function2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@first
+@second
+@third
+def my_function():
+    pass
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:1
+          |
+        2 | / @first
+        3 | | @second
+        4 | | @third
+          | |______^
+        5 |   def my_function():
+        6 |       pass
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:5:1
+          |
+        3 |   @second
+        4 |   @third
+        5 | / def my_function():
+        6 | |     pass
+          | |________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_class1() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@dataclass
+class MyClass:
+    value: int
+    name: str
+<CURSOR>
+"#,
+            )
+            .build();
+
+        // Single decorator is one line, so no decorator folding range is emitted.
+        assert_snapshot!(test.folding_ranges(), @r"
+        info[folding-range]: Folding Range
+         --> main.py:3:1
+          |
+        2 |   @dataclass
+        3 | / class MyClass:
+        4 | |     value: int
+        5 | |     name: str
+          | |_____________^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_folding_range_decorated_class2() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+@decorator_a
+@decorator_b
+class MyClass:
+    value: int
+<CURSOR>
+"#,
+            )
+            .build();
+
+        assert_snapshot!(test.folding_ranges(), @"
+        info[folding-range]: Folding Range
+         --> main.py:2:1
+          |
+        2 | / @decorator_a
+        3 | | @decorator_b
+          | |____________^
+        4 |   class MyClass:
+        5 |       value: int
+          |
+
+        info[folding-range]: Folding Range
+         --> main.py:4:1
+          |
+        2 |   @decorator_a
+        3 |   @decorator_b
+        4 | / class MyClass:
+        5 | |     value: int
+          | |______________^
+          |
+        ");
+    }
+
     struct FoldingRangeDiagnostic {
         file: File,
         folding_range: FoldingRange,
