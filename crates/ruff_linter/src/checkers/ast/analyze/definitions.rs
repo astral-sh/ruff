@@ -117,12 +117,15 @@ pub(crate) fn definitions(checker: &mut Checker) {
             })
     };
 
-    let definitions = std::mem::take(&mut checker.semantic.definitions);
     let mut overloaded_name: Option<&str> = None;
     for ContextualizedDefinition {
         definition,
         visibility,
-    } in definitions.resolve(exports.as_deref()).iter()
+    } in checker
+        .semantic
+        .definitions
+        .resolve(exports.as_deref())
+        .iter()
     {
         let docstring = docstrings::extraction::extract_docstring(definition);
 

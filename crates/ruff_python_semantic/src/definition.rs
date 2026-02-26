@@ -214,11 +214,11 @@ impl<'a> Definitions<'a> {
     }
 
     /// Resolve the visibility of each definition in the collection.
-    pub fn resolve(self, exports: Option<&[DunderAllName]>) -> ContextualizedDefinitions<'a> {
+    pub fn resolve(&'a self, exports: Option<&[DunderAllName]>) -> ContextualizedDefinitions<'a> {
         let mut definitions: IndexVec<DefinitionId, ContextualizedDefinition<'a>> =
             IndexVec::with_capacity(self.len());
 
-        for definition in self {
+        for definition in self.iter() {
             // Determine the visibility of the next definition, taking into account its parent's
             // visibility.
             let visibility = {
@@ -306,7 +306,7 @@ impl<'a> IntoIterator for Definitions<'a> {
 
 /// A [`Definition`] in a Python program with its resolved [`Visibility`].
 pub struct ContextualizedDefinition<'a> {
-    pub definition: Definition<'a>,
+    pub definition: &'a Definition<'a>,
     pub visibility: Visibility,
 }
 
