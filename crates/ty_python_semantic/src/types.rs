@@ -121,7 +121,6 @@ mod tuple;
 mod type_ordering;
 mod typed_dict;
 mod unpacker;
-pub mod unused_bindings;
 mod variance;
 mod visitor;
 
