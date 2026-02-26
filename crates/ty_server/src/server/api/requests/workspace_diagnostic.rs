@@ -418,6 +418,7 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
+                    .chain(unnecessary.iter())
                     .filter_map(|diagnostic| {
                         Some(
                             to_lsp_diagnostic(
@@ -431,20 +432,6 @@ impl<'a> ResponseWriter<'a> {
                         )
                     })
                     .collect::<Vec<_>>();
-
-                let mut lsp_diagnostics = lsp_diagnostics;
-                lsp_diagnostics.extend(unnecessary.iter().filter_map(|diagnostic| {
-                    Some(
-                        to_lsp_diagnostic(
-                            db,
-                            diagnostic,
-                            self.position_encoding,
-                            self.client_capabilities,
-                            self.global_settings,
-                        )?
-                        .1,
-                    )
-                }));
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
                     uri: url,
