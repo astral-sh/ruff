@@ -1365,6 +1365,9 @@ pub struct DisplayDiagnosticConfig {
     /// This is intended for temporary use by Ruff, which only has a single `error` severity at the
     /// moment. We should be able to remove this option when Ruff gets more severities.
     hide_severity: bool,
+    /// Whether to display the primary rule code (i.e. the human-readable name)
+    /// or the secondary code (i.e. the noqa code, in Ruff).
+    display_code: CodeRank,
     /// Whether to show the availability of a fix in a diagnostic.
     show_fix_status: bool,
     /// Whether to show the diff for an available fix after the main diagnostic.
@@ -1386,6 +1389,7 @@ impl DisplayDiagnosticConfig {
             context: 2,
             preview: false,
             hide_severity: false,
+            display_code: CodeRank::Primary,
             show_fix_status: false,
             show_fix_diff: false,
             fix_applicability: Applicability::Safe,
@@ -1423,6 +1427,14 @@ impl DisplayDiagnosticConfig {
     pub fn hide_severity(self, yes: bool) -> DisplayDiagnosticConfig {
         DisplayDiagnosticConfig {
             hide_severity: yes,
+            ..self
+        }
+    }
+
+    /// Whether to use the primary or secondary code to display.
+    pub fn display_code(self, rank: CodeRank) -> DisplayDiagnosticConfig {
+        DisplayDiagnosticConfig {
+            display_code: rank,
             ..self
         }
     }
@@ -1705,4 +1717,11 @@ impl From<&SecondaryCode> for SecondaryCode {
     fn from(value: &SecondaryCode) -> Self {
         value.clone()
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CodeRank {
+    #[default]
+    Primary,
+    Secondary,
 }
