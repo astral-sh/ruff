@@ -82,6 +82,7 @@ pub(super) struct Declarations {
 pub(super) struct LiveDeclaration {
     pub(super) declaration: ScopedDefinitionId,
     pub(super) reachability_constraint: ScopedReachabilityConstraintId,
+    pub(super) reachability_constraint_before_transfer: Option<ScopedReachabilityConstraintId>,
 }
 
 pub(super) type LiveDeclarationsIterator<'a> = std::slice::Iter<'a, LiveDeclaration>;
@@ -103,6 +104,7 @@ impl Declarations {
         let initial_declaration = LiveDeclaration {
             declaration: ScopedDefinitionId::UNBOUND,
             reachability_constraint,
+            reachability_constraint_before_transfer: None,
         };
         Self {
             live_declarations: smallvec![initial_declaration],
@@ -123,6 +125,7 @@ impl Declarations {
         self.live_declarations.push(LiveDeclaration {
             declaration,
             reachability_constraint,
+            reachability_constraint_before_transfer: None,
         });
     }
 
@@ -135,6 +138,20 @@ impl Declarations {
         for declaration in &mut self.live_declarations {
             declaration.reachability_constraint = reachability_constraints
                 .add_and_constraint(declaration.reachability_constraint, constraint);
+        }
+    }
+
+    pub(super) fn mark_transferred(
+        &mut self,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        for declaration in &mut self.live_declarations {
+            declaration.reachability_constraint_before_transfer =
+                Some(declaration.reachability_constraint);
+            declaration.reachability_constraint = reachability_constraints.add_and_constraint(
+                declaration.reachability_constraint,
+                ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            );
         }
     }
 
@@ -158,9 +175,25 @@ impl Declarations {
                 EitherOrBoth::Both(a, b) => {
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
+                    let reachability_constraint_before_transfer = match (
+                        a.reachability_constraint_before_transfer,
+                        b.reachability_constraint_before_transfer,
+                    ) {
+                        (Some(a), Some(b)) => {
+                            debug_assert_eq!(
+                                a, b,
+                                "`reachability_constraint_before_transfer` should be a unique ID."
+                            );
+                            Some(a)
+                        }
+                        (Some(a), None) => Some(a),
+                        (None, Some(b)) => Some(b),
+                        (None, None) => None,
+                    };
                     self.live_declarations.push(LiveDeclaration {
                         declaration: a.declaration,
                         reachability_constraint,
+                        reachability_constraint_before_transfer,
                     });
                 }
 
@@ -175,6 +208,11 @@ impl Declarations {
         self.live_declarations.shrink_to_fit();
         for declaration in &self.live_declarations {
             reachability_constraints.mark_used(declaration.reachability_constraint);
+            if let Some(reachability_before_transfer) =
+                declaration.reachability_constraint_before_transfer
+            {
+                reachability_constraints.mark_used(reachability_before_transfer);
+            }
         }
     }
 }
@@ -226,6 +264,11 @@ impl Bindings {
         self.live_bindings.shrink_to_fit();
         for binding in &self.live_bindings {
             reachability_constraints.mark_used(binding.reachability_constraint);
+            if let Some(reachability_before_transfer) =
+                binding.reachability_constraint_before_transfer
+            {
+                reachability_constraints.mark_used(reachability_before_transfer);
+            }
             reachability_constraints.mark_used(binding.narrowing_constraint);
         }
     }
@@ -237,6 +280,7 @@ pub(crate) struct LiveBinding {
     pub(crate) binding: ScopedDefinitionId,
     pub(crate) narrowing_constraint: ScopedNarrowingConstraint,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
+    pub(crate) reachability_constraint_before_transfer: Option<ScopedReachabilityConstraintId>,
 }
 
 pub(super) type LiveBindingsIterator<'a> = std::slice::Iter<'a, LiveBinding>;
@@ -247,6 +291,7 @@ impl Bindings {
             binding: ScopedDefinitionId::UNBOUND,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
+            reachability_constraint_before_transfer: None,
         };
         Self {
             unbound_narrowing_constraint: None,
@@ -277,6 +322,7 @@ impl Bindings {
             binding,
             narrowing_constraint: ScopedNarrowingConstraint::ALWAYS_TRUE,
             reachability_constraint,
+            reachability_constraint_before_transfer: None,
         });
     }
 
@@ -301,6 +347,19 @@ impl Bindings {
         for binding in &mut self.live_bindings {
             binding.reachability_constraint = reachability_constraints
                 .add_and_constraint(binding.reachability_constraint, constraint);
+        }
+    }
+
+    pub(super) fn mark_transferred(
+        &mut self,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        for binding in &mut self.live_bindings {
+            binding.reachability_constraint_before_transfer = Some(binding.reachability_constraint);
+            binding.reachability_constraint = reachability_constraints.add_and_constraint(
+                binding.reachability_constraint,
+                ScopedReachabilityConstraintId::ALWAYS_FALSE,
+            );
         }
     }
 
@@ -343,10 +402,27 @@ impl Bindings {
                     let reachability_constraint = reachability_constraints
                         .add_or_constraint(a.reachability_constraint, b.reachability_constraint);
 
+                    let reachability_constraint_before_transfer = match (
+                        a.reachability_constraint_before_transfer,
+                        b.reachability_constraint_before_transfer,
+                    ) {
+                        (Some(a), Some(b)) => {
+                            debug_assert_eq!(
+                                a, b,
+                                "`reachability_constraint_before_transfer` should be a unique ID."
+                            );
+                            Some(a)
+                        }
+                        (Some(a), None) => Some(a),
+                        (None, Some(b)) => Some(b),
+                        (None, None) => None,
+                    };
+
                     self.live_bindings.push(LiveBinding {
                         binding: a.binding,
                         narrowing_constraint,
                         reachability_constraint,
+                        reachability_constraint_before_transfer,
                     });
                 }
 
@@ -412,6 +488,14 @@ impl PlaceState {
             .record_reachability_constraint(reachability_constraints, constraint);
         self.declarations
             .record_reachability_constraint(reachability_constraints, constraint);
+    }
+
+    pub(super) fn mark_transferred(
+        &mut self,
+        reachability_constraints: &mut ReachabilityConstraintsBuilder,
+    ) {
+        self.bindings.mark_transferred(reachability_constraints);
+        self.declarations.mark_transferred(reachability_constraints);
     }
 
     /// Record a newly-encountered declaration of this place.
@@ -483,6 +567,7 @@ mod tests {
                 |LiveDeclaration {
                      declaration,
                      reachability_constraint: _,
+                     reachability_constraint_before_transfer: _,
                  }| {
                     if *declaration == ScopedDefinitionId::UNBOUND {
                         "undeclared".into()
