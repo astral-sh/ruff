@@ -3,7 +3,7 @@ from faststream._internal.broker import BrokerUsecase
 
 if TYPE_CHECKING:
     # See: https://github.com/astral-sh/ruff/issues/22554
-    # shoud detect -------------------------vvvvvvvvvvvv
+    # shoud detect -------------------------vvvvvvvvvvvvv
     from faststream._internal.broker import BrokerUsecase
     from faststream.specification.schema import Contact, License
 
