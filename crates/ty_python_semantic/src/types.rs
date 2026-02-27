@@ -4767,50 +4767,54 @@ impl<'db> Type<'db> {
             _ => self,
         };
 
-        // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
-        // Per the spec: if the return type is not an instance of the class being constructed
-        // (or a subclass thereof), use the metaclass `__call__` directly and skip `__new__`/`__init__`.
-        // If the return type is dynamic/contains typevars, fall through to evaluate `__new__`/`__init__`.
-        let metaclass_dunder_call = self_type.member_lookup_with_policy(
-            db,
-            "__call__".into(),
-            MemberLookupPolicy::NO_INSTANCE_FALLBACK
-                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
-        );
-
         let Some(constructor_instance_ty) = self_type.to_instance(db) else {
             return fallback_bindings();
         };
 
-        // Classify metaclass `__call__` overloads by whether they return an instance
-        // of the class being constructed. For mixed or all-instance cases, save the
-        // relevant bindings/signatures for later combination with `__new__`/`__init__`.
+        // Check for a custom `__call__` on the metaclass (excluding `type.__call__`).
+        // Per the spec: if the return type is not an instance of the class being constructed
+        // (or a subclass thereof), use the metaclass `__call__` directly and skip `__new__`/`__init__`.
+        // If the return type is dynamic/contains typevars, fall through to evaluate `__new__`/`__init__`.
+        //
+        // Short-circuit: skip the lookup when the metaclass is exactly `type`, since
+        // `type.__call__` is always excluded by `META_CLASS_NO_TYPE_FALLBACK` anyway.
+        let has_custom_metaclass = class.metaclass(db) != KnownClass::Type.to_class_literal(db);
+
         let mut metaclass_mixed_non_instance_sigs = None;
         let mut metaclass_instance_bindings: Option<(Bindings<'db>, Type<'db>)> = None;
 
-        if let Place::Defined(DefinedPlace {
-            ty: Type::BoundMethod(metaclass_call_method),
-            ..
-        }) = metaclass_dunder_call.place
-        {
-            let signature = metaclass_call_method.function(db).signature(db);
-            match classify_constructor_overloads(
+        if has_custom_metaclass {
+            let metaclass_dunder_call = self_type.member_lookup_with_policy(
                 db,
-                signature,
-                class,
-                constructor_instance_ty,
-                Some(metaclass_call_method.self_instance(db)),
-            ) {
-                OverloadDisposition::AllNonInstance => {
-                    return Type::BoundMethod(metaclass_call_method).bindings(db);
-                }
-                OverloadDisposition::Mixed(combined_sigs) => {
-                    metaclass_mixed_non_instance_sigs = Some(combined_sigs);
-                }
-                OverloadDisposition::AllInstance => {
-                    let metaclass_call_ty = Type::BoundMethod(metaclass_call_method);
-                    metaclass_instance_bindings =
-                        Some((metaclass_call_ty.bindings(db), metaclass_call_ty));
+                "__call__".into(),
+                MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                    | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+            );
+
+            if let Place::Defined(DefinedPlace {
+                ty: Type::BoundMethod(metaclass_call_method),
+                ..
+            }) = metaclass_dunder_call.place
+            {
+                let signature = metaclass_call_method.function(db).signature(db);
+                match classify_constructor_overloads(
+                    db,
+                    signature,
+                    class,
+                    constructor_instance_ty,
+                    Some(metaclass_call_method.self_instance(db)),
+                ) {
+                    OverloadDisposition::AllNonInstance => {
+                        return Type::BoundMethod(metaclass_call_method).bindings(db);
+                    }
+                    OverloadDisposition::Mixed(combined_sigs) => {
+                        metaclass_mixed_non_instance_sigs = Some(combined_sigs);
+                    }
+                    OverloadDisposition::AllInstance => {
+                        let metaclass_call_ty = Type::BoundMethod(metaclass_call_method);
+                        metaclass_instance_bindings =
+                            Some((metaclass_call_ty.bindings(db), metaclass_call_ty));
+                    }
                 }
             }
         }
