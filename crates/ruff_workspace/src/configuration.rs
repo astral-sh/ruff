@@ -934,7 +934,7 @@ impl LintConfiguration {
                     .warn
                     .iter()
                     .flatten()
-                    .chain(&selection.extend_select)
+                    .chain(&selection.extend_warn)
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector.rules(&preview) {
