@@ -731,42 +731,30 @@ impl<'db> ConstraintSetBuilder<'db> {
         // builder's orderings. That's not the quickest thing in the world, but that's fine, since
         // `OwnedConstraintSet` is only used in mdtests, and not in type inference of user code.
 
-        fn rebuild_node<'db>(
-            db: &'db dyn Db,
-            builder: &ConstraintSetBuilder<'db>,
-            other: &OwnedConstraintSet<'db>,
-            cache: &mut FxHashMap<NodeId, NodeId>,
-            old_node: NodeId,
-        ) -> NodeId {
-            if old_node.is_terminal() {
-                return old_node;
+        let mut nodes = IndexVec::with_capacity(other.nodes.len());
+        let remap_node = |nodes: &IndexVec<NodeId, NodeId>, node: NodeId| {
+            if node.is_terminal() {
+                return node;
             }
-            if let Some(remapped) = cache.get(&old_node) {
-                return *remapped;
-            }
+            nodes[node]
+        };
 
-            let old_interior = other.nodes[old_node];
+        for old_interior in &other.nodes {
             let old_constraint = other.constraints[old_interior.constraint];
             let condition = Constraint::new_node(
                 db,
-                builder,
+                self,
                 old_constraint.typevar,
                 old_constraint.lower,
                 old_constraint.upper,
             );
-
-            let if_true = rebuild_node(db, builder, other, cache, old_interior.if_true);
-            let if_false = rebuild_node(db, builder, other, cache, old_interior.if_false);
-            let remapped = condition.ite(builder, if_true, if_false);
-
-            cache.insert(old_node, remapped);
-            remapped
+            let if_true = remap_node(&nodes, old_interior.if_true);
+            let if_false = remap_node(&nodes, old_interior.if_false);
+            let remapped = condition.ite(self, if_true, if_false);
+            nodes.push(remapped);
         }
 
-        // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
-        let mut cache = FxHashMap::default();
-        let node = rebuild_node(db, self, other, &mut cache, other.node);
-
+        let node = remap_node(&nodes, other.node);
         let support =
             other
                 .support
@@ -777,7 +765,6 @@ impl<'db> ConstraintSetBuilder<'db> {
                     let remapped_constraint = self.intern_constraint(db, old_constraint_data);
                     self.ordered_union_support(support, SupportId::Singleton(remapped_constraint))
                 });
-
         ConstraintSet::from_node_and_support(self, node, support)
     }
 
