@@ -516,9 +516,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::EllipsisLiteral(_) => {
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!(
-                        "Ellipsis literal (`...`) is not allowed in this context in a type expression"
-                    ),
+                    format_args!("`...` is not allowed in this context in a type expression"),
                 );
                 Type::unknown()
             }
