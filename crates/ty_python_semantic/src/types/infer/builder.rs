@@ -1199,44 +1199,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // We only flag when one of the conflicting entries is an
                     // explicit base, to avoid false positives from deep MRO
                     // conflicts in built-in type hierarchies.
-                    {
-                        let explicit_generic_bases: FxHashMap<
-                            StaticClassLiteral<'db>,
-                            ClassType<'db>,
-                        > = class
-                            .explicit_bases(self.db())
-                            .iter()
-                            .filter_map(|base| {
-                                let Type::GenericAlias(generic) = base else {
-                                    return None;
-                                };
-                                Some((generic.origin(self.db()), ClassType::Generic(*generic)))
-                            })
-                            .collect();
 
-                        if !explicit_generic_bases.is_empty() {
-                            for base in mro.iter().skip(1) {
-                                let ClassBase::Class(class_type) = base else {
-                                    continue;
-                                };
-                                let Some((literal, Some(_))) =
-                                    class_type.static_class_literal(self.db())
-                                else {
-                                    continue;
-                                };
-                                if let Some(&expected) = explicit_generic_bases.get(&literal)
-                                    && expected != *class_type
-                                    && let Some(builder) = self
-                                        .context
-                                        .report_lint(&INVALID_GENERIC_CLASS, class_node)
-                                {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot inherit from class `{}` with \
+                    let explicit_bases = class.explicit_bases(self.db());
+
+                    if explicit_bases.iter().any(Type::is_generic_alias) {
+                        for supercls in mro.iter().skip(1) {
+                            let ClassBase::Class(supercls) = supercls else {
+                                continue;
+                            };
+                            let Some((literal, Some(spec))) =
+                                supercls.static_class_literal(self.db())
+                            else {
+                                continue;
+                            };
+                            if let Some(expected) = explicit_bases
+                                .iter()
+                                .filter_map(Type::as_generic_alias)
+                                .find(|alias| alias.origin(self.db()) == literal)
+                                && expected.specialization(self.db()) != spec
+                                && let Some(builder) =
+                                    self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot inherit from class `{}` with \
                                         inconsistent type argument ordering",
-                                        literal.name(self.db()),
-                                    ));
-                                    break;
-                                }
+                                    literal.name(self.db()),
+                                ));
+                                break;
                             }
                         }
                     }
