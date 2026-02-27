@@ -910,9 +910,8 @@ pub(crate) struct Constraint<'db> {
     pub(crate) upper: Type<'db>,
 }
 
-impl<'db> Constraint<'db> {
-    #[expect(clippy::new_ret_no_self)]
-    fn new(
+impl ConstraintId {
+    fn new<'db>(
         db: &'db dyn Db,
         builder: &ConstraintSetBuilder<'db>,
         typevar: BoundTypeVarInstance<'db>,
@@ -928,7 +927,9 @@ impl<'db> Constraint<'db> {
             },
         )
     }
+}
 
+impl<'db> Constraint<'db> {
     /// Returns a new range constraint.
     ///
     /// Panics if `lower` and `upper` are not both fully static.
@@ -1005,7 +1006,7 @@ impl<'db> Constraint<'db> {
             {
                 return Node::new_constraint(
                     builder,
-                    Constraint::new(db, builder, typevar, Type::Never, Type::object()),
+                    ConstraintId::new(db, builder, typevar, Type::Never, Type::object()),
                     1,
                 )
                 .negate(builder);
@@ -1054,7 +1055,7 @@ impl<'db> Constraint<'db> {
                 };
                 Node::new_constraint(
                     builder,
-                    Constraint::new(
+                    ConstraintId::new(
                         db,
                         builder,
                         typevar,
@@ -1072,12 +1073,12 @@ impl<'db> Constraint<'db> {
             {
                 let lower = Node::new_constraint(
                     builder,
-                    Constraint::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
+                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
                     1,
                 );
                 let upper = Node::new_constraint(
                     builder,
-                    Constraint::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
+                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
                     1,
                 );
                 lower.and(builder, upper)
@@ -1087,7 +1088,7 @@ impl<'db> Constraint<'db> {
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, builder, lower) => {
                 let lower = Node::new_constraint(
                     builder,
-                    Constraint::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
+                    ConstraintId::new(db, builder, lower, Type::Never, Type::TypeVar(typevar)),
                     1,
                 );
                 let upper = if upper.is_object() {
@@ -1107,7 +1108,7 @@ impl<'db> Constraint<'db> {
                 };
                 let upper = Node::new_constraint(
                     builder,
-                    Constraint::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
+                    ConstraintId::new(db, builder, upper, Type::TypeVar(typevar), Type::object()),
                     1,
                 );
                 lower.and(builder, upper)
@@ -1115,7 +1116,7 @@ impl<'db> Constraint<'db> {
 
             _ => Node::new_constraint(
                 builder,
-                Constraint::new(db, builder, typevar, lower, upper),
+                ConstraintId::new(db, builder, typevar, lower, upper),
                 1,
             ),
         }
@@ -1378,9 +1379,8 @@ enum Node {
     Interior(InteriorNode),
 }
 
-impl Node {
+impl NodeId {
     /// Creates a new BDD node, ensuring that it is quasi-reduced.
-    #[expect(clippy::new_ret_no_self)]
     fn new(
         builder: &ConstraintSetBuilder<'_>,
         constraint: ConstraintId,
@@ -1416,7 +1416,9 @@ impl Node {
             max_source_order,
         })
     }
+}
 
+impl Node {
     /// Creates a new BDD node for an individual constraint. (The BDD will evaluate to `true` when
     /// the constraint holds, and to `false` when it does not.)
     fn new_constraint(
@@ -1504,7 +1506,7 @@ impl NodeId {
             Node::AlwaysTrue | Node::AlwaysFalse => self,
             Node::Interior(_) => {
                 let interior = builder.interior_node_data(self);
-                Node::new(
+                NodeId::new(
                     builder,
                     interior.constraint,
                     interior.if_true.with_adjusted_source_order(builder, delta),
@@ -1732,7 +1734,7 @@ impl NodeId {
             (Node::AlwaysTrue, Node::AlwaysTrue) => ALWAYS_TRUE,
             (Node::AlwaysTrue, Node::Interior(_)) => {
                 let other_interior = builder.interior_node_data(other);
-                Node::new(
+                NodeId::new(
                     builder,
                     other_interior.constraint,
                     ALWAYS_TRUE,
@@ -1742,7 +1744,7 @@ impl NodeId {
             }
             (Node::Interior(_), Node::AlwaysTrue) => {
                 let self_interior = builder.interior_node_data(self);
-                Node::new(
+                NodeId::new(
                     builder,
                     self_interior.constraint,
                     ALWAYS_TRUE,
@@ -1892,7 +1894,7 @@ impl NodeId {
             (Node::AlwaysFalse, Node::AlwaysFalse) => ALWAYS_FALSE,
             (Node::AlwaysFalse, Node::Interior(_)) => {
                 let other_interior = builder.interior_node_data(other);
-                Node::new(
+                NodeId::new(
                     builder,
                     other_interior.constraint,
                     ALWAYS_FALSE,
@@ -1902,7 +1904,7 @@ impl NodeId {
             }
             (Node::Interior(_), Node::AlwaysFalse) => {
                 let self_interior = builder.interior_node_data(self);
-                Node::new(
+                NodeId::new(
                     builder,
                     self_interior.constraint,
                     ALWAYS_FALSE,
@@ -1954,7 +1956,7 @@ impl NodeId {
             }
             (Node::AlwaysTrue | Node::AlwaysFalse, Node::Interior(_)) => {
                 let interior = builder.interior_node_data(other);
-                Node::new(
+                NodeId::new(
                     builder,
                     interior.constraint,
                     self.iff_inner(builder, interior.if_true, other_offset),
@@ -1964,7 +1966,7 @@ impl NodeId {
             }
             (Node::Interior(_), Node::AlwaysTrue | Node::AlwaysFalse) => {
                 let interior = builder.interior_node_data(self);
-                Node::new(
+                NodeId::new(
                     builder,
                     interior.constraint,
                     interior.if_true.iff_inner(builder, other, other_offset),
@@ -2708,7 +2710,7 @@ impl InteriorNode {
         drop(storage);
 
         let interior = builder.interior_node_data(self.node());
-        let result = Node::new(
+        let result = NodeId::new(
             builder,
             interior.constraint,
             interior.if_true.negate(builder),
@@ -2734,7 +2736,7 @@ impl InteriorNode {
         let other_interior = builder.interior_node_data(other.node());
         let other_ordering = other_interior.constraint.ordering();
         let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => Node::new(
+            Ordering::Equal => NodeId::new(
                 builder,
                 self_interior.constraint,
                 self_interior
@@ -2745,7 +2747,7 @@ impl InteriorNode {
                     .or_inner(builder, other_interior.if_false, other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Less => Node::new(
+            Ordering::Less => NodeId::new(
                 builder,
                 self_interior.constraint,
                 self_interior
@@ -2756,7 +2758,7 @@ impl InteriorNode {
                     .or_inner(builder, other.node(), other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Greater => Node::new(
+            Ordering::Greater => NodeId::new(
                 builder,
                 other_interior.constraint,
                 self.node()
@@ -2785,7 +2787,7 @@ impl InteriorNode {
         let other_interior = builder.interior_node_data(other.node());
         let other_ordering = other_interior.constraint.ordering();
         let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => Node::new(
+            Ordering::Equal => NodeId::new(
                 builder,
                 self_interior.constraint,
                 self_interior
@@ -2796,7 +2798,7 @@ impl InteriorNode {
                     .and_inner(builder, other_interior.if_false, other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Less => Node::new(
+            Ordering::Less => NodeId::new(
                 builder,
                 self_interior.constraint,
                 self_interior
@@ -2807,7 +2809,7 @@ impl InteriorNode {
                     .and_inner(builder, other.node(), other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Greater => Node::new(
+            Ordering::Greater => NodeId::new(
                 builder,
                 other_interior.constraint,
                 self.node()
@@ -2836,7 +2838,7 @@ impl InteriorNode {
         let other_interior = builder.interior_node_data(other.node());
         let other_ordering = other_interior.constraint.ordering();
         let result = match self_ordering.cmp(&other_ordering) {
-            Ordering::Equal => Node::new(
+            Ordering::Equal => NodeId::new(
                 builder,
                 self_interior.constraint,
                 self_interior
@@ -2847,7 +2849,7 @@ impl InteriorNode {
                     .iff_inner(builder, other_interior.if_false, other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Less => Node::new(
+            Ordering::Less => NodeId::new(
                 builder,
                 self_interior.constraint,
                 self_interior
@@ -2858,7 +2860,7 @@ impl InteriorNode {
                     .iff_inner(builder, other.node(), other_offset),
                 self_interior.source_order,
             ),
-            Ordering::Greater => Node::new(
+            Ordering::Greater => NodeId::new(
                 builder,
                 other_interior.constraint,
                 self.node()
@@ -3123,7 +3125,7 @@ impl InteriorNode {
                 let (if_false, found_in_false) =
                     self_interior.if_false.restrict_one(db, builder, assignment);
                 (
-                    Node::new(
+                    NodeId::new(
                         builder,
                         self_interior.constraint,
                         if_true,
@@ -3451,7 +3453,7 @@ impl InteriorNode {
                 };
 
                 let new_constraint =
-                    Constraint::new(db, builder, constrained_typevar, new_lower, new_upper);
+                    ConstraintId::new(db, builder, constrained_typevar, new_lower, new_upper);
                 if seen_constraints.contains(&new_constraint) {
                     continue;
                 }
@@ -4178,9 +4180,9 @@ impl SequentMap {
                 // but they constrain different typevars and must be created in the orientation
                 // allowed by `can_be_bound_for`.
                 if upper_typevar.can_be_bound_for(db, builder, lower_typevar) {
-                    Constraint::new(db, builder, lower_typevar, Type::Never, upper)
+                    ConstraintId::new(db, builder, lower_typevar, Type::Never, upper)
                 } else {
-                    Constraint::new(
+                    ConstraintId::new(
                         db,
                         builder,
                         upper_typevar,
@@ -4192,12 +4194,12 @@ impl SequentMap {
 
             // Case 2
             (Type::TypeVar(lower_typevar), _) => {
-                Constraint::new(db, builder, lower_typevar, Type::Never, upper)
+                ConstraintId::new(db, builder, lower_typevar, Type::Never, upper)
             }
 
             // Case 3
             (_, Type::TypeVar(upper_typevar)) => {
-                Constraint::new(db, builder, upper_typevar, lower, Type::object())
+                ConstraintId::new(db, builder, upper_typevar, lower, Type::object())
             }
 
             _ => return,
@@ -4372,7 +4374,7 @@ impl SequentMap {
         if let Type::TypeVar(lower_bound_typevar) = new_lower
             && !lower_bound_typevar.can_be_bound_for(db, builder, constrained_typevar)
         {
-            post_constraints.push(Constraint::new(
+            post_constraints.push(ConstraintId::new(
                 db,
                 builder,
                 lower_bound_typevar,
@@ -4385,7 +4387,7 @@ impl SequentMap {
         if let Type::TypeVar(upper_bound_typevar) = new_upper
             && !upper_bound_typevar.can_be_bound_for(db, builder, constrained_typevar)
         {
-            post_constraints.push(Constraint::new(
+            post_constraints.push(ConstraintId::new(
                 db,
                 builder,
                 upper_bound_typevar,
@@ -4396,7 +4398,7 @@ impl SequentMap {
         }
 
         if !(constrained_lower.is_never() && constrained_upper.is_object()) {
-            post_constraints.push(Constraint::new(
+            post_constraints.push(ConstraintId::new(
                 db,
                 builder,
                 constrained_typevar,
@@ -4461,7 +4463,7 @@ impl SequentMap {
                         if let Type::TypeVar(lower_bound_typevar) = right_lower
                             && !lower_bound_typevar.can_be_bound_for(db, builder, bound_typevar)
                         {
-                            post_constraints.push(Constraint::new(
+                            post_constraints.push(ConstraintId::new(
                                 db,
                                 builder,
                                 lower_bound_typevar,
@@ -4474,7 +4476,7 @@ impl SequentMap {
                         if let Type::TypeVar(upper_bound_typevar) = right_upper
                             && !upper_bound_typevar.can_be_bound_for(db, builder, bound_typevar)
                         {
-                            post_constraints.push(Constraint::new(
+                            post_constraints.push(ConstraintId::new(
                                 db,
                                 builder,
                                 upper_bound_typevar,
@@ -4485,7 +4487,7 @@ impl SequentMap {
                         }
 
                         if !(constrained_lower.is_never() && constrained_upper.is_object()) {
-                            post_constraints.push(Constraint::new(
+                            post_constraints.push(ConstraintId::new(
                                 db,
                                 builder,
                                 bound_typevar,
