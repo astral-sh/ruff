@@ -1207,11 +1207,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             .explicit_bases(self.db())
                             .iter()
                             .filter_map(|base| {
-                                if let Type::GenericAlias(generic) = base {
-                                    Some((generic.origin(self.db()), ClassType::Generic(*generic)))
-                                } else {
-                                    None
-                                }
+                                let Type::GenericAlias(generic) = base else {
+                                    return None;
+                                };
+                                Some((generic.origin(self.db()), ClassType::Generic(*generic)))
                             })
                             .collect();
 
@@ -1225,20 +1224,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 else {
                                     continue;
                                 };
-                                if let Some(&expected) = explicit_generic_bases.get(&literal) {
-                                    if expected != *class_type {
-                                        if let Some(builder) = self
-                                            .context
-                                            .report_lint(&INVALID_GENERIC_CLASS, class_node)
-                                        {
-                                            builder.into_diagnostic(format_args!(
-                                                "Cannot inherit from class `{}` with \
-                                                inconsistent type argument ordering",
-                                                literal.name(self.db()),
-                                            ));
-                                        }
-                                        break;
-                                    }
+                                if let Some(&expected) = explicit_generic_bases.get(&literal)
+                                    && expected != *class_type
+                                    && let Some(builder) = self
+                                        .context
+                                        .report_lint(&INVALID_GENERIC_CLASS, class_node)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cannot inherit from class `{}` with \
+                                        inconsistent type argument ordering",
+                                        literal.name(self.db()),
+                                    ));
+                                    break;
                                 }
                             }
                         }
