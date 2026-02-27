@@ -63,13 +63,13 @@ Or, when an ellipsis literal is used as a parameter type in the list (note that 
 form uses `...` as the entire first argument, not inside a list):
 
 ```py
-# error: [invalid-type-form] "Ellipsis literal (`...`) is not allowed as a parameter type in `Callable`"
+# error: [invalid-type-form] "Ellipsis literal (`...`) is not allowed in this context in a type expression"
 def _(c: Callable[[...], int]):
     reveal_type(c)  # revealed: (Unknown, /) -> int
 ```
 
 ```py
-# error: [invalid-type-form] "Ellipsis literal (`...`) is not allowed as a parameter type in `Callable`"
+# error: [invalid-type-form] "Ellipsis literal (`...`) is not allowed in this context in a type expression"
 def _(c: Callable[[int, ...], int]):
     reveal_type(c)  # revealed: (int, Unknown, /) -> int
 ```

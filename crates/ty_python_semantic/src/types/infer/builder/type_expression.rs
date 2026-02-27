@@ -514,7 +514,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::IpyEscapeCommand(_) => todo!("Implement Ipy escape command support"),
 
             ast::Expr::EllipsisLiteral(_) => {
-                todo_type!("ellipsis literal in type expression")
+                self.report_invalid_type_expression(
+                    expression,
+                    format_args!(
+                        "Ellipsis literal (`...`) is not allowed in this context in a type expression"
+                    ),
+                );
+                Type::unknown()
             }
 
             ast::Expr::Starred(starred) => self.infer_starred_type_expression(starred),
@@ -639,15 +645,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut first_unpacked_variadic_tuple = None;
 
                 for element in elements {
-                    if element.is_ellipsis_literal_expr()
-                        && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
-                    {
-                        let mut diagnostic =
-                            builder.into_diagnostic("Invalid `tuple` specialization");
-                        diagnostic.set_primary_message(
-                            "`...` can only be used as the second element \
-                            in a two-element `tuple` specialization",
-                        );
+                    if element.is_ellipsis_literal_expr() {
+                        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple) {
+                            let mut diagnostic =
+                                builder.into_diagnostic("Invalid `tuple` specialization");
+                            diagnostic.set_primary_message(
+                                "`...` can only be used as the second element \
+                                in a two-element `tuple` specialization",
+                            );
+                        }
+                        self.store_expression_type(element, Type::unknown());
+                        element_types.push(Type::unknown());
+                        continue;
                     }
                     let element_ty = self.infer_type_expression(element);
                     return_todo |=
@@ -720,14 +729,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 ty
             }
             single_element => {
-                if single_element.is_ellipsis_literal_expr()
-                    && let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple)
-                {
-                    let mut diagnostic = builder.into_diagnostic("Invalid `tuple` specialization");
-                    diagnostic.set_primary_message(
-                        "`...` can only be used as the second element \
-                            in a two-element `tuple` specialization",
-                    );
+                if single_element.is_ellipsis_literal_expr() {
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, tuple) {
+                        let mut diagnostic =
+                            builder.into_diagnostic("Invalid `tuple` specialization");
+                        diagnostic.set_primary_message(
+                            "`...` can only be used as the second element \
+                                in a two-element `tuple` specialization",
+                        );
+                    }
+                    self.store_expression_type(single_element, Type::unknown());
+                    return TupleType::heterogeneous(self.db(), std::iter::once(Type::unknown()));
                 }
                 let single_element_ty = self.infer_type_expression(single_element);
                 if element_could_alter_type_of_whole_tuple(single_element, single_element_ty, self)
@@ -1610,7 +1622,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     std::slice::from_ref(arguments_slice)
                 };
                 for argument in arguments {
-                    self.infer_type_expression(argument);
+                    if argument.is_ellipsis_literal_expr() {
+                        // The trailing `...` in `Concatenate[int, str, ...]` is valid;
+                        // store without going through type-expression inference.
+                        self.store_expression_type(argument, Type::unknown());
+                    } else {
+                        self.infer_type_expression(argument);
+                    }
                 }
                 let num_arguments = arguments.len();
                 let inferred_type = if num_arguments < 2 {
@@ -1853,18 +1871,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut return_todo = false;
 
                 for param in params {
-                    if param.is_ellipsis_literal_expr() {
-                        self.report_invalid_type_expression(
-                            param,
-                            format_args!(
-                                "Ellipsis literal (`...`) is not allowed \
-                                as a parameter type in `Callable`"
-                            ),
-                        );
-                        self.store_expression_type(param, Type::unknown());
-                        parameter_types.push(Type::unknown());
-                        continue;
-                    }
                     let param_type = self.infer_type_expression(param);
                     // This is similar to what we currently do for inferring tuple type expression.
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics

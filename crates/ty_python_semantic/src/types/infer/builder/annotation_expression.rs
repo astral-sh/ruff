@@ -380,6 +380,14 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
             }
 
+            // `...` is valid in annotation contexts such as type alias bodies
+            // (`type Foo = ...`), but invalid as a nested type expression (e.g., inside
+            // `Callable[[...], int]`). Handle it here to avoid the error from
+            // `infer_type_expression_no_store`.
+            ast::Expr::EllipsisLiteral(_) => {
+                TypeAndQualifiers::declared(todo_type!("ellipsis literal in annotation expression"))
+            }
+
             // All other annotation expressions are (possibly) valid type expressions, so handle
             // them there instead.
             type_expr => {
