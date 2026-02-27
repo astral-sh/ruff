@@ -1853,6 +1853,18 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut return_todo = false;
 
                 for param in params {
+                    if param.is_ellipsis_literal_expr() {
+                        self.report_invalid_type_expression(
+                            param,
+                            format_args!(
+                                "Ellipsis literal (`...`) is not allowed \
+                                as a parameter type in `Callable`"
+                            ),
+                        );
+                        self.store_expression_type(param, Type::unknown());
+                        parameter_types.push(Type::unknown());
+                        continue;
+                    }
                     let param_type = self.infer_type_expression(param);
                     // This is similar to what we currently do for inferring tuple type expression.
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
