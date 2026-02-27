@@ -87,19 +87,17 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 continue;
             }
 
-            if !is_f811_shadowing_in_type_checking_enabled(checker.settings()) {
-                let shadowed_in_type_checking = shadowed
-                    .source
-                    .is_some_and(|source| is_in_type_checking_block(checker, source));
-                let binding_in_type_checking = binding
-                    .source
-                    .is_some_and(|source| is_in_type_checking_block(checker, source));
+            let shadowed_in_type_checking = shadowed
+                .source
+                .is_some_and(|source| is_in_type_checking_block(checker, source));
+            let binding_in_type_checking = binding
+                .source
+                .is_some_and(|source| is_in_type_checking_block(checker, source));
 
-                if (shadowed_in_type_checking || binding_in_type_checking)
-                    && !(shadowed_in_type_checking && binding_in_type_checking)
-                {
-                    continue;
-                }
+            if (shadowed_in_type_checking || binding_in_type_checking)
+                && !(shadowed_in_type_checking && binding_in_type_checking)
+            {
+                continue;
             }
 
             if shadow.same_scope() {
@@ -273,7 +271,7 @@ fn bindings_in_different_forks(
         return !checker.semantic().same_branch(left, right);
     }
 
-    if left_ ^ right_ {
+    if shadow.same_scope() && (left_ ^ right_) {
         let left_binding = &checker.semantic().bindings[shadow.shadowed_id()];
         let right_binding = &checker.semantic().bindings[shadow.binding_id()];
 
