@@ -197,11 +197,9 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 continue;
             };
 
-            let fix = Fix::safe_edit(edit);
-
             fixes.insert(
                 source,
-                fix.isolate(Checker::isolation(
+                Fix::safe_edit(edit).isolate(Checker::isolation(
                     checker.semantic().parent_statement_id(source),
                 )),
             );
