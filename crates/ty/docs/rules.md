@@ -650,9 +650,9 @@ Checks for `@final` decorators applied to non-method functions.
 
 **Why is this bad?**
 
-The `@final` decorator is only meaningful on methods (instance methods,
-class methods, static methods) and classes. Applying it to a module-level
-function or a nested function has no effect and is likely a mistake.
+The `@final` decorator is only meaningful on methods  and classes.
+Applying it to a module-level function or a nested function has no
+effect and is likely a mistake.
 
 **Example**
 

@@ -3186,6 +3186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut function_decorators = FunctionDecorators::empty();
         let mut deprecated = None;
         let mut dataclass_transformer_params = None;
+        let mut final_decorator = None;
 
         for decorator in decorator_list {
             let decorator_type = self.infer_decorator(decorator);
@@ -3194,14 +3195,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function_decorators |= decorator_function_decorator;
 
             match decorator_type {
-                Type::FunctionLiteral(function) => {
-                    if let Some(KnownFunction::NoTypeCheck) = function.known(self.db()) {
+                Type::FunctionLiteral(function) => match function.known(self.db()) {
+                    Some(KnownFunction::NoTypeCheck) => {
                         // If the function is decorated with the `no_type_check` decorator,
                         // we need to suppress any errors that come after the decorators.
                         self.context.set_in_no_type_check(InNoTypeCheck::Yes);
                         continue;
                     }
-                }
+                    Some(KnownFunction::Final) => {
+                        final_decorator = Some(decorator);
+                        continue;
+                    }
+                    _ => {}
+                },
                 Type::KnownInstance(KnownInstanceType::Deprecated(deprecated_inst)) => {
                     deprecated = Some(deprecated_inst);
                 }
@@ -3218,27 +3224,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         // Check for `@final` applied to non-method functions.
-        // `@final` is only meaningful on methods and classes; using it on a module-level
-        // or nested function is an error per the typing spec.
-        if function_decorators.contains(FunctionDecorators::FINAL)
+        // `@final` is only meaningful on methods and classes.
+        if let Some(final_decorator) = final_decorator
             && !self
                 .index
                 .scope(self.scope().file_scope_id(self.db()))
                 .kind()
                 .is_class()
-            && let Some(final_decorator) = decorator_list.iter().find(|decorator| {
-                matches!(
-                    self.expression_type(&decorator.expression),
-                    Type::FunctionLiteral(f) if f.is_known(self.db(), KnownFunction::Final)
-                )
-            })
             && let Some(builder) = self
                 .context
                 .report_lint(&FINAL_ON_NON_METHOD, final_decorator)
         {
-            builder.into_diagnostic(format_args!(
-                "`@final` cannot be applied to a non-method function `{name}`",
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "`@final` cannot be applied to non-method function `{name}`",
             ));
+            diagnostic.info("`@final` is only meaningful on methods and classes");
         }
 
         let has_defaults = parameters

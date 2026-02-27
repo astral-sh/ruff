@@ -436,7 +436,7 @@ function is an error.
 ```py
 from typing import final
 
-@final  # error: [final-on-non-method] "`@final` cannot be applied to a non-method function `func1`"
+@final  # error: [final-on-non-method] "`@final` cannot be applied to non-method function `func1`"
 def func1(): ...
 
 # Nested function decorated with `@final` is also invalid
