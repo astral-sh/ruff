@@ -2148,6 +2148,16 @@
             "$ref": "#/definitions/RuleSelector"
           }
         },
+        "extend-warn": {
+          "description": "A list of rule codes or prefixes to enable with severity `warning`,\nin addition to those specified by [`warn`](#lint_warn).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
         "external": {
           "description": "A list of rule codes or prefixes that are unsupported by Ruff, but should be\npreserved when (e.g.) validating `# noqa` directives. Useful for\nretaining `# noqa` directives that cover plugins not yet implemented\nby Ruff.",
           "type": [
@@ -2559,6 +2569,16 @@
         },
         "unfixable": {
           "description": "A list of rule codes or prefixes to consider non-fixable.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/RuleSelector"
+          }
+        },
+        "warn": {
+          "description": "A list of rule codes or prefixes to enable with severity level\n`warning`. Prefixes can specify exact  rules (like `F841`), entire\ncategories (like `F`), or anything in  between.\n\nWhen breaking ties between enabled and disabled rules (via `select`,\n`warn`, and  `ignore`, respectively), more specific prefixes override\nless  specific prefixes. In case of a tie, the precedence, from highest\nto lowest, is `ignore`, `warn`, and then `select`.",
           "type": [
             "array",
             "null"
