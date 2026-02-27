@@ -360,3 +360,12 @@ class EmptyClass:
 
 @app.get("/things/{thing_id}")
 async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
+
+
+# Same instance patterns as default values (not Annotated).
+# OK: `__call__` declares `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
+# Error: `__call__` has `other`, not `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...

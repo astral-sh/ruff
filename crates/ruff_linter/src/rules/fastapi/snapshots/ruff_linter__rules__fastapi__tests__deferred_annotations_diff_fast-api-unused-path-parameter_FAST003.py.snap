@@ -146,4 +146,7 @@ help: Add `thing_id` to function signature
 361 | @app.get("/things/{thing_id}")
     - async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
 362 + async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)], thing_id): ...
+363 | 
+364 | 
+365 | # Same instance patterns as default values (not Annotated).
 note: This is an unsafe fix and may change runtime behavior
