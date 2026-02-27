@@ -301,7 +301,7 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
 
     use crate::diagnostic::{
-        Annotation, DiagnosticFormat, Severity,
+        Annotation, CodeRank, DiagnosticFormat, Severity,
         render::tests::{
             NOTEBOOK, TestEnvironment, create_diagnostics, create_notebook_diagnostics,
             create_syntax_error_diagnostics,
@@ -390,6 +390,7 @@ mod tests {
     fn hide_severity_output() {
         let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Full);
         env.hide_severity(true);
+        env.display_code(CodeRank::Secondary);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
 
@@ -446,6 +447,7 @@ mod tests {
     fn hide_severity_syntax_errors() {
         let (mut env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Full);
         env.hide_severity(true);
+        env.display_code(CodeRank::Secondary);
 
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @r"
         invalid-syntax: Expected one or more symbol names after import

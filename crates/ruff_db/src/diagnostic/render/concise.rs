@@ -143,7 +143,7 @@ mod tests {
     use ruff_diagnostics::Applicability;
 
     use crate::diagnostic::{
-        DiagnosticFormat,
+        CodeRank, DiagnosticFormat,
         render::tests::{
             TestEnvironment, create_diagnostics, create_notebook_diagnostics,
             create_syntax_error_diagnostics,
@@ -165,6 +165,7 @@ mod tests {
     fn show_fixes() {
         let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
         env.hide_severity(true);
+        env.display_code(CodeRank::Secondary);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"
@@ -179,6 +180,7 @@ mod tests {
     fn show_fixes_preview() {
         let (mut env, diagnostics) = create_diagnostics(DiagnosticFormat::Concise);
         env.hide_severity(true);
+        env.display_code(CodeRank::Secondary);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         env.preview(true);
@@ -194,6 +196,7 @@ mod tests {
     fn show_fixes_syntax_errors() {
         let (mut env, diagnostics) = create_syntax_error_diagnostics(DiagnosticFormat::Concise);
         env.hide_severity(true);
+        env.display_code(CodeRank::Secondary);
         env.show_fix_status(true);
         env.fix_applicability(Applicability::DisplayOnly);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics), @"

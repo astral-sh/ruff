@@ -2584,6 +2584,12 @@ watermelon
             self.config = config.hide_severity(yes);
         }
 
+        /// Which code (primary or secondary) to display.
+        pub(super) fn display_code(&mut self, rank: CodeRank) {
+            let config = self.config.clone();
+            self.config = config.display_code(rank);
+        }
+
         /// Show fix availability when rendering.
         pub(super) fn show_fix_status(&mut self, yes: bool) {
             let config = self.config.clone();
