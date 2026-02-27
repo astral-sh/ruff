@@ -437,8 +437,8 @@ reveal_type(E("foo"))  # revealed: E[str]
 
 ## Mixed overloaded `__new__` should preserve constructor literal promotion
 
-When mixed `__new__` overloads defer `__init__` validation, the inferred constructor
-specialization should still apply literal promotion from `__init__`.
+When mixed `__new__` overloads defer `__init__` validation, the inferred constructor specialization
+should still apply literal promotion from `__init__`.
 
 ```py
 from typing import Generic, TypeVar, overload

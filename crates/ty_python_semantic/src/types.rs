@@ -4975,7 +4975,7 @@ impl<'db> Type<'db> {
                 CallableBinding::from_overloads(callable_type, Vec::from(combined_sigs)).into();
 
             if let Some((init_bindings, _)) = init_bindings {
-                bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
+                bindings.set_mixed_constructor_init(class.class_literal(db), &init_bindings);
             }
 
             return bindings
