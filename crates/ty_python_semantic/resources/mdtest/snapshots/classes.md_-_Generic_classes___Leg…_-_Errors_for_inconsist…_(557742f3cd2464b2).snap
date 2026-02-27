@@ -1,0 +1,74 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: classes.md - Generic classes: Legacy syntax - Errors for inconsistent type arguments
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypeVar, Generic
+ 2 | 
+ 3 | T1 = TypeVar("T1")
+ 4 | T2 = TypeVar("T2")
+ 5 | 
+ 6 | class Grandparent(Generic[T1, T2]): ...
+ 7 | class Parent(Grandparent[T1, T2]): ...
+ 8 | 
+ 9 | # Consistent ordering is fine:
+10 | class GoodChild(Parent[T1, T2], Grandparent[T1, T2]): ...
+11 | 
+12 | # error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild, T1@BadChild]` and `Grandparent[T1@BadChild, T2@BadChild]`"
+13 | class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...
+14 | 
+15 | # The same applies when the explicit base is partially specialized differently:
+16 | class Parent2(Grandparent[T1, T2]): ...
+17 | 
+18 | # error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild2, int]` and `Grandparent[T1@BadChild2, T2@BadChild2]`"
+19 | class BadChild2(Parent2[T1, T2], Grandparent[T2, int]): ...
+20 | 
+21 | # Implicit specialization is fine:
+22 | class Fine(Parent, Grandparent[T1, T2]): ...
+```
+
+# Diagnostics
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:13:7
+   |
+12 | # error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild, T1@BadChild]` …
+13 | class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...
+   |       ^^^^^^^^^--------------^^-------------------^
+   |                |               |
+   |                |               Later class base is `<class 'Grandparent[T2@BadChild, T1@BadChild]'>`
+   |                Earlier class base inherits from `Grandparent[T1@BadChild, T2@BadChild]`
+14 |
+15 | # The same applies when the explicit base is partially specialized differently:
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:19:7
+   |
+18 | # error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild2, int]` and `Gr…
+19 | class BadChild2(Parent2[T1, T2], Grandparent[T2, int]): ...
+   |       ^^^^^^^^^^---------------^^--------------------^
+   |                 |                |
+   |                 |                Later class base is `<class 'Grandparent[T2@BadChild2, int]'>`
+   |                 Earlier class base inherits from `Grandparent[T1@BadChild2, T2@BadChild2]`
+20 |
+21 | # Implicit specialization is fine:
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```

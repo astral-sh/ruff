@@ -1175,7 +1175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 },
-                Ok(mro) => {
+                Ok(_) => {
                     disjoint_bases.remove_redundant_entries(self.db());
 
                     if disjoint_bases.len() > 1 {
@@ -1196,36 +1196,83 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     //   class Parent(Grandparent[T1, T2]): ...
                     //   class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
                     //
-                    // We only flag when one of the conflicting entries is an
-                    // explicit base, to avoid false positives from deep MRO
-                    // conflicts in built-in type hierarchies.
 
                     let explicit_bases = class.explicit_bases(self.db());
+                    let mut checked_classes = FxHashSet::default();
 
-                    if explicit_bases.iter().any(Type::is_generic_alias) {
-                        for supercls in mro.iter().skip(1) {
-                            let ClassBase::Class(supercls) = supercls else {
-                                continue;
+                    'outer: for (i, base) in explicit_bases.iter().enumerate() {
+                        let Type::GenericAlias(alias) = base else {
+                            continue;
+                        };
+                        let origin = alias.origin(self.db());
+                        let spec = alias.specialization(self.db());
+                        for (i2, later_base) in explicit_bases[..i].iter().enumerate() {
+                            let base_class = match later_base {
+                                Type::ClassLiteral(c) if c.generic_context(self.db()).is_none() => {
+                                    ClassType::NonGeneric(*c)
+                                }
+                                Type::GenericAlias(c) => ClassType::Generic(*c),
+                                _ => continue,
                             };
-                            let Some((literal, Some(spec))) =
-                                supercls.static_class_literal(self.db())
-                            else {
-                                continue;
-                            };
-                            if let Some(expected) = explicit_bases
-                                .iter()
-                                .filter_map(Type::as_generic_alias)
-                                .find(|alias| alias.origin(self.db()) == literal)
-                                && expected.specialization(self.db()) != spec
-                                && let Some(builder) =
-                                    self.context.report_lint(&INVALID_GENERIC_CLASS, class_node)
-                            {
-                                builder.into_diagnostic(format_args!(
-                                    "Cannot inherit from class `{}` with \
-                                        inconsistent type argument ordering",
-                                    literal.name(self.db()),
+                            for supercls in base_class.iter_mro(self.db()).skip(1) {
+                                if !checked_classes.insert(supercls) {
+                                    break;
+                                }
+                                let ClassBase::Class(ClassType::Generic(supercls_alias)) = supercls
+                                else {
+                                    continue;
+                                };
+                                if supercls_alias.origin(self.db()) != origin {
+                                    continue;
+                                }
+                                if supercls_alias.specialization(self.db()) == spec {
+                                    continue;
+                                }
+                                let Some(builder) = self.context.report_lint(
+                                    &INVALID_GENERIC_CLASS,
+                                    class.header_range(self.db()),
+                                ) else {
+                                    break 'outer;
+                                };
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Inconsistent type arguments for `{}` among class bases",
+                                    origin.name(self.db())
                                 ));
-                                break;
+                                if class_node.bases().len() == explicit_bases.len()
+                                    && !class_node.bases().iter().any(ast::Expr::is_starred_expr)
+                                {
+                                    diagnostic.annotate(
+                                        self.context.secondary(&class_node.bases()[i2]).message(
+                                            format_args!(
+                                                "Earlier class base inherits from `{}`",
+                                                supercls_alias.display(self.db())
+                                            ),
+                                        ),
+                                    );
+                                    diagnostic.annotate(
+                                        self.context.secondary(&class_node.bases()[i]).message(
+                                            format_args!(
+                                                "Later class base is `{}`",
+                                                base.display(self.db())
+                                            ),
+                                        ),
+                                    );
+                                } else {
+                                    diagnostic.info(format_args!(
+                                        "Earlier class base inherits from `{}`",
+                                        supercls_alias.display(self.db())
+                                    ));
+                                    diagnostic.info(format_args!(
+                                        "Later class base is `{}`",
+                                        alias.display(self.db())
+                                    ));
+                                }
+                                diagnostic.set_concise_message(format_args!(
+                                    "Inconsistent type arguments: class cannot inherit \
+                                    from both `{}` and `{}`",
+                                    alias.display(self.db()),
+                                    supercls_alias.display(self.db())
+                                ));
                             }
                         }
                     }

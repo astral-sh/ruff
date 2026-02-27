@@ -947,13 +947,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::GenericAlias(_))
     }
 
-    pub(crate) const fn as_generic_alias(&self) -> Option<GenericAlias<'db>> {
-        match self {
-            Type::GenericAlias(alias) => Some(*alias),
-            _ => None,
-        }
-    }
-
     /// Returns whether this type represents a specialization of a generic type.
     ///
     /// For example, whereas `<class 'list'>` is a generic type, `<class 'list[int]'>`
