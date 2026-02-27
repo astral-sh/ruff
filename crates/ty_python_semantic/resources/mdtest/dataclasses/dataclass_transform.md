@@ -687,6 +687,104 @@ class NotOrderedWithOverrides:
         return False
 ```
 
+#### Order inheritance diagnostics
+
+Subclassing a dataclass-like class with `order=True` is problematic because comparing instances of
+different classes in the hierarchy will raise a `TypeError` at runtime.
+
+##### Using function-based transformers
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform()
+def model(*, order: bool = False): ...
+
+@model(order=True)
+class OrderedParent:
+    x: int
+
+class Child(OrderedParent):  # error: [subclass-of-dataclass-with-order]
+    pass
+
+@model()
+class UnorderedChild(OrderedParent):  # error: [subclass-of-dataclass-with-order]
+    y: str
+```
+
+If the child class also has `order=True`, the diagnostic is suppressed:
+
+```py
+@model(order=True)
+class OrderedChild(OrderedParent):
+    y: str
+```
+
+If the child class manually overrides all comparison methods, the diagnostic is also suppressed:
+
+```py
+class ManualChild(OrderedParent):
+    def __lt__(self, other: object) -> bool:
+        return True
+    def __le__(self, other: object) -> bool:
+        return True
+    def __gt__(self, other: object) -> bool:
+        return True
+    def __ge__(self, other: object) -> bool:
+        return True
+```
+
+##### Using metaclass-based transformers
+
+For metaclass-based transformers, the child inherits the metaclass and its `order_default=True`, so
+comparison methods are generated for the child too and no diagnostic is emitted:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(order_default=True)
+class OrderedMeta(type): ...
+
+class MetaParent(metaclass=OrderedMeta):
+    x: int
+
+# No diagnostic: MetaChild inherits OrderedMeta, so it also has order=True
+class MetaChild(MetaParent):
+    pass
+```
+
+If the child explicitly sets `order=False`, a diagnostic is emitted:
+
+```py
+class MetaChildNoOrder(MetaParent, order=False):  # error: [subclass-of-dataclass-with-order]
+    pass
+```
+
+##### Using base-class-based transformers
+
+Similarly, base-class-based transformers propagate through inheritance:
+
+```py
+from typing import dataclass_transform
+
+@dataclass_transform(order_default=True)
+class OrderedBase: ...
+
+class BaseParent(OrderedBase):
+    x: int
+
+# No diagnostic: BaseChild also inherits the transform with order_default=True
+class BaseChild(BaseParent):
+    pass
+```
+
+If the child explicitly sets `order=False`, a diagnostic is emitted:
+
+```py
+class BaseChildNoOrder(BaseParent, order=False):  # error: [subclass-of-dataclass-with-order]
+    pass
+```
+
 ## Other `dataclass` parameters
 
 Other parameters from normal dataclasses can also be set on models created using

@@ -502,7 +502,7 @@ from dataclasses import dataclass
 class ParentDataclass:
     x: int
 
-class Child(ParentDataclass):
+class Child(ParentDataclass):  # error: [subclass-of-dataclass-with-order]
     @override
     def __lt__(self, other: ParentDataclass) -> bool: ...  # fine
 

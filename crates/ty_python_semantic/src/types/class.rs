@@ -778,6 +778,20 @@ impl<'db> ClassLiteral<'db> {
             }
         }
     }
+
+    /// Checks if the given dataclass parameter flag is set for this class.
+    pub(crate) fn has_dataclass_param(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+        param: DataclassFlags,
+    ) -> bool {
+        match self {
+            Self::Static(class) => class.has_dataclass_param(db, field_policy, param),
+            Self::Dynamic(class) => class.has_dataclass_param(db, field_policy, param),
+            Self::DynamicNamedTuple(_) => false,
+        }
+    }
 }
 
 impl<'db> From<StaticClassLiteral<'db>> for ClassLiteral<'db> {
@@ -875,6 +889,15 @@ impl<'db> ClassType<'db> {
                 Some(generic.specialization(db)),
             ),
         }
+    }
+
+    /// Checks if the given dataclass parameter flag is set for this class.
+    pub(crate) fn has_dataclass_param(self, db: &'db dyn Db, param: DataclassFlags) -> bool {
+        let (literal, specialization) = self.class_literal_and_specialization(db);
+        let Some(field_policy) = CodeGeneratorKind::from_class(db, literal, specialization) else {
+            return false;
+        };
+        literal.has_dataclass_param(db, field_policy, param)
     }
 
     /// Returns the statement-defined class literal and specialization for this class.
@@ -2816,8 +2839,7 @@ impl<'db> StaticClassLiteral<'db> {
     }
 
     /// Checks if the given dataclass parameter flag is set for this class.
-    /// This checks both the `dataclass_params` and `transformer_params`.
-    fn has_dataclass_param(
+    pub(crate) fn has_dataclass_param(
         self,
         db: &'db dyn Db,
         field_policy: CodeGeneratorKind<'db>,
@@ -5522,6 +5544,27 @@ impl<'db> DynamicClassLiteral<'db> {
             self.has_dynamic_namespace(db),
             dataclass_params,
         )
+    }
+
+    /// Checks if the given dataclass parameter flag is set for this class.
+    pub(crate) fn has_dataclass_param(
+        self,
+        db: &'db dyn Db,
+        field_policy: CodeGeneratorKind<'db>,
+        param: DataclassFlags,
+    ) -> bool {
+        let transformer_params =
+            if let CodeGeneratorKind::DataclassLike(Some(transformer_params)) = field_policy {
+                Some(DataclassParams::from_transformer_params(
+                    db,
+                    transformer_params,
+                ))
+            } else {
+                None
+            };
+        self.dataclass_params(db)
+            .is_some_and(|params| params.flags(db).contains(param))
+            || transformer_params.is_some_and(|params| params.flags(db).contains(param))
     }
 }
 
