@@ -279,7 +279,7 @@ fn bindings_in_different_forks(
 
         if left_binding.scope == right_binding.scope
             && let (Some(left_import), Some(right_import)) =
-            (left_binding.as_any_import(), right_binding.as_any_import())
+                (left_binding.as_any_import(), right_binding.as_any_import())
             && left_import.qualified_name() == right_import.qualified_name()
         {
             return false;
