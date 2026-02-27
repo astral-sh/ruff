@@ -437,19 +437,18 @@ function is an error.
 from typing import final
 
 @final  # error: [final-on-non-method] "`@final` cannot be applied to a non-method function `func1`"
-def func1() -> int:
-    return 0
+def func1(): ...
 
 # Nested function decorated with `@final` is also invalid
 def outer():
     @final  # error: [final-on-non-method]
-    def inner() -> None: ...
+    def inner(): ...
 
 # A function nested inside a method is also not a method
 class F:
     def method(self):
         @final  # error: [final-on-non-method]
-        def not_a_method() -> None: ...
+        def not_a_method(): ...
 ```
 
 ## An `@final` method is overridden by an implicit instance attribute
