@@ -65,7 +65,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     fn report_invalid_type_expression(
         &self,
         expression: &ast::Expr,
-        message: std::fmt::Arguments,
+        message: impl std::fmt::Display,
     ) -> Option<LintDiagnosticGuard<'_, '_>> {
         self.context
             .report_lint(&INVALID_TYPE_FORM, expression)
@@ -516,7 +516,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             ast::Expr::EllipsisLiteral(_) => {
                 self.report_invalid_type_expression(
                     expression,
-                    format_args!("`...` is not allowed in this context in a type expression"),
+                    "`...` is not allowed in this context in a type expression",
                 );
                 Type::unknown()
             }
@@ -1292,26 +1292,53 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let return_type = arguments.next().map(|arg| self.infer_type_expression(arg));
 
-        let correct_argument_number = if let Some(third_argument) = arguments.next() {
-            self.infer_type_expression(third_argument);
-            for argument in arguments {
-                self.infer_type_expression(argument);
-            }
-            false
-        } else {
-            return_type.is_some()
-        };
-
-        if !correct_argument_number {
-            report_invalid_arguments_to_callable(&self.context, subscript);
-        }
-
-        let callable_type = if let (Some(parameters), Some(return_type), true) =
-            (parameters, return_type, correct_argument_number)
+        let callable_type = if parameters.is_none()
+            && let Some(first_argument) = first_argument
+            && let ast::Expr::List(list) = first_argument
+            && let [single_param] = &list.elts[..]
+            && single_param.is_ellipsis_literal_expr()
         {
-            Type::single_callable(db, Signature::new(parameters, return_type))
+            self.store_expression_type(single_param, Type::unknown());
+            if let Some(mut diagnostic) = self.report_invalid_type_expression(
+                first_argument,
+                "`[...]` is not a valid parameter list for `Callable`",
+            ) {
+                if let Some(returns) = return_type {
+                    diagnostic.set_primary_message(format_args!(
+                        "Did you mean `Callable[..., {}]`?",
+                        returns.display(db)
+                    ));
+                }
+            }
+            Type::single_callable(
+                db,
+                Signature::new(
+                    Parameters::unknown(),
+                    return_type.unwrap_or_else(Type::unknown),
+                ),
+            )
         } else {
-            Type::Callable(CallableType::unknown(db))
+            let correct_argument_number = if let Some(third_argument) = arguments.next() {
+                self.infer_type_expression(third_argument);
+                for argument in arguments {
+                    self.infer_type_expression(argument);
+                }
+                false
+            } else {
+                return_type.is_some()
+            };
+
+            if !correct_argument_number {
+                report_invalid_arguments_to_callable(&self.context, subscript);
+            }
+
+            if correct_argument_number
+                && let (Some(parameters), Some(return_type)) = (parameters, return_type)
+            {
+                Type::single_callable(db, Signature::new(parameters, return_type))
+            } else {
+                Type::Callable(CallableType::unknown(db))
+            }
         };
 
         // `Signature` / `Parameters` are not a `Type` variant, so we're storing
@@ -1863,35 +1890,25 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 return Some(Parameters::gradual_form());
             }
             ast::Expr::List(ast::ExprList { elts: params, .. }) => {
+                if let [ast::Expr::EllipsisLiteral(_)] = &params[..] {
+                    // Return `None` here so that we emit a specific diagnostic at the callsite.
+                    return None;
+                }
+
                 let mut parameter_types = Vec::with_capacity(params.len());
 
                 // Whether to infer `Todo` for the parameters
                 let mut return_todo = false;
 
-                // `Callable[[...], R]` — the user almost certainly meant `Callable[..., R]`
-                if let [sole_param] = &params[..]
-                    && sole_param.is_ellipsis_literal_expr()
-                {
-                    if let Some(mut diagnostic) = self.report_invalid_type_expression(
-                        sole_param,
-                        format_args!("`...` is not allowed in this context in a type expression"),
-                    ) {
-                        diagnostic
-                            .set_primary_message("Did you mean `Callable[..., <return type>]`?");
-                    }
-                    self.store_expression_type(sole_param, Type::unknown());
-                    parameter_types.push(Type::unknown());
-                } else {
-                    for param in params {
-                        let param_type = self.infer_type_expression(param);
-                        // This is similar to what we currently do for inferring tuple type expression.
-                        // We currently infer `Todo` for the parameters to avoid invalid diagnostics
-                        // when trying to check for assignability or any other relation. For example,
-                        // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                        return_todo |= param_type.is_todo()
-                            && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
-                        parameter_types.push(param_type);
-                    }
+                for param in params {
+                    let param_type = self.infer_type_expression(param);
+                    // This is similar to what we currently do for inferring tuple type expression.
+                    // We currently infer `Todo` for the parameters to avoid invalid diagnostics
+                    // when trying to check for assignability or any other relation. For example,
+                    // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
+                    return_todo |= param_type.is_todo()
+                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                    parameter_types.push(param_type);
                 }
 
                 return Some(if return_todo {
