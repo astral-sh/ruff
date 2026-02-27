@@ -176,7 +176,7 @@ reveal_type(Valid[int]())  # revealed: Valid[int, int, int]
 reveal_type(Valid[int, str]())  # revealed: Valid[int, str, int | str]
 reveal_type(Valid[int, str, None]())  # revealed: Valid[int, str, None]
 
-# error: [invalid-generic-class] "Default of `U` references type variable `T`, which is not a type parameter of this class"
+# error: [invalid-generic-class] "Default of `U` cannot reference type variable `T`"
 class Invalid(Generic[U]): ...
 ```
 
