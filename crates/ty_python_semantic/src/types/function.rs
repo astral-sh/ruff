@@ -1409,18 +1409,31 @@ fn report_invalid_union_type_elements<'db>(
                 .message("This `UnionType` instance contains non-class elements"),
         );
     }
+
+    // When we have a secondary annotation pointing at the UnionType expression,
+    // "the union" is unambiguous. Otherwise, spell out the union type in the message.
+    let union_suffix = match (&union_type_expr, union_type) {
+        (None, Type::KnownInstance(KnownInstanceType::UnionType(instance))) => {
+            match instance.union_type(db) {
+                Ok(ty) => format!(" `{}`", ty.display(db)),
+                Err(_) => String::new(),
+            }
+        }
+        _ => String::new(),
+    };
+
     match other_invalid_elements {
         [] => diagnostic.info(format_args!(
-            "Element `{}` in the union is not a class object",
+            "Element `{}` in the union{union_suffix} is not a class object",
             first_invalid_element.display(db)
         )),
         [single] => diagnostic.info(format_args!(
-            "Elements `{}` and `{}` in the union are not class objects",
+            "Elements `{}` and `{}` in the union{union_suffix} are not class objects",
             first_invalid_element.display(db),
             single.display(db),
         )),
         _ => diagnostic.info(format_args!(
-            "Element `{}` in the union, and {} more elements, are not class objects",
+            "Element `{}` in the union{union_suffix}, and {} more elements, are not class objects",
             first_invalid_element.display(db),
             other_invalid_elements.len(),
         )),

@@ -133,7 +133,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
 27 |     else:
    |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
-info: Element `<class 'list[int]'>` in the union is not a class object
+info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object
 info: rule `invalid-argument-type` is enabled by default
 
 ```
