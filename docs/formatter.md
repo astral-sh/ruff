@@ -285,43 +285,6 @@ to `<!-- fmt:off -->` and `<!-- fmt:on -->` respectively.
 
 [blacken-docs]: https://github.com/adamchainz/blacken-docs/
 
-Ruff will not automatically discover or format Markdown files in your project,
-but will format any Markdown files explicitly passed with a `.md` extension:
-
-```shell-session
-$ ruff format --preview --check docs/
-warning: No Python files found under the given path(s)
-
-$ ruff format --preview --check docs/*.md
-13 files already formatted
-```
-
-This is likely to change in a future release when the feature is stabilized.
-Including Markdown files without also enabling [preview mode](preview.md#preview)
-will result in an error message and non-zero [exit code](#exit-codes).
-
-To include Markdown files by default when running Ruff on your project, add them
-with [`extend-include`](settings.md#extend-include) in your project settings:
-
-=== "pyproject.toml"
-
-    ```toml
-    [tool.ruff]
-    # Find and format code blocks in Markdown files
-    extend-include = ["*.md"]
-    # OR
-    extend-include = ["docs/*.md"]
-    ```
-
-=== "ruff.toml"
-
-    ```toml
-    # Find and format code blocks in Markdown files
-    extend-include = ["*.md"]
-    # OR
-    extend-include = ["docs/*.md"]
-    ```
-
 To format Markdown files with extensions other than `.md`, configure custom
 [`extension`](settings.md#extension) mappings. Ruff will automatically include
 these mapped extensions in file discovery:
@@ -352,6 +315,24 @@ repos:
       - id: ruff-format
         types_or: [python, pyi, jupyter, markdown]
 ```
+
+To *disable* formatting of Markdown files, add them to
+[`extend-exclude`](settings.md#extend-exclude) in your project settings:
+
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ruff]
+    # Disable formatting in Markdown files
+    extend-include = ["*.md"]
+    ```
+
+=== "ruff.toml"
+
+    ```toml
+    # Disable formatting in Markdown files
+    extend-include = ["*.md"]
+    ```
 
 ## Format suppression
 
