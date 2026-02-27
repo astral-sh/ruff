@@ -352,6 +352,20 @@ Bing() < 3.14  # error: [unsupported-operator]
 3.14 in Bing()  # error: [unsupported-operator]
 ```
 
+`Unknown` should still propagate through these operations.
+
+```py
+from typing import NewType
+from doesnotexist import unknown  # error: [unresolved-import]
+
+MyFloat = NewType("MyFloat", float)
+
+reveal_type(unknown)  # revealed: Unknown
+reveal_type(1.0 * unknown)  # revealed: Unknown
+reveal_type(MyFloat(1.0) * unknown)  # revealed: Unknown
+reveal_type(unknown * MyFloat(1.0))  # revealed: Unknown
+```
+
 Unary operations take a different codepath and need their own test cases:
 
 ```py
