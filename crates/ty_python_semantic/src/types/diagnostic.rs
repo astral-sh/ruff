@@ -4942,6 +4942,41 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     }
 }
 
+pub(crate) fn report_invalid_pep695_typevar_default_reference<'db>(
+    context: &InferContext<'db, '_>,
+    class: StaticClassLiteral<'db>,
+    typevar_with_bad_default: TypeVarInstance<'db>,
+    referenced_later_typevar: TypeVarInstance<'db>,
+) {
+    let db = context.db();
+
+    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Type parameter `{}` cannot use type parameter `{}` in its default, \
+        because `{}` is defined after `{}` in the type parameter list",
+        typevar_with_bad_default.name(db),
+        referenced_later_typevar.name(db),
+        referenced_later_typevar.name(db),
+        typevar_with_bad_default.name(db),
+    ));
+
+    for tvar in [typevar_with_bad_default, referenced_later_typevar] {
+        let Some(definition) = tvar.definition(db) else {
+            continue;
+        };
+        let file = definition.file(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(
+                definition.full_range(db, &parsed_module(db, file).load(db)),
+            ))
+            .message(format_args!("`{}` defined here", tvar.name(db))),
+        );
+    }
+}
+
 pub(crate) fn report_shadowed_type_variable<'db>(
     context: &InferContext<'db, '_>,
     typevar_name: &ast::name::Name,

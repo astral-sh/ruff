@@ -785,6 +785,19 @@ class F[S: X]:
 X = int
 ```
 
+Type variable defaults can reference earlier type variables, but not later ones:
+
+```py
+# This is fine: U's default references T, which comes before U
+class Good[T, U = T]: ...
+
+# error: [invalid-generic-class] "Type parameter `S` cannot use type parameter `T` in its default, because `T` is defined after `S` in the type parameter list"
+class Bad[S = T, T = int]: ...
+
+# error: [invalid-generic-class]
+class AlsoBad[S = list[T], T = int]: ...
+```
+
 ## Cyclic class definitions
 
 ### F-bounded quantification

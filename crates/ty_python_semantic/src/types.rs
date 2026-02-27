@@ -1194,6 +1194,16 @@ impl<'db> Type<'db> {
         })
     }
 
+    /// Returns `true` if this type contains a reference to the given `TypeVarInstance`,
+    /// either as a bound type variable (`Type::TypeVar`) or as a known-instance `TypeVar`.
+    pub(crate) fn contains_typevar(self, db: &'db dyn Db, typevar: TypeVarInstance<'db>) -> bool {
+        any_over_type(db, self, false, |ty| match ty {
+            Type::TypeVar(bound_tv) => bound_tv.typevar(db) == typevar,
+            Type::KnownInstance(KnownInstanceType::TypeVar(tv)) => tv == typevar,
+            _ => false,
+        })
+    }
+
     pub(crate) const fn as_special_form(self) -> Option<SpecialFormType> {
         match self {
             Type::SpecialForm(special_form) => Some(special_form),
