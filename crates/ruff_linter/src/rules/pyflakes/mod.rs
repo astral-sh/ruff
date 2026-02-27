@@ -1028,7 +1028,8 @@ mod tests {
             &locator,
             &indexer,
         );
-        let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+        let suppressions =
+            Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer, &settings);
         let mut messages = check_path(
             Path::new("<filename>"),
             None,
