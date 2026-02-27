@@ -650,7 +650,7 @@ Checks for `@final` decorators applied to non-method functions.
 
 **Why is this bad?**
 
-The `@final` decorator is only meaningful on methods  and classes.
+The `@final` decorator is only meaningful on methods and classes.
 Applying it to a module-level function or a nested function has no
 effect and is likely a mistake.
 
