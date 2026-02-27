@@ -570,6 +570,7 @@ impl<'db> Bindings<'db> {
         for binding in self.iter_flat_mut() {
             if binding.check_mixed_constructor_init(
                 db,
+                constraints,
                 argument_types,
                 call_expression_tcx,
                 dataclass_field_specifiers,
@@ -2753,6 +2754,7 @@ impl<'db> CallableBinding<'db> {
     fn check_mixed_constructor_init(
         &mut self,
         db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
@@ -2772,6 +2774,7 @@ impl<'db> CallableBinding<'db> {
             .init_bindings
             .check_types_impl(
                 db,
+                constraints,
                 argument_types,
                 call_expression_tcx,
                 dataclass_field_specifiers,
