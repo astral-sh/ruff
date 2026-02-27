@@ -2601,6 +2601,21 @@ def f(arg1: type):
         reveal_type(arg1)  # revealed: type & ~type[OnlyClassmethodMembers]
 ```
 
+The same diagnostics are also emitted when protocol classes appear inside a tuple passed as the
+second argument to `isinstance()` or `issubclass()`:
+
+```py
+def g(arg: object, arg2: type):
+    isinstance(arg, (HasX, RuntimeCheckableHasX))  # error: [isinstance-against-protocol]
+    isinstance(arg, (HasX, int))  # error: [isinstance-against-protocol]
+
+    # error: [isinstance-against-protocol]
+    # error: [isinstance-against-protocol]
+    issubclass(arg2, (HasX, RuntimeCheckableHasX))
+
+    issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
+```
+
 ## Match class patterns and protocols
 
 <!-- snapshot-diagnostics -->
@@ -3059,6 +3074,8 @@ class B(Protocol):
 
 obj = something_unresolvable  # error: [unresolved-reference]
 reveal_type(obj)  # revealed: Unknown
+# error: [isinstance-against-protocol]
+# error: [isinstance-against-protocol]
 if isinstance(obj, (B, A)):
     reveal_type(obj)  # revealed: (Unknown & B) | (Unknown & A)
 ```

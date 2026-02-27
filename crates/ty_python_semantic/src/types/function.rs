@@ -1260,6 +1260,52 @@ impl<'db> FunctionType<'db> {
     }
 }
 
+/// Check the second argument to `isinstance()` or `issubclass()` for protocol classes and typed
+/// dicts that cannot be used at runtime. Handles class literals, tuples (including nested tuples),
+/// and recursively validates each element.
+fn check_classinfo_in_isinstance<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db, '_>,
+    call_expression: &ast::ExprCall,
+    function: KnownFunction,
+    classinfo: Type<'db>,
+) {
+    match classinfo {
+        Type::ClassLiteral(class) => {
+            if class.is_typed_dict(db) {
+                report_runtime_check_against_typed_dict(context, call_expression, class, function);
+            } else if let Some(protocol_class) = class.into_protocol_class(db) {
+                if !protocol_class.is_runtime_checkable(db) {
+                    report_runtime_check_against_non_runtime_checkable_protocol(
+                        context,
+                        call_expression,
+                        protocol_class,
+                        function,
+                    );
+                } else if function == KnownFunction::IsSubclass {
+                    let non_method_members = protocol_class.interface(db).non_method_members(db);
+                    if !non_method_members.is_empty() {
+                        report_issubclass_check_against_protocol_with_non_method_members(
+                            context,
+                            call_expression,
+                            protocol_class,
+                            &non_method_members,
+                        );
+                    }
+                }
+            }
+        }
+        Type::NominalInstance(nominal) => {
+            if let Some(tuple_spec) = nominal.tuple_spec(db) {
+                for element in tuple_spec.iter_all_elements() {
+                    check_classinfo_in_isinstance(db, context, call_expression, function, element);
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
 /// this will return `True` at runtime, `Truthiness::AlwaysFalse` if we can definitely infer
 /// that this will return `False` at runtime, or `Truthiness::Ambiguous` if we should infer `bool`
@@ -1980,37 +2026,10 @@ impl KnownFunction {
                     return;
                 };
 
+                check_classinfo_in_isinstance(db, context, call_expression, self, *second_argument);
+
                 match second_argument {
                     Type::ClassLiteral(class) => {
-                        if class.is_typed_dict(db) {
-                            report_runtime_check_against_typed_dict(
-                                context,
-                                call_expression,
-                                *class,
-                                self,
-                            );
-                        } else if let Some(protocol_class) = class.into_protocol_class(db) {
-                            if !protocol_class.is_runtime_checkable(db) {
-                                report_runtime_check_against_non_runtime_checkable_protocol(
-                                    context,
-                                    call_expression,
-                                    protocol_class,
-                                    self,
-                                );
-                            } else if self == KnownFunction::IsSubclass {
-                                let non_method_members =
-                                    protocol_class.interface(db).non_method_members(db);
-                                if !non_method_members.is_empty() {
-                                    report_issubclass_check_against_protocol_with_non_method_members(
-                                        context,
-                                        call_expression,
-                                        protocol_class,
-                                        &non_method_members,
-                                    );
-                                }
-                            }
-                        }
-
                         if self == KnownFunction::IsInstance {
                             overload.set_return_type(
                                 is_instance_truthiness(db, *first_arg, *class).into_type(db),
