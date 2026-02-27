@@ -4379,8 +4379,8 @@ lint.warn = ["ARG001"]
             .args(["--stdin-filename", "test.py"])
             .arg("-")
             .pass_stdin(r#"def foo(x): print("hello")"#), @r###"
-    success: false
-    exit_code: 1
+    success: true
+    exit_code: 0
     ----- stdout -----
     test.py:1:9: ARG001 Unused function argument: `x`
     Found 1 error.
