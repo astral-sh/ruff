@@ -5005,12 +5005,16 @@ impl<'db> Type<'db> {
 
         let bindings = if let Some(bindings) = missing_init_bindings {
             bindings
-        } else if let Some((metaclass_bindings, metaclass_ty)) = metaclass_instance_bindings {
-            // Metaclass `__call__` returned instance types — include alongside `__new__`/`__init__`.
+        } else {
+            // Collect all bindings that must accept the constructor call.
+            // This may include `__new__`, `__init__`, and/or a metaclass `__call__`.
             let mut all_bindings: SmallVec<[Bindings<'db>; 3]> = SmallVec::new();
-            let mut callable_type_builder = UnionBuilder::new(db).add(metaclass_ty);
-            all_bindings.push(metaclass_bindings);
+            let mut callable_type_builder = UnionBuilder::new(db);
 
+            if let Some((metaclass_bindings, metaclass_ty)) = metaclass_instance_bindings {
+                all_bindings.push(metaclass_bindings);
+                callable_type_builder = callable_type_builder.add(metaclass_ty);
+            }
             if let Some((new_bindings, new_callable)) = new_bindings {
                 all_bindings.push(new_bindings);
                 callable_type_builder = callable_type_builder.add(new_callable);
@@ -5020,21 +5024,13 @@ impl<'db> Type<'db> {
                 callable_type_builder = callable_type_builder.add(init_callable);
             }
 
-            let callable_type = callable_type_builder.build();
-            Bindings::from_union(callable_type, all_bindings)
-        } else {
-            // Common path: no metaclass `__call__`, just `__new__` and/or `__init__`.
-            match (new_bindings, init_bindings) {
-                (Some((new_bindings, new_callable)), Some((init_bindings, init_callable))) => {
-                    let callable_type = UnionBuilder::new(db)
-                        .add(new_callable)
-                        .add(init_callable)
-                        .build();
-                    Bindings::from_union(callable_type, [new_bindings, init_bindings])
+            match all_bindings.len() {
+                0 => return fallback_bindings(),
+                1 => all_bindings.into_iter().next().unwrap(),
+                _ => {
+                    let callable_type = callable_type_builder.build();
+                    Bindings::from_union(callable_type, all_bindings)
                 }
-                (Some((new_bindings, _)), None) => new_bindings,
-                (None, Some((init_bindings, _))) => init_bindings,
-                (None, None) => return fallback_bindings(),
             }
         };
 
