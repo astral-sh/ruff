@@ -1917,12 +1917,17 @@ def _(obj: object, obj2: type):
     issubclass(obj2, Person)
 ```
 
-The same applies when a `TypedDict` class appears inside a tuple:
+The same applies when a `TypedDict` class appears inside a tuple, including non-literal tuples:
 
 ```py
 def _(obj: object, obj2: type):
     isinstance(obj, (int, Person))  # error: [isinstance-against-typed-dict]
     issubclass(obj2, (int, Person))  # error: [isinstance-against-typed-dict]
+
+classes = (int, Person)
+
+def _(obj: object):
+    isinstance(obj, classes)  # error: [isinstance-against-typed-dict]
 ```
 
 They also cannot be used in class patterns for `match` statements:

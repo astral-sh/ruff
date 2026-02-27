@@ -185,10 +185,12 @@ And `Any` cannot be used in `isinstance()` checks:
 isinstance("", Any)
 ```
 
-The same applies when `Any` is nested inside a tuple:
+The same applies when `Any` is nested inside a tuple, including non-literal tuples:
 
 ```py
 isinstance("", (int, Any))  # error: [invalid-argument-type]
+classes = (int, Any)
+isinstance("", classes)  # error: [invalid-argument-type]
 ```
 
 But `issubclass()` checks are fine:

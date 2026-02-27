@@ -139,6 +139,19 @@ def _(x: int | list[int] | bytes):
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
+Including non-literal tuples:
+
+```py
+classes = (int, list[int] | bytes)
+
+def _(x: int | list[int] | bytes):
+    # error: [invalid-argument-type]
+    if isinstance(x, classes):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
 ## PEP-604 unions on Python \<3.10
 
 PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to

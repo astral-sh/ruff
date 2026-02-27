@@ -1265,16 +1265,17 @@ impl<'db> FunctionType<'db> {
 /// `UnionType` elements). Handles class literals, tuples (including nested tuples), and
 /// recursively validates each element.
 ///
-/// `classinfo_expr` is the AST expression corresponding to `classinfo`, used for precise
-/// annotation spans (e.g., highlighting just the `UnionType` inside a tuple rather than
-/// the whole tuple).
+/// `classinfo_expr` is the AST expression corresponding to `classinfo`, if available. It is
+/// used for precise annotation spans (e.g., highlighting just the `UnionType` inside a tuple
+/// rather than the whole tuple). It may be `None` when the tuple is not a literal in the AST
+/// (e.g., when it's stored in a variable).
 fn check_classinfo_in_isinstance<'db>(
     db: &'db dyn Db,
     context: &InferContext<'db, '_>,
     call_expression: &ast::ExprCall,
     function: KnownFunction,
     classinfo: Type<'db>,
-    classinfo_expr: &ast::Expr,
+    classinfo_expr: Option<&ast::Expr>,
 ) {
     match classinfo {
         Type::ClassLiteral(class) => {
@@ -1321,11 +1322,13 @@ fn check_classinfo_in_isinstance<'db>(
             );
         }
         Type::NominalInstance(nominal) => {
-            if let Some(tuple_spec) = nominal.tuple_spec(db)
-                && let ast::Expr::Tuple(tuple_expr) = classinfo_expr
-            {
-                for (element, element_expr) in tuple_spec.iter_all_elements().zip(&tuple_expr.elts)
-                {
+            if let Some(tuple_spec) = nominal.tuple_spec(db) {
+                let element_exprs = match classinfo_expr {
+                    Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
+                    _ => None,
+                };
+                for (index, element) in tuple_spec.iter_all_elements().enumerate() {
+                    let element_expr = element_exprs.and_then(|elts| elts.get(index));
                     check_classinfo_in_isinstance(
                         db,
                         context,
@@ -1349,7 +1352,7 @@ fn report_invalid_union_type_elements<'db>(
     call_expression: &ast::ExprCall,
     function: KnownFunction,
     union_type: Type<'db>,
-    union_type_expr: &ast::Expr,
+    union_type_expr: Option<&ast::Expr>,
 ) {
     fn find_invalid_elements<'db>(
         db: &'db dyn Db,
@@ -1400,10 +1403,12 @@ fn report_invalid_union_type_elements<'db>(
         "A `UnionType` instance can only be used as the second argument to \
         `{function_name}` if all elements are class objects"
     ));
-    diagnostic.annotate(
-        Annotation::secondary(context.span(union_type_expr))
-            .message("This `UnionType` instance contains non-class elements"),
-    );
+    if let Some(union_type_expr) = union_type_expr {
+        diagnostic.annotate(
+            Annotation::secondary(context.span(union_type_expr))
+                .message("This `UnionType` instance contains non-class elements"),
+        );
+    }
     match other_invalid_elements {
         [] => diagnostic.info(format_args!(
             "Element `{}` in the union is not a class object",
@@ -2148,7 +2153,7 @@ impl KnownFunction {
                     call_expression,
                     self,
                     *second_argument,
-                    &call_expression.arguments.args[1],
+                    Some(&call_expression.arguments.args[1]),
                 );
 
                 if let Type::ClassLiteral(class) = second_argument

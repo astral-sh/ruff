@@ -83,6 +83,10 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 68 |     issubclass(arg2, (HasX, RuntimeCheckableHasX))
 69 | 
 70 |     issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
+71 | classes = (HasX, int)
+72 | 
+73 | def h(arg: object):
+74 |     isinstance(arg, classes)  # error: [isinstance-against-protocol]
 ```
 
 # Diagnostics
@@ -299,6 +303,7 @@ error[isinstance-against-protocol]: Class `HasX` cannot be used as the second ar
 69 |
 70 |     issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+71 | classes = (HasX, int)
    |
 info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
  --> src/mdtest_snippet.py:3:7
@@ -310,6 +315,29 @@ info: `HasX` is declared as a protocol class, but it is not declared as runtime-
 4 |     x: int
   |
 info: A protocol class can only be used in `issubclass` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
+info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+info: rule `isinstance-against-protocol` is enabled by default
+
+```
+
+```
+error[isinstance-against-protocol]: Class `HasX` cannot be used as the second argument to `isinstance`
+  --> src/mdtest_snippet.py:74:5
+   |
+73 | def h(arg: object):
+74 |     isinstance(arg, classes)  # error: [isinstance-against-protocol]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+   |
+info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import Protocol
+2 |
+3 | class HasX(Protocol):
+  |       ^^^^^^^^^^^^^^ `HasX` declared here
+4 |     x: int
+  |
+info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
 info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
 info: rule `isinstance-against-protocol` is enabled by default
 

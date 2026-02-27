@@ -2616,6 +2616,15 @@ def g(arg: object, arg2: type):
     issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
 ```
 
+This also works when the tuple is not a literal in the source:
+
+```py
+classes = (HasX, int)
+
+def h(arg: object):
+    isinstance(arg, classes)  # error: [isinstance-against-protocol]
+```
+
 ## Match class patterns and protocols
 
 <!-- snapshot-diagnostics -->
