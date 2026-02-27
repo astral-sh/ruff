@@ -352,7 +352,8 @@ async def read_thing_callable_dep_missing(query: Annotated[str, Depends(Callable
 async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
 
 
-# OK: class with no __init__ and no __call__ (unknown dependency, no diagnostic)
+# Error: class with no __init__ and no __call__; FastAPI calls __init__ which
+# has no parameters, so `thing_id` is not covered by the dependency.
 class EmptyClass:
     pass
 

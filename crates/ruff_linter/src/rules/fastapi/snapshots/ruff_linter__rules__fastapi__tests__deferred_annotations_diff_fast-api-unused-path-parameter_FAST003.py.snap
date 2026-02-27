@@ -129,21 +129,21 @@ help: Add `thing_id` to function signature
 352 + async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())], thing_id): ...
 353 | 
 354 | 
-355 | # OK: class with no __init__ and no __call__ (unknown dependency, no diagnostic)
+355 | # Error: class with no __init__ and no __call__; FastAPI calls __init__ which
 note: This is an unsafe fix and may change runtime behavior
 
 
 FAST003 [*] Parameter `thing_id` appears in route path, but not in `read_thing_empty_class_dep` signature
-   --> FAST003.py:360:19
+   --> FAST003.py:361:19
     |
-360 | @app.get("/things/{thing_id}")
+361 | @app.get("/things/{thing_id}")
     |                   ^^^^^^^^^^
-361 | async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
+362 | async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
     |
 help: Add `thing_id` to function signature
-358 | 
 359 | 
-360 | @app.get("/things/{thing_id}")
+360 | 
+361 | @app.get("/things/{thing_id}")
     - async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
-361 + async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)], thing_id): ...
+362 + async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)], thing_id): ...
 note: This is an unsafe fix and may change runtime behavior
