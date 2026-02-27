@@ -17,7 +17,9 @@ use crate::semantic_index::{
     DeclarationWithConstraint, SemanticIndex, attribute_declarations, attribute_scopes,
 };
 use crate::types::bound_super::BoundSuperError;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_DATACLASS_OVERRIDE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
 use crate::types::enums::{
@@ -59,8 +61,8 @@ use crate::{
         semantic_index, use_def_map,
     },
     types::{
-        CallArguments, CallError, CallErrorKind, MetaclassCandidate, TypeDefinition, UnionType,
-        definition_expression_type,
+        CallArguments, CallError, CallErrorKind, MetaclassCandidate, MetaclassTransformInfo,
+        TypeDefinition, UnionType, definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -119,7 +121,7 @@ fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _self_: StaticClassLiteral<'db>,
-) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
+) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
@@ -180,8 +182,8 @@ impl<'db> CodeGeneratorKind<'db> {
         ) -> Option<CodeGeneratorKind<'db>> {
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
-            } else if let Ok((_, Some(transformer_params))) = class.try_metaclass(db) {
-                Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
+            } else if let Ok((_, Some(info))) = class.try_metaclass(db) {
+                Some(CodeGeneratorKind::DataclassLike(Some(info.params)))
             } else if let Some(transformer_params) =
                 class.iter_mro(db, specialization).skip(1).find_map(|base| {
                     base.into_class().and_then(|class| {
@@ -407,6 +409,14 @@ pub enum ClassLiteral<'db> {
 }
 
 impl<'db> ClassLiteral<'db> {
+    /// Return a `ClassLiteral` representing the class `builtins.object`
+    pub(super) fn object(db: &'db dyn Db) -> Self {
+        KnownClass::Object
+            .to_class_literal(db)
+            .as_class_literal()
+            .expect("`object` should always be a non-generic class in typeshed")
+    }
+
     /// Returns the name of the class.
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db ast::name::Name {
         match self {
@@ -754,6 +764,20 @@ impl<'db> ClassLiteral<'db> {
             Self::DynamicNamedTuple(_) => self,
         }
     }
+
+    /// Returns all of the explicit base class types for this class.
+    ///
+    /// Note that when this is a namedtuple this always returns a sequence
+    /// of length one corresponding to `tuple`.
+    pub(crate) fn explicit_bases(self, db: &'db dyn Db) -> Box<[Type<'db>]> {
+        match self {
+            Self::Static(static_class) => static_class.explicit_bases(db).into(),
+            Self::Dynamic(dynamic_class) => dynamic_class.explicit_bases(db).into(),
+            Self::DynamicNamedTuple(namedtuple) => {
+                [Type::from(namedtuple.tuple_base_class(db))].into()
+            }
+        }
+    }
 }
 
 impl<'db> From<StaticClassLiteral<'db>> for ClassLiteral<'db> {
@@ -793,12 +817,7 @@ pub enum ClassType<'db> {
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
-        ClassType::NonGeneric(
-            KnownClass::Object
-                .to_class_literal(db)
-                .as_class_literal()
-                .expect("`object` should always be a non-generic class in typeshed"),
-        )
+        ClassType::NonGeneric(ClassLiteral::object(db))
     }
 
     pub(super) const fn is_generic(self) -> bool {
@@ -1113,77 +1132,88 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other, InferableTypeVars::None)
-            .is_always_satisfied(db)
+        self.when_subclass_of(
+            db,
+            other,
+            &ConstraintSetBuilder::new(),
+            InferableTypeVars::None,
+        )
+        .is_always_satisfied(db)
     }
 
-    pub(super) fn when_subclass_of(
+    pub(super) fn when_subclass_of<'c>(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             other,
+            constraints,
             inferable,
             TypeRelation::Subtyping,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(constraints),
+            &IsDisjointVisitor::default(constraints),
         )
     }
 
-    pub(super) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        self.iter_mro(db).when_any(db, |base| {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.iter_mro(db).when_any(db, constraints, |base| {
             match base {
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy { .. }
-                    | TypeRelation::SubtypingAssuming(_) => {
-                        ConstraintSet::from(other.is_object(db))
+                    | TypeRelation::SubtypingAssuming => {
+                        ConstraintSet::from_bool(constraints, other.is_object(db))
                     }
                     TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
-                        ConstraintSet::from(!other.is_final(db))
+                        ConstraintSet::from_bool(constraints, !other.is_final(db))
                     }
                 },
 
                 // Protocol, Generic, and TypedDict are special bases that don't match ClassType.
                 ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => {
-                    ConstraintSet::from(false)
+                    ConstraintSet::from_bool(constraints, false)
                 }
 
                 ClassBase::Class(base) => match (base, other) {
                     // Two non-generic classes match if they have the same class literal.
                     (ClassType::NonGeneric(base_literal), ClassType::NonGeneric(other_literal)) => {
-                        ConstraintSet::from(base_literal == other_literal)
+                        ConstraintSet::from_bool(constraints, base_literal == other_literal)
                     }
 
                     // Two generic classes match if they have the same origin and compatible specializations.
                     (ClassType::Generic(base), ClassType::Generic(other)) => {
-                        ConstraintSet::from(base.origin(db) == other.origin(db)).and(db, || {
-                            base.specialization(db).has_relation_to_impl(
-                                db,
-                                other.specialization(db),
-                                inferable,
-                                relation,
-                                relation_visitor,
-                                disjointness_visitor,
-                            )
-                        })
+                        ConstraintSet::from_bool(constraints, base.origin(db) == other.origin(db))
+                            .and(db, constraints, || {
+                                base.specialization(db).has_relation_to_impl(
+                                    db,
+                                    other.specialization(db),
+                                    constraints,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            })
                     }
 
                     // Generic and non-generic classes don't match.
                     (ClassType::Generic(_), ClassType::NonGeneric(_))
                     | (ClassType::NonGeneric(_), ClassType::Generic(_)) => {
-                        ConstraintSet::from(false)
+                        ConstraintSet::from_bool(constraints, false)
                     }
                 },
             }
@@ -1212,7 +1242,12 @@ impl<'db> ClassType<'db> {
     }
 
     /// Return `true` if this class could exist in the MRO of `other`.
-    pub(super) fn could_exist_in_mro_of(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn could_exist_in_mro_of(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
         other
             .iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -1227,6 +1262,7 @@ impl<'db> ClassType<'db> {
                             .is_disjoint_from(
                                 db,
                                 other_alias.specialization(db),
+                                constraints,
                                 InferableTypeVars::None,
                             )
                             .is_always_satisfied(db)
@@ -1241,17 +1277,22 @@ impl<'db> ClassType<'db> {
     /// For two given classes `A` and `B`, it is often possible to say for sure
     /// that there could never exist any class `C` that inherits from both `A` and `B`.
     /// In these situations, this method returns `false`; in all others, it returns `true`.
-    pub(super) fn could_coexist_in_mro_with(self, db: &'db dyn Db, other: Self) -> bool {
+    pub(super) fn could_coexist_in_mro_with(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &ConstraintSetBuilder<'db>,
+    ) -> bool {
         if self == other {
             return true;
         }
 
         if self.is_final(db) {
-            return other.could_exist_in_mro_of(db, self);
+            return other.could_exist_in_mro_of(db, self, constraints);
         }
 
         if other.is_final(db) {
-            return self.could_exist_in_mro_of(db, other);
+            return self.could_exist_in_mro_of(db, other, constraints);
         }
 
         // Two disjoint bases can only coexist in an MRO if one is a subclass of the other.
@@ -1288,7 +1329,15 @@ impl<'db> ClassType<'db> {
         let Some(other_metaclass_instance) = other_metaclass.to_instance(db) else {
             return true;
         };
-        if self_metaclass_instance.is_disjoint_from(db, other_metaclass_instance) {
+        if self_metaclass_instance
+            .when_disjoint_from(
+                db,
+                other_metaclass_instance,
+                constraints,
+                InferableTypeVars::None,
+            )
+            .is_always_satisfied(db)
+        {
             return false;
         }
 
@@ -2734,6 +2783,38 @@ impl<'db> StaticClassLiteral<'db> {
         (dataclass_params, transformer_params)
     }
 
+    /// Returns the effective frozen status of this class if it's a dataclass-like class.
+    ///
+    /// Returns `Some(true)` for a frozen dataclass-like class, `Some(false)` for a non-frozen one,
+    /// and `None` if the class is not a dataclass-like class, or if the dataclass is neither frozen
+    /// nor non-frozen.
+    pub(crate) fn is_frozen_dataclass(self, db: &'db dyn Db) -> Option<bool> {
+        // Check if this is a base-class-based transformer that has dataclass_transformer_params directly
+        // attached to it (because it is itself decorated with `@dataclass_transform`), or if this class
+        // has an explicit metaclass that is decorated with `@dataclass_transform`.
+        //
+        // In both cases, this signifies that this class is neither frozen nor non-frozen.
+        //
+        // See <https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-semantics> for details.
+        if self.dataclass_transformer_params(db).is_some()
+            || self
+                .try_metaclass(db)
+                .is_ok_and(|(_, info)| info.is_some_and(|i| i.from_explicit_metaclass))
+        {
+            return None;
+        }
+
+        if let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+            CodeGeneratorKind::from_class(db, self.into(), None)?
+        {
+            // Otherwise, if this class is a dataclass-like class, determine its frozen status based on
+            // dataclass params and dataclass transformer params.
+            Some(self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN))
+        } else {
+            None
+        }
+    }
+
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
     fn has_dataclass_param(
@@ -2783,7 +2864,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn try_metaclass(
         self,
         db: &'db dyn Db,
-    ) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
+    ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
         tracing::trace!("StaticClassLiteral::try_metaclass: {}", self.name(db));
 
         // Identify the class's own metaclass (or take the first base class's metaclass).
@@ -2887,11 +2968,15 @@ impl<'db> StaticClassLiteral<'db> {
             });
         }
 
-        let dataclass_transformer_params = candidate
+        let transform_info = candidate
             .metaclass
             .static_class_literal(db)
-            .and_then(|(metaclass_literal, _)| metaclass_literal.dataclass_transformer_params(db));
-        Ok((candidate.metaclass.into(), dataclass_transformer_params))
+            .and_then(|(metaclass_literal, _)| metaclass_literal.dataclass_transformer_params(db))
+            .map(|params| MetaclassTransformInfo {
+                params,
+                from_explicit_metaclass: candidate.explicit_metaclass_of == self,
+            });
+        Ok((candidate.metaclass.into(), transform_info))
     }
 
     /// Returns the class member of this class named `name`.
@@ -3461,7 +3546,7 @@ impl<'db> StaticClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN) {
+                if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
                         Parameters::new(
                             db,
@@ -3959,7 +4044,7 @@ impl<'db> StaticClassLiteral<'db> {
             match name.as_str() {
                 "__setattr__" | "__delattr__" => {
                     if let CodeGeneratorKind::DataclassLike(_) = field_policy
-                        && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
+                        && self.is_frozen_dataclass(db) == Some(true)
                     {
                         if let Some(builder) = context.report_lint(
                             &INVALID_DATACLASS_OVERRIDE,
@@ -7441,12 +7526,13 @@ impl KnownClass {
             .is_ok_and(|class| class.is_subclass_of(db, None, other))
     }
 
-    pub(super) fn when_subclass_of<'db>(
+    pub(super) fn when_subclass_of<'db, 'c>(
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-    ) -> ConstraintSet<'db> {
-        ConstraintSet::from(self.is_subclass_of(db, other))
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
+        ConstraintSet::from_bool(constraints, self.is_subclass_of(db, other))
     }
 
     /// Return the module in which we should look up the definition for this class

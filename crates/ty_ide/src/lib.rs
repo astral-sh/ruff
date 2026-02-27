@@ -25,6 +25,7 @@ mod semantic_tokens;
 mod signature_help;
 mod stub_mapping;
 mod symbols;
+mod type_hierarchy;
 mod workspace_symbols;
 
 pub use all_symbols::{AllSymbolInfo, all_symbols};
@@ -48,11 +49,14 @@ pub use semantic_tokens::{
 };
 pub use signature_help::{ParameterDetails, SignatureDetails, SignatureHelpInfo, signature_help};
 pub use symbols::{FlatSymbols, HierarchicalSymbols, SymbolId, SymbolInfo, SymbolKind};
+pub use type_hierarchy::{
+    TypeHierarchyItem, prepare_type_hierarchy, type_hierarchy_subtypes, type_hierarchy_supertypes,
+};
 pub use workspace_symbols::{WorkspaceSymbolInfo, workspace_symbols};
 
 use ruff_db::{
     files::{File, FileRange},
-    system::SystemPathBuf,
+    system::{SystemPath, SystemPathBuf},
     vendored::VendoredPath,
 };
 use ruff_text_size::{Ranged, TextRange};
@@ -345,6 +349,25 @@ pub fn cached_vendored_root(db: &dyn ty_python_semantic::Db) -> Option<SystemPat
     let writable = db.system().as_writable()?;
     let relative_root = relative_cached_vendored_root();
     Some(writable.cache_dir()?.join(relative_root))
+}
+
+/// Maps an absolute system path to a vendored path.
+///
+/// This is useful for normalizing file paths received from the LSP. Namely,
+/// the LSP might include a *system* file path to a vendored typeshed file.
+/// But the ty LSP really wants to represent that as a `VendoredPath` and not
+/// a `SystemPath`. Otherwise we end up with different `File` values in memory
+/// for the same file on disk.
+///
+/// Callers should provide [`cached_vendored_root`]. Whenever the system path
+/// begins with the vendored root, this routine will return a vendored file
+/// path.
+pub fn map_system_to_vendored<'a>(
+    cached_vendored_root: &SystemPath,
+    absolute_path: &'a SystemPath,
+) -> Option<&'a VendoredPath> {
+    let rel_path = absolute_path.strip_prefix(cached_vendored_root).ok()?;
+    Some(VendoredPath::new(rel_path.as_str()))
 }
 
 #[cfg(test)]

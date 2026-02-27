@@ -18,7 +18,9 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, semantic_index};
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::infer_deferred_types;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
@@ -286,19 +288,22 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(crate) fn has_relation_to_impl<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         Self::has_relation_to_inner(
             db,
             &self.overloads,
             &other.overloads,
+            constraints,
             inferable,
             relation,
             relation_visitor,
@@ -326,19 +331,21 @@ impl<'db> CallableSignature<'db> {
             .map(|bound_typevar| (bound_typevar, signature.return_ty))
     }
 
-    pub(crate) fn when_constraint_set_assignable_to(
+    pub(crate) fn when_constraint_set_assignable_to<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             other,
+            constraints,
             inferable,
             TypeRelation::ConstraintSetAssignability,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(constraints),
+            &IsDisjointVisitor::default(constraints),
         )
     }
 
@@ -347,13 +354,14 @@ impl<'db> CallableSignature<'db> {
     ///
     /// This is intentionally accept-only. If the probe does not definitely succeed, it returns
     /// `None` and callers should fall back to legacy per-overload relation checks.
-    fn try_unary_overload_aggregate_relation(
+    fn try_unary_overload_aggregate_relation<'c>(
         db: &'db dyn Db,
+        constraints: &'c ConstraintSetBuilder<'db>,
         self_signatures: &[Signature<'db>],
         other_signature: &Signature<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-    ) -> Option<ConstraintSet<'db>> {
+        relation: TypeRelation,
+    ) -> Option<ConstraintSet<'db, 'c>> {
         let single_required_positional_parameter_type = |signature: &Signature<'db>| {
             if signature.parameters().len() != 1 {
                 return None;
@@ -402,7 +410,7 @@ impl<'db> CallableSignature<'db> {
                 return None;
             }
             let signatures_are_disjoint = self_parameter_type
-                .when_disjoint_from(db, other_parameter_type, inferable)
+                .when_disjoint_from(db, other_parameter_type, constraints, inferable)
                 .is_always_satisfied(db);
 
             if signatures_are_disjoint {
@@ -422,16 +430,19 @@ impl<'db> CallableSignature<'db> {
         let parameters_cover_target = other_parameter_type.has_relation_to(
             db,
             parameter_type_union.build(),
+            constraints,
             inferable,
             relation,
         );
         let returns_match_target = return_type_union.build().has_relation_to(
             db,
             other_signature.return_ty,
+            constraints,
             inferable,
             relation,
         );
-        let aggregate_relation = parameters_cover_target.and(db, || returns_match_target);
+        let aggregate_relation =
+            parameters_cover_target.and(db, constraints, || returns_match_target);
         aggregate_relation
             .is_always_satisfied(db)
             .then_some(aggregate_relation)
@@ -439,15 +450,17 @@ impl<'db> CallableSignature<'db> {
 
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
-    fn has_relation_to_inner(
+    #[expect(clippy::too_many_arguments)]
+    fn has_relation_to_inner<'c>(
         db: &'db dyn Db,
         self_signatures: &[Signature<'db>],
         other_signatures: &[Signature<'db>],
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         if relation.is_constraint_set_assignability() {
             // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
             let self_is_single_paramspec = Self::signatures_is_single_paramspec(self_signatures);
@@ -464,6 +477,7 @@ impl<'db> CallableSignature<'db> {
                 ) => {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         self_bound_typevar,
                         Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
@@ -471,12 +485,13 @@ impl<'db> CallableSignature<'db> {
                     let return_types_match = self_return_type.has_relation_to_impl(
                         db,
                         other_return_type,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
                     );
-                    return param_spec_matches.and(db, || return_types_match);
+                    return param_spec_matches.and(db, constraints, || return_types_match);
                 }
 
                 (Some((self_bound_typevar, self_return_type)), None) => {
@@ -495,6 +510,7 @@ impl<'db> CallableSignature<'db> {
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         self_bound_typevar,
                         Type::Never,
                         upper,
@@ -502,17 +518,18 @@ impl<'db> CallableSignature<'db> {
                     let return_types_match = other_signatures
                         .iter()
                         .map(|signature| signature.return_ty)
-                        .when_any(db, |other_return_type| {
+                        .when_any(db, constraints, |other_return_type| {
                             self_return_type.has_relation_to_impl(
                                 db,
                                 other_return_type,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
                                 disjointness_visitor,
                             )
                         });
-                    return param_spec_matches.and(db, || return_types_match);
+                    return param_spec_matches.and(db, constraints, || return_types_match);
                 }
 
                 (None, Some((other_bound_typevar, other_return_type))) => {
@@ -531,6 +548,7 @@ impl<'db> CallableSignature<'db> {
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         other_bound_typevar,
                         lower,
                         Type::object(),
@@ -538,17 +556,18 @@ impl<'db> CallableSignature<'db> {
                     let return_types_match = self_signatures
                         .iter()
                         .map(|signature| signature.return_ty)
-                        .when_any(db, |self_return_type| {
+                        .when_any(db, constraints, |self_return_type| {
                             self_return_type.has_relation_to_impl(
                                 db,
                                 other_return_type,
+                                constraints,
                                 inferable,
                                 relation,
                                 relation_visitor,
                                 disjointness_visitor,
                             )
                         });
-                    return param_spec_matches.and(db, || return_types_match);
+                    return param_spec_matches.and(db, constraints, || return_types_match);
                 }
 
                 (None, None) => {}
@@ -561,6 +580,7 @@ impl<'db> CallableSignature<'db> {
                 self_signature.has_relation_to_impl(
                     db,
                     other_signature,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -572,6 +592,7 @@ impl<'db> CallableSignature<'db> {
             (_, [other_signature]) => {
                 if let Some(aggregate_relation) = Self::try_unary_overload_aggregate_relation(
                     db,
+                    constraints,
                     self_signatures,
                     other_signature,
                     inferable,
@@ -580,44 +601,53 @@ impl<'db> CallableSignature<'db> {
                     return aggregate_relation;
                 }
 
-                self_signatures.iter().when_any(db, |self_signature| {
+                self_signatures
+                    .iter()
+                    .when_any(db, constraints, |self_signature| {
+                        Self::has_relation_to_inner(
+                            db,
+                            std::slice::from_ref(self_signature),
+                            other_signatures,
+                            constraints,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+            }
+
+            // `self` is definitely not overloaded while `other` is possibly overloaded.
+            ([_], _) => other_signatures
+                .iter()
+                .when_all(db, constraints, |other_signature| {
                     Self::has_relation_to_inner(
                         db,
-                        std::slice::from_ref(self_signature),
-                        other_signatures,
+                        self_signatures,
+                        std::slice::from_ref(other_signature),
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
                         disjointness_visitor,
                     )
-                })
-            }
-
-            // `self` is definitely not overloaded while `other` is possibly overloaded.
-            ([_], _) => other_signatures.iter().when_all(db, |other_signature| {
-                Self::has_relation_to_inner(
-                    db,
-                    self_signatures,
-                    std::slice::from_ref(other_signature),
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+                }),
 
             // `self` is definitely overloaded while `other` is possibly overloaded.
-            (_, _) => other_signatures.iter().when_all(db, |other_signature| {
-                Self::has_relation_to_inner(
-                    db,
-                    self_signatures,
-                    std::slice::from_ref(other_signature),
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+            (_, _) => other_signatures
+                .iter()
+                .when_all(db, constraints, |other_signature| {
+                    Self::has_relation_to_inner(
+                        db,
+                        self_signatures,
+                        std::slice::from_ref(other_signature),
+                        constraints,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                }),
         }
     }
 }
@@ -1013,12 +1043,13 @@ impl<'db> Signature<'db> {
         }
     }
 
-    pub(crate) fn when_constraint_set_assignable_to_signatures(
+    pub(crate) fn when_constraint_set_assignable_to_signatures<'c>(
         &self,
         db: &'db dyn Db,
         other: &CallableSignature<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         // If this signature is a paramspec, bind it to the entire overloaded other callable.
         if let Some(self_bound_typevar) = self.parameters.as_paramspec()
             && other.is_single_paramspec().is_none()
@@ -1034,53 +1065,66 @@ impl<'db> Signature<'db> {
                 })),
                 CallableTypeKind::ParamSpecValue,
             ));
-            let param_spec_matches =
-                ConstraintSet::constrain_typevar(db, self_bound_typevar, Type::Never, upper);
+            let param_spec_matches = ConstraintSet::constrain_typevar(
+                db,
+                constraints,
+                self_bound_typevar,
+                Type::Never,
+                upper,
+            );
             let return_types_match = other
                 .overloads
                 .iter()
                 .map(|signature| signature.return_ty)
-                .when_any(db, |other_return_type| {
+                .when_any(db, constraints, |other_return_type| {
                     self.return_ty.when_constraint_set_assignable_to(
                         db,
                         other_return_type,
+                        constraints,
                         inferable,
                     )
                 });
-            return param_spec_matches.and(db, || return_types_match);
+            return param_spec_matches.and(db, constraints, || return_types_match);
         }
 
-        other.overloads.iter().when_all(db, |other_signature| {
-            self.when_constraint_set_assignable_to(db, other_signature, inferable)
-        })
+        other
+            .overloads
+            .iter()
+            .when_all(db, constraints, |other_signature| {
+                self.when_constraint_set_assignable_to(db, other_signature, constraints, inferable)
+            })
     }
 
-    fn when_constraint_set_assignable_to(
+    fn when_constraint_set_assignable_to<'c>(
         &self,
         db: &'db dyn Db,
         other: &Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
+    ) -> ConstraintSet<'db, 'c> {
         self.has_relation_to_impl(
             db,
             other,
+            constraints,
             inferable,
             TypeRelation::ConstraintSetAssignability,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(constraints),
+            &IsDisjointVisitor::default(constraints),
         )
     }
 
     /// Implementation of subtyping and assignability for signature.
-    fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    fn has_relation_to_impl<'c>(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         // If either signature is generic, their typevars should also be considered inferable when
         // checking whether one signature is a subtype/etc of the other, since we only need to find
         // one specialization that causes the check to succeed.
@@ -1102,6 +1146,7 @@ impl<'db> Signature<'db> {
         let when = self.has_relation_to_inner(
             db,
             other,
+            constraints,
             inferable,
             relation,
             relation_visitor,
@@ -1112,18 +1157,24 @@ impl<'db> Signature<'db> {
         // we produce, we reduce it back down to the inferable set that the caller asked about.
         // If we introduced new inferable typevars, those will be existentially quantified away
         // before returning.
-        when.reduce_inferable(db, self_inferable.iter().chain(other_inferable.iter()))
+        when.reduce_inferable(
+            db,
+            constraints,
+            self_inferable.iter().chain(other_inferable.iter()),
+        )
     }
 
-    fn has_relation_to_inner(
+    #[expect(clippy::too_many_arguments)]
+    fn has_relation_to_inner<'c>(
         &self,
         db: &'db dyn Db,
         other: &Signature<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         /// A helper struct to zip two slices of parameters together that provides control over the
         /// two iterators individually. It also keeps track of the current parameter in each
         /// iterator.
@@ -1185,7 +1236,7 @@ impl<'db> Signature<'db> {
             }
         }
 
-        let mut result = ConstraintSet::from(true);
+        let mut result = ConstraintSet::from_bool(constraints, true);
 
         let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
             match (type1, type2) {
@@ -1213,9 +1264,11 @@ impl<'db> Signature<'db> {
             !result
                 .intersect(
                     db,
+                    constraints,
                     type1.has_relation_to_impl(
                         db,
                         type2,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -1243,27 +1296,29 @@ impl<'db> Signature<'db> {
                 .keyword_variadic()
                 .is_some_and(|(_, param)| param.annotated_type().is_object())
         {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(constraints, true);
         }
 
         // The top signature is supertype of (and assignable from) all other signatures. It is a
         // subtype of no signature except itself, and assignable only to the gradual signature.
         if other.parameters.is_top() {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(constraints, true);
         } else if self.parameters.is_top() && !other.parameters.is_gradual() {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
 
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
             return match relation {
-                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => {
-                    ConstraintSet::from(false)
+                TypeRelation::Subtyping | TypeRelation::SubtypingAssuming => {
+                    ConstraintSet::from_bool(constraints, false)
                 }
                 TypeRelation::Redundancy { .. } => result.intersect(
                     db,
-                    ConstraintSet::from(
+                    constraints,
+                    ConstraintSet::from_bool(
+                        constraints,
                         self.parameters.is_gradual() && other.parameters.is_gradual(),
                     ),
                 ),
@@ -1281,11 +1336,12 @@ impl<'db> Signature<'db> {
                 (Some(self_bound_typevar), Some(other_bound_typevar)) => {
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         self_bound_typevar,
                         Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
                     );
-                    result.intersect(db, param_spec_matches);
+                    result.intersect(db, constraints, param_spec_matches);
                     return result;
                 }
 
@@ -1301,11 +1357,12 @@ impl<'db> Signature<'db> {
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         self_bound_typevar,
                         Type::Never,
                         upper,
                     );
-                    result.intersect(db, param_spec_matches);
+                    result.intersect(db, constraints, param_spec_matches);
                     return result;
                 }
 
@@ -1321,11 +1378,12 @@ impl<'db> Signature<'db> {
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
+                        constraints,
                         other_bound_typevar,
                         lower,
                         Type::object(),
                     );
-                    result.intersect(db, param_spec_matches);
+                    result.intersect(db, constraints, param_spec_matches);
                     return result;
                 }
 
@@ -1346,9 +1404,15 @@ impl<'db> Signature<'db> {
 
         loop {
             let Some(next_parameter) = parameters.next() else {
-                // All parameters have been checked or both the parameter lists were empty. In
-                // either case, `self` is a subtype of `other`.
-                return result;
+                if other_keywords.is_empty() {
+                    // All parameters have been checked or both the parameter lists were empty.
+                    // In either case, `self` is a subtype of `other`.
+                    return result;
+                }
+                // There are keyword parameters in `other` that were only matched positionally
+                // against a variadic parameter in `self`. We need to verify that they can also
+                // be matched as keyword arguments, which is done after this loop.
+                break;
             };
 
             match next_parameter {
@@ -1368,7 +1432,7 @@ impl<'db> Signature<'db> {
                         // `other`, then the non-variadic parameters in `self` must have a default
                         // value.
                         if default_type.is_none() {
-                            return ConstraintSet::from(false);
+                            return ConstraintSet::from_bool(constraints, false);
                         }
                     }
                     ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {
@@ -1380,7 +1444,7 @@ impl<'db> Signature<'db> {
                 EitherOrBoth::Right(_) => {
                     // If there are more parameters in `other` than in `self`, then `self` is not a
                     // subtype of `other`.
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 }
 
                 EitherOrBoth::Both(self_parameter, other_parameter) => {
@@ -1400,7 +1464,7 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_default.is_none() && other_default.is_some() {
-                                return ConstraintSet::from(false);
+                                return ConstraintSet::from_bool(constraints, false);
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
@@ -1421,11 +1485,11 @@ impl<'db> Signature<'db> {
                             },
                         ) => {
                             if self_name != other_name {
-                                return ConstraintSet::from(false);
+                                return ConstraintSet::from_bool(constraints, false);
                             }
                             // The following checks are the same as positional-only parameters.
                             if self_default.is_none() && other_default.is_some() {
-                                return ConstraintSet::from(false);
+                                return ConstraintSet::from_bool(constraints, false);
                             }
                             if !check_types(
                                 other_parameter.annotated_type(),
@@ -1510,7 +1574,7 @@ impl<'db> Signature<'db> {
                             break;
                         }
 
-                        _ => return ConstraintSet::from(false),
+                        _ => return ConstraintSet::from_bool(constraints, false),
                     }
                 }
             }
@@ -1544,7 +1608,7 @@ impl<'db> Signature<'db> {
                     // only contains keyword-only and keyword-variadic parameters. However, if the
                     // parameter has a default, it's valid because callers don't need to provide it.
                     if default_type.is_none() {
-                        return ConstraintSet::from(false);
+                        return ConstraintSet::from_bool(constraints, false);
                     }
                 }
                 ParameterKind::Variadic { .. } => {}
@@ -1572,7 +1636,7 @@ impl<'db> Signature<'db> {
                                 ..
                             } => {
                                 if self_default.is_none() && other_default.is_some() {
-                                    return ConstraintSet::from(false);
+                                    return ConstraintSet::from_bool(constraints, false);
                                 }
                                 if !check_types(
                                     other_parameter.annotated_type(),
@@ -1593,14 +1657,14 @@ impl<'db> Signature<'db> {
                             return result;
                         }
                     } else {
-                        return ConstraintSet::from(false);
+                        return ConstraintSet::from_bool(constraints, false);
                     }
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     let Some(self_keyword_variadic_type) = self_keyword_variadic else {
                         // For a `self <: other` relationship, if `other` has a keyword variadic
                         // parameter, `self` must also have a keyword variadic parameter.
-                        return ConstraintSet::from(false);
+                        return ConstraintSet::from_bool(constraints, false);
                     };
                     if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
                         return result;
@@ -1608,7 +1672,7 @@ impl<'db> Signature<'db> {
                 }
                 _ => {
                     // This can only occur in case of a syntax error.
-                    return ConstraintSet::from(false);
+                    return ConstraintSet::from_bool(constraints, false);
                 }
             }
         }
@@ -1617,7 +1681,7 @@ impl<'db> Signature<'db> {
         // optional otherwise the subtype relation is invalid.
         for (_, self_parameter) in self_keywords {
             if self_parameter.default_type().is_none() {
-                return ConstraintSet::from(false);
+                return ConstraintSet::from_bool(constraints, false);
             }
         }
 

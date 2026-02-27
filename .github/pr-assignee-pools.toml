@@ -9,7 +9,7 @@ reviewers = ["amyreese", "ntBre"]
 [[pools]]
 name = "ty-semantic"
 paths = ["/crates/ty_python_semantic/**"]
-reviewers = ["carljm", "sharkdp", "dcreager", "ibraheemdev", "oconnor663"]
+reviewers = ["carljm", "dcreager", "ibraheemdev", "oconnor663"]
 
 [[pools]]
 name = "ty-module-resolver"

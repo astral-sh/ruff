@@ -1,6 +1,6 @@
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::generics::InferableTypeVars;
 use crate::types::protocol_class::ProtocolClass;
 use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
@@ -212,24 +212,29 @@ impl<'db> SubclassOfType<'db> {
     }
 
     /// Return `true` if `self` has a certain relation to `other`.
-    pub(crate) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(crate) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(!relation.is_subtyping())
+                ConstraintSet::from_bool(constraints, !relation.is_subtyping())
             }
             (SubclassOfInner::Dynamic(_), SubclassOfInner::Class(other_class)) => {
-                ConstraintSet::from(other_class.is_object(db) || relation.is_assignability())
+                ConstraintSet::from_bool(
+                    constraints,
+                    other_class.is_object(db) || relation.is_assignability(),
+                )
             }
             (SubclassOfInner::Class(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(relation.is_assignability())
+                ConstraintSet::from_bool(constraints, relation.is_assignability())
             }
 
             // For example, `type[bool]` describes all possible runtime subclasses of the class `bool`,
@@ -239,6 +244,7 @@ impl<'db> SubclassOfType<'db> {
                 .has_relation_to_impl(
                     db,
                     other_class,
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -254,19 +260,23 @@ impl<'db> SubclassOfType<'db> {
     /// Return` true` if `self` is a disjoint type from `other`.
     ///
     /// See [`Type::is_disjoint_from`] for more details.
-    pub(crate) fn is_disjoint_from_impl(
+    pub(crate) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        _visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match (self.subclass_of, other.subclass_of) {
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
-                ConstraintSet::from(!self_class.could_coexist_in_mro_with(db, other_class))
+                ConstraintSet::from_bool(
+                    constraints,
+                    !self_class.could_coexist_in_mro_with(db, other_class, constraints),
+                )
             }
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
                 unreachable!()

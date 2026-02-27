@@ -11,7 +11,9 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
@@ -137,20 +139,22 @@ impl<'db> Type<'db> {
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
-    pub(super) fn satisfies_protocol(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn satisfies_protocol<'c>(
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         // `self` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
         // `self` has the protocol class in its MRO. This is a much cheaper check than the
         // structural check we perform below, so we do it first to avoid the structural check when
         // we can.
-        let mut result = ConstraintSet::from(false);
+        let mut result = ConstraintSet::from_bool(constraints, false);
         if let Some(nominal_instance) = protocol.to_nominal_instance() {
             // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
@@ -164,13 +168,14 @@ impl<'db> Type<'db> {
             let nominally_satisfied = type_to_test.has_relation_to_impl(
                 db,
                 Type::NominalInstance(nominal_instance),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
                 disjointness_visitor,
             );
             if result
-                .union(db, nominally_satisfied)
+                .union(db, constraints, nominally_satisfied)
                 .is_always_satisfied(db)
             {
                 return result;
@@ -195,6 +200,7 @@ impl<'db> Type<'db> {
             self_protocol.interface(db).has_relation_to_impl(
                 db,
                 protocol.interface(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -205,10 +211,11 @@ impl<'db> Type<'db> {
                 .inner
                 .interface(db)
                 .members(db)
-                .when_all(db, |member| {
+                .when_all(db, constraints, |member| {
                     member.is_satisfied_by(
                         db,
                         self,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -216,7 +223,7 @@ impl<'db> Type<'db> {
                     )
                 })
         };
-        result.or(db, || structurally_satisfied)
+        result.or(db, constraints, || structurally_satisfied)
     }
 }
 
@@ -430,23 +437,26 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match (self.0, other.0) {
-            (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
+            (_, NominalInstanceInner::Object) => ConstraintSet::from_bool(constraints, true),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
             ) => tuple1.has_relation_to_impl(
                 db,
                 tuple2,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -455,6 +465,7 @@ impl<'db> NominalInstanceType<'db> {
             _ => self.class(db).has_relation_to_impl(
                 db,
                 other.class(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -463,38 +474,44 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         if self.is_object() || other.is_object() {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
-        let mut result = ConstraintSet::from(false);
+        let mut result = ConstraintSet::from_bool(constraints, false);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
                 let compatible = self_spec.is_disjoint_from_impl(
                     db,
                     &other_spec,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
                 );
-                if result.union(db, compatible).is_always_satisfied(db) {
+                if result
+                    .union(db, constraints, compatible)
+                    .is_always_satisfied(db)
+                {
                     return result;
                 }
             }
         }
 
-        result.or(db, || {
-            ConstraintSet::from(
+        result.or(db, constraints, || {
+            ConstraintSet::from_bool(
+                constraints,
                 !self
                     .class(db)
-                    .could_coexist_in_mro_with(db, other.class(db)),
+                    .could_coexist_in_mro_with(db, other.class(db), constraints),
             )
         })
     }
@@ -712,14 +729,16 @@ impl<'db> ProtocolInstanceType<'db> {
             protocol: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
+            let constraints = ConstraintSetBuilder::new();
             Type::object()
                 .satisfies_protocol(
                     db,
                     protocol,
+                    &constraints,
                     InferableTypeVars::None,
                     TypeRelation::Subtyping,
-                    &HasRelationToVisitor::default(),
-                    &IsDisjointVisitor::default(),
+                    &HasRelationToVisitor::default(&constraints),
+                    &IsDisjointVisitor::default(&constraints),
                 )
                 .is_always_satisfied(db)
         }
@@ -744,14 +763,15 @@ impl<'db> ProtocolInstanceType<'db> {
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<'c>(
         self,
         _db: &'db dyn Db,
         _other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        ConstraintSet::from(false)
+        _visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        ConstraintSet::from_bool(constraints, false)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {

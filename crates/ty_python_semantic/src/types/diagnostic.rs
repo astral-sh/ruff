@@ -31,9 +31,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{
-    DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType,
-};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -121,6 +119,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&OVERRIDE_OF_FINAL_VARIABLE);
     registry.register_lint(&INEFFECTIVE_FINAL);
+    registry.register_lint(&FINAL_ON_NON_METHOD);
     registry.register_lint(&FINAL_WITHOUT_VALUE);
     registry.register_lint(&ABSTRACT_METHOD_IN_FINAL_CLASS);
     registry.register_lint(&CALL_ABSTRACT_METHOD);
@@ -2161,6 +2160,32 @@ declare_lint! {
         summary: "detects calls to `final()` that type checkers cannot interpret",
         status: LintStatus::stable("0.0.1-alpha.33"),
         default_level: Level::Warn,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for `@final` decorators applied to non-method functions.
+    ///
+    /// ## Why is this bad?
+    /// The `@final` decorator is only meaningful on methods and classes.
+    /// Applying it to a module-level function or a nested function has no
+    /// effect and is likely a mistake.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import final
+    ///
+    /// # Error: @final is not allowed on non-method functions
+    /// @final
+    /// def my_function() -> int:
+    ///     return 0
+    /// ```
+    pub(crate) static FINAL_ON_NON_METHOD = {
+        summary: "detects `@final` applied to non-method functions",
+        status: LintStatus::stable("0.0.20"),
+        default_level: Level::Error,
     }
 }
 
@@ -5566,7 +5591,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     class_node: &ast::StmtClassDef,
     base_class: StaticClassLiteral<'db>,
     base_class_node: &ast::Expr,
-    base_class_params: DataclassFlags,
+    base_is_frozen: bool,
 ) {
     let db = context.db();
 
@@ -5576,7 +5601,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         return;
     };
 
-    let mut diagnostic = if base_class_params.is_frozen() {
+    let mut diagnostic = if base_is_frozen {
         let mut diagnostic =
             builder.into_diagnostic("Non-frozen dataclass cannot inherit from frozen dataclass");
         diagnostic.set_concise_message(format_args!(

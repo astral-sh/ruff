@@ -1,0 +1,102 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Function assignability and overrides
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | class Parent:
+ 2 |     def method(self, x: str) -> bool:
+ 3 |         raise NotImplementedError
+ 4 | 
+ 5 | class Child1(Parent):
+ 6 |     # error: [invalid-method-override]
+ 7 |     def method(self, x: bytes) -> bool:
+ 8 |         raise NotImplementedError
+ 9 | class Child2(Parent):
+10 |     # error: [invalid-method-override]
+11 |     def method(self, x: str) -> None:
+12 |         raise NotImplementedError
+13 | class Child3(Parent):
+14 |     # error: [invalid-method-override]
+15 |     def method(self, y: str):
+16 |         raise NotImplementedError
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+ --> src/mdtest_snippet.py:7:9
+  |
+5 | class Child1(Parent):
+6 |     # error: [invalid-method-override]
+7 |     def method(self, x: bytes) -> bool:
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+8 |         raise NotImplementedError
+9 | class Child2(Parent):
+  |
+ ::: src/mdtest_snippet.py:2:9
+  |
+1 | class Parent:
+2 |     def method(self, x: str) -> bool:
+  |         ---------------------------- `Parent.method` defined here
+3 |         raise NotImplementedError
+  |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.py:11:9
+   |
+ 9 | class Child2(Parent):
+10 |     # error: [invalid-method-override]
+11 |     def method(self, x: str) -> None:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+12 |         raise NotImplementedError
+13 | class Child3(Parent):
+   |
+  ::: src/mdtest_snippet.py:2:9
+   |
+ 1 | class Parent:
+ 2 |     def method(self, x: str) -> bool:
+   |         ---------------------------- `Parent.method` defined here
+ 3 |         raise NotImplementedError
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `method`
+  --> src/mdtest_snippet.py:15:9
+   |
+13 | class Child3(Parent):
+14 |     # error: [invalid-method-override]
+15 |     def method(self, y: str):
+   |         ^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.method`
+16 |         raise NotImplementedError
+   |
+  ::: src/mdtest_snippet.py:2:9
+   |
+ 1 | class Parent:
+ 2 |     def method(self, x: str) -> bool:
+   |         ---------------------------- `Parent.method` defined here
+ 3 |         raise NotImplementedError
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
