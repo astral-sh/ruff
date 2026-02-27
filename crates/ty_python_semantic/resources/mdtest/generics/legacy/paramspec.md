@@ -154,7 +154,7 @@ In type annotations, `ParamSpec` is only valid as the first element to `Callable
 to `Concatenate`, or as a type parameter to `Protocol` or `Generic`.
 
 ```py
-from typing import Any, ParamSpec, Callable, Concatenate, Protocol, Generic
+from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic
 
 P = ParamSpec("P")
 
@@ -188,8 +188,6 @@ def invalid_return() -> P:
 def invalid_variable_annotation(y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: P = y
-
-from typing import Final
 
 def invalid_with_qualifier(y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
