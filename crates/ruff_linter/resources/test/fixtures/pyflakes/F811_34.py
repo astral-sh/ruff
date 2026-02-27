@@ -8,7 +8,7 @@ if TYPE_CHECKING:
     from faststream.specification.schema import Contact, License
 
 if TYPE_CHECKING:
-    # See:https://github.com/astral-sh/ruff/pull/22560#discussion_r2866237036
+    # See: https://github.com/astral-sh/ruff/pull/22560#discussion_r2866237036
 	import pyarrow_hotfix
 
 def foo():
