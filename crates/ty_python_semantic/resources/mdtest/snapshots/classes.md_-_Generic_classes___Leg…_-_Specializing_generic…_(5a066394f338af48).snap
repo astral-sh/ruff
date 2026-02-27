@@ -1,0 +1,218 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: classes.md - Generic classes: Legacy syntax - Specializing generic classes explicitly
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import Generic, Literal, TypeVar
+ 2 | 
+ 3 | T = TypeVar("T")
+ 4 | 
+ 5 | class C(Generic[T]):
+ 6 |     x: T
+ 7 | 
+ 8 | reveal_type(C[int]())  # revealed: C[int]
+ 9 | reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
+10 | # error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
+11 | reveal_type(C[int, int]())  # revealed: C[Unknown]
+12 | from typing import Union
+13 | 
+14 | BoundedT = TypeVar("BoundedT", bound=int)
+15 | BoundedByUnionT = TypeVar("BoundedByUnionT", bound=Union[int, str])
+16 | 
+17 | class Bounded(Generic[BoundedT]): ...
+18 | class BoundedByUnion(Generic[BoundedByUnionT]): ...
+19 | class IntSubclass(int): ...
+20 | 
+21 | reveal_type(Bounded[int]())  # revealed: Bounded[int]
+22 | reveal_type(Bounded[IntSubclass]())  # revealed: Bounded[IntSubclass]
+23 | 
+24 | # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
+25 | reveal_type(Bounded[str]())  # revealed: Bounded[Unknown]
+26 | 
+27 | # error:  [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
+28 | reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown]
+29 | 
+30 | reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
+31 | reveal_type(BoundedByUnion[IntSubclass]())  # revealed: BoundedByUnion[IntSubclass]
+32 | reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion[str]
+33 | reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion[int | str]
+34 | ConstrainedT = TypeVar("ConstrainedT", int, str)
+35 | 
+36 | class Constrained(Generic[ConstrainedT]): ...
+37 | 
+38 | reveal_type(Constrained[int]())  # revealed: Constrained[int]
+39 | 
+40 | # TODO: error: [invalid-argument-type]
+41 | # TODO: revealed: Constrained[Unknown]
+42 | reveal_type(Constrained[IntSubclass]())  # revealed: Constrained[IntSubclass]
+43 | 
+44 | reveal_type(Constrained[str]())  # revealed: Constrained[str]
+45 | 
+46 | # TODO: error: [invalid-argument-type]
+47 | # TODO: revealed: Unknown
+48 | reveal_type(Constrained[int | str]())  # revealed: Constrained[int | str]
+49 | 
+50 | # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`"
+51 | reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]
+52 | WithDefaultU = TypeVar("WithDefaultU", default=int)
+53 | 
+54 | class WithDefault(Generic[T, WithDefaultU]): ...
+55 | 
+56 | reveal_type(WithDefault[str, str]())  # revealed: WithDefault[str, str]
+57 | reveal_type(WithDefault[str]())  # revealed: WithDefault[str, int]
+58 | from typing_extensions import TypeVar, Generic
+59 | 
+60 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
+61 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
+62 | 
+63 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
+64 | class GoodOrder(Generic[WithDefaultT1, WithDefaultT2]): ...
+65 | 
+66 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
+67 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
+68 | 
+69 | WithDefaultU = TypeVar("WithDefaultU", default=int)
+70 | 
+71 | # error: [invalid-generic-class]
+72 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
+```
+
+# Diagnostics
+
+```
+error[invalid-type-arguments]: Too many type arguments to class `C`: expected 1, got 2
+  --> src/mdtest_snippet.py:11:20
+   |
+ 9 | reveal_type(C[Literal[5]]())  # revealed: C[Literal[5]]
+10 | # error: [invalid-type-arguments] "Too many type arguments to class `C`: expected 1, got 2"
+11 | reveal_type(C[int, int]())  # revealed: C[Unknown]
+   |                    ^^^
+12 | from typing import Union
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
+
+```
+error[invalid-type-arguments]: Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`
+  --> src/mdtest_snippet.py:25:21
+   |
+24 | # error: [invalid-type-arguments] "Type `str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
+25 | reveal_type(Bounded[str]())  # revealed: Bounded[Unknown]
+   |                     ^^^
+26 |
+27 | # error:  [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
+   |
+  ::: src/mdtest_snippet.py:14:1
+   |
+12 | from typing import Union
+13 |
+14 | BoundedT = TypeVar("BoundedT", bound=int)
+   | -------- Type variable defined here
+15 | BoundedByUnionT = TypeVar("BoundedByUnionT", bound=Union[int, str])
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
+
+```
+error[invalid-type-arguments]: Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`
+  --> src/mdtest_snippet.py:28:21
+   |
+27 | # error:  [invalid-type-arguments] "Type `int | str` is not assignable to upper bound `int` of type variable `BoundedT@Bounded`"
+28 | reveal_type(Bounded[int | str]())  # revealed: Bounded[Unknown]
+   |                     ^^^^^^^^^
+29 |
+30 | reveal_type(BoundedByUnion[int]())  # revealed: BoundedByUnion[int]
+   |
+  ::: src/mdtest_snippet.py:14:1
+   |
+12 | from typing import Union
+13 |
+14 | BoundedT = TypeVar("BoundedT", bound=int)
+   | -------- Type variable defined here
+15 | BoundedByUnionT = TypeVar("BoundedByUnionT", bound=Union[int, str])
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
+
+```
+error[invalid-type-arguments]: Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`
+  --> src/mdtest_snippet.py:51:25
+   |
+50 | # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `ConstrainedT@Constrained`"
+51 | reveal_type(Constrained[object]())  # revealed: Constrained[Unknown]
+   |                         ^^^^^^
+52 | WithDefaultU = TypeVar("WithDefaultU", default=int)
+   |
+  ::: src/mdtest_snippet.py:34:1
+   |
+32 | reveal_type(BoundedByUnion[str]())  # revealed: BoundedByUnion[str]
+33 | reveal_type(BoundedByUnion[int | str]())  # revealed: BoundedByUnion[int | str]
+34 | ConstrainedT = TypeVar("ConstrainedT", int, str)
+   | ------------ Type variable defined here
+35 |
+36 | class Constrained(Generic[ConstrainedT]): ...
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
+  --> src/mdtest_snippet.py:67:7
+   |
+66 | # error: [invalid-generic-class] "Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`"
+67 | class BadOrder(Generic[WithDefaultT2, WithDefaultT1]): ...
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+68 |
+69 | WithDefaultU = TypeVar("WithDefaultU", default=int)
+   |
+  ::: src/mdtest_snippet.py:60:1
+   |
+58 | from typing_extensions import TypeVar, Generic
+59 |
+60 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
+   | ----------------------------------------------------- `WithDefaultT1` defined here
+61 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
+   | --------------------------------------------------------------- `WithDefaultT2` defined here
+62 |
+63 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later type parameter `WithDefaultT1`
+  --> src/mdtest_snippet.py:72:7
+   |
+71 | # error: [invalid-generic-class]
+72 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  ::: src/mdtest_snippet.py:60:1
+   |
+58 | from typing_extensions import TypeVar, Generic
+59 |
+60 | WithDefaultT1 = TypeVar("WithDefaultT1", default=int)
+   | ----------------------------------------------------- `WithDefaultT1` defined here
+61 | WithDefaultT2 = TypeVar("WithDefaultT2", default=WithDefaultT1)
+   | --------------------------------------------------------------- `WithDefaultT2` defined here
+62 |
+63 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```

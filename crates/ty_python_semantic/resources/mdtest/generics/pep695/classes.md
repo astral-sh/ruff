@@ -763,6 +763,8 @@ def protocol_case(x: GenericProtocol[[int], str]) -> None:
 
 ### No back-references
 
+<!-- snapshot-diagnostics -->
+
 Typevar bounds/constraints/defaults are lazy, but cannot refer to later typevars. Furthermore,
 bounds/constraints cannot refer to other type variables, i.e. they must be non-generic.
 

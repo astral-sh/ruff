@@ -137,6 +137,8 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTyp
 
 ## Specializing generic classes explicitly
 
+<!-- snapshot-diagnostics -->
+
 The type parameter can be specified explicitly:
 
 ```py
