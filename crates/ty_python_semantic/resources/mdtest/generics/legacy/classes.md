@@ -252,7 +252,7 @@ StepT = TypeVar("StepT", default=int | None)
 Start2T = TypeVar("Start2T", default="StopT")
 Stop2T = TypeVar("Stop2T", default=int)
 
-# error: [invalid-generic-class] "Default of `Start2T` cannot reference type variable `StopT`"
+# error: [invalid-generic-class] "Default of `Start2T` cannot reference out-of-scope type variable `StopT`"
 class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 

@@ -4963,7 +4963,7 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
         ))
     } else {
         builder.into_diagnostic(format_args!(
-            "Default of `{}` cannot reference type variable `{}`",
+            "Default of `{}` cannot reference out-of-scope type variable `{}`",
             typevar_with_bad_default.name(db),
             referenced_typevar.name(db),
         ))
