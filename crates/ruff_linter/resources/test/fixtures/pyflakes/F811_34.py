@@ -9,6 +9,7 @@ if TYPE_CHECKING:
 
 if TYPE_CHECKING:
     # See: https://github.com/astral-sh/ruff/pull/22560#discussion_r2866237036
+    # should not detect
 	import pyarrow_hotfix
 
 def foo():
