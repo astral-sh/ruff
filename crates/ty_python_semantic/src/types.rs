@@ -50,7 +50,9 @@ use crate::types::builder::RecursivelyDefined;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 use crate::types::class::NamedTupleSpec;
 pub(crate) use crate::types::class_base::ClassBase;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension, OwnedConstraintSet,
+};
 use crate::types::context::{LintDiagnosticGuard, LintDiagnosticGuardBuilder};
 use crate::types::diagnostic::{INVALID_AWAIT, INVALID_TYPE_FORM, UNSUPPORTED_BOOL_CONVERSION};
 pub use crate::types::display::{DisplaySettings, TypeDetail, TypeDisplayDetails};
@@ -1670,9 +1672,10 @@ impl<'db> Type<'db> {
         target: Type<'db>,
         inferable: InferableTypeVars<'_, 'db>,
     ) -> Type<'db> {
+        let constraints = ConstraintSetBuilder::new();
         self.filter_union(db, |elem| {
             !elem
-                .when_disjoint_from(db, target, inferable)
+                .when_disjoint_from(db, target, &constraints, inferable)
                 .is_always_satisfied(db)
         })
     }
@@ -2046,11 +2049,13 @@ impl<'db> Type<'db> {
     where
         F: FnMut(BoundTypeVarInstance<'db>, Type<'db>, TypeVarVariance, TypeContext<'db>),
     {
+        let constraints = ConstraintSetBuilder::new();
         self.visit_specialization_impl(
             db,
             tcx,
             TypeVarVariance::Covariant,
             &mut f,
+            &constraints,
             &SpecializationVisitor::default(),
         );
     }
@@ -2061,24 +2066,44 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         polarity: TypeVarVariance,
         f: &mut dyn FnMut(BoundTypeVarInstance<'db>, Type<'db>, TypeVarVariance, TypeContext<'db>),
+        constraints: &ConstraintSetBuilder<'db>,
         visitor: &SpecializationVisitor<'db>,
     ) {
         let Type::NominalInstance(instance) = self else {
             match self {
                 Type::Union(union) => {
                     for element in union.elements(db) {
-                        element.visit_specialization_impl(db, tcx, polarity, f, visitor);
+                        element.visit_specialization_impl(
+                            db,
+                            tcx,
+                            polarity,
+                            f,
+                            constraints,
+                            visitor,
+                        );
                     }
                 }
                 Type::Intersection(intersection) => {
                     for element in intersection.positive(db) {
-                        element.visit_specialization_impl(db, tcx, polarity, f, visitor);
+                        element.visit_specialization_impl(
+                            db,
+                            tcx,
+                            polarity,
+                            f,
+                            constraints,
+                            visitor,
+                        );
                     }
                 }
                 Type::TypeAlias(alias) => visitor.visit(self, || {
-                    alias
-                        .value_type(db)
-                        .visit_specialization_impl(db, tcx, polarity, f, visitor);
+                    alias.value_type(db).visit_specialization_impl(
+                        db,
+                        tcx,
+                        polarity,
+                        f,
+                        constraints,
+                        visitor,
+                    );
                 }),
                 _ => {}
             }
@@ -2100,7 +2125,7 @@ impl<'db> Type<'db> {
 
             if let Some(tcx) = tcx.annotation {
                 let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
-                let _ = builder.infer_reverse(tcx, alias_instance);
+                let _ = builder.infer_reverse(constraints, tcx, alias_instance);
             }
 
             builder.into_type_mappings()
@@ -2113,7 +2138,7 @@ impl<'db> Type<'db> {
             f(type_var, *ty, variance, narrowed_tcx);
 
             visitor.visit(*ty, || {
-                ty.visit_specialization_impl(db, narrowed_tcx, variance, f, visitor);
+                ty.visit_specialization_impl(db, narrowed_tcx, variance, f, constraints, visitor);
             });
         }
     }
@@ -3675,8 +3700,9 @@ impl<'db> Type<'db> {
             }
 
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked_set)) => {
-                let constraints = tracked_set.constraints(db);
-                Truthiness::from(constraints.is_always_satisfied(db))
+                let constraints = ConstraintSetBuilder::new();
+                let tracked_set = constraints.load(tracked_set.constraints(db));
+                Truthiness::from(tracked_set.is_always_satisfied(db))
             }
 
             Type::FunctionLiteral(_)
@@ -4914,9 +4940,16 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         argument_types: &CallArguments<'_, 'db>,
     ) -> Result<Bindings<'db>, CallError<'db>> {
+        let constraints = ConstraintSetBuilder::new();
         self.bindings(db)
             .match_parameters(db, argument_types)
-            .check_types(db, argument_types, TypeContext::default(), &[])
+            .check_types(
+                db,
+                &constraints,
+                argument_types,
+                TypeContext::default(),
+                &[],
+            )
     }
 
     /// Look up a dunder method on the meta-type of `self` and call it.
@@ -5001,10 +5034,11 @@ impl<'db> Type<'db> {
                 definedness: boundness,
                 ..
             }) => {
+                let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, argument_types, tcx, &[])?;
+                    .check_types(db, &constraints, argument_types, tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
@@ -5035,10 +5069,11 @@ impl<'db> Type<'db> {
                 definedness: boundness,
                 ..
             }) => {
+                let constraints = ConstraintSetBuilder::new();
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
-                    .check_types(db, argument_types, tcx, &[])?;
+                    .check_types(db, &constraints, argument_types, tcx, &[])?;
 
                 if boundness == Definedness::PossiblyUndefined {
                     return Err(CallDunderError::PossiblyUnbound(Box::new(bindings)));
@@ -7208,7 +7243,8 @@ impl<'db> TypeMapping<'_, 'db> {
 /// so out of an abundance of caution, we are interning the struct.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct InternedConstraintSet<'db> {
-    constraints: ConstraintSet<'db>,
+    #[returns(ref)]
+    constraints: OwnedConstraintSet<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -10301,15 +10337,17 @@ impl<'db> BoundMethodType<'db> {
         ))
     }
 
-    fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         // A bound method is a typically a subtype of itself. However, we must explicitly verify
         // the subtyping of the underlying function signatures (since they might be specialized
         // differently), and of the bound self parameter (taking care that parameters, including a
@@ -10318,15 +10356,17 @@ impl<'db> BoundMethodType<'db> {
             .has_relation_to_impl(
                 db,
                 other.function(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
                 disjointness_visitor,
             )
-            .and(db, || {
+            .and(db, constraints, || {
                 other.self_instance(db).has_relation_to_impl(
                     db,
                     self.self_instance(db),
+                    constraints,
                     inferable,
                     relation,
                     relation_visitor,
@@ -10528,22 +10568,25 @@ impl<'db> CallableType<'db> {
     /// Check whether this callable type has the given relation to another callable type.
     ///
     /// See [`Type::is_subtype_of`] and [`Type::is_assignable_to`] for more details.
-    fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         if other.is_function_like(db) && !self.is_function_like(db) {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
 
         self.signatures(db).has_relation_to_impl(
             db,
             other.signatures(db),
+            constraints,
             inferable,
             relation,
             relation_visitor,
@@ -10600,19 +10643,22 @@ impl<'db> CallableTypes<'db> {
         Self::from_elements(self.0.iter().map(|element| f(*element)))
     }
 
-    pub(crate) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(crate) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: CallableType<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        self.0.iter().when_all(db, |element| {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        self.0.iter().when_all(db, constraints, |element| {
             element.has_relation_to_impl(
                 db,
                 other,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -10690,15 +10736,17 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
 }
 
 impl<'db> KnownBoundMethodType<'db> {
-    fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match (self, other) {
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(self_function),
@@ -10706,6 +10754,7 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => self_function.has_relation_to_impl(
                 db,
                 other_function,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -10718,6 +10767,7 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => self_function.has_relation_to_impl(
                 db,
                 other_function,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -10734,12 +10784,13 @@ impl<'db> KnownBoundMethodType<'db> {
             ) => Type::PropertyInstance(self_property).when_equivalent_to_impl(
                 db,
                 Type::PropertyInstance(other_property),
+                constraints,
                 relation_visitor,
                 disjointness_visitor,
             ),
 
             (KnownBoundMethodType::StrStartswith(_), KnownBoundMethodType::StrStartswith(_)) => {
-                ConstraintSet::from(self == other)
+                ConstraintSet::from_bool(constraints, self == other)
             }
 
             (
@@ -10769,7 +10820,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | (
                 KnownBoundMethodType::GenericContextSpecializeConstrained(_),
                 KnownBoundMethodType::GenericContextSpecializeConstrained(_),
-            ) => ConstraintSet::from(true),
+            ) => ConstraintSet::from_bool(constraints, true),
 
             (
                 KnownBoundMethodType::FunctionTypeDunderGet(_)
@@ -10796,7 +10847,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
-            ) => ConstraintSet::from(false),
+            ) => ConstraintSet::from_bool(constraints, false),
         }
     }
 

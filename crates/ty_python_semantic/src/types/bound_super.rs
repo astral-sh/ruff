@@ -11,7 +11,7 @@ use crate::{
         BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
         MemberLookupPolicy, NominalInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType,
         Type, TypeVarBoundOrConstraints, TypeVarConstraints, TypeVarInstance, UnionBuilder,
-        constraints::ConstraintSet,
+        constraints::{ConstraintSet, ConstraintSetBuilder},
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         relation::{HasRelationToVisitor, IsDisjointVisitor},
@@ -747,73 +747,89 @@ impl<'db> BoundSuperType<'db> {
     /// cannot simply delegate to `Type::is_equivalent_to_impl` for this
     /// case, because `Type::is_equivalent_to_impl` itself delegates back to
     /// `Type::has_relation_to_impl`, which would cause an infinite loop.
-    pub(crate) fn is_equivalent_to_impl(
+    pub(crate) fn is_equivalent_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        constraints: &'c ConstraintSetBuilder<'db>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         let mut class_equivalence = match (self.pivot_class(db), other.pivot_class(db)) {
             (ClassBase::Class(left), ClassBase::Class(right)) => Type::from(left)
                 .when_equivalent_to_impl(
                     db,
                     Type::from(right),
+                    constraints,
                     relation_visitor,
                     disjointness_visitor,
                 ),
-            (ClassBase::Class(_), _) => ConstraintSet::from(false),
+            (ClassBase::Class(_), _) => ConstraintSet::from_bool(constraints, false),
 
             // A `Divergent` type is only equivalent to itself
             (
                 ClassBase::Dynamic(DynamicType::Divergent(l)),
                 ClassBase::Dynamic(DynamicType::Divergent(r)),
-            ) => ConstraintSet::from(l == r),
+            ) => ConstraintSet::from_bool(constraints, l == r),
             (ClassBase::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, ClassBase::Dynamic(DynamicType::Divergent(_))) => ConstraintSet::from(false),
-            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => ConstraintSet::from(true),
-            (ClassBase::Dynamic(_), _) => ConstraintSet::from(false),
+            | (_, ClassBase::Dynamic(DynamicType::Divergent(_))) => {
+                ConstraintSet::from_bool(constraints, false)
+            }
+            (ClassBase::Dynamic(_), ClassBase::Dynamic(_)) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
+            (ClassBase::Dynamic(_), _) => ConstraintSet::from_bool(constraints, false),
 
-            (ClassBase::Generic, ClassBase::Generic) => ConstraintSet::from(true),
-            (ClassBase::Generic, _) => ConstraintSet::from(false),
+            (ClassBase::Generic, ClassBase::Generic) => ConstraintSet::from_bool(constraints, true),
+            (ClassBase::Generic, _) => ConstraintSet::from_bool(constraints, false),
 
-            (ClassBase::Protocol, ClassBase::Protocol) => ConstraintSet::from(true),
-            (ClassBase::Protocol, _) => ConstraintSet::from(false),
+            (ClassBase::Protocol, ClassBase::Protocol) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
+            (ClassBase::Protocol, _) => ConstraintSet::from_bool(constraints, false),
 
-            (ClassBase::TypedDict, ClassBase::TypedDict) => ConstraintSet::from(true),
-            (ClassBase::TypedDict, _) => ConstraintSet::from(false),
+            (ClassBase::TypedDict, ClassBase::TypedDict) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
+            (ClassBase::TypedDict, _) => ConstraintSet::from_bool(constraints, false),
         };
         if class_equivalence.is_never_satisfied(db) {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
         let owner_equivalence = match (self.owner(db), other.owner(db)) {
             (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => Type::from(left)
                 .when_equivalent_to_impl(
                     db,
                     Type::from(right),
+                    constraints,
                     relation_visitor,
                     disjointness_visitor,
                 ),
-            (SuperOwnerKind::Class(_), _) => ConstraintSet::from(false),
+            (SuperOwnerKind::Class(_), _) => ConstraintSet::from_bool(constraints, false),
 
             (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => Type::from(left)
                 .when_equivalent_to_impl(
                     db,
                     Type::from(right),
+                    constraints,
                     relation_visitor,
                     disjointness_visitor,
                 ),
-            (SuperOwnerKind::Instance(_), _) => ConstraintSet::from(false),
+            (SuperOwnerKind::Instance(_), _) => ConstraintSet::from_bool(constraints, false),
 
             // A `Divergent` type is only equivalent to itself
             (
                 SuperOwnerKind::Dynamic(DynamicType::Divergent(l)),
                 SuperOwnerKind::Dynamic(DynamicType::Divergent(r)),
-            ) => ConstraintSet::from(l == r),
+            ) => ConstraintSet::from_bool(constraints, l == r),
             (SuperOwnerKind::Dynamic(DynamicType::Divergent(_)), _)
-            | (_, SuperOwnerKind::Dynamic(DynamicType::Divergent(_))) => ConstraintSet::from(false),
-            (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => ConstraintSet::from(true),
-            (SuperOwnerKind::Dynamic(_), _) => ConstraintSet::from(false),
+            | (_, SuperOwnerKind::Dynamic(DynamicType::Divergent(_))) => {
+                ConstraintSet::from_bool(constraints, false)
+            }
+            (SuperOwnerKind::Dynamic(_), SuperOwnerKind::Dynamic(_)) => {
+                ConstraintSet::from_bool(constraints, true)
+            }
+            (SuperOwnerKind::Dynamic(_), _) => ConstraintSet::from_bool(constraints, false),
 
             (
                 SuperOwnerKind::InstanceTypeVar(l_typevar, l_class),
@@ -826,21 +842,23 @@ impl<'db> BoundSuperType<'db> {
                 .when_equivalent_to_impl(
                     db,
                     Type::TypeVar(r_typevar),
+                    constraints,
                     relation_visitor,
                     disjointness_visitor,
                 )
-                .and(db, || {
+                .and(db, constraints, || {
                     Type::from(l_class).when_equivalent_to_impl(
                         db,
                         Type::from(r_class),
+                        constraints,
                         relation_visitor,
                         disjointness_visitor,
                     )
                 }),
             (SuperOwnerKind::InstanceTypeVar(..) | SuperOwnerKind::ClassTypeVar(..), _) => {
-                ConstraintSet::from(false)
+                ConstraintSet::from_bool(constraints, false)
             }
         };
-        class_equivalence.intersect(db, owner_equivalence)
+        class_equivalence.intersect(db, constraints, owner_equivalence)
     }
 }

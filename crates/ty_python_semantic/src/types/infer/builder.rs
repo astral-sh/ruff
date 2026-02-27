@@ -67,6 +67,7 @@ use crate::types::class::{
     DynamicMetaclassConflict, DynamicNamedTupleAnchor, DynamicNamedTupleLiteral, FieldKind,
     MetaclassErrorKind, MethodDecorator, NamedTupleField, NamedTupleSpec,
 };
+use crate::types::constraints::ConstraintSetBuilder;
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
@@ -10630,6 +10631,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression_tcx: TypeContext<'db>,
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
+        let constraints = ConstraintSetBuilder::new();
 
         let has_generic_context = bindings
             .iter_flat()
@@ -10669,6 +10671,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if speculated_bindings
                 .check_types_impl(
                     db,
+                    &constraints,
                     argument_types,
                     narrowed_tcx,
                     &self.dataclass_field_specifiers,
@@ -10708,6 +10711,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             Some(bindings.check_types_impl(
                 db,
+                &constraints,
                 argument_types,
                 narrowed_tcx,
                 &self.dataclass_field_specifiers,
@@ -10751,6 +10755,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         bindings.check_types_impl(
             db,
+            &constraints,
             argument_types,
             call_expression_tcx,
             &self.dataclass_field_specifiers,
@@ -10774,6 +10779,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         debug_assert_eq!(arguments_types.len(), bindings.argument_forms().len());
 
         let db = self.db();
+        let constraints = ConstraintSetBuilder::new();
         let iter = itertools::izip!(
             0..,
             arguments_types.iter_mut(),
@@ -10858,6 +10864,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     if let Some(declared_return_ty) = call_expression_tcx.annotation {
                         let _ = builder.infer_reverse(
+                            &constraints,
                             declared_return_ty,
                             overload
                                 .constructor_instance_type
@@ -11656,6 +11663,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return None;
         };
 
+        let constraints = ConstraintSetBuilder::new();
         let inferable = generic_context.inferable_typevars(self.db());
 
         // Remove any union elements of that are unrelated to the collection type.
@@ -11689,6 +11697,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 builder
                     .infer_reverse_map(
+                        &constraints,
                         tcx,
                         collection_instance,
                         |(typevar, variance, inferred_ty)| {
@@ -11745,7 +11754,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // collection by unioning the inferred type with `Unknown`.
             let elt_tcx = elt_tcx.unwrap_or(Type::unknown());
 
-            builder.infer(Type::TypeVar(elt_ty), elt_tcx).ok()?;
+            builder
+                .infer(&constraints, Type::TypeVar(elt_ty), elt_tcx)
+                .ok()?;
         }
 
         for elts in elts {
@@ -11773,10 +11784,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 let mut elt_tys = elt_tys.clone();
                 if let Some((key_ty, value_ty)) = elt_tys.next_tuple() {
-                    builder.infer(Type::TypeVar(key_ty), unpacked_key_ty).ok()?;
+                    builder
+                        .infer(&constraints, Type::TypeVar(key_ty), unpacked_key_ty)
+                        .ok()?;
 
                     builder
-                        .infer(Type::TypeVar(value_ty), unpacked_value_ty)
+                        .infer(&constraints, Type::TypeVar(value_ty), unpacked_value_ty)
                         .ok()?;
                 }
 
@@ -11823,6 +11836,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 builder
                     .infer(
+                        &constraints,
                         Type::TypeVar(elt_ty),
                         if elt.is_starred_expr() {
                             inferred_elt_ty
@@ -13943,12 +13957,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _ => fallback_unary_expression_type(),
             },
 
-            (
-                ast::UnaryOp::Invert,
-                Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)),
-            ) => {
-                let constraints = constraints.constraints(self.db());
-                let result = constraints.negate(self.db());
+            (ast::UnaryOp::Invert, Type::KnownInstance(KnownInstanceType::ConstraintSet(set))) => {
+                let constraints = ConstraintSetBuilder::new();
+                let result = constraints.into_owned(|constraints| {
+                    let set = constraints.load(set.constraints(self.db()));
+                    set.negate(self.db(), constraints)
+                });
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     InternedConstraintSet::new(self.db(), result),
                 ))
@@ -14703,9 +14717,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
                 ast::Operator::BitAnd,
             ) => {
-                let left = left.constraints(self.db());
-                let right = right.constraints(self.db());
-                let result = left.and(self.db(), || right);
+                let constraints = ConstraintSetBuilder::new();
+                let result = constraints.into_owned(|constraints| {
+                    let left = constraints.load(left.constraints(self.db()));
+                    let right = constraints.load(right.constraints(self.db()));
+                    left.and(self.db(), constraints, || right)
+                });
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     InternedConstraintSet::new(self.db(), result),
                 )))
@@ -14716,9 +14733,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
                 ast::Operator::BitOr,
             ) => {
-                let left = left.constraints(self.db());
-                let right = right.constraints(self.db());
-                let result = left.or(self.db(), || right);
+                let constraints = ConstraintSetBuilder::new();
+                let result = constraints.into_owned(|constraints| {
+                    let left = constraints.load(left.constraints(self.db()));
+                    let right = constraints.load(right.constraints(self.db()));
+                    left.or(self.db(), constraints, || right)
+                });
                 Some(Type::KnownInstance(KnownInstanceType::ConstraintSet(
                     InternedConstraintSet::new(self.db(), result),
                 )))
@@ -15568,14 +15588,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-            ) => match op {
-                ast::CmpOp::Eq => Some(Ok(Type::bool_literal(
-                    left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
-                ))),
-                ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(
-                    !left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
-                ))),
-                _ => None,
+            ) => {
+                let constraints = ConstraintSetBuilder::new();
+                let left = constraints.load(left.constraints(self.db()));
+                let right = constraints.load(right.constraints(self.db()));
+                let result = left.iff(self.db(), &constraints, right);
+                let equivalent = result.is_always_satisfied(self.db());
+                match op {
+                    ast::CmpOp::Eq => Some(Ok(Type::bool_literal(equivalent))),
+                    ast::CmpOp::NotEq => Some(Ok(Type::bool_literal(!equivalent))),
+                    _ => None,
+                }
             }
 
             (
@@ -16385,6 +16408,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let db = self.db();
+        let constraints = ConstraintSetBuilder::new();
         let slice_node = subscript.slice.as_ref();
 
         let exactly_one_paramspec = generic_context.exactly_one_paramspec(db);
@@ -16452,7 +16476,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     match typevar.typevar(db).bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if provided_type
-                                .when_assignable_to(db, bound, InferableTypeVars::None)
+                                .when_assignable_to(
+                                    db,
+                                    bound,
+                                    &constraints,
+                                    InferableTypeVars::None,
+                                )
                                 .is_never_satisfied(db)
                             {
                                 let node = get_node(index);
@@ -16474,7 +16503,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 specialization_types.push(Some(provided_type));
                             }
                         }
-                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        Some(TypeVarBoundOrConstraints::Constraints(typevar_constraints)) => {
                             // TODO: this is wrong, the given specialization needs to be assignable
                             // to _at least one_ of the individual constraints, not to the union of
                             // all of them. `int | str` is not a valid specialization of a typevar
@@ -16482,7 +16511,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if provided_type
                                 .when_assignable_to(
                                     db,
-                                    constraints.as_type(db),
+                                    typevar_constraints.as_type(db),
+                                    &constraints,
                                     InferableTypeVars::None,
                                 )
                                 .is_never_satisfied(db)
@@ -16495,7 +16525,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         "Type `{}` does not satisfy constraints `{}` \
                                             of type variable `{}`",
                                         provided_type.display(db),
-                                        constraints
+                                        typevar_constraints
                                             .elements(db)
                                             .iter()
                                             .map(|c| c.display(db))
