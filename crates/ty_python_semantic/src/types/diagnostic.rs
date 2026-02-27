@@ -4955,7 +4955,7 @@ pub(crate) fn report_rebound_typevar<'db>(
         return;
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic class `{}` uses type variable `{typevar_name}` that is already bound by an enclosing scope",
+        "Generic class `{}` uses type variable `{typevar_name}` already bound by an enclosing scope",
         class_node.name,
     ));
     diagnostic.set_primary_message(format_args!(
@@ -4986,7 +4986,7 @@ pub(crate) fn report_rebound_typevar_function<'db>(
         return;
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic function `{}` uses type variable `{typevar_name}` that is already bound by an enclosing scope",
+        "Generic function `{}` uses type variable `{typevar_name}` already bound by an enclosing scope",
         function_node.name,
     ));
     diagnostic.set_primary_message(format_args!(

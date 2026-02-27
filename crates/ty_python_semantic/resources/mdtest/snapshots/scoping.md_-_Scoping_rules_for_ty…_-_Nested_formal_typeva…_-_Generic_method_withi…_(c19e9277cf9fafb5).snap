@@ -24,7 +24,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 # Diagnostics
 
 ```
-error[shadowed-type-variable]: Generic function `bad` uses type variable `T` that is already bound by an enclosing scope
+error[shadowed-type-variable]: Generic function `bad` uses type variable `T` already bound by an enclosing scope
  --> src/mdtest_snippet.py:5:9
   |
 4 |     # error: [shadowed-type-variable]
