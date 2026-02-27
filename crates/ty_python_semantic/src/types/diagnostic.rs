@@ -115,6 +115,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&POSSIBLY_MISSING_ATTRIBUTE);
     registry.register_lint(&POSSIBLY_MISSING_IMPORT);
     registry.register_lint(&POSSIBLY_UNRESOLVED_REFERENCE);
+    registry.register_lint(&SHADOWED_TYPE_VARIABLE);
     registry.register_lint(&SUBCLASS_OF_FINAL_CLASS);
     registry.register_lint(&OVERRIDE_OF_FINAL_METHOD);
     registry.register_lint(&OVERRIDE_OF_FINAL_VARIABLE);
@@ -2731,6 +2732,33 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for type variables in nested generic classes or functions that shadow type variables
+    /// from an enclosing scope.
+    ///
+    /// ## Why is this bad?
+    /// Shadowing type variables makes the code confusing and is disallowed by the typing spec.
+    ///
+    /// ## Examples
+    /// ```python
+    /// class Outer[T]:
+    ///     # Error: `T` is already used by `Outer`
+    ///     class Inner[T]: ...
+    ///
+    ///     # Error: `T` is already used by `Outer`
+    ///     def method[T](self, x: T) -> T: ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+    pub(crate) static SHADOWED_TYPE_VARIABLE = {
+        summary: "detects type variables that shadow type variables from outer scopes",
+        status: LintStatus::stable("0.0.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
     /// Detects variables declared as `global` in an inner scope that have no explicit
     /// bindings or declarations in the global scope.
     ///
@@ -4914,23 +4942,26 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     }
 }
 
-pub(crate) fn report_rebound_typevar<'db>(
+pub(crate) fn report_shadowed_type_variable<'db>(
     context: &InferContext<'db, '_>,
     typevar_name: &ast::name::Name,
-    class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
+    kind: &str,
+    name: &ast::name::Name,
+    range: TextRange,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, class.header_range(db)) else {
+    let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, range) else {
         return;
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic class `{}` must not reference type variables bound in an enclosing scope",
-        class_node.name,
+        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_primary_message(format_args!(
-        "`{typevar_name}` referenced in class definition here"
+        "`{typevar_name}` used in {kind} definition here"
     ));
     let Some(other_definition) = other_typevar.binding_context(db).definition() else {
         return;
