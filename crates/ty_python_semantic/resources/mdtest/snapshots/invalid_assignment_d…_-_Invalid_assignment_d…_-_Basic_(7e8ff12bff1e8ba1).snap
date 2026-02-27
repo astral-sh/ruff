@@ -1,0 +1,34 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Basic
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(source: str):
+2 |     target: bytes = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `str` is not assignable to `bytes`
+ --> src/mdtest_snippet.py:2:13
+  |
+1 | def _(source: str):
+2 |     target: bytes = source  # error: [invalid-assignment]
+  |             -----   ^^^^^^ Incompatible value of type `str`
+  |             |
+  |             Declared type
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

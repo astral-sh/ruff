@@ -67,6 +67,7 @@ mod tests {
     #[test_case(Rule::SuspiciousXmlExpatImport, Path::new("S407.pyi"))]
     #[test_case(Rule::SuspiciousXmlMinidomImport, Path::new("S408.py"))]
     #[test_case(Rule::SuspiciousXmlMinidomImport, Path::new("S408.pyi"))]
+    #[test_case(Rule::SuspiciousXmlMinidomImport, Path::new("S408_type_checking.py"))]
     #[test_case(Rule::SuspiciousXmlPulldomImport, Path::new("S409.py"))]
     #[test_case(Rule::SuspiciousXmlPulldomImport, Path::new("S409.pyi"))]
     #[test_case(Rule::SuspiciousLxmlImport, Path::new("S410.py"))]

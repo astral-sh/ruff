@@ -469,6 +469,7 @@ pub(crate) fn server_capabilities(
             }),
             ..Default::default()
         }),
+        type_hierarchy_provider: Some(OneOf::Left(true)),
         ..Default::default()
     }
 }

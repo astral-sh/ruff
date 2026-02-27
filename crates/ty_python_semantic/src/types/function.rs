@@ -65,7 +65,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
 use crate::types::call::{Binding, CallArguments};
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
     ASSERT_TYPE_UNSPELLABLE_SUBTYPE, INVALID_ARGUMENT_TYPE, REDUNDANT_CAST, STATIC_ASSERT_ERROR,
@@ -80,18 +80,15 @@ use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner,
-    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
-    UnionBuilder, UnionType, binding_type, definition_expression_type, infer_definition_types,
-    walk_signature,
+    KnownClass, KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
+    Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints, UnionBuilder, UnionType,
+    binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 
@@ -163,7 +160,7 @@ bitflags! {
     /// arguments that were passed in. For the precise meaning of the fields, see [1].
     ///
     /// [1]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, salsa::Update)]
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
     pub struct DataclassTransformerFlags: u8 {
         const EQ_DEFAULT = 1 << 0;
         const ORDER_DEFAULT = 1 << 1;
@@ -183,7 +180,6 @@ impl Default for DataclassTransformerFlags {
 /// Metadata for a dataclass-transformer. Stored inside a `Type::DataclassTransformer(…)`
 /// instance that we use as the return type for `dataclass_transform(…)` calls.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct DataclassTransformerParams<'db> {
     pub flags: DataclassTransformerFlags,
 
@@ -208,13 +204,7 @@ pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
 ///
 /// If a function has multiple overloads, each overload is represented by a separate function
 /// definition in the AST, and is therefore a separate `OverloadLiteral` instance.
-///
-/// # Ordering
-/// Ordering is based on the function's id assigned by salsa and not on the function literal's
-/// values. The id may change between runs, or when the function literal was garbage collected and
-/// recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct OverloadLiteral<'db> {
     /// Name of the function at definition.
     #[returns(ref)]
@@ -392,6 +382,15 @@ impl<'db> OverloadLiteral<'db> {
         let previous_literal = previous_type.literal(db);
         let previous_overload = previous_literal.last_definition(db);
         if !previous_overload.is_overload(db) {
+            return None;
+        }
+
+        // These can both happen in edge cases where a definition created with a `def`
+        // statement shadows a non-`def` symbol with the same name.
+        if previous_overload.name(db) != self.name(db) {
+            return None;
+        }
+        if previous_overload.definition(db).scope(db) != scope {
             return None;
         }
 
@@ -643,13 +642,7 @@ impl<'db> OverloadLiteral<'db> {
 /// Representation of a function definition in the AST, along with any previous overloads of the
 /// function. Each overload can be separately generic or not, and each generic overload uses
 /// distinct typevars.
-///
-/// # Ordering
-/// Ordering is based on the function's id assigned by salsa and not on the function literal's
-/// values. The id may change between runs, or when the function literal was garbage collected and
-/// recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
     pub(crate) last_definition: OverloadLiteral<'db>,
 }
@@ -883,7 +876,6 @@ impl AbstractMethodKind {
 /// Represents a function type, which might be a non-generic function, or a specialization of a
 /// generic function.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
     pub(crate) literal: FunctionLiteral<'db>,
 
@@ -1195,17 +1187,19 @@ impl<'db> FunctionType<'db> {
         BoundMethodType::new(db, self, self_instance)
     }
 
-    pub(crate) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(crate) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         if self.literal(db) != other.literal(db) {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
 
         let self_signature = self.signature(db);
@@ -1213,29 +1207,12 @@ impl<'db> FunctionType<'db> {
         self_signature.has_relation_to_impl(
             db,
             other_signature,
+            constraints,
             inferable,
             relation,
             relation_visitor,
             disjointness_visitor,
         )
-    }
-
-    pub(crate) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self.normalized(db) == other.normalized(db) {
-            return ConstraintSet::from(true);
-        }
-        if self.literal(db) != other.literal(db) {
-            return ConstraintSet::from(false);
-        }
-        let self_signature = self.signature(db);
-        let other_signature = other.signature(db);
-        self_signature.is_equivalent_to_impl(db, other_signature, inferable, visitor)
     }
 
     pub(crate) fn find_legacy_typevars_impl(
@@ -1249,26 +1226,6 @@ impl<'db> FunctionType<'db> {
         for signature in &signatures.overloads {
             signature.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
         }
-    }
-
-    pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let literal = self.literal(db);
-        let updated_signature = self
-            .updated_signature(db)
-            .map(|signature| signature.normalized_impl(db, visitor));
-        let updated_last_definition_signature = self
-            .updated_last_definition_signature(db)
-            .map(|signature| signature.normalized_impl(db, visitor));
-        Self::new(
-            db,
-            literal,
-            updated_signature,
-            updated_last_definition_signature,
-        )
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -1300,6 +1257,186 @@ impl<'db> FunctionType<'db> {
         enclosing_class: ClassType<'db>,
     ) -> Option<AbstractMethodKind> {
         self.literal(db).as_abstract_method(db, enclosing_class)
+    }
+}
+
+/// Check the second argument to `isinstance()` or `issubclass()` for types that cannot be used
+/// at runtime (protocol classes, typed dicts, `typing.Any` in `isinstance`, and invalid
+/// `UnionType` elements). Handles class literals, tuples (including nested tuples), and
+/// recursively validates each element.
+///
+/// `classinfo_expr` is the AST expression corresponding to `classinfo`, if available. It is
+/// used for precise annotation spans (e.g., highlighting just the `UnionType` inside a tuple
+/// rather than the whole tuple). It may be `None` when the tuple is not a literal in the AST
+/// (e.g., when it's stored in a variable).
+fn check_classinfo_in_isinstance<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db, '_>,
+    call_expression: &ast::ExprCall,
+    function: KnownFunction,
+    classinfo: Type<'db>,
+    classinfo_expr: Option<&ast::Expr>,
+) {
+    match classinfo {
+        Type::ClassLiteral(class) => {
+            if class.is_typed_dict(db) {
+                report_runtime_check_against_typed_dict(context, call_expression, class, function);
+            } else if let Some(protocol_class) = class.into_protocol_class(db) {
+                if !protocol_class.is_runtime_checkable(db) {
+                    report_runtime_check_against_non_runtime_checkable_protocol(
+                        context,
+                        call_expression,
+                        protocol_class,
+                        function,
+                    );
+                } else if function == KnownFunction::IsSubclass {
+                    let non_method_members = protocol_class.interface(db).non_method_members(db);
+                    if !non_method_members.is_empty() {
+                        report_issubclass_check_against_protocol_with_non_method_members(
+                            context,
+                            call_expression,
+                            protocol_class,
+                            &non_method_members,
+                        );
+                    }
+                }
+            }
+        }
+        Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsInstance => {
+            let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression) else {
+                return;
+            };
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "`typing.Any` cannot be used with `isinstance()`"
+            ));
+            diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+        }
+        Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+            report_invalid_union_type_elements(
+                db,
+                context,
+                call_expression,
+                function,
+                classinfo,
+                classinfo_expr,
+            );
+        }
+        Type::NominalInstance(nominal) => {
+            if let Some(tuple_spec) = nominal.tuple_spec(db) {
+                let element_exprs = match classinfo_expr {
+                    Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
+                    _ => None,
+                };
+                for (index, element) in tuple_spec.iter_all_elements().enumerate() {
+                    let element_expr = element_exprs.and_then(|elts| elts.get(index));
+                    check_classinfo_in_isinstance(
+                        db,
+                        context,
+                        call_expression,
+                        function,
+                        element,
+                        element_expr,
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Report an error if a `types.UnionType` instance passed to `isinstance()`/`issubclass()`
+/// contains elements that are not class objects.
+fn report_invalid_union_type_elements<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db, '_>,
+    call_expression: &ast::ExprCall,
+    function: KnownFunction,
+    union_type: Type<'db>,
+    union_type_expr: Option<&ast::Expr>,
+) {
+    fn find_invalid_elements<'db>(
+        db: &'db dyn Db,
+        function: KnownFunction,
+        ty: Type<'db>,
+        invalid_elements: &mut Vec<Type<'db>>,
+    ) {
+        match ty {
+            Type::ClassLiteral(_) => {}
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::NoneType) => {}
+            Type::SpecialForm(special_form) if special_form.is_valid_isinstance_target() => {}
+            // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
+            Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsSubclass => {}
+            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                match instance.value_expression_types(db) {
+                    Ok(value_expression_types) => {
+                        for element in value_expression_types {
+                            find_invalid_elements(db, function, element, invalid_elements);
+                        }
+                    }
+                    Err(_) => {
+                        invalid_elements.push(ty);
+                    }
+                }
+            }
+            _ => invalid_elements.push(ty),
+        }
+    }
+
+    let mut invalid_elements = vec![];
+    find_invalid_elements(db, function, union_type, &mut invalid_elements);
+
+    let Some((first_invalid_element, other_invalid_elements)) = invalid_elements.split_first()
+    else {
+        return;
+    };
+
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression) else {
+        return;
+    };
+
+    let function_name: &str = function.into();
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Invalid second argument to `{function_name}`"));
+    diagnostic.info(format_args!(
+        "A `UnionType` instance can only be used as the second argument to \
+        `{function_name}` if all elements are class objects"
+    ));
+    if let Some(union_type_expr) = union_type_expr {
+        diagnostic.annotate(
+            Annotation::secondary(context.span(union_type_expr))
+                .message("This `UnionType` instance contains non-class elements"),
+        );
+    }
+
+    // When we have a secondary annotation pointing at the UnionType expression,
+    // "the union" is unambiguous. Otherwise, spell out the union type in the message.
+    let union_suffix = match (&union_type_expr, union_type) {
+        (None, Type::KnownInstance(KnownInstanceType::UnionType(instance))) => {
+            match instance.union_type(db) {
+                Ok(ty) => format!(" `{}`", ty.display(db)),
+                Err(_) => String::new(),
+            }
+        }
+        _ => String::new(),
+    };
+
+    match other_invalid_elements {
+        [] => diagnostic.info(format_args!(
+            "Element `{}` in the union{union_suffix} is not a class object",
+            first_invalid_element.display(db)
+        )),
+        [single] => diagnostic.info(format_args!(
+            "Elements `{}` and `{}` in the union{union_suffix} are not class objects",
+            first_invalid_element.display(db),
+            single.display(db),
+        )),
+        _ => diagnostic.info(format_args!(
+            "Element `{}` in the union{union_suffix}, and {} more elements, are not class objects",
+            first_invalid_element.display(db),
+            other_invalid_elements.len(),
+        )),
     }
 }
 
@@ -1451,12 +1588,10 @@ pub(super) fn function_body_kind<'db>(
         } = raise
         && infer_type(exc).is_subtype_of(
             db,
-            UnionType::from_elements(
+            UnionType::from_two_elements(
                 db,
-                [
-                    KnownClass::NotImplementedError.to_class_literal(db),
-                    KnownClass::NotImplementedError.to_instance(db),
-                ],
+                KnownClass::NotImplementedError.to_class_literal(db),
+                KnownClass::NotImplementedError.to_instance(db),
             ),
         )
     {
@@ -2025,145 +2160,21 @@ impl KnownFunction {
                     return;
                 };
 
-                match second_argument {
-                    Type::ClassLiteral(class) => {
-                        if class.is_typed_dict(db) {
-                            report_runtime_check_against_typed_dict(
-                                context,
-                                call_expression,
-                                *class,
-                                self,
-                            );
-                        } else if let Some(protocol_class) = class.into_protocol_class(db) {
-                            if !protocol_class.is_runtime_checkable(db) {
-                                report_runtime_check_against_non_runtime_checkable_protocol(
-                                    context,
-                                    call_expression,
-                                    protocol_class,
-                                    self,
-                                );
-                            } else if self == KnownFunction::IsSubclass {
-                                let non_method_members =
-                                    protocol_class.interface(db).non_method_members(db);
-                                if !non_method_members.is_empty() {
-                                    report_issubclass_check_against_protocol_with_non_method_members(
-                                        context,
-                                        call_expression,
-                                        protocol_class,
-                                        &non_method_members,
-                                    );
-                                }
-                            }
-                        }
+                check_classinfo_in_isinstance(
+                    db,
+                    context,
+                    call_expression,
+                    self,
+                    *second_argument,
+                    call_expression.arguments.args.get(1),
+                );
 
-                        if self == KnownFunction::IsInstance {
-                            overload.set_return_type(
-                                is_instance_truthiness(db, *first_arg, *class).into_type(db),
-                            );
-                        }
-                    }
-                    // The special-casing here is necessary because we recognise the symbol `typing.Any` as an
-                    // instance of `type` at runtime. Even once we understand typeshed's annotation for
-                    // `isinstance()`, we'd continue to accept calls such as `isinstance(x, typing.Any)` without
-                    // emitting a diagnostic if we didn't have this branch.
-                    Type::SpecialForm(SpecialFormType::Any)
-                        if self == KnownFunction::IsInstance =>
-                    {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
-                        else {
-                            return;
-                        };
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "`typing.Any` cannot be used with `isinstance()`"
-                        ));
-                        diagnostic
-                            .set_primary_message("This call will raise `TypeError` at runtime");
-                    }
-
-                    Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
-                        fn find_invalid_elements<'db>(
-                            db: &'db dyn Db,
-                            function: KnownFunction,
-                            ty: Type<'db>,
-                            invalid_elements: &mut Vec<Type<'db>>,
-                        ) {
-                            match ty {
-                                Type::ClassLiteral(_) => {}
-                                Type::NominalInstance(instance)
-                                    if instance.has_known_class(db, KnownClass::NoneType) => {}
-                                Type::SpecialForm(special_form)
-                                    if special_form.is_valid_isinstance_target() => {}
-                                // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
-                                Type::SpecialForm(SpecialFormType::Any)
-                                    if function == KnownFunction::IsSubclass => {}
-                                Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                                    match instance.value_expression_types(db) {
-                                        Ok(value_expression_types) => {
-                                            for element in value_expression_types {
-                                                find_invalid_elements(
-                                                    db,
-                                                    function,
-                                                    element,
-                                                    invalid_elements,
-                                                );
-                                            }
-                                        }
-                                        Err(_) => {
-                                            invalid_elements.push(ty);
-                                        }
-                                    }
-                                }
-                                _ => invalid_elements.push(ty),
-                            }
-                        }
-
-                        let mut invalid_elements = vec![];
-                        find_invalid_elements(db, self, *second_argument, &mut invalid_elements);
-
-                        let Some((first_invalid_element, other_invalid_elements)) =
-                            invalid_elements.split_first()
-                        else {
-                            return;
-                        };
-
-                        let Some(builder) =
-                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
-                        else {
-                            return;
-                        };
-
-                        let function_name: &str = self.into();
-
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid second argument to `{function_name}`"
-                        ));
-                        diagnostic.info(format_args!(
-                            "A `UnionType` instance can only be used as the second argument to \
-                            `{function_name}` if all elements are class objects"
-                        ));
-                        diagnostic.annotate(
-                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
-                                .message("This `UnionType` instance contains non-class elements"),
-                        );
-                        match other_invalid_elements {
-                            [] => diagnostic.info(format_args!(
-                                "Element `{}` in the union is not a class object",
-                                first_invalid_element.display(db)
-                            )),
-                            [single] => diagnostic.info(format_args!(
-                                "Elements `{}` and `{}` in the union are not class objects",
-                                first_invalid_element.display(db),
-                                single.display(db),
-                            )),
-                            _ => diagnostic.info(format_args!(
-                                "Element `{}` in the union, and {} more elements, are not class objects",
-                                first_invalid_element.display(db),
-                                other_invalid_elements.len(),
-                            ))
-                        }
-                    }
-                    _ => {}
+                if let Type::ClassLiteral(class) = second_argument
+                    && self == KnownFunction::IsInstance
+                {
+                    overload.set_return_type(
+                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
+                    );
                 }
             }
 

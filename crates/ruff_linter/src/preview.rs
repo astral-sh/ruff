@@ -5,7 +5,7 @@
 //! which specific feature this preview check is for. Having named functions simplifies the promotion:
 //! Simply delete the function and let Rust tell you which checks you have to remove.
 
-use crate::settings::LinterSettings;
+use crate::settings::{LinterSettings, types::PreviewMode};
 
 // Rule-specific behavior
 
@@ -300,5 +300,15 @@ pub(crate) const fn is_resolve_string_annotation_pyi041_enabled(settings: &Linte
 
 // https://github.com/astral-sh/ruff/pull/23510
 pub(crate) const fn is_baseloader_safe_in_yaml_load_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/21373
+pub(crate) const fn is_expanded_import_conventions_enabled(preview: PreviewMode) -> bool {
+    preview.is_enabled()
+}
+
+// https://github.com/astral-sh/ruff/pull/23535
+pub(crate) const fn is_file_level_invalid_rule_code_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }

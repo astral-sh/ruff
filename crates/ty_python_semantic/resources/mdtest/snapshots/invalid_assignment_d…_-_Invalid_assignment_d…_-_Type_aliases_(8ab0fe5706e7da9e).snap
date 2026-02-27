@@ -1,0 +1,45 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Type aliases
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Protocol
+ 2 | 
+ 3 | class SupportsName(Protocol):
+ 4 |     def name(self) -> str: ...
+ 5 | 
+ 6 | class HasName:
+ 7 |     def name(self) -> bytes:
+ 8 |         return b""
+ 9 | 
+10 | type StringOrName = str | SupportsName
+11 | 
+12 | def _(source: HasName):
+13 |     target: SupportsName = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `HasName` is not assignable to `SupportsName`
+  --> src/mdtest_snippet.py:13:13
+   |
+12 | def _(source: HasName):
+13 |     target: SupportsName = source  # error: [invalid-assignment]
+   |             ------------   ^^^^^^ Incompatible value of type `HasName`
+   |             |
+   |             Declared type
+   |
+info: rule `invalid-assignment` is enabled by default
+
+```

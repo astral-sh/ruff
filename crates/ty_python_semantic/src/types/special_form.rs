@@ -7,9 +7,10 @@ use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::{
     FileScopeId, definition::Definition, place_table, scope::ScopeId, semantic_index, use_def_map,
 };
+use crate::types::IntersectionType;
 use crate::types::{
-    CallableType, IntersectionBuilder, InvalidTypeExpression, InvalidTypeExpressionError,
-    TypeDefinition, TypeQualifiers, generics::typing_self, infer::nearest_enclosing_class,
+    CallableType, InvalidTypeExpression, InvalidTypeExpressionError, TypeDefinition,
+    TypeQualifiers, generics::typing_self, infer::nearest_enclosing_class,
 };
 use ruff_db::files::File;
 use strum_macros::EnumString;
@@ -21,11 +22,7 @@ use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 /// The enum uses a nested structure: variants that fall into well-defined subcategories
 /// (legacy stdlib aliases and type qualifiers) are represented as nested enums,
 /// while other special forms that each require unique handling remain as direct variants.
-///
-/// # Ordering
-///
-/// Ordering is stable and should be the same between runs.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum SpecialFormType {
     /// Special forms that are simple aliases to classes elsewhere in the standard library.
     LegacyStdlibAlias(LegacyStdlibAlias),
@@ -652,12 +649,11 @@ impl SpecialFormType {
             // but it appears to be what users often expect, and it improves compatibility with
             // other type checkers such as mypy.
             // See conversation in https://github.com/astral-sh/ruff/pull/19915.
-            Self::NamedTuple => Ok(IntersectionBuilder::new(db)
-                .positive_elements([
-                    Type::homogeneous_tuple(db, Type::object()),
-                    KnownClass::NamedTupleLike.to_instance(db),
-                ])
-                .build()),
+            Self::NamedTuple => Ok(IntersectionType::from_two_elements(
+                db,
+                Type::homogeneous_tuple(db, Type::object()),
+                KnownClass::NamedTupleLike.to_instance(db),
+            )),
 
             Self::TypingSelf => {
                 let index = semantic_index(db, scope_id.file(db));
@@ -762,7 +758,7 @@ impl std::fmt::Display for SpecialFormType {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum LegacyStdlibAlias {
     List,
     Dict,
@@ -812,7 +808,7 @@ impl std::fmt::Display for LegacyStdlibAlias {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 pub enum TypeQualifier {
     ReadOnly,
     Final,

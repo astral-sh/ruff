@@ -11,17 +11,17 @@ use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, ConstraintSetBuilder, IteratorConstraintsExtension,
+};
 use crate::types::enums::is_single_member_enum;
 use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
-use crate::types::relation::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
-};
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    LiteralValueTypeKind, NormalizedVisitor, TypeContext, TypeMapping, VarianceInferable,
+    LiteralValueTypeKind, TypeContext, TypeMapping, VarianceInferable,
 };
 use crate::{Db, FxOrderSet, Program};
 pub(super) use synthesized_protocol::SynthesizedProtocolType;
@@ -134,29 +134,27 @@ impl<'db> Type<'db> {
         M: IntoIterator<Item = (&'a str, Type<'db>)>,
     {
         Self::ProtocolInstance(ProtocolInstanceType::synthesized(
-            SynthesizedProtocolType::new(
-                db,
-                ProtocolInterface::with_property_members(db, members),
-                &NormalizedVisitor::default(),
-            ),
+            SynthesizedProtocolType::new(ProtocolInterface::with_property_members(db, members)),
         ))
     }
 
     /// Return `true` if `self` conforms to the interface described by `protocol`.
-    pub(super) fn satisfies_protocol(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn satisfies_protocol<'c>(
         self,
         db: &'db dyn Db,
         protocol: ProtocolInstanceType<'db>,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         // `self` might satisfy the protocol nominally, if `protocol` is a class-based protocol and
         // `self` has the protocol class in its MRO. This is a much cheaper check than the
         // structural check we perform below, so we do it first to avoid the structural check when
         // we can.
-        let mut result = ConstraintSet::from(false);
+        let mut result = ConstraintSet::from_bool(constraints, false);
         if let Some(nominal_instance) = protocol.to_nominal_instance() {
             // if `self` and `other` are *both* protocols, we also need to treat `self` as if it
             // were a nominal type, or we won't consider a protocol `P` that explicitly inherits
@@ -170,13 +168,14 @@ impl<'db> Type<'db> {
             let nominally_satisfied = type_to_test.has_relation_to_impl(
                 db,
                 Type::NominalInstance(nominal_instance),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
                 disjointness_visitor,
             );
             if result
-                .union(db, nominally_satisfied)
+                .union(db, constraints, nominally_satisfied)
                 .is_always_satisfied(db)
             {
                 return result;
@@ -201,6 +200,7 @@ impl<'db> Type<'db> {
             self_protocol.interface(db).has_relation_to_impl(
                 db,
                 protocol.interface(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -211,10 +211,11 @@ impl<'db> Type<'db> {
                 .inner
                 .interface(db)
                 .members(db)
-                .when_all(db, |member| {
+                .when_all(db, constraints, |member| {
                     member.is_satisfied_by(
                         db,
                         self,
+                        constraints,
                         inferable,
                         relation,
                         relation_visitor,
@@ -222,7 +223,7 @@ impl<'db> Type<'db> {
                     )
                 })
         };
-        result.or(db, || structurally_satisfied)
+        result.or(db, constraints, || structurally_satisfied)
     }
 }
 
@@ -417,22 +418,6 @@ impl<'db> NominalInstanceType<'db> {
         })
     }
 
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Type<'db> {
-        match self.0 {
-            NominalInstanceInner::ExactTuple(tuple) => {
-                Type::tuple(tuple.normalized_impl(db, visitor))
-            }
-            NominalInstanceInner::NonTuple(class) => Type::NominalInstance(NominalInstanceType(
-                NominalInstanceInner::NonTuple(class.normalized_impl(db, visitor)),
-            )),
-            NominalInstanceInner::Object => Type::object(),
-        }
-    }
-
     pub(super) fn recursive_type_normalized_impl(
         self,
         db: &'db dyn Db,
@@ -452,23 +437,26 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn has_relation_to_impl(
+    #[expect(clippy::too_many_arguments)]
+    pub(super) fn has_relation_to_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        relation: TypeRelation,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         match (self.0, other.0) {
-            (_, NominalInstanceInner::Object) => ConstraintSet::from(true),
+            (_, NominalInstanceInner::Object) => ConstraintSet::from_bool(constraints, true),
             (
                 NominalInstanceInner::ExactTuple(tuple1),
                 NominalInstanceInner::ExactTuple(tuple2),
             ) => tuple1.has_relation_to_impl(
                 db,
                 tuple2,
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -477,6 +465,7 @@ impl<'db> NominalInstanceType<'db> {
             _ => self.class(db).has_relation_to_impl(
                 db,
                 other.class(db),
+                constraints,
                 inferable,
                 relation,
                 relation_visitor,
@@ -485,60 +474,44 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn is_equivalent_to_impl(
+    pub(super) fn is_disjoint_from_impl<'c>(
         self,
         db: &'db dyn Db,
         other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        match (self.0, other.0) {
-            (
-                NominalInstanceInner::ExactTuple(tuple1),
-                NominalInstanceInner::ExactTuple(tuple2),
-            ) => tuple1.is_equivalent_to_impl(db, tuple2, inferable, visitor),
-            (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
-                ConstraintSet::from(true)
-            }
-            (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
-                class1.is_equivalent_to_impl(db, class2, inferable, visitor)
-            }
-            _ => ConstraintSet::from(false),
-        }
-    }
-
-    pub(super) fn is_disjoint_from_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-    ) -> ConstraintSet<'db> {
+        disjointness_visitor: &IsDisjointVisitor<'db, 'c>,
+        relation_visitor: &HasRelationToVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
         if self.is_object() || other.is_object() {
-            return ConstraintSet::from(false);
+            return ConstraintSet::from_bool(constraints, false);
         }
-        let mut result = ConstraintSet::from(false);
+        let mut result = ConstraintSet::from_bool(constraints, false);
         if let Some(self_spec) = self.tuple_spec(db) {
             if let Some(other_spec) = other.tuple_spec(db) {
                 let compatible = self_spec.is_disjoint_from_impl(
                     db,
                     &other_spec,
+                    constraints,
                     inferable,
                     disjointness_visitor,
                     relation_visitor,
                 );
-                if result.union(db, compatible).is_always_satisfied(db) {
+                if result
+                    .union(db, constraints, compatible)
+                    .is_always_satisfied(db)
+                {
                     return result;
                 }
             }
         }
 
-        result.or(db, || {
-            ConstraintSet::from(
+        result.or(db, constraints, || {
+            ConstraintSet::from_bool(
+                constraints,
                 !self
                     .class(db)
-                    .could_coexist_in_mro_with(db, other.class(db)),
+                    .could_coexist_in_mro_with(db, other.class(db), constraints),
             )
         })
     }
@@ -657,9 +630,7 @@ impl<'db> VarianceInferable<'db> for NominalInstanceType<'db> {
 
 /// A `ProtocolInstanceType` represents the set of all possible runtime objects
 /// that conform to the interface described by a certain protocol.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub struct ProtocolInstanceType<'db> {
     pub(super) inner: Protocol<'db>,
 
@@ -758,45 +729,21 @@ impl<'db> ProtocolInstanceType<'db> {
             protocol: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
+            let constraints = ConstraintSetBuilder::new();
             Type::object()
                 .satisfies_protocol(
                     db,
                     protocol,
+                    &constraints,
                     InferableTypeVars::None,
                     TypeRelation::Subtyping,
-                    &HasRelationToVisitor::default(),
-                    &IsDisjointVisitor::default(),
+                    &HasRelationToVisitor::default(&constraints),
+                    &IsDisjointVisitor::default(&constraints),
                 )
                 .is_always_satisfied(db)
         }
 
         is_equivalent_to_object_inner(db, self, ())
-    }
-
-    /// Return a "normalized" version of this `Protocol` type.
-    ///
-    /// See [`Type::normalized`] for more details.
-    pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &NormalizedVisitor::default())
-    }
-
-    /// Return a "normalized" version of this `Protocol` type.
-    ///
-    /// See [`Type::normalized`] for more details.
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Type<'db> {
-        if self.is_equivalent_to_object(db) {
-            return Type::object();
-        }
-        match self.inner {
-            Protocol::FromClass(_) => Type::ProtocolInstance(Self::synthesized(
-                SynthesizedProtocolType::new(db, self.inner.interface(db), visitor),
-            )),
-            Protocol::Synthesized(_) => Type::ProtocolInstance(self),
-        }
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -811,53 +758,20 @@ impl<'db> ProtocolInstanceType<'db> {
         })
     }
 
-    /// Return `true` if this protocol type is equivalent to the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
-    pub(super) fn is_equivalent_to_impl(
-        self,
-        db: &'db dyn Db,
-        other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        visitor: &IsEquivalentVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        if self == other {
-            return ConstraintSet::from(true);
-        }
-
-        // `Generator` special case: Prior to 3.13, the `_ReturnT_co` type didn't appear in any
-        // methods (except `__iter__`, but that returns the self type recursively, so it can't rule
-        // out equivalence). We don't want generators with different return types to be equivalent
-        // to each other. In this case we compare the `ClassType`s nominally.
-        if let Protocol::FromClass(self_class) = self.inner
-            && let Protocol::FromClass(other_class) = other.inner
-            && self_class.known(db) == Some(KnownClass::Generator)
-            && other_class.known(db) == Some(KnownClass::Generator)
-            && Program::get(db).python_version(db) < PythonVersion::PY313
-        {
-            return (*self_class).is_equivalent_to_impl(db, *other_class, inferable, visitor);
-        }
-
-        let self_normalized = self.normalized(db);
-        if self_normalized == Type::ProtocolInstance(other) {
-            return ConstraintSet::from(true);
-        }
-        ConstraintSet::from(self_normalized == other.normalized(db))
-    }
-
     /// Return `true` if this protocol type is disjoint from the protocol `other`.
     ///
     /// TODO: a protocol `X` is disjoint from a protocol `Y` if `X` and `Y`
     /// have a member with the same name but disjoint types
     #[expect(clippy::unused_self)]
-    pub(super) fn is_disjoint_from_impl(
+    pub(super) fn is_disjoint_from_impl<'c>(
         self,
         _db: &'db dyn Db,
         _other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
         _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        ConstraintSet::from(false)
+        _visitor: &IsDisjointVisitor<'db, 'c>,
+    ) -> ConstraintSet<'db, 'c> {
+        ConstraintSet::from_bool(constraints, false)
     }
 
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
@@ -914,15 +828,7 @@ impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
 
 /// An enumeration of the two kinds of protocol types: those that originate from a class
 /// definition in source code, and those that are synthesized from a set of members.
-///
-/// # Ordering
-///
-/// Ordering between variants is stable and should be the same between runs.
-/// Ordering within variants is based on the wrapped data's salsa-assigned id and not on its values.
-/// The id may change between runs, or when e.g. a `Protocol` was garbage-collected and recreated.
-#[derive(
-    Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
 pub(super) enum Protocol<'db> {
     FromClass(ProtocolClass<'db>),
     Synthesized(SynthesizedProtocolType<'db>),
@@ -969,32 +875,18 @@ mod synthesized_protocol {
     use crate::semantic_index::definition::Definition;
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-        NormalizedVisitor, Type, TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, Type,
+        TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
 
     /// A "synthesized" protocol type that is dissociated from a class definition in source code.
-    ///
-    /// Two synthesized protocol types with the same members will share the same Salsa ID,
-    /// making them easy to compare for equivalence. A synthesized protocol type is therefore
-    /// returned by [`super::ProtocolInstanceType::normalized`] so that two protocols with the same members
-    /// will be understood as equivalent even in the context of differently ordered unions or intersections.
-    ///
-    /// The constructor method of this type maintains the invariant that a synthesized protocol type
-    /// is always constructed from a *normalized* protocol interface.
-    #[derive(
-        Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, PartialOrd, Ord, get_size2::GetSize,
-    )]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, salsa::Update, get_size2::GetSize)]
     pub(in crate::types) struct SynthesizedProtocolType<'db>(ProtocolInterface<'db>);
 
     impl<'db> SynthesizedProtocolType<'db> {
-        pub(super) fn new(
-            db: &'db dyn Db,
-            interface: ProtocolInterface<'db>,
-            visitor: &NormalizedVisitor<'db>,
-        ) -> Self {
-            Self(interface.normalized_impl(db, visitor))
+        pub(super) fn new(interface: ProtocolInterface<'db>) -> Self {
+            Self(interface)
         }
 
         pub(super) fn apply_type_mapping_impl<'a>(
@@ -1002,9 +894,12 @@ mod synthesized_protocol {
             db: &'db dyn Db,
             type_mapping: &TypeMapping<'a, 'db>,
             tcx: TypeContext<'db>,
-            _visitor: &ApplyTypeMappingVisitor<'db>,
+            visitor: &ApplyTypeMappingVisitor<'db>,
         ) -> Self {
-            Self(self.0.specialized_and_normalized(db, type_mapping, tcx))
+            Self(
+                self.0
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            )
         }
 
         pub(super) fn find_legacy_typevars_impl(
