@@ -75,29 +75,29 @@ def valid[**P](
     a2: Callable[Concatenate[int, P], int],
 ) -> None: ...
 def invalid[**P](
-    # error: [invalid-type-form] "A bare `ParamSpec` is not valid in this context"
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a1: P,
-    # error: [invalid-type-form] "A bare `ParamSpec` is not valid in this context"
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a2: list[P],
-    # error: [invalid-type-form] "A bare `ParamSpec` is not valid in this context"
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a3: Callable[[P], int],
-    # error: [invalid-type-form] "A bare `ParamSpec` is not valid in this context"
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     a4: Callable[..., P],
     # TODO: error
     a5: Callable[Concatenate[P, ...], int],
 ) -> None: ...
 
-# error: [invalid-type-form] "A bare `ParamSpec` is not valid in this context"
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
 def invalid_return[**P]() -> P:
     raise NotImplementedError
 
-# error: [invalid-type-form] "A bare `ParamSpec` is not valid in this context"
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
 type Alias[**P] = P
 
 from typing import Any
 
 def invalid_variable_annotation[**P](y: Any) -> None:
-    # error: [invalid-type-form] "A bare `ParamSpec` is not valid in this context"
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: P = y
 ```
 
