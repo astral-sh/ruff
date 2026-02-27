@@ -996,6 +996,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::PytestParametrizeNamesWrongType,
                 Rule::PytestParametrizeValuesWrongType,
                 Rule::PytestDuplicateParametrizeTestCases,
+                Rule::PytestParametrizeBoolWithoutIds,
             ]) {
                 flake8_pytest_style::rules::parametrize(checker, call);
             }

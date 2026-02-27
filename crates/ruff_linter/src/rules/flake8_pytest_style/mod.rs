@@ -196,6 +196,12 @@ mod tests {
         "PT015"
     )]
     #[test_case(
+        Rule::PytestParametrizeBoolWithoutIds,
+        Path::new("PT101.py"),
+        Settings::default(),
+        "PT101"
+    )]
+    #[test_case(
         Rule::PytestFailWithoutMessage,
         Path::new("PT016.py"),
         Settings::default(),
