@@ -95,6 +95,7 @@ impl Display for RuleTable {
             namespace = "linter.rules",
             fields = [
                 self.enabled,
+                self.warn,
                 self.should_fix
             ]
         }
