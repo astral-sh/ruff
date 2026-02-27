@@ -1222,11 +1222,13 @@ fn resolve_name_impl<'a>(
                             candidate.path.search_path()
                         );
                     } else {
-                        let shadows_all = stub_candidate.missing_submodule_is_terminal();
                         next_candidates.push(stub_candidate);
-                        if shadows_all {
-                            break;
-                        }
+                        // Don't break here: we always need to process the non-stub
+                        // candidate for the same search path, because sub-packages
+                        // within the stubs may override py_typed to partial. Thus,
+                        // we should be able to fall through to the runtime package.
+                        // We can only do that if we continue processing candidates
+                        // here.
                     }
                 }
             }
