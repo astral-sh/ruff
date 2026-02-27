@@ -165,7 +165,7 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
     // Create a fix for each source statement.
     let mut fixes = FxHashMap::default();
     for entries in redefinitions.values() {
-        let Some(runtime_source) = entries.iter().find_map(|info| info.runtime_import) else {
+        let Some(source) = entries.iter().find_map(|info| info.runtime_import) else {
             continue;
         };
 
@@ -184,8 +184,8 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             .collect::<Vec<_>>();
 
         if !member_names.is_empty() {
-            let statement = checker.semantic().statement(runtime_source);
-            let parent = checker.semantic().parent_statement(runtime_source);
+            let statement = checker.semantic().statement(source);
+            let parent = checker.semantic().parent_statement(source);
             let Ok(edit) = edits::remove_unused_imports(
                 member_names.iter().map(AsRef::as_ref),
                 statement,
@@ -200,9 +200,9 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
             let fix = Fix::safe_edit(edit);
 
             fixes.insert(
-                runtime_source,
+                source,
                 fix.isolate(Checker::isolation(
-                    checker.semantic().parent_statement_id(runtime_source),
+                    checker.semantic().parent_statement_id(source),
                 )),
             );
         }
