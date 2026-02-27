@@ -1443,16 +1443,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Check that PEP 695 type variable defaults don't reference
                 // type variables that come later in the type parameter list.
                 if let Some(generic_context) = class.pep695_generic_context(self.db()) {
-                    let variables: Vec<_> = generic_context.variables(self.db()).collect();
                     let db = self.db();
+                    let variables = generic_context.variables(db);
 
-                    for (i, bound_typevar) in variables.iter().enumerate() {
+                    // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
+                    // a `std::slice::Iter` under the hood.
+                    for (i, bound_typevar) in variables.clone().enumerate() {
                         let typevar = bound_typevar.typevar(db);
                         let Some(default_ty) = typevar.default_type(db) else {
                             continue;
                         };
 
-                        for later_bound_tv in &variables[i + 1..] {
+                        for later_bound_tv in variables.clone().skip(i + 1) {
                             let later_typevar = later_bound_tv.typevar(db);
                             if default_ty.contains_typevar(db, later_typevar) {
                                 report_invalid_pep695_typevar_default_reference(
