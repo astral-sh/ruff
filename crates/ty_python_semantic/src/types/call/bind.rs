@@ -164,6 +164,9 @@ impl<'db> BindingsElement<'db> {
 /// only when the matched `__new__` overload is instance-returning.
 #[derive(Debug, Clone)]
 struct MixedConstructorInit<'db> {
+    /// The callable type that produced the mixed constructor overloads.
+    /// Used to avoid applying deferred `__init__` checks to unrelated union elements.
+    constructor_callable_type: Type<'db>,
     /// The class literal of the class being constructed, used to determine whether
     /// the matched `__new__` overload is instance-returning by checking if its return
     /// type is an instance of this class (or a subclass thereof).
@@ -179,6 +182,10 @@ impl<'db> MixedConstructorInit<'db> {
         let constructor_class = self.constructor_class_literal.default_specialization(db);
         elements.iter().any(|element| {
             element.bindings.iter().any(|binding| {
+                if binding.callable_type != self.constructor_callable_type {
+                    return false;
+                }
+
                 binding.matching_overloads().any(|(_, overload)| {
                     overload
                         .return_ty
@@ -229,8 +236,9 @@ pub(crate) struct Bindings<'db> {
     /// When `__new__` has overloads with mixed return types (some instance, some not),
     /// this holds the `__init__` bindings for deferred validation. After overload resolution
     /// determines which `__new__` overload matched, `__init__` is only checked if the matched
-    /// overload is instance-returning. See [`MixedConstructorInit`] for details.
-    mixed_constructor_init: Option<Box<MixedConstructorInit<'db>>>,
+    /// overload is instance-returning. Multiple entries can appear after union composition.
+    /// See [`MixedConstructorInit`] for details.
+    mixed_constructor_inits: Vec<MixedConstructorInit<'db>>,
 }
 
 impl<'db> Bindings<'db> {
@@ -244,12 +252,14 @@ impl<'db> Bindings<'db> {
         let mut implicit_dunder_new_is_possibly_unbound = false;
         let mut implicit_dunder_init_is_possibly_unbound = false;
         let mut elements_acc = SmallVec::new();
+        let mut mixed_constructor_inits = Vec::new();
 
         // Preserve each input's existing union/intersection structure.
         for set in bindings_iter {
             implicit_dunder_new_is_possibly_unbound |= set.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound |=
                 set.implicit_dunder_init_is_possibly_unbound;
+            mixed_constructor_inits.extend(set.mixed_constructor_inits);
             elements_acc.extend(set.elements);
         }
 
@@ -262,7 +272,7 @@ impl<'db> Bindings<'db> {
             constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound,
             implicit_dunder_init_is_possibly_unbound,
-            mixed_constructor_init: None,
+            mixed_constructor_inits,
         }
     }
 
@@ -277,11 +287,13 @@ impl<'db> Bindings<'db> {
         let mut implicit_dunder_new_is_possibly_unbound = true;
         let mut implicit_dunder_init_is_possibly_unbound = true;
         let mut inner_bindings_acc = SmallVec::new();
+        let mut mixed_constructor_inits = Vec::new();
 
         for set in bindings_iter {
             implicit_dunder_new_is_possibly_unbound &= set.implicit_dunder_new_is_possibly_unbound;
             implicit_dunder_init_is_possibly_unbound &=
                 set.implicit_dunder_init_is_possibly_unbound;
+            mixed_constructor_inits.extend(set.mixed_constructor_inits);
             for element in set.elements {
                 for binding in element.bindings {
                     inner_bindings_acc.push(binding);
@@ -299,7 +311,7 @@ impl<'db> Bindings<'db> {
             elements,
             argument_forms: ArgumentForms::new(0),
             constructor_instance_type: None,
-            mixed_constructor_init: None,
+            mixed_constructor_inits,
         }
     }
 
@@ -310,6 +322,11 @@ impl<'db> Bindings<'db> {
         for binding in self.iter_flat_mut() {
             binding.replace_callable_type(before, after);
         }
+        for mixed_init in &mut self.mixed_constructor_inits {
+            if mixed_init.constructor_callable_type == before {
+                mixed_init.constructor_callable_type = after;
+            }
+        }
     }
 
     pub(crate) fn with_constructor_instance_type(
@@ -318,10 +335,14 @@ impl<'db> Bindings<'db> {
     ) -> Self {
         self.constructor_instance_type = Some(constructor_instance_type);
 
-        for binding in self.iter_flat_mut() {
-            binding.constructor_instance_type = Some(constructor_instance_type);
-            for overload in &mut binding.overloads {
-                overload.constructor_instance_type = Some(constructor_instance_type);
+        // For mixed constructor overloads, preserve per-overload return behavior in `__new__`
+        // while still enabling constructor-level return-type synthesis on `Bindings`.
+        if self.mixed_constructor_inits.is_empty() {
+            for binding in self.iter_flat_mut() {
+                binding.constructor_instance_type = Some(constructor_instance_type);
+                for overload in &mut binding.overloads {
+                    overload.constructor_instance_type = Some(constructor_instance_type);
+                }
             }
         }
 
@@ -345,7 +366,7 @@ impl<'db> Bindings<'db> {
                 );
             }
         }
-        if let Some(ref mut mixed_init) = self.mixed_constructor_init {
+        for mixed_init in &mut self.mixed_constructor_inits {
             for element in &mut mixed_init.init_bindings.elements {
                 for binding in &mut element.bindings {
                     for overload in &mut binding.overloads {
@@ -366,10 +387,11 @@ impl<'db> Bindings<'db> {
         constructor_class_literal: ClassLiteral<'db>,
         init_bindings: Bindings<'db>,
     ) {
-        self.mixed_constructor_init = Some(Box::new(MixedConstructorInit {
+        self.mixed_constructor_inits.push(MixedConstructorInit {
+            constructor_callable_type: self.callable_type,
             constructor_class_literal,
             init_bindings,
-        }));
+        });
     }
 
     pub(crate) fn set_dunder_call_is_possibly_unbound(&mut self) {
@@ -456,7 +478,7 @@ impl<'db> Bindings<'db> {
                     bindings: elem.bindings.into_iter().map(&f).collect(),
                 })
                 .collect(),
-            mixed_constructor_init: self.mixed_constructor_init,
+            mixed_constructor_inits: self.mixed_constructor_inits,
         }
     }
 
@@ -478,7 +500,7 @@ impl<'db> Bindings<'db> {
         for binding in self.iter_flat_mut() {
             binding.match_parameters(db, arguments, &mut argument_forms);
         }
-        if let Some(ref mut mixed_init) = self.mixed_constructor_init {
+        for mixed_init in &mut self.mixed_constructor_inits {
             let mut init_forms = ArgumentForms::new(arguments.len());
             for binding in mixed_init.init_bindings.iter_flat_mut() {
                 binding.match_parameters(db, arguments, &mut init_forms);
@@ -548,7 +570,7 @@ impl<'db> Bindings<'db> {
 
         // For mixed `__new__` overloads: check `__init__` if matched overload is instance-returning.
         let mut init_error = false;
-        if let Some(ref mut mixed_init) = self.mixed_constructor_init {
+        for mixed_init in &mut self.mixed_constructor_inits {
             if mixed_init.is_instance_returning(db, &self.elements)
                 && mixed_init
                     .init_bindings
@@ -638,6 +660,7 @@ impl<'db> Bindings<'db> {
             .as_nominal_instance()
             .and_then(|inst| inst.class(db).static_class_literal(db))
             .map(|(lit, _)| lit);
+        let has_mixed_constructor_inits = !self.mixed_constructor_inits.is_empty();
 
         // If any matched overload's signature return type, when resolved with the inferred
         // specialization, is a non-instance type (e.g. `__new__[S] -> S` with `S` inferred as
@@ -647,11 +670,20 @@ impl<'db> Bindings<'db> {
             .as_nominal_instance()
             .map(|inst| inst.class(db));
         for binding in self.iter_flat() {
+            if has_mixed_constructor_inits
+                && !self
+                    .mixed_constructor_inits
+                    .iter()
+                    .any(|mixed| mixed.constructor_callable_type == binding.callable_type)
+            {
+                continue;
+            }
+
             let Some((_, overload)) = binding.matching_overloads().next() else {
                 continue;
             };
             let sig_return = overload.signature.return_ty;
-            if !sig_return.has_typevar(db) {
+            if !has_mixed_constructor_inits && !sig_return.has_typevar(db) {
                 continue;
             }
             // Fast path: if the declared return is already a specialization of the
@@ -663,10 +695,10 @@ impl<'db> Bindings<'db> {
             {
                 continue;
             }
-            let Some(specialization) = overload.specialization else {
-                continue;
-            };
-            let resolved = sig_return.apply_specialization(db, specialization);
+            let resolved = overload
+                .specialization
+                .map(|specialization| sig_return.apply_specialization(db, specialization))
+                .unwrap_or(overload.return_ty);
             if resolved.has_typevar(db) || resolved.is_unknown() {
                 continue;
             }
@@ -719,15 +751,11 @@ impl<'db> Bindings<'db> {
         let class_context = class_specialization.generic_context(db);
 
         let mut combined: Option<Specialization<'db>> = None;
-
-        // TODO this loops over all bindings, flattening union/intersection
-        // shape. As we improve our constraint solver, there may be an
-        // improvement needed here.
-        for binding in self.iter_flat() {
+        let mut combine_binding_specialization = |binding: &CallableBinding<'db>| {
             // For constructors, use the first matching overload (declaration order) to avoid
             // merging incompatible constructor specializations.
             let Some((_, overload)) = binding.matching_overloads().next() else {
-                continue;
+                return;
             };
             // Prefer extracting the class specialization from the resolved overload return type.
             // Fall back to restricting the inferred specialization to class-level type
@@ -741,12 +769,31 @@ impl<'db> Bindings<'db> {
                         .and_then(|s| s.restrict(db, class_context))
                 });
             let Some(specialization) = specialization else {
-                continue;
+                return;
             };
             combined = Some(match combined {
                 None => specialization,
                 Some(previous) => previous.combine(db, specialization),
             });
+        };
+
+        // TODO this loops over all bindings, flattening union/intersection
+        // shape. As we improve our constraint solver, there may be an
+        // improvement needed here.
+        for binding in self.iter_flat() {
+            combine_binding_specialization(binding);
+        }
+
+        // Mixed constructor overloads keep `__init__` bindings out-of-band for deferred
+        // validation. If a matched overload is instance-returning, include inferred
+        // specializations from those deferred `__init__` bindings as well.
+        for mixed_init in &self.mixed_constructor_inits {
+            if !mixed_init.is_instance_returning(db, &self.elements) {
+                continue;
+            }
+            for binding in mixed_init.init_bindings.iter_flat() {
+                combine_binding_specialization(binding);
+            }
         }
 
         // If constructor inference doesn't yield a specialization, fall back to the default
@@ -829,7 +876,7 @@ impl<'db> Bindings<'db> {
         }
 
         // Report `__init__` diagnostics for mixed constructor overloads
-        if let Some(ref mixed_init) = self.mixed_constructor_init {
+        for mixed_init in &self.mixed_constructor_inits {
             if mixed_init.is_instance_returning(context.db(), &self.elements) {
                 mixed_init.init_bindings.report_diagnostics(context, node);
             }
@@ -2119,7 +2166,7 @@ impl<'db> From<CallableBinding<'db>> for Bindings<'db> {
             constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
-            mixed_constructor_init: None,
+            mixed_constructor_inits: Vec::new(),
         }
     }
 }
@@ -2147,7 +2194,7 @@ impl<'db> From<Binding<'db>> for Bindings<'db> {
             constructor_instance_type: None,
             implicit_dunder_new_is_possibly_unbound: false,
             implicit_dunder_init_is_possibly_unbound: false,
-            mixed_constructor_init: None,
+            mixed_constructor_inits: Vec::new(),
         }
     }
 }

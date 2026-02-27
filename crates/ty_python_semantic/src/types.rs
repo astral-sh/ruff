@@ -5042,7 +5042,9 @@ impl<'db> Type<'db> {
                 bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
             }
 
-            return bindings.with_generic_context(db, class_generic_context);
+            return bindings
+                .with_generic_context(db, class_generic_context)
+                .with_constructor_instance_type(constructor_instance_ty);
         }
 
         // If the metaclass `__call__` had mixed return types (some non-instance, some instance),
@@ -5057,7 +5059,9 @@ impl<'db> Type<'db> {
                 bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
             }
 
-            return bindings.with_generic_context(db, class_generic_context);
+            return bindings
+                .with_generic_context(db, class_generic_context)
+                .with_constructor_instance_type(constructor_instance_ty);
         }
 
         let bindings = if let Some(bindings) = missing_init_bindings {

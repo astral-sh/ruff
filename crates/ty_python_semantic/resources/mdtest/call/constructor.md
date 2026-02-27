@@ -432,7 +432,38 @@ class E(Generic[T]):
 
 # The `T -> Self` overload is instance-returning, so `__init__` must also be checked.
 # error: [missing-argument]
-E("foo")
+reveal_type(E("foo"))  # revealed: E[str]
+```
+
+## Union of mixed constructors should preserve deferred `__init__` checks
+
+```py
+from typing import overload
+from typing_extensions import Self
+
+class C:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str, y: str) -> None: ...
+
+class D:
+    @overload
+    def __new__(cls, x: int) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> Self: ...
+    def __new__(cls, x: int | str) -> object: ...
+    def __init__(self, x: str) -> None: ...
+
+def f(flag: bool) -> None:
+    ctor = C if flag else D
+
+    # `str -> Self` is selected on both constructor branches. `C.__init__` still
+    # requires `y`, so this should fail even after unioning constructor bindings.
+    # error: [missing-argument]
+    ctor("foo")
 ```
 
 ## `__new__` returning a strict subclass preserves that return type
