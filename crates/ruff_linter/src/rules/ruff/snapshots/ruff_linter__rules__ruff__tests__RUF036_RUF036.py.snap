@@ -35,7 +35,7 @@ help: Move `None` to the end of the type union
 10 | 
 11 | 
 
-RUF036 [*] `None` not at the end of the type union.
+RUF036 `None` not at the end of the type union.
   --> RUF036.py:12:16
    |
 12 | def func3(arg: None | None | int): 
@@ -43,14 +43,6 @@ RUF036 [*] `None` not at the end of the type union.
 13 |     ...
    |
 help: Move `None` to the end of the type union
-9  |     ...
-10 | 
-11 | 
-   - def func3(arg: None | None | int): 
-12 + def func3(arg: int | None | None): 
-13 |     ...
-14 | 
-15 | 
 
 RUF036 [*] `None` not at the end of the type union.
   --> RUF036.py:16:16
