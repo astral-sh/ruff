@@ -88,16 +88,18 @@ pub(crate) fn task_branch_as_short_circuit(checker: &Checker, function_def: &Stm
 fn has_task_branch_decorator(function_def: &StmtFunctionDef, checker: &Checker) -> bool {
     function_def.decorator_list.iter().any(|decorator| {
         let expr = map_callable(&decorator.expression);
-        if let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr {
-            if attr.as_str() == "branch" {
-                return checker
-                    .semantic()
-                    .resolve_qualified_name(value)
-                    .is_some_and(|qualified_name| {
-                        matches!(qualified_name.segments(), ["airflow", "decorators", "task"])
-                    });
-            }
-        }
-        false
+        let Expr::Attribute(ast::ExprAttribute { value, attr, .. }) = expr else {
+            return false;
+        };
+        attr.as_str() == "branch"
+            && checker
+                .semantic()
+                .resolve_qualified_name(value)
+                .is_some_and(|qn| {
+                    matches!(
+                        qn.segments(),
+                        ["airflow", "decorators" | "sdk", "task"]
+                    )
+                })
     })
 }
