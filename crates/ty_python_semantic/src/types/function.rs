@@ -1260,6 +1260,186 @@ impl<'db> FunctionType<'db> {
     }
 }
 
+/// Check the second argument to `isinstance()` or `issubclass()` for types that cannot be used
+/// at runtime (protocol classes, typed dicts, `typing.Any` in `isinstance`, and invalid
+/// `UnionType` elements). Handles class literals, tuples (including nested tuples), and
+/// recursively validates each element.
+///
+/// `classinfo_expr` is the AST expression corresponding to `classinfo`, if available. It is
+/// used for precise annotation spans (e.g., highlighting just the `UnionType` inside a tuple
+/// rather than the whole tuple). It may be `None` when the tuple is not a literal in the AST
+/// (e.g., when it's stored in a variable).
+fn check_classinfo_in_isinstance<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db, '_>,
+    call_expression: &ast::ExprCall,
+    function: KnownFunction,
+    classinfo: Type<'db>,
+    classinfo_expr: Option<&ast::Expr>,
+) {
+    match classinfo {
+        Type::ClassLiteral(class) => {
+            if class.is_typed_dict(db) {
+                report_runtime_check_against_typed_dict(context, call_expression, class, function);
+            } else if let Some(protocol_class) = class.into_protocol_class(db) {
+                if !protocol_class.is_runtime_checkable(db) {
+                    report_runtime_check_against_non_runtime_checkable_protocol(
+                        context,
+                        call_expression,
+                        protocol_class,
+                        function,
+                    );
+                } else if function == KnownFunction::IsSubclass {
+                    let non_method_members = protocol_class.interface(db).non_method_members(db);
+                    if !non_method_members.is_empty() {
+                        report_issubclass_check_against_protocol_with_non_method_members(
+                            context,
+                            call_expression,
+                            protocol_class,
+                            &non_method_members,
+                        );
+                    }
+                }
+            }
+        }
+        Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsInstance => {
+            let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression) else {
+                return;
+            };
+            let mut diagnostic = builder.into_diagnostic(format_args!(
+                "`typing.Any` cannot be used with `isinstance()`"
+            ));
+            diagnostic.set_primary_message("This call will raise `TypeError` at runtime");
+        }
+        Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
+            report_invalid_union_type_elements(
+                db,
+                context,
+                call_expression,
+                function,
+                classinfo,
+                classinfo_expr,
+            );
+        }
+        Type::NominalInstance(nominal) => {
+            if let Some(tuple_spec) = nominal.tuple_spec(db) {
+                let element_exprs = match classinfo_expr {
+                    Some(ast::Expr::Tuple(tuple_expr)) => Some(&tuple_expr.elts),
+                    _ => None,
+                };
+                for (index, element) in tuple_spec.iter_all_elements().enumerate() {
+                    let element_expr = element_exprs.and_then(|elts| elts.get(index));
+                    check_classinfo_in_isinstance(
+                        db,
+                        context,
+                        call_expression,
+                        function,
+                        element,
+                        element_expr,
+                    );
+                }
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Report an error if a `types.UnionType` instance passed to `isinstance()`/`issubclass()`
+/// contains elements that are not class objects.
+fn report_invalid_union_type_elements<'db>(
+    db: &'db dyn Db,
+    context: &InferContext<'db, '_>,
+    call_expression: &ast::ExprCall,
+    function: KnownFunction,
+    union_type: Type<'db>,
+    union_type_expr: Option<&ast::Expr>,
+) {
+    fn find_invalid_elements<'db>(
+        db: &'db dyn Db,
+        function: KnownFunction,
+        ty: Type<'db>,
+        invalid_elements: &mut Vec<Type<'db>>,
+    ) {
+        match ty {
+            Type::ClassLiteral(_) => {}
+            Type::NominalInstance(instance)
+                if instance.has_known_class(db, KnownClass::NoneType) => {}
+            Type::SpecialForm(special_form) if special_form.is_valid_isinstance_target() => {}
+            // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
+            Type::SpecialForm(SpecialFormType::Any) if function == KnownFunction::IsSubclass => {}
+            Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
+                match instance.value_expression_types(db) {
+                    Ok(value_expression_types) => {
+                        for element in value_expression_types {
+                            find_invalid_elements(db, function, element, invalid_elements);
+                        }
+                    }
+                    Err(_) => {
+                        invalid_elements.push(ty);
+                    }
+                }
+            }
+            _ => invalid_elements.push(ty),
+        }
+    }
+
+    let mut invalid_elements = vec![];
+    find_invalid_elements(db, function, union_type, &mut invalid_elements);
+
+    let Some((first_invalid_element, other_invalid_elements)) = invalid_elements.split_first()
+    else {
+        return;
+    };
+
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression) else {
+        return;
+    };
+
+    let function_name: &str = function.into();
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Invalid second argument to `{function_name}`"));
+    diagnostic.info(format_args!(
+        "A `UnionType` instance can only be used as the second argument to \
+        `{function_name}` if all elements are class objects"
+    ));
+    if let Some(union_type_expr) = union_type_expr {
+        diagnostic.annotate(
+            Annotation::secondary(context.span(union_type_expr))
+                .message("This `UnionType` instance contains non-class elements"),
+        );
+    }
+
+    // When we have a secondary annotation pointing at the UnionType expression,
+    // "the union" is unambiguous. Otherwise, spell out the union type in the message.
+    let union_suffix = match (&union_type_expr, union_type) {
+        (None, Type::KnownInstance(KnownInstanceType::UnionType(instance))) => {
+            match instance.union_type(db) {
+                Ok(ty) => format!(" `{}`", ty.display(db)),
+                Err(_) => String::new(),
+            }
+        }
+        _ => String::new(),
+    };
+
+    match other_invalid_elements {
+        [] => diagnostic.info(format_args!(
+            "Element `{}` in the union{union_suffix} is not a class object",
+            first_invalid_element.display(db)
+        )),
+        [single] => diagnostic.info(format_args!(
+            "Elements `{}` and `{}` in the union{union_suffix} are not class objects",
+            first_invalid_element.display(db),
+            single.display(db),
+        )),
+        _ => diagnostic.info(format_args!(
+            "Element `{}` in the union{union_suffix}, and {} more elements, are not class objects",
+            first_invalid_element.display(db),
+            other_invalid_elements.len(),
+        )),
+    }
+}
+
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
 /// this will return `True` at runtime, `Truthiness::AlwaysFalse` if we can definitely infer
 /// that this will return `False` at runtime, or `Truthiness::Ambiguous` if we should infer `bool`
@@ -1980,145 +2160,21 @@ impl KnownFunction {
                     return;
                 };
 
-                match second_argument {
-                    Type::ClassLiteral(class) => {
-                        if class.is_typed_dict(db) {
-                            report_runtime_check_against_typed_dict(
-                                context,
-                                call_expression,
-                                *class,
-                                self,
-                            );
-                        } else if let Some(protocol_class) = class.into_protocol_class(db) {
-                            if !protocol_class.is_runtime_checkable(db) {
-                                report_runtime_check_against_non_runtime_checkable_protocol(
-                                    context,
-                                    call_expression,
-                                    protocol_class,
-                                    self,
-                                );
-                            } else if self == KnownFunction::IsSubclass {
-                                let non_method_members =
-                                    protocol_class.interface(db).non_method_members(db);
-                                if !non_method_members.is_empty() {
-                                    report_issubclass_check_against_protocol_with_non_method_members(
-                                        context,
-                                        call_expression,
-                                        protocol_class,
-                                        &non_method_members,
-                                    );
-                                }
-                            }
-                        }
+                check_classinfo_in_isinstance(
+                    db,
+                    context,
+                    call_expression,
+                    self,
+                    *second_argument,
+                    call_expression.arguments.args.get(1),
+                );
 
-                        if self == KnownFunction::IsInstance {
-                            overload.set_return_type(
-                                is_instance_truthiness(db, *first_arg, *class).into_type(db),
-                            );
-                        }
-                    }
-                    // The special-casing here is necessary because we recognise the symbol `typing.Any` as an
-                    // instance of `type` at runtime. Even once we understand typeshed's annotation for
-                    // `isinstance()`, we'd continue to accept calls such as `isinstance(x, typing.Any)` without
-                    // emitting a diagnostic if we didn't have this branch.
-                    Type::SpecialForm(SpecialFormType::Any)
-                        if self == KnownFunction::IsInstance =>
-                    {
-                        let Some(builder) =
-                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
-                        else {
-                            return;
-                        };
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "`typing.Any` cannot be used with `isinstance()`"
-                        ));
-                        diagnostic
-                            .set_primary_message("This call will raise `TypeError` at runtime");
-                    }
-
-                    Type::KnownInstance(KnownInstanceType::UnionType(_)) => {
-                        fn find_invalid_elements<'db>(
-                            db: &'db dyn Db,
-                            function: KnownFunction,
-                            ty: Type<'db>,
-                            invalid_elements: &mut Vec<Type<'db>>,
-                        ) {
-                            match ty {
-                                Type::ClassLiteral(_) => {}
-                                Type::NominalInstance(instance)
-                                    if instance.has_known_class(db, KnownClass::NoneType) => {}
-                                Type::SpecialForm(special_form)
-                                    if special_form.is_valid_isinstance_target() => {}
-                                // `Any` can be used in `issubclass()` calls but not `isinstance()` calls
-                                Type::SpecialForm(SpecialFormType::Any)
-                                    if function == KnownFunction::IsSubclass => {}
-                                Type::KnownInstance(KnownInstanceType::UnionType(instance)) => {
-                                    match instance.value_expression_types(db) {
-                                        Ok(value_expression_types) => {
-                                            for element in value_expression_types {
-                                                find_invalid_elements(
-                                                    db,
-                                                    function,
-                                                    element,
-                                                    invalid_elements,
-                                                );
-                                            }
-                                        }
-                                        Err(_) => {
-                                            invalid_elements.push(ty);
-                                        }
-                                    }
-                                }
-                                _ => invalid_elements.push(ty),
-                            }
-                        }
-
-                        let mut invalid_elements = vec![];
-                        find_invalid_elements(db, self, *second_argument, &mut invalid_elements);
-
-                        let Some((first_invalid_element, other_invalid_elements)) =
-                            invalid_elements.split_first()
-                        else {
-                            return;
-                        };
-
-                        let Some(builder) =
-                            context.report_lint(&INVALID_ARGUMENT_TYPE, call_expression)
-                        else {
-                            return;
-                        };
-
-                        let function_name: &str = self.into();
-
-                        let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Invalid second argument to `{function_name}`"
-                        ));
-                        diagnostic.info(format_args!(
-                            "A `UnionType` instance can only be used as the second argument to \
-                            `{function_name}` if all elements are class objects"
-                        ));
-                        diagnostic.annotate(
-                            Annotation::secondary(context.span(&call_expression.arguments.args[1]))
-                                .message("This `UnionType` instance contains non-class elements"),
-                        );
-                        match other_invalid_elements {
-                            [] => diagnostic.info(format_args!(
-                                "Element `{}` in the union is not a class object",
-                                first_invalid_element.display(db)
-                            )),
-                            [single] => diagnostic.info(format_args!(
-                                "Elements `{}` and `{}` in the union are not class objects",
-                                first_invalid_element.display(db),
-                                single.display(db),
-                            )),
-                            _ => diagnostic.info(format_args!(
-                                "Element `{}` in the union, and {} more elements, are not class objects",
-                                first_invalid_element.display(db),
-                                other_invalid_elements.len(),
-                            ))
-                        }
-                    }
-                    _ => {}
+                if let Type::ClassLiteral(class) = second_argument
+                    && self == KnownFunction::IsInstance
+                {
+                    overload.set_return_type(
+                        is_instance_truthiness(db, *first_arg, *class).into_type(db),
+                    );
                 }
             }
 

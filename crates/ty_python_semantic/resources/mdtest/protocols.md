@@ -2601,6 +2601,41 @@ def f(arg1: type):
         reveal_type(arg1)  # revealed: type & ~type[OnlyClassmethodMembers]
 ```
 
+The same diagnostics are also emitted when protocol classes appear inside a tuple passed as the
+second argument to `isinstance()` or `issubclass()`:
+
+```py
+def g(arg: object, arg2: type):
+    isinstance(arg, (HasX, RuntimeCheckableHasX))  # error: [isinstance-against-protocol]
+    isinstance(arg, (HasX, int))  # error: [isinstance-against-protocol]
+
+    # error: [isinstance-against-protocol]
+    # error: [isinstance-against-protocol]
+    issubclass(arg2, (HasX, RuntimeCheckableHasX))
+
+    issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
+```
+
+This includes nested tuples:
+
+```py
+def g2(arg: object, arg2: type):
+    isinstance(arg, (int, (HasX, str)))  # error: [isinstance-against-protocol]
+
+    # error: [isinstance-against-protocol]
+    # error: [isinstance-against-protocol]
+    issubclass(arg2, (int, (HasX, RuntimeCheckableHasX)))
+```
+
+This also works when the tuple is not a literal in the source:
+
+```py
+classes = (HasX, int)
+
+def h(arg: object):
+    isinstance(arg, classes)  # error: [isinstance-against-protocol]
+```
+
 ## Match class patterns and protocols
 
 <!-- snapshot-diagnostics -->
@@ -3049,11 +3084,13 @@ static_assert(not is_disjoint_from(Proto, Nominal))
 This snippet caused us to panic on an early version of the implementation for protocols.
 
 ```py
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
+@runtime_checkable
 class A(Protocol):
     def x(self) -> "B | A": ...
 
+@runtime_checkable
 class B(Protocol):
     def y(self): ...
 

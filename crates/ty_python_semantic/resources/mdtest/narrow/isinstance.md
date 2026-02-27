@@ -128,6 +128,41 @@ def _(x: int | list[int] | bytes):
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
+The same validation also applies when an invalid `UnionType` is nested inside a tuple:
+
+```py
+def _(x: int | list[int] | bytes):
+    # error: [invalid-argument-type]
+    if isinstance(x, (int, list[int] | bytes)):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+Including nested tuples:
+
+```py
+def _(x: int | list[int] | bytes):
+    # error: [invalid-argument-type]
+    if isinstance(x, (int, (str, list[int] | bytes))):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+And non-literal tuples:
+
+```py
+classes = (int, list[int] | bytes)
+
+def _(x: int | list[int] | bytes):
+    # error: [invalid-argument-type]
+    if isinstance(x, classes):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
 ## PEP-604 unions on Python \<3.10
 
 PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to
@@ -310,6 +345,15 @@ def _(flag: bool):
     # error: [unknown-argument]
     if isinstance(x, int, foo="bar"):
         reveal_type(x)  # revealed: Literal[1, "a"]
+```
+
+## Splatted calls with invalid `classinfo`
+
+Diagnostics are still emitted for invalid `classinfo` types when the arguments are splatted:
+
+```py
+args = (object(), int | list[str])
+isinstance(*args)  # error: [invalid-argument-type]
 ```
 
 ## Generic aliases are not supported as second argument
