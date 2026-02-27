@@ -13,6 +13,7 @@ mod requests;
 mod semantic_tokens;
 mod symbols;
 mod traits;
+mod type_hierarchy;
 
 use self::traits::{NotificationHandler, RequestHandler};
 use super::{Result, schedule::BackgroundSchedule};
