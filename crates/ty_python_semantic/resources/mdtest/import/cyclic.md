@@ -37,8 +37,7 @@ See: <https://github.com/astral-sh/ty/issues/113>
 ```py
 from pkg.sub import A
 
-# TODO: This should be `<class 'A'>`
-reveal_type(A)  # revealed: Divergent
+reveal_type(A)  # revealed: <class 'A'>
 ```
 
 `pkg/outer.py`:

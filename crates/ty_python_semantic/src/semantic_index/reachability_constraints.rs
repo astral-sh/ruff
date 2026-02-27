@@ -1180,9 +1180,22 @@ impl ReachabilityConstraints {
                 .place
                 {
                     crate::place::Place::Defined(crate::place::DefinedPlace {
+                        ty,
                         definedness: crate::place::Definedness::AlwaysDefined,
                         ..
-                    }) => Truthiness::AlwaysTrue,
+                    }) => {
+                        // If the resolved type is a cycle-recovery `Divergent` type, we
+                        // can't be certain the symbol is actually defined in the source
+                        // module; it might only appear defined due to a cyclic re-import.
+                        // Treating this as `Ambiguous` allows the pre-existing definition
+                        // (if any) to remain visible alongside the star-import definition,
+                        // so that fixpoint iteration can converge to the correct type.
+                        if ty.is_divergent() {
+                            Truthiness::Ambiguous
+                        } else {
+                            Truthiness::AlwaysTrue
+                        }
+                    }
                     crate::place::Place::Defined(crate::place::DefinedPlace {
                         definedness: crate::place::Definedness::PossiblyUndefined,
                         ..
