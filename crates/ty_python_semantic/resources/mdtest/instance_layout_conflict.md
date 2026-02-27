@@ -171,7 +171,7 @@ class Bar:
 class Baz(Foo, Bar): ...  # fine
 ```
 
-## Built-ins with implicit layouts
+## Builtins with implicit layouts
 
 <!-- snapshot-diagnostics -->
 
@@ -206,7 +206,7 @@ class E(  # error: [instance-layout-conflict]
     str
 ): ...
 
-class F(int, str, bytes, bytearray): ...  # error: [instance-layout-conflict]
+class F(int, bytes, bytearray): ...  # error: [instance-layout-conflict]
 
 @disjoint_base
 class G: ...
@@ -223,9 +223,12 @@ class I(  # error: [instance-layout-conflict]
 ```
 
 We avoid emitting an `instance-layout-conflict` diagnostic for this class definition, because
-`range` is `@final`, so we'll complain about the `class` statement anyway:
+`range` is `@final`, so we'll complain about the `class` statement anyway. (We also emit
+`invalid-generic-class` here, as `Sequence[str]` and `Sequence[int]` coexist invalidly in this
+class's MRO.)
 
 ```py
+# error: [invalid-generic-class]
 class Foo(range, str): ...  # error: [subclass-of-final-class]
 ```
 

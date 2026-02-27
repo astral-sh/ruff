@@ -33,8 +33,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 18 | # error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild2, int]` and `Grandparent[T1@BadChild2, T2@BadChild2]`"
 19 | class BadChild2(Parent2[T1, T2], Grandparent[T2, int]): ...
 20 | 
-21 | # Implicit specialization is fine:
-22 | class Fine(Parent, Grandparent[T1, T2]): ...
+21 | # The inconsistency can also come through two intermediate classes (diamond):
+22 | class Parent3(Grandparent[T1, T2]): ...
+23 | class Parent4(Grandparent[T1, T2]): ...
+24 | 
+25 | # error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild3, T1@BadChild3]` and `Grandparent[T1@BadChild3, T2@BadChild3]`"
+26 | class BadChild3(Parent3[T1, T2], Parent4[T2, T1]): ...
+27 | 
+28 | # Implicit specialization is fine:
+29 | class Fine(Parent, Grandparent[T1, T2]): ...
+30 | class AlsoFine(Parent3, Parent4[T1, T2]): ...
 ```
 
 # Diagnostics
@@ -67,7 +75,24 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
    |                 |                Later class base is `Grandparent[T2@BadChild2, int]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild2, T2@BadChild2]`
 20 |
-21 | # Implicit specialization is fine:
+21 | # The inconsistency can also come through two intermediate classes (diamond):
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` among class bases
+  --> src/mdtest_snippet.py:26:7
+   |
+25 | # error: [invalid-generic-class] "Inconsistent type arguments: class cannot inherit from both `Grandparent[T2@BadChild3, T1@BadChild3]…
+26 | class BadChild3(Parent3[T1, T2], Parent4[T2, T1]): ...
+   |       ^^^^^^^^^^---------------^^---------------^
+   |                 |                |
+   |                 |                Later class base inherits from `Grandparent[T2@BadChild3, T1@BadChild3]`
+   |                 Earlier class base inherits from `Grandparent[T1@BadChild3, T2@BadChild3]`
+27 |
+28 | # Implicit specialization is fine:
    |
 info: rule `invalid-generic-class` is enabled by default
 
