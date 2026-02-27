@@ -59,8 +59,8 @@ use crate::{
         semantic_index, use_def_map,
     },
     types::{
-        CallArguments, CallError, CallErrorKind, MetaclassCandidate, TypeDefinition, UnionType,
-        definition_expression_type,
+        CallArguments, CallError, CallErrorKind, MetaclassCandidate, MetaclassTransformInfo,
+        TypeDefinition, UnionType, definition_expression_type,
     },
 };
 use indexmap::IndexSet;
@@ -119,7 +119,7 @@ fn try_metaclass_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _self_: StaticClassLiteral<'db>,
-) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
+) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
     Err(MetaclassError {
         kind: MetaclassErrorKind::Cycle,
     })
@@ -180,8 +180,8 @@ impl<'db> CodeGeneratorKind<'db> {
         ) -> Option<CodeGeneratorKind<'db>> {
             if class.dataclass_params(db).is_some() {
                 Some(CodeGeneratorKind::DataclassLike(None))
-            } else if let Ok((_, Some(transformer_params))) = class.try_metaclass(db) {
-                Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
+            } else if let Ok((_, Some(info))) = class.try_metaclass(db) {
+                Some(CodeGeneratorKind::DataclassLike(Some(info.params)))
             } else if let Some(transformer_params) =
                 class.iter_mro(db, specialization).skip(1).find_map(|base| {
                     base.into_class().and_then(|class| {
@@ -2734,6 +2734,38 @@ impl<'db> StaticClassLiteral<'db> {
         (dataclass_params, transformer_params)
     }
 
+    /// Returns the effective frozen status of this class if it's a dataclass-like class.
+    ///
+    /// Returns `Some(true)` for a frozen dataclass-like class, `Some(false)` for a non-frozen one,
+    /// and `None` if the class is not a dataclass-like class, or if the dataclass is neither frozen
+    /// nor non-frozen.
+    pub(crate) fn is_frozen_dataclass(self, db: &'db dyn Db) -> Option<bool> {
+        // Check if this is a base-class-based transformer that has dataclass_transformer_params directly
+        // attached to it (because it is itself decorated with `@dataclass_transform`), or if this class
+        // has an explicit metaclass that is decorated with `@dataclass_transform`.
+        //
+        // In both cases, this signifies that this class is neither frozen nor non-frozen.
+        //
+        // See <https://typing.python.org/en/latest/spec/dataclasses.html#dataclass-semantics> for details.
+        if self.dataclass_transformer_params(db).is_some()
+            || self
+                .try_metaclass(db)
+                .is_ok_and(|(_, info)| info.is_some_and(|i| i.from_explicit_metaclass))
+        {
+            return None;
+        }
+
+        if let field_policy @ CodeGeneratorKind::DataclassLike(_) =
+            CodeGeneratorKind::from_class(db, self.into(), None)?
+        {
+            // Otherwise, if this class is a dataclass-like class, determine its frozen status based on
+            // dataclass params and dataclass transformer params.
+            Some(self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN))
+        } else {
+            None
+        }
+    }
+
     /// Checks if the given dataclass parameter flag is set for this class.
     /// This checks both the `dataclass_params` and `transformer_params`.
     fn has_dataclass_param(
@@ -2783,7 +2815,7 @@ impl<'db> StaticClassLiteral<'db> {
     pub(super) fn try_metaclass(
         self,
         db: &'db dyn Db,
-    ) -> Result<(Type<'db>, Option<DataclassTransformerParams<'db>>), MetaclassError<'db>> {
+    ) -> Result<(Type<'db>, Option<MetaclassTransformInfo<'db>>), MetaclassError<'db>> {
         tracing::trace!("StaticClassLiteral::try_metaclass: {}", self.name(db));
 
         // Identify the class's own metaclass (or take the first base class's metaclass).
@@ -2887,11 +2919,15 @@ impl<'db> StaticClassLiteral<'db> {
             });
         }
 
-        let dataclass_transformer_params = candidate
+        let transform_info = candidate
             .metaclass
             .static_class_literal(db)
-            .and_then(|(metaclass_literal, _)| metaclass_literal.dataclass_transformer_params(db));
-        Ok((candidate.metaclass.into(), dataclass_transformer_params))
+            .and_then(|(metaclass_literal, _)| metaclass_literal.dataclass_transformer_params(db))
+            .map(|params| MetaclassTransformInfo {
+                params,
+                from_explicit_metaclass: candidate.explicit_metaclass_of == self,
+            });
+        Ok((candidate.metaclass.into(), transform_info))
     }
 
     /// Returns the class member of this class named `name`.
@@ -3461,7 +3497,7 @@ impl<'db> StaticClassLiteral<'db> {
                 signature_from_fields(vec![self_parameter], instance_ty)
             }
             (CodeGeneratorKind::DataclassLike(_), "__setattr__") => {
-                if self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN) {
+                if self.is_frozen_dataclass(db) == Some(true) {
                     let signature = Signature::new(
                         Parameters::new(
                             db,
@@ -3959,7 +3995,7 @@ impl<'db> StaticClassLiteral<'db> {
             match name.as_str() {
                 "__setattr__" | "__delattr__" => {
                     if let CodeGeneratorKind::DataclassLike(_) = field_policy
-                        && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
+                        && self.is_frozen_dataclass(db) == Some(true)
                     {
                         if let Some(builder) = context.report_lint(
                             &INVALID_DATACLASS_OVERRIDE,

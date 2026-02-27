@@ -542,12 +542,6 @@ bitflags! {
     }
 }
 
-impl DataclassFlags {
-    pub(crate) const fn is_frozen(self) -> bool {
-        self.contains(Self::FROZEN)
-    }
-}
-
 pub(crate) const DATACLASS_FLAGS: &[(&str, DataclassFlags)] = &[
     ("init", DataclassFlags::INIT),
     ("repr", DataclassFlags::REPR),
@@ -11626,6 +11620,16 @@ impl std::fmt::Display for QualifiedTypeAliasName<'_> {
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: ClassType<'db>,
     explicit_metaclass_of: StaticClassLiteral<'db>,
+}
+
+/// Information about a `@dataclass_transform`-decorated metaclass.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(super) struct MetaclassTransformInfo<'db> {
+    pub(super) params: DataclassTransformerParams<'db>,
+
+    /// Whether the metaclass providing these parameters was declared on the class itself
+    /// (via an explicit `metaclass=` keyword) rather than inherited from a base class.
+    pub(super) from_explicit_metaclass: bool,
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]

@@ -31,9 +31,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{
-    DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType,
-};
+use crate::types::{KnownInstanceType, MemberLookupPolicy, TypeVarInstance, UnionType};
 use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -5566,7 +5564,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
     class_node: &ast::StmtClassDef,
     base_class: StaticClassLiteral<'db>,
     base_class_node: &ast::Expr,
-    base_class_params: DataclassFlags,
+    base_is_frozen: bool,
 ) {
     let db = context.db();
 
@@ -5576,7 +5574,7 @@ pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
         return;
     };
 
-    let mut diagnostic = if base_class_params.is_frozen() {
+    let mut diagnostic = if base_is_frozen {
         let mut diagnostic =
             builder.into_diagnostic("Non-frozen dataclass cannot inherit from frozen dataclass");
         diagnostic.set_concise_message(format_args!(
