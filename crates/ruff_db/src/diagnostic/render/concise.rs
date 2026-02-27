@@ -1,5 +1,5 @@
 use crate::diagnostic::{
-    Diagnostic, DisplayDiagnosticConfig, Severity,
+    CodeRank, Diagnostic, DisplayDiagnosticConfig, Severity,
     stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
@@ -68,7 +68,9 @@ impl<'a> ConciseRenderer<'a> {
             }
 
             if self.config.hide_severity {
-                if let Some(code) = diag.secondary_code() {
+                if let Some(code) = diag.secondary_code()
+                    && matches!(self.config.display_code, CodeRank::Secondary)
+                {
                     write!(
                         f,
                         "{code} ",
@@ -104,15 +106,29 @@ impl<'a> ConciseRenderer<'a> {
                     Severity::Error => ("error", stylesheet.error),
                     Severity::Fatal => ("fatal", stylesheet.error),
                 };
-                write!(
-                    f,
-                    "{severity}[{id}] ",
-                    severity = fmt_styled(severity, severity_style),
-                    id = fmt_styled(
-                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
-                        stylesheet.emphasis
-                    )
-                )?;
+                if matches!(self.config.display_code, CodeRank::Secondary)
+                    && let Some(code) = diag.secondary_code()
+                {
+                    write!(
+                        f,
+                        "{severity}[{id}] ",
+                        severity = fmt_styled(severity, severity_style),
+                        id = fmt_styled(
+                            fmt_with_hyperlink(&code, diag.documentation_url(), &stylesheet),
+                            stylesheet.emphasis
+                        )
+                    )?;
+                } else {
+                    write!(
+                        f,
+                        "{severity}[{id}] ",
+                        severity = fmt_styled(severity, severity_style),
+                        id = fmt_styled(
+                            fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
+                            stylesheet.emphasis
+                        )
+                    )?;
+                }
             }
 
             writeln!(f, "{message}", message = diag.concise_message())?;

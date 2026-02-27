@@ -11,7 +11,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
-    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
+    CodeRank, Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
 };
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
@@ -463,6 +463,7 @@ pub(crate) fn print_jupyter_messages(
     let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
+        .display_code(CodeRank::Secondary)
         .with_show_fix_status(true)
         .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly);
@@ -482,6 +483,7 @@ pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
     let config = DisplayDiagnosticConfig::new("ruff")
         .format(DiagnosticFormat::Full)
         .hide_severity(true)
+        .display_code(CodeRank::Secondary)
         .with_show_fix_status(true)
         .show_fix_diff(true)
         .with_fix_applicability(Applicability::DisplayOnly);
