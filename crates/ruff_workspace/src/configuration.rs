@@ -100,7 +100,7 @@ impl RuleSelection {
                 self.warn
                     .iter()
                     .flatten()
-                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+                    .map(|selector| (RuleSelectorKind::Enable, selector)),
             )
             .chain(
                 self.ignore
@@ -125,7 +125,7 @@ impl RuleSelection {
             .chain(
                 self.extend_warn
                     .iter()
-                    .map(|selector| (RuleSelectorKind::Modify, selector)),
+                    .map(|selector| (RuleSelectorKind::Enable, selector)),
             )
     }
 }
@@ -929,7 +929,7 @@ impl LintConfiguration {
                         }
                     }
                 }
-                // Iterate over rule selectors in order of specificity.
+                // Apply the same logic to `fixable`, `unfixable`, and `warn`
                 for selector in selection
                     .warn
                     .iter()
@@ -949,10 +949,9 @@ impl LintConfiguration {
                 {
                     for rule in selector.rules(&preview) {
                         select_map_updates.insert(rule, false);
+                        warn_map_updates.insert(rule, false);
                     }
                 }
-
-                // Apply the same logic to `fixable` and `unfixable`.
                 for selector in selection
                     .fixable
                     .iter()
@@ -1002,10 +1001,8 @@ impl LintConfiguration {
                     docstring_overrides.insert(rule);
                 }
             }
-
+            // Apply the same logic to `fixable`, `unfixable`, and `warn`
             if let Some(warn) = &selection.warn {
-                // If the `select` option is given we reassign the whole select_set
-                // (overriding everything that has been defined previously).
                 warn_set = warn_map_updates
                     .into_iter()
                     .filter_map(|(rule, enabled)| enabled.then_some(rule))
@@ -1018,13 +1015,10 @@ impl LintConfiguration {
                     carryover_ignores = Some(&selection.ignore);
                 }
             } else {
-                // Otherwise we apply the updates on top of the existing select_set.
                 for (rule, enabled) in warn_map_updates {
                     warn_set.set(rule, enabled);
                 }
             }
-
-            // Apply the same logic to `fixable` and `unfixable`.
             if let Some(fixable) = &selection.fixable {
                 fixable_set = fixable_map_updates
                     .into_iter()

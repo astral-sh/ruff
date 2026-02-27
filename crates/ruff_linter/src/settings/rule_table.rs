@@ -83,6 +83,7 @@ impl RuleTable {
     #[inline]
     pub fn disable(&mut self, rule: Rule) {
         self.enabled.remove(rule);
+        self.warn.remove(rule);
         self.should_fix.remove(rule);
     }
 }
