@@ -17,19 +17,19 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
 1 | def f[T](x: T, y: T) -> None:
 2 |     def ok[S](a: S, b: S) -> None: ...
 3 | 
-4 |     # error: [invalid-generic-class]
+4 |     # error: [shadowed-type-variable]
 5 |     def bad[T](a: T, b: T) -> None: ...
 ```
 
 # Diagnostics
 
 ```
-error[invalid-generic-class]: Generic function `bad` must not reference type variables bound in an enclosing scope
+error[shadowed-type-variable]: Generic function `bad` uses type variable `T` that is already bound by an enclosing scope
  --> src/mdtest_snippet.py:5:9
   |
-4 |     # error: [invalid-generic-class]
+4 |     # error: [shadowed-type-variable]
 5 |     def bad[T](a: T, b: T) -> None: ...
-  |         ^^^ `T` referenced in function definition here
+  |         ^^^ `T` used in function definition here
   |
  ::: src/mdtest_snippet.py:1:5
   |
@@ -37,6 +37,6 @@ error[invalid-generic-class]: Generic function `bad` must not reference type var
   |     ------------------------ Type variable `T` is bound in this enclosing scope
 2 |     def ok[S](a: S, b: S) -> None: ...
   |
-info: rule `invalid-generic-class` is enabled by default
+info: rule `shadowed-type-variable` is enabled by default
 
 ```
