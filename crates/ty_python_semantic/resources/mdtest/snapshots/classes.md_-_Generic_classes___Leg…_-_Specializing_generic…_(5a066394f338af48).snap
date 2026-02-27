@@ -236,11 +236,9 @@ error[invalid-generic-class]: Default of `Start2T` cannot reference out-of-scope
 82 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-  ::: src/mdtest_snippet.py:76:1
+  ::: src/mdtest_snippet.py:78:1
    |
-75 | StartT = TypeVar("StartT", default=int)
 76 | StopT = TypeVar("StopT", default=StartT)
-   | ---------------------------------------- `StopT` defined here
 77 | StepT = TypeVar("StepT", default=int | None)
 78 | Start2T = TypeVar("Start2T", default="StopT")
    | --------------------------------------------- `Start2T` defined here

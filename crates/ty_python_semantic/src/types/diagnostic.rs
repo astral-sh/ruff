@@ -4969,7 +4969,13 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
         ))
     };
 
-    for tvar in [typevar_with_bad_default, referenced_typevar] {
+    let typevars_to_annotate = if is_later_in_list {
+        &[typevar_with_bad_default, referenced_typevar][..]
+    } else {
+        &[typevar_with_bad_default][..]
+    };
+
+    for tvar in typevars_to_annotate {
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
