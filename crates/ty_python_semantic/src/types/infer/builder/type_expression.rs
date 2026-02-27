@@ -1855,9 +1855,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         };
         if is_paramspec {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node) {
-                builder.into_diagnostic(
-                    "`ParamSpec` is not valid in this context; \
-                    it can only be used as the first argument to `Callable` \
+                let mut diagnostic =
+                    builder.into_diagnostic("A bare `ParamSpec` is not valid in this context");
+                diagnostic.info(
+                    "`ParamSpec` can only be used as the first argument to `Callable` \
                     or the last argument to `Concatenate`",
                 );
             }
