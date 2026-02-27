@@ -4945,6 +4945,37 @@ pub(crate) fn report_rebound_typevar<'db>(
     )));
 }
 
+pub(crate) fn report_rebound_typevar_function<'db>(
+    context: &InferContext<'db, '_>,
+    typevar_name: &ast::name::Name,
+    function_node: &ast::StmtFunctionDef,
+    other_typevar: BoundTypeVarInstance<'db>,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, function_node.name.range())
+    else {
+        return;
+    };
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Generic function `{}` must not reference type variables bound in an enclosing scope",
+        function_node.name,
+    ));
+    diagnostic.set_primary_message(format_args!(
+        "`{typevar_name}` referenced in function definition here"
+    ));
+    let Some(other_definition) = other_typevar.binding_context(db).definition() else {
+        return;
+    };
+    let span = match binding_type(db, other_definition) {
+        Type::ClassLiteral(class) => class.header_span(db),
+        Type::FunctionLiteral(function) => function.spans(db).signature,
+        _ => return,
+    };
+    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
+        "Type variable `{typevar_name}` is bound in this enclosing scope",
+    )));
+}
+
 // I tried refactoring this function to placate Clippy,
 // but it did not improve readability! -- AW.
 #[expect(clippy::too_many_arguments)]

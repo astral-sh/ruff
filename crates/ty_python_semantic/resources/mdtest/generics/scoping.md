@@ -242,21 +242,25 @@ We assume that the more general form holds.
 
 ### Generic function within generic function
 
+<!-- snapshot-diagnostics -->
+
 ```py
 def f[T](x: T, y: T) -> None:
     def ok[S](a: S, b: S) -> None: ...
 
-    # TODO: error
+    # error: [invalid-generic-class]
     def bad[T](a: T, b: T) -> None: ...
 ```
 
 ### Generic method within generic class
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class C[T]:
     def ok[S](self, a: S, b: S) -> None: ...
 
-    # TODO: error
+    # error: [invalid-generic-class]
     def bad[T](self, a: T, b: T) -> None: ...
 ```
 

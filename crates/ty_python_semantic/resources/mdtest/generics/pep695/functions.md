@@ -689,7 +689,7 @@ def test[T: int](items: list[T]) -> list[T]:
 from typing import overload
 
 def outer[T](t: T) -> None:
-    def inner[T](t: T) -> None: ...
+    def inner[T](t: T) -> None: ...  # error: [invalid-generic-class]
 
     inner(t)
 

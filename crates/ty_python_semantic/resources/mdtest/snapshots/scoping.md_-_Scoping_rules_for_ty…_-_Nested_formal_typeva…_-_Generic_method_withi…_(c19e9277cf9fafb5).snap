@@ -1,0 +1,42 @@
+---
+source: crates/ty_test/src/lib.rs
+assertion_line: 624
+expression: snapshot
+---
+
+---
+mdtest name: scoping.md - Scoping rules for type variables - Nested formal typevars must be distinct - Generic method within generic class
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/scoping.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C[T]:
+2 |     def ok[S](self, a: S, b: S) -> None: ...
+3 | 
+4 |     # error: [invalid-generic-class]
+5 |     def bad[T](self, a: T, b: T) -> None: ...
+```
+
+# Diagnostics
+
+```
+error[invalid-generic-class]: Generic function `bad` must not reference type variables bound in an enclosing scope
+ --> src/mdtest_snippet.py:5:9
+  |
+4 |     # error: [invalid-generic-class]
+5 |     def bad[T](self, a: T, b: T) -> None: ...
+  |         ^^^ `T` referenced in function definition here
+  |
+ ::: src/mdtest_snippet.py:1:7
+  |
+1 | class C[T]:
+  |       - Type variable `T` is bound in this enclosing scope
+2 |     def ok[S](self, a: S, b: S) -> None: ...
+  |
+info: rule `invalid-generic-class` is enabled by default
+
+```

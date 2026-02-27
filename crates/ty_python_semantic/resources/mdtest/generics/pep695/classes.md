@@ -659,7 +659,7 @@ class C[T]:
     # error: [unresolved-reference]
     def cannot_use_outside_of_method(self, u: U): ...
 
-    # TODO: error
+    # error: [invalid-generic-class]
     def cannot_shadow_class_typevar[T](self, t: T): ...
 
 # revealed: ty_extensions.GenericContext[T@C]
