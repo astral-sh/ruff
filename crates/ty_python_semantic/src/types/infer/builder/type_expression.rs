@@ -1866,8 +1866,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 diagnostic.info("A bare ParamSpec is only valid:");
                 diagnostic.info(" - as the first argument to `Callable`");
                 diagnostic.info(" - as the last argument to `Concatenate`");
-                diagnostic.info(" - as part of a type parameter list when defining a generic class");
-                diagnostic.info(" - or as part of an argument list when specializing a generic class");
+                diagnostic
+                    .info(" - as part of a type parameter list when defining a generic class");
+                diagnostic
+                    .info(" - or as part of an argument list when specializing a generic class");
             }
             true
         } else {
