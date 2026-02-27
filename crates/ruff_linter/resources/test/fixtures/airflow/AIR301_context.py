@@ -205,3 +205,18 @@ def test_inlet_events_dataset_subscript_ok(**context):
 
     print(context["inlet_events"][Dataset("this://is-url")])
     print(context["inlet_events"][Asset("this://is-url")])
+
+
+# Same context checks with airflow.sdk import
+from airflow.sdk import task as sdk_task
+
+
+@sdk_task
+def sdk_access_deprecated_context_key(**context):
+    execution_date = context["execution_date"]
+    next_ds = context["next_ds"]
+
+
+@sdk_task
+def sdk_access_valid_context_key(**context):
+    logical_date = context["logical_date"]
