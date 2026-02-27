@@ -307,3 +307,8 @@ pub(crate) const fn is_expanded_import_conventions_enabled(preview: PreviewMode)
 pub(crate) const fn is_file_level_invalid_rule_code_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/23404
+pub(crate) const fn is_ruff_ignore_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}

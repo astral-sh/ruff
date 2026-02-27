@@ -123,7 +123,12 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(locator.contents(), parsed.tokens(), &indexer);
+    let suppressions = Suppressions::from_tokens(
+        locator.contents(),
+        parsed.tokens(),
+        &indexer,
+        &settings.linter,
+    );
 
     // Generate checks.
     let diagnostics = check_path(

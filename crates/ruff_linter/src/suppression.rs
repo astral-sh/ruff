@@ -18,11 +18,13 @@ use smallvec::{SmallVec, smallvec};
 use crate::checkers::ast::{DiagnosticGuard, LintContext};
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
+use crate::preview::is_ruff_ignore_enabled;
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
+use crate::settings::LinterSettings;
 use crate::{Locator, Violation};
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -185,8 +187,13 @@ impl<'a> SuppressionDiagnostic<'a> {
 }
 
 impl Suppressions {
-    pub fn from_tokens(source: &str, tokens: &Tokens, indexer: &Indexer) -> Suppressions {
-        let builder = SuppressionsBuilder::new(source);
+    pub fn from_tokens(
+        source: &str,
+        tokens: &Tokens,
+        indexer: &Indexer,
+        settings: &LinterSettings,
+    ) -> Suppressions {
+        let builder = SuppressionsBuilder::new(source, settings);
         builder.load_from_tokens(tokens, indexer)
     }
 
@@ -467,9 +474,9 @@ impl Suppressions {
     }
 }
 
-#[derive(Default)]
 pub(crate) struct SuppressionsBuilder<'a> {
     source: &'a str,
+    settings: &'a LinterSettings,
 
     valid: Vec<Suppression>,
     invalid: Vec<InvalidSuppression>,
@@ -478,10 +485,13 @@ pub(crate) struct SuppressionsBuilder<'a> {
 }
 
 impl<'a> SuppressionsBuilder<'a> {
-    pub(crate) fn new(source: &'a str) -> Self {
+    pub(crate) fn new(source: &'a str, settings: &'a LinterSettings) -> Self {
         Self {
             source,
-            ..Default::default()
+            settings,
+            valid: Vec::new(),
+            invalid: Vec::new(),
+            pending: Vec::new(),
         }
     }
 
@@ -516,22 +526,26 @@ impl<'a> SuppressionsBuilder<'a> {
             // Standalone suppression comments
 
             if suppression.action == SuppressionAction::Ignore {
-                let range =
-                    if indentation_at_offset(suppression.range.start(), self.source).is_some() {
+                if is_ruff_ignore_enabled(self.settings) {
+                    let range = if indentation_at_offset(suppression.range.start(), self.source)
+                        .is_some()
+                    {
                         // own-line ignore
                         Self::standalone_comment_range(suppression.range, before, after)
                     } else {
                         // trailing ignore
                         self.trailing_comment_range(suppression.range, before, after)
                     };
-                for code in suppression.codes_as_str(self.source) {
-                    self.valid.push(Suppression {
-                        code: code.into(),
-                        range,
-                        used: false.into(),
-                        comments: SuppressionComments::Single(suppression.clone()),
-                    });
+                    for code in suppression.codes_as_str(self.source) {
+                        self.valid.push(Suppression {
+                            code: code.into(),
+                            range,
+                            used: false.into(),
+                            comments: SuppressionComments::Single(suppression.clone()),
+                        });
+                    }
                 }
+                // TODO: drop a warning if preview mode disabled, or silently ignore suppression?
                 suppressions.next();
                 continue;
             }
@@ -1076,9 +1090,12 @@ mod tests {
     use ruff_text_size::{TextLen, TextRange, TextSize};
     use similar::DiffableStr;
 
-    use crate::suppression::{
-        InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
-        SuppressionParser, Suppressions,
+    use crate::{
+        settings::LinterSettings,
+        suppression::{
+            InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
+            SuppressionParser, Suppressions,
+        },
     };
 
     #[test]
@@ -2428,7 +2445,12 @@ bar = [
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
             let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
             let indexer = Indexer::from_tokens(parsed.tokens(), source);
-            let suppressions = Suppressions::from_tokens(source, parsed.tokens(), &indexer);
+            let suppressions = Suppressions::from_tokens(
+                source,
+                parsed.tokens(),
+                &indexer,
+                &LinterSettings::default().with_preview_mode(),
+            );
             DebugSuppressions {
                 source,
                 suppressions,
