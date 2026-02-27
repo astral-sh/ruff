@@ -1844,26 +1844,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
     ///
     /// Returns `true` if the type was a `ParamSpec` and a diagnostic was reported.
     pub(crate) fn check_for_bare_paramspec(&self, ty: Type<'db>, node: &ast::Expr) -> bool {
-        let is_paramspec = match ty {
-            Type::TypeVar(typevar) => {
-                typevar.is_paramspec(self.db()) && typevar.paramspec_attr(self.db()).is_none()
+        let db = self.db();
+        let paramspec_name = match ty {
+            Type::TypeVar(typevar)
+                if typevar.is_paramspec(db) && typevar.paramspec_attr(db).is_none() =>
+            {
+                Some(typevar.typevar(db).name(db))
             }
-            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
-                typevar.is_paramspec(self.db())
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar))
+                if typevar.is_paramspec(db) =>
+            {
+                Some(typevar.name(db))
             }
-            _ => false,
+            _ => None,
         };
-        if is_paramspec {
+        if let Some(name) = paramspec_name {
             if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node) {
-                let mut diagnostic =
-                    builder.into_diagnostic("A bare `ParamSpec` is not valid in this context");
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Bare ParamSpec `{name}` is not valid in this context",
+                ));
                 diagnostic.info(
                     "`ParamSpec` can only be used as the first argument to `Callable` \
                     or the last argument to `Concatenate`",
                 );
             }
+            true
+        } else {
+            false
         }
-        is_paramspec
     }
 
     /// Infer the first argument to a `typing.Callable` type expression and returns the
