@@ -1863,10 +1863,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 let mut diagnostic = builder.into_diagnostic(format_args!(
                     "Bare ParamSpec `{name}` is not valid in this context",
                 ));
-                diagnostic.info(
-                    "A bare ParamSpec can only be used as the first argument to `Callable`, \
-                    the last argument to `Concatenate`, or as part of a type parameter/argument list",
-                );
+                diagnostic.info("A bare ParamSpec is only valid:");
+                diagnostic.info(" - as the first argument to `Callable`");
+                diagnostic.info(" - as the last argument to `Concatenate`");
+                diagnostic.info(" - or as part of a type parameter/argument list");
             }
             true
         } else {
