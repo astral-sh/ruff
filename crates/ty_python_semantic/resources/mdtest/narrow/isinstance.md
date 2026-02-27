@@ -347,6 +347,15 @@ def _(flag: bool):
         reveal_type(x)  # revealed: Literal[1, "a"]
 ```
 
+## Splatted calls with invalid `classinfo`
+
+Diagnostics are still emitted for invalid `classinfo` types when the arguments are splatted:
+
+```py
+args = (object(), int | list[str])
+isinstance(*args)  # error: [invalid-argument-type]
+```
+
 ## Generic aliases are not supported as second argument
 
 The `classinfo` argument cannot be a generic alias:

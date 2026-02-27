@@ -2166,7 +2166,7 @@ impl KnownFunction {
                     call_expression,
                     self,
                     *second_argument,
-                    Some(&call_expression.arguments.args[1]),
+                    call_expression.arguments.args.get(1),
                 );
 
                 if let Type::ClassLiteral(class) = second_argument
