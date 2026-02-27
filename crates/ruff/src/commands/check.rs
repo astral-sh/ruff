@@ -10,6 +10,7 @@ use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 use ruff_linter::message::create_panic_diagnostic;
+use ruff_python_ast::{SourceType, TomlSourceType};
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::Diagnostic;
@@ -41,8 +42,20 @@ pub(crate) fn check(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
+    let (mut paths, resolver) = python_files_in_path(files, pyproject_config, config_arguments)?;
     debug!("Identified files to lint in: {:?}", start.elapsed());
+
+    // Filter out paths for file types not supported for linting
+    paths.retain(|path| {
+        if let Ok(ResolvedFile::Root(path) | ResolvedFile::Nested(path)) = path {
+            matches!(
+                SourceType::from(path),
+                SourceType::Python(_) | SourceType::Toml(TomlSourceType::Pyproject)
+            )
+        } else {
+            false
+        }
+    });
 
     if paths.is_empty() {
         warn_user_once!("No Python files found under the given path(s)");
