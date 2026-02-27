@@ -238,8 +238,8 @@ pub(crate) fn redefined_while_unused(checker: &Checker, scope_id: ScopeId, scope
                 diagnostic.set_parent(range.start());
             }
 
-            if let Some(runtime_source) = info.runtime_import {
-                if let Some(fix) = fixes.get(&runtime_source) {
+            if let Some(source) = info.runtime_import {
+                if let Some(fix) = fixes.get(&source) {
                     diagnostic.set_fix(fix.clone());
                 }
             }
