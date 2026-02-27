@@ -331,6 +331,7 @@ impl Bindings {
         // as-is.
         let a = a.live_bindings.into_iter();
         let b = b.live_bindings.into_iter();
+
         for zipped in a.merge_join_by(b, |a, b| a.binding.cmp(&b.binding)) {
             match zipped {
                 EitherOrBoth::Both(a, b) => {

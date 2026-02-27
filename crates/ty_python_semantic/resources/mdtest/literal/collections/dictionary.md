@@ -122,3 +122,53 @@ x6 = x7 = {"a": 1}
 reveal_type(x6["a"])  # revealed: Unknown | int
 reveal_type(x7["a"])  # revealed: Unknown | int
 ```
+
+## Dict unpacking in function calls
+
+Narrowing is also performed for dictionary unpacking expressions:
+
+```py
+def f1(a: int): ...
+def f2(a: int, b: str): ...
+def f3(a: int, b: str, c: float): ...
+
+x = {"a": 1, "b": "a"}
+
+f2(**x)  # ok
+
+# N.B. This could error, but we avoid making overly general assumptions about dictionary literals.
+f1(**x)  # ok
+
+# error: [invalid-argument-type]
+f3(**x)
+
+x["c"] = 1.0
+f3(**x)  # ok
+
+def _(x: dict[str, int]):
+    # error: [invalid-argument-type]
+    f2(**x)
+
+def _(x: dict[str, int | str]):
+    # error: [invalid-argument-type]
+    f1(**x)
+
+    x["a"] = 1
+    f1(**x)  # ok
+
+def _(x: dict[str, int | str], flag: bool):
+    if flag:
+        x["a"] = 1
+
+    # error: [invalid-argument-type]
+    f1(**x)
+
+def f4(a: int | bool, b: bool): ...
+def _(flag: bool, kwargs: dict[str, int]):
+    if flag:
+        kwargs["a"] = True
+
+    kwargs["b"] = False
+
+    f4(**kwargs)  # ok
+```
