@@ -169,6 +169,8 @@ class ValidGeneric(Generic[P]):
 def valid(
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
+    a3: Callable["P", int],
+    a4: Callable[Concatenate[int, "P"], int],
 ) -> None: ...
 def invalid(
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
