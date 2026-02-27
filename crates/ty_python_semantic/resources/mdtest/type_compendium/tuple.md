@@ -389,7 +389,7 @@ static_assert(not is_disjoint_from(tuple[N1, ...], tuple[N2, ...]))
 ```
 
 We model tuple types to _not_ be disjoint from arbitrary instance types, because we allow for the
-possibility of `tuple` to be subclassed
+possibility of `tuple` to be subclassed.
 
 ```py
 class C: ...

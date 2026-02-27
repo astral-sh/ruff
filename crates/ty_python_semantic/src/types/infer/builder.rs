@@ -1196,8 +1196,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     //   class Parent(Grandparent[T1, T2]): ...
                     //   class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
                     let explicit_bases = class.explicit_bases(self.db());
-                    let can_annotate_bases = class_node.bases().len() == explicit_bases.len()
-                        && !class_node.bases().iter().any(ast::Expr::is_starred_expr);
+                    let can_annotate_bases = || {
+                        class_node.bases().len() == explicit_bases.len()
+                            && !class_node.bases().iter().any(ast::Expr::is_starred_expr)
+                    };
 
                     // Maps each generic ancestor's class literal to the first
                     // specialization seen and the index of the explicit base it
@@ -1254,7 +1256,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             if a.origin(self.db()) == origin
                                     );
 
-                                    if can_annotate_bases {
+                                    if can_annotate_bases() {
                                         diagnostic.annotate(
                                             self.context
                                                 .secondary(&class_node.bases()[earlier_idx])
