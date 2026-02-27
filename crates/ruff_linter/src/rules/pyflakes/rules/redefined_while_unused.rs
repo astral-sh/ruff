@@ -271,11 +271,12 @@ fn bindings_in_different_forks(
         return !checker.semantic().same_branch(left, right);
     }
 
-    if shadow.same_scope() && (left_ ^ right_) {
+    if left_ ^ right_ {
         let left_binding = &checker.semantic().bindings[shadow.shadowed_id()];
         let right_binding = &checker.semantic().bindings[shadow.binding_id()];
 
-        if let (Some(left_import), Some(right_import)) =
+        if left_binding.scope == right_binding.scope
+            && let (Some(left_import), Some(right_import)) =
             (left_binding.as_any_import(), right_binding.as_any_import())
             && left_import.qualified_name() == right_import.qualified_name()
         {
