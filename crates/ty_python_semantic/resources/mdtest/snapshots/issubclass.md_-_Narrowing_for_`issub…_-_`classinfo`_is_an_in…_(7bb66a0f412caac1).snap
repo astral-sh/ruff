@@ -55,9 +55,9 @@ error[invalid-argument-type]: Invalid second argument to `issubclass`
  7 | def _(x: type[int | list | bytes]):
  8 |     # error: [invalid-argument-type]
  9 |     if issubclass(x, (int, list[int] | bytes)):
-   |        ^^^^^^^^^^^^^^------------------------^
-   |                      |
-   |                      This `UnionType` instance contains non-class elements
+   |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
+   |                            |
+   |                            This `UnionType` instance contains non-class elements
 10 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 11 |     else:
    |

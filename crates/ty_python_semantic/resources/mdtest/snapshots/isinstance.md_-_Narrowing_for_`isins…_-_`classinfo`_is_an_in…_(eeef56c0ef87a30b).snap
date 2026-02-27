@@ -101,9 +101,9 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
 15 | def _(x: int | list[int] | bytes):
 16 |     # error: [invalid-argument-type]
 17 |     if isinstance(x, (int, list[int] | bytes)):
-   |        ^^^^^^^^^^^^^^------------------------^
-   |                      |
-   |                      This `UnionType` instance contains non-class elements
+   |        ^^^^^^^^^^^^^^^^^^^^-----------------^^
+   |                            |
+   |                            This `UnionType` instance contains non-class elements
 18 |         reveal_type(x)  # revealed: int | list[int] | bytes
 19 |     else:
    |
