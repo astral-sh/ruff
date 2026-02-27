@@ -4782,22 +4782,9 @@ impl<'db> Type<'db> {
             return fallback_bindings();
         };
 
-        let is_non_instance_overload = |sig: &Signature<'db>| {
-            !sig.return_ty.has_typevar(db)
-                && ConstructorReturnDisposition::of(db, sig.return_ty, class).is_not_instance()
-        };
-        let is_explicit_strict_subclass_return = |sig: &Signature<'db>| {
-            sig.return_ty.as_nominal_instance().is_some_and(|inst| {
-                let returned_class = inst.class(db);
-                returned_class.class_literal(db) != class.class_literal(db)
-                    && returned_class.is_subclass_of(db, class)
-            })
-        };
-
-        // For overloaded metaclass `__call__` with mixed return types, we save the
-        // non-instance overloads and combine them with `__init__` after lookup.
-        // For instance-returning metaclass `__call__`, we save the bindings to include
-        // in the union with `__new__`/`__init__` so its parameters also get validated.
+        // Classify metaclass `__call__` overloads by whether they return an instance
+        // of the class being constructed. For mixed or all-instance cases, save the
+        // relevant bindings/signatures for later combination with `__new__`/`__init__`.
         let mut metaclass_mixed_non_instance_sigs = None;
         let mut metaclass_instance_bindings: Option<(Bindings<'db>, Type<'db>)> = None;
 
@@ -4807,47 +4794,24 @@ impl<'db> Type<'db> {
         }) = metaclass_dunder_call.place
         {
             let signature = metaclass_call_method.function(db).signature(db);
-
-            let non_instance_sigs: SmallVec<[Signature<'db>; 4]> = signature
-                .overloads
-                .iter()
-                .filter(|sig| is_non_instance_overload(sig))
-                .cloned()
-                .collect();
-
-            if !non_instance_sigs.is_empty() {
-                if non_instance_sigs.len() == signature.overloads.len() {
-                    // All overloads return non-instance types: use metaclass `__call__` directly.
+            match classify_constructor_overloads(
+                db,
+                signature,
+                class,
+                constructor_instance_ty,
+                Some(metaclass_call_method.self_instance(db)),
+            ) {
+                OverloadDisposition::AllNonInstance => {
                     return Type::BoundMethod(metaclass_call_method).bindings(db);
                 }
-
-                // Mixed: save ALL overloads. Non-instance overloads keep their return type.
-                // Instance-returning overloads keep strict-subclass returns (e.g. `-> D` while
-                // constructing `C`) but otherwise normalize to `constructor_instance_ty` so that
-                // `Self`-like returns remain instance-typed.
-                let metaclass_self = metaclass_call_method.self_instance(db);
-                metaclass_mixed_non_instance_sigs = Some(
-                    signature
-                        .overloads
-                        .iter()
-                        .map(|sig| {
-                            let mut bound = sig.bind_self(db, Some(metaclass_self));
-                            if !is_non_instance_overload(sig)
-                                && !is_explicit_strict_subclass_return(sig)
-                            {
-                                bound.return_ty = constructor_instance_ty;
-                            }
-                            bound
-                        })
-                        .collect::<SmallVec<[Signature<'db>; 4]>>(),
-                );
-            } else {
-                // All overloads return instance/uncertain types. Save the metaclass
-                // `__call__` bindings so we can include them in the union with
-                // `__new__`/`__init__` — this ensures the metaclass parameters are validated.
-                let metaclass_call_ty = Type::BoundMethod(metaclass_call_method);
-                metaclass_instance_bindings =
-                    Some((metaclass_call_ty.bindings(db), metaclass_call_ty));
+                OverloadDisposition::Mixed(combined_sigs) => {
+                    metaclass_mixed_non_instance_sigs = Some(combined_sigs);
+                }
+                OverloadDisposition::AllInstance => {
+                    let metaclass_call_ty = Type::BoundMethod(metaclass_call_method);
+                    metaclass_instance_bindings =
+                        Some((metaclass_call_ty.bindings(db), metaclass_call_ty));
+                }
             }
         }
 
@@ -4873,14 +4837,10 @@ impl<'db> Type<'db> {
         // constructor-call bindings.
         let new_method = self_type.lookup_dunder_new(db);
 
-        // Construct an instance type to look up `__init__`. We use `self_type` (possibly identity-
-        // specialized) so the instance retains inferable class typevars during constructor checking.
-        // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let lookup_init_ty = constructor_instance_ty;
-
         // Lookup the `__init__` instance method in the MRO, excluding `object` initially; we only
         // fall back to `object.__init__` in the `__new__`-absent case (see rules above).
-        let init_method_no_object = lookup_init_ty.member_lookup_with_policy(
+        // TODO: we should use the actual return type of `__new__` to determine the instance type
+        let init_method_no_object = constructor_instance_ty.member_lookup_with_policy(
             db,
             "__init__".into(),
             MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
@@ -4907,12 +4867,7 @@ impl<'db> Type<'db> {
         // method will not be called." Also: "an explicit return type of `Any` should be treated
         // as a type that is not an instance of the class being constructed."
         //
-        // Use a structural class-based check instead of full assignability/subtyping to avoid
-        // deep recursive relation checks on large codebases (for example static-frame).
-        //
-        // For overloaded `__new__` with mixed return types (some instance, some not), we build
-        // combined overloads where non-instance overloads keep their return type and instance-
-        // returning overloads get `constructor_instance_ty` as their return type.
+        // Classify `__new__` overloads the same way we did for metaclass `__call__` above.
         let mut new_mixed_non_instance_sigs = None;
 
         if let Some((ref _new_bindings_inner, ref new_callable)) = new_bindings {
@@ -4933,43 +4888,21 @@ impl<'db> Type<'db> {
                     });
 
                 if !is_object_or_type {
-                    let signature = func.signature(db);
-
-                    let non_instance_sigs: SmallVec<[Signature<'db>; 4]> = signature
-                        .overloads
-                        .iter()
-                        .filter(|sig| is_non_instance_overload(sig))
-                        .cloned()
-                        .collect();
-
-                    if !non_instance_sigs.is_empty() {
-                        if non_instance_sigs.len() == signature.overloads.len() {
-                            // All overloads return non-instance types: use `__new__`
-                            // directly. Each overload keeps its own return type, so
-                            // overload resolution picks the correct one per call site.
+                    match classify_constructor_overloads(
+                        db,
+                        func.signature(db),
+                        class,
+                        constructor_instance_ty,
+                        Some(self_type),
+                    ) {
+                        OverloadDisposition::AllNonInstance => {
                             let (new_bindings, _) = new_bindings.unwrap();
                             return new_bindings.with_generic_context(db, class_generic_context);
                         }
-
-                        // Mixed: save ALL overloads. Non-instance overloads keep their return
-                        // type. Instance-returning overloads keep strict-subclass returns but
-                        // otherwise normalize to `constructor_instance_ty` so `Self`-like
-                        // returns stay instance-typed.
-                        new_mixed_non_instance_sigs = Some(
-                            signature
-                                .overloads
-                                .iter()
-                                .map(|sig| {
-                                    let mut bound = sig.bind_self(db, Some(self_type));
-                                    if !is_non_instance_overload(sig)
-                                        && !is_explicit_strict_subclass_return(sig)
-                                    {
-                                        bound.return_ty = constructor_instance_ty;
-                                    }
-                                    bound
-                                })
-                                .collect::<SmallVec<[Signature<'db>; 4]>>(),
-                        );
+                        OverloadDisposition::Mixed(combined_sigs) => {
+                            new_mixed_non_instance_sigs = Some(combined_sigs);
+                        }
+                        OverloadDisposition::AllInstance => {}
                     }
                 }
             }
@@ -4992,7 +4925,7 @@ impl<'db> Type<'db> {
                 Some((bindings, *init_method))
             }
             (Place::Undefined, false) => {
-                let init_method_with_object = lookup_init_ty.member_lookup_with_policy(
+                let init_method_with_object = constructor_instance_ty.member_lookup_with_policy(
                     db,
                     "__init__".into(),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
@@ -5030,30 +4963,17 @@ impl<'db> Type<'db> {
             (Place::Undefined, true) => None,
         };
 
-        // If `__new__` had mixed return types (some non-instance, some instance), keep all
-        // `__new__` overloads with correct per-overload return types, and attach `__init__`
-        // bindings as deferred conditional validation. At call checking time, `__init__` is
-        // only validated when the matched `__new__` overload is instance-returning.
-        if let Some(combined_sigs) = new_mixed_non_instance_sigs {
+        // If `__new__` or metaclass `__call__` had mixed return types (some non-instance, some
+        // instance), keep all overloads with correct per-overload return types, and attach
+        // `__init__` bindings as deferred conditional validation. At call checking time,
+        // `__init__` is only validated when the matched overload is instance-returning.
+        let mixed_sigs_and_callable = new_mixed_non_instance_sigs
+            .map(|sigs| (sigs, self_type))
+            .or(metaclass_mixed_non_instance_sigs.map(|sigs| (sigs, self)));
+
+        if let Some((combined_sigs, callable_type)) = mixed_sigs_and_callable {
             let mut bindings: Bindings<'db> =
-                CallableBinding::from_overloads(self_type, combined_sigs).into();
-
-            if let Some((init_bindings, _)) = init_bindings {
-                bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
-            }
-
-            return bindings
-                .with_generic_context(db, class_generic_context)
-                .with_constructor_instance_type(constructor_instance_ty);
-        }
-
-        // If the metaclass `__call__` had mixed return types (some non-instance, some instance),
-        // keep all overloads with per-overload return types, and attach `__init__` bindings as
-        // deferred conditional validation. At call checking time, `__init__` is only validated
-        // when the matched overload is instance-returning.
-        if let Some(combined_sigs) = metaclass_mixed_non_instance_sigs {
-            let mut bindings: Bindings<'db> =
-                CallableBinding::from_overloads(self, combined_sigs).into();
+                CallableBinding::from_overloads(callable_type, Vec::from(combined_sigs)).into();
 
             if let Some((init_bindings, _)) = init_bindings {
                 bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
@@ -7267,6 +7187,77 @@ impl ConstructorReturnDisposition {
     const fn is_not_instance(self) -> bool {
         matches!(self, Self::NotInstance)
     }
+}
+
+/// Result of classifying a constructor's overloads by whether they return an
+/// instance of the class being constructed.
+enum OverloadDisposition<'db> {
+    /// All overloads return non-instance types.
+    AllNonInstance,
+    /// Mix of instance-returning and non-instance-returning overloads.
+    /// Contains the combined signatures with `self` bound and instance-returning
+    /// overloads normalized to `constructor_instance_ty`.
+    Mixed(Box<[Signature<'db>]>),
+    /// All overloads return instance/uncertain types (no non-instance overloads).
+    AllInstance,
+}
+
+/// Classify a constructor callable's overloads by whether each returns an
+/// instance of `class`.
+///
+/// - `signature`: the callable's full overloaded signature
+/// - `class`: the class being constructed
+/// - `constructor_instance_ty`: the instance type to substitute for instance-returning overloads
+/// - `bind_self_ty`: the type to bind `self`/`cls` to when building mixed signatures
+fn classify_constructor_overloads<'db>(
+    db: &'db dyn Db,
+    signature: &CallableSignature<'db>,
+    class: ClassType<'db>,
+    constructor_instance_ty: Type<'db>,
+    bind_self_ty: Option<Type<'db>>,
+) -> OverloadDisposition<'db> {
+    let is_non_instance = |sig: &Signature<'db>| {
+        !sig.return_ty.has_typevar(db)
+            && ConstructorReturnDisposition::of(db, sig.return_ty, class).is_not_instance()
+    };
+
+    let non_instance_count = signature
+        .overloads
+        .iter()
+        .filter(|sig| is_non_instance(sig))
+        .count();
+
+    if non_instance_count == 0 {
+        return OverloadDisposition::AllInstance;
+    }
+    if non_instance_count == signature.overloads.len() {
+        return OverloadDisposition::AllNonInstance;
+    }
+
+    // Mixed: build combined signatures. Non-instance overloads keep their return
+    // type. Instance-returning overloads keep strict-subclass returns (e.g. `-> D`
+    // while constructing `C`) but otherwise normalize to `constructor_instance_ty`
+    // so that `Self`-like returns remain instance-typed.
+    let combined = signature
+        .overloads
+        .iter()
+        .map(|sig| {
+            let mut bound = sig.bind_self(db, bind_self_ty);
+            if !is_non_instance(sig) {
+                let is_strict_subclass = sig.return_ty.as_nominal_instance().is_some_and(|inst| {
+                    let returned_class = inst.class(db);
+                    returned_class.class_literal(db) != class.class_literal(db)
+                        && returned_class.is_subclass_of(db, class)
+                });
+                if !is_strict_subclass {
+                    bound.return_ty = constructor_instance_ty;
+                }
+            }
+            bound
+        })
+        .collect();
+
+    OverloadDisposition::Mixed(combined)
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
