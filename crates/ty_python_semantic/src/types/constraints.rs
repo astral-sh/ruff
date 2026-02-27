@@ -87,7 +87,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
     UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxIndexMap, FxIndexSet, FxOrderSet};
+use crate::{Db, FxIndexMap, FxIndexSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -204,11 +204,27 @@ where
     }
 }
 
+/// An owned copy of a [`ConstraintSet`]. Unlike [`ConstraintSet`], this type owns the storage
+/// arenas that hold its BDD.
+///
+/// This type is never created as part of the core type inference algorithms; it is only used by
+/// the [`InternedConstraintSet`][crate::types::InternedConstraintSet] type, which is the wrapper
+/// type that lets us create and operate on constraint sets in our mdtests. That means we don't
+/// have to be overly worried about the efficiency of this type.
+///
+/// Note that you cannot interrogate an owned constraint set in any useful way. Instead, you must
+/// [`load`][ConstraintSetBuilder::load] it into a new builder, and query the result.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct OwnedConstraintSet<'db> {
     /// The BDD representing this constraint set
     node: NodeId,
+
+    /// The constraints arena for this BDD. This is extracted from the [`ConstraintSetBuilder`]
+    /// when an owned constraint set is constructed.
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
+
+    /// The nodes arena for this BDD. This is extracted from the [`ConstraintSetBuilder`] when an
+    /// owned constraint set is constructed.
     nodes: IndexVec<NodeId, InteriorNodeData>,
 }
 
@@ -226,7 +242,11 @@ pub struct OwnedConstraintSet<'db> {
 pub struct ConstraintSet<'db, 'c> {
     /// The BDD representing this constraint set
     node: NodeId,
+
+    /// A reference to the builder that holds the storage for this constraint set's BDD
     builder: &'c ConstraintSetBuilder<'db>,
+
+    /// Ensures that the `'c` lifetime is invariant
     _invariant: PhantomData<fn(&'c ()) -> &'c ()>,
 }
 
@@ -269,6 +289,7 @@ impl<'db, 'c> ConstraintSet<'db, 'c> {
         )
     }
 
+    /// Verifies that this constraint set was created by `builder`
     #[track_caller]
     fn verify_builder(self, builder: &'c ConstraintSetBuilder<'db>) {
         debug_assert!(std::ptr::eq(self.builder, builder));
@@ -596,6 +617,19 @@ impl Debug for ConstraintSet<'_, '_> {
     }
 }
 
+/// Holds the storage for the BDD structure of a related collection of constraint sets.
+///
+/// This is usually passed around by shared reference to avoid convoluted APIs that thread mutable
+/// references to the builder back and forth.
+///
+/// Most core type inference algorithms create one of these, create one or more constraint sets in
+/// the builder, interrogate those constraint sets, and then throw the builder away.
+///
+/// All of our BDD algorithms rely heavily on interning and memoization, for both correctness and
+/// efficiency. These caches are only unique within the context of a particular builder. We do not
+/// cache globally across the entire ty process. (The main reason is to avoid any dependencies on
+/// the particular order in which files or expressions are visited during type checking. A minor
+/// additional benefit is that the builder does not need to be thread-safe or impl [`Sync`].)
 #[derive(Default)]
 pub(crate) struct ConstraintSetBuilder<'db> {
     storage: RefCell<ConstraintSetStorage<'db>>,
@@ -603,12 +637,27 @@ pub(crate) struct ConstraintSetBuilder<'db> {
 
 #[derive(Clone, Debug, Default, Eq, PartialEq, get_size2::GetSize)]
 struct ConstraintSetStorage<'db> {
-    typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
+    /// Constraints are the variables of our BDD. They are interned to give them a space-efficient
+    /// identity. Constraints are added to this arena as they are encountered when constructing
+    /// constraint sets. The ordering within the arena defines the BDD variable ordering in our BDD
+    /// structures.
     constraints: IndexVec<ConstraintId, Constraint<'db>>,
+
+    /// Typevars are interned so that they have a stable ordering within this builder, which does
+    /// not depend on their salsa IDs. (The salsa IDs are not stable, since each typevar can be
+    /// used (possibly indirectly) in expressions in different files, and there are no guarantees
+    /// about the order or the speed that we process each file.)
+    ///
+    /// The ordering of typevars within this arena defines which typevars can be the lower/upper
+    /// bounds of another (e.g., whether we encode `T ≤ U` as `Never ≤ T ≤ U` or `T ≤ U ≤ object`).
+    typevars: IndexVec<TypeVarId, BoundTypeVarIdentity<'db>>,
+
+    /// The BDD nodes that appear in any of the constraint sets constructed in this builder.
     nodes: IndexVec<NodeId, InteriorNodeData>,
 
-    typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
+    // Everything below are the memoization tables for the arenas and for our BDD operations.
     constraint_cache: FxHashMap<Constraint<'db>, ConstraintId>,
+    typevar_cache: FxHashMap<BoundTypeVarIdentity<'db>, TypeVarId>,
     node_cache: FxHashMap<InteriorNodeData, NodeId>,
 
     negate_cache: FxHashMap<NodeId, NodeId>,
@@ -630,10 +679,18 @@ impl<'db> ConstraintSetBuilder<'db> {
         Self::default()
     }
 
+    /// Creates an [`OwnedConstraintSet`], consuming this builder in the process. You provide a
+    /// callback that constructs a [`ConstraintSet`]. We then package that constraint set up with
+    /// the storage arenas from this builder.
     pub(crate) fn into_owned(
         self,
         f: impl for<'c> FnOnce(&'c Self) -> ConstraintSet<'db, 'c>,
     ) -> OwnedConstraintSet<'db> {
+        // NOTE: We do not store any of the builder's memoization caches in the result. Owned
+        // constraint sets can only be used by adding them to a new builder. Doing so adds copies
+        // of the constraints and nodes to the new builder, since they might overlap with
+        // constraints and nodes that already exist there. That means the memoization caches from
+        // the original builder aren't relevant to the new builder, and don't need to be retained.
         let constraint = f(&self);
         let node = constraint.node;
         let storage = self.storage.into_inner();
@@ -644,11 +701,20 @@ impl<'db> ConstraintSetBuilder<'db> {
         }
     }
 
+    /// Loads an [`OwnedConstraintSet`] into this builder.
     pub(crate) fn load<'c>(
         &'c self,
         db: &'db dyn Db,
         other: &OwnedConstraintSet<'db>,
     ) -> ConstraintSet<'db, 'c> {
+        // The BDD structure inside a builder depends on the ordering of constraints and typevars
+        // in the builder's arenas. (The constraint ordering defines the BDD variable ordering,
+        // while the typevar ordering defines which typevars can be lower/upper bounds of other
+        // typevars.) There is no guarantee that the `OwnedConstraintSet` and this builder have
+        // consistent orderings, so we have to just reload everything, standardizing on _this_
+        // builder's orderings. That's not the quickest thing in the world, but that's fine, since
+        // `OwnedConstraintSet` is only used in mdtests, and not in type inference of user code.
+
         fn rebuild_node<'db>(
             db: &'db dyn Db,
             builder: &ConstraintSetBuilder<'db>,
@@ -681,11 +747,13 @@ impl<'db> ConstraintSetBuilder<'db> {
             remapped
         }
 
+        // Maps NodeIds in the OwnedConstraintSet to the corresponding NodeIds in this builder.
         let mut cache = FxHashMap::default();
         let node = rebuild_node(db, self, other, &mut cache, other.node);
         ConstraintSet::from_node(self, node)
     }
 
+    /// Interns a single typevar, giving it a stable order in this builder
     fn intern_typevar(&self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarId {
         let identity = typevar.identity(db);
         let mut storage = self.storage.borrow_mut();
@@ -697,6 +765,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         id
     }
 
+    /// Interns all of the typevars mentioned in a type in a stable order.
     fn intern_mentioned_typevars_in_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         struct InternMentionedTypevars<'a, 'db> {
             builder: &'a ConstraintSetBuilder<'db>,
@@ -735,6 +804,7 @@ impl<'db> ConstraintSetBuilder<'db> {
         .visit_type(db, ty);
     }
 
+    /// Interns all of the typevars mentioned in a constraint in a stable order.
     fn intern_constraint_typevars(
         &self,
         db: &'db dyn Db,
@@ -1069,12 +1139,12 @@ impl ConstraintId {
     /// and working with BDDs. We don't do that, but we have tried to make some simple choices that
     /// have clear wins.
     ///
-    /// In particular, we use the IDs that salsa assigns to each constraint as it is created. This
-    /// tends to ensure that constraints that are close to each other in the source are also close
-    /// to each other in the BDD structure.
+    /// In particular, we use the order that constraints are added to this builder. This gives us
+    /// an ordering that is stable across runs, and which is not influenced by when and how quickly
+    /// we analyze the other files in the project.
     ///
     /// As an optimization, we also _reverse_ this ordering, so that constraints that appear
-    /// earlier in the source appear "lower" (closer to the terminal nodes) in the BDD. Since we
+    /// earlier in the arena appear "lower" (closer to the terminal nodes) in the BDD. Since we
     /// build up BDDs by combining smaller BDDs (which will have been constructed from expressions
     /// earlier in the source), this tends to minimize the amount of "node shuffling" that we have
     /// to do when combining BDDs.
@@ -1265,13 +1335,13 @@ impl ConstraintId {
     }
 }
 
-/// The index of a BDD node within a [`ConstraintSetStorage`].
+/// The index of a BDD node within a [`ConstraintSetBuilder`].
 ///
 /// The "variables" of a constraint set BDD are individual constraints, represented by an interned
 /// [`Constraint`].
 ///
-/// Terminal nodes (`false` and `true`) have hard-coded index values. Interior nodes are stored in
-/// a [`ConstraintSetStorage`], and are represented by the index into the storage array. By
+/// Terminal nodes (`false` and `true`) have hard-coded IDs. Interior nodes are stored in a
+/// [`ConstraintSetBuilder`], and are represented by the index into the storage array. By
 /// construction, interior nodes can only refer to nodes with smaller indexes (since the nodes that
 /// outgoing edges point at must already exist).
 ///
@@ -3870,9 +3940,9 @@ struct SequentMap {
     /// Sequents of the form `C₁ ∧ C₂ → false`
     pair_impossibilities: FxHashSet<(ConstraintId, ConstraintId)>,
     /// Sequents of the form `C₁ ∧ C₂ → D`
-    pair_implications: FxHashMap<(ConstraintId, ConstraintId), FxOrderSet<ConstraintId>>,
+    pair_implications: FxIndexMap<(ConstraintId, ConstraintId), FxIndexSet<ConstraintId>>,
     /// Sequents of the form `C → D`
-    single_implications: FxHashMap<ConstraintId, FxOrderSet<ConstraintId>>,
+    single_implications: FxIndexMap<ConstraintId, FxIndexSet<ConstraintId>>,
 }
 
 impl SequentMap {
