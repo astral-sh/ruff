@@ -33,14 +33,20 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/narrow/isinstance.md
 18 |         reveal_type(x)  # revealed: int | list[int] | bytes
 19 |     else:
 20 |         reveal_type(x)  # revealed: int | list[int] | bytes
-21 | classes = (int, list[int] | bytes)
-22 | 
-23 | def _(x: int | list[int] | bytes):
-24 |     # error: [invalid-argument-type]
-25 |     if isinstance(x, classes):
+21 | def _(x: int | list[int] | bytes):
+22 |     # error: [invalid-argument-type]
+23 |     if isinstance(x, (int, (str, list[int] | bytes))):
+24 |         reveal_type(x)  # revealed: int | list[int] | bytes
+25 |     else:
 26 |         reveal_type(x)  # revealed: int | list[int] | bytes
-27 |     else:
-28 |         reveal_type(x)  # revealed: int | list[int] | bytes
+27 | classes = (int, list[int] | bytes)
+28 | 
+29 | def _(x: int | list[int] | bytes):
+30 |     # error: [invalid-argument-type]
+31 |     if isinstance(x, classes):
+32 |         reveal_type(x)  # revealed: int | list[int] | bytes
+33 |     else:
+34 |         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
 # Diagnostics
@@ -123,14 +129,33 @@ info: rule `invalid-argument-type` is enabled by default
 
 ```
 error[invalid-argument-type]: Invalid second argument to `isinstance`
-  --> src/mdtest_snippet.py:25:8
+  --> src/mdtest_snippet.py:23:8
    |
-23 | def _(x: int | list[int] | bytes):
-24 |     # error: [invalid-argument-type]
-25 |     if isinstance(x, classes):
+21 | def _(x: int | list[int] | bytes):
+22 |     # error: [invalid-argument-type]
+23 |     if isinstance(x, (int, (str, list[int] | bytes))):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^-----------------^^^
+   |                                  |
+   |                                  This `UnionType` instance contains non-class elements
+24 |         reveal_type(x)  # revealed: int | list[int] | bytes
+25 |     else:
+   |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:31:8
+   |
+29 | def _(x: int | list[int] | bytes):
+30 |     # error: [invalid-argument-type]
+31 |     if isinstance(x, classes):
    |        ^^^^^^^^^^^^^^^^^^^^^^
-26 |         reveal_type(x)  # revealed: int | list[int] | bytes
-27 |     else:
+32 |         reveal_type(x)  # revealed: int | list[int] | bytes
+33 |     else:
    |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union `list[int] | bytes` is not a class object

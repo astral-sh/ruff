@@ -2616,6 +2616,17 @@ def g(arg: object, arg2: type):
     issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
 ```
 
+This includes nested tuples:
+
+```py
+def g2(arg: object, arg2: type):
+    isinstance(arg, (int, (HasX, str)))  # error: [isinstance-against-protocol]
+
+    # error: [isinstance-against-protocol]
+    # error: [isinstance-against-protocol]
+    issubclass(arg2, (int, (HasX, RuntimeCheckableHasX)))
+```
+
 This also works when the tuple is not a literal in the source:
 
 ```py

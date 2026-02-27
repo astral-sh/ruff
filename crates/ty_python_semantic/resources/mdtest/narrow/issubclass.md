@@ -192,7 +192,18 @@ def _(x: type[int | list | bytes]):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 ```
 
-Including non-literal tuples:
+Including nested tuples:
+
+```py
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, (int, (str, list[int] | bytes))):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
+And non-literal tuples:
 
 ```py
 classes = (int, list[int] | bytes)

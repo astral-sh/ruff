@@ -139,7 +139,18 @@ def _(x: int | list[int] | bytes):
         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
-Including non-literal tuples:
+Including nested tuples:
+
+```py
+def _(x: int | list[int] | bytes):
+    # error: [invalid-argument-type]
+    if isinstance(x, (int, (str, list[int] | bytes))):
+        reveal_type(x)  # revealed: int | list[int] | bytes
+    else:
+        reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+And non-literal tuples:
 
 ```py
 classes = (int, list[int] | bytes)

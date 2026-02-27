@@ -189,6 +189,7 @@ The same applies when `Any` is nested inside a tuple, including non-literal tupl
 
 ```py
 isinstance("", (int, Any))  # error: [invalid-argument-type]
+isinstance("", (int, (str, Any)))  # error: [invalid-argument-type]
 classes = (int, Any)
 isinstance("", classes)  # error: [invalid-argument-type]
 ```
@@ -198,4 +199,5 @@ But `issubclass()` checks are fine:
 ```py
 issubclass(object, Any)  # no error!
 issubclass(object, (int, Any))  # no error!
+issubclass(object, (int, (str, Any)))  # no error!
 ```

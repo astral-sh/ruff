@@ -83,10 +83,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/protocols.md
 68 |     issubclass(arg2, (HasX, RuntimeCheckableHasX))
 69 | 
 70 |     issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
-71 | classes = (HasX, int)
-72 | 
-73 | def h(arg: object):
-74 |     isinstance(arg, classes)  # error: [isinstance-against-protocol]
+71 | def g2(arg: object, arg2: type):
+72 |     isinstance(arg, (int, (HasX, str)))  # error: [isinstance-against-protocol]
+73 | 
+74 |     # error: [isinstance-against-protocol]
+75 |     # error: [isinstance-against-protocol]
+76 |     issubclass(arg2, (int, (HasX, RuntimeCheckableHasX)))
+77 | classes = (HasX, int)
+78 | 
+79 | def h(arg: object):
+80 |     isinstance(arg, classes)  # error: [isinstance-against-protocol]
 ```
 
 # Diagnostics
@@ -303,7 +309,8 @@ error[isinstance-against-protocol]: Class `HasX` cannot be used as the second ar
 69 |
 70 |     issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
-71 | classes = (HasX, int)
+71 | def g2(arg: object, arg2: type):
+72 |     isinstance(arg, (int, (HasX, str)))  # error: [isinstance-against-protocol]
    |
 info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
  --> src/mdtest_snippet.py:3:7
@@ -322,10 +329,85 @@ info: rule `isinstance-against-protocol` is enabled by default
 
 ```
 error[isinstance-against-protocol]: Class `HasX` cannot be used as the second argument to `isinstance`
-  --> src/mdtest_snippet.py:74:5
+  --> src/mdtest_snippet.py:72:5
    |
-73 | def h(arg: object):
-74 |     isinstance(arg, classes)  # error: [isinstance-against-protocol]
+70 |     issubclass(arg2, (HasX, OnlyMethodMembers))  # error: [isinstance-against-protocol]
+71 | def g2(arg: object, arg2: type):
+72 |     isinstance(arg, (int, (HasX, str)))  # error: [isinstance-against-protocol]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+73 |
+74 |     # error: [isinstance-against-protocol]
+   |
+info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import Protocol
+2 |
+3 | class HasX(Protocol):
+  |       ^^^^^^^^^^^^^^ `HasX` declared here
+4 |     x: int
+  |
+info: A protocol class can only be used in `isinstance` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
+info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+info: rule `isinstance-against-protocol` is enabled by default
+
+```
+
+```
+error[isinstance-against-protocol]: Class `HasX` cannot be used as the second argument to `issubclass`
+  --> src/mdtest_snippet.py:76:5
+   |
+74 |     # error: [isinstance-against-protocol]
+75 |     # error: [isinstance-against-protocol]
+76 |     issubclass(arg2, (int, (HasX, RuntimeCheckableHasX)))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+77 | classes = (HasX, int)
+   |
+info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable
+ --> src/mdtest_snippet.py:3:7
+  |
+1 | from typing_extensions import Protocol
+2 |
+3 | class HasX(Protocol):
+  |       ^^^^^^^^^^^^^^ `HasX` declared here
+4 |     x: int
+  |
+info: A protocol class can only be used in `issubclass` checks if it is decorated with `@typing.runtime_checkable` or `@typing_extensions.runtime_checkable`
+info: See https://docs.python.org/3/library/typing.html#typing.runtime_checkable
+info: rule `isinstance-against-protocol` is enabled by default
+
+```
+
+```
+error[isinstance-against-protocol]: Class `RuntimeCheckableHasX` cannot be used as the second argument to `issubclass`
+  --> src/mdtest_snippet.py:76:5
+   |
+74 |     # error: [isinstance-against-protocol]
+75 |     # error: [isinstance-against-protocol]
+76 |     issubclass(arg2, (int, (HasX, RuntimeCheckableHasX)))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
+77 | classes = (HasX, int)
+   |
+info: A protocol class cannot be used in `issubclass` checks if it has non-method members
+  --> src/mdtest_snippet.py:20:5
+   |
+18 | @runtime_checkable
+19 | class RuntimeCheckableHasX(Protocol):
+20 |     x: int
+   |     ^ Non-method member `x` declared here
+21 |
+22 | def f(arg: object):
+   |
+info: rule `isinstance-against-protocol` is enabled by default
+
+```
+
+```
+error[isinstance-against-protocol]: Class `HasX` cannot be used as the second argument to `isinstance`
+  --> src/mdtest_snippet.py:80:5
+   |
+79 | def h(arg: object):
+80 |     isinstance(arg, classes)  # error: [isinstance-against-protocol]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^ This call will raise `TypeError` at runtime
    |
 info: `HasX` is declared as a protocol class, but it is not declared as runtime-checkable

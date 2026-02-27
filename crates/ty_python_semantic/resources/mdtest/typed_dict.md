@@ -1923,6 +1923,7 @@ The same applies when a `TypedDict` class appears inside a tuple, including non-
 def _(obj: object, obj2: type):
     isinstance(obj, (int, Person))  # error: [isinstance-against-typed-dict]
     issubclass(obj2, (int, Person))  # error: [isinstance-against-typed-dict]
+    isinstance(obj, (int, (str, Person)))  # error: [isinstance-against-typed-dict]
 
 classes = (int, Person)
 
