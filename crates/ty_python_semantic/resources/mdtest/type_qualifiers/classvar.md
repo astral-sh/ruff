@@ -158,6 +158,7 @@ class C(Generic[T, P]):
     c: ClassVar[int | T]
 
     # error: [invalid-type-form] "`ClassVar` cannot contain type variables"
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     d: ClassVar[P]
 
     # No error: no type variables
