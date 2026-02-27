@@ -2184,7 +2184,7 @@ declare_lint! {
     /// ```
     pub(crate) static FINAL_ON_NON_METHOD = {
         summary: "detects `@final` applied to non-method functions",
-        status: LintStatus::stable("0.0.22"),
+        status: LintStatus::stable("0.0.20"),
         default_level: Level::Error,
     }
 }

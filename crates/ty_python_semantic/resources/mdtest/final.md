@@ -446,33 +446,11 @@ def outer():
     def inner() -> None:
         pass
 
-# Using `typing_extensions.final` should also be detected
-import typing_extensions
-
-@typing_extensions.final  # error: [final-on-non-method]
-def func2() -> None:
-    pass
-
-# `@final` on methods is fine (no error)
-class MyClass:
-    @final
-    def method(self) -> None:
-        pass
-
-    @final
-    @classmethod
-    def class_method(cls) -> None:
-        pass
-
-    @final
-    @staticmethod
-    def static_method() -> None:
-        pass
-
-# `@final` on classes is fine (no error)
-@final
-class FinalClass:
-    pass
+# A function nested inside a method is also not a method
+class F:
+    def method(self):
+        @final  # error: [final-on-non-method]
+        def not_a_method() -> None: ...
 ```
 
 ## An `@final` method is overridden by an implicit instance attribute

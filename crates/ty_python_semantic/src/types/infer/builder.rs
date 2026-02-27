@@ -3220,25 +3220,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Check for `@final` applied to non-method functions.
         // `@final` is only meaningful on methods and classes; using it on a module-level
         // or nested function is an error per the typing spec.
-        if function_decorators.contains(FunctionDecorators::FINAL) {
-            let file_scope_id = self.scope().file_scope_id(self.db());
-            if !self.index.scope(file_scope_id).kind().is_class() {
-                if let Some(final_decorator) = decorator_list.iter().find(|decorator| {
-                    matches!(
-                        self.expression_type(&decorator.expression),
-                        Type::FunctionLiteral(f) if f.is_known(self.db(), KnownFunction::Final)
-                    )
-                }) {
-                    if let Some(builder) = self
-                        .context
-                        .report_lint(&FINAL_ON_NON_METHOD, final_decorator)
-                    {
-                        builder.into_diagnostic(format_args!(
-                            "`@final` cannot be applied to a non-method function `{name}`",
-                        ));
-                    }
-                }
-            }
+        if function_decorators.contains(FunctionDecorators::FINAL)
+            && !self
+                .index
+                .scope(self.scope().file_scope_id(self.db()))
+                .kind()
+                .is_class()
+            && let Some(final_decorator) = decorator_list.iter().find(|decorator| {
+                matches!(
+                    self.expression_type(&decorator.expression),
+                    Type::FunctionLiteral(f) if f.is_known(self.db(), KnownFunction::Final)
+                )
+            })
+            && let Some(builder) = self
+                .context
+                .report_lint(&FINAL_ON_NON_METHOD, final_decorator)
+        {
+            builder.into_diagnostic(format_args!(
+                "`@final` cannot be applied to a non-method function `{name}`",
+            ));
         }
 
         let has_defaults = parameters
