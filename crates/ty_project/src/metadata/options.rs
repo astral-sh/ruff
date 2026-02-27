@@ -71,13 +71,14 @@ pub struct Options {
     /// Valid severities are:
     ///
     /// * `ignore`: Disable the rule.
+    /// * `hint`: Enable the rule and create a hint diagnostic.
     /// * `warn`: Enable the rule and create a warning diagnostic.
     /// * `error`: Enable the rule and create an error diagnostic.
     ///   ty will exit with a non-zero code if any error diagnostics are emitted.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
-        value_type = r#"dict[RuleName | "all", "ignore" | "warn" | "error"]"#,
+        value_type = r#"dict[RuleName | "all", "ignore" | "hint" | "warn" | "error"]"#,
         example = r#"
             [tool.ty.rules]
             possibly-unresolved-reference = "warn"
@@ -1567,7 +1568,7 @@ pub struct OverrideOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"{...}"#,
-        value_type = r#"dict[RuleName | "all", "ignore" | "warn" | "error"]"#,
+        value_type = r#"dict[RuleName | "all", "ignore" | "hint" | "warn" | "error"]"#,
         example = r#"
             [[tool.ty.overrides]]
             include = ["src"]

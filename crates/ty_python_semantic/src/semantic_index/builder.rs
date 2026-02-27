@@ -554,6 +554,73 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         });
     }
 
+    fn resolve_nested_reference_scope(
+        &self,
+        nested_scope: FileScopeId,
+        name: &str,
+    ) -> Option<FileScopeId> {
+        VisibleAncestorsIter::new(&self.scopes, nested_scope)
+            .skip(1)
+            .find_map(|(scope_id, _)| {
+                let place_table = &self.place_tables[scope_id];
+                let symbol_id = place_table.symbol_id(name)?;
+                let symbol = place_table.symbol(symbol_id);
+
+                // Only a true local binding in an ancestor scope can be the resolution target.
+                // `global`/`nonlocal` here are forwarding declarations, not owning bindings.
+                symbol.is_local().then_some(scope_id)
+            })
+    }
+
+    /// Marks bindings in enclosing scopes as used when a nested scope resolves a reference to them.
+    ///
+    /// This reuses enclosing-snapshot data so lazy scopes account for later reassignments that can
+    /// also reach the nested reference.
+    fn mark_captured_bindings_used(&mut self) {
+        let mut resolved_scopes_by_nested_symbol =
+            FxHashMap::<(FileScopeId, ScopedSymbolId), Option<FileScopeId>>::default();
+
+        let mut snapshots_to_mark = Vec::new();
+
+        for (&key, &snapshot_id) in &self.enclosing_snapshots {
+            let ScopedPlaceId::Symbol(enclosing_symbol_id) = key.enclosing_place else {
+                continue;
+            };
+
+            let enclosing_symbol =
+                self.place_tables[key.enclosing_scope].symbol(enclosing_symbol_id);
+            let nested_place_table = &self.place_tables[key.nested_scope];
+
+            let Some(nested_symbol_id) =
+                nested_place_table.symbol_id(enclosing_symbol.name().as_str())
+            else {
+                continue;
+            };
+
+            let nested_symbol = nested_place_table.symbol(nested_symbol_id);
+            if !nested_symbol.is_used() || nested_symbol.is_local() || nested_symbol.is_global() {
+                continue;
+            }
+
+            let resolved_scope = *resolved_scopes_by_nested_symbol
+                .entry((key.nested_scope, nested_symbol_id))
+                .or_insert_with(|| {
+                    self.resolve_nested_reference_scope(
+                        key.nested_scope,
+                        enclosing_symbol.name().as_str(),
+                    )
+                });
+
+            if resolved_scope == Some(key.enclosing_scope) {
+                snapshots_to_mark.push((key.enclosing_scope, snapshot_id));
+            }
+        }
+
+        for (scope_id, snapshot_id) in snapshots_to_mark {
+            self.use_def_maps[scope_id].mark_enclosing_snapshot_bindings_used(snapshot_id);
+        }
+    }
+
     fn pop_scope(&mut self) -> FileScopeId {
         self.try_node_context_stack_manager.exit_scope();
 
@@ -1509,6 +1576,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
 
         // Pop the root scope
         self.pop_scope();
+        self.mark_captured_bindings_used();
         self.sweep_nonlocal_lazy_snapshots();
         assert!(self.scope_stack.is_empty());
 

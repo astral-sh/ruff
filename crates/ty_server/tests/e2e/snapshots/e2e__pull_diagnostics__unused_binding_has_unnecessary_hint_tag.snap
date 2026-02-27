@@ -1,0 +1,29 @@
+---
+source: crates/ty_server/tests/e2e/pull_diagnostics.rs
+expression: diagnostics
+---
+{
+  "kind": "full",
+  "resultId": "[RESULT_ID]",
+  "items": [
+    {
+      "range": {
+        "start": {
+          "line": 1,
+          "character": 4
+        },
+        "end": {
+          "line": 1,
+          "character": 5
+        }
+      },
+      "severity": 4,
+      "code": "unused-binding",
+      "source": "ty",
+      "message": "Binding `x` is unused",
+      "tags": [
+        1
+      ]
+    }
+  ]
+}

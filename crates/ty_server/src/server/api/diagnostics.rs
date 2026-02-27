@@ -9,6 +9,7 @@ use lsp_types::{
 use ruff_diagnostics::Applicability;
 use ruff_text_size::Ranged;
 use rustc_hash::FxHashMap;
+use ty_python_semantic::types::ide_support::unused_bindings;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
@@ -23,6 +24,8 @@ use crate::session::{DocumentHandle, GlobalSettings};
 use crate::system::{AnySystemPath, file_to_url};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
+
+const UNUSED_BINDING_CODE: &str = "unused-binding";
 
 #[derive(Debug)]
 pub(super) struct Diagnostics {
@@ -42,10 +45,9 @@ impl Diagnostics {
             return None;
         }
 
-        // Generate result ID based on raw diagnostic content only
+        // Generate result ID based on raw diagnostic content only.
         let mut hasher = DefaultHasher::new();
 
-        // Hash the length first to ensure different numbers of diagnostics produce different hashes
         diagnostics.hash(&mut hasher);
 
         Some(format!("{:016x}", hasher.finish()))
@@ -325,13 +327,40 @@ pub(super) fn compute_diagnostics(
         return None;
     };
 
-    let diagnostics = db.check_file(file);
+    let mut diagnostics = db.check_file(file);
+    if db.project().should_check_file(db, file) {
+        diagnostics.extend(unused_binding_diagnostics(db, file));
+    }
 
     Some(Diagnostics {
         items: diagnostics,
         encoding,
         file_or_notebook: file,
     })
+}
+
+pub(super) fn unused_binding_diagnostics(
+    db: &ProjectDatabase,
+    file: File,
+) -> Vec<ruff_db::diagnostic::Diagnostic> {
+    use ruff_db::diagnostic::{Annotation, DiagnosticId, DiagnosticTag};
+    use ruff_db::files::FileRange;
+
+    unused_bindings(db, file)
+        .iter()
+        .map(|binding| {
+            let mut diagnostic = ruff_db::diagnostic::Diagnostic::new(
+                DiagnosticId::lint(UNUSED_BINDING_CODE),
+                Severity::Hint,
+                format!("Binding `{}` is unused", binding.name),
+            );
+            diagnostic.annotate(
+                Annotation::primary(FileRange::new(file, binding.range).into())
+                    .tag(DiagnosticTag::Unnecessary),
+            );
+            diagnostic
+        })
+        .collect()
 }
 
 /// Converts the tool specific [`Diagnostic`][ruff_db::diagnostic::Diagnostic] to an LSP
@@ -364,6 +393,7 @@ pub(super) fn to_lsp_diagnostic(
     };
 
     let severity = match diagnostic.severity() {
+        Severity::Hint => DiagnosticSeverity::HINT,
         Severity::Info => DiagnosticSeverity::INFORMATION,
         Severity::Warning => DiagnosticSeverity::WARNING,
         Severity::Error | Severity::Fatal => DiagnosticSeverity::ERROR,

@@ -21,7 +21,7 @@ use ty_project::{ProgressReporter, ProjectDatabase};
 use crate::PositionEncoding;
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::DocumentKey;
-use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
+use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic, unused_binding_diagnostics};
 use crate::server::api::traits::{
     BackgroundRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -235,6 +235,8 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
     }
 
     fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
+        let unnecessary = unused_binding_diagnostics(db, file);
+
         // Another thread might have panicked at this point because of a salsa cancellation which
         // poisoned the result. If the response is poisoned, just don't report and wait for our thread
         // to unwind with a salsa cancellation next.
@@ -255,10 +257,10 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         // Don't report empty diagnostics. We clear previous diagnostics in `into_response`
         // which also handles the case where a file no longer has diagnostics because
         // it's no longer part of the project.
-        if !diagnostics.is_empty() {
+        if !diagnostics.is_empty() || !unnecessary.is_empty() {
             state
                 .response
-                .write_diagnostics_for_file(db, file, diagnostics);
+                .write_diagnostics_for_file(db, file, diagnostics, &unnecessary);
         }
 
         state.response.maybe_flush();
@@ -281,7 +283,7 @@ impl ProgressReporter for WorkspaceDiagnosticsProgressReporter<'_> {
         let response = &mut self.state.get_mut().unwrap().response;
 
         for (file, diagnostics) in by_file {
-            response.write_diagnostics_for_file(db, file, &diagnostics);
+            response.write_diagnostics_for_file(db, file, &diagnostics, &[]);
         }
         response.maybe_flush();
     }
@@ -371,6 +373,7 @@ impl<'a> ResponseWriter<'a> {
         db: &ProjectDatabase,
         file: File,
         diagnostics: &[Diagnostic],
+        unnecessary: &[Diagnostic],
     ) {
         let Some(url) = file_to_url(db, file) else {
             tracing::debug!("Failed to convert file path to URL at {}", file.path(db));
@@ -392,7 +395,11 @@ impl<'a> ResponseWriter<'a> {
             .map(|doc| i64::from(doc.version()))
             .ok();
 
-        let result_id = Diagnostics::result_id_from_hash(diagnostics);
+        let combined_count = diagnostics.len() + unnecessary.len();
+        let mut combined = Vec::with_capacity(combined_count);
+        combined.extend_from_slice(diagnostics);
+        combined.extend_from_slice(unnecessary);
+        let result_id = Diagnostics::result_id_from_hash(&combined);
 
         let previous_result_id = self.previous_result_ids.remove(&key).map(|(_url, id)| id);
 
@@ -411,6 +418,7 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
+                    .chain(unnecessary.iter())
                     .filter_map(|diagnostic| {
                         Some(
                             to_lsp_diagnostic(
