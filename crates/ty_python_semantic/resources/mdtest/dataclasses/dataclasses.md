@@ -1936,16 +1936,16 @@ from enum import Enum
 
 E = Enum("E", "A B C")
 
-# TODO: should emit `invalid-dataclass`
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
 dataclass(E)
 
-# TODO: should emit `invalid-dataclass`
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
 dataclass()(E)
 
-# TODO: should emit `invalid-dataclass`
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
 dataclass(Enum("Inline1", "X Y"))
 
-# TODO: should emit `invalid-dataclass`
+# error: [invalid-dataclass] "Cannot use `dataclass()` on an enum class"
 dataclass()(Enum("Inline2", "X Y"))
 ```
 

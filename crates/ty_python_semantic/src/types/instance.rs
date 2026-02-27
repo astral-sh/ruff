@@ -46,7 +46,7 @@ impl<'db> Type<'db> {
             ClassLiteral::Dynamic(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
-            ClassLiteral::DynamicNamedTuple(_) => {
+            ClassLiteral::DynamicNamedTuple(_) | ClassLiteral::DynamicEnum(_) => {
                 Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(class)))
             }
             ClassLiteral::Static(class_literal) => {

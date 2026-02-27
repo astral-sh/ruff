@@ -1092,7 +1092,35 @@ EnumWithSubclassOfEnumMetaMetaclass.NO.value
 
 ## Function syntax
 
-To do: <https://typing.python.org/en/latest/spec/enums.html#enum-definition>
+```py
+from enum import Enum
+from ty_extensions import enum_members
+
+Color = Enum("Color", "RED", "GREEN", "BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+Color = Enum("Color", "RED GREEN BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+Color = Enum("Color", "RED, GREEN, BLUE")
+
+# revealed: tuple[Literal["RED"], Literal["GREEN"], Literal["BLUE"]]
+reveal_type(enum_members(Color))
+
+Color = Enum("Color", [("RED", 1), ("GREEN", 2), ("BLUE", 3)])
+
+# TODO: This should be supported
+reveal_type(enum_members(Color))  # revealed: Unknown
+
+Color = Enum("Color", (("RED", 1), ("GREEN", 2), ("BLUE", 3)))
+
+# TODO: This should be supported
+reveal_type(enum_members(Color))  # revealed: Unknown
+```
 
 ## Exhaustiveness checking
 
