@@ -280,8 +280,10 @@ reveal_type(X() < Y())  # revealed: int
 
 ## Equality and Inequality Fallback
 
-This test confirms that `==` and `!=` comparisons default to identity comparisons (`is`, `is not`)
-when argument types do not match the method signature.
+When a custom `__eq__`/`__ne__` method exists but its signature doesn't match the argument types, ty
+emits an `unsupported-operator` diagnostic. The inferred type is a union of all possible runtime
+outcomes: the return types of the forward and reflected dunder methods, plus `bool` for the identity
+comparison fallback (when both methods return `NotImplemented`).
 
 Please refer to the [docs](https://docs.python.org/3/reference/datamodel.html#object.__eq__)
 
@@ -290,13 +292,89 @@ from __future__ import annotations
 
 class A:
     def __eq__(self, other: int) -> A:  # error: [invalid-method-override]
+        if not isinstance(other, int):
+            return NotImplemented
         return A()
 
     def __ne__(self, other: int) -> A:  # error: [invalid-method-override]
+        if not isinstance(other, int):
+            return NotImplemented
         return A()
 
-reveal_type(A() == A())  # revealed: bool
-reveal_type(A() != A())  # revealed: bool
+# error: [unsupported-operator]
+reveal_type(A() == A())  # revealed: A | bool
+# error: [unsupported-operator]
+reveal_type(A() != A())  # revealed: A | bool
+```
+
+## Equality Forward Fails but Reflected Succeeds
+
+When the forward `__eq__`/`__ne__` fails due to a signature mismatch but the reflected side
+succeeds, no error should be emitted.
+
+```py
+from __future__ import annotations
+
+class A:
+    def __eq__(self, other: int) -> bool:  # error: [invalid-method-override]
+        if not isinstance(other, int):
+            return NotImplemented
+        return False
+
+    def __ne__(self, other: int) -> bool:  # error: [invalid-method-override]
+        if not isinstance(other, int):
+            return NotImplemented
+        return False
+
+class B:
+    def __eq__(self, other: A) -> list[int]:  # error: [invalid-method-override]
+        if not isinstance(other, A):
+            return NotImplemented
+        return []
+
+    def __ne__(self, other: A) -> list[int]:  # error: [invalid-method-override]
+        if not isinstance(other, A):
+            return NotImplemented
+        return []
+
+# A.__eq__(B()) fails (wants int), but B.__eq__(A()) succeeds
+reveal_type(A() == B())  # revealed: list[int]
+# A.__ne__(B()) fails (wants int), but B.__ne__(A()) succeeds
+reveal_type(A() != B())  # revealed: list[int]
+```
+
+## Equality Forward Inherited from object but Reflected Has Wrong Signature
+
+When the forward side inherits `object.__eq__` (which accepts `object`) and the reflected side has a
+custom `__eq__` with a mismatching signature, the forward side still succeeds (since `object.__eq__`
+accepts any `object`), so no error is emitted.
+
+```py
+from __future__ import annotations
+
+class A: ...
+
+class B:
+    def __eq__(self, other: int) -> list[int]:  # error: [invalid-method-override]
+        if not isinstance(other, int):
+            return NotImplemented
+        return []
+
+# A inherits object.__eq__, so object.__eq__(B()) succeeds (object accepts object)
+reveal_type(A() == B())  # revealed: bool
+```
+
+## Equality with No Custom Dunder
+
+When neither side defines a custom `__eq__`, the inherited `object.__eq__` accepts `object`, so no
+error is emitted and the result is `bool`.
+
+```py
+class C: ...
+class D: ...
+
+reveal_type(C() == D())  # revealed: bool
+reveal_type(C() != D())  # revealed: bool
 ```
 
 ## Object Comparisons with Typeshed
