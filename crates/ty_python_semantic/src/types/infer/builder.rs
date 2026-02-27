@@ -1253,7 +1253,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         self.context.secondary(&class_node.bases()[i]).message(
                                             format_args!(
                                                 "Later class base is `{}`",
-                                                base.display(self.db())
+                                                alias.display(self.db())
                                             ),
                                         ),
                                     );

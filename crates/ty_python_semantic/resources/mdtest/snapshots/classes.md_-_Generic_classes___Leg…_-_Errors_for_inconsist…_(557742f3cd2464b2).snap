@@ -47,7 +47,7 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 13 | class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...
    |       ^^^^^^^^^--------------^^-------------------^
    |                |               |
-   |                |               Later class base is `<class 'Grandparent[T2@BadChild, T1@BadChild]'>`
+   |                |               Later class base is `Grandparent[T2@BadChild, T1@BadChild]`
    |                Earlier class base inherits from `Grandparent[T1@BadChild, T2@BadChild]`
 14 |
 15 | # The same applies when the explicit base is partially specialized differently:
@@ -64,7 +64,7 @@ error[invalid-generic-class]: Inconsistent type arguments for `Grandparent` amon
 19 | class BadChild2(Parent2[T1, T2], Grandparent[T2, int]): ...
    |       ^^^^^^^^^^---------------^^--------------------^
    |                 |                |
-   |                 |                Later class base is `<class 'Grandparent[T2@BadChild2, int]'>`
+   |                 |                Later class base is `Grandparent[T2@BadChild2, int]`
    |                 Earlier class base inherits from `Grandparent[T1@BadChild2, T2@BadChild2]`
 20 |
 21 | # Implicit specialization is fine:
