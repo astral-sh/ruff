@@ -6,7 +6,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 +linter.unresolved_target_version = 3.11
 
 --- Summary ---
-Removed: 2
+Removed: 3
 Added: 0
 
 --- Removed ---
@@ -34,17 +34,39 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 RUF027 [*] Possible f-string without an `f` prefix
-  --> RUF027_0.py:92:11
+  --> RUF027_0.py:75:9
    |
-90 | def backslash_test():
-91 |     x = "test"
-92 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+73 |     a = 4
+74 |     b = "{a:b} {a:^5}"
+75 |     c = "{a:\x64}"  # RUF027
+   |         ^^^^^^^^^^
+76 |
+77 | # fstrings are never correct as type definitions
+   |
+help: Add `f` prefix
+72 | def format_specifiers():
+73 |     a = 4
+74 |     b = "{a:b} {a:^5}"
+   -     c = "{a:\x64}"  # RUF027
+75 +     c = f"{a:\x64}"  # RUF027
+76 | 
+77 | # fstrings are never correct as type definitions
+78 | # so we should always skip those
+note: This is an unsafe fix and may change runtime behavior
+
+
+RUF027 [*] Possible f-string without an `f` prefix
+  --> RUF027_0.py:93:11
+   |
+91 | def backslash_test():
+92 |     x = "test"
+93 |     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
    |           ^^^^^^^^^^^^^^^^^^
    |
 help: Add `f` prefix
-89 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
-90 | def backslash_test():
-91 |     x = "test"
+90 | # Should not trigger RUF027 for Python < 3.12 due to backslashes in interpolations
+91 | def backslash_test():
+92 |     x = "test"
    -     print("Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
-92 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
+93 +     print(f"Hello {'\\n'}{x}")  # Should not trigger RUF027 for Python < 3.12
 note: This is an unsafe fix and may change runtime behavior

@@ -72,6 +72,7 @@ def method_calls():
 def format_specifiers():
     a = 4
     b = "{a:b} {a:^5}"
+    c = "{a:\x64}"  # RUF027
 
 # fstrings are never correct as type definitions
 # so we should always skip those

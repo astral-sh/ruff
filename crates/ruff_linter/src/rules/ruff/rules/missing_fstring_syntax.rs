@@ -254,9 +254,10 @@ fn should_be_fstring(
                 has_name = true;
             }
             if let Some(spec) = &element.format_spec {
-                let spec = &fstring_expr[spec.range()];
-                if FormatSpec::parse(spec).is_err() {
-                    return false;
+                if let Some(spec) = cooked_format_spec(spec) {
+                    if FormatSpec::parse(&spec).is_err() {
+                        return false;
+                    }
                 }
             }
         }
@@ -268,7 +269,19 @@ fn should_be_fstring(
     true
 }
 
-// fast check to disqualify any string literal without brackets
+// Reconstruct a "cooked" format spec from the AST, so escape sequences like `\xNN`
+// are interpreted as Python would. Skip dynamic format specs (with interpolations).
+fn cooked_format_spec(spec: &ast::InterpolatedStringFormatSpec) -> Option<String> {
+    // If the format spec contains interpolations (e.g., `f"{foo:{spec}}"`),
+    // we can't statically validate it here.
+    if spec.elements.interpolations().next().is_some() {
+        return None;
+    }
+
+    Some(spec.elements.literals().map(|lit| &**lit).collect())
+}
+
+// Fast check to disqualify any string literal without brackets
 #[inline]
 fn has_brackets(possible_fstring: &str) -> bool {
     // this qualifies rare false positives like "{ unclosed bracket"
