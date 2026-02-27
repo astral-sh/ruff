@@ -854,11 +854,15 @@ impl<'db> Bindings<'db> {
         }
 
         // Report `__init__` diagnostics for mixed constructor overloads.
+        let mut reported_mixed_init_callables = FxHashSet::default();
         for binding in self.iter_flat() {
             let Some(mixed_init) = binding.mixed_constructor_init.as_ref() else {
                 continue;
             };
             if mixed_init.is_instance_returning(context.db(), binding) {
+                if !reported_mixed_init_callables.insert(mixed_init.init_bindings.callable_type()) {
+                    continue;
+                }
                 mixed_init.init_bindings.report_diagnostics(context, node);
             }
         }

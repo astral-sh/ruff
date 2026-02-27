@@ -4889,6 +4889,7 @@ impl<'db> Type<'db> {
         //
         // Classify `__new__` overloads the same way we did for metaclass `__call__` above.
         let mut new_mixed_non_instance_sigs = None;
+        let mut new_is_all_non_instance = false;
 
         if let Some((ref _new_bindings_inner, ref new_callable)) = new_bindings {
             let func = match *new_callable {
@@ -4916,8 +4917,7 @@ impl<'db> Type<'db> {
                         Some(self_type),
                     ) {
                         OverloadDisposition::AllNonInstance => {
-                            let (new_bindings, _) = new_bindings.unwrap();
-                            return new_bindings.with_generic_context(db, class_generic_context);
+                            new_is_all_non_instance = true;
                         }
                         OverloadDisposition::Mixed(combined_sigs) => {
                             new_mixed_non_instance_sigs = Some(combined_sigs);
@@ -4929,7 +4929,7 @@ impl<'db> Type<'db> {
         }
 
         // Only fall back to `object.__init__` when `__new__` is absent.
-        let init_bindings = match (&init_method_no_object.place, has_any_new) {
+        let mut init_bindings = match (&init_method_no_object.place, has_any_new) {
             (
                 Place::Defined(DefinedPlace {
                     ty: init_method,
@@ -4983,25 +4983,20 @@ impl<'db> Type<'db> {
             (Place::Undefined, true) => None,
         };
 
-        // If `__new__` or metaclass `__call__` had mixed return types (some non-instance, some
-        // instance), keep all overloads with correct per-overload return types, and attach
-        // `__init__` bindings as deferred conditional validation. At call checking time,
-        // `__init__` is only validated when the matched overload is instance-returning.
-        let mixed_sigs_and_callable = new_mixed_non_instance_sigs
-            .map(|sigs| (sigs, self_type))
-            .or(metaclass_mixed_non_instance_sigs.map(|sigs| (sigs, self)));
+        // Preserve legacy behavior when `__new__` always returns a non-instance and there are no
+        // metaclass constraints to additionally enforce: skip constructor synthesis and use the
+        // raw `__new__` return type directly.
+        if new_is_all_non_instance
+            && metaclass_instance_bindings.is_none()
+            && metaclass_mixed_non_instance_sigs.is_none()
+        {
+            let (new_bindings, _) = new_bindings.unwrap();
+            return new_bindings.with_generic_context(db, class_generic_context);
+        }
 
-        if let Some((combined_sigs, callable_type)) = mixed_sigs_and_callable {
-            let mut bindings: Bindings<'db> =
-                CallableBinding::from_overloads(callable_type, Vec::from(combined_sigs)).into();
-
-            if let Some((init_bindings, _)) = init_bindings {
-                bindings.set_mixed_constructor_init(class.class_literal(db), &init_bindings);
-            }
-
-            return bindings
-                .with_generic_context(db, class_generic_context)
-                .with_constructor_instance_type(constructor_instance_ty);
+        // If `__new__` always returns a non-instance type, `__init__` should never be validated.
+        if new_is_all_non_instance {
+            init_bindings = None;
         }
 
         let bindings = if let Some(bindings) = missing_init_bindings {
@@ -5009,20 +5004,48 @@ impl<'db> Type<'db> {
         } else {
             // Collect all bindings that must accept the constructor call.
             // This may include `__new__`, `__init__`, and/or a metaclass `__call__`.
-            let mut all_bindings: SmallVec<[Bindings<'db>; 3]> = SmallVec::new();
+            let has_mixed_constructor_paths = new_mixed_non_instance_sigs.is_some()
+                || metaclass_mixed_non_instance_sigs.is_some();
+            let mut all_bindings: SmallVec<[Bindings<'db>; 4]> = SmallVec::new();
             let mut callable_type_builder = UnionBuilder::new(db);
 
             if let Some((metaclass_bindings, metaclass_ty)) = metaclass_instance_bindings {
                 all_bindings.push(metaclass_bindings);
                 callable_type_builder = callable_type_builder.add(metaclass_ty);
             }
-            if let Some((new_bindings, new_callable)) = new_bindings {
+
+            // If `__new__` or metaclass `__call__` had mixed return types (some non-instance,
+            // some instance), keep all overloads with per-overload return types and attach
+            // deferred `__init__` validation. If both are mixed, both constraint sets apply.
+            if let Some(combined_sigs) = metaclass_mixed_non_instance_sigs {
+                let mut bindings: Bindings<'db> =
+                    CallableBinding::from_overloads(self, Vec::from(combined_sigs)).into();
+                if let Some((init_bindings, _)) = init_bindings.as_ref() {
+                    bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
+                }
+                all_bindings.push(bindings);
+                callable_type_builder = callable_type_builder.add(self);
+            }
+            if let Some(combined_sigs) = new_mixed_non_instance_sigs {
+                let mut bindings: Bindings<'db> =
+                    CallableBinding::from_overloads(self_type, Vec::from(combined_sigs)).into();
+                if let Some((init_bindings, _)) = init_bindings.as_ref() {
+                    bindings.set_mixed_constructor_init(class.class_literal(db), init_bindings);
+                }
+                all_bindings.push(bindings);
+                callable_type_builder = callable_type_builder.add(self_type);
+            } else if let Some((new_bindings, new_callable)) = new_bindings {
                 all_bindings.push(new_bindings);
                 callable_type_builder = callable_type_builder.add(new_callable);
             }
-            if let Some((init_bindings, init_callable)) = init_bindings {
-                all_bindings.push(init_bindings);
-                callable_type_builder = callable_type_builder.add(init_callable);
+
+            // For mixed constructor paths, `__init__` is checked conditionally via deferred
+            // validation attached to the mixed bindings above.
+            if !has_mixed_constructor_paths {
+                if let Some((init_bindings, init_callable)) = init_bindings {
+                    all_bindings.push(init_bindings);
+                    callable_type_builder = callable_type_builder.add(init_callable);
+                }
             }
 
             match all_bindings.len() {

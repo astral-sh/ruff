@@ -247,6 +247,7 @@ directly, while instance-returning overloads are replaced by `__init__` validati
 
 ```py
 from typing import Any, overload
+from typing_extensions import Literal
 
 class Meta(type):
     @overload
@@ -345,6 +346,71 @@ class Baz(metaclass=Meta):
 # No error is raised because the metaclass `__call__` controls construction.
 reveal_type(Baz(1))  # revealed: () -> int
 reveal_type(Baz("hello"))  # revealed: () -> str
+```
+
+### Metaclass `__call__` is still checked when `__new__` is all non-instance
+
+When `__new__` always returns a non-instance type, `__init__` should be skipped, but metaclass
+`__call__` argument validation should still apply.
+
+```py
+class Meta(type):
+    def __call__(cls, x: str) -> "C":
+        raise NotImplementedError
+
+class C(metaclass=Meta):
+    def __new__(cls, x: bytes) -> int:
+        return 1
+
+# error: [invalid-argument-type]
+reveal_type(C(b"hello"))  # revealed: C
+```
+
+### Mixed `__new__` and mixed metaclass `__call__` both constrain calls
+
+If both constructor systems are mixed (some overloads instance-returning and some non-instance),
+their argument constraints should both be enforced.
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+from typing import Any, Literal, overload
+
+class Meta(type):
+    @overload
+    def __call__(cls, x: int) -> int: ...
+    @overload
+    def __call__(cls, x: str) -> "D": ...
+    def __call__(cls, x: int | str) -> Any:
+        raise NotImplementedError
+
+class D(metaclass=Meta):
+    @overload
+    def __new__(cls, x: bytes) -> int: ...
+    @overload
+    def __new__(cls, x: str) -> "D": ...
+    def __new__(cls, x: object) -> Any:
+        return 1
+
+    def __init__(self, x: Literal["ok"]) -> None:
+        pass
+
+# `__new__` rejects `int` even though metaclass `__call__` accepts it.
+# error: [no-matching-overload]
+D(1)
+
+# `__init__` rejects the argument after both `__call__` and `__new__` match `str -> D`.
+# error: [invalid-argument-type]
+D("bad")
+
+# Metaclass `__call__` rejects `bytes` even though `__new__` accepts it.
+# error: [no-matching-overload]
+reveal_type(D(b"hello"))  # revealed: int
+
+reveal_type(D("ok"))  # revealed: D
 ```
 
 ## Default
