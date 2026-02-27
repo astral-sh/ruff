@@ -435,6 +435,29 @@ class E(Generic[T]):
 reveal_type(E("foo"))  # revealed: E[str]
 ```
 
+## Mixed overloaded `__new__` should preserve constructor literal promotion
+
+When mixed `__new__` overloads defer `__init__` validation, the inferred constructor
+specialization should still apply literal promotion from `__init__`.
+
+```py
+from typing import Generic, TypeVar, overload
+from typing_extensions import Self
+
+T = TypeVar("T")
+
+class E(Generic[T]):
+    @overload
+    def __new__(cls, tag: int, y: object) -> int: ...
+    @overload
+    def __new__(cls, tag: str, y: object) -> Self: ...
+    def __new__(cls, tag: int | str, y: object) -> object: ...
+    def __init__(self, tag: str, y: T) -> None: ...
+
+reveal_type(E("ok", 1))  # revealed: E[int]
+reveal_type(E(1, 1))  # revealed: int
+```
+
 ## Union of mixed constructors should preserve deferred `__init__` checks
 
 ```py

@@ -362,6 +362,17 @@ impl<'db> Bindings<'db> {
             }
         }
 
+        // Deferred `__init__` bindings in mixed constructor overloads still need constructor
+        // instance context for generic specialization inference (including literal promotion).
+        for mixed_init in &mut self.mixed_constructor_inits {
+            for binding in mixed_init.init_bindings.iter_flat_mut() {
+                binding.constructor_instance_type = Some(constructor_instance_type);
+                for overload in &mut binding.overloads {
+                    overload.constructor_instance_type = Some(constructor_instance_type);
+                }
+            }
+        }
+
         self
     }
 
