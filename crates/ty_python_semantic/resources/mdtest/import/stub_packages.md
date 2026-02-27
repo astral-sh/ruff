@@ -312,3 +312,68 @@ import yaml
 
 reveal_type(yaml.YamlLoader)  # revealed: <class 'YamlLoader'>
 ```
+
+## Priority across search paths
+
+According to [import resolution ordering], a `foo-stubs` stub package should have priority over a
+`foo` package regardless of search path ordering.
+
+Regression test for <https://github.com/astral-sh/ty/issues/1967>
+
+### Stub package comes first on the search path
+
+```toml
+[environment]
+extra-paths = ["/path-one", "/path-two"]
+```
+
+`/path-one/shapes-stubs/__init__.pyi`:
+
+```pyi
+class Pentagon:
+    sides: int
+```
+
+`/path-two/shapes/__init__.py`:
+
+```py
+class Pentagon: ...
+```
+
+`main.py`:
+
+```py
+from shapes import Pentagon
+
+reveal_type(Pentagon().sides)  # revealed: int
+```
+
+### Stub package comes last on the search path
+
+```toml
+[environment]
+extra-paths = ["/path-two", "/path-one"]
+```
+
+`/path-one/shapes-stubs/__init__.pyi`:
+
+```pyi
+class Pentagon:
+    sides: int
+```
+
+`/path-two/shapes/__init__.py`:
+
+```py
+class Pentagon: ...
+```
+
+`main.py`:
+
+```py
+from shapes import Pentagon
+
+reveal_type(Pentagon().sides)  # revealed: int
+```
+
+[import resolution ordering]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
