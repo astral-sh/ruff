@@ -153,6 +153,8 @@ class B: ...
 In type annotations, `ParamSpec` is only valid as the first element to `Callable`, the final element
 to `Concatenate`, or as a type parameter to `Protocol` or `Generic`.
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Any, Final, ParamSpec, Callable, Concatenate, Protocol, Generic
 
