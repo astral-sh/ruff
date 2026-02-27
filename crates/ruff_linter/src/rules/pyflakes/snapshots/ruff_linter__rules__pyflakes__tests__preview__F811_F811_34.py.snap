@@ -1,20 +1,25 @@
 ---
 source: crates/ruff_linter/src/rules/pyflakes/mod.rs
 ---
-F811 [*] Redefinition of unused `BrokerUsecase` from line 1
- --> F811_34.py:1:41
+F811 [*] Redefinition of unused `BrokerUsecase` from line 2
+ --> F811_34.py:2:41
   |
-1 | from faststream._internal.broker import BrokerUsecase
+1 | from typing import TYPE_CHECKING
+2 | from faststream._internal.broker import BrokerUsecase
   |                                         ------------- previous definition of `BrokerUsecase` here
-2 |
-3 | if TYPE_CHECKING:
-4 |     from faststream._internal.broker import BrokerUsecase
+3 |
+4 | if TYPE_CHECKING:
+5 |     # See: https://github.com/astral-sh/ruff/issues/22554
+6 |     # shoud detect -------------------------vvvvvvvvvvvvv
+7 |     from faststream._internal.broker import BrokerUsecase
   |                                             ^^^^^^^^^^^^^ `BrokerUsecase` redefined here
-5 |     from faststream.specification.schema import Contact, License
+8 |     from faststream.specification.schema import Contact, License
   |
 help: Remove definition: `BrokerUsecase`
-1 | from faststream._internal.broker import BrokerUsecase
-2 | 
-3 | if TYPE_CHECKING:
+4 | if TYPE_CHECKING:
+5 |     # See: https://github.com/astral-sh/ruff/issues/22554
+6 |     # shoud detect -------------------------vvvvvvvvvvvvv
   -     from faststream._internal.broker import BrokerUsecase
-4 |     from faststream.specification.schema import Contact, License
+7 |     from faststream.specification.schema import Contact, License
+8 | 
+9 | if TYPE_CHECKING:
