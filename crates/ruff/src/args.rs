@@ -294,6 +294,17 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub select: Option<Vec<RuleSelector>>,
+    /// Comma-separated list of rule codes to enable (or ALL, to enable all
+    /// rules) with severity `warning`
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = RuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    pub warn: Option<Vec<RuleSelector>>,
     /// Comma-separated list of rule codes to disable.
     #[arg(
         long,
@@ -314,6 +325,16 @@ pub struct CheckCommand {
         hide_possible_values = true
     )]
     pub extend_select: Option<Vec<RuleSelector>>,
+    /// Like --warn, but adds additional rule codes on top of those already specified.
+    #[arg(
+        long,
+        value_delimiter = ',',
+        value_name = "RULE_CODE",
+        value_parser = RuleSelectorParser,
+        help_heading = "Rule selection",
+        hide_possible_values = true
+    )]
+    pub extend_warn: Option<Vec<RuleSelector>>,
     /// Like --ignore. (Deprecated: You can just use --ignore instead.)
     #[arg(
         long,
@@ -786,6 +807,7 @@ impl CheckCommand {
             extend_ignore: self.extend_ignore,
             extend_per_file_ignores: self.extend_per_file_ignores,
             extend_select: self.extend_select,
+            extend_warn: self.extend_warn,
             extend_unfixable: self.extend_unfixable,
             fixable: self.fixable,
             ignore: self.ignore,
@@ -794,6 +816,7 @@ impl CheckCommand {
             preview: resolve_bool_arg(self.preview, self.no_preview).map(PreviewMode::from),
             respect_gitignore: resolve_bool_arg(self.respect_gitignore, self.no_respect_gitignore),
             select: self.select,
+            warn: self.warn,
             target_version: self.target_version.map(ast::PythonVersion::from),
             unfixable: self.unfixable,
             // TODO(charlie): Included in `pyproject.toml`, but not inherited.
