@@ -791,7 +791,7 @@ Type variable defaults can reference earlier type variables, but not later ones:
 # This is fine: U's default references T, which comes before U
 class Good[T, U = T]: ...
 
-# error: [invalid-generic-class] "Default of type parameter `S` cannot reference later type parameter `T`"
+# error: [invalid-generic-class] "Default of `S` cannot reference later type parameter `T`"
 class Bad[S = T, T = int]: ...
 
 # error: [invalid-generic-class]
