@@ -241,6 +241,21 @@ WithDefaultU = TypeVar("WithDefaultU", default=int)
 class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
 ```
 
+A type variable default cannot reference a type variable that is not a type parameter of the class:
+
+```py
+from typing_extensions import TypeVar, Generic
+
+StartT = TypeVar("StartT", default=int)
+StopT = TypeVar("StopT", default=StartT)
+StepT = TypeVar("StepT", default=int | None)
+Start2T = TypeVar("Start2T", default="StopT")
+Stop2T = TypeVar("Stop2T", default=int)
+
+# error: [invalid-generic-class] "Default of `Start2T` references type variable `StopT`, which is not a type parameter of this class"
+class Bad(Generic[Start2T, Stop2T, StepT]): ...
+```
+
 ## Diagnostics for bad specializations
 
 We show the user where the type variable was defined if a specialization is given that doesn't

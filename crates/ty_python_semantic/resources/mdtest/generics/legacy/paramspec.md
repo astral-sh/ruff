@@ -430,8 +430,8 @@ reveal_type(p3.attr2)  # revealed: (str, /) -> None
 class ParamSpecWithDefault5(Generic[PAnother, P]):
     attr: Callable[PAnother, None]
 
-# TODO: error
 # PAnother has default as P (another ParamSpec) which is not in scope
+# error: [invalid-generic-class]
 class ParamSpecWithDefault6(Generic[PAnother]):
     attr: Callable[PAnother, None]
 ```

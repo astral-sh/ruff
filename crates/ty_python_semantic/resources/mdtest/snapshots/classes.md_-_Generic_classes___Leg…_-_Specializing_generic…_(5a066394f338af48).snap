@@ -85,6 +85,16 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/classes.
 70 | 
 71 | # error: [invalid-generic-class]
 72 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
+73 | from typing_extensions import TypeVar, Generic
+74 | 
+75 | StartT = TypeVar("StartT", default=int)
+76 | StopT = TypeVar("StopT", default=StartT)
+77 | StepT = TypeVar("StepT", default=int | None)
+78 | Start2T = TypeVar("Start2T", default="StopT")
+79 | Stop2T = TypeVar("Stop2T", default=int)
+80 | 
+81 | # error: [invalid-generic-class] "Default of `Start2T` references type variable `StopT`, which is not a type parameter of this class"
+82 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
 ```
 
 # Diagnostics
@@ -201,6 +211,7 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
 71 | # error: [invalid-generic-class]
 72 | class AlsoBadOrder(Generic[WithDefaultT2, WithDefaultT1, WithDefaultU]): ...
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+73 | from typing_extensions import TypeVar, Generic
    |
   ::: src/mdtest_snippet.py:60:1
    |
@@ -212,6 +223,28 @@ error[invalid-generic-class]: Default of `WithDefaultT2` cannot reference later 
    | --------------------------------------------------------------- `WithDefaultT2` defined here
 62 |
 63 | # This is fine: WithDefaultT2's default references WithDefaultT1, which comes before it
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Default of `Start2T` references type variable `StopT`, which is not a type parameter of this class
+  --> src/mdtest_snippet.py:82:7
+   |
+81 | # error: [invalid-generic-class] "Default of `Start2T` references type variable `StopT`, which is not a type parameter of this class"
+82 | class Bad(Generic[Start2T, Stop2T, StepT]): ...
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+  ::: src/mdtest_snippet.py:76:1
+   |
+75 | StartT = TypeVar("StartT", default=int)
+76 | StopT = TypeVar("StopT", default=StartT)
+   | ---------------------------------------- `StopT` defined here
+77 | StepT = TypeVar("StepT", default=int | None)
+78 | Start2T = TypeVar("Start2T", default="StopT")
+   | --------------------------------------------- `Start2T` defined here
+79 | Stop2T = TypeVar("Stop2T", default=int)
    |
 info: rule `invalid-generic-class` is enabled by default
 

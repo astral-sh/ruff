@@ -1440,8 +1440,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                // Check that type variable defaults don't reference
-                // type variables that come later in the type parameter list.
+                // Check that type variable defaults only reference type variables
+                // that precede them in the type parameter list.
                 if let Some(generic_context) = class
                     .pep695_generic_context(self.db())
                     .or(class.legacy_generic_context(self.db()))
@@ -1449,25 +1449,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let db = self.db();
                     let variables = generic_context.variables(db);
 
+                    let all_typevars: smallvec::SmallVec<[TypeVarInstance<'_>; 4]> =
+                        variables.clone().map(|btv| btv.typevar(db)).collect();
+
                     // `variables` should be fairly cheap to clone; it's just several cheap wrappers around
                     // a `std::slice::Iter` under the hood.
-                    for (i, bound_typevar) in variables.clone().enumerate() {
+                    for (i, bound_typevar) in variables.enumerate() {
                         let typevar = bound_typevar.typevar(db);
                         let Some(default_ty) = typevar.default_type(db) else {
                             continue;
                         };
 
-                        for later_bound_tv in variables.clone().skip(i + 1) {
-                            let later_typevar = later_bound_tv.typevar(db);
-                            if default_ty.contains_typevar(db, later_typevar) {
-                                report_invalid_typevar_default_reference(
-                                    &self.context,
-                                    class,
-                                    typevar,
-                                    later_typevar,
-                                );
-                                break;
-                            }
+                        let earlier_typevars = &all_typevars[..i];
+                        if let Some(bad_typevar) =
+                            default_ty.find_typevar_not_in(db, earlier_typevars)
+                        {
+                            let is_later_in_list = all_typevars[i + 1..].contains(&bad_typevar);
+                            report_invalid_typevar_default_reference(
+                                &self.context,
+                                class,
+                                typevar,
+                                bad_typevar,
+                                is_later_in_list,
+                            );
                         }
                     }
                 }

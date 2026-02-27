@@ -370,7 +370,7 @@ reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
 P2 = ParamSpec("P2")
 
-# TODO: error: paramspec is out of scope
+# error: [invalid-generic-class] "Default of `P1` references type variable `P2`, which is not a type parameter of this class"
 class ParamSpecWithDefault5[**P1 = P2]:
     attr: Callable[P1, None]
 ```

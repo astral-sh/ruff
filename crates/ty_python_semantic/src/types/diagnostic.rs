@@ -4946,7 +4946,8 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
     context: &InferContext<'db, '_>,
     class: StaticClassLiteral<'db>,
     typevar_with_bad_default: TypeVarInstance<'db>,
-    referenced_later_typevar: TypeVarInstance<'db>,
+    referenced_typevar: TypeVarInstance<'db>,
+    is_later_in_list: bool,
 ) {
     let db = context.db();
 
@@ -4954,13 +4955,22 @@ pub(crate) fn report_invalid_typevar_default_reference<'db>(
         return;
     };
 
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Default of `{}` cannot reference later type parameter `{}`",
-        typevar_with_bad_default.name(db),
-        referenced_later_typevar.name(db),
-    ));
+    let mut diagnostic = if is_later_in_list {
+        builder.into_diagnostic(format_args!(
+            "Default of `{}` cannot reference later type parameter `{}`",
+            typevar_with_bad_default.name(db),
+            referenced_typevar.name(db),
+        ))
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Default of `{}` references type variable `{}`, \
+            which is not a type parameter of this class",
+            typevar_with_bad_default.name(db),
+            referenced_typevar.name(db),
+        ))
+    };
 
-    for tvar in [typevar_with_bad_default, referenced_later_typevar] {
+    for tvar in [typevar_with_bad_default, referenced_typevar] {
         let Some(definition) = tvar.definition(db) else {
             continue;
         };
