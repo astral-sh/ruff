@@ -1864,8 +1864,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     "Bare ParamSpec `{name}` is not valid in this context",
                 ));
                 diagnostic.info(
-                    "`ParamSpec` can only be used as the first argument to `Callable` \
-                    or the last argument to `Concatenate`",
+                    "A bare ParamSpec can only be used as the first argument to `Callable`, \
+                    the last argument to `Concatenate`, or as part of a type parameter/argument list",
                 );
             }
             true

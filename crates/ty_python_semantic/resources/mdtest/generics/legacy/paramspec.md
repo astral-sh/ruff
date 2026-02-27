@@ -188,6 +188,24 @@ def invalid_return() -> P:
 def invalid_variable_annotation(y: Any) -> None:
     # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
     x: P = y
+
+from typing import Final
+
+def invalid_with_qualifier(y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: Final[P] = y
+
+# error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+def invalid_stringified_return() -> "P":
+    raise NotImplementedError
+
+def invalid_stringified_annotation(
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    a: "P",
+) -> None: ...
+def invalid_stringified_variable_annotation(y: Any) -> None:
+    # error: [invalid-type-form] "Bare ParamSpec `P` is not valid in this context"
+    x: "P" = y
 ```
 
 ## Validating `P.args` and `P.kwargs` usage

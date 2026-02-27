@@ -9174,9 +9174,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             DeferredExpressionState::from(self.defer_annotations()),
         );
 
-        if declared.qualifiers.is_empty() {
-            self.check_for_bare_paramspec(declared.inner_type(), annotation);
-        }
+        self.check_for_bare_paramspec(declared.inner_type(), annotation);
 
         let is_pep_613_type_alias = declared.inner_type().is_typealias_special_form();
 
