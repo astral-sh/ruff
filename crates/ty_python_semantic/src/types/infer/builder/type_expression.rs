@@ -1868,15 +1868,30 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Whether to infer `Todo` for the parameters
                 let mut return_todo = false;
 
-                for param in params {
-                    let param_type = self.infer_type_expression(param);
-                    // This is similar to what we currently do for inferring tuple type expression.
-                    // We currently infer `Todo` for the parameters to avoid invalid diagnostics
-                    // when trying to check for assignability or any other relation. For example,
-                    // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
-                    return_todo |= param_type.is_todo()
-                        && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
-                    parameter_types.push(param_type);
+                // `Callable[[...], R]` — the user almost certainly meant `Callable[..., R]`
+                if let [sole_param] = &params[..]
+                    && sole_param.is_ellipsis_literal_expr()
+                {
+                    if let Some(mut diagnostic) = self.report_invalid_type_expression(
+                        sole_param,
+                        format_args!("`...` is not allowed in this context in a type expression"),
+                    ) {
+                        diagnostic
+                            .set_primary_message("Did you mean `Callable[..., <return type>]`?");
+                    }
+                    self.store_expression_type(sole_param, Type::unknown());
+                    parameter_types.push(Type::unknown());
+                } else {
+                    for param in params {
+                        let param_type = self.infer_type_expression(param);
+                        // This is similar to what we currently do for inferring tuple type expression.
+                        // We currently infer `Todo` for the parameters to avoid invalid diagnostics
+                        // when trying to check for assignability or any other relation. For example,
+                        // `*tuple[int, str]`, `Unpack[]`, etc. are not yet supported.
+                        return_todo |= param_type.is_todo()
+                            && matches!(param, ast::Expr::Starred(_) | ast::Expr::Subscript(_));
+                        parameter_types.push(param_type);
+                    }
                 }
 
                 return Some(if return_todo {
