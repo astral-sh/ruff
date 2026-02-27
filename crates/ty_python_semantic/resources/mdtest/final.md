@@ -443,8 +443,7 @@ def func1() -> int:
 # Nested function decorated with `@final` is also invalid
 def outer():
     @final  # error: [final-on-non-method]
-    def inner() -> None:
-        pass
+    def inner() -> None: ...
 
 # A function nested inside a method is also not a method
 class F:
