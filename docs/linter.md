@@ -501,6 +501,23 @@ The file-level suppression comment specification is as follows:
   optional whitespace and a case-insensitive match for `noqa`. After this, the
   specification is as in the inline `noqa` suppressions above.
 
+In [`preview`](preview.md) mode, one or more rules can be ignored across an
+entire file with an "ignore-all" comment on its own line, at global module scope,
+and preferably near the top of the file:
+
+```python
+# ruff: ignore-all[F401, ARG001]
+```
+
+The full-level suppression comment specification is as follows:
+
+- An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
+  after the `#` symbol and `:` symbol, followed by `ignore-all[`, any codes to
+  be suppressed, and ending with `]`.
+- Codes to be suppressed must be separated by commas, with optional whitespace
+  before or after each code, and may be followed by an optional trailing comma
+  after the last code.
+
 ### Detecting unused suppressions
 
 Ruff implements a special rule, [`unused-noqa`](https://docs.astral.sh/ruff/rules/unused-noqa/),
