@@ -176,7 +176,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
     use crate::{Edit, Fix};
     use crate::{Locator, Violation};
-    use ruff_db::diagnostic::Diagnostic;
+    use ruff_db::diagnostic::{Diagnostic, Severity};
 
     fn create_diagnostics(
         filename: &str,
@@ -189,6 +189,7 @@ mod tests {
                 let mut diagnostic = MissingNewlineAtEndOfFile.into_diagnostic(
                     edit.range(),
                     &SourceFileBuilder::new(filename, source).finish(),
+                    Severity::Error,
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
                 diagnostic
