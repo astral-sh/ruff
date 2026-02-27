@@ -337,6 +337,20 @@ def _(x: object, y: type[int]):
         reveal_type(x)  # revealed: int
 ```
 
+Negative narrowing is not sound in this case, because `type[A]` includes subclasses of `A`:
+
+```py
+class A: ...
+class B: ...
+
+def f(x: A | B, y: type[A]):
+    if isinstance(x, y):
+        reveal_type(x)  # revealed: A
+        return
+
+    reveal_type(x)  # revealed: A | B
+```
+
 ## Adding a disjoint element to an existing intersection
 
 We used to incorrectly infer `Literal` booleans for some of these.
