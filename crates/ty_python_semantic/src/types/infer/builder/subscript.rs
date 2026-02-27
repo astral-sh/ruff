@@ -5,6 +5,7 @@ use ruff_python_ast::{self as ast, ExprContext};
 use ruff_text_size::Ranged;
 
 use super::TypeInferenceBuilder;
+use super::paramspec_validation::check_for_bare_paramspec;
 use crate::place::{DefinedPlace, Definedness, Place};
 use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::definition::Definition;
@@ -551,7 +552,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             Type::paramspec_value_callable(db, Parameters::unknown())
                         })
                     } else {
-                        self.infer_type_expression(expr)
+                        let ty = self.infer_type_expression(expr);
+                        check_for_bare_paramspec(&self.context, ty, expr);
+                        ty
                     };
 
                     inferred_type_arguments.push(provided_type);
