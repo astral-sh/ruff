@@ -76,7 +76,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -95,7 +96,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -114,7 +116,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -133,7 +136,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -150,7 +154,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -168,7 +173,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -187,7 +193,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -206,7 +213,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -223,7 +231,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -242,7 +251,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
@@ -259,7 +269,8 @@ error[invalid-type-form]: Bare ParamSpec `P` is not valid in this context
 info: A bare ParamSpec is only valid:
 info:  - as the first argument to `Callable`
 info:  - as the last argument to `Concatenate`
-info:  - or as part of a type parameter/argument list
+info:  - as part of a type parameter list when defining a generic class
+info:  - or as part of an argument list when specializing a generic class
 info: rule `invalid-type-form` is enabled by default
 
 ```
