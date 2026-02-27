@@ -73,21 +73,21 @@ use crate::types::diagnostic::{
     self, ABSTRACT_METHOD_IN_FINAL_CLASS, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS,
     CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION,
     DATACLASS_FIELD_ORDER, DIVISION_BY_ZERO, DUPLICATE_BASE, DUPLICATE_KW_ONLY,
-    FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL, INVALID_ARGUMENT_TYPE,
-    INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE, INVALID_DATACLASS,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_KEY,
-    INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS,
-    INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT,
-    INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_GUARD_DEFINITION,
-    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPE_VARIABLE_DEFAULT,
-    INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE, PARAMETER_ALREADY_ASSIGNED,
-    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS, TypedDictDeleteErrorKind,
-    UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    FINAL_ON_NON_METHOD, FINAL_WITHOUT_VALUE, INCONSISTENT_MRO, INEFFECTIVE_FINAL,
+    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
+    INVALID_DATACLASS, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM,
+    INVALID_KEY, INVALID_LEGACY_POSITIONAL_PARAMETER, INVALID_LEGACY_TYPE_VARIABLE,
+    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
+    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ALIAS_TYPE,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_GUARD_DEFINITION, INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS,
+    INVALID_TYPE_VARIABLE_DEFAULT, INVALID_TYPED_DICT_HEADER, INVALID_TYPED_DICT_STATEMENT,
+    IncompatibleBases, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, NOT_SUBSCRIPTABLE,
+    PARAMETER_ALREADY_ASSIGNED, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TOO_MANY_POSITIONAL_ARGUMENTS,
+    TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNKNOWN_ARGUMENT, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_DYNAMIC_BASE,
+    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_call_to_abstract_method, report_cannot_delete_typed_dict_key,
@@ -3215,6 +3215,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             decorator_types_and_nodes.push((decorator_type, decorator));
+        }
+
+        // Check for `@final` applied to non-method functions.
+        // `@final` is only meaningful on methods and classes; using it on a module-level
+        // or nested function is an error per the typing spec.
+        if function_decorators.contains(FunctionDecorators::FINAL) {
+            let file_scope_id = self.scope().file_scope_id(self.db());
+            if !self.index.scope(file_scope_id).kind().is_class() {
+                if let Some(final_decorator) = decorator_list.iter().find(|decorator| {
+                    matches!(
+                        self.expression_type(&decorator.expression),
+                        Type::FunctionLiteral(f) if f.is_known(self.db(), KnownFunction::Final)
+                    )
+                }) {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&FINAL_ON_NON_METHOD, final_decorator)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "`@final` cannot be applied to a non-method function `{name}`",
+                        ));
+                    }
+                }
+            }
         }
 
         let has_defaults = parameters
