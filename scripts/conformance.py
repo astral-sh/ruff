@@ -22,9 +22,6 @@ Examples:
     # Custom test directory
     %(prog)s --target-path custom/tests --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
 
-    # Show all diagnostics (not just changed ones)
-    %(prog)s --all --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7
-
     # Show a diff with local paths to the test directory instead of table of links
     %(prog)s --old-ty uvx ty@0.0.1a35 --new-ty uvx ty@0.0.7 --format diff
 """
@@ -78,6 +75,17 @@ CONFORMANCE_DIR_WITH_README = (
 )
 CONFORMANCE_URL = CONFORMANCE_DIR_WITH_README + "tests/{filename}#L{line}"
 
+# Priority order for section headings: improvements first, regressions last.
+TITLE_PRIORITY: dict[str, int] = {
+    "True positives added": 0,
+    "False positives removed": 1,
+    "False positives added": 2,
+    "True positives removed": 3,
+    "Optional Diagnostics Added": 4,
+    "Optional Diagnostics Removed": 5,
+    "Optional Diagnostics Changed": 6,
+}
+
 
 class Source(StrEnum):
     OLD = auto()
@@ -91,16 +99,16 @@ class Classification(StrEnum):
     TRUE_NEGATIVE = auto()
     FALSE_NEGATIVE = auto()
 
-    def into_title(self) -> str:
+    def into_title(self, *, verb: Literal["added", "removed", "changed"]) -> str:
         match self:
             case Classification.TRUE_POSITIVE:
-                return "True positives added"
+                return f"True positives {verb}"
             case Classification.FALSE_POSITIVE:
-                return "False positives added"
+                return f"False positives {verb}"
             case Classification.TRUE_NEGATIVE:
-                return "False positives removed"
+                return f"True negatives {verb}"
             case Classification.FALSE_NEGATIVE:
-                return "True positives removed"
+                return f"False negatives {verb}"
 
 
 @dataclass(kw_only=True, slots=True)
@@ -115,6 +123,7 @@ class Evaluation:
 class Change(StrEnum):
     ADDED = auto()
     REMOVED = auto()
+    CHANGED = auto()
     UNCHANGED = auto()
 
     def into_title(self) -> str:
@@ -123,6 +132,8 @@ class Change(StrEnum):
                 return "Optional Diagnostics Added"
             case Change.REMOVED:
                 return "Optional Diagnostics Removed"
+            case Change.CHANGED:
+                return "Optional Diagnostics Changed"
             case Change.UNCHANGED:
                 return "Optional Diagnostics Unchanged"
 
@@ -227,7 +238,7 @@ class Diagnostic:
 
 
 @dataclass(kw_only=True, slots=True)
-class GroupedDiagnostics:
+class TestCase:
     key: str
     sources: AbstractSet[Source]
     old: list[Diagnostic]
@@ -240,6 +251,12 @@ class GroupedDiagnostics:
             return Change.ADDED
         elif Source.OLD in self.sources and Source.NEW not in self.sources:
             return Change.REMOVED
+        elif (
+            Source.NEW in self.sources
+            and Source.OLD in self.sources
+            and not self.diagnostics_are_equivalent(self.old, self.new)
+        ):
+            return Change.CHANGED
         else:
             return Change.UNCHANGED
 
@@ -263,6 +280,22 @@ class GroupedDiagnostics:
                 return self.old
             case Source.EXPECTED:
                 return self.expected
+
+    @staticmethod
+    def diagnostics_are_equivalent(a: list[Diagnostic], b: list[Diagnostic]) -> bool:
+        """Compare two diagnostic lists for equality, ignoring the `source` field."""
+
+        def fingerprint(d: Diagnostic) -> tuple:
+            return (
+                d.check_name,
+                d.description,
+                d.severity,
+                str(d.location.path),
+                d.location.positions.begin.line,
+                d.location.positions.begin.column,
+            )
+
+        return sorted(map(fingerprint, a)) == sorted(map(fingerprint, b))
 
     def classify(self, source: Source) -> Evaluation:
         diagnostics = self.diagnostics_by_source(source)
@@ -373,26 +406,6 @@ class GroupedDiagnostics:
         sign = "-" if removed else "+"
         return "\n".join(f"{sign} {diagnostic}" for diagnostic in diagnostics)
 
-    def display(self, format: Literal["diff", "github"]) -> str:
-        eval = self.classify(Source.NEW)
-        match eval.classification:
-            case Classification.TRUE_POSITIVE | Classification.FALSE_POSITIVE:
-                assert self.new is not None
-                return (
-                    self._render_diff(self.new)
-                    if format == "diff"
-                    else self._render_row(self.new)
-                )
-
-            case Classification.FALSE_NEGATIVE | Classification.TRUE_NEGATIVE:
-                diagnostics = self.old if self.old else self.expected
-
-                return (
-                    self._render_diff(diagnostics, removed=True)
-                    if format == "diff"
-                    else self._render_row(diagnostics)
-                )
-
 
 @dataclass(kw_only=True, slots=True)
 class Statistics:
@@ -498,7 +511,7 @@ def group_diagnostics_by_key(
     old: list[Diagnostic],
     new: list[Diagnostic],
     expected: list[Diagnostic],
-) -> list[GroupedDiagnostics]:
+) -> list[TestCase]:
     # propagate tags from expected diagnostics to old and new diagnostics
     tagged_lines = {
         (d.location.path.name, d.location.positions.begin.line): d.tag
@@ -521,7 +534,7 @@ def group_diagnostics_by_key(
     ]
 
     diagnostics = sorted(diagnostics, key=attrgetter("key"))
-    grouped_diagnostics = []
+    test_cases = []
     for key, group in groupby(diagnostics, key=attrgetter("key")):
         old_diagnostics: list[Diagnostic] = []
         new_diagnostics: list[Diagnostic] = []
@@ -538,25 +551,25 @@ def group_diagnostics_by_key(
                 case Source.EXPECTED:
                     expected_diagnostics.append(diag)
 
-        grouped = GroupedDiagnostics(
+        grouped = TestCase(
             key=key,
             sources=sources,
             old=old_diagnostics,
             new=new_diagnostics,
             expected=expected_diagnostics,
         )
-        grouped_diagnostics.append(grouped)
+        test_cases.append(grouped)
 
-    return grouped_diagnostics
+    return test_cases
 
 
 def compute_stats(
-    grouped_diagnostics: list[GroupedDiagnostics],
+    test_cases: list[TestCase],
     ty_version: Literal["new", "old"],
 ) -> Statistics:
     source = Source.NEW if ty_version == "new" else Source.OLD
 
-    def increment(statistics: Statistics, grouped: GroupedDiagnostics) -> Statistics:
+    def increment(statistics: Statistics, grouped: TestCase) -> Statistics:
         eval = grouped.classify(source)
         statistics.true_positives += eval.true_positives
         statistics.false_positives += eval.false_positives
@@ -564,35 +577,48 @@ def compute_stats(
         statistics.total_diagnostics += len(grouped.diagnostics_by_source(source))
         return statistics
 
-    return reduce(increment, grouped_diagnostics, Statistics())
+    return reduce(increment, test_cases, Statistics())
 
 
-def render_grouped_diagnostics(
-    grouped: list[GroupedDiagnostics],
+def render_test_cases(
+    test_cases: list[TestCase],
     *,
-    changed_only: bool = True,
     format: Literal["diff", "github"] = "diff",
 ) -> str:
-    if changed_only:
-        grouped = [
-            diag for diag in grouped if diag.change in (Change.ADDED, Change.REMOVED)
-        ]
+    # Each entry is (title, test_case, source) — one entry per section a test case appears in.
+    # CHANGED test cases contribute two entries: old diagnostics under "[X] removed" and
+    # new diagnostics under "[Y] added".
+    entries: list[tuple[str, TestCase, Source]] = []
 
-    get_change = attrgetter("change")
+    for test_case in test_cases:
+        change = test_case.change
+        if change == Change.UNCHANGED:
+            continue
 
-    def get_classification(diag) -> Classification:
-        return diag.classify(Source.NEW).classification
+        if test_case.optional:
+            if change == Change.ADDED:
+                entries.append((Change.ADDED.into_title(), test_case, Source.NEW))
+            elif change == Change.REMOVED:
+                entries.append((Change.REMOVED.into_title(), test_case, Source.OLD))
+            elif change == Change.CHANGED:
+                # Show old under "removed" and new under "added" so both are visible.
+                entries.append((Change.REMOVED.into_title(), test_case, Source.OLD))
+                entries.append((Change.ADDED.into_title(), test_case, Source.NEW))
+        else:
+            if change in (Change.ADDED, Change.CHANGED):
+                new_class = test_case.classify(Source.NEW).classification
+                title = new_class.into_title(verb="added")
+                entries.append((title, test_case, Source.NEW))
+            if change in (Change.REMOVED, Change.CHANGED):
+                old_class = test_case.classify(Source.OLD).classification
+                title = old_class.into_title(verb="removed")
+                entries.append((title, test_case, Source.OLD))
 
-    optional_diagnostics = sorted(
-        (diag for diag in grouped if diag.optional),
-        key=get_change,
-        reverse=True,
-    )
-    required_diagnostics = sorted(
-        (diag for diag in grouped if not diag.optional),
-        key=get_classification,
-        reverse=True,
-    )
+    if not entries:
+        return ""
+
+    # Sort by priority then test-case key so groups are contiguous and stable.
+    entries.sort(key=lambda e: (TITLE_PRIORITY.get(e[0], 99), e[0], e[1].key))
 
     match format:
         case "diff":
@@ -608,17 +634,18 @@ def render_grouped_diagnostics(
             raise ValueError("format must be one of 'diff' or 'github'")
 
     lines = []
-    for group, diagnostics in chain(
-        groupby(required_diagnostics, key=get_classification),
-        groupby(optional_diagnostics, key=get_change),
-    ):
-        lines.append(f"### {group.into_title()}")
+    for title, group in groupby(entries, key=lambda e: e[0]):
+        lines.append(f"### {title}")
         lines.extend(["", "<details>", ""])
-
         lines.extend(header)
 
-        for diag in diagnostics:
-            lines.append(diag.display(format=format))
+        for _, test_case, source in group:
+            diagnostics = test_case.diagnostics_by_source(source)
+            removed = source == Source.OLD
+            if format == "diff":
+                lines.append(test_case._render_diff(diagnostics, removed=removed))
+            else:
+                lines.append(test_case._render_row(diagnostics))
 
         lines.append(footer)
         lines.extend(["", "</details>", ""])
@@ -657,9 +684,7 @@ def diff_format(
             assert_never((greater_is_better, increased))  # ty: ignore[type-assertion-failure]
 
 
-def render_summary(
-    grouped_diagnostics: list[GroupedDiagnostics], *, force_summary_table: bool
-) -> str:
+def render_summary(test_cases: list[TestCase], *, force_summary_table: bool) -> str:
     def format_metric(diff: float, old: float, new: float):
         if diff > 0:
             return f"increased from {old:.2%} to {new:.2%}"
@@ -667,12 +692,12 @@ def render_summary(
             return f"decreased from {old:.2%} to {new:.2%}"
         return f"held steady at {old:.2%}"
 
-    old = compute_stats(grouped_diagnostics, ty_version="old")
-    new = compute_stats(grouped_diagnostics, ty_version="new")
+    old = compute_stats(test_cases, ty_version="old")
+    new = compute_stats(test_cases, ty_version="new")
 
     assert new.true_positives > 0, (
         "Expected ty to have at least one true positive.\n"
-        f"Sample of grouped diagnostics: {grouped_diagnostics[:5]}"
+        f"Sample of grouped diagnostics: {test_cases[:5]}"
     )
 
     precision_change = new.precision - old.precision
@@ -685,7 +710,7 @@ def render_summary(
     base_header = f"[Typing conformance results]({CONFORMANCE_DIR_WITH_README})"
 
     if not force_summary_table and all(
-        diag.change is Change.UNCHANGED for diag in grouped_diagnostics
+        diag.change is Change.UNCHANGED for diag in test_cases
     ):
         return dedent(
             f"""
@@ -799,12 +824,6 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--all",
-        action="store_true",
-        help="Show all diagnostics, not just changed ones",
-    )
-
-    parser.add_argument(
         "--format", type=str, choices=["diff", "github"], default="github"
     )
 
@@ -860,9 +879,7 @@ def main():
     rendered = "\n\n".join(
         [
             render_summary(grouped, force_summary_table=args.force_summary_table),
-            render_grouped_diagnostics(
-                grouped, changed_only=not args.all, format=args.format
-            ),
+            render_test_cases(grouped, format=args.format),
         ]
     )
 
