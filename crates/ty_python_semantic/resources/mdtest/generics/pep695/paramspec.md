@@ -67,6 +67,8 @@ def foo[**P = int]() -> None:
 
 `ParamSpec` is only valid as the first element to `Callable` or the final element to `Concatenate`.
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing import Any, Final, ParamSpec, Callable, Concatenate
 
