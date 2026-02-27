@@ -181,6 +181,17 @@ def _(x: type[int | list | bytes]):
         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 ```
 
+The same validation also applies when an invalid `UnionType` is nested inside a tuple:
+
+```py
+def _(x: type[int | list | bytes]):
+    # error: [invalid-argument-type]
+    if issubclass(x, (int, list[int] | bytes)):
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+    else:
+        reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+```
+
 ## PEP-604 unions on Python \<3.10
 
 PEP-604 unions were added in Python 3.10, so attempting to use them on Python 3.9 does not lead to

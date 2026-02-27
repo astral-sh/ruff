@@ -3064,18 +3064,18 @@ static_assert(not is_disjoint_from(Proto, Nominal))
 This snippet caused us to panic on an early version of the implementation for protocols.
 
 ```py
-from typing import Protocol
+from typing import Protocol, runtime_checkable
 
+@runtime_checkable
 class A(Protocol):
     def x(self) -> "B | A": ...
 
+@runtime_checkable
 class B(Protocol):
     def y(self): ...
 
 obj = something_unresolvable  # error: [unresolved-reference]
 reveal_type(obj)  # revealed: Unknown
-# error: [isinstance-against-protocol]
-# error: [isinstance-against-protocol]
 if isinstance(obj, (B, A)):
     reveal_type(obj)  # revealed: (Unknown & B) | (Unknown & A)
 ```

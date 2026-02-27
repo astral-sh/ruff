@@ -13,12 +13,18 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/narrow/issubclass.md
 ## mdtest_snippet.py
 
 ```
-1 | def _(x: type[int | list | bytes]):
-2 |     # error: [invalid-argument-type]
-3 |     if issubclass(x, int | list[int]):
-4 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
-5 |     else:
-6 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+ 1 | def _(x: type[int | list | bytes]):
+ 2 |     # error: [invalid-argument-type]
+ 3 |     if issubclass(x, int | list[int]):
+ 4 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+ 5 |     else:
+ 6 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+ 7 | def _(x: type[int | list | bytes]):
+ 8 |     # error: [invalid-argument-type]
+ 9 |     if issubclass(x, (int, list[int] | bytes)):
+10 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+11 |     else:
+12 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 ```
 
 # Diagnostics
@@ -36,6 +42,25 @@ error[invalid-argument-type]: Invalid second argument to `issubclass`
 4 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
 5 |     else:
   |
+info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Invalid second argument to `issubclass`
+  --> src/mdtest_snippet.py:9:8
+   |
+ 7 | def _(x: type[int | list | bytes]):
+ 8 |     # error: [invalid-argument-type]
+ 9 |     if issubclass(x, (int, list[int] | bytes)):
+   |        ^^^^^^^^^^^^^^------------------------^
+   |                      |
+   |                      This `UnionType` instance contains non-class elements
+10 |         reveal_type(x)  # revealed: type[int | list[Unknown] | bytes]
+11 |     else:
+   |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object
 info: rule `invalid-argument-type` is enabled by default
