@@ -129,15 +129,16 @@ pub(crate) fn none_not_at_end_of_union<'a>(checker: &Checker, union: &'a Expr) {
     let mut diagnostic = checker.report_diagnostic(NoneNotAtEndOfUnion, union.range());
 
     // Skip fix for nested unions to avoid flattening, and for PEP 604 unions
-    // with multiple `None`s to avoid generating `None | None` (a runtime error
-    // on Python < 3.13 without `from __future__ import annotations`).
-    if !(has_nested_union(semantic, union)
+    // with multiple `None`s to avoid generating `None | None`.
+    if has_nested_union(semantic, union)
         || other_exprs.is_empty()
-        || is_pep604 && none_exprs.len() > 1)
+        || is_pep604 && none_exprs.len() > 1
     {
-        if let Some(fix) = generate_fix(checker, &other_exprs, &none_exprs, union, is_pep604) {
-            diagnostic.set_fix(fix);
-        }
+        return;
+    }
+
+    if let Some(fix) = generate_fix(checker, &other_exprs, &none_exprs, union, is_pep604) {
+        diagnostic.set_fix(fix);
     }
 }
 
