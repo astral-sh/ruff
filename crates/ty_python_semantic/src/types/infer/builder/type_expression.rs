@@ -1280,7 +1280,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
         let parameters = first_argument.and_then(|arg| self.infer_callable_parameter_types(arg));
 
-        let return_type = arguments.next().map(|arg| self.infer_type_expression(arg));
+        let return_type = arguments.next().map(|arg| {
+            let ty = self.infer_type_expression(arg);
+            self.check_for_bare_paramspec(ty, arg);
+            ty
+        });
 
         let correct_argument_number = if let Some(third_argument) = arguments.next() {
             self.infer_type_expression(third_argument);
@@ -1833,6 +1837,34 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         })
     }
 
+    /// Report a diagnostic if `ty` is a `ParamSpec` that is not valid in this context.
+    ///
+    /// `ParamSpec` is only valid as the first argument to `Callable` or the last argument to
+    /// `Concatenate`. In all other type expression positions, a bare `ParamSpec` is invalid.
+    ///
+    /// Returns `true` if the type was a `ParamSpec` and a diagnostic was reported.
+    pub(crate) fn check_for_bare_paramspec(&self, ty: Type<'db>, node: &ast::Expr) -> bool {
+        let is_paramspec = match ty {
+            Type::TypeVar(typevar) => {
+                typevar.is_paramspec(self.db()) && typevar.paramspec_attr(self.db()).is_none()
+            }
+            Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                typevar.is_paramspec(self.db())
+            }
+            _ => false,
+        };
+        if is_paramspec {
+            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, node) {
+                builder.into_diagnostic(
+                    "`ParamSpec` is not valid in this context; \
+                    it can only be used as the first argument to `Callable` \
+                    or the last argument to `Concatenate`",
+                );
+            }
+        }
+        is_paramspec
+    }
+
     /// Infer the first argument to a `typing.Callable` type expression and returns the
     /// corresponding [`Parameters`].
     ///
@@ -1854,6 +1886,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                 for param in params {
                     let param_type = self.infer_type_expression(param);
+                    self.check_for_bare_paramspec(param_type, param);
                     // This is similar to what we currently do for inferring tuple type expression.
                     // We currently infer `Todo` for the parameters to avoid invalid diagnostics
                     // when trying to check for assignability or any other relation. For example,
