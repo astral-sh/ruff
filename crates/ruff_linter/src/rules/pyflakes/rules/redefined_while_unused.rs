@@ -274,10 +274,6 @@ fn bindings_in_different_forks(
     let left_ = is_in_type_checking_block(checker, left);
     let right_ = is_in_type_checking_block(checker, right);
 
-    if !is_f811_shadowing_in_type_checking_enabled(checker.settings()) {
-        return !checker.semantic().same_branch(left, right);
-    }
-
     if left_ ^ right_ {
         let left_binding = &checker.semantic().bindings[shadow.shadowed_id()];
         let right_binding = &checker.semantic().bindings[shadow.binding_id()];
