@@ -1376,6 +1376,16 @@ static_assert(is_subtype_of(CallableTypeOf[variadic_a], CallableTypeOf[standard_
 static_assert(not is_subtype_of(CallableTypeOf[variadic_b], CallableTypeOf[standard_int]))
 ```
 
+A variadic parameter alone cannot match a standard parameter because the keyword part would be
+unmatched. Both a variadic and a keyword-variadic (or a keyword-only parameter with the same name)
+are needed to cover the standard parameter.
+
+```py
+def only_variadic(*args: int) -> None: ...
+
+static_assert(not is_subtype_of(CallableTypeOf[only_variadic], CallableTypeOf[standard_int]))
+```
+
 #### Keyword-only
 
 For keyword-only parameters, the name should be the same:
