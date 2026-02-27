@@ -25,7 +25,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{DefinedPlace, Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
     INVALID_DATACLASS, MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
@@ -89,13 +89,16 @@ impl<'db> BindingsElement<'db> {
     fn check_types(
         &mut self,
         db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
         let mut result = ArgumentForms::default();
         let mut any_forms = false;
         for binding in &mut self.bindings {
-            if let Some(forms) = binding.check_types(db, argument_types, call_expression_tcx) {
+            if let Some(forms) =
+                binding.check_types(db, constraints, argument_types, call_expression_tcx)
+            {
                 result.merge(&forms);
                 any_forms = true;
             }
@@ -426,12 +429,14 @@ impl<'db> Bindings<'db> {
     pub(crate) fn check_types(
         mut self,
         db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
     ) -> Result<Self, CallError<'db>> {
         match self.check_types_impl(
             db,
+            constraints,
             argument_types,
             call_expression_tcx,
             dataclass_field_specifiers,
@@ -444,6 +449,7 @@ impl<'db> Bindings<'db> {
     pub(crate) fn check_types_impl(
         &mut self,
         db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
         dataclass_field_specifiers: &[Type<'db>],
@@ -451,7 +457,7 @@ impl<'db> Bindings<'db> {
         // Check types for each element (union variant)
         for element in &mut self.elements {
             if let Some(updated_argument_forms) =
-                element.check_types(db, argument_types, call_expression_tcx)
+                element.check_types(db, constraints, argument_types, call_expression_tcx)
             {
                 // If this element returned a new set of argument forms (indicating successful
                 // argument type expansion), merge them into the existing forms.
@@ -1146,9 +1152,11 @@ impl<'db> Bindings<'db> {
                     Type::FunctionLiteral(function_type) => match function_type.known(db) {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
-                                let tracked = InternedConstraintSet::new(db, constraints);
+                                let constraints = ConstraintSetBuilder::new();
+                                let result = constraints.into_owned(|constraints| {
+                                    ty_a.when_equivalent_to(db, *ty_b, constraints)
+                                });
+                                let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
                                 ));
@@ -1157,9 +1165,16 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::None);
-                                let tracked = InternedConstraintSet::new(db, constraints);
+                                let constraints = ConstraintSetBuilder::new();
+                                let result = constraints.into_owned(|constraints| {
+                                    ty_a.when_subtype_of(
+                                        db,
+                                        *ty_b,
+                                        constraints,
+                                        InferableTypeVars::None,
+                                    )
+                                });
+                                let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
                                 ));
@@ -1168,9 +1183,16 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::None);
-                                let tracked = InternedConstraintSet::new(db, constraints);
+                                let constraints = ConstraintSetBuilder::new();
+                                let result = constraints.into_owned(|constraints| {
+                                    ty_a.when_assignable_to(
+                                        db,
+                                        *ty_b,
+                                        constraints,
+                                        InferableTypeVars::None,
+                                    )
+                                });
+                                let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
                                 ));
@@ -1179,9 +1201,16 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
-                                let constraints =
-                                    ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::None);
-                                let tracked = InternedConstraintSet::new(db, constraints);
+                                let constraints = ConstraintSetBuilder::new();
+                                let result = constraints.into_owned(|constraints| {
+                                    ty_a.when_disjoint_from(
+                                        db,
+                                        *ty_b,
+                                        constraints,
+                                        InferableTypeVars::None,
+                                    )
+                                });
+                                let tracked = InternedConstraintSet::new(db, result);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
                                 ));
@@ -1415,7 +1444,7 @@ impl<'db> Bindings<'db> {
                             };
 
                             let union_with_default =
-                                |ty| UnionType::from_elements(db, [ty, default]);
+                                |ty| UnionType::from_two_elements(db, ty, default);
 
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
@@ -1724,8 +1753,17 @@ impl<'db> Bindings<'db> {
                         else {
                             return;
                         };
-                        let constraints = ConstraintSet::range(db, *lower, *typevar, *upper);
-                        let tracked = InternedConstraintSet::new(db, constraints);
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            ConstraintSet::constrain_typevar(
+                                db,
+                                constraints,
+                                *typevar,
+                                *lower,
+                                *upper,
+                            )
+                        });
+                        let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
                         ));
@@ -1735,8 +1773,10 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSet::from(true);
-                        let tracked = InternedConstraintSet::new(db, constraints);
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints
+                            .into_owned(|constraints| ConstraintSet::from_bool(constraints, true));
+                        let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
                         ));
@@ -1746,8 +1786,10 @@ impl<'db> Bindings<'db> {
                         if !overload.parameter_types().is_empty() {
                             return;
                         }
-                        let constraints = ConstraintSet::from(false);
-                        let tracked = InternedConstraintSet::new(db, constraints);
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints
+                            .into_owned(|constraints| ConstraintSet::from_bool(constraints, false));
+                        let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
                         ));
@@ -1760,12 +1802,16 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
-                        let result = ty_a.when_subtype_of_assuming(
-                            db,
-                            *ty_b,
-                            tracked.constraints(db),
-                            InferableTypeVars::None,
-                        );
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            ty_a.when_subtype_of_assuming(
+                                db,
+                                *ty_b,
+                                constraints.load(tracked.constraints(db)),
+                                constraints,
+                                InferableTypeVars::None,
+                            )
+                        });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1783,9 +1829,12 @@ impl<'db> Bindings<'db> {
                             continue;
                         };
 
-                        let result = tracked
-                            .constraints(db)
-                            .implies(db, || other.constraints(db));
+                        let constraints = ConstraintSetBuilder::new();
+                        let result = constraints.into_owned(|constraints| {
+                            let lhs = constraints.load(tracked.constraints(db));
+                            let rhs = constraints.load(other.constraints(db));
+                            lhs.implies(db, constraints, || rhs)
+                        });
                         let tracked = InternedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),
@@ -1822,25 +1871,26 @@ impl<'db> Bindings<'db> {
                             _ => continue,
                         };
 
-                        let result = tracked
-                            .constraints(db)
-                            .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
+                        let constraints = ConstraintSetBuilder::new();
+                        let set = constraints.load(tracked.constraints(db));
+                        let result =
+                            set.satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
                         overload.set_return_type(Type::bool_literal(result));
                     }
 
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::GenericContextSpecializeConstrained(generic_context),
                     ) => {
-                        let [Some(constraints)] = overload.parameter_types() else {
+                        let [Some(set)] = overload.parameter_types() else {
                             continue;
                         };
-                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(constraints)) =
-                            constraints
-                        else {
+                        let Type::KnownInstance(KnownInstanceType::ConstraintSet(set)) = set else {
                             continue;
                         };
+                        let constraints = ConstraintSetBuilder::new();
+                        let set = constraints.load(set.constraints(db));
                         let specialization =
-                            generic_context.specialize_constrained(db, constraints.constraints(db));
+                            generic_context.specialize_constrained(db, &constraints, set);
                         let result = match specialization {
                             Ok(specialization) => Type::KnownInstance(
                                 KnownInstanceType::Specialization(specialization),
@@ -2098,6 +2148,7 @@ impl<'db> CallableBinding<'db> {
     fn check_types(
         &mut self,
         db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_types: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) -> Option<ArgumentForms> {
@@ -2125,7 +2176,12 @@ impl<'db> CallableBinding<'db> {
                 // still perform type checking for non-overloaded function to provide better user
                 // experience.
                 if let [overload] = self.overloads.as_mut_slice() {
-                    overload.check_types(db, argument_types.as_ref(), call_expression_tcx);
+                    overload.check_types(
+                        db,
+                        constraints,
+                        argument_types.as_ref(),
+                        call_expression_tcx,
+                    );
                 }
                 return None;
             }
@@ -2133,7 +2189,12 @@ impl<'db> CallableBinding<'db> {
                 // If only one candidate overload remains, it is the winning match. Evaluate it as
                 // a regular (non-overloaded) call.
                 self.matching_overload_before_type_checking = Some(index);
-                self.overloads[index].check_types(db, argument_types.as_ref(), call_expression_tcx);
+                self.overloads[index].check_types(
+                    db,
+                    constraints,
+                    argument_types.as_ref(),
+                    call_expression_tcx,
+                );
                 return None;
             }
             MatchingOverloadIndex::Multiple(indexes) => {
@@ -2145,7 +2206,12 @@ impl<'db> CallableBinding<'db> {
         // Step 2: Evaluate each remaining overload as a regular (non-overloaded) call to determine
         // whether it is compatible with the supplied argument list.
         for (_, overload) in self.matching_overloads_mut() {
-            overload.check_types(db, argument_types.as_ref(), call_expression_tcx);
+            overload.check_types(
+                db,
+                constraints,
+                argument_types.as_ref(),
+                call_expression_tcx,
+            );
         }
 
         tracing::trace!(
@@ -2187,6 +2253,7 @@ impl<'db> CallableBinding<'db> {
                         // If two or more candidate overloads remain, proceed to step 5.
                         self.filter_overloads_using_any_or_unknown(
                             db,
+                            constraints,
                             argument_types.as_ref(),
                             &indexes,
                         );
@@ -2233,7 +2300,12 @@ impl<'db> CallableBinding<'db> {
                     let parameter_type =
                         overload.signature.parameters()[*parameter_index].annotated_type();
                     if argument_type
-                        .when_assignable_to(db, parameter_type, overload.inferable_typevars)
+                        .when_assignable_to(
+                            db,
+                            parameter_type,
+                            constraints,
+                            overload.inferable_typevars,
+                        )
                         .is_always_satisfied(db)
                     {
                         is_argument_assignable_to_any_overload = true;
@@ -2306,7 +2378,7 @@ impl<'db> CallableBinding<'db> {
                 merged_argument_forms.merge(&argument_forms);
 
                 for (_, overload) in self.matching_overloads_mut() {
-                    overload.check_types(db, expanded_arguments, call_expression_tcx);
+                    overload.check_types(db, constraints, expanded_arguments, call_expression_tcx);
                 }
 
                 tracing::trace!(
@@ -2340,6 +2412,7 @@ impl<'db> CallableBinding<'db> {
                             MatchingOverloadIndex::Multiple(indexes) => {
                                 self.filter_overloads_using_any_or_unknown(
                                     db,
+                                    constraints,
                                     expanded_arguments,
                                     &indexes,
                                 );
@@ -2450,6 +2523,7 @@ impl<'db> CallableBinding<'db> {
     fn filter_overloads_using_any_or_unknown(
         &mut self,
         db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
@@ -2483,11 +2557,7 @@ impl<'db> CallableBinding<'db> {
                     let first_parameter_type = &mut first_parameter_types[parameter_index];
                     if let Some(first_parameter_type) = first_parameter_type {
                         if !first_parameter_type
-                            .when_equivalent_to(
-                                db,
-                                current_parameter_type,
-                                overload.inferable_typevars,
-                            )
+                            .when_equivalent_to(db, current_parameter_type, constraints)
                             .is_always_satisfied(db)
                         {
                             participating_parameter_indexes.insert(parameter_index);
@@ -2630,11 +2700,7 @@ impl<'db> CallableBinding<'db> {
                 matching_overloads.all(|(_, overload)| {
                     overload
                         .return_type()
-                        .when_equivalent_to(
-                            db,
-                            first_overload_return_type,
-                            overload.inferable_typevars,
-                        )
+                        .when_equivalent_to(db, first_overload_return_type, constraints)
                         .is_always_satisfied(db)
                 })
             } else {
@@ -3560,7 +3626,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         })
     }
 
-    fn infer_specialization(&mut self) {
+    fn infer_specialization(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let Some(generic_context) = self.signature.generic_context else {
             return;
         };
@@ -3588,32 +3654,37 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .class_specialization(self.db)?;
 
                 builder
-                    .infer_reverse_map(tcx, return_ty, |(identity, variance, inferred_ty)| {
-                        // Avoid unnecessarily widening the return type based on a covariant
-                        // type parameter from the type context, as it can lead to argument
-                        // assignability errors if the type variable is constrained by a narrower
-                        // parameter type.
-                        if variance.is_covariant() {
-                            return None;
-                        }
-
-                        // Avoid inferring a preferred type based on partially specialized type context
-                        // from an outer generic call. If the type context is a union, we try to keep
-                        // any concrete elements.
-                        let inferred_ty = inferred_ty.filter_union(self.db, |ty| {
-                            if ty.has_unspecialized_type_var(self.db) {
-                                partially_specialized_declared_type.insert(identity);
-                                false
-                            } else {
-                                true
+                    .infer_reverse_map(
+                        constraints,
+                        tcx,
+                        return_ty,
+                        |(identity, variance, inferred_ty)| {
+                            // Avoid unnecessarily widening the return type based on a covariant
+                            // type parameter from the type context, as it can lead to argument
+                            // assignability errors if the type variable is constrained by a narrower
+                            // parameter type.
+                            if variance.is_covariant() {
+                                return None;
                             }
-                        });
-                        if inferred_ty.has_unspecialized_type_var(self.db) {
-                            return None;
-                        }
 
-                        Some(inferred_ty)
-                    })
+                            // Avoid inferring a preferred type based on partially specialized type context
+                            // from an outer generic call. If the type context is a union, we try to keep
+                            // any concrete elements.
+                            let inferred_ty = inferred_ty.filter_union(self.db, |ty| {
+                                if ty.has_unspecialized_type_var(self.db) {
+                                    partially_specialized_declared_type.insert(identity);
+                                    false
+                                } else {
+                                    true
+                                }
+                            });
+                            if inferred_ty.has_unspecialized_type_var(self.db) {
+                                return None;
+                            }
+
+                            Some(inferred_ty)
+                        },
+                    )
                     .ok()?;
 
                 Some(builder.type_mappings().clone())
@@ -3622,6 +3693,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let mut specialization_errors = Vec::new();
         let assignable_to_declared_type = self.infer_argument_types(
+            constraints,
             &mut builder,
             &preferred_type_mappings,
             &partially_specialized_declared_type,
@@ -3638,6 +3710,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             specialization_errors.clear();
 
             self.infer_argument_types(
+                constraints,
                 &mut builder,
                 &FxHashMap::default(),
                 &FxHashSet::default(),
@@ -3704,6 +3777,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn infer_argument_types(
         &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
         builder: &mut SpecializationBuilder<'db>,
         preferred_type_mappings: &FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
         partially_specialized_declared_type: &FxHashSet<BoundTypeVarIdentity<'_>>,
@@ -3719,6 +3793,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.argument_matches[argument_index].iter()
             {
                 let specialization_result = builder.infer_map(
+                    constraints,
                     parameters[parameter_index].annotated_type(),
                     variadic_argument_type.unwrap_or(argument_type),
                     |(identity, _, inferred_ty)| {
@@ -3754,6 +3829,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_argument_type(
         &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
@@ -3784,7 +3860,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if !self.constraint_set_errors[argument_index]
             && !parameter.has_starred_annotation()
             && argument_type
-                .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
+                .when_assignable_to(self.db, expected_ty, constraints, self.inferable_typevars)
                 .is_never_satisfied(self.db)
         {
             let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
@@ -3802,12 +3878,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         if let Some(existing) = self.parameter_tys[parameter_index].replace(argument_type) {
             // We already verified in `match_parameters` that we only match multiple arguments
             // with variadic parameters.
-            let union = UnionType::from_elements(self.db, [existing, argument_type]);
+            let union = UnionType::from_two_elements(self.db, existing, argument_type);
             self.parameter_tys[parameter_index] = Some(union);
         }
     }
 
-    fn check_argument_types(&mut self) {
+    fn check_argument_types(&mut self, constraints: &ConstraintSetBuilder<'db>) {
         let paramspec = self
             .signature
             .parameters()
@@ -3817,7 +3893,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.enumerate_argument_types()
         {
             if let Some((_, paramspec)) = paramspec {
-                if self.try_paramspec_evaluation_at(argument_index, paramspec) {
+                if self.try_paramspec_evaluation_at(constraints, argument_index, paramspec) {
                     // Once we find an argument that matches the `ParamSpec`, we can stop checking
                     // the remaining arguments since `ParamSpec` should always be the last
                     // parameter.
@@ -3827,11 +3903,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
             match argument {
                 Argument::Variadic => self.check_variadic_argument_type(
+                    constraints,
                     argument_index,
                     adjusted_argument_index,
                     argument,
                 ),
                 Argument::Keywords => self.check_keyword_variadic_argument_type(
+                    constraints,
                     argument_index,
                     adjusted_argument_index,
                     argument,
@@ -3841,6 +3919,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     // If the argument isn't splatted, just check its type directly.
                     for parameter_index in &self.argument_matches[argument_index].parameters {
                         self.check_argument_type(
+                            constraints,
                             argument_index,
                             adjusted_argument_index,
                             argument,
@@ -3869,7 +3948,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             //
             // Here, no arguments match the `ParamSpec` parameter, but `P` specializes to `(x: int)`,
             // so we need to perform a sub-call with no arguments.
-            self.evaluate_paramspec_sub_call(None, paramspec);
+            self.evaluate_paramspec_sub_call(constraints, None, paramspec);
         }
     }
 
@@ -3905,6 +3984,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// Returns `true` if the sub-call was invoked, `false` otherwise.
     fn try_paramspec_evaluation_at(
         &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
@@ -3920,7 +4000,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         }
 
-        self.evaluate_paramspec_sub_call(Some(argument_index), paramspec)
+        self.evaluate_paramspec_sub_call(constraints, Some(argument_index), paramspec)
     }
 
     /// Invoke a sub-call for the given `ParamSpec` type variable, using the remaining arguments.
@@ -3934,6 +4014,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// For more details, refer to [`Self::try_paramspec_evaluation_at`].
     fn evaluate_paramspec_sub_call(
         &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_index: Option<usize>,
         paramspec: BoundTypeVarInstance<'db>,
     ) -> bool {
@@ -3973,8 +4054,13 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
         let bindings = match Bindings::from(callable_binding)
             .match_parameters(self.db, &sub_arguments)
-            .check_types(self.db, &sub_arguments, self.call_expression_tcx, &[])
-        {
+            .check_types(
+                self.db,
+                constraints,
+                &sub_arguments,
+                self.call_expression_tcx,
+                &[],
+            ) {
             Ok(bindings) => bindings,
             Err(CallError(_, bindings)) => *bindings,
         };
@@ -4046,6 +4132,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_variadic_argument_type(
         &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
@@ -4054,6 +4141,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             self.argument_matches[argument_index].iter()
         {
             self.check_argument_type(
+                constraints,
                 argument_index,
                 adjusted_argument_index,
                 argument,
@@ -4065,6 +4153,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
     fn check_keyword_variadic_argument_type(
         &mut self,
+        constraints: &ConstraintSetBuilder<'db>,
         argument_index: usize,
         adjusted_argument_index: Option<usize>,
         argument: Argument<'a>,
@@ -4078,6 +4167,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
+                    constraints,
                     argument_index,
                     adjusted_argument_index,
                     argument,
@@ -4093,6 +4183,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .when_assignable_to(
                         self.db,
                         KnownClass::Str.to_instance(self.db),
+                        constraints,
                         self.inferable_typevars,
                     )
                     .is_always_satisfied(self.db)
@@ -4120,6 +4211,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 std::iter::repeat(value_type).zip(&self.argument_matches[argument_index].parameters)
             {
                 self.check_argument_type(
+                    constraints,
                     argument_index,
                     adjusted_argument_index,
                     Argument::Keywords,
@@ -4292,6 +4384,7 @@ impl<'db> Binding<'db> {
     fn check_types(
         &mut self,
         db: &'db dyn Db,
+        constraints: &ConstraintSetBuilder<'db>,
         arguments: &CallArguments<'_, 'db>,
         call_expression_tcx: TypeContext<'db>,
     ) {
@@ -4315,8 +4408,8 @@ impl<'db> Binding<'db> {
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
-        checker.infer_specialization();
-        checker.check_argument_types();
+        checker.infer_specialization(constraints);
+        checker.check_argument_types(constraints);
 
         (self.inferable_typevars, self.specialization, self.return_ty) = checker.finish();
     }

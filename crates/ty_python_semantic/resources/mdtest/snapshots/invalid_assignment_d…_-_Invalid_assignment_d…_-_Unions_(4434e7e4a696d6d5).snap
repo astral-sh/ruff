@@ -1,0 +1,72 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: invalid_assignment_details.md - Invalid assignment diagnostics - Unions
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment_details.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(source: str | None):
+2 |     target: str = source  # error: [invalid-assignment]
+3 | def _(source: int):
+4 |     target: str | None = source  # error: [invalid-assignment]
+5 | def _(source: str | None):
+6 |     target: bytes | None = source  # error: [invalid-assignment]
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Object of type `str | None` is not assignable to `str`
+ --> src/mdtest_snippet.py:2:13
+  |
+1 | def _(source: str | None):
+2 |     target: str = source  # error: [invalid-assignment]
+  |             ---   ^^^^^^ Incompatible value of type `str | None`
+  |             |
+  |             Declared type
+3 | def _(source: int):
+4 |     target: str | None = source  # error: [invalid-assignment]
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Object of type `int` is not assignable to `str | None`
+ --> src/mdtest_snippet.py:4:13
+  |
+2 |     target: str = source  # error: [invalid-assignment]
+3 | def _(source: int):
+4 |     target: str | None = source  # error: [invalid-assignment]
+  |             ----------   ^^^^^^ Incompatible value of type `int`
+  |             |
+  |             Declared type
+5 | def _(source: str | None):
+6 |     target: bytes | None = source  # error: [invalid-assignment]
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Object of type `str | None` is not assignable to `bytes | None`
+ --> src/mdtest_snippet.py:6:13
+  |
+4 |     target: str | None = source  # error: [invalid-assignment]
+5 | def _(source: str | None):
+6 |     target: bytes | None = source  # error: [invalid-assignment]
+  |             ------------   ^^^^^^ Incompatible value of type `str | None`
+  |             |
+  |             Declared type
+  |
+info: rule `invalid-assignment` is enabled by default
+
+```

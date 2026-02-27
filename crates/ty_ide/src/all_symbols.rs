@@ -44,6 +44,7 @@ pub fn all_symbols<'db>(
                 let Some(file) = module.file(&*db) else {
                     continue;
                 };
+                let name = module.name(&*db);
 
                 // Note that this will always consider namespace
                 // packages to be "not firsty party." This isn't
@@ -55,33 +56,15 @@ pub fn all_symbols<'db>(
                     .search_path(&*db)
                     .is_none_or(|sp| !sp.is_first_party());
 
-                // By convention, modules starting with an underscore
-                // are generally considered unexported. However, we
-                // should consider first party modules fair game.
-                //
-                // Note that we apply this recursively. e.g.,
-                // `numpy._core.multiarray` is considered private
-                // because it's a child of `_core`.
-                if is_non_first_party && module.name(&*db).components().any(|c| c.starts_with('_'))
-                {
+                // Filter out non-first-party modules that are conventionally
+                // regarded as private or tests.
+                if is_non_first_party && (name.is_private() || name.is_test_module()) {
                     continue;
                 }
 
-                // Test modules in third-party packages are almost never
-                // useful to import. We filter out:
-                // - Modules where a non-root component is "test" or "tests"
-                //   (e.g., `numpy.tests.test_core`)
-                // - Modules named "conftest" (pytest configuration)
-                //
-                // Note: We intentionally keep top-level "testing" modules
-                // like `pandas.testing` since those provide utilities meant
-                // for external use.
-                if is_non_first_party && is_test_module(module.name(&*db)) {
-                    continue;
-                }
                 // TODO: also make it available in `TYPE_CHECKING` blocks
                 // (we'd need https://github.com/astral-sh/ty/issues/1553 to do this well)
-                if !is_typing_extensions_available && module.name(&*db) == &typing_extensions {
+                if !is_typing_extensions_available && name == &typing_extensions {
                     continue;
                 }
                 s.spawn(move |_| {
@@ -574,30 +557,6 @@ mod merge {
         let path2 = sym2.file.path(db).as_str();
         path1.cmp(path2)
     }
-}
-
-/// Returns `true` if the module appears to be a test module.
-///
-/// A module is considered a test module if:
-/// - Any non-root component is "test" or "tests" (e.g., `numpy.tests.test_core`)
-/// - The final component is "conftest" (pytest configuration)
-///
-/// Note: Top-level "testing" modules like `pandas.testing` are intentionally
-/// not filtered, as they provide utilities meant for external use.
-fn is_test_module(module_name: &ModuleName) -> bool {
-    // Check if the final component is "conftest" (pytest configuration)
-    if module_name.components().next_back() == Some("conftest") {
-        return true;
-    }
-
-    // Check if any non-root component is "test" or "tests" We skip the
-    // first component since that's usually the name of a PyPI package.
-    // We generally only want to exclude test modules from *inside* a
-    // package.
-    module_name
-        .components()
-        .skip(1)
-        .any(|c| c == "test" || c == "tests")
 }
 
 #[cfg(test)]
@@ -1224,39 +1183,5 @@ def test_helper_xyzxyzxyz():
 
             main
         }
-    }
-
-    #[test]
-    fn is_test_module_detects_test_directories() {
-        // Test modules (should be filtered for non-first-party)
-        assert!(is_test_module(
-            &ModuleName::new_static("numpy.tests.test_core").unwrap()
-        ));
-        assert!(is_test_module(
-            &ModuleName::new_static("pandas.tests.arithmetic.test_numeric").unwrap()
-        ));
-        assert!(is_test_module(
-            &ModuleName::new_static("requests.test.utils").unwrap()
-        ));
-
-        // Conftest modules (should be filtered)
-        assert!(is_test_module(
-            &ModuleName::new_static("mypackage.conftest").unwrap()
-        ));
-        assert!(is_test_module(&ModuleName::new_static("conftest").unwrap()));
-
-        // Non-test modules (should NOT be filtered)
-        assert!(!is_test_module(&ModuleName::new_static("numpy").unwrap()));
-        assert!(!is_test_module(
-            &ModuleName::new_static("pandas.testing").unwrap()
-        ));
-        assert!(!is_test_module(&ModuleName::new_static("pytest").unwrap()));
-        assert!(!is_test_module(
-            &ModuleName::new_static("unittest").unwrap()
-        ));
-        // Root-level test packages should not be filtered
-        // (the filter only applies to non-root components)
-        assert!(!is_test_module(&ModuleName::new_static("test").unwrap()));
-        assert!(!is_test_module(&ModuleName::new_static("tests").unwrap()));
     }
 }

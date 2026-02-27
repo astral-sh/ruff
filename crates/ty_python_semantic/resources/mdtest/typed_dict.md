@@ -1197,9 +1197,7 @@ def f(var: Foo | int):
     assert_type(var, Foo | int)
     assert_type(var, Bar | int)
     assert_type(var, Baz | int)
-    # TODO: Union simplification compares `TypedDict`s by name/identity to avoid cycles. This assert
-    # should also pass once that's fixed.
-    assert_type(var, Foo | Bar | Baz | int)  # error: [type-assertion-failure]
+    assert_type(var, Foo | Bar | Baz | int)
 ```
 
 Here are several cases that are not equivalent. In particular, assignability does not imply
@@ -1917,6 +1915,20 @@ def _(obj: object, obj2: type):
     isinstance(obj, Person)
     # error: [isinstance-against-typed-dict] "`TypedDict` class `Person` cannot be used as the second argument to `issubclass`"
     issubclass(obj2, Person)
+```
+
+The same applies when a `TypedDict` class appears inside a tuple, including non-literal tuples:
+
+```py
+def _(obj: object, obj2: type):
+    isinstance(obj, (int, Person))  # error: [isinstance-against-typed-dict]
+    issubclass(obj2, (int, Person))  # error: [isinstance-against-typed-dict]
+    isinstance(obj, (int, (str, Person)))  # error: [isinstance-against-typed-dict]
+
+classes = (int, Person)
+
+def _(obj: object):
+    isinstance(obj, classes)  # error: [isinstance-against-typed-dict]
 ```
 
 They also cannot be used in class patterns for `match` statements:

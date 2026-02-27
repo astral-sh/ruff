@@ -242,21 +242,25 @@ We assume that the more general form holds.
 
 ### Generic function within generic function
 
+<!-- snapshot-diagnostics -->
+
 ```py
 def f[T](x: T, y: T) -> None:
     def ok[S](a: S, b: S) -> None: ...
 
-    # TODO: error
+    # error: [shadowed-type-variable]
     def bad[T](a: T, b: T) -> None: ...
 ```
 
 ### Generic method within generic class
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class C[T]:
     def ok[S](self, a: S, b: S) -> None: ...
 
-    # TODO: error
+    # error: [shadowed-type-variable]
     def bad[T](self, a: T, b: T) -> None: ...
 ```
 
@@ -269,9 +273,9 @@ from typing import Iterable
 
 def f[T](x: T, y: T) -> None:
     class Ok[S]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad1[T]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad2(Iterable[T]): ...
 ```
 
@@ -284,9 +288,9 @@ from typing import Iterable
 
 class C[T]:
     class Ok1[S]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad1[T]: ...
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad2(Iterable[T]): ...
 ```
 
@@ -310,7 +314,7 @@ list:
 
 ```py
 class Outer[T]:
-    # error: [invalid-generic-class]
+    # error: [shadowed-type-variable]
     class Bad(list[T]): ...
 ```
 

@@ -1,5 +1,5 @@
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
 
 use crate::{
@@ -7,10 +7,10 @@ use crate::{
     place::{
         DefinedPlace, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations,
     },
-    semantic_index::{place_table, use_def_map},
+    semantic_index::{place_table, scope::ScopeId, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, LiteralValueTypeKind,
-        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers,
+        MemberLookupPolicy, StaticClassLiteral, Type, TypeQualifiers, function::FunctionType,
     },
 };
 
@@ -18,15 +18,47 @@ use crate::{
 pub(crate) struct EnumMetadata<'db> {
     pub(crate) members: FxIndexMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
+
+    /// Members whose values were defined using `auto()`.
+    pub(crate) auto_members: FxHashSet<Name>,
+
+    /// The explicit `_value_` annotation type, if declared.
+    pub(crate) value_annotation: Option<Type<'db>>,
+
+    /// The custom `__init__` function, if defined on this enum.
+    ///
+    /// When present, member values are validated by synthesizing a call to
+    /// `__init__` rather than by simple type assignability.
+    pub(crate) init_function: Option<FunctionType<'db>>,
 }
 
 impl get_size2::GetSize for EnumMetadata<'_> {}
 
-impl EnumMetadata<'_> {
+impl<'db> EnumMetadata<'db> {
     fn empty() -> Self {
         EnumMetadata {
             members: FxIndexMap::default(),
             aliases: FxHashMap::default(),
+            auto_members: FxHashSet::default(),
+            value_annotation: None,
+            init_function: None,
+        }
+    }
+
+    /// Returns the type of `.value`/`._value_` for a given enum member.
+    ///
+    /// Priority: explicit `_value_` annotation, then `__init__` → `Any`,
+    /// then the inferred member value type.
+    pub(crate) fn value_type(&self, member_name: &Name) -> Option<Type<'db>> {
+        if !self.members.contains_key(member_name) {
+            return None;
+        }
+        if let Some(annotation) = self.value_annotation {
+            Some(annotation)
+        } else if self.init_function.is_some() {
+            Some(Type::Dynamic(DynamicType::Any))
+        } else {
+            self.members.get(member_name).copied()
         }
     }
 
@@ -81,7 +113,7 @@ pub(crate) fn enum_metadata<'db>(
 
     let mut enum_values: FxHashMap<Type<'db>, Name> = FxHashMap::default();
     let mut auto_counter = 0;
-
+    let mut auto_members = FxHashSet::default();
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
         let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
         let ignore_place = place_from_bindings(db, ignore_bindings).place;
@@ -105,8 +137,9 @@ pub(crate) fn enum_metadata<'db>(
         .filter_map(|(symbol_id, bindings)| {
             let name = table.symbol(symbol_id).name();
 
-            if name.starts_with("__") && !name.ends_with("__") {
-                // Skip private attributes
+            if name.starts_with("__") {
+                // Skip private attributes (`__private`) and dunders (`__module__`, etc.).
+                // CPython's enum metaclass never treats these as members.
                 return None;
             }
 
@@ -146,6 +179,7 @@ pub(crate) fn enum_metadata<'db>(
                             // enum.auto
                             Some(KnownClass::Auto) => {
                                 auto_counter += 1;
+                                auto_members.insert(name.clone());
 
                                 // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
                                 let auto_value_ty =
@@ -287,7 +321,79 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    Some(EnumMetadata { members, aliases })
+    // Look up an explicit `_value_` annotation, if present. Falls back to
+    // checking parent enum classes in the MRO.
+    let value_annotation =
+        custom_value_annotation(db, scope_id).or_else(|| inherited_value_annotation(db, class));
+
+    // Look up a custom `__init__`, falling back to parent enum classes.
+    let init_function = custom_init(db, scope_id).or_else(|| inherited_init(db, class));
+
+    Some(EnumMetadata {
+        members,
+        aliases,
+        auto_members,
+        value_annotation,
+        init_function,
+    })
+}
+
+/// Iterates over parent enum classes in the MRO, skipping known classes
+/// (like `Enum`, `StrEnum`, etc.) that we handle specially.
+fn iter_parent_enum_classes<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> impl Iterator<Item = StaticClassLiteral<'db>> + 'db {
+    class
+        .iter_mro(db, None)
+        .skip(1)
+        .filter_map(ClassBase::into_class)
+        .filter_map(move |class_type| {
+            let base = class_type.class_literal(db).as_static()?;
+            (base.known(db).is_none() && is_enum_class_by_inheritance(db, base)).then_some(base)
+        })
+}
+
+/// Returns the `_value_` annotation type if one is declared in the given scope.
+fn custom_value_annotation<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<Type<'db>> {
+    let symbol_id = place_table(db, scope).symbol_id("_value_")?;
+    let declarations = use_def_map(db, scope).end_of_scope_symbol_declarations(symbol_id);
+    place_from_declarations(db, declarations)
+        .ignore_conflicting_declarations()
+        .ignore_possibly_undefined()
+}
+
+/// Looks up an inherited `_value_` annotation from parent enum classes in the MRO.
+fn inherited_value_annotation<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<Type<'db>> {
+    iter_parent_enum_classes(db, class)
+        .find_map(|base| custom_value_annotation(db, base.body_scope(db)))
+}
+
+/// Looks up an inherited `__init__` from parent enum classes in the MRO.
+fn inherited_init<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> Option<FunctionType<'db>> {
+    iter_parent_enum_classes(db, class).find_map(|base| custom_init(db, base.body_scope(db)))
+}
+
+/// Returns the custom `__init__` function type if one is defined on the enum.
+fn custom_init<'db>(db: &'db dyn Db, scope: ScopeId<'db>) -> Option<FunctionType<'db>> {
+    let init_symbol_id = place_table(db, scope).symbol_id("__init__")?;
+    let init_type = place_from_declarations(
+        db,
+        use_def_map(db, scope).end_of_scope_symbol_declarations(init_symbol_id),
+    )
+    .ignore_conflicting_declarations()
+    .ignore_possibly_undefined()?;
+
+    match init_type {
+        Type::FunctionLiteral(f) => Some(f),
+        _ => None,
+    }
 }
 
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(

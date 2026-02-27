@@ -88,13 +88,13 @@ present, they are not included in the class's generic context.
 
 ```py
 class OuterClass(Generic[T]):
-    # error: [invalid-generic-class] "Generic class `InnerClass` must not reference type variables bound in an enclosing scope"
+    # error: [shadowed-type-variable] "Generic class `InnerClass` uses type variable `T` already bound by an enclosing scope"
     class InnerClass(list[T]): ...
     # revealed: None
     reveal_type(generic_context(InnerClass))
 
     def method(self):
-        # error: [invalid-generic-class] "Generic class `InnerClassInMethod` must not reference type variables bound in an enclosing scope"
+        # error: [shadowed-type-variable] "Generic class `InnerClassInMethod` uses type variable `T` already bound by an enclosing scope"
         class InnerClassInMethod(list[T]): ...
         # revealed: None
         reveal_type(generic_context(InnerClassInMethod))

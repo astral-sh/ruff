@@ -474,4 +474,18 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    /// Regression test for <https://github.com/astral-sh/ruff/issues/23587>.
+    #[test]
+    fn conflict_with_definition_rules() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/swap_with_temporary_variable_1.py"),
+            &LinterSettings::for_rules(vec![
+                Rule::SwapWithTemporaryVariable,
+                Rule::MissingTypeFunctionArgument,
+            ]),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
 }

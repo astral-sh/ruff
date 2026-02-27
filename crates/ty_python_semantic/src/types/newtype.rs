@@ -1,11 +1,10 @@
-use std::collections::BTreeSet;
-
 use crate::Db;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, ConstraintSetBuilder};
 use crate::types::{ClassType, KnownUnion, Type, definition_expression_type, visitor};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use rustc_hash::FxHashSet;
 
 /// A `typing.NewType` declaration, either from the perspective of the
 /// identity-callable-that-acts-like-a-subtype-in-type-expressions returned by the call to
@@ -22,12 +21,7 @@ use ruff_python_ast as ast;
 /// - `typing.NewType`: `Type::ClassLiteral(ClassLiteral)` with `KnownClass::NewType`.
 /// - `Foo`: `Type::KnownInstance(KnownInstanceType::NewType(NewType { .. }))`
 /// - `x`: `Type::NewTypeInstance(NewType { .. })`
-///
-/// # Ordering
-/// Ordering is based on the newtype's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the newtype was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
-#[derive(PartialOrd, Ord)]
 pub struct NewType<'db> {
     /// The name of this NewType (e.g. `"Foo"`)
     #[returns(ref)]
@@ -96,7 +90,7 @@ impl<'db> NewType<'db> {
     fn iter_bases(self, db: &'db dyn Db) -> NewTypeBaseIter<'db> {
         NewTypeBaseIter {
             current: Some(self),
-            seen_before: BTreeSet::new(),
+            seen_before: FxHashSet::default(),
             db,
         }
     }
@@ -123,27 +117,41 @@ impl<'db> NewType<'db> {
     // Since a regular class can't inherit from a newtype, the only way for one newtype to be a
     // subtype of another is to have the other in its chain of newtype bases. Once we reach the
     // base class, we don't have to keep looking.
-    pub(crate) fn has_relation_to_impl(self, db: &'db dyn Db, other: Self) -> ConstraintSet<'db> {
+    pub(crate) fn has_relation_to_impl<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         if self.is_equivalent_to_impl(db, other) {
-            return ConstraintSet::from(true);
+            return ConstraintSet::from_bool(constraints, true);
         }
         for base in self.iter_bases(db) {
             if let NewTypeBase::NewType(base_newtype) = base {
                 if base_newtype.is_equivalent_to_impl(db, other) {
-                    return ConstraintSet::from(true);
+                    return ConstraintSet::from_bool(constraints, true);
                 }
             }
         }
-        ConstraintSet::from(false)
+        ConstraintSet::from_bool(constraints, false)
     }
 
-    pub(crate) fn is_disjoint_from_impl(self, db: &'db dyn Db, other: Self) -> ConstraintSet<'db> {
+    pub(crate) fn is_disjoint_from_impl<'c>(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        constraints: &'c ConstraintSetBuilder<'db>,
+    ) -> ConstraintSet<'db, 'c> {
         // Two NewTypes are disjoint if they're not equal and neither inherits from the other.
         // NewTypes have single inheritance, and a regular class can't inherit from a NewType, so
         // it's not possible for some third type to multiply-inherit from both.
-        let mut self_not_subtype_of_other = self.has_relation_to_impl(db, other).negate(db);
-        let other_not_subtype_of_self = other.has_relation_to_impl(db, self).negate(db);
-        self_not_subtype_of_other.intersect(db, other_not_subtype_of_self)
+        let mut self_not_subtype_of_other = self
+            .has_relation_to_impl(db, other, constraints)
+            .negate(db, constraints);
+        let other_not_subtype_of_self = other
+            .has_relation_to_impl(db, self, constraints)
+            .negate(db, constraints);
+        self_not_subtype_of_other.intersect(db, constraints, other_not_subtype_of_self)
     }
 
     /// Create a new `NewType` by mapping the underlying `ClassType`. This descends through any
@@ -256,7 +264,7 @@ impl<'db> NewTypeBase<'db> {
 /// over the base class need to pass down a cycle-detecting visitor as usual.
 struct NewTypeBaseIter<'db> {
     current: Option<NewType<'db>>,
-    seen_before: BTreeSet<NewType<'db>>,
+    seen_before: FxHashSet<NewType<'db>>,
     db: &'db dyn Db,
 }
 

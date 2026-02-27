@@ -299,3 +299,73 @@ async def read_thing_posonly_default_trailing(query: str = "", /,): ...
 
 @app.get("/things/{thing_id}")
 async def read_thing_posonly_with_regular(query: str = "", /, x=None): ...
+
+
+# https://github.com/astral-sh/ruff/issues/23526
+
+# Error: `Depends(CallableQuery)` passes the class itself, so FastAPI uses
+# `__init__` (which has no params here), not `__call__`. The path parameter
+# `thing_id` is unused.
+class CallableQuery:
+    def __call__(self, thing_id: int):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep(query: Annotated[str, Depends(CallableQuery)]): ...
+
+
+# OK: `Depends(CallableQuery())` passes an instance, so FastAPI uses `__call__`,
+# which declares `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_instance(query: Annotated[str, Depends(CallableQuery())]): ...
+
+
+# OK: class with both __init__ and __call__, passed as class reference.
+# FastAPI uses `__init__`, which declares `thing_id`.
+class InitAndCallQuery:
+    def __init__(self, thing_id: int):
+        pass
+
+    def __call__(self, other: str):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_dep(query: Annotated[str, Depends(InitAndCallQuery)]): ...
+
+
+# Error: `Depends(CallableQueryOther)` — class reference, uses `__init__` (no
+# params). `thing_id` is unused.
+class CallableQueryOther:
+    def __call__(self, other: str):
+        pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_missing(query: Annotated[str, Depends(CallableQueryOther)]): ...
+
+
+# Error: `Depends(InitAndCallQuery())` passes an instance, so FastAPI uses
+# `__call__`, which has `other` — not `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_instance(query: Annotated[str, Depends(InitAndCallQuery())]): ...
+
+
+# Error: class with no __init__ and no __call__; FastAPI calls __init__ which
+# has no parameters, so `thing_id` is not covered by the dependency.
+class EmptyClass:
+    pass
+
+
+@app.get("/things/{thing_id}")
+async def read_thing_empty_class_dep(query: Annotated[str, Depends(EmptyClass)]): ...
+
+
+# Same instance patterns as default values (not Annotated).
+# OK: `__call__` declares `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_callable_dep_instance_default(query: str = Depends(CallableQuery())): ...
+# Error: `__call__` has `other`, not `thing_id`.
+@app.get("/things/{thing_id}")
+async def read_thing_init_and_call_instance_default(query: str = Depends(InitAndCallQuery())): ...

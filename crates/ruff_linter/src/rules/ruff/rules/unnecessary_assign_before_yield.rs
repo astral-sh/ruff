@@ -40,7 +40,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// variable assignment changes the local variable bindings visible to
 /// `locals()` and debuggers when the generator is suspended at the `yield`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "NEXT_RUFF_VERSION")]
+#[violation_metadata(preview_since = "0.15.3")]
 pub(crate) struct UnnecessaryAssignBeforeYield {
     name: String,
     is_yield_from: bool,

@@ -555,6 +555,16 @@
             }
           ]
         },
+        "final-on-non-method": {
+          "title": "detects `@final` applied to non-method functions",
+          "description": "## What it does\nChecks for `@final` decorators applied to non-method functions.\n\n## Why is this bad?\nThe `@final` decorator is only meaningful on methods and classes.\nApplying it to a module-level function or a nested function has no\neffect and is likely a mistake.\n\n## Example\n\n```python\nfrom typing import final\n\n# Error: @final is not allowed on non-method functions\n@final\ndef my_function() -> int:\n    return 0\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "final-without-value": {
           "title": "detects `Final` declarations without a value",
           "description": "## What it does\nChecks for `Final` symbols that are declared without a value and are never\nassigned a value in their scope.\n\n## Why is this bad?\nA `Final` symbol must be initialized with a value at the time of declaration\nor in a subsequent assignment. At module or function scope, the assignment must\noccur in the same scope. In a class body, the assignment may occur in `__init__`.\n\n## Examples\n```python\nfrom typing import Final\n\n# Error: `Final` symbol without a value\nMY_CONSTANT: Final[int]\n\n# OK: `Final` symbol with a value\nMY_CONSTANT: Final[int] = 1\n```",
@@ -1239,6 +1249,16 @@
           "title": "detects redundant combinations of `ClassVar` and `Final`",
           "description": "## What it does\nChecks for redundant combinations of the `ClassVar` and `Final` type qualifiers.\n\n## Why is this bad?\nAn attribute that is marked `Final` in a class body is implicitly a class variable.\nMarking it as `ClassVar` is therefore redundant.\n\nNote that this diagnostic is not emitted for dataclass fields, where\n`ClassVar[Final[int]]` has a distinct meaning from `Final[int]`.\n\n## Examples\n```python\nfrom typing import ClassVar, Final\n\nclass C:\n    x: ClassVar[Final[int]] = 1  # redundant\n    y: Final[ClassVar[int]] = 1  # redundant\n```",
           "default": "warn",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "shadowed-type-variable": {
+          "title": "detects type variables that shadow type variables from outer scopes",
+          "description": "## What it does\nChecks for type variables in nested generic classes or functions that shadow type variables\nfrom an enclosing scope.\n\n## Why is this bad?\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n```python\nclass Outer[T]:\n    # Error: `T` is already used by `Outer`\n    class Inner[T]: ...\n\n    # Error: `T` is already used by `Outer`\n    def method[T](self, x: T) -> T: ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "default": "error",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

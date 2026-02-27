@@ -277,24 +277,18 @@ impl<'a> FileNoqaDirectives<'a> {
                             vec![]
                         }
                         Directive::Codes(codes) => {
-                            codes.iter().filter_map(|code| {
-                                let code = code.as_str();
-                                // Ignore externally-defined rules.
-                                if external.iter().any(|external| code.starts_with(external)) {
-                                    return None;
-                                }
+                            codes
+                                .iter()
+                                .filter_map(|code| {
+                                    let code = code.as_str();
+                                    // Ignore externally-defined rules.
+                                    if external.iter().any(|external| code.starts_with(external)) {
+                                        return None;
+                                    }
 
-                                if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code))
-                                {
-                                    Some(rule)
-                                } else {
-                                    #[expect(deprecated)]
-                                    let line = locator.compute_line_index(range.start());
-                                    let path_display = relativize_path(path);
-                                    warn!("Invalid rule code provided to `# ruff: noqa` at {path_display}:{line}: {code}");
-                                    None
-                                }
-                            }).collect()
+                                    Rule::from_code(get_redirect_target(code).unwrap_or(code)).ok()
+                                })
+                                .collect()
                         }
                     };
 

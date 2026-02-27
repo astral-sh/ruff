@@ -94,6 +94,7 @@ expression: initialization_result
       "range": true,
       "full": true
     },
+    "typeHierarchyProvider": true,
     "inlayHintProvider": {},
     "diagnosticProvider": {
       "identifier": "ty",

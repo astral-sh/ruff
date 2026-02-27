@@ -770,14 +770,13 @@ impl<'db> FmtDetailed<'db> for TypeAliasDisplay<'db> {
         }
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
-            if let Some(definition) = self.type_alias.definition(self.db) {
-                let file = definition.file(self.db);
-                let offset = definition
-                    .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
-                    .range()
-                    .start();
-                fmt_file_location(self.db, file, offset, f)?;
-            }
+            let definition = self.type_alias.definition(self.db);
+            let file = definition.file(self.db);
+            let offset = definition
+                .focus_range(self.db, &parsed_module(self.db, file).load(self.db))
+                .range()
+                .start();
+            fmt_file_location(self.db, file, offset, f)?;
         }
         Ok(())
     }
@@ -2972,11 +2971,7 @@ mod tests {
 
     use crate::Db;
     use crate::db::tests::setup_db;
-    use crate::place::typing_extensions_symbol;
-    use crate::types::typed_dict::{
-        SynthesizedTypedDictType, TypedDictFieldBuilder, TypedDictSchema,
-    };
-    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type, TypedDictType};
+    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type};
 
     #[test]
     fn string_literal_display() {
@@ -2993,62 +2988,6 @@ mod tests {
         assert_eq!(
             Type::string_literal(&db, r#"""#).display(&db).to_string(),
             r#"Literal["\""]"#
-        );
-    }
-
-    #[test]
-    fn synthesized_protocol_display() {
-        let db = setup_db();
-
-        // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
-        let supports_index_synthesized = KnownClass::SupportsIndex.to_instance(&db).normalized(&db);
-        assert_eq!(
-            supports_index_synthesized.display(&db).to_string(),
-            "<Protocol with members '__index__'>"
-        );
-
-        let iterator_synthesized = typing_extensions_symbol(&db, "Iterator")
-            .place
-            .ignore_possibly_undefined()
-            .unwrap()
-            .to_instance(&db)
-            .unwrap()
-            .normalized(&db); // Call `.normalized()` to turn the class-based protocol into a nameless synthesized one.
-
-        assert_eq!(
-            iterator_synthesized.display(&db).to_string(),
-            "<Protocol with members '__iter__', '__next__'>"
-        );
-    }
-
-    #[test]
-    fn synthesized_typeddict_display() {
-        let db = setup_db();
-
-        let mut items = TypedDictSchema::default();
-        items.insert(
-            Name::new("foo"),
-            TypedDictFieldBuilder::new(Type::int_literal(42))
-                .required(true)
-                .build(),
-        );
-        items.insert(
-            Name::new("bar"),
-            TypedDictFieldBuilder::new(Type::string_literal(&db, "hello"))
-                .required(true)
-                .build(),
-        );
-
-        let synthesized = SynthesizedTypedDictType::new(&db, items);
-        let type_ = Type::TypedDict(TypedDictType::Synthesized(synthesized));
-        // Fields are sorted internally, even prior to normalization.
-        assert_eq!(
-            type_.display(&db).to_string(),
-            "<TypedDict with items 'bar', 'foo'>",
-        );
-        assert_eq!(
-            type_.normalized(&db).display(&db).to_string(),
-            "<TypedDict with items 'bar', 'foo'>",
         );
     }
 

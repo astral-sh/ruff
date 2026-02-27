@@ -473,7 +473,7 @@ impl<'db> SemanticIndex<'db> {
             .map(|node_ref| self.expect_single_definition(node_ref))
     }
 
-    fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
+    pub(crate) fn is_scope_reachable(&self, db: &'db dyn Db, scope_id: FileScopeId) -> bool {
         self.parent_scope_id(scope_id)
             .is_none_or(|parent_scope_id| {
                 if !self.is_scope_reachable(db, parent_scope_id) {
