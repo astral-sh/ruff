@@ -105,9 +105,8 @@ use crate::types::diagnostic::{
     report_match_pattern_against_typed_dict, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_rebound_typevar, report_rebound_typevar_function,
-    report_unsupported_augmented_assignment, report_unsupported_base,
-    report_unsupported_binary_operation, report_unsupported_comparison,
+    report_shadowed_type_variable, report_unsupported_augmented_assignment,
+    report_unsupported_base, report_unsupported_binary_operation, report_unsupported_comparison,
 };
 use crate::types::enums::is_enum_class_by_inheritance;
 use crate::types::function::{
@@ -1453,11 +1452,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 if let Some(other_typevar) =
                                     enclosing.binds_named_typevar(self.db(), name)
                                 {
-                                    report_rebound_typevar(
+                                    report_shadowed_type_variable(
                                         &self.context,
                                         name,
-                                        class,
-                                        class_node,
+                                        "class",
+                                        &class_node.name.id,
+                                        class.header_range(self.db()),
                                         other_typevar,
                                     );
                                 }
@@ -1472,11 +1472,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
                             if let Some(other_typevar) = enclosing.binds_typevar(self.db(), typevar)
                             {
-                                report_rebound_typevar(
+                                report_shadowed_type_variable(
                                     &self.context,
                                     typevar.name(self.db()),
-                                    class,
-                                    class_node,
+                                    "class",
+                                    &class_node.name.id,
+                                    class.header_range(self.db()),
                                     other_typevar,
                                 );
                             }
@@ -3295,10 +3296,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(other_typevar) =
                         enclosing.binds_named_typevar(self.db(), &param_name.id)
                     {
-                        report_rebound_typevar_function(
+                        report_shadowed_type_variable(
                             &self.context,
                             &param_name.id,
-                            function,
+                            "function",
+                            &function.name.id,
+                            function.name.range(),
                             other_typevar,
                         );
                     }

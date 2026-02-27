@@ -4942,54 +4942,26 @@ pub(crate) fn report_invalid_type_param_order<'db>(
     }
 }
 
-pub(crate) fn report_rebound_typevar<'db>(
+pub(crate) fn report_shadowed_type_variable<'db>(
     context: &InferContext<'db, '_>,
     typevar_name: &ast::name::Name,
-    class: StaticClassLiteral<'db>,
-    class_node: &ast::StmtClassDef,
+    kind: &str,
+    name: &ast::name::Name,
+    range: TextRange,
     other_typevar: BoundTypeVarInstance<'db>,
 ) {
     let db = context.db();
-    let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, class.header_range(db)) else {
+    let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, range) else {
         return;
     };
     let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic class `{}` uses type variable `{typevar_name}` already bound by an enclosing scope",
-        class_node.name,
+        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
+    ));
+    diagnostic.set_concise_message(format_args!(
+        "Generic {kind} `{name}` uses type variable `{typevar_name}` already bound by an enclosing scope",
     ));
     diagnostic.set_primary_message(format_args!(
-        "`{typevar_name}` used in class definition here"
-    ));
-    let Some(other_definition) = other_typevar.binding_context(db).definition() else {
-        return;
-    };
-    let span = match binding_type(db, other_definition) {
-        Type::ClassLiteral(class) => class.header_span(db),
-        Type::FunctionLiteral(function) => function.spans(db).signature,
-        _ => return,
-    };
-    diagnostic.annotate(Annotation::secondary(span).message(format_args!(
-        "Type variable `{typevar_name}` is bound in this enclosing scope",
-    )));
-}
-
-pub(crate) fn report_rebound_typevar_function<'db>(
-    context: &InferContext<'db, '_>,
-    typevar_name: &ast::name::Name,
-    function_node: &ast::StmtFunctionDef,
-    other_typevar: BoundTypeVarInstance<'db>,
-) {
-    let db = context.db();
-    let Some(builder) = context.report_lint(&SHADOWED_TYPE_VARIABLE, function_node.name.range())
-    else {
-        return;
-    };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
-        "Generic function `{}` uses type variable `{typevar_name}` already bound by an enclosing scope",
-        function_node.name,
-    ));
-    diagnostic.set_primary_message(format_args!(
-        "`{typevar_name}` used in function definition here"
+        "`{typevar_name}` used in {kind} definition here"
     ));
     let Some(other_definition) = other_typevar.binding_context(db).definition() else {
         return;
