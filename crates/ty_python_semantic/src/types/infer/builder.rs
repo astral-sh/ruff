@@ -1175,7 +1175,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     }
                 },
-                Ok(_) => {
+                Ok(mro) => {
                     disjoint_bases.remove_redundant_entries(self.db());
 
                     if disjoint_bases.len() > 1 {
@@ -1185,6 +1185,63 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Some(class_node.bases()),
                             &disjoint_bases,
                         );
+                    }
+
+                    // Check for inconsistent specializations of the same generic
+                    // base class. This detects when a class explicitly inherits
+                    // from a generic class that also appears elsewhere in the MRO
+                    // with a different specialization. For example:
+                    //
+                    //   class Grandparent(Generic[T1, T2]): ...
+                    //   class Parent(Grandparent[T1, T2]): ...
+                    //   class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...  # Error
+                    //
+                    // We only flag when one of the conflicting entries is an
+                    // explicit base, to avoid false positives from deep MRO
+                    // conflicts in built-in type hierarchies.
+                    {
+                        let explicit_generic_bases: FxHashMap<
+                            StaticClassLiteral<'db>,
+                            ClassType<'db>,
+                        > = class
+                            .explicit_bases(self.db())
+                            .iter()
+                            .filter_map(|base| {
+                                if let Type::GenericAlias(generic) = base {
+                                    Some((generic.origin(self.db()), ClassType::Generic(*generic)))
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+
+                        if !explicit_generic_bases.is_empty() {
+                            for base in mro.iter().skip(1) {
+                                let ClassBase::Class(class_type) = base else {
+                                    continue;
+                                };
+                                let Some((literal, Some(_))) =
+                                    class_type.static_class_literal(self.db())
+                                else {
+                                    continue;
+                                };
+                                if let Some(&expected) = explicit_generic_bases.get(&literal) {
+                                    if expected != *class_type {
+                                        if let Some(builder) = self
+                                            .context
+                                            .report_lint(&INVALID_GENERIC_CLASS, class_node)
+                                        {
+                                            builder.into_diagnostic(format_args!(
+                                                "Cannot inherit from class `{}` with \
+                                                inconsistent type argument ordering",
+                                                literal.name(self.db()),
+                                            ));
+                                        }
+                                        break;
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

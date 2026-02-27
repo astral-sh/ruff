@@ -135,6 +135,30 @@ reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecialized))
 reveal_type(generic_context(ExplicitInheritedGenericPartiallySpecializedExtraTypevar))
 ```
 
+When inheriting from the same generic ancestor through multiple paths, the type argument ordering
+must be consistent. It is an error for a class to explicitly inherit from a generic base class that
+also appears elsewhere in the MRO with a different specialization:
+
+```py
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+
+class Grandparent(Generic[T1, T2]): ...
+class Parent(Grandparent[T1, T2]): ...
+
+# Consistent ordering is fine:
+class GoodChild(Parent[T1, T2], Grandparent[T1, T2]): ...
+
+# error: [invalid-generic-class] "Cannot inherit from class `Grandparent` with inconsistent type argument ordering"
+class BadChild(Parent[T1, T2], Grandparent[T2, T1]): ...
+
+# The same applies when the explicit base is partially specialized differently:
+class Parent2(Grandparent[T1, T2]): ...
+
+# error: [invalid-generic-class] "Cannot inherit from class `Grandparent` with inconsistent type argument ordering"
+class BadChild2(Parent2[T1, T2], Grandparent[T2, int]): ...
+```
+
 ## Specializing generic classes explicitly
 
 The type parameter can be specified explicitly:
