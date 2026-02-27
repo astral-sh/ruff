@@ -1257,7 +1257,7 @@
         },
         "shadowed-type-variable": {
           "title": "detects type variables that shadow type variables from outer scopes",
-          "description": "## What it does\nChecks for type variables in nested generic classes or functions that shadow type variables\nfrom an enclosing scope.\n\n## Why is this bad?\nA type variable defined in an inner scope should not shadow one from an outer scope.\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n```python\nclass Outer[T]:\n    # Error: `T` is already used by `Outer`\n    class Inner[T]: ...\n\n    # Error: `T` is already used by `Outer`\n    def method[T](self, x: T) -> T: ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "description": "## What it does\nChecks for type variables in nested generic classes or functions that shadow type variables\nfrom an enclosing scope.\n\n## Why is this bad?\nShadowing type variables makes the code confusing and is disallowed by the typing spec.\n\n## Examples\n```python\nclass Outer[T]:\n    # Error: `T` is already used by `Outer`\n    class Inner[T]: ...\n\n    # Error: `T` is already used by `Outer`\n    def method[T](self, x: T) -> T: ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
           "default": "error",
           "oneOf": [
             {

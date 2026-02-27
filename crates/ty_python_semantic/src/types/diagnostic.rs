@@ -2736,7 +2736,6 @@ declare_lint! {
     /// from an enclosing scope.
     ///
     /// ## Why is this bad?
-    /// A type variable defined in an inner scope should not shadow one from an outer scope.
     /// Shadowing type variables makes the code confusing and is disallowed by the typing spec.
     ///
     /// ## Examples
@@ -2753,7 +2752,7 @@ declare_lint! {
     /// - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
     pub(crate) static SHADOWED_TYPE_VARIABLE = {
         summary: "detects type variables that shadow type variables from outer scopes",
-        status: LintStatus::stable("0.0.1-alpha.1"),
+        status: LintStatus::stable("0.0.20"),
         default_level: Level::Error,
     }
 }
