@@ -509,7 +509,7 @@ and preferably near the top of the file:
 # ruff: ignore-all[F401, ARG001]
 ```
 
-The full-level suppression comment specification is as follows:
+The full file-level suppression comment specification is as follows:
 
 - An own-line comment starting with case sensitive `#ruff:`, with optional whitespace
   after the `#` symbol and `:` symbol, followed by `ignore-all[`, any codes to
